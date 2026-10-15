@@ -462,6 +462,11 @@
   list-style: none;
 }
 
+/* The mode switch sits above the mounted panels inside the same card. */
+.addModes {
+  margin-bottom: 2px;
+}
+
 /* Nested in a card that already carries the module chrome. */
 .addCard .editor,
 .setupCard .editor {

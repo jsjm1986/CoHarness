@@ -170,6 +170,14 @@ async function mountSection(
   return { ...scripted, controller }
 }
 
+/** Reach the custom-provider card through the unified add entry. */
+function openCustomCard(): void {
+  fireEvent.click(screen.getByRole('button', { name: en.add }))
+  // Both modes offered → the card opens on catalog; switch to the custom tab.
+  const tab = screen.queryByRole('tab', { name: en.addModeCustom })
+  if (tab !== null) fireEvent.click(tab)
+}
+
 /** Open the editor of one configured row and expand its customized fold. */
 function openEditor(provider: string): void {
   const row = screen.getByText(provider).closest('li')
@@ -1322,7 +1330,7 @@ describe('hand-declared providers', () => {
   it('closes the create card when an existing row is opened for editing', async () => {
     await mountSection({ providers: { openai: { baseURL: 'https://proxy.example/v1' } } })
 
-    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    openCustomCard()
     expect(screen.getByText(en.customTitle)).toBeTruthy()
 
     // Two cards at once would each be closable by the other: whichever one is
@@ -1334,12 +1342,12 @@ describe('hand-declared providers', () => {
   it('reaches the card from the section and returns to the button on cancel', async () => {
     await mountSection()
 
-    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    openCustomCard()
     expect(screen.getByText(en.customTitle)).toBeTruthy()
 
     fireEvent.click(screen.getByText(en.cancel))
     await waitFor(() => { expect(screen.queryByText(en.customTitle)).toBeNull() })
-    expect(screen.getByRole('button', { name: en.customAdd })).toBeTruthy()
+    expect(screen.getByRole('button', { name: en.add })).toBeTruthy()
   })
 
   it('forwards a caller-supplied provider id pattern to the create card', async () => {
@@ -1348,7 +1356,7 @@ describe('hand-declared providers', () => {
       providerIdPattern: /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/,
     })
 
-    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    openCustomCard()
     fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
     expect(screen.getByText(en.customRouteInvalid)).toBeTruthy()
     fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'org-primary' } })
@@ -1545,7 +1553,7 @@ describe('API key field', () => {
     const { controller, mutate } = await mountSection()
     const load = vi.spyOn(controller, 'load')
 
-    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    openCustomCard()
     fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
     fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: 'https://acme.test/v1' } })
     fireEvent.click(screen.getByRole('button', { name: en.addModel }))

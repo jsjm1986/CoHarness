@@ -15,7 +15,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
-import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconPlusOutline16, Modal, SegmentedTabs } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from './slot-contract.ts'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -145,7 +145,13 @@ export async function removeProviderProfile(
     // to retry the idempotent operation instead of the row silently staying.
     return messageOf(error)
   }
-  await controller.load()
+  try {
+    await controller.load()
+  } catch (error) {
+    // The removal committed but the refresh rejected: report it so the row's
+    // stale presence is not mistaken for a failed delete.
+    return messageOf(error)
+  }
   return undefined
 }
 
@@ -267,23 +273,34 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     () => controller.store.getSnapshot(),
     () => controller.store.getSnapshot(),
   )
+  /** A new or failed surface waits for a current snapshot; background refreshes preserve its drafts. */
+  const [hasReadySnapshot, setHasReadySnapshot] = useState(state.status === 'ready')
+  if (state.status === 'ready' && !hasReadySnapshot) setHasReadySnapshot(true)
+  if (state.status === 'error' && hasReadySnapshot) setHasReadySnapshot(false)
   const projectUnavailable = projectRequested && (binding === undefined
     || state.error === 'project-model-settings-unsupported'
     || state.error === 'project-model-settings-unavailable')
   const [editing, setEditing] = useState<EditorTarget | undefined>(undefined)
-  const [adding, setAdding] = useState(false)
+  /** The add card's active mode; `undefined` while the card is closed. */
+  const [addMode, setAddMode] = useState<'adopt' | 'custom' | undefined>(undefined)
+  /** The modes shown since the add card opened; each keeps its panel mounted. */
+  const [visitedModes, setVisitedModes] = useState<ReadonlySet<'adopt' | 'custom'>>(() => new Set())
+  /** The adopt-mode draft: which dormant route the user is configuring. */
+  const [adoptDraft, setAdoptDraft] = useState<EditorTarget | undefined>(undefined)
+  /** In-flight writes reported by each mounted add panel; either one locks the mode switch. */
+  const [cardBusy, setCardBusy] = useState({ adopt: false, custom: false })
   const [deleteTarget, setDeleteTarget] = useState<EditorTarget | undefined>(undefined)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailure, setDeleteFailure] = useState<string | undefined>(undefined)
   const [savedTarget, setSavedTarget] = useState<ProviderIdentity | undefined>(undefined)
-  const [declaring, setDeclaring] = useState(false)
   const [dismissedSetup, setDismissedSetup] = useState<ReadonlySet<string>>(() => new Set())
 
   useEffect(() => {
     setEditing(undefined)
-    setAdding(false)
+    setAddMode(undefined)
+    setVisitedModes(new Set())
+    setAdoptDraft(undefined)
     setDeleteTarget(undefined)
-    setDeclaring(false)
     setDismissedSetup(new Set())
   }, [managementScope, projectId])
 
@@ -291,14 +308,29 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     // Announced only once the refreshed directory is in the snapshot the
     // notice reads its name from: an apply can rename the route, and the
     // target captured when the card opened still carries the old name.
-    void controller.load().then(() => { setSavedTarget(target) })
+    // A refresh failure already published its error surface; there is no
+    // saved notice to announce without the refreshed directory it names.
+    void controller.load().then(() => { setSavedTarget(target) }).catch(() => {})
   }
+
+  /** Fire-and-forget refresh: the snapshot publishes whatever the caller cannot act on. */
+  const refresh = (): void => { void controller.load().catch(() => {}) }
 
   const closeEditor = (changed: boolean, target: ProviderIdentity): void => {
     setEditing(undefined)
-    setAdding(false)
-    setDeclaring(false)
     if (changed) announceSaved(target)
+  }
+
+  /**
+   * Close the add card, discarding every mounted mode's draft. A committed
+   * panel refreshes the directory before the card's identity is announced.
+   */
+  const closeAddCard = (changed: boolean, target: ProviderIdentity | undefined): void => {
+    setAddMode(undefined)
+    setVisitedModes(new Set())
+    setAdoptDraft(undefined)
+    setCardBusy({ adopt: false, custom: false })
+    if (changed && target !== undefined) announceSaved(target)
   }
 
   /**
@@ -343,16 +375,24 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
       </div>
     )
   }
-  if (state.status === 'idle') void controller.load()
+  if (state.status === 'idle') refresh()
   if (state.status === 'error') {
     /* v8 ignore next -- an error status always carries text; the fallback satisfies the nullable type */
     const errorText = state.error ?? ''
     return (
       <div className={styles['section']}>
         <p className={styles['error']}>{`${t('loadFailed')}: ${errorText}`}</p>
-        <button type="button" className={styles['secondaryButton']} onClick={() => { void controller.load() }}>
+        <button type="button" className={styles['secondaryButton']} onClick={refresh}>
           {t('retry')}
         </button>
+      </div>
+    )
+  }
+  if (!hasReadySnapshot && state.status !== 'ready') {
+    return (
+      <div className={styles['section']}>
+        <h2 className={styles['title']}>{managementScope === 'project' ? t('projectTitle') : t('title')}</h2>
+        <p className={styles['intro']}>{managementScope === 'project' ? t('projectIntro') : t('intro')}</p>
       </div>
     )
   }
@@ -381,7 +421,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   // personal directory may still expose dormant adapter routes, but when no
   // such route is addable there is no valid target for the generic action.
   const canAdoptProvider = addable.length > 0
-  const addTarget = adding ? editing : undefined
+  const addTarget = addMode === 'adopt' || visitedModes.has('adopt') ? adoptDraft : undefined
   const addRow = addTarget === undefined
     ? undefined
     : addable.find(row => row.entry.provider === addTarget.provider)
@@ -390,6 +430,34 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   // one whose schema names the protocols one may speak; without it mounted
   // there is nothing to declare and the entry point stays disabled.
   const protocols = protocolChoices(state.namespaces.get('llm-pi-ai'), schema)
+
+  // Each add mode is offered while its precondition holds: adopt needs a
+  // dormant adapter route, custom needs the pi-ai namespace's protocol list.
+  const adoptOffered = canAdoptProvider
+  const customOffered = protocols.length > 0
+  /** An in-flight write in either mounted panel locks the mode switch. */
+  const switchLocked = cardBusy.adopt || cardBusy.custom
+
+  /** Open the add card on one mode, or switch modes keeping every visited panel mounted. */
+  const openAdd = (mode: 'adopt' | 'custom'): void => {
+    if (controller.store.getSnapshot().status !== 'ready') return
+    setSavedTarget(undefined)
+    setEditing(undefined)
+    if (mode === 'adopt') {
+      const first = addable[0]
+      if (first === undefined) return
+      // The draft survives a directory refresh: the row may be adopted or
+      // withdrawn elsewhere while the card holds the captured target.
+      setAdoptDraft(draft => draft ?? targetOf(first, managementScope, projectId))
+    }
+    setAddMode(mode)
+    setVisitedModes(visited => new Set(visited).add(mode))
+  }
+
+  /** One panel's busy reporter; the latest value replaces the mode's slot. */
+  const busyReporter = (mode: 'adopt' | 'custom') => (busy: boolean): void => {
+    setCardBusy(previous => previous[mode] === busy ? previous : { ...previous, [mode]: busy })
+  }
 
   return (
     <div className={styles['section']}>
@@ -475,7 +543,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
               </li>
             )
           }
-          const open = !adding && editing?.provider === row.entry.provider
+          const open = editing?.provider === row.entry.provider
           const credentialConfigured = row.credential?.configured === true
           const credentialMissing = !credentialConfigured
             && row.apiKeyEnv !== undefined
@@ -516,13 +584,15 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                     type="button"
                     className={styles['secondaryButton']}
                     aria-label={providerCopy(t('editProvider'), target)}
+                    disabled={!open && state.status !== 'ready'}
                     onClick={() => {
+                      if (!open && controller.store.getSnapshot().status !== 'ready') return
                       setSavedTarget(undefined)
-                      // One card at a time: leaving `declaring` set would show
-                      // the create card beside this editor, and closing either
-                      // one discards the other's draft.
-                      setDeclaring(false)
-                      setAdding(false)
+                      // One card at a time: an open add card closes with its
+                      // drafts, and closing either card discards the other's.
+                      setAddMode(undefined)
+                      setVisitedModes(new Set())
+                      setAdoptDraft(undefined)
                       setEditing(open ? undefined : target)
                     }}
                   >
@@ -534,8 +604,9 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                         type="button"
                         className={styles['dangerButton']}
                         aria-label={providerCopy(t('removeProvider'), target)}
-                        disabled={!state.writable}
+                        disabled={!state.writable || state.status !== 'ready'}
                         onClick={() => {
+                          if (controller.store.getSnapshot().status !== 'ready') return
                           setSavedTarget(undefined)
                           setDeleteFailure(undefined)
                           setDeleteTarget(target)
@@ -571,119 +642,130 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
         })}
       </ul>
       <div className={styles['addBlock']}>
-        {addTarget !== undefined && addNamespace !== undefined
+        {addMode === undefined
           ? (
-            <div className={styles['addCard']}>
-              <div className={styles['field']}>
-                <span className={styles['fieldLabel']}>{t('provider')}</span>
-                <select
-                  className={`${styles['input']} ${styles['selectInput']}`}
-                  value={addTarget.provider}
-                  aria-label={t('provider')}
-                  onChange={(event) => {
-                    const row = addable.find(candidate => candidate.entry.provider === event.target.value)
-                    /* v8 ignore next -- the select only lists addable rows */
-                    if (row === undefined) return
-                    setEditing(targetOf(row, managementScope, projectId))
-                  }}
-                >
-                  {addable.map(row => (
-                    <option key={row.entry.provider} value={row.entry.provider}>{row.entry.displayName}</option>
-                  ))}
-                </select>
-              </div>
-              <ProviderEditor
-                key={addTarget.provider}
-                provider={addTarget.provider}
-                displayName={addTarget.displayName}
-                hideTitle
-                namespace={addNamespace}
-                schema={schema}
-                settingsPath={addTarget.settingsPath}
-                api={api}
-                discoverModels={discoverModels}
-                t={t}
-                readOnly={!state.writable}
-                credentialScope={managementScope}
-                {...projectId === undefined ? {} : { projectId }}
-                onClose={(changed) => { closeEditor(changed, addTarget) }}
-              />
-              {addRow === undefined
-                ? null
-                : renderSlot(
-                  'settings.models.provider-card',
-                  { provider: addRow.entry, configured: addRow.configured, keyConfigured: keyConfiguredOf(addRow) },
-                  { entryKey: addRow.entry.settingsNs },
-                )}
+            // One entry point opens the add card on whichever mode fits;
+            // the card itself offers both modes while both are offered.
+            <div className={`${styles['addActions']} ${styles['addActionsSingle']}`}>
+              <button
+                type="button"
+                className={`${styles['addButton']} ${styles['addButtonFull']}`}
+                disabled={(!adoptOffered && !customOffered) || !state.writable || state.status !== 'ready'}
+                onClick={() => { openAdd(adoptOffered ? 'adopt' : 'custom') }}
+              >
+                {/* Same glyph as the composer's attach button. */}
+                <IconPlusOutline16 size={14} />
+                {t('add')}
+              </button>
             </div>
           )
-          : declaring
-            ? (
-              <div className={styles['addCard']}>
-                <CustomProviderCard
-                  taken={scopedRows.map(row => row.entry.provider)}
-                  protocols={protocols}
-                  {...(managementScope === 'project'
-                    ? { routePattern: PROJECT_PROVIDER_PATTERN }
-                    : injected.providerIdPattern === undefined
-                      ? {}
-                      : { routePattern: injected.providerIdPattern })}
-                  /* v8 ignore next -- the card only opens from a button disabled without this namespace */
-                  revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
-                  api={api}
-                  discoverModels={discoverModels}
-                  t={t}
-                  readOnly={!state.writable}
-                  credentialScope={managementScope}
-                  {...projectId === undefined ? {} : { projectId }}
-                  onClose={(changed) => {
-                    setDeclaring(false)
-                    if (changed) void controller.load()
-                  }}
-                />
-              </div>
-            )
-            : (
-              // When a dormant adapter route exists, the user can adopt it or
-              // declare a new route. Organization facades expose only the
-              // latter, so do not paint an unreachable disabled sibling.
-              <div className={`${styles['addActions']} ${canAdoptProvider ? '' : styles['addActionsSingle']}`}>
-                {canAdoptProvider && (
-                  <button
-                    type="button"
-                    className={styles['addButton']}
-                    disabled={!state.writable}
-                    onClick={() => {
-                      const first = addable[0]
-                      /* v8 ignore next -- the button is rendered only while an entry is addable */
-                      if (first === undefined) return
-                      setSavedTarget(undefined)
-                      setDeclaring(false)
-                      setAdding(true)
-                      setEditing(targetOf(first, managementScope, projectId))
+          : (
+            <div className={styles['addCard']}>
+              {adoptOffered && customOffered
+                ? (
+                  <SegmentedTabs
+                    items={[
+                      { value: 'adopt' as const, label: t('addModeAdopt'), id: 'models-add-adopt', panelId: 'models-add-adopt-panel' },
+                      { value: 'custom' as const, label: t('addModeCustom'), id: 'models-add-custom', panelId: 'models-add-custom-panel' },
+                    ]}
+                    value={addMode}
+                    onChange={(mode) => {
+                      if (switchLocked) return
+                      openAdd(mode)
                     }}
-                  >
-                    {/* Same glyph as the composer's attach button. */}
-                    <IconPlusOutline16 size={14} />
-                    {t('add')}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className={`${styles['addButton']} ${canAdoptProvider ? '' : styles['addButtonFull']}`}
-                  disabled={protocols.length === 0 || !state.writable}
-                  onClick={() => {
-                    setSavedTarget(undefined)
-                    setAdding(false)
-                    setEditing(undefined)
-                    setDeclaring(true)
-                  }}
-                >
-                  <IconPlusOutline16 size={14} />
-                  {t('customAdd')}
-                </button>
-              </div>
-            )}
+                    label={t('add')}
+                    className={styles['addModes']}
+                  />
+                )
+                : null}
+              {visitedModes.has('adopt')
+                ? (
+                  <div id="models-add-adopt-panel" role="tabpanel" aria-labelledby="models-add-adopt" hidden={addMode !== 'adopt'}>
+                    {addTarget === undefined
+                      ? null
+                      : (
+                        <>
+                          <div className={styles['field']}>
+                            <span className={styles['fieldLabel']}>{t('provider')}</span>
+                            <select
+                              className={`${styles['input']} ${styles['selectInput']}`}
+                              value={addTarget.provider}
+                              aria-label={t('provider')}
+                              onChange={(event) => {
+                                const row = addable.find(candidate => candidate.entry.provider === event.target.value)
+                                /* v8 ignore next -- the select only lists addable rows */
+                                if (row === undefined) return
+                                setAdoptDraft(targetOf(row, managementScope, projectId))
+                              }}
+                            >
+                              {addable.map(row => (
+                                <option key={row.entry.provider} value={row.entry.provider}>{row.entry.displayName}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {addNamespace === undefined
+                            ? null
+                            : (
+                              <ProviderEditor
+                                key={addTarget.provider}
+                                provider={addTarget.provider}
+                                displayName={addTarget.displayName}
+                                hideTitle
+                                namespace={addNamespace}
+                                schema={schema}
+                                settingsPath={addTarget.settingsPath}
+                                api={api}
+                                discoverModels={discoverModels}
+                                t={t}
+                                readOnly={!state.writable}
+                                credentialScope={managementScope}
+                                {...projectId === undefined ? {} : { projectId }}
+                                onClose={(changed) => { closeAddCard(changed, addTarget) }}
+                                onBusyChange={busyReporter('adopt')}
+                              />
+                            )}
+                          {addRow === undefined
+                            ? null
+                            : renderSlot(
+                              'settings.models.provider-card',
+                              { provider: addRow.entry, configured: addRow.configured, keyConfigured: keyConfiguredOf(addRow) },
+                              { entryKey: addRow.entry.settingsNs },
+                            )}
+                        </>
+                      )}
+                  </div>
+                )
+                : null}
+              {visitedModes.has('custom')
+                ? (
+                  <div id="models-add-custom-panel" role="tabpanel" aria-labelledby="models-add-custom" hidden={addMode !== 'custom'}>
+                    <CustomProviderCard
+                      taken={scopedRows.map(row => row.entry.provider)}
+                      protocols={protocols}
+                      {...(managementScope === 'project'
+                        ? { routePattern: PROJECT_PROVIDER_PATTERN }
+                        : injected.providerIdPattern === undefined
+                          ? {}
+                          : { routePattern: injected.providerIdPattern })}
+                      /* v8 ignore next -- the card only opens from a mode offered only with this namespace */
+                      revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
+                      api={api}
+                      discoverModels={discoverModels}
+                      t={t}
+                      readOnly={!state.writable}
+                      credentialScope={managementScope}
+                      {...projectId === undefined ? {} : { projectId }}
+                      onClose={(changed) => {
+                        closeAddCard(false, undefined)
+                        if (changed) refresh()
+                      }}
+                      onBusyChange={busyReporter('custom')}
+                    />
+                  </div>
+                )
+                : null}
+            </div>
+          )}
       </div>
       {renderSlot('settings.models.footer', {})}
       <Modal

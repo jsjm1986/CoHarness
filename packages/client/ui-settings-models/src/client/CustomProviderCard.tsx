@@ -19,7 +19,7 @@
  * canonical levels and any gateway-specific wire spellings.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { apiKeyFailure } from './apiKey.ts'
@@ -72,6 +72,8 @@ export interface CustomProviderCardProps {
   routePattern?: RegExp
   /** Close the card; `changed` reports whether a provider was created. */
   onClose: (changed: boolean) => void
+  /** Report the card's in-flight write so a surrounding mode switch can lock. */
+  onBusyChange?: (busy: boolean) => void
 }
 
 /**
@@ -91,6 +93,8 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const [keyDraft, setKeyDraft] = useState('')
   const [models, setModels] = useState<readonly ModelDraft[]>([])
   const [busy, setBusy] = useState(false)
+  const { onBusyChange } = props
+  useEffect(() => { onBusyChange?.(busy) }, [busy, onBusyChange])
   const [failure, setFailure] = useState<string | undefined>(undefined)
   /**
    * The profile write landed. Only the key write can still be outstanding, so

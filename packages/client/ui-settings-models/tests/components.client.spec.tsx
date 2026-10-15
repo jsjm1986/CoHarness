@@ -43,6 +43,7 @@ function capacityInputs(label: string): HTMLInputElement[] {
 const PiAiConfig = Schema.object({
   providers: Schema.dict(Schema.object({
     apiKeyEnv: Schema.string().role('credential-ref'),
+    api: Schema.union(['openai-completions', 'openai-responses']),
     baseURL: Schema.string(),
     reasoning: Schema.union(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']),
     headers: Schema.dict(Schema.string()),
@@ -322,8 +323,7 @@ describe('ModelsSection', () => {
     expect(screen.queryByRole('heading', { name: en.organizationTitle })).toBeNull()
     expect(screen.queryByText('openai')).toBeNull()
     expect(screen.queryByText('DeepSeek')).toBeNull()
-    expect(screen.queryByRole('button', { name: en.add })).toBeNull()
-    expect(screen.getByRole('button', { name: en.customAdd })).toBeTruthy()
+    expect(screen.getByRole('button', { name: en.add })).toBeTruthy()
   })
 
   it('renders the unkeyed whole-section provider as an open setup card in the first-run posture', async () => {
@@ -1414,6 +1414,36 @@ describe('ModelsSection', () => {
     fireEvent.click(screen.getByText(en.cancel))
     await screen.findByText(en.add)
     expect(screen.queryByLabelText(en.provider)).toBeNull()
+  })
+
+  it('keeps both mode drafts while switching between catalog and custom', async () => {
+    await mountSection()
+    fireEvent.click(screen.getByText(en.add))
+    await screen.findByLabelText(en.provider)
+    fireEvent.change(screen.getByLabelText<HTMLSelectElement>(en.provider), { target: { value: 'broken' } })
+    fireEvent.click(screen.getByRole('tab', { name: en.addModeCustom }))
+    fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
+    // Back to catalog: the dormant-route draft is where the user left it.
+    fireEvent.click(screen.getByRole('tab', { name: en.addModeAdopt }))
+    expect(screen.getByLabelText<HTMLSelectElement>(en.provider).value).toBe('broken')
+    // And back: the typed route id survived the whole round trip.
+    fireEvent.click(screen.getByRole('tab', { name: en.addModeCustom }))
+    expect(screen.getByLabelText<HTMLInputElement>(en.customRoute).value).toBe('acme')
+  })
+
+  it('discards both mode drafts when the add card closes', async () => {
+    await mountSection()
+    fireEvent.click(screen.getByText(en.add))
+    await screen.findByLabelText(en.provider)
+    fireEvent.click(screen.getByRole('tab', { name: en.addModeCustom }))
+    fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
+    // Both hidden-mounted panels render a Cancel; either closes the card.
+    fireEvent.click(screen.getAllByText(en.cancel)[0] as HTMLElement)
+    await screen.findByText(en.add)
+
+    fireEvent.click(screen.getByText(en.add))
+    fireEvent.click(screen.getByRole('tab', { name: en.addModeCustom }))
+    expect(screen.getByLabelText<HTMLInputElement>(en.customRoute).value).toBe('')
   })
 
   it('collapses the setup card on cancel without disturbing another open card', async () => {
