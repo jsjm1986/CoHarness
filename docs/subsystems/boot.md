@@ -14,7 +14,7 @@ The [boot package group](../../packages/boot/README.md) owns launcher-provided p
 
 `InstallBundleOptions.enabled` defaults to true. False installs without selecting the bundle layer. `approvedBuilds` grants persistent script permission to the supplied pending package names before installation.
 
-`ChangeResult.changed` reports a disk edit independently of `application`: `applied`, `restart-required`, `overridden`, `cancelled` or `failed`. Optional `error` carries a localizable code and external diagnostic. `packageResult` records the pnpm exit code, bounded output, truncation flag and complete diagnostic log path. `pendingBuilds` lists undecided packages across the profile; `approvedBuilds` records the names granted permission by this operation.
+`ChangeResult.changed` reports a disk edit independently of `application`: `applied`, `restart-required`, `overridden`, `cancelled` or `failed`. Optional `error` carries a localizable code and external diagnostic. `packageResult` records the pnpm exit code, bounded output, truncation flag and complete diagnostic log path. `pendingBuilds` lists undecided packages across the profile; `approvedBuilds` records the names granted permission by this operation; `bundle` and `version` name the package a finished installation added and its manifest version.
 
 `PluginInstallFrame` is one private progress, log or final-result frame. `installBundleStream` requires a unique request id, admits only its own diagnostics and cancels the owned installation when its transport closes. Consumers require the final result and a clean stream end; they must not reconnect and replay an installation.
 

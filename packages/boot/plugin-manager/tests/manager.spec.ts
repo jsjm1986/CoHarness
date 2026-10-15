@@ -478,6 +478,9 @@ it('installs only valid bundle declarations and honors installation without acti
   const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async (_context, args) => {
     const name = String(args[1])
     bundle(name, [{ id: name, name: './plugin.mjs', config: { service: name } }])
+    if (name === 'another-bundle') {
+      writeFileSync(join(dir, 'node_modules', name, 'package.json'), JSON.stringify({ name, dsh: { bundle: { patch: './cordis.patch.yml' } } }))
+    }
     const manifest = readProfileManifest('test', dir)
     manifest.dependencies = { ...manifest.dependencies, [name]: '1.0.0' }
     writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
@@ -485,12 +488,14 @@ it('installs only valid bundle declarations and honors installation without acti
   })
   onTestFinished(() => { install.mockRestore() })
   expect(await manager.installBundle('new-bundle', { enabled: false })).toMatchObject({
-    changed: true, application: 'applied', stage: 'enable', target: 'new-bundle', bundle: 'new-bundle', packageResult: { exitCode: 0 },
+    changed: true, application: 'applied', stage: 'enable', target: 'new-bundle', bundle: 'new-bundle', version: '1.0.0', packageResult: { exitCode: 0 },
   })
   expect((await manager.listBundles()).find(row => row.name === 'new-bundle')?.enabled).toBe(false)
   expect(await manager.setBundleEnabled('new-bundle', true)).toMatchObject({ application: 'applied' })
   expect((await manager.listPlugins()).find(row => row.patchId === 'new-bundle')?.fiberPhase).toBe('active')
-  expect(await manager.installBundle('another-bundle')).toMatchObject({ application: 'applied' })
+  const another = await manager.installBundle('another-bundle')
+  expect(another).toMatchObject({ application: 'applied', bundle: 'another-bundle' })
+  expect(another).not.toHaveProperty('version')
   expect((await manager.listBundles()).find(row => row.name === 'another-bundle')?.enabled).toBe(true)
 })
 

@@ -36,7 +36,7 @@ Status: implemented
 
 ## 后果
 
-`inspect`、`cancelInstall` 以及 `plugin-manager/changed`、`plugin-manager/install-log`、`plugin-manager/install-state` 事件加入管理器的 Remote；`listBundles` 携带标题、行与覆盖项；`ChangeResult` 增加 `cancelled`、`bundle` 与 `packageResult.kind`；配置增加 `pnpmCommand` 与 `inspectTimeoutMs`。对话框是围绕同一张主题卡的四个画面。
+`inspect`、`cancelInstall` 以及 `plugin-manager/changed`、`plugin-manager/install-log`、`plugin-manager/install-state` 事件加入管理器的 Remote；`listBundles` 携带标题、行与覆盖项；`ChangeResult` 增加 `cancelled`、`bundle`、`version` 与 `packageResult.kind`；配置增加 `pnpmCommand` 与 `inspectTimeoutMs`。对话框是围绕同一张主题卡的四个画面。
 
 ## 测试
 

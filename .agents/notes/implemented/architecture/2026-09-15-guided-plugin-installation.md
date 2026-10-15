@@ -36,7 +36,7 @@ The install dialog put a spec straight into `pnpm add` and showed pnpm's termina
 
 ## Consequences
 
-`inspect`, `cancelInstall`, and the `plugin-manager/changed`, `plugin-manager/install-log`, and `plugin-manager/install-state` events join the manager's Remote; `listBundles` carries titles, rows, and overrides; `ChangeResult` gains `cancelled`, `bundle`, and `packageResult.kind`; the config gains `pnpmCommand` and `inspectTimeoutMs`. The dialog is four screens over one subject card.
+`inspect`, `cancelInstall`, and the `plugin-manager/changed`, `plugin-manager/install-log`, and `plugin-manager/install-state` events join the manager's Remote; `listBundles` carries titles, rows, and overrides; `ChangeResult` gains `cancelled`, `bundle`, `version`, and `packageResult.kind`; the config gains `pnpmCommand` and `inspectTimeoutMs`. The dialog is four screens over one subject card.
 
 ## Testing
 

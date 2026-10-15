@@ -1155,6 +1155,7 @@ function InstallDialog({
     : null
   // Another registry is worth offering only for a failure the Host laid at the one it asked.
   const changeable = phase === 'failed' && !approvable && install.failure?.failedAt === 'registry'
+  const subject = install.subject
   return (
     <Modal open={install.open} onClose={onClose} title={heading} headless className={css.installDialog as string}>
       <div className={css.wizard} data-install-phase={phase}>
@@ -1191,7 +1192,9 @@ function InstallDialog({
             {uncertaintyText === null ? null : <p className={css.wizardSub} role="alert">{uncertaintyText}</p>}
             {phase === 'unknown' ? <p className={css.wizardSub}>{t('installUnknownDescription')}</p> : null}
           </div>
-          {install.subject === null ? null : <SubjectCard subject={install.subject} t={t} />}
+          {subject === null
+            ? null
+            : <SubjectCard subject={phase === 'done' && install.installedVersion !== null ? { ...subject, version: install.installedVersion } : subject} t={t} />}
           {approvable
             ? (
               <section className={css.approval} role="group" aria-labelledby={approvalId} data-install-approval>
@@ -1211,6 +1214,18 @@ function InstallDialog({
             : null}
           {phase === 'done' && install.restartRequired
             ? <p className={css.resultWarn} role="status">{restartText('installDoneRestart', install.restartReason, t)}</p>
+            : null}
+          {phase === 'done' && subject?.kind === 'registry' && subject.name !== undefined && subject.version !== undefined
+            && install.installedVersion !== null && install.installedVersion !== subject.version
+            // A fallback registry can serve another release than the one inspected, so only a single-registry run is explained.
+            && (install.attempts?.registries.length ?? 1) === 1
+            ? (
+              <p className={css.resultWarn} role="status">
+                {t('installDoneOtherVersion', {
+                  installed: install.installedVersion, version: subject.version, exact: `${subject.name}@${subject.version}`,
+                })}
+              </p>
+            )
             : null}
           {phase === 'done' && install.approvedBuilds.length > 0
             ? <p className={css.result} role="status">{t('installDoneApproved', { names: install.approvedBuilds.join(', ') })}</p>
