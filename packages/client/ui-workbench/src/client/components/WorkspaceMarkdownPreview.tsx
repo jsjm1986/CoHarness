@@ -1,5 +1,6 @@
 /** Accumulated Workspace Markdown rendered over the existing authorized resource lifetime. */
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Button, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -7,8 +8,21 @@ import { isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ReadWorkspacePreview } from './WorkspaceFilePreview.tsx'
 import type {} from '../markdown/locales.ts'
+import { splitFrontmatter } from '../markdown/frontmatter.ts'
+import type { FrontmatterFieldsProps } from '../markdown/frontmatter-fields.tsx'
 import type { WorkspacePreviewResource } from './WorkspaceFileTab.tsx'
 import css from './Workbench.module.css'
+
+/** Show the verbatim frontmatter when the field-list chunk cannot load. */
+function FrontmatterFallback({ fallback }: FrontmatterFieldsProps): ReactNode {
+  return fallback
+}
+
+const FrontmatterFields = lazy(() => import('../markdown/frontmatter-fields.tsx').then(
+  module => ({ default: module.FrontmatterFields }),
+  // The failed chunk only removes the field layout; the body and verbatim metadata stay usable.
+  () => ({ default: FrontmatterFallback }),
+))
 
 /** @param path - workspace-relative filename. @returns whether the Markdown renderer handles its content. */
 export function isWorkspaceMarkdown(path: string): boolean { return /\.(?:md|markdown)$/iu.test(path) }
@@ -92,6 +106,7 @@ export function WorkspaceMarkdownPreview({ request, read, resource, markdownT, c
       toolbarLabels: { codeLabel, wrapLabel, unwrapLabel },
     }, footnotes,
   }), [copyLabel, copiedLabel, footnotes, codeLabel, wrapLabel, unwrapLabel])
+  const split = useMemo(() => splitFrontmatter(result?.text ?? ''), [result])
   const failure = error ?? metadata.error
   return <section aria-label={request.path} className={css.filePreview}>
     <div className={css.filePreviewActions}>
@@ -102,9 +117,24 @@ export function WorkspaceMarkdownPreview({ request, read, resource, markdownT, c
     {!denied && metadata.value?.changed === true && <p role="status">{labels.changed}</p>}
     {!denied && result !== undefined && (
       <div className={css.markdownDocument} data-workspace-markdown>
-        <MarkdownText text={result.text} streaming={false} labels={markdownLabels} />
+        {split === undefined ? null : <FrontmatterBox source={split.source} />}
+        <MarkdownText text={split?.body ?? result.text} streaming={false} labels={markdownLabels} />
       </div>
     )}
     {!denied && result === undefined && (pending || metadata.status === 'loading') && <p role="status">{labels.loading}</p>}
   </section>
+}
+
+/**
+ * Frame one frontmatter block and choose its field list or verbatim source.
+ * @param props - YAML between the frontmatter delimiters.
+ * @returns the metadata box; it collapses when the document has no content.
+ */
+function FrontmatterBox({ source }: { source: string }): ReactNode {
+  const verbatim = <pre className={css.frontmatterSource}>{source}</pre>
+  return (
+    <div className={css.frontmatter} data-workspace-frontmatter>
+      <Suspense fallback={verbatim}><FrontmatterFields source={source} fallback={verbatim} /></Suspense>
+    </div>
+  )
 }

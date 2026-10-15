@@ -77,7 +77,7 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await writeFile(join(workspaceDir, FILE_NAME), FIRST_CONTENT)
     const linkedLines = Array.from({ length: 32 }, (_, index) => `Line ${String(index + 1)}`)
     await writeFile(join(workspaceDir, 'links.txt'), linkedLines.join('\n'))
-    await writeFile(join(workspaceDir, 'guide.md'), '# Guide\n\nPacked **markdown** preview.\n')
+    await writeFile(join(workspaceDir, 'guide.md'), '---\nname: guide\ndescription: Packed markdown preview\n---\n\n# Guide\n\nPacked **markdown** preview.\n')
     await mkdir(join(workspaceDir, 'assets'), { recursive: true })
     await writeFile(join(workspaceDir, 'assets/app.js'), 'document.body.dataset.packed = "yes"\n')
     await writeFile(join(workspaceDir, 'page.html'), '<!doctype html><p>HTML body</p><script src="assets/app.js"></script>\n')
@@ -145,6 +145,7 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     const markdownDialog = page.getByRole('region', { name: 'guide.md', exact: true })
     await markdownDialog.locator('[data-workspace-markdown] h1').waitFor({ timeout: 15_000 })
     expect(await markdownDialog.locator('[data-workspace-markdown] h1').textContent()).toBe('Guide')
+    await markdownDialog.locator('[data-workspace-frontmatter] dl').waitFor({ timeout: 15_000 })
     const markdownSnapshot = await captureStableAria(page, 'section[aria-label="guide.md"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(MARKDOWN_EXPECTED, markdownSnapshot, MODE)
 
