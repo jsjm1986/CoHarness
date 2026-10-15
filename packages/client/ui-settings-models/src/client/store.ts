@@ -163,6 +163,8 @@ export class ModelsSettingsStore {
 
   /** Latest load wins; an older response never overwrites a newer one. */
   private generation = 0
+  /** Callers follow the current refresh's outcome, including callers whose read was superseded. */
+  private readonly pendingLoads = new Set<PromiseWithResolvers<void>>()
 
   /**
    * @param api - the wire face (credentials/llm domains, and settings writes).
@@ -179,42 +181,53 @@ export class ModelsSettingsStore {
    * settings answer in parallel, then one batched credential describe over
    * every referenced ref. Provider failure or absence of an initial settings
    * answer keeps the last good rows and surfaces an error; a failed settings
-   * refresh reuses the mirror's held view.
-   * @returns nothing; the snapshot carries the outcome.
+   * refresh reuses the mirror's held view. Concurrent callers resolve only
+   * after the current refresh publishes its ready or error snapshot.
+   * @returns resolution after the current snapshot is published.
+   * @throws the current read's unexpected rejection; superseded rejections are ignored.
    */
-  async load(): Promise<void> {
+  load(): Promise<void> {
+    const pending = Promise.withResolvers<void>()
+    this.pendingLoads.add(pending)
     const generation = ++this.generation
+    void this.read(generation).then(
+      () => { this.settleLoads(generation, (load) => { load.resolve() }) },
+      (error: unknown) => { this.settleLoads(generation, (load) => { load.reject(error) }) },
+    )
+    return pending.promise
+  }
+
+  /** Publish one joined answer; stale answers leave the current refresh in charge. */
+  private async read(generation: number): Promise<void> {
     this.store.update((s) => { s.status = 'loading'; s.error = null })
-    let providers: ConfigurableProviderView[]
-    let modelGroups: ModelProviderGroup[]
-    let modelFailures: Array<{ id: string; message: string }>
-    let writable: boolean
-    let views: readonly SettingsNamespaceView[]
+    let providersResponse: Awaited<ReturnType<IApiClient['llm']['providers']>>
+    let modelsResponse: Awaited<ReturnType<IApiClient['llm']['models']>>
     try {
-      const [providersResponse, modelsResponse] = await Promise.all([
+      ;[providersResponse, modelsResponse] = await Promise.all([
         this.api.llm.providers({}),
         this.api.llm.models({}),
         this.describeFace.ensure(),
       ])
-      if (!providersResponse.result.ok) throw new Error(providersResponse.result.error.message)
-      if (!modelsResponse.result.ok) throw new Error(modelsResponse.result.error.message)
-      const mirrored = this.describeFace.getSnapshot()
-      if (mirrored.view === undefined) {
-        throw new Error(mirrored.error ?? 'settings are unavailable in this browser')
-      }
-      providers = providersResponse.result.value.providers
-      modelGroups = modelsResponse.result.value.groups
-      modelFailures = modelsResponse.result.value.failures
-      writable = mirrored.view.writable
-      views = mirrored.view.namespaces
     } catch (error) {
-      if (generation !== this.generation) return
-      this.store.update((s) => {
-        s.status = 'error'
-        s.error = error instanceof Error ? error.message : String(error)
-      })
+      // The wire's unexpected kind still publishes a failure — the page shows
+      // its error surface instead of spinning forever — while the rejection
+      // itself reaches every waiting load() caller.
+      if (generation === this.generation) this.failLoad(messageOf(error))
+      throw error
+    }
+    if (generation !== this.generation) return
+    if (!providersResponse.result.ok) { this.failLoad(providersResponse.result.error.message); return }
+    if (!modelsResponse.result.ok) { this.failLoad(modelsResponse.result.error.message); return }
+    const mirrored = this.describeFace.getSnapshot()
+    if (mirrored.view === undefined) {
+      this.failLoad(mirrored.error ?? 'settings are unavailable in this browser')
       return
     }
+    const providers = providersResponse.result.value.providers
+    const modelGroups = modelsResponse.result.value.groups
+    const modelFailures = modelsResponse.result.value.failures
+    const writable = mirrored.view.writable
+    const views = mirrored.view.namespaces
     const namespaces = new Map(views.map(view => [view.ns, view]))
     const modelsByProvider = new Map(modelGroups.map(group => [group.id, group.models]))
     const failuresByProvider = new Map(modelFailures.map(failure => [failure.id, failure.message]))
@@ -275,6 +288,22 @@ export class ModelsSettingsStore {
         }
       })
       s.namespaces = namespaces
+    })
+  }
+
+  /** Settle callers only while this read still owns the current refresh. */
+  private settleLoads(generation: number, settle: (load: PromiseWithResolvers<void>) => void): void {
+    if (generation !== this.generation) return
+    const pending = [...this.pendingLoads]
+    this.pendingLoads.clear()
+    for (const load of pending) settle(load)
+  }
+
+  /** Publish the current joined read's failure text. */
+  private failLoad(message: string): void {
+    this.store.update((s) => {
+      s.status = 'error'
+      s.error = message
     })
   }
 }

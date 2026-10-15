@@ -277,12 +277,126 @@ describe('edge joins', () => {
     expect(store.store.getSnapshot().rows).toHaveLength(5)
   })
 
-  it('stringifies a non-Error load failure', async () => {
-    // The wire can surface non-Error throwables; the store must stringify them.
+  it('propagates a non-Error transport rejection to the caller', async () => {
+    // Business refusals arrive as `{ ok: false }`; a throw is the wire's
+    // unexpected kind and reaches the caller as the rejection reason.
     const { face, mirror } = api({ providers: async () => { throw 'plain refusal' } })
     const store = new ModelsSettingsStore(face, settingsSchema, mirror)
-    await store.load()
+    await expect(store.load()).rejects.toBe('plain refusal')
     expect(store.store.getSnapshot()).toMatchObject({ status: 'error', error: 'plain refusal' })
+  })
+
+  it('keeps superseded callers pending until the latest joined snapshot is published', async () => {
+    const firstRead = Promise.withResolvers<undefined>()
+    const latestRead = Promise.withResolvers<undefined>()
+    const firstStarted = Promise.withResolvers<undefined>()
+    const latestStarted = Promise.withResolvers<undefined>()
+    let calls = 0
+    const { face, mirror } = api({ describeCredentials: () => {
+      calls += 1
+      const gate = calls === 1 ? firstRead : latestRead
+      const started = calls === 1 ? firstStarted : latestStarted
+      started.resolve(undefined)
+      return gate.promise.then(() => ok({ credentials: {} }))
+    } })
+    const store = new ModelsSettingsStore(face, settingsSchema, mirror)
+    let firstSettled = false
+    const first = store.load().then(() => { firstSettled = true })
+    await firstStarted.promise
+    const latest = store.load()
+    await latestStarted.promise
+    try {
+      firstRead.resolve(undefined)
+      await new Promise<void>((resolve) => { setImmediate(resolve) })
+      expect(firstSettled).toBe(false)
+      expect(store.store.getSnapshot().status).toBe('loading')
+      latestRead.resolve(undefined)
+      await Promise.all([first, latest])
+      expect(firstSettled).toBe(true)
+      expect(store.store.getSnapshot().status).toBe('ready')
+    } finally {
+      firstRead.resolve(undefined)
+      latestRead.resolve(undefined)
+      await Promise.all([first, latest])
+    }
+  })
+
+  it('settles callers after the latest credential refusal without waiting for an obsolete read', async () => {
+    const obsoleteRead = Promise.withResolvers<undefined>()
+    const latestRead = Promise.withResolvers<undefined>()
+    const obsoleteStarted = Promise.withResolvers<undefined>()
+    const latestStarted = Promise.withResolvers<undefined>()
+    let calls = 0
+    const { face, mirror } = api({ describeCredentials: () => {
+      calls += 1
+      const call = calls
+      const gate = calls === 1 ? obsoleteRead : latestRead
+      const started = calls === 1 ? obsoleteStarted : latestStarted
+      started.resolve(undefined)
+      return gate.promise.then(() => call === 2 ? fail('latest credentials unavailable') : ok({ credentials: {} }))
+    } })
+    const store = new ModelsSettingsStore(face, settingsSchema, mirror)
+    let obsoleteSettled = false
+    const obsolete = store.load().then(() => { obsoleteSettled = true })
+    await obsoleteStarted.promise
+    const latest = store.load()
+    await latestStarted.promise
+    try {
+      latestRead.resolve(undefined)
+      await latest
+      await new Promise<void>((resolve) => { setImmediate(resolve) })
+      expect(obsoleteSettled).toBe(true)
+      expect(store.store.getSnapshot()).toMatchObject({ status: 'ready', credentialError: 'latest credentials unavailable' })
+      obsoleteRead.reject(new Error('obsolete transport unavailable'))
+      await Promise.allSettled([obsoleteRead.promise])
+      await new Promise<void>((resolve) => { setImmediate(resolve) })
+      expect(store.store.getSnapshot()).toMatchObject({ status: 'ready', credentialError: 'latest credentials unavailable' })
+    } finally {
+      obsoleteRead.resolve(undefined)
+      latestRead.resolve(undefined)
+      await Promise.all([obsolete, latest])
+    }
+  })
+
+  it('propagates the latest unexpected rejection to every waiting caller', async () => {
+    const obsoleteRead = Promise.withResolvers<undefined>()
+    const latestRead = Promise.withResolvers<undefined>()
+    const obsoleteStarted = Promise.withResolvers<undefined>()
+    const latestStarted = Promise.withResolvers<undefined>()
+    let calls = 0
+    // The directory call sits in the read's first stage: its rejection is the
+    // wire's unexpected kind (credential rejections degrade by design).
+    const { face, mirror } = api({ providers: () => {
+      calls += 1
+      const gate = calls === 1 ? obsoleteRead : latestRead
+      const started = calls === 1 ? obsoleteStarted : latestStarted
+      started.resolve(undefined)
+      return gate.promise.then(() => ok({ providers: DIRECTORY }))
+    } })
+    const store = new ModelsSettingsStore(face, settingsSchema, mirror)
+    let firstSettlement: PromiseSettledResult<void> | undefined
+    const first = store.load()
+    const firstObserved = Promise.allSettled([first]).then(([settlement]) => { firstSettlement = settlement })
+    await obsoleteStarted.promise
+    const second = store.load()
+    await latestStarted.promise
+    const latestSettlement = Promise.allSettled([second])
+    const rejection = new Error('latest transport unavailable')
+    try {
+      latestRead.reject(rejection)
+      expect(await latestSettlement).toEqual([{ status: 'rejected', reason: rejection }])
+      await new Promise<void>((resolve) => { setImmediate(resolve) })
+      expect(firstSettlement).toEqual({ status: 'rejected', reason: rejection })
+      obsoleteRead.reject(new Error('obsolete transport unavailable'))
+      await Promise.allSettled([obsoleteRead.promise])
+      await new Promise<void>((resolve) => { setImmediate(resolve) })
+      expect(store.store.getSnapshot()).toMatchObject({ status: 'error', error: 'latest transport unavailable' })
+    } finally {
+      obsoleteRead.resolve(undefined)
+      latestRead.resolve(undefined)
+      await firstObserved
+      await latestSettlement
+    }
   })
 
   it('drops a stale successful response after a newer load finished', async () => {

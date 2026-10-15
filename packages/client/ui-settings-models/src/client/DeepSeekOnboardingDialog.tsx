@@ -59,7 +59,8 @@ export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): 
   const readiness = onboardingReadiness(state)
 
   useEffect(() => {
-    if (state.status === 'idle') void controller.load()
+    // The snapshot publishes a refresh failure; this trigger has nothing to add.
+    if (state.status === 'idle') void controller.load().catch(() => {})
   }, [controller, state.status])
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): 
       complete()
       return
     }
-    void controller.load()
+    void controller.load().catch(() => {})
   }
 
   return (

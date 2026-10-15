@@ -48,7 +48,8 @@ export type { ModelsSettingsState, ProviderRow } from './store.ts'
  */
 export function refreshIfLoaded(controller: ModelsSettingsStore): void {
   if (controller.store.getSnapshot().status === 'idle') return
-  void controller.load()
+  // The snapshot publishes a refresh failure; the trigger has nothing to add.
+  void controller.load().catch(() => {})
 }
 
 /**
@@ -132,7 +133,7 @@ export function apply(ctx: ClientContext): void {
           // inside the refresh chain instead of creating an unhandled promise.
           void bridge.refresh()
             .catch(() => undefined)
-            .then(() => { void projectController.load() })
+            .then(() => projectController.load().catch(() => {}))
         }
       }
     }
