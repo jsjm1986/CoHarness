@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { chromium, type Page } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { launchWebScaffold, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode } from './scaffold.ts'
@@ -210,6 +210,10 @@ it('reports bootstrap rebuilds without remounting the settings page or navigatin
     const originalInput = await draft.elementHandle()
     let navigations = 0
     page.on('framenavigated', () => { navigations++ })
+    const clientPath = scaffold.ctx.clientModules.clientPath('@deepseek-ai/dsh-client-modules')!
+    const originalStat = await stat(clientPath)
+    onTestFinished(() => utimes(clientPath, originalStat.atime, originalStat.mtime))
+    await utimes(clientPath, originalStat.atime, new Date(originalStat.mtimeMs + 1_000))
     scaffold.ctx.clientModules.rebuilt('@deepseek-ai/dsh-client-modules')
     const failure = page.locator('[data-client-sync-failure]')
     await failure.getByText(/replacing bootstrap module .* requires a page reload/).waitFor()

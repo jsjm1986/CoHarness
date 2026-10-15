@@ -1,5 +1,6 @@
 /** Node-half composition diagnostics for package metadata and built client bundles. */
 
+import { Hash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SourceMap } from 'node:module'
@@ -431,7 +432,7 @@ describe('client bundle activation', () => {
     emitLoaderEntryChange(context, packageName)
     await Promise.resolve()
     expect(service.graph().entries.map(entry => entry.id)).toEqual([packageName])
-    expect(service.graph().entries[0]!.rev).not.toBe(firstRevision)
+    expect(service.graph().entries[0]!.rev).toBe(firstRevision)
     expect(service.clientPath(packageName)).toBe(clientPath)
   })
 
@@ -667,26 +668,104 @@ describe('client bundle activation', () => {
     expect((await routeRequest(route, third)).status).toBe(200)
   })
 
-  it('assigns opaque startup revisions instead of deriving them from artifact content', () => {
+  it('preserves artifact revisions across registry restarts and scan order changes', () => {
     const firstName = '@fixture/startup-revision-first'
     const secondName = '@fixture/startup-revision-second'
     writeBuiltPackage(firstName, {})
     writeBuiltPackage(secondName, {})
 
     const service = construct([firstName, secondName])
-    const [first, second] = service.graph().entries
-    const firstMatch = /^(?<nonce>[a-f\d]{16})-(?<sequence>\d+)$/.exec(first!.rev)
-    const secondMatch = /^(?<nonce>[a-f\d]{16})-(?<sequence>\d+)$/.exec(second!.rev)
-    expect(firstMatch?.groups).toMatchObject({ sequence: '0' })
-    expect(secondMatch?.groups).toMatchObject({ nonce: firstMatch?.groups?.nonce, sequence: '1' })
+    expect(construct([firstName, secondName]).graph()).toEqual(service.graph())
+    const reversed = construct([secondName, firstName]).graph()
+    for (const entry of service.graph().entries) {
+      expect(reversed.entries.find(row => row.id === entry.id)).toEqual(entry)
+    }
     const firstPath = service.clientPath(firstName)!
     const firstStat = statSync(firstPath)
     expect(service.artifactBaseline(firstName)).toEqual({
       path: firstPath,
       mtimeMs: firstStat.mtimeMs,
+      ctimeMs: firstStat.ctimeMs,
       size: firstStat.size,
     })
     expect(service.artifactBaseline('@fixture/unknown')).toBeUndefined()
+  })
+
+  it('keeps the initial graph and subscribers unchanged when a rebuild has identical artifacts', () => {
+    const packageName = '@fixture/unchanged-rebuild'
+    writeBuiltPackage(packageName, {})
+    const service = construct([packageName])
+    const graph = service.graph()
+    const onRebuilt = vi.fn()
+    const onGraphChanged = vi.fn()
+    service.onRebuilt(onRebuilt)
+    service.onGraphChanged(onGraphChanged)
+
+    expect(service.rebuilt(packageName)).toBe(graph.entries[0]!.rev)
+    expect(service.graph()).toBe(graph)
+    expect(onRebuilt).not.toHaveBeenCalled()
+    expect(onGraphChanged).not.toHaveBeenCalled()
+  })
+
+  it('hashes only metadata when publishing initial and rebuilt artifact revisions', () => {
+    const packageName = '@fixture/metadata-revision'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    const bundle = `module.exports = ${JSON.stringify('x'.repeat(64 * 1024))}\n`
+    writeFileSync(clientPath, bundle)
+    const update = vi.spyOn(Hash.prototype, 'update')
+    try {
+      const service = construct([packageName])
+      writeFileSync(clientPath, `module.exports = ${JSON.stringify('y'.repeat(64 * 1024))}\n`)
+      service.rebuilt(packageName)
+      const inputBytes = update.mock.calls.map(([input]) => Buffer.byteLength(input))
+      expect(inputBytes.length).toBeGreaterThan(0)
+      expect(inputBytes.reduce((total, bytes) => total + bytes, 0)).toBeLessThan(4 * 1024)
+    } finally {
+      update.mockRestore()
+    }
+  })
+
+  it.each(['bytes', 'build stamp'])('agrees with a fresh registry after rebuilding changed %s', (change) => {
+    const packageName = '@fixture/changed-rebuild'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    writeFileSync(clientPath, 'module.exports = {}\n')
+    const timestamp = new Date(1_700_000_000_000)
+    utimesSync(clientPath, timestamp, timestamp)
+    const service = construct([packageName])
+    const before = service.graph()
+    const initialStat = statSync(clientPath)
+    if (change === 'bytes') {
+      writeFileSync(clientPath, 'module.exports = { changed: true }\n')
+      utimesSync(clientPath, initialStat.atime, initialStat.mtime)
+    } else {
+      utimesSync(clientPath, initialStat.atime, new Date(initialStat.mtimeMs + 1_000))
+    }
+
+    const rev = service.rebuilt(packageName)
+    expect(rev).not.toBe(before.entries[0]!.rev)
+    expect(construct([packageName]).graph()).toEqual(service.graph())
+  })
+
+  it('changes revisions when a same-size rewrite preserves mtime', async () => {
+    const packageName = '@fixture/restored-mtime'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    writeFileSync(clientPath, 'module.exports = { generation: 1 }\n')
+    const timestamp = new Date(1_700_000_000_000)
+    utimesSync(clientPath, timestamp, timestamp)
+    const service = construct([packageName])
+    const before = service.artifactBaseline(packageName)!
+    const first = service.graph()
+    // ctime is OS-owned; cross its millisecond before the write on every supported filesystem.
+    await expect.poll(() => Date.now()).toBeGreaterThan(Math.ceil(before.ctimeMs))
+    writeFileSync(clientPath, 'module.exports = { generation: 2 }\n')
+    utimesSync(clientPath, timestamp, timestamp)
+    expect(statSync(clientPath)).toMatchObject({ mtimeMs: before.mtimeMs, size: before.size })
+
+    expect(service.rebuilt(packageName)).not.toBe(first.entries[0]!.rev)
+    expect(construct([packageName]).graph()).toEqual(service.graph())
   })
 
   it('splits startup combos before the map-form URL exceeds 3 KiB', async () => {
@@ -780,6 +859,8 @@ describe('client bundle activation', () => {
     expect((await routeRequest(route, `${row.url}&stale=1`.replace(`rev=${row.rev}`, 'rev=stale'))).status).toBe(404)
 
     writeFileSync(`${clientPath}.map`, '{"version":3,"names":[],"mappings":"AAAA","sources":["src/changed.tsx"]}\n')
+    const entryStat = statSync(clientPath)
+    utimesSync(clientPath, entryStat.atime, new Date(entryStat.mtimeMs + 1_000))
     const nextRev = service.rebuilt(packageName)
     expect(nextRev).not.toBe(row.rev)
     const nextRow = service.graph().entries[0]!

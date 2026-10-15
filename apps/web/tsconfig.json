@@ -23,6 +23,8 @@
   // cannot see both sides of the cordis Context merges).
   "exclude": [
     "tests/client-plugin-live.e2e.ts",
+    "tests/connection-recovery.e2e.ts",
+    "tests/server-restart.e2e.ts",
     "tests/default-product-isolation.e2e.ts",
     "tests/scaffold.ts",
     "tests/expected.ts",

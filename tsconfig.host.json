@@ -10,6 +10,8 @@
   "include": [
     "knip.config.ts",
     "apps/web/product-isolation.ts",
+    "apps/web/tests/connection-recovery.e2e.ts",
+    "apps/web/tests/server-restart.e2e.ts",
     "apps/web/tests/scaffold.ts",
     "apps/web/tests/aria-normalize.ts",
     "apps/web/tests/aria-normalize.spec.ts",
