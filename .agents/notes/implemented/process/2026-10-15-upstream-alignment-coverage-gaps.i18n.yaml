@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-15-upstream-alignment-coverage-gaps.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-15-upstream-alignment-coverage-gaps.md
+/agent-note-upstream-alignment-audits-must-cover-feature-graphs-scope-boundaries-and-diverged-seam-contracts:
+  en: be9aa23687e34690
+  zh: 7d654cef5db907b3
+/agent-note-upstream-alignment-audits-must-cover-feature-graphs-scope-boundaries-and-diverged-seam-contracts/problem:
+  en: 0b329bc02573f364
+  zh: 140e193f72722b57
+/agent-note-upstream-alignment-audits-must-cover-feature-graphs-scope-boundaries-and-diverged-seam-contracts/decision:
+  en: 5e6522b319b146c4
+  zh: db1269d148adca60
+/agent-note-upstream-alignment-audits-must-cover-feature-graphs-scope-boundaries-and-diverged-seam-contracts/alternatives-considered:
+  en: a70866c55c3dc4b6
+  zh: 9f1b66578809bcc9
+/agent-note-upstream-alignment-audits-must-cover-feature-graphs-scope-boundaries-and-diverged-seam-contracts/consequences:
+  en: 35a66f2ba59a2303
+  zh: 8455ecc9ab6db77a
