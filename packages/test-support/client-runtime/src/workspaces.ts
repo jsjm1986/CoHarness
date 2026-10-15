@@ -52,12 +52,13 @@ export class TestWorkspaces implements IWorkspaces {
    * default resolves the workspace id back as the session id; stub for
    * cross-session flows.
    * @param workspaceId - target workspace.
+   * @param options - `agentPreset` names the composition the conversation runs.
    * @returns the connected session id.
    */
-  async connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId> {
-    this.calls.push({ method: 'connectWorkspace', args: [workspaceId] })
+  async connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId> {
+    this.calls.push({ method: 'connectWorkspace', args: [workspaceId, options] })
     const stub = this.stubs.get('connectWorkspace')
-    if (stub !== undefined) return await (stub(workspaceId) as Promise<SessionId>)
+    if (stub !== undefined) return await (stub(workspaceId, options) as Promise<SessionId>)
     return `session-of-${workspaceId}` as SessionId
   }
 
@@ -65,12 +66,13 @@ export class TestWorkspaces implements IWorkspaces {
    * Open a Workspace's most recent historical Session (recorded). The default
    * resolves the workspace id back as the session id; stub for navigation tests.
    * @param workspaceId - target workspace.
+   * @param options - forwarded preset options for the fallback connect.
    * @returns the session id selected by the history-first entry flow.
    */
-  async openWorkspace(workspaceId: WorkspaceId): Promise<SessionId> {
-    this.calls.push({ method: 'openWorkspace', args: [workspaceId] })
+  async openWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId> {
+    this.calls.push({ method: 'openWorkspace', args: [workspaceId, options] })
     const stub = this.stubs.get('openWorkspace')
-    if (stub !== undefined) return await (stub(workspaceId) as Promise<SessionId>)
+    if (stub !== undefined) return await (stub(workspaceId, options) as Promise<SessionId>)
     return `session-of-${workspaceId}` as SessionId
   }
 

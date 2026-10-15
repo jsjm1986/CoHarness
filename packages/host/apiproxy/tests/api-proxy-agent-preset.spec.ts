@@ -12,9 +12,12 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { type AgentFactory } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId, type Session } from '@deepseek-ai/dsh-session'
+import { SessionDraftId } from '@deepseek-ai/dsh-session/types'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import { RpcId, type RpcRequest } from '../src/api/rpc.ts'
+import type { WorkspaceId } from '../src/api/workspace.ts'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import {
   InvalidPresetIdError, PresetExistsError, UnknownPresetError,
 } from '@deepseek-ai/dsh-agent-presets'
@@ -73,6 +76,13 @@ function roster(ids: readonly string[], userIds: readonly string[] = []): unknow
     recompose: (_ctx: Context, id: string) => {
       if (!ids.includes(id)) return Promise.reject(new UnknownPresetError(id, ids))
       return Promise.resolve({ id, trust: 'system', path: `/presets/${id}.yml` })
+    },
+    // What a real blank-session switch leaves behind: the selection event is
+    // the running composition's record; the header keeps the creation fact.
+    select: (agent: { session: { append: (type: string, payload: unknown) => void } }, id: string) => {
+      if (!ids.includes(id)) return Promise.reject(new UnknownPresetError(id, ids))
+      agent.session.append('agent-preset/selected', { agentPreset: id })
+      return Promise.resolve(id)
     },
     // The standing scope key a cold transcript read resolves presenters in.
     standingKeyFor: (id?: string) => {
@@ -505,5 +515,296 @@ describe('session.history presenter scope', () => {
     } finally {
       failingStandingKeys.delete('standard')
     }
+  })
+})
+
+/**
+ * A workspace blank named by `session.create` is a reuse candidate, not an
+ * identity: it has no turns to replay, so it runs the requested preset or the
+ * deployment default — including when the preset its log recorded no longer
+ * exists. A candidate that filled or lost its writer between inspection and
+ * resume is declined and replaced by a freshly minted Session.
+ */
+describe('session.create reusing a workspace blank session', () => {
+  const workspaceId = brandString<WorkspaceId>('w-reuse')
+  const selected = (preset: string, seq = 0) => ({
+    type: 'agent-preset/selected', seq: seq as never, time: 1100,
+    data: { agentPreset: preset },
+  })
+  const prompt = (seq = 0) => ({
+    type: 'user/message', seq: seq as never, time: 1200,
+    data: createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } }),
+    surfaceOp: 'append',
+  })
+
+  interface StoredSpec {
+    readonly id: string
+    readonly preset?: string
+    /** Events `inspect` reports the persisted log holds. */
+    readonly events: readonly unknown[]
+    /** Events `resume` actually replays — diverges from `events` when a turn lands between the two reads. */
+    readonly resumeEvents?: readonly unknown[]
+  }
+
+  async function reuseHarness(options: {
+    readonly presets?: readonly string[]
+    readonly stored?: StoredSpec
+    readonly members?: readonly string[]
+    readonly archived?: readonly string[]
+    readonly resumeError?: Error
+  } = {}) {
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-apiproxy-reuse-')))
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(UserQuestionService)
+    const meta = options.stored === undefined ? undefined : {
+      id: SessionId(options.stored.id), cwd, createdAt: 1000,
+      ...options.stored.preset === undefined ? {} : { agentPreset: options.stored.preset },
+    }
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve(meta === undefined ? [] : [{ header: meta }]),
+      listHeaders: () => Promise.resolve(meta === undefined ? [] : [meta]),
+      readHeader: (id: unknown) => Promise.resolve(meta?.id === id ? meta : undefined),
+      inspect: () => Promise.resolve({ meta, events: [...(options.stored?.events ?? [])] }),
+      reserveDraft: () => Promise.resolve(undefined),
+    } as never)
+    if (options.presets !== undefined) ctx.provide('agentPresets', roster(options.presets) as never)
+
+    const attached: string[] = []
+    const workspace = {
+      id: workspaceId, path: cwd,
+      sessionIds: (options.members ?? []).map(SessionId),
+      attachSession: (sessionId: unknown) => {
+        attached.push(String(sessionId))
+        workspace.sessionIds = [sessionId as never, ...workspace.sessionIds]
+        return Promise.resolve()
+      },
+    }
+    ctx.provide('workspaceRegistry', {
+      get: (id: unknown) => String(id) === workspaceId ? workspace : undefined,
+      list: () => [workspace],
+      archivedSessionIds: (options.archived ?? []).map(SessionId),
+    } as never)
+
+    const factory: AgentFactory = {
+      async createAgent(_ownerCtx, createOptions) {
+        const session = ctx.sessions.create(
+          createOptions.sessionId,
+          createOptions.meta === undefined ? {} : { meta: createOptions.meta },
+        )
+        const agent = stubAgent(session)
+        const agentCtx = ctx.extend({ agent })
+        ;(agent as { ctx?: Context }).ctx = agentCtx
+        await createOptions.setup?.(agentCtx, agent)
+        const unregister = ctx.agents.register(agent)
+        await unregister
+        return { agent, dispose: unregister, tryDisposeIdle: async () => false }
+      },
+      async resume(_ownerCtx, resumeOptions) {
+        if (options.resumeError !== undefined) throw options.resumeError
+        const session = ctx.sessions.create(resumeOptions.resumeSessionId, {
+          meta: { cwd, createdAt: 1000 },
+          seed: [...(options.stored?.resumeEvents ?? options.stored?.events ?? [])] as never,
+        })
+        const agent = stubAgent(session)
+        const agentCtx = ctx.extend({ agent })
+        ;(agent as { ctx?: Context }).ctx = agentCtx
+        await resumeOptions.setup?.(agentCtx, agent)
+        const unregister = ctx.agents.register(agent)
+        await unregister
+        return { agent, dispose: unregister, tryDisposeIdle: async () => false }
+      },
+    }
+    ctx.agents.setFactory(factory)
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }),
+      cwd,
+    })
+    return { api, ctx, cwd, attached }
+  }
+
+  const reuseCreate = (sessionId: string, extra: Record<string, unknown> = {}) =>
+    request({ sessionId: SessionId(sessionId), workspaceId, reuseWorkspaceBlank: true as const, ...extra })
+
+  it('runs the requested preset, not the recorded one', async () => {
+    const { api, ctx } = await reuseHarness({
+      presets: ['standard', 'minimal'],
+      stored: { id: 'b1', preset: 'minimal', events: [selected('minimal')] },
+      members: ['b1'],
+    })
+
+    const response = await api.sessions.create(reuseCreate('b1', { agentPreset: 'standard' }))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value).toMatchObject({ sessionId: 'b1', agentPreset: 'standard' })
+    expect(ctx.sessions.get(SessionId('b1'))?.snapshotEvents().some(
+      event => event.type === 'agent-preset/selected' && event.data.agentPreset === 'standard',
+    )).toBe(true)
+  })
+
+  it('runs the deployment default when the recorded preset no longer exists', async () => {
+    // The bug: the blank's recorded preset was deleted, so resolving it made
+    // every New Session fail. A blank replays nothing, so nothing binds it
+    // to the stale composition.
+    const { api } = await reuseHarness({
+      presets: ['standard'],
+      stored: { id: 'b2', preset: 'gone', events: [selected('gone')] },
+      members: ['b2'],
+    })
+
+    const response = await api.sessions.create(reuseCreate('b2'))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value).toMatchObject({ sessionId: 'b2', agentPreset: 'standard' })
+  })
+
+  it('mints a fresh session when the candidate filled between inspection and resume', async () => {
+    // `inspect` reported blank; a turn landed before the writer's setup ran.
+    // The candidate is left alone and New Session still succeeds.
+    const { api, ctx, attached } = await reuseHarness({
+      presets: ['standard'],
+      stored: { id: 'b3', preset: 'standard', events: [], resumeEvents: [prompt()] },
+      members: ['b3'],
+    })
+
+    const response = await api.sessions.create(reuseCreate('b3'))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value.sessionId).not.toBe('b3')
+    expect(attached).toEqual([response.result.value.sessionId])
+    expect(ctx.agents.get(SessionId('b3'))).toBeUndefined()
+  })
+
+  it('mints a fresh session when the candidate lost its writer', async () => {
+    const { api, attached } = await reuseHarness({
+      presets: ['standard'],
+      stored: { id: 'b4', preset: 'standard', events: [] },
+      members: ['b4'],
+      resumeError: Object.assign(new Error('writer held'), { name: 'SessionAlreadyOwnedError' }),
+    })
+
+    const response = await api.sessions.create(reuseCreate('b4'))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value.sessionId).not.toBe('b4')
+    expect(attached).toEqual([response.result.value.sessionId])
+  })
+
+  it('mints a fresh session when the named candidate already has history', async () => {
+    const { api, attached } = await reuseHarness({
+      presets: ['standard'],
+      stored: { id: 'b5', preset: 'standard', events: [prompt()] },
+      members: ['b5'],
+    })
+
+    const response = await api.sessions.create(reuseCreate('b5'))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value.sessionId).not.toBe('b5')
+    expect(attached).toEqual([response.result.value.sessionId])
+  })
+
+  it('adopts a named non-blank session under its recorded preset when reuse is not requested', async () => {
+    // Without the reuse flag a named session is an identity: its history was
+    // produced under the recorded composition, so it must resume under it.
+    const { api } = await reuseHarness({
+      presets: ['standard', 'minimal'],
+      stored: { id: 'b6', preset: 'minimal', events: [selected('minimal'), prompt(1)] },
+      members: ['b6'],
+    })
+
+    const response = await api.sessions.create(request({
+      sessionId: SessionId('b6'), workspaceId, agentPreset: 'minimal',
+    }))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value).toMatchObject({ sessionId: 'b6', agentPreset: 'minimal' })
+  })
+
+  it('switches a live blank session to the requested preset', async () => {
+    const { api, ctx } = await reuseHarness({
+      presets: ['standard', 'minimal'],
+      members: ['b7'],
+    })
+    await api.sessions.create(request({ sessionId: SessionId('b7'), agentPreset: 'minimal' }))
+
+    const response = await api.sessions.create(reuseCreate('b7', { agentPreset: 'standard' }))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value).toMatchObject({ sessionId: 'b7', agentPreset: 'standard' })
+    expect(ctx.sessions.get(SessionId('b7'))?.snapshotEvents().some(
+      event => event.type === 'agent-preset/selected' && event.data.agentPreset === 'standard',
+    )).toBe(true)
+  })
+
+  it('mints a fresh session when the live candidate already has history', async () => {
+    const { api, ctx, attached } = await reuseHarness({
+      presets: ['standard'],
+      members: ['b8'],
+    })
+    const first = await api.sessions.create(request({ sessionId: SessionId('b8') }))
+    expect(first.result.ok).toBe(true)
+    const live = ctx.agents.get(SessionId('b8'))
+    if (live === undefined) throw new Error('b8 was never created')
+    live.session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'started' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+
+    const response = await api.sessions.create(reuseCreate('b8'))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value.sessionId).not.toBe('b8')
+    expect(attached).toEqual([response.result.value.sessionId])
+  })
+
+  it('keeps a restored draft on its recorded preset and falls back when it is undeclared', async () => {
+    // Startup restoration names the blank the draft tracked. The draft keeps
+    // the selection it recorded; a deleted preset degrades to the default
+    // rather than blocking the restore.
+    const { api } = await reuseHarness({
+      presets: ['standard', 'minimal'],
+      stored: { id: 'b9', preset: 'minimal', events: [selected('minimal')] },
+      members: ['b9'],
+    })
+
+    const kept = await api.sessions.create(request({ sessionId: SessionId('b9'), draftId: SessionDraftId('d1'), workspaceId }))
+
+    expect(kept.result.ok).toBe(true)
+    if (!kept.result.ok) throw new Error('unreachable')
+    expect(kept.result.value).toMatchObject({ sessionId: 'b9', agentPreset: 'minimal' })
+
+    const { api: api2 } = await reuseHarness({
+      presets: ['standard'],
+      stored: { id: 'b10', preset: 'gone', events: [selected('gone')] },
+      members: ['b10'],
+    })
+
+    const healed = await api2.sessions.create(request({ sessionId: SessionId('b10'), draftId: SessionDraftId('d2'), workspaceId }))
+
+    expect(healed.result.ok).toBe(true)
+    if (!healed.result.ok) throw new Error('unreachable')
+    expect(healed.result.value).toMatchObject({ sessionId: 'b10', agentPreset: 'standard' })
+  })
+
+  it('refuses a requested preset on a blank reuse when no roster composes', async () => {
+    const { api } = await reuseHarness({
+      stored: { id: 'b11', events: [] },
+      members: ['b11'],
+    })
+
+    const response = await api.sessions.create(reuseCreate('b11', { agentPreset: 'standard' }))
+
+    expect(response.result.ok).toBe(false)
+    if (response.result.ok) throw new Error('unreachable')
+    expect(response.result.error.code).toBe('agent-preset-conflict')
   })
 })

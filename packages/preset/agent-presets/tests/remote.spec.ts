@@ -380,6 +380,23 @@ describe('switching one session\'s composition', () => {
     expect(await ctx.agentPresets.select(agent, 'minimal')).toBe('minimal')
   })
 
+  it('keeps the composition when the session already records the requested preset', async () => {
+    const ctx = await harness()
+    const handle = await ctx.agents.create({
+      sessionId: SessionId('sel-same'),
+      meta: { agentPreset: 'standard' },
+      setup: async (agentCtx: Context) => void await ctx.agentPresets.mount(agentCtx, 'standard'),
+    })
+    const agent = handle.agent
+    const recompose = vi.spyOn(ctx.agentPresets, 'recompose')
+
+    expect(await ctx.agentPresets.select(agent, 'standard')).toBe('standard')
+
+    expect(recompose).not.toHaveBeenCalled()
+    expect(recordedPreset(agent)).toBeUndefined()
+    expect(ctx.agentPresets.composedPreset(agent.ctx)).toBe('standard')
+  })
+
   it('serializes two concurrent switches on one session', async () => {
     const ctx = await harness()
     const agent = await agentOn(ctx, 'sel-race', 'standard')

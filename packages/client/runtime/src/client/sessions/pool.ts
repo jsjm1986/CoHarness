@@ -500,6 +500,21 @@ export class SessionRuntimePool implements ISessions {
       .then(id => clientSessionKey(owner.target, id))
   }
 
+  /**
+   * Create or adopt a Session the request names directly in the bootstrap
+   * Workspace runtime, translating the pooled identity both ways.
+   * @param opts - caller-selected create options; `sessionId` is a pooled key.
+   * @returns the resolved pooled Session identity.
+   */
+  create(opts?: Parameters<Runtime['create']>[0]): Promise<SessionId> {
+    const owner = [...this.entries.values()].find(entry => entry.runtime === this.base)
+    if (owner === undefined) return Promise.reject(new Error('Bootstrap runtime is unavailable'))
+    const options = opts?.sessionId === undefined
+      ? opts
+      : { ...opts, sessionId: this.originalId(opts.sessionId, owner) }
+    return this.base.create(options).then(id => clientSessionKey(owner.target, id))
+  }
+
   /** Withdraw every visible Session before asynchronous account-change teardown begins. */
   invalidateAccount(): void {
     if (this.accountInvalidated) return

@@ -654,8 +654,10 @@ composedPreset(agentCtx: Context): string | undefined
  *
  * Recomposing is limited to a session with no visible conversation content
  * because its history is produced under its preset's tools; the agent and
- * the session survive, only the composition is swapped. Switches on one
- * session queue so a stale blankness read cannot interleave two swaps.
+ * the session survive, only the composition is swapped. A Session whose log
+ * records the preset and whose Agent runs its current generation keeps its
+ * composition; nothing is logged or announced. Switches on one session queue
+ * so a stale blankness read cannot interleave two swaps.
  * @param agent - exact live agent whose composition is swapped.
  * @param agentPreset - the preset to compose instead.
  * @returns the preset id that was recorded.

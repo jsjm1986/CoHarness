@@ -309,15 +309,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'The workspaces-service face injected as `ctx.workspaces`.',
     methods: [
       {
-        signature: 'connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId>',
+        signature: 'connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId>',
         description: 'Connect a Workspace to its reusable or freshly created blank session.',
-        parameters: [{ name: 'workspaceId', description: 'target workspace.' }],
+        parameters: [{ name: 'workspaceId', description: 'target workspace.' }, { name: 'options', description: '`agentPreset` names the composition the conversation runs; omitted composes the deployment default. A reused blank runs this choice rather than its recorded preset, and a preset the roster no longer declares degrades to the default instead of failing the connect.' }],
         returns: 'the connected session id.',
       },
       {
-        signature: 'openWorkspace(workspaceId: WorkspaceId): Promise<SessionId>',
+        signature: 'openWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId>',
         description: 'Open the most recent historical conversation in a Workspace.',
-        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }],
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'options', description: 'forwarded to {@link connectWorkspace} when the Workspace has no selectable history.' }],
         returns: 'the selected historical or fallback blank Session id.',
       },
       {

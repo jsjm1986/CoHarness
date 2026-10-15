@@ -667,6 +667,7 @@ export class SessionManager {
         ...(opts.draftId === undefined ? {} : { draftId: opts.draftId }),
         ...(opts.visibility === undefined ? {} : { visibility: opts.visibility }),
         ...(opts.sshTarget === undefined ? {} : { sshTarget: opts.sshTarget }),
+        ...(opts.agentPreset === undefined ? {} : { agentPreset: opts.agentPreset }),
         ...(reuseWorkspaceBlank ? { reuseWorkspaceBlank: true as const } : {}),
       }
       const payload = opts.workspaceId !== undefined

@@ -437,6 +437,109 @@ describe('WorkspaceRuntime', () => {
     await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-fresh-2')
   })
 
+  it('connectWorkspace forwards agentPreset on reuse and fresh arms', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('alpha', [sid('s-blank')]), workspace('beta')] as never[],
+    }))
+    api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha' }] as never[],
+    }))
+    api.onCreate = payload => Promise.resolve(ok({
+      sessionId: (payload as { sessionId?: SessionId }).sessionId ?? sid('s-unexpected'),
+    }))
+    await Promise.all([workspaces.refresh(), sessions.refresh()])
+    await Promise.resolve()
+
+    // Reuse arm: the named preset rides the wire so the blank re-composes
+    // under it rather than under its recorded composition.
+    await expect(workspaces.connectWorkspace(wid('alpha'), { agentPreset: 'minimal' })).resolves.toBe('s-blank')
+    expect(api.callsOf('session.create')[0]).toEqual({
+      workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true, agentPreset: 'minimal',
+    })
+
+    // Fresh arm: same option reaches a newly minted session.
+    await expect(workspaces.connectWorkspace(wid('beta'), { agentPreset: 'minimal' })).resolves.toBeTruthy()
+    expect(api.callsOf('session.create')[1]).toMatchObject({ workspaceId: 'beta', agentPreset: 'minimal' })
+  })
+
+  it('connectWorkspace retries once without a preset the roster no longer declares', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('alpha')] as never[] }))
+    api.onList = () => Promise.resolve(ok({ items: [] }))
+    api.onCreate = payload => Promise.resolve(
+      callField(payload, 'agentPreset') === undefined
+        ? ok({ sessionId: sid('s-default') })
+        : err<{ sessionId: SessionId }>({ code: 'agent-preset-not-found', message: 'gone', details: { agentPreset: 'gone', available: [] } }),
+    )
+    await Promise.all([workspaces.refresh(), sessions.refresh()])
+    await Promise.resolve()
+
+    await expect(workspaces.connectWorkspace(wid('alpha'), { agentPreset: 'gone' })).resolves.toBe('s-default')
+    const creates = api.callsOf('session.create')
+    expect(creates).toHaveLength(2)
+    expect(callField(creates[0], 'agentPreset')).toBe('gone')
+    expect(callField(creates[1], 'agentPreset')).toBeUndefined()
+  })
+
+  it('connectWorkspace re-pulls the session list when a named reuse candidate is declined', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('alpha', [sid('s-blank')])] as never[],
+    }))
+    api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha' }] as never[],
+    }))
+    // The host declines the stale blank and mints a fresh identity instead.
+    api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-minted') }))
+    await Promise.all([workspaces.refresh(), sessions.refresh()])
+    await Promise.resolve()
+    const baseline = api.callsOf('session.list').length
+
+    await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-minted')
+    // The declined candidate may still read blank from cached metadata; the
+    // authoritative pull reconciles its row before callers trust the tree.
+    await vi.waitFor(() => { expect(api.callsOf('session.list').length).toBeGreaterThan(baseline) })
+  })
+
+  it('connects naming different presets do not join the same in-flight create', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('alpha')] as never[] }))
+    api.onList = () => Promise.resolve(ok({ items: [] }))
+    api.onCreate = payload => Promise.resolve(ok({
+      sessionId: (payload as { sessionId?: SessionId }).sessionId ?? sid('s-unexpected'),
+    }))
+    await Promise.all([workspaces.refresh(), sessions.refresh()])
+    await Promise.resolve()
+
+    // Each request names the composition its conversation must run, so a
+    // superseding connect always reaches the Host instead of silently joining
+    // an attempt composed under another preset. Both reserve the Workspace's
+    // one draft identity on the wire; the Host serializes adoption and
+    // answers an incompatible second preset with its declared conflict.
+    const [first, second] = await Promise.all([
+      workspaces.connectWorkspace(wid('alpha'), { agentPreset: 'a' }),
+      workspaces.connectWorkspace(wid('alpha'), { agentPreset: 'b' }),
+    ])
+    const creates = api.callsOf('session.create')
+    expect(creates).toHaveLength(2)
+    expect(callField(creates[0], 'agentPreset')).toBe('a')
+    expect(callField(creates[1], 'agentPreset')).toBe('b')
+    expect(first).toBe(second)
+  })
+
   it('openWorkspace selects the newest visible history and ignores blank, archived, and subagent rows', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
@@ -1082,6 +1185,56 @@ describe('startInitialSelection', () => {
     expect(noRecent.api.callsOf('session.create')).toHaveLength(0)
     expect(() => noRecent.workspaces.startInitialSelection()).toThrow(/already started/)
     stopEmpty()
+  })
+
+  it('re-adopts a saved blank under its recorded preset through the reuse arm', async () => {
+    const b = bench()
+    b.api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha', agentPreset: 'minimal' }] as never[],
+    }))
+    b.api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('alpha', [sid('s-blank')])] as never[] }))
+    await b.sessions.refresh()
+    b.sessions.open(sid('s-blank'))
+    b.api.onCreate = payload => Promise.resolve(ok({
+      sessionId: (payload as { sessionId?: SessionId }).sessionId ?? sid('s-unexpected'),
+    }))
+
+    const stop = b.workspaces.startInitialSelection()
+    await b.workspaces.refresh()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    // The saved blank is named directly with its recorded preset — the
+    // draft reservation is a New Session concept and must not tag along.
+    expect(b.api.callsOf('session.create')).toEqual([{
+      workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true, agentPreset: 'minimal',
+    }])
+    expect(b.sessions.list.getSnapshot().current).toBe('s-blank')
+    stop()
+  })
+
+  it('restores a saved blank under the default once its recorded preset is undeclared', async () => {
+    const b = bench()
+    b.api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha', agentPreset: 'gone' }] as never[],
+    }))
+    b.api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('alpha', [sid('s-blank')])] as never[] }))
+    await b.sessions.refresh()
+    b.sessions.open(sid('s-blank'))
+    b.api.onCreate = payload => Promise.resolve(
+      callField(payload, 'agentPreset') === undefined
+        ? ok({ sessionId: sid('s-blank') })
+        : err<{ sessionId: SessionId }>({ code: 'agent-preset-not-found', message: 'gone', details: { agentPreset: 'gone', available: [] } }),
+    )
+
+    const stop = b.workspaces.startInitialSelection()
+    await b.workspaces.refresh()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const creates = b.api.callsOf('session.create')
+    expect(creates).toHaveLength(2)
+    expect(creates[0]).toMatchObject({ sessionId: 's-blank', reuseWorkspaceBlank: true, agentPreset: 'gone' })
+    expect(creates[1]).toMatchObject({ sessionId: 's-blank', reuseWorkspaceBlank: true })
+    expect(callField(creates[1], 'agentPreset')).toBeUndefined()
+    expect(b.sessions.list.getSnapshot().current).toBe('s-blank')
+    stop()
   })
 
   it('an explicit clear cancels initial selection even when creation finishes later', async () => {

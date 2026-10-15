@@ -17,15 +17,21 @@ export interface IWorkspaces {
   /**
    * Connect a Workspace to its reusable or freshly created blank session.
    * @param workspaceId - target workspace.
+   * @param options - `agentPreset` names the composition the conversation
+   *   runs; omitted composes the deployment default. A reused blank runs this
+   *   choice rather than its recorded preset, and a preset the roster no
+   *   longer declares degrades to the default instead of failing the connect.
    * @returns the connected session id.
    */
-  connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
+  connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId>
   /**
    * Open the most recent historical conversation in a Workspace.
    * @param workspaceId - target Workspace.
+   * @param options - forwarded to {@link connectWorkspace} when the Workspace
+   *   has no selectable history.
    * @returns the selected historical or fallback blank Session id.
    */
-  openWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
+  openWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId>
   /**
    * The New Session flow: connect the explicit, current-Session, or recent
    * Workspace and open the resulting session. Connect and navigation failures

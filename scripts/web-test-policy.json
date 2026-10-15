@@ -20,6 +20,7 @@
     "auto-review-denial.e2e.ts": "conversation",
     "background-job-list.e2e.ts": "workbench",
     "bash-abort-row.e2e.ts": "conversation",
+    "blank-preset-reuse.e2e.ts": "lifecycle",
     "built-boot.snapshot.ts": "shell",
     "chat-continuous-conversation.e2e.ts": "conversation",
     "chat-long-interactions.e2e.ts": "conversation",

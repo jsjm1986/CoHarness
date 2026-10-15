@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-16-blank-session-preset-reuse.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-16-blank-session-preset-reuse.md
+/agent-note-blank-sessions-reuse-under-the-requested-preset-never-the-recorded-one:
+  en: 5119a4fa022b3440
+  zh: e79ed5b850a93cb5
+/agent-note-blank-sessions-reuse-under-the-requested-preset-never-the-recorded-one/problem:
+  en: a86a4355f1527869
+  zh: 3703f2acb50ceefe
+/agent-note-blank-sessions-reuse-under-the-requested-preset-never-the-recorded-one/decision:
+  en: 3d13c93a76eb97fb
+  zh: 11a6661c9ef77d17
+/agent-note-blank-sessions-reuse-under-the-requested-preset-never-the-recorded-one/alternatives-considered:
+  en: fa464d4734ced074
+  zh: 7a1e908f2a2f6c58
+/agent-note-blank-sessions-reuse-under-the-requested-preset-never-the-recorded-one/consequences:
+  en: 4ed19d1348445bb5
+  zh: aefdb3b2dc3717a7
+/agent-note-blank-sessions-reuse-under-the-requested-preset-never-the-recorded-one/testing:
+  en: 13be3ed6c8ed52fd
+  zh: 3dad3c521dbc8b87

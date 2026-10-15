@@ -765,20 +765,30 @@ export class SessionRuntime implements ISessions {
 
   private async createPrepared(prepared: SessionCreateOptions, reuseSessionId?: SessionId): Promise<SessionId> {
     const sessionId = reuseSessionId ?? prepared.sessionId
-    const { runtimeTarget: _runtimeTarget, ...wireOptions } = prepared
+    const { runtimeTarget: _runtimeTarget, reuseWorkspaceBlank: reuseRequested, ...wireOptions } = prepared
+    const reusing = reuseSessionId !== undefined || reuseRequested === true
     // A reservation belongs only to a newly minted draft. Reusing an existing
     // blank session must not attach or consume another tab's reservation key.
-    const request = reuseSessionId === undefined
+    const request = !reusing
       ? wireOptions
       : (() => {
         const { draftId: _draftId, ...rest } = wireOptions
-        return { ...rest, sessionId: reuseSessionId }
+        return sessionId === undefined ? rest : { ...rest, sessionId }
       })()
-    const result = await this.manager.create(
-      request,
-      reuseSessionId !== undefined,
-    )
+    let result = await this.manager.create(request, reusing)
+    // A preset the flow named but the roster no longer declares degrades to
+    // the deployment default rather than blocking the new conversation.
+    if (!result.ok && prepared.agentPreset !== undefined
+      && (result.error.code === 'agent-preset-not-found' || result.error.code === 'agent-preset-invalid')) {
+      const { agentPreset: _agentPreset, ...fallback } = request
+      result = await this.manager.create(fallback, reusing)
+    }
     if (!result.ok) throw new SessionCreateError(result.error, sessionId)
+    // A declined candidate can still read blank from cached list metadata,
+    // hiding it from the tree; an authoritative pull reconciles its row.
+    if (reusing && sessionId !== undefined && result.value.sessionId !== sessionId) {
+      void this.manager.refreshList().catch(() => undefined)
+    }
     this.projectList()
     return result.value.sessionId
   }

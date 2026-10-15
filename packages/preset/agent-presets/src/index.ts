@@ -51,7 +51,7 @@ import {
   type AgentPresetComposition,
 } from './composition-inventory.ts'
 import type { AgentPresetDocument, AgentPresetRoster } from './types.ts'
-import { agentPresetProjectionDefinition } from './session.ts'
+import { agentPresetProjectionDefinition, resolveSessionPreset } from './session.ts'
 export type * from './types.ts'
 export { agentPresetProjectionDefinition } from './session.ts'
 
@@ -596,8 +596,10 @@ export class AgentPresets extends TypertRemoteService {
    *
    * Recomposing is limited to a session with no visible conversation content
    * because its history is produced under its preset's tools; the agent and
-   * the session survive, only the composition is swapped. Switches on one
-   * session queue so a stale blankness read cannot interleave two swaps.
+   * the session survive, only the composition is swapped. A Session whose log
+   * records the preset and whose Agent runs its current generation keeps its
+   * composition; nothing is logged or announced. Switches on one session queue
+   * so a stale blankness read cannot interleave two swaps.
    * @param agent - exact live agent whose composition is swapped.
    * @param agentPreset - the preset to compose instead.
    * @returns the preset id that was recorded.
@@ -624,12 +626,26 @@ export class AgentPresets extends TypertRemoteService {
     // content may have arrived, since this call was queued. Standalone plugin
     // events and empty turns keep a fresh session blank.
     // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-    if (agent.session.snapshotEvents().some(hasConversationContent)) {
+    const events = agent.session.snapshotEvents()
+    if (events.some(hasConversationContent)) {
       throw new RemoteError(
         'agent-preset/locked',
         `session "${agent.id}" has already started; its agent preset is fixed`,
         { sessionId: agent.id, agentPreset },
       )
+    }
+    // A Session whose log records the preset and whose Agent runs its current
+    // generation keeps its composition; nothing is logged or announced. An
+    // unscoped agent cannot prove either half, so it always recomposes.
+    const agentKey = scopeOf(agent.ctx)
+    if (agentKey !== undefined && resolveSessionPreset({ header: agent.session.header, events }) === agentPreset) {
+      const preset = await this.resolveMountable(agentPreset)
+      const parent = scopeParentOf(agentKey)
+      const realm = parent !== undefined && 'realm' in parent && typeof parent.realm === 'string'
+        ? parent.realm
+        : undefined
+      const standing = this.standing.get(preset.id)?.get(realm)
+      if (standing !== undefined && parent === (await standing).key) return agentPreset
     }
     try {
       const preset = await this.recompose(agent.ctx, agentPreset)

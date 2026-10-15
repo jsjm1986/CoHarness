@@ -1179,7 +1179,7 @@ async function probeColdSessionMetadata(
   meta: SessionHeader,
   maxBytes: number,
   signal?: AbortSignal,
-): Promise<SessionListMetadata | undefined> {
+): Promise<{ metadata: SessionListMetadata; events: readonly SessionEvent[] } | undefined> {
   if (maxBytes === 0) return undefined
   signal?.throwIfAborted()
   const location = persistence.locate(meta)
@@ -1196,7 +1196,7 @@ async function probeColdSessionMetadata(
   try {
     const { events } = await persistence.readFrom(meta.id, SessionLogOffset(0), signal)
     signal?.throwIfAborted()
-    return sessionListMetadata(events)
+    return { metadata: sessionListMetadata(events), events }
   } catch (error) {
     signal?.throwIfAborted()
     ctx.logger.warn(`session.list: blank probe for "${meta.id}" failed (serving it as visible): ${String(error)}`)
@@ -1216,7 +1216,7 @@ async function summarizeCold(
   const probed = metadata?.blank === false
     ? undefined
     : await probeColdSessionMetadata(ctx, persistence, meta, blankProbeMaxBytes, signal)
-  const resolvedMetadata = probed ?? metadata
+  const resolvedMetadata = probed?.metadata ?? metadata
   return {
     sessionId: meta.id,
     updatedAt: sessionListUpdatedAt(meta, resolvedMetadata),
@@ -1230,10 +1230,11 @@ async function summarizeCold(
     ...(resolvedMetadata?.visibleContentSeq === null || resolvedMetadata?.visibleContentSeq === undefined
       ? {}
       : { visibleContentSeq: resolvedMetadata.visibleContentSeq }),
-    // Header-only: reading the log for a blank-window preset switch would
-    // defeat the same index read, and attaching the session replaces this row
-    // with `summarize()`, which resolves the switch from the events.
-    ...sessionListFields(meta),
+    // A probed artifact already paid the log read, so its preset resolves from
+    // the events — the same folded truth a live `summarize()` serves for a
+    // blank-window switch. An unprobed row stays header-only: reading a large
+    // log for that switch would defeat the index read.
+    ...sessionListFields(meta, probed?.events ?? []),
   }
 }
 
@@ -1770,6 +1771,9 @@ class AgentPresetConflict extends Error {
     )
   }
 }
+
+/** The named reuse candidate failed placement, blankness, or writer checks; the caller mints a fresh identity. */
+class BlankReuseDeclined extends Error {}
 
 /** Requested identity already belongs to a session with another project cwd. */
 class SessionCwdConflict extends Error {
@@ -3285,7 +3289,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     }
   }
 
-  /** Resolve one requested identity to a live agent, creating or resuming it once. */
+  /**
+   * Resolve one requested identity to a live agent, creating or resuming it once.
+   * @param reuseBlank - treat the named Session as a blank-reuse candidate: it
+   * runs the requested preset (or the configured default) rather than the one
+   * its log recorded, and any candidate that has content, declines a preset
+   * switch, or loses its writer is refused so the caller can mint a fresh one.
+   */
   async function ensureSession(
     sessionId: SessionId,
     cwd: string,
@@ -3293,6 +3303,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     presetId?: string,
     draft = false,
     sshTarget?: number,
+    reuseBlank = false,
   ): Promise<Agent> {
     using _admission = ctx.agents.reserveUse([sessionId])
     let creation = sessionCreations.get(sessionId)
@@ -3303,7 +3314,26 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (attached !== undefined && hasSubagentOwner(attached, live)) {
           throw new SubagentSessionOwnership(sessionId)
         }
-        if (live !== undefined) return live
+        if (live !== undefined) {
+          if (!reuseBlank) return live
+          if (!sessionBlank(live.session)) throw new BlankReuseDeclined()
+          const presets = ctx.get('agentPresets')
+          if (presetId !== undefined && presets === undefined) {
+            throw new AgentPresetConflict(sessionId, presetId, resolveSessionPreset(live.session))
+          }
+          if (presets !== undefined) {
+            const target = (await presets.resolve(presetId)).id
+            if (target !== resolveSessionPreset(live.session)) {
+              try {
+                await presets.select(live, target)
+              } catch (error: unknown) {
+                if (remoteErrorOf(error)?.code === 'agent-preset/locked') throw new BlankReuseDeclined()
+                throw error
+              }
+            }
+          }
+          return live
+        }
 
         const persistence = checkPersistedIdentity ? ctx.get('sessionPersistence') : undefined
         const stored = persistence === undefined
@@ -3334,6 +3364,42 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // Resolved from the log, not the header: a session that switched
           // while blank ran every turn under the newer composition.
           const storedPreset = resolveSessionPreset({ header: inspected.meta, events: inspected.events })
+          const reusable = reuseBlank || (draft && !inspected.events.some(isConversationContentEvent))
+          if (reusable) {
+            // A blank has no turns to replay, so nothing constrains it to the
+            // recorded composition — including when that composition is no
+            // longer declared. A reuse candidate runs the requested preset or
+            // the deployment default; a draft keeps the recorded preset,
+            // falling back to the default when it is undeclared.
+            if (reuseBlank && inspected.events.some(isConversationContentEvent)) throw new BlankReuseDeclined()
+            const requested = presetId ?? (draft ? storedPreset : undefined)
+            if (presetId !== undefined && ctx.get('agentPresets') === undefined) {
+              throw new AgentPresetConflict(sessionId, presetId, storedPreset)
+            }
+            let composition: Awaited<ReturnType<typeof composeAgent>>
+            try {
+              composition = await composeAgent(requested, inspected.meta.sshTarget)
+            } catch (error: unknown) {
+              const resolvable = error instanceof UnknownPresetError || error instanceof PresetMountError
+              if (presetId !== undefined || !resolvable) throw error
+              composition = await composeAgent(undefined, inspected.meta.sshTarget)
+            }
+            return sessionOwner.own(await ctx.agents.resume({
+              resumeSessionId: sessionId,
+              agentOptions: agentOptions(),
+              setup: async (agentCtx, agent) => {
+                // Re-check under the acquired writer: a turn may have started
+                // since the cold inspection named this candidate.
+                if (!sessionBlank(agent.session)) throw new BlankReuseDeclined()
+                const commit = await composition.setup(agentCtx, agent)
+                const target = composition.agentPreset
+                if (target !== undefined && resolveSessionPreset(agent.session) !== target) {
+                  agent.session.append('agent-preset/selected', { agentPreset: target })
+                }
+                return commit
+              },
+            }))
+          }
           assertPresetUnchanged(sessionId, presetId, storedPreset)
           assertSshTargetUnchanged(sessionId, sshTarget, inspected.meta.sshTarget)
           // The stored preset wins over anything the request names: a resumed
@@ -3368,11 +3434,18 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           setup: composition.setup,
         }))
       })().catch((error: unknown) => {
+        // A decline is terminal: the recovery below exists for identities a
+        // concurrent path created, and this candidate's own blankness verdict
+        // is already in.
+        if (error instanceof BlankReuseDeclined) throw error
         // Another Host entry path may have published the same identity while
         // this operation crossed an asynchronous persistence/filesystem step.
         const live = ctx.agents.get(sessionId)
         if (live !== undefined) {
           if (hasSubagentOwner(live.session, live)) throw new SubagentSessionOwnership(sessionId)
+          // A reuse request never adopts a session it did not verify: the
+          // concurrent winner keeps its identity and the caller mints fresh.
+          if (reuseBlank) throw error
           return live
         }
         const attached = ctx.sessions.get(sessionId)
@@ -4195,10 +4268,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (workspace !== undefined && draftRequested) {
           draftSessions.set(sessionId, { workspace, draftId, materialized: false })
         }
-        const refreshDefaultAfterReuse = request.payload.reuseWorkspaceBlank === true
+        const reuseRequested = request.payload.reuseWorkspaceBlank === true
           && workspace !== undefined
           && workspace.sessionIds.includes(sessionId)
           && !ctx.workspaceRegistry.archivedSessionIds.includes(sessionId)
+
         try {
           await withSessionCreation(
             visibility,
@@ -4209,7 +4283,24 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               requestedPreset,
               draftRequested,
               requestedSshTarget,
-            ),
+              reuseRequested,
+            ).catch(async (error: unknown) => {
+              // A declined reuse candidate is left untouched and replaced by a
+              // fresh Session: the stale blank never blocks New Session, and
+              // writer contention no longer surfaces to the client.
+              const writerHeld = error instanceof Error && error.name === 'SessionAlreadyOwnedError'
+              if (!reuseRequested || (!(error instanceof BlankReuseDeclined) && !writerHeld)) throw error
+              const minted = `session-${randomUUID()}` as SessionId
+              const draft = draftSessions.get(sessionId)
+              if (draft !== undefined) {
+                draftSessions.delete(sessionId)
+                draftSessions.set(minted, draft)
+              }
+              sessionId = minted
+              return await ensureSession(
+                sessionId, cwd, false, requestedPreset, draftRequested, requestedSshTarget,
+              )
+            }),
           )
         } catch (error: unknown) {
           if (draftRequested) draftSessions.delete(sessionId)
@@ -4306,7 +4397,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
           }
         }
-        if (refreshDefaultAfterReuse) {
+        if (reuseRequested && sessionId === request.payload.sessionId) {
           const adopted = ctx.agents.get(sessionId)
           if (adopted !== undefined && sessionBlank(adopted.session)) {
             ctx.get('permissionPresets')?.refreshDefaultForReuse(adopted.session)
