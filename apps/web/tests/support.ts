@@ -172,3 +172,26 @@ export async function expectTooltipOnTop(tooltip: Locator): Promise<void> {
 export function conversationContextKey(kind: string, id: string): string {
   return `${kind.length}:${kind}${id}`
 }
+
+/**
+ * Expand the settled Turn process containing a hidden descendant. The
+ * process toggle precedes its folded members in DOM order, so the owning
+ * control is the last `[data-turn-process]` button before the target.
+ * @param page - page containing the Chat view.
+ * @param target - descendant whose outer process disclosure should open.
+ */
+export async function expandOwningTurnProcess(_page: Page, target: Locator): Promise<void> {
+  if (await target.isVisible()) return
+  const owner = await target.evaluateHandle((element) => {
+    let owner: Element | null = null
+    for (const control of element.ownerDocument.querySelectorAll('[data-turn-process]')) {
+      if (control.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) owner = control
+      else break
+    }
+    return owner
+  })
+  const control = owner.asElement()
+  if (control === null) return
+  await control.waitForElementState('visible', { timeout: 10_000 })
+  if (await control.getAttribute('aria-expanded') === 'false') await control.click()
+}

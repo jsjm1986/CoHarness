@@ -34,6 +34,8 @@
     "apps/web/tests/plan-review.e2e.ts",
     "apps/web/tests/steering.e2e.ts",
     "apps/web/tests/navigation-panes.e2e.ts",
+    "apps/web/tests/shell-command-details.e2e.ts",
+    "apps/web/tests/terminal-command-browser.ts",
     "apps/web/tests/chat-scroll-fixture.ts",
     "apps/web/tests/trajectory-virtualization.e2e.ts",
     "apps/web/tests/lifecycle-chrome.e2e.ts",

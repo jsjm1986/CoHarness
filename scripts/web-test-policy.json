@@ -101,6 +101,7 @@
     "session-feedback.e2e.ts": "conversation",
     "settings-chrome.e2e.ts": "settings",
     "settings-compact.e2e.ts": "settings",
+    "shell-command-details.e2e.ts": "conversation",
     "shipped-composition.e2e.ts": "shell",
     "sidebar-browser.e2e.ts": "documents",
     "sidebar-scrollbar.e2e.ts": "workbench",

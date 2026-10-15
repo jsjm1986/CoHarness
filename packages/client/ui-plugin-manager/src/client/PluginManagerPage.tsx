@@ -685,6 +685,7 @@ const INSTALL_TERMINAL_LINES = 12
 /** The install terminal's display copy, from the tab's dictionary. */
 function terminalLabels(t: Translate): TerminalBlockLabels {
   return {
+    commandLine: line => t('terminalCommandLine', { n: String(line) }),
     /* v8 ignore next -- the Host reports a killed pnpm as a null exit code, never a signal name; the label interface needs one */
     signal: signal => t('terminalSignal', { signal }),
     exitCode: code => t('terminalExitCode', { code: String(code) }),

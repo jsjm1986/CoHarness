@@ -18,6 +18,7 @@ import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-sub
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
 import { captureStableAria } from './scaffold.ts'
 import { REPO_ROOT, saveFailureShot, saveFailureDom } from './support.ts'
+import { expectSelectableTerminalCommand } from './terminal-command-browser.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/plugin-install-approve', import.meta.url))
 const MODE = webSnapshotMode()
@@ -206,6 +207,10 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
       await blocked.getByRole('button', { name: 'Allow these scripts and retry', exact: true }).click()
       await dialog.getByText(`Install scripts allowed for ${pendingKey}`, { exact: true }).waitFor({ timeout: 90_000 })
       await dialog.getByText('Installed', { exact: true }).waitFor()
+      // The recorded install command stays selectable and horizontally
+      // scrollable in the run's terminal card, overflowing or not.
+      await dialog.getByRole('button', { name: 'Show install details', exact: true }).click()
+      await expectSelectableTerminalCommand(page, dialog.locator('[data-terminal]').first(), `pnpm add file:${addon}`, 380)
       expect(await readFile(built, 'utf8')).toBe('built')
       const approvedPolicy = parseYaml(await readFile(join(profileDir, 'pnpm-workspace.yaml'), 'utf8')) as
         { allowBuilds: Record<string, unknown> }

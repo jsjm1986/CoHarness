@@ -112,6 +112,7 @@ function formatDuration(elapsedMs: number, t: TranslateNS<typeof NS>): string {
 /** Localized display copy for the embedded terminal panel. */
 function terminalLabels(t: TranslateNS<typeof NS>): TerminalBlockLabels {
   return {
+    commandLine: line => t('terminal.commandLine', { n: line }),
     // The labels contract requires exit-fact formatters, but this panel never
     // passes exit facts, so TerminalBlock never invokes them.
     /* v8 ignore next */

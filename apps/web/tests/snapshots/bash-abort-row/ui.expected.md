@@ -4,6 +4,8 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - button "2 tool calls · 1 intermediate message" [expanded]:
