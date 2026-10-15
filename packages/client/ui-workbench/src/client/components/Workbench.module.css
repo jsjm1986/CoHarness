@@ -247,15 +247,16 @@
 .sidebarSection { display: flex; flex: none; flex-direction: column; gap: var(--dsw-space-1); }
 .sidebarSectionTitle { display: flex; align-items: center; justify-content: space-between; gap: var(--dsw-space-2); padding: 0 var(--dsw-space-1); color: var(--dsw-alias-label-caption); font-size: 12px; }
 .sidebarCount { color: var(--dsw-alias-label-caption); font-size: 11px; font-variant-numeric: tabular-nums; }
-/* Hairline row list: rows divide on fine rules, the active row reads via a left
-   blue tick plus hover fill — no card chrome. */
+/* Hairline row list: rows divide on fine rules; the active row reads via a
+   business-blue tint fill with an inked title — no card chrome or edge tick. */
 .sidebarPanes { display: flex; flex-direction: column; border-top: 1px solid var(--dsw-alias-border-l1); }
 .sidebarEmpty { margin: var(--dsw-space-1) var(--dsw-space-2); color: var(--dsw-alias-label-caption); font-size: 12px; }
 
 .sidebarPaneRow { position: relative; display: flex; border-bottom: 1px solid var(--dsw-alias-border-l1); transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .sidebarPaneRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
-.sidebarPaneRow[data-active] { background: var(--dsw-alias-interactive-bg-active); }
-.sidebarPaneRow[data-active]::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2.5px; background: var(--dsw-alias-state-business-primary); }
+.sidebarPaneRow[data-active] { background: var(--dsw-alias-state-business-tertiary); }
+.sidebarPaneRow[data-active] .sidebarPaneTitle { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
+.sidebarPaneRow[data-active] .sidebarPaneIndex { color: var(--dsw-alias-state-business-primary); font-weight: 700; }
 .sidebarPaneRow[data-attention] .sidebarPaneTitle { color: var(--dsw-alias-state-warn-label); }
 /* Index cell: static numeral swaps to the pane shortcut on row hover. */
 .sidebarPaneIndex { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 14px; margin-top: 1px; color: var(--dsw-alias-label-caption); font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; pointer-events: none; }
