@@ -53,7 +53,9 @@ function abortError(signal: AbortSignal): Error {
 export class SharedRead<T> {
   private settled = false
   private waiters = 0
+  /** Cancellation shared by the underlying scan; the last departing waiter or {@link cancel} trips it. */
   readonly controller = new AbortController()
+  /** The scan's settle; every {@link wait} attaches to this one promise. */
   readonly promise: Promise<T>
 
   constructor(start: (signal: AbortSignal) => Promise<T>) {
@@ -62,6 +64,12 @@ export class SharedRead<T> {
     })
   }
 
+  /**
+   * Join the shared scan. A waiter's own signal drops only that waiter; when
+   * the last waiter leaves before settle, the scan is aborted.
+   * @param signal - optional per-waiter cancellation.
+   * @returns the shared scan result.
+   */
   wait(signal?: AbortSignal): Promise<T> {
     if (signal?.aborted) {
       if (this.waiters === 0 && !this.settled) this.controller.abort()
@@ -94,7 +102,10 @@ export class SharedRead<T> {
     })
   }
 
-  /** Cancel the shared scan when its cached result is no longer useful. */
+  /**
+   * Cancel the shared scan when its cached result is no longer useful.
+   * @param reason - abort reason seen by the underlying scan.
+   */
   cancel(reason = new Error('document scan invalidated')): void {
     if (!this.settled) this.controller.abort(reason)
   }
@@ -139,6 +150,7 @@ export interface LocalUserDocFsOptions {
 export class LocalUserDocFs {
   /** Absolute document root. */
   readonly root: string
+  /** Deployment-resolved document limits enforced on writes. */
   readonly limits: UserDocLimits
   private readonly uploads: LocalUploadManager
   private readonly legacyRoot: string | undefined
@@ -231,11 +243,23 @@ export class LocalUserDocFs {
     await this.ensureReady()
   }
 
+  /**
+   * Resolve a document name inside a directory to canonical target ids.
+   * @param input - target description; an absent `directoryId` names the root.
+   * @returns the resolved directory/document identity for later operations.
+   */
   async resolveTarget(input: ResolveUserDocTarget): Promise<UserDocTarget> {
     await this.ensureReady()
     return resolveDocTarget(this.root, input.directoryId ?? UserDocDirectoryId(''), input.name)
   }
 
+  /**
+   * Stream a body into a new document at a resolved target.
+   * @param target - destination from {@link resolveTarget}.
+   * @param body - document content; enforcement of limits happens while streaming.
+   * @param signal - aborts the write; the partial file is removed.
+   * @returns the stored document ref.
+   */
   async save(
     target: UserDocTarget,
     body: ReadableStream<Uint8Array>,
@@ -247,17 +271,35 @@ export class LocalUserDocFs {
     return saved
   }
 
+  /**
+   * Open a resumable upload session under the per-scope concurrency cap.
+   * @param input - directory, name, size, and fingerprint of the intended upload.
+   * @returns the session; an identical in-flight fingerprint joins it instead.
+   */
   async beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession> {
     await this.ensureReady()
     return this.uploads.begin(input)
   }
 
+  /**
+   * Report a session's persisted chunk offsets and state.
+   * @param uploadId - session id from {@link beginUpload}.
+   * @param signal - aborts the read.
+   * @returns the session snapshot a resuming client needs.
+   */
   async inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession> {
     signal?.throwIfAborted()
     await this.ensureReady()
     return this.uploads.inspect(uploadId)
   }
 
+  /**
+   * Append one chunk at its declared offset.
+   * @param uploadId - session id from {@link beginUpload}.
+   * @param chunk - offset plus bytes; out-of-order offsets are rejected.
+   * @param signal - aborts the write.
+   * @returns the session after the chunk landed.
+   */
   async writeUploadChunk(
     uploadId: UserDocUploadId,
     chunk: UserDocUploadChunk,
@@ -267,6 +309,13 @@ export class LocalUserDocFs {
     return this.uploads.write(uploadId, chunk, signal)
   }
 
+  /**
+   * Verify the assembled payload against its fingerprint and publish it.
+   * @param uploadId - session id from {@link beginUpload}.
+   * @param sha256 - expected digest of the complete payload.
+   * @param signal - aborts the publish.
+   * @returns the session in `verifying` or `complete` state.
+   */
   async completeUpload(uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal): Promise<UserDocUploadSession> {
     signal?.throwIfAborted()
     await this.ensureReady()
@@ -275,12 +324,22 @@ export class LocalUserDocFs {
     return completed
   }
 
+  /**
+   * Drop an upload session and its buffered chunks.
+   * @param uploadId - session id from {@link beginUpload}.
+   * @param signal - aborts the cancellation read itself.
+   */
   async cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted()
     await this.ensureReady()
     return this.uploads.cancel(uploadId)
   }
 
+  /**
+   * Scan the root listing; concurrent callers share one in-flight scan.
+   * @param signal - aborts this caller's wait, not the shared scan.
+   * @returns active document refs.
+   */
   async list(signal?: AbortSignal): Promise<UserDocRef[]> {
     await this.ensureReady()
     const existing = this.fullReads.get('root')
@@ -295,6 +354,12 @@ export class LocalUserDocFs {
     return operation.wait(signal)
   }
 
+  /**
+   * Scan one directory's listing; concurrent callers share one scan.
+   * @param directoryId - directory to list.
+   * @param signal - aborts this caller's wait, not the shared scan.
+   * @returns the directory's refs plus sub-directory refs.
+   */
   async listDirectory(
     directoryId: UserDocDirectoryId,
     signal?: AbortSignal,
@@ -313,6 +378,11 @@ export class LocalUserDocFs {
     return operation.wait(signal)
   }
 
+  /**
+   * List every directory in the scope.
+   * @param signal - aborts the scan.
+   * @returns directory refs in path order.
+   */
   async listDirectories(signal?: AbortSignal): Promise<UserDocDirectoryRef[]> {
     await this.ensureReady()
     return listDocDirectories(this.root, signal)
@@ -331,6 +401,11 @@ export class LocalUserDocFs {
     return [...this.activeReads]
   }
 
+  /**
+   * Scan the recoverable-trash listing; concurrent callers share one scan.
+   * @param signal - aborts this caller's wait, not the shared scan.
+   * @returns trashed refs with their retention deadline.
+   */
   async listTrash(signal?: AbortSignal): Promise<UserDocTrashRef[]> {
     signal?.throwIfAborted()
     await this.ensureReady()
@@ -346,6 +421,12 @@ export class LocalUserDocFs {
     return operation.wait(signal)
   }
 
+  /**
+   * Move a document into recoverable trash.
+   * @param docId - document to trash.
+   * @param signal - aborts the move.
+   * @returns the trash ref carrying the retention deadline.
+   */
   async trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef> {
     signal?.throwIfAborted()
     await this.ensureReady()
@@ -354,6 +435,14 @@ export class LocalUserDocFs {
     return trashed
   }
 
+  /**
+   * Return a trashed document to a directory, optionally renamed.
+   * @param docId - trashed document.
+   * @param directoryId - destination; absent restores the original directory.
+   * @param name - replacement name; absent keeps the original.
+   * @param signal - aborts the restore.
+   * @returns the restored document ref.
+   */
   async restore(docId: UserDocId, directoryId?: UserDocDirectoryId, name?: string, signal?: AbortSignal): Promise<UserDocRef> {
     signal?.throwIfAborted()
     await this.ensureReady()
@@ -362,6 +451,11 @@ export class LocalUserDocFs {
     return restored
   }
 
+  /**
+   * Permanently delete a trashed document.
+   * @param docId - trashed document.
+   * @param signal - aborts the delete.
+   */
   async purge(docId: UserDocId, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted()
     await this.ensureReady()
@@ -369,6 +463,12 @@ export class LocalUserDocFs {
     this.invalidateReads()
   }
 
+  /**
+   * Create a directory under a parent.
+   * @param parentDirectoryId - parent; the root id nests at top level.
+   * @param name - new directory name.
+   * @returns the created directory ref.
+   */
   async createDirectory(parentDirectoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef> {
     await this.ensureReady()
     const created = await createDocDirectory(this.root, parentDirectoryId, name)
@@ -376,6 +476,12 @@ export class LocalUserDocFs {
     return created
   }
 
+  /**
+   * Rename a directory in place.
+   * @param directoryId - directory to rename.
+   * @param name - new name.
+   * @returns the updated ref.
+   */
   async renameDirectory(directoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef> {
     await this.ensureReady()
     const renamed = await renameDocDirectory(this.root, directoryId, name)
@@ -383,12 +489,22 @@ export class LocalUserDocFs {
     return renamed
   }
 
+  /**
+   * Delete a directory.
+   * @param directoryId - directory to remove.
+   */
   async removeDirectory(directoryId: UserDocDirectoryId): Promise<void> {
     await this.ensureReady()
     await removeDocDirectory(this.root, directoryId)
     this.invalidateReads()
   }
 
+  /**
+   * Move a document into another directory.
+   * @param docId - document to move.
+   * @param directoryId - destination directory.
+   * @returns the updated ref.
+   */
   async move(docId: UserDocId, directoryId: UserDocDirectoryId): Promise<UserDocRef> {
     await this.ensureReady()
     const moved = await moveDocFile(this.root, docId, directoryId)
@@ -396,21 +512,43 @@ export class LocalUserDocFs {
     return moved
   }
 
+  /**
+   * Read a document's metadata without its body.
+   * @param docId - document to stat.
+   * @param signal - aborts the read.
+   * @returns the document ref.
+   */
   async stat(docId: UserDocId, signal?: AbortSignal): Promise<UserDocRef> {
     await this.ensureReady()
     return statDocFile(this.root, docId, signal)
   }
 
+  /**
+   * Read a document's metadata and buffered body.
+   * @param docId - document to read.
+   * @param signal - aborts the read.
+   * @returns ref plus body bytes.
+   */
   async read(docId: UserDocId, signal?: AbortSignal): Promise<StoredUserDoc> {
     await this.ensureReady()
     return readDocFile(this.root, docId, signal)
   }
 
+  /**
+   * Open a streaming read over a document's stored body.
+   * @param docId - document to stream.
+   * @returns the ref plus a body stream for callers that must not buffer.
+   */
   async openRead(docId: UserDocId): Promise<{ ref: UserDocRef; body: ReadableStream<Uint8Array> }> {
     await this.ensureReady()
     return openDocFile(this.root, docId)
   }
 
+  /**
+   * Delete a document outright, bypassing trash.
+   * @param docId - document to remove.
+   * @param signal - aborts the delete.
+   */
   async remove(docId: UserDocId, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted()
     await this.ensureReady()

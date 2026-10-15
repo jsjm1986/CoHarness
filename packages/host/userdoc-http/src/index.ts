@@ -1918,9 +1918,9 @@ async function purgeDocument(host: UserDocHttpHost, res: UserDocResponse, url: U
 
 /**
  * Handle the document subtree after Connection has admitted the request authority.
- * @param ctx - Host context containing Connection and the document store.
- * @param req - incoming HTTP request.
- * @param res - response that the route owns.
+ * @param host - document store plus catalog/attachment hooks the route reports through.
+ * @param req - incoming HTTP request; a minimal `{ method, url, headers, body }` face is accepted.
+ * @param res - response that the route owns; a minimal `{ writeHead, end, ... }` face is accepted.
  */
 export async function handleUserDocHttp(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
   const url = query(req)
