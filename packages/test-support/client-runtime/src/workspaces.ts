@@ -1,7 +1,7 @@
 /** Test-owned workspaces face: the renderer standard-kit observable plus recorded actions. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  DirectoryListing, IWorkspaces, SessionId, SnapshotStore, WorkspaceId, WorkspaceListState, WorkspaceView,
+  DirectoryListing, IWorkspaces, SessionId, SnapshotStore, StartSessionOptions, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceListState } from './fixtures.ts'
 import type { Stabilizer } from './fixtures.ts'
@@ -79,10 +79,11 @@ export class TestWorkspaces implements IWorkspaces {
   /**
    * New-session flow (recorded; stubbed behavior runs when installed).
    * @param workspaceId - optional explicit workspace target.
+   * @param options - draft initialization and failure observer for the landed Session.
    */
-  startSession(workspaceId?: WorkspaceId): void {
-    this.calls.push({ method: 'startSession', args: [workspaceId] })
-    this.stubs.get('startSession')?.(workspaceId)
+  startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void {
+    this.calls.push({ method: 'startSession', args: [workspaceId, options] })
+    this.stubs.get('startSession')?.(workspaceId, options)
   }
 
   /**

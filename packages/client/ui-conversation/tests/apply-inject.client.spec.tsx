@@ -342,7 +342,7 @@ describe('conversation slot inject API', () => {
     await vi.waitFor(() => {
       expect(b.runtime.sessions.calls.filter(c => c.method === 'open')).toHaveLength(1)
     })
-    expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openWorkspace', args: ['workspace-1'] })
+    expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openWorkspace', args: ['workspace-1', undefined] })
     expect(state.getSnapshot().draft).toBe('carry me')
     // Cross-session history entry: the draft remains in the old session unless
     // the caller explicitly confirms the discard flow.

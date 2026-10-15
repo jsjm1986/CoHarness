@@ -56,6 +56,7 @@
     "apps/web/tests/seeded-history.e2e.ts",
     "apps/web/tests/cold-blank-session.e2e.ts",
     "apps/web/tests/blank-preset-reuse.e2e.ts",
+    "apps/web/tests/draft-initialization.e2e.ts",
     "apps/web/tests/responsive-shell.e2e.ts",
     "apps/web/tests/project-collaboration.e2e.ts",
     "apps/web/tests/document-manager.e2e.ts",

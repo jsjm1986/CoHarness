@@ -12,7 +12,7 @@ import type { ClientContext, ISessions, SessionBinding, SessionReference, Sessio
 import type { InputTriggerController, SubmitImageAttachment, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { queueReadFaceOf } from '../contract/queue.ts'
-import type { ComposerKeyboard, DraftAttachmentId, DraftDocumentId, SessionInputResolver, SessionInput } from './contract.ts'
+import type { ComposerKeyboard, DraftAttachmentId, DraftDocumentId, DraftInitializationOptions, SessionInputResolver, SessionInput } from './contract.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
@@ -47,6 +47,8 @@ interface ConversationAttachmentFace {
 /** Session-addressed input facade registry (SessionInputResolver face + composer-layer extras). */
 export class InputHub implements SessionInputResolver {
   private readonly shells = new Map<SessionId, { binding: SessionBinding; shell: SessionInputShell }>()
+  /** Initialization awaiting its Session's first shell; consumed once at shellFor. */
+  private readonly pendingInits = new Map<SessionId, DraftInitializationOptions>()
 
   /**
    * @param ctx - client root context (services resolved lazily per call — boot order stays free).
@@ -81,6 +83,8 @@ export class InputHub implements SessionInputResolver {
     const existing = this.shells.get(binding.sessionId)
     if (existing?.binding === binding) return existing.shell
     const { sessionId: id, session, ctx: actx } = binding
+    const pending = this.pendingInits.get(id)
+    this.pendingInits.delete(id)
     const shell = new SessionInputShell({
       actx,
       inputTriggers: () => this.controller(actx),
@@ -105,6 +109,10 @@ export class InputHub implements SessionInputResolver {
       },
     })
     this.shells.set(id, { binding, shell })
+    // Initialize before any consumer can read the shell — the first
+    // input-model read holds the complete draft, with no React effect
+    // restoring text afterwards.
+    if (pending !== undefined) this.applyDraftInitialization(shell, pending)
     // The one teardown axis: listeners, shell, and map entries all ride the
     // scope fiber (nothing here outlives the scope).
     actx.effect(() => {
@@ -160,6 +168,47 @@ export class InputHub implements SessionInputResolver {
     const binding = this.sessions().binding(id)
     if (binding === undefined) throw new Error(`conversation.input: session "${id}" resolved no binding`)
     return this.shellFor(binding)
+  }
+
+  /**
+   * Existing shell only — unlike {@link shell}, resolves no binding and
+   * creates nothing.
+   * @param id - Session to look up.
+   * @returns the live shell, or undefined when none exists.
+   */
+  peek(id: SessionId): SessionInputShell | undefined {
+    return this.shells.get(id)?.shell
+  }
+
+  /**
+   * Route draft initialization to one Session's input: applied at once when
+   * the shell already exists, otherwise retained until shellFor creates it —
+   * either way the first input-model read carries the complete draft.
+   * @param id - target Session.
+   * @param options - prompt text and/or the clear flag.
+   */
+  requestDraftInitialization(id: SessionId, options: DraftInitializationOptions): void {
+    const existing = this.shells.get(id)?.shell
+    if (existing === undefined) {
+      this.pendingInits.set(id, options)
+      return
+    }
+    this.applyDraftInitialization(existing, options)
+  }
+
+  /**
+   * Clear or prefill rules over one shell. A live submission owns the draft
+   * and refuses the change; explicit clearing replaces text only — image and
+   * document attachments are untouched.
+   */
+  private applyDraftInitialization(shell: SessionInputShell, options: DraftInitializationOptions): void {
+    const snapshot = shell.snapshot
+    if (snapshot.phase === 'adjudicating' || snapshot.phase === 'submitting') return
+    if (options.clearPreviousDraft === true) {
+      shell.setDraft(options.prompt ?? '')
+      return
+    }
+    if (options.prompt !== undefined && snapshot.draft === '') shell.setDraft(options.prompt)
   }
 
   /**

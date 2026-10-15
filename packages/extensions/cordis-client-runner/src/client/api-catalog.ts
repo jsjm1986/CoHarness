@@ -321,9 +321,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the selected historical or fallback blank Session id.',
       },
       {
-        signature: 'startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void',
+        signature: 'startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void',
         description: 'The New Session flow: connect the explicit, current-Session, or recent Workspace and open the resulting session. Connect and navigation failures are non-fatal — they log and reach `onFailure` when supplied; the current view stays usable.',
-        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }, { name: 'onFailure', description: 'observer for the rejected connect/open, for surfaces that turn an explicit New Session click into a notice.' }],
+        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }, { name: 'options', description: 'draft initialization (`prompt` prefills the target Session\'s composer without sending; `clearPreviousDraft` discards its draft text first) plus `onFailure`, the observer for the rejected connect/open.' }],
       },
       {
         signature: 'create(input: { path: string }): Promise<WorkspaceView>',
@@ -913,6 +913,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'StartedToolCall',
     declaration: 'export interface StartedToolCall extends ToolCallHead {\n    readonly phase: \'start\';\n    readonly argsRaw: string;\n}',
+  },
+  {
+    name: 'StartSessionOptions',
+    declaration: 'export interface StartSessionOptions {\n    readonly prompt?: string;\n    readonly clearPreviousDraft?: boolean;\n    readonly onFailure?: (reason: unknown) => void;\n}',
   },
   {
     name: 'SteeringMessageNode',

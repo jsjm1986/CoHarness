@@ -881,6 +881,76 @@ describe('WorkspaceRuntime', () => {
     expect(connect).toHaveBeenCalledWith(wid('hinted'))
   })
 
+  it('emits draft-initialize for the retained Session once navigation commits', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('target')] as never[] }))
+    api.onList = () => Promise.resolve(ok({ items: [{ sessionId: sid('blank'), updatedAt: 1, running: false, blank: true }] as never[] }))
+    const events: Array<{ sessionId: string; prompt?: string; clearPreviousDraft?: boolean }> = []
+    ctx.on('conversation/draft-initialize', (payload) => { events.push(payload) })
+    try {
+      await Promise.all([workspaces.refresh(), sessions.refresh()])
+      const connect = vi.spyOn(workspaces, 'connectWorkspace').mockResolvedValue(sid('blank'))
+      workspaces.startSession(wid('target'), { prompt: 'seed the composer' })
+      await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe(sid('blank')) })
+      expect(connect).toHaveBeenCalledWith(wid('target'))
+      expect(events).toEqual([{ sessionId: sid('blank'), prompt: 'seed the composer' }])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('emits no draft-initialize without options or after a superseded navigation', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('target')] as never[] }))
+    api.onList = () => Promise.resolve(ok({ items: ['old', 'stale', 'new'].map(id => ({
+      sessionId: sid(id), updatedAt: 1, running: false, blank: false,
+    })) }))
+    const events: Array<{ sessionId: string }> = []
+    ctx.on('conversation/draft-initialize', (payload) => { events.push(payload) })
+    try {
+      await Promise.all([workspaces.refresh(), sessions.refresh()])
+      sessions.open(sid('old'))
+      const pending = deferred<SessionId>()
+      vi.spyOn(workspaces, 'connectWorkspace').mockReturnValue(pending.promise)
+      workspaces.startSession(wid('target'), { prompt: 'stale write' })
+      sessions.open(sid('new'))
+      pending.resolve(sid('stale'))
+      await pending.promise
+      await Promise.resolve()
+      expect(events).toEqual([])
+
+      workspaces.startSession(wid('target'), { prompt: 'late', clearPreviousDraft: true })
+      await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe(sid('stale')) })
+      expect(events).toEqual([{ sessionId: sid('stale'), prompt: 'late', clearPreviousDraft: true }])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('routes a rejected start to the options onFailure observer', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('target')] as never[] }))
+    api.onList = () => Promise.resolve(ok({ items: [] }))
+    const onFailure = vi.fn()
+    try {
+      await Promise.all([workspaces.refresh(), sessions.refresh()])
+      vi.spyOn(workspaces, 'connectWorkspace').mockRejectedValue(new Error('connect refused'))
+      workspaces.startSession(wid('target'), { onFailure })
+      await vi.waitFor(() => { expect(onFailure).toHaveBeenCalledOnce() })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('archives a session, projects the set from the response, list, and frame, and clears only the current one', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

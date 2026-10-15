@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-17-session-draft-initialization.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-17-session-draft-initialization.md
+/agent-note-session-draft-initialization-behind-a-root-event:
+  en: 964b9161ffb96bb4
+  zh: ab9f27ae0053fb07
+/agent-note-session-draft-initialization-behind-a-root-event/problem:
+  en: 9ac9cf959b793a34
+  zh: 873840bbaf3e9f8f
+/agent-note-session-draft-initialization-behind-a-root-event/decision:
+  en: 7d8618b9be488d9a
+  zh: c6173b15820106e4
+/agent-note-session-draft-initialization-behind-a-root-event/alternatives-considered:
+  en: 35cf7d07227e91d8
+  zh: 0654a3d41e55e36c
+/agent-note-session-draft-initialization-behind-a-root-event/consequences:
+  en: 191e2e2978a73403
+  zh: 3033ea0b21dfff18
+/agent-note-session-draft-initialization-behind-a-root-event/testing:
+  en: ddc9b4a5cc1a992d
+  zh: 07536eb3b5287d7f

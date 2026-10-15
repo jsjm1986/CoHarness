@@ -5,7 +5,7 @@
  * conversation wiring layer alone sees the full SessionInput. InputMachine
  * (machine.ts) is package-private and never exported.
  */
-import type { ClientContext, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionId, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { UserDocIdType } from '@deepseek-ai/dsh-userdoc'
 import type {
@@ -92,10 +92,29 @@ export interface SessionInput extends InputTarget, InputDraftActions {
   readonly state: SnapshotStore<InputState>
 }
 
+/**
+ * Draft initialization handed to a Session's input before its composer
+ * exists. Carried by the `conversation/draft-initialize` root event.
+ */
+export interface DraftInitializationOptions {
+  /** Unsent text the draft starts with — a prefill only; nothing is sent or executed. */
+  readonly prompt?: string
+  /** Replace the Session's draft text; omitted preserves a nonempty draft. Attachments are untouched either way. */
+  readonly clearPreviousDraft?: boolean
+}
+
 /** Session-addressed access to the per-session input facade. */
 export interface SessionInputResolver {
   /** Resolve the facade for one session-scope ctx. */
   for(actx: ClientContext): SessionInput
+  /**
+   * Apply draft initialization to one Session — immediately when its shell
+   * exists, or at shell creation otherwise. A live submission owns the draft
+   * and refuses the change; the latest request supersedes an unconsumed one.
+   * @param sessionId - target Session.
+   * @param options - prompt text and/or the clear flag.
+   */
+  requestDraftInitialization(sessionId: SessionId, options: DraftInitializationOptions): void
 }
 
 /**

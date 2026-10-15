@@ -382,6 +382,31 @@ export function apply(ctx: Context): void {
     },
   }), 'ui-conversation: input standard-kit provider')
 
+  // Draft initialization lands through the root event so New Session flows
+  // need no reach into this package; the hub answers for the exact Session.
+  // The per-session chat store is the durable draft owner: writes go through
+  // it as well so an unmounted Session keeps the initialized text across
+  // remount and reload, and a cleared draft cannot re-seed later.
+  ctx.effect(() => ctx.on('conversation/draft-initialize',
+    (payload: { sessionId: SessionId; prompt?: string; clearPreviousDraft?: boolean }) => {
+      const { sessionId, ...options } = payload
+      const chat = ctx.slots.bindStore(chatStore, sessionId)
+      const shell = inputHub.peek(sessionId)
+      // A live submission owns the draft and refuses the change.
+      if (shell !== undefined
+        && (shell.snapshot.phase === 'adjudicating' || shell.snapshot.phase === 'submitting')) return
+      // The existing draft is the live shell text when present, else the
+      // persisted owner — an empty shell not yet seeded from the store does
+      // not make a preserved draft adoptable.
+      const current = shell === undefined || shell.snapshot.draft === ''
+        ? chat.store.getSnapshot().draft : shell.snapshot.draft
+      const next = options.clearPreviousDraft === true ? options.prompt ?? ''
+        : options.prompt !== undefined && current === '' ? options.prompt : undefined
+      if (next === undefined) return
+      chat.actions.setDraft(next)
+      inputHub.requestDraftInitialization(sessionId, { prompt: next, clearPreviousDraft: true })
+    }), 'ui-conversation: draft-initialize listener')
+
   // Resident current-session-optional shell. It owns the stable Hero/composer
   // frame while strict session slots fill only their session-bound regions.
   // The reserved `conversation` key keeps the layout's main selection on this

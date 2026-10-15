@@ -46,6 +46,7 @@
     "details-session-lifecycle.e2e.ts": "lifecycle",
     "diff-context.e2e.ts": "conversation",
     "document-manager.e2e.ts": "documents",
+    "draft-initialization.e2e.ts": "lifecycle",
     "feedback-command.e2e.ts": "conversation",
     "goal-bar.e2e.ts": "conversation",
     "goal-command-presentation.e2e.ts": "conversation",

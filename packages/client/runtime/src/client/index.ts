@@ -100,7 +100,7 @@ export type {
   SubmissionHandle,
 } from './contract/session.ts'
 export type { AgentContext, ISessions, SessionRuntimeTarget, SessionTarget, SessionReference, SessionRetainOptions, SessionRetainInfo } from './contract/sessions.ts'
-export type { IWorkspaces } from './contract/workspaces.ts'
+export type { IWorkspaces, StartSessionOptions } from './contract/workspaces.ts'
 export type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/session-create.ts'
 export type {
   SessionBinding, SessionListState, SessionProvideContribution, SessionProvideDescriptor, SessionSummary,
@@ -265,6 +265,20 @@ declare module '@deepseek-ai/cordis' {
      * @returns true when a Browser consumer accepts the link; absent handlers retain external navigation.
      */
     'web/browser-open'(request: { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; url: string }): true | undefined
+    /**
+     * Initialize one Session's composer draft after a New Session navigation
+     * commits. A prefill only — listeners mutate the unsent draft and never
+     * send, execute, or log anything.
+     * @param payload - target Session, prompt text, and the clear flag.
+     * @mode emit
+     */
+    'conversation/draft-initialize'(
+      payload: {
+        sessionId: import('@deepseek-ai/dsh-session/types').SessionId
+        prompt?: string
+        clearPreviousDraft?: boolean
+      },
+    ): void
   }
   interface Context {
     slots: import('./slots.ts').SlotRegistry

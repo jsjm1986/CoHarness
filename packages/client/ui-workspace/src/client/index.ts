@@ -21,7 +21,7 @@ import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace/types'
 import {
   commitSessionNavigation, WorkspaceArchiveError,
-  type ClientContext, type SessionId, type WorkspaceId,
+  type ClientContext, type SessionId, type StartSessionOptions, type WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -62,6 +62,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
+/**
+ * Draft initialization a New Session flow may hand its landing composer.
+ * Failure notification stays with the Workspace UI's notice channel.
+ */
+export type UiStartSessionOptions = Omit<StartSessionOptions, 'onFailure'>
+
 /** Session navigation face other plugins consume through `ctx.uiWorkspace`. */
 export interface UiWorkspace {
   /**
@@ -73,8 +79,11 @@ export interface UiWorkspace {
   /**
    * Start a New Session flow and navigate to its Session.
    * @param workspaceId - explicit target; absent inherits the current or most recent Workspace.
+   * @param options - draft initialization for the landing composer: `prompt`
+   * prefills unsent text (an empty draft only; it never sends or executes),
+   * `clearPreviousDraft` discards the draft text first.
    */
-  startSession(workspaceId?: WorkspaceId): void
+  startSession(workspaceId?: WorkspaceId, options?: UiStartSessionOptions): void
   /**
    * Fork a Session and open its child.
    * @param sessionId - source Session.
@@ -217,13 +226,16 @@ export function apply(ctx: ClientContext): void {
         console.warn('session navigation failed:', reason)
       })
     },
-    startSession: (workspaceId) => {
+    startSession: (workspaceId, options) => {
       // Starting a session targets the Conversation surface — the no-workspace
       // clear and a same-session reuse emit no selection change, so the panel
       // reset cannot ride the session-list subscription `openSession` enjoys.
       ctx.layout.selectPanel(null)
-      ctx.workspaces.startSession(workspaceId, (reason) => {
-        notify({ kind: 'createFailed', message: createFailureMessage(reason) })
+      ctx.workspaces.startSession(workspaceId, {
+        ...options,
+        onFailure: (reason) => {
+          notify({ kind: 'createFailed', message: createFailureMessage(reason) })
+        },
       })
     },
     forkSession,

@@ -10,7 +10,7 @@ import type {
 import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.ts'
-import type { IWorkspaces } from '../contract/workspaces.ts'
+import type { IWorkspaces, StartSessionOptions } from '../contract/workspaces.ts'
 import { commitSessionNavigation } from '../navigation.ts'
 import { WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
 
@@ -143,7 +143,7 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param api - shared wire client.
    * @param sessions - cross-domain sessions face used for recency and blank-session reuse.
    */
-  constructor(ctx: Context, private readonly api: IApiClient, private readonly sessions: SessionsPort) {
+  constructor(private readonly rootCtx: Context, private readonly api: IApiClient, private readonly sessions: SessionsPort) {
     // Whole-set echoes install only for sessions owned by the runtime this
     // mirror tracks; a session-addressed call routed elsewhere returns a
     // foreign registry's set, which its own runtime frames own.
@@ -155,7 +155,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     })
     this.manager.subscribe(() => { this.project() })
     this.sessions.list.subscribe(() => { this.project() })
-    ctx.reflect.provide('workspaces', this, undefined)
+    rootCtx.reflect.provide('workspaces', this, undefined)
   }
 
   /**
@@ -366,9 +366,11 @@ export class WorkspaceRuntime implements IWorkspaces {
    * Connect failures are non-fatal (console diagnostics plus `onFailure`;
    * the current view stays usable).
    * @param workspaceId - explicit target Workspace for scoped actions.
-   * @param onFailure - observer for the rejected connect/open.
+   * @param options - draft initialization for the landed Session and the
+   * rejected-connect observer.
    */
-  startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void {
+  startSession(workspaceId?: WorkspaceId, options: StartSessionOptions = {}): void {
+    const { prompt, clearPreviousDraft, onFailure } = options
     const workspace = this.list.getSnapshot()
     const sessions = this.sessions.list.getSnapshot()
     const current = sessions.current
@@ -391,6 +393,15 @@ export class WorkspaceRuntime implements IWorkspaces {
           if (this.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
             || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
           this.sessions.open(sessionId)
+          // Draft initialization is a prefill only: nothing is sent, and the
+          // input hub applies it when (or if) the Session's composer exists.
+          if (prompt !== undefined || clearPreviousDraft === true) {
+            this.rootCtx.emit('conversation/draft-initialize', {
+              sessionId,
+              ...(prompt !== undefined ? { prompt } : {}),
+              ...(clearPreviousDraft === true ? { clearPreviousDraft: true } : {}),
+            })
+          }
         })
       },
     ).catch((reason: unknown) => {

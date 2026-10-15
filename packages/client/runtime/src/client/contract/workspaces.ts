@@ -10,6 +10,20 @@ import type { DirectoryListing, SessionId, WorkspaceId, WorkspaceView } from '@d
 import type { WorkspaceListState } from '../workspaces/service.ts'
 import type { ObservableSnapshot } from './store.ts'
 
+/**
+ * Options for {@link IWorkspaces.startSession}. A shallow copy captures these
+ * values before asynchronous creation, so the result addresses only the
+ * retained target Session.
+ */
+export interface StartSessionOptions {
+  /** Unsent composer text the new conversation starts with — a prefill only; nothing is sent or executed. */
+  readonly prompt?: string
+  /** Replace the target Session's draft text; omitted preserves a nonempty draft. Attachments are untouched either way. */
+  readonly clearPreviousDraft?: boolean
+  /** Observer for the rejected connect/open, for surfaces that turn an explicit New Session click into a notice. */
+  readonly onFailure?: (reason: unknown) => void
+}
+
 /** The workspaces-service face injected as `ctx.workspaces`. */
 export interface IWorkspaces {
   /** The useWorkspaces standard feed (read face — writes stay inside the domain). */
@@ -39,10 +53,12 @@ export interface IWorkspaces {
    * view stays usable.
    * @param workspaceId - explicit target; omitted inherits the current
    * Session's Workspace before falling back to the recency projection.
-   * @param onFailure - observer for the rejected connect/open, for surfaces
-   * that turn an explicit New Session click into a notice.
+   * @param options - draft initialization (`prompt` prefills the target
+   * Session's composer without sending; `clearPreviousDraft` discards its
+   * draft text first) plus `onFailure`, the observer for the rejected
+   * connect/open.
    */
-  startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void
+  startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void
   /**
    * Register an existing path as a Workspace.
    * @param input - the Host create payload.

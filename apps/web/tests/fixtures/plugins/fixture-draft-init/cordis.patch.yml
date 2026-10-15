@@ -1,0 +1,3 @@
+- insert:
+    - id: fixture-draft-init
+      name: '@fixture/draft-init'

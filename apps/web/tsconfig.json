@@ -61,6 +61,7 @@
     "tests/seeded-history.e2e.ts",
     "tests/cold-blank-session.e2e.ts",
     "tests/blank-preset-reuse.e2e.ts",
+    "tests/draft-initialization.e2e.ts",
     "tests/responsive-shell.e2e.ts",
     "tests/project-collaboration.e2e.ts",
     "tests/workspace-history-entry.e2e.ts",
