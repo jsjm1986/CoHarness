@@ -42,7 +42,7 @@ export function StewardChip({ useCollaboration, t }: StewardChipProps) {
     >
       <button type="button" className={css.chip} aria-label={t('steward.chip.label')}>
         <span className={css.icon} aria-hidden="true"><IconShieldOutline16 size={14} /></span>
-        <span className={css.label} aria-hidden="true">{t('steward.chip.label')}</span>
+        <span className={css.label} aria-hidden="true" data-clip-label>{t('steward.chip.label')}</span>
       </button>
     </Tooltip>
   )

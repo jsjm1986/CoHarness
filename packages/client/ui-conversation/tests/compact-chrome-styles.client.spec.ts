@@ -115,6 +115,13 @@ describe('conversation compact chrome', () => {
     // The very narrowest panes hide the context meter; compact phones keep it.
     expect(contextMeter).toMatch(/@container\s*\(max-width:\s*340px\)\s*\{[^@]*\.root\s*\{[^}]*display:\s*none/u)
     expect(contextMeter).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.root\s*\{[^}]*display:\s*inline-flex/u)
+    // Contributed-item lanes share one degrade contract: the lane publishes
+    // data-clipped while it overflows, every item drops its data-clip-label
+    // span under the shared rule, and the floor keeps one icon seat intact
+    // only while an item actually rendered (empty slot wrappers are :empty).
+    expect(input).toMatch(/\.extensionItems\s*\{[^}]*overflow:\s*hidden/u)
+    expect(input).toMatch(/\.extensionItems\[data-clipped\]\s*:global\(\[data-clip-label\]\)\s*\{[^}]*display:\s*none/u)
+    expect(input).toMatch(/\.extensionItems:has\(>\s*:not\(:empty\)\)\s*\{[^}]*min-width:\s*24px/u)
     // Nothing may force the trailing group onto a second line.
     expect(input).not.toContain('flex-basis: 100%')
     expect(input).not.toMatch(/\.row:has\(\[data-model-select\]\)/u)

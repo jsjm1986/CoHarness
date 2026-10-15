@@ -52,16 +52,13 @@
 }
 
 /* Seat-driven collapse: the extension lane publishes `data-clipped` the
-   moment its content overflows, so the chip drops to its icon seat exactly
-   when the lane would slice it — no guessed breakpoint, no partial label. */
+   moment its content overflows and hides `data-clip-label` text globally;
+   the chip only owns its icon-seat shape here — exactly when the lane would
+   slice it, never a guessed breakpoint, never a partial label. */
 :global([data-input-extension][data-clipped]) .chip {
   width: 24px;
   padding: 0;
   justify-content: center;
-}
-
-:global([data-input-extension][data-clipped]) .label {
-  display: none;
 }
 
 /* The compact phone toolbar runs icon-only on its single line; the seat

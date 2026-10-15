@@ -23,7 +23,9 @@ describe('StewardChip.module.css', () => {
     // hardcoded width.
     expect(css).not.toMatch(/@container/)
     expect(css).toMatch(/:global\(\[data-input-extension\]\[data-clipped\]\)\s*\.chip\s*\{[^}]*justify-content:\s*center/)
-    expect(css).toMatch(/:global\(\[data-input-extension\]\[data-clipped\]\)\s*\.label\s*\{[^}]*display:\s*none/)
+    // Label hiding under the clip flag is owned by the lane's shared
+    // [data-clip-label] rule — the chip must not re-declare it.
+    expect(css).not.toMatch(/data-clipped\]\)\s*\.label\s*\{[^}]*display:\s*none/)
     const compact = css.match(/:global\(\[data-viewport='compact'\]\)\s*\.chip\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(compact).toContain('var(--dsw-touch-target)')
     expect(css).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.label\s*\{[^}]*display:\s*none/)

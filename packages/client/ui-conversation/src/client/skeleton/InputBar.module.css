@@ -434,12 +434,25 @@
   gap: var(--dsw-space-1);
   /* The row never wraps; contributed items are the first thing to clip when
      the line runs out of width. ExtensionItems publishes `data-clipped` on
-     the lane while its content overflows; items opt in to
-     [data-input-extension][data-clipped] selectors to drop secondary chrome
-     rather than slice mid-glyph. The lane floor keeps one icon seat intact —
-     below it the row would be slicing the collapsed seat itself. */
-  min-width: 24px;
+     the lane while its content overflows; items mark their secondary text
+     with `data-clip-label` so the shared rule below drops it whole rather
+     than letting the lane slice mid-glyph. */
   overflow: hidden;
+}
+
+/* Floor only while an item actually rendered — the lane's slot wrappers are
+   display:contents and go :empty when every registrant returns null, and an
+   empty lane must not claim row width. */
+.extensionItems:has(> :not(:empty)) {
+  min-width: 24px;
+}
+
+/* Shared degrade contract: while the lane clips, every contributed item
+   hides its `data-clip-label` span. Items keep their own seat shape under
+   the flag; only label removal is owned here so no item can regress into
+   partial-glyph rendering. */
+.extensionItems[data-clipped] :global([data-clip-label]) {
+  display: none;
 }
 
 /* Wide gaps between the tool seats and between the mode chips so the pill
