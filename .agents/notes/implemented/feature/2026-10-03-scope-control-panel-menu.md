@@ -14,7 +14,7 @@ The Scope switcher popover pinned itself to the shared `Menu` minimum width, so 
 
 - `Menu` accepts `listStyle`, a `CSSProperties` override merged under the portal's computed `left`/`top`; measurement and viewport clamping are unchanged because the override applies to the same element the positioning code measures.
 - `ScopeControl` observes the trigger button with `ResizeObserver` and passes `width: clamp(trigger.offsetWidth, 240, 400)` as `listStyle`; dragging the sidebar therefore re-sizes the open menu without re-opening it.
-- Scope rows render one line: a status dot (brand-colored on the active scope), the name, and a mode flag pinned to the row's trailing edge — a status dot + text for restricted scopes (muted for read-only, warn amber for steward) and plain text for the unrestricted tiers (personal, admin, read-write). The panel gains a `scope.menuTitle` header above the search field.
+- Scope rows render one line: a status dot (brand-colored on the active scope), the name, and a mode flag pinned to the row's trailing edge — a status dot + text for restricted scopes (muted for read-only, warn amber for steward) and plain text for the minority unrestricted tier — the dominant tier among admin/read-write stays unflagged (full-roster tally), personal always answers. The panel gains a `scope.menuTitle` header above the search field.
 
 ## Alternatives considered
 

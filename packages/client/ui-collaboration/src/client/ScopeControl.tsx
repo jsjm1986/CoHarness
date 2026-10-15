@@ -8,7 +8,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {
-  CollaborationSnapshot, CollaborationVisibility,
+  CollaborationSnapshot, CollaborationVisibility, ProjectMembership,
 } from './collaboration-client.ts'
 import type { NS } from './locales.ts'
 import { ProjectManagerModal, type ProjectManagerMode } from './ProjectManagerModal.tsx'
@@ -131,6 +131,27 @@ export function ScopeControl({
     ? context?.projects ?? []
     : context.projects.filter(project => project.name.toLowerCase().includes(normalizedProjectQuery))
 
+  // The grant flag answers "what differs from your usual access": the tier
+  // that dominates the roster — admin or plain read-write — carries no
+  // information, so it renders unflagged and only the minority tier (plus
+  // personal, read-only, and steward) keeps a mark. A tie suppresses admin,
+  // the visually heavier label. The tally reads the full roster, never the
+  // filtered view, so searching cannot flip which tier stays quiet.
+  const adminGrantCount = context === undefined ? 0
+    : context.projects.filter(project => project.kind !== 'steward' && project.canManage === true).length
+  const rwGrantCount = context === undefined ? 0
+    : context.projects.filter(project => project.kind !== 'steward' && project.canManage !== true && project.mode === 'rw').length
+  const suppressedGrant: 'admin' | 'rw' = adminGrantCount >= rwGrantCount ? 'admin' : 'rw'
+  const grantText = (project: ProjectMembership): string => (
+    project.kind === 'steward'
+      ? t('scope.steward')
+      : project.canManage === true
+        ? (suppressedGrant === 'admin' ? '' : t('scope.admin'))
+        : project.mode === 'ro'
+          ? t('scope.readOnly')
+          : (suppressedGrant === 'rw' ? '' : t('scope.readWrite'))
+  )
+
   useEffect(() => {
     if (getInvitationCount === undefined) return
     let active = true
@@ -193,35 +214,36 @@ export function ScopeControl({
           </span>
         )
   )
-  const projectEntries: MenuEntry[] = visibleProjects.map(project => ({
-    id: `scope:project:${project.projectId}`,
-    label: (
-      <span className={css.scopeRow}>
-        {project.kind === 'steward'
-          ? (
-            <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
-              <IconShieldOutline16 size={11} />
-            </span>
-          )
-          : (
-            <span className={`${css.tile} ${tileTone(project.name)}`} aria-hidden="true">
-              {tileGlyph(project.name)}
+  const projectEntries: MenuEntry[] = visibleProjects.map((project) => {
+    const flag = grantText(project)
+    return {
+      id: `scope:project:${project.projectId}`,
+      label: (
+        <span className={css.scopeRow}>
+          {project.kind === 'steward'
+            ? (
+              <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
+                <IconShieldOutline16 size={11} />
+              </span>
+            )
+            : (
+              <span className={`${css.tile} ${tileTone(project.name)}`} aria-hidden="true">
+                {tileGlyph(project.name)}
+              </span>
+            )}
+          <span className={css.scopeName}>{project.name}</span>
+          {flag !== '' && (
+            <span className={project.kind === 'steward'
+              ? css.scopeFlagWarn
+              : project.mode === 'ro' && project.canManage !== true ? css.scopeFlagMark : css.scopeFlag}>
+              {flag}
             </span>
           )}
-        <span className={css.scopeName}>{project.name}</span>
-        <span className={project.kind === 'steward'
-          ? css.scopeFlagWarn
-          : project.mode === 'ro' ? css.scopeFlagMark : css.scopeFlag}>
-          {project.kind === 'steward'
-            ? t('scope.steward')
-            : project.canManage === true
-              ? t('scope.admin')
-              : project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
         </span>
-      </span>
-    ),
-    disabled: state.scopeBusy,
-  }))
+      ),
+      disabled: state.scopeBusy,
+    }
+  })
   if (visibleProjects.length === 0 && normalizedProjectQuery !== '') {
     projectEntries.push({
       type: 'label', id: 'project-search-empty', text: t('scope.searchEmpty'),
@@ -556,11 +578,7 @@ export function ScopeControl({
                 {visibleProjects.map((project) => {
                   const id = `scope:project:${project.projectId}`
                   const selected = id === currentScopeId
-                  const modeText = project.kind === 'steward'
-                    ? t('scope.steward')
-                    : project.canManage === true
-                      ? t('scope.admin')
-                      : project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')
+                  const modeText = grantText(project)
                   return (
                     <button
                       key={id}
@@ -585,9 +603,11 @@ export function ScopeControl({
                           </span>
                         )}
                       <span className={css.pageRowName}>{project.name}</span>
-                      <span className={project.kind === 'steward' ? css.pageValueWarn : css.pageValue}>
-                        {modeText}
-                      </span>
+                      {modeText !== '' && (
+                        <span className={project.kind === 'steward' ? css.pageValueWarn : css.pageValue}>
+                          {modeText}
+                        </span>
+                      )}
                       {selected && pageCheck}
                     </button>
                   )

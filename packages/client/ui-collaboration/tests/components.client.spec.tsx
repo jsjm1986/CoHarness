@@ -231,13 +231,13 @@ describe('ScopeControl', () => {
 
     fireEvent.change(search, { target: { value: '审计' } })
     expect(screen.getByRole('button', { name: /审计平台/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /项目 1可编辑/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: '项目 1' })).toBeNull()
 
     fireEvent.change(search, { target: { value: '不存在' } })
     expect(screen.getByText('没有匹配的项目空间')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '清除项目空间搜索' }))
     expect(search.value).toBe('')
-    expect(screen.getByRole('button', { name: /项目 1可编辑/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '项目 1' })).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('group', { name: '切换个人或项目空间' })).toBeNull()
@@ -269,28 +269,49 @@ describe('ScopeControl', () => {
     expect(stewardItem.querySelector('svg')).not.toBeNull()
     expect(stewardItem.querySelector(`span.${css.tileWarn}`)).not.toBeNull()
     const projectItem = screen.getByRole('button', { name: /支付重构/ })
-    // Every row answers the member's grant: read-write reads 可编辑.
-    expect(projectItem.textContent).toContain('可编辑')
+    // The dominant read-write tier stays quiet; only minority tiers flag.
+    expect(projectItem.textContent).not.toContain('可编辑')
+    expect(projectItem.textContent).not.toContain('只读')
     const tile = projectItem.querySelector(`span.${css.tile}`)
     expect(tile).not.toBeNull()
     expect(tile?.textContent).toBe('支')
   })
 
-  it('flags every roster row with the member grant: admin, read-write, read-only', () => {
-    const context: CollaborationContext = {
+  it('flags only the minority grant tier: the dominant tier renders unflagged', () => {
+    // Admin-dominant roster: admin rows go quiet, the plain read-write row
+    // keeps its flag, and personal/read-only always answer.
+    const adminHeavy: CollaborationContext = {
       ...projectContext,
       projects: [
         { projectId: 9, name: '支付重构', path: '/srv/pay', mode: 'rw', canManage: true },
         { projectId: 10, name: '审计平台', path: '/srv/audit', mode: 'ro' },
+        { projectId: 11, name: '提示词组合', path: '/srv/prompt', mode: 'rw', canManage: true },
         { projectId: 12, name: '数据看板', path: '/srv/data', mode: 'rw' },
       ],
     }
-    render(<ScopeControl {...scopeProps(snapshot({ context }))} />)
+    render(<ScopeControl {...scopeProps(snapshot({ context: adminHeavy }))} />)
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
     expect(screen.getByRole('button', { name: /个人空间/ }).textContent).toContain('个人')
-    expect(screen.getByRole('button', { name: /支付重构/ }).textContent).toContain('管理员')
+    expect(screen.getByRole('button', { name: /支付重构/ }).textContent).not.toContain('管理员')
+    expect(screen.getByRole('button', { name: /提示词组合/ }).textContent).not.toContain('管理员')
     expect(screen.getByRole('button', { name: /审计平台/ }).textContent).toContain('只读')
     expect(screen.getByRole('button', { name: /数据看板/ }).textContent).toContain('可编辑')
+  })
+
+  it('flags admin rows when read-write dominates the roster', () => {
+    const rwHeavy: CollaborationContext = {
+      ...projectContext,
+      projects: [
+        { projectId: 9, name: '支付重构', path: '/srv/pay', mode: 'rw', canManage: true },
+        { projectId: 12, name: '数据看板', path: '/srv/data', mode: 'rw' },
+        { projectId: 13, name: '插件开发', path: '/srv/plugin', mode: 'rw' },
+      ],
+    }
+    render(<ScopeControl {...scopeProps(snapshot({ context: rwHeavy }))} />)
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    expect(screen.getByRole('button', { name: /支付重构/ }).textContent).toContain('管理员')
+    expect(screen.getByRole('button', { name: /数据看板/ }).textContent).not.toContain('可编辑')
+    expect(screen.getByRole('button', { name: /插件开发/ }).textContent).not.toContain('可编辑')
   })
 
   it('renders a compact rail trigger and omits create visibility for read-only projects', () => {
