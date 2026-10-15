@@ -394,6 +394,7 @@ function consumerSurfaceGates(): Gate[] {
     }),
     pnpmScript('client-packages', 'verify-client-packages', { label: 'client packages' }),
     pnpmScript('client-ui-i18n', 'verify-client-ui-i18n', { label: 'client UI i18n' }),
+    pnpmScript('menu-surface-backdrop', 'verify-menu-surface-backdrop', { label: 'menu surface backdrop' }),
     pnpmScript('client-route-resolution', 'verify-client-route-resolution', { label: 'client route resolution' }),
     pnpmScript('plugin-surfaces', 'verify-plugin-surfaces', { label: 'plugin surfaces' }),
     pnpmScript('no-bare-dispatcher', 'verify-no-bare-dispatcher', { label: 'proxy-aware dispatchers' }),
