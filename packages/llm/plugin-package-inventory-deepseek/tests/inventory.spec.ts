@@ -92,21 +92,76 @@ describe('DeepSeek plugin package inventory', () => {
     })
   })
 
-  it('omits the field and warns for an active package with malformed identity metadata', async () => {
+  it.each([false, true])('deduplicates name-only identities separately from versioned identities (reversed=%s)', async (reversed) => {
     const { ctx, root } = await harness()
-    const warnings: unknown[][] = []
-    ctx.logger.exporter({ levels: { default: LoggerLevel.WARN }, export: (message) => { if (message.type === 'warn') warnings.push(message.args) } })
-    const bad = await packagePlugin(root, 'bad', { name: 'bad' })
-    await ctx.loader.create({ name: bad })
+    const versioned = await packagePlugin(root, 'versioned', { name: 'same', version: 'undefined' })
+    const unversioned = await packagePlugin(root, 'unversioned', { name: 'same' })
+    const entries = reversed ? [unversioned, versioned] : [versioned, unversioned]
+    for (const name of [...entries, ...entries]) await ctx.loader.create({ name })
     const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
-    expect(prepared.fields.dsh_plugin_packages).toBeUndefined()
-    expect(warnings.map(args => String(args[1]))).toEqual([expect.stringContaining('must declare non-empty name and version')])
+    expect(prepared.fields.dsh_plugin_packages?.packages).toStrictEqual([
+      { name: 'same' },
+      { name: 'same', version: 'undefined' },
+    ])
+  })
+
+  it.each(['invalid JSON', 'null', 'deleted'])('retains readable packages when another manifest is %s', async (kind) => {
+    const { ctx, root } = await harness()
+    const bad = await packagePlugin(root, 'bad', { name: 'bad', version: '1.0.0' })
+    const good = await packagePlugin(root, 'good', { name: 'good', version: '2.0.0' })
+    await ctx.loader.create({ name: bad })
+    await ctx.loader.create({ name: good })
+    const manifest = join(root, 'bad/package.json')
+    if (kind === 'deleted') await rm(manifest)
+    else await writeFile(manifest, kind === 'null' ? 'null' : '{')
+    const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
+    expect(prepared.fields.dsh_plugin_packages?.packages).toEqual([{ name: 'good', version: '2.0.0' }])
   })
 
   it('omits a loose ESM module whose nearest manifest only marks the module type', async () => {
     const { ctx, root } = await harness()
     const marker = await packagePlugin(root, 'marker-only', {})
     await ctx.loader.create({ name: marker })
+    await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL }))
+      .resolves.toMatchObject({ fields: { dsh_plugin_packages: { version: 1, packages: [] } } })
+  })
+
+  it.each(['file', 'bare'])('reports an unversioned private %s package by name alongside versioned packages', async (kind) => {
+    const { ctx, root } = await harness()
+    const parent = await packagePlugin(root, 'node_modules/inspector', { name: 'inspector', version: '1.0.0' })
+    const nested = await packagePlugin(root, kind === 'file' ? 'node_modules/inspector/skill' : 'node_modules/inspector-skill',
+      { name: 'inspector-skill', private: true })
+    const versioned = await packagePlugin(root, 'versioned-private', { name: 'versioned-private', private: true, version: '2.0.0' })
+    await ctx.loader.create({ name: kind === 'file' ? pathToFileURL(join(root, nested)).href : 'inspector-skill/plugin.mjs' })
+    await ctx.loader.create({ name: versioned })
+
+    const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
+    expect(prepared.fields.dsh_plugin_packages?.packages).toEqual([
+      { name: 'inspector-skill' },
+      { name: 'versioned-private', version: '2.0.0' },
+    ])
+    await ctx.loader.create({ name: parent })
+    const withParent = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
+    expect(withParent.fields.dsh_plugin_packages?.packages).toEqual([
+      { name: 'inspector', version: '1.0.0' },
+      { name: 'inspector-skill' },
+      { name: 'versioned-private', version: '2.0.0' },
+    ])
+  })
+
+  it.each([true, false, undefined].flatMap(isPrivate => [undefined, '', '  ', null, 1, false, {}, []]
+    .map(version => ({ name: 'optional-metadata', private: isPrivate, version }))))('omits unavailable version metadata %j', async (manifest) => {
+    const { ctx, root } = await harness()
+    const plugin = await packagePlugin(root, 'invalid', manifest)
+    await ctx.loader.create({ name: plugin })
+    const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
+    expect(prepared.fields.dsh_plugin_packages?.packages).toStrictEqual([{ name: 'optional-metadata' }])
+  })
+
+  it.each([undefined, '', '  ', 1])('omits unavailable package name %j', async (name) => {
+    const { ctx, root } = await harness()
+    const plugin = await packagePlugin(root, 'invalid', { name, version: '1.0.0' })
+    await ctx.loader.create({ name: plugin })
     await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL }))
       .resolves.toMatchObject({ fields: { dsh_plugin_packages: { version: 1, packages: [] } } })
   })
@@ -160,7 +215,7 @@ describe('DeepSeek plugin package inventory', () => {
     ])
   })
 
-  it('omits the field and warns when a Loader-resolved bare entry has no package manifest', async () => {
+  it('omits a Loader-resolved bare entry with no package manifest and warns', async () => {
     const { ctx } = await harness()
     const warnings: unknown[][] = []
     ctx.logger.exporter({ levels: { default: LoggerLevel.WARN }, export: (message) => { if (message.type === 'warn') warnings.push(message.args) } })
@@ -170,8 +225,8 @@ describe('DeepSeek plugin package inventory', () => {
     } as unknown as NonNullable<typeof ctx.loader.internal>
     await ctx.loader.create({ name: 'missing-package' })
     const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
-    expect(prepared.fields.dsh_plugin_packages).toBeUndefined()
-    expect(warnings.map(args => String(args[1]))).toEqual([expect.stringContaining('cannot resolve active package')])
+    expect(prepared.fields.dsh_plugin_packages).toEqual({ version: 1, packages: [] })
+    expect(warnings.map(args => String(args[0]))).toEqual([expect.stringContaining('omitting unreadable package identity')])
   })
 
   it('supports a direct embedding whose context has no base URL', async () => {
