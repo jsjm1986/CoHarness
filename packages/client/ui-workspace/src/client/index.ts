@@ -218,6 +218,10 @@ export function apply(ctx: ClientContext): void {
       })
     },
     startSession: (workspaceId) => {
+      // Starting a session targets the Conversation surface — the no-workspace
+      // clear and a same-session reuse emit no selection change, so the panel
+      // reset cannot ride the session-list subscription `openSession` enjoys.
+      ctx.layout.selectPanel(null)
       ctx.workspaces.startSession(workspaceId, (reason) => {
         notify({ kind: 'createFailed', message: createFailureMessage(reason) })
       })

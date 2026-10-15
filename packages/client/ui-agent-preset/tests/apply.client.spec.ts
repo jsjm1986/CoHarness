@@ -657,6 +657,8 @@ describe('ui-agent-preset apply', () => {
     const workspaces = workspacesDouble()
     ctx.provide('workspaces', workspaces as never)
     ctx.provide('sessions', sessionsDouble({ byId: {} }) as never)
+    const selectPanel = vi.fn()
+    ctx.provide('layout', { selectPanel } as never)
     await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
 
     const entry = slots.entries('plugins.add.actions')[0]!
@@ -668,6 +670,9 @@ describe('ui-agent-preset apply', () => {
     // The menu shares the section's launch: its own fresh roster read alone
     // proves the deployment offers preset selection, so the draft stages and
     // the session flow begins without Settings ever having been opened.
+    // Launching from a main panel first returns the center to the
+    // Conversation — the draft composes there.
+    expect(selectPanel).toHaveBeenCalledWith(null)
     expect(workspaces.starts).toHaveLength(1)
     conversation()
     page()

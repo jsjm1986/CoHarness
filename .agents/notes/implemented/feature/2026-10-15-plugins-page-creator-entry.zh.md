@@ -16,6 +16,8 @@ Status: implemented
 
 启动门禁读取两个界面的证据：section store 的 `showPicker` 或共享名单的 ready 状态。用户从未打开过的入口，不能否决另一个入口已经证实可行的启动。
 
+从主面板发起需要显式回到会话界面。`layout.selectPanel(null)` 在 `creatorDraft` 内、`startSession` 之前执行：无工作区时的清空与同会话复用都不产生选择变化，面板否则会盖在草稿之上。同样的缺口存在于 shell 的 New Session 按钮和 Workspace 浏览器的启动动作；两处现在都在手势处复位面板——分别在 `ui-sidebar` 的注入与共享的 `uiWorkspace.startSession` 门面——与 `openSession` 在提交时已有的复位一致。
+
 ## Alternatives considered
 
 **在 `ui-plugin-manager` 内硬编码 Creator 项。** Plugins 页将不得不引入 agent-preset 的概念——名单状态、`cordis` id、seat 暂存——颠倒槽位系统存在的分层意义。页面拥有菜单外观；预设插件拥有这个入口。
@@ -26,7 +28,7 @@ Status: implemented
 
 ## Consequences
 
-`ui-agent-preset` 对 `dsh-client-ui-plugin-manager` 新增一条仅类型依赖，用于 `plugins.add.actions` 的 SlotMap 合并——peer 加 dev，无运行时 import。Creator 入口现在可从两个界面进入且启动语义完全一致；隐藏模式选择的部署会看到菜单项带原因禁用，而不是消失。入口随绑定 `creatorDraft` 的会话作用域销毁，因此 face 读取的是当前绑定而非捕获值。
+`ui-agent-preset` 对 `dsh-client-ui-plugin-manager`(`plugins.add.actions` 的 SlotMap 合并）和 `dsh-client-ui-layout`(`ctx.layout` 合并）各新增一条仅类型依赖——peer 与 dev 匹配声明，无运行时 import。Creator 入口现在可从两个界面进入且启动语义完全一致；隐藏模式选择的部署会看到菜单项带原因禁用，而不是消失。入口随绑定 `creatorDraft` 的会话作用域销毁，因此 face 读取的是当前绑定而非捕获值。
 
 ## Testing
 

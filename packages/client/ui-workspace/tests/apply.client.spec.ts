@@ -408,6 +408,9 @@ describe('ui-workspace apply', () => {
       }))
     })
     b.ctx.uiWorkspace.startSession()
+    // The gesture returns the center to the Conversation first — a clear or
+    // same-session reuse emits no selection change for the panel to ride.
+    expect(b.selectPanel).toHaveBeenLastCalledWith(null)
     await vi.waitFor(() => {
       expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createFailed', message: 'workspace-archived: gone', seq: 1 })
     })
