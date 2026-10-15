@@ -61,6 +61,7 @@
     "markdown-cjk-strong.e2e.ts": "conversation",
     "markdown-images.e2e.ts": "conversation",
     "markdown-inline-code-links.e2e.ts": "conversation",
+    "markdown-wide-table.e2e.ts": "conversation",
     "math-rendering.e2e.ts": "conversation",
     "max-tokens-notice.snapshot.ts": "conversation",
     "message-actions.e2e.ts": "conversation",

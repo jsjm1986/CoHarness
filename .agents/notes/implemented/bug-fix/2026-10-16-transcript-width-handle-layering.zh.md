@@ -12,7 +12,7 @@ Conversation shell 将每个正文宽度拖拽条渲染为阅读列旁的全高�
 
 Conversation shell 将宽度拖拽条保持在第零层，不创建覆盖整个 body 的堆叠上下文。Chat 只将具体的表格元素提到第一层，阅读列、限定在列内的工具卡片与表格滚动包装层都不创建新的堆叠层级。因此只有表格的可见盒子实际延伸进沟槽时才会占有指针；能容纳在正文中的四列表格不会阻断旁边的沟槽拖拽。消息的固定定位 Tooltip 保持在表格堆叠上下文之外，仍可绘制在粘滞 composer 上方。
 
-该规则依赖交付的 Chromium 引擎不会把滚动容器的 inline-size query container 变成中间堆叠上下文；back-to-bottom 控件能高于粘滞 composer 也已依赖相同的引擎行为。消息操作浏览器场景钉住了该假设的 Tooltip 一半；宽表格命中场景将随上游表格 breakout CSS 的移植一并落地——本 fork 尚未移植该表面，在此之前没有可见的 Chat 元素能延伸进沟槽，提升规则处于空转状态。如果改为提高整个 Chat root，其透明全宽盒子反而会重新占用沟槽。
+该规则依赖交付的 Chromium 引擎不会把滚动容器的 inline-size query container 变成中间堆叠上下文；back-to-bottom 控件能高于粘滞 composer 也已依赖相同的引擎行为。消息操作浏览器场景钉住了该假设的 Tooltip 一半，宽表格浏览器场景则通过 container-query breakout 钉住了可见表格的那一半。如果改为提高整个 Chat root，其透明全宽盒子反而会重新占用沟槽。
 
 宽度拖拽条仅使用主指针按键开始调整。拖拽条上的普通滚轮输入会从像素、计算后的行高或页面单位规整为像素，再转发给直接相邻的 transcript scrollport，因此指针悬停在沟槽时不会中断阅读滚动。Ctrl+滚轮表示浏览器缩放或触控板捏合手势，不会被转发。
 
@@ -30,4 +30,4 @@ Composer chrome 保留更高层级，因此完整的粘滞底部区带刻意不�
 
 ## 后果
 
-可见 Chat 内容只在其可见元素实际延伸进宽度拖拽区域时拥有指针输入，裸露沟槽则保留更轻的宽度调整提示、主按键拖拽和 transcript 滚轮滚动。单元测试固定声明的拖拽条尺寸、指针按键行为、直接 scrollport 查找、缩放排除和每种 DOM delta mode。Chromium `elementFromPoint` 场景证明消息操作 Tooltip 仍绘制在粘滞 composer 上方；上游场景的表格命中一半在上游表格 breakout 表面落地前暂缓。
+可见 Chat 内容只在其可见元素实际延伸进宽度拖拽区域时拥有指针输入，裸露沟槽则保留更轻的宽度调整提示、主按键拖拽和 transcript 滚轮滚动。单元测试固定声明的拖拽条尺寸、指针按键行为、直接 scrollport 查找、缩放排除和每种 DOM delta mode。Chromium `elementFromPoint` 场景证明消息操作 Tooltip 仍绘制在粘滞 composer 上方，且可见的宽表格会占据拖拽条区域而适配列宽的表格仍让沟槽可拖。
