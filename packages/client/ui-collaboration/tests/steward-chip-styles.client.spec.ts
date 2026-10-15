@@ -6,8 +6,15 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(fileURLToPath(new URL('../src/client/StewardChip.module.css', import.meta.url)), 'utf8')
 
 describe('StewardChip.module.css', () => {
-  it('never wraps its label and never shrinks mid-row', () => {
-    expect(css).toMatch(/\.chip\s*\{[^}]*flex:\s*none/)
+  it('degrades inside the clip-first extension seat instead of slicing', () => {
+    // The seat clips contributed items first on a short row: the label
+    // ellipsizes toward zero, the icon never squishes, and the pill keeps an
+    // icon-sized floor so the seat edge never cuts a glyph mid-stroke.
+    expect(css).toMatch(/\.chip\s*\{[^}]*flex:\s*0 1 auto/)
+    expect(css).toMatch(/\.chip\s*\{[^}]*min-width:\s*26px/)
+    expect(css).toMatch(/\.chip\s*\{[^}]*overflow:\s*hidden/)
+    expect(css).toMatch(/\.icon\s*\{[^}]*flex:\s*none/)
+    expect(css).toMatch(/\.label\s*\{[^}]*text-overflow:\s*ellipsis/)
     expect(css).toMatch(/\.label\s*\{[^}]*white-space:\s*nowrap/)
   })
 

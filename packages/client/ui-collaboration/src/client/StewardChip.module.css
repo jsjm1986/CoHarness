@@ -6,7 +6,13 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  flex: none;
+  /* The extension seat clips contributed items first on a short row, so the
+     chip must degrade inside it: the label ellipsizes, the icon never
+     squishes, and the pill itself stays intact down to its icon floor. */
+  flex: 0 1 auto;
+  min-width: 26px;
+  overflow: hidden;
+  box-sizing: border-box;
   gap: var(--dsw-space-1);
   height: 22px;
   padding: 0 var(--dsw-space-2);
@@ -38,7 +44,16 @@
   outline-offset: 2px;
 }
 
+.icon {
+  display: inline-flex;
+  flex: none;
+}
+
 .label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
