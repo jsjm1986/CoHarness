@@ -791,28 +791,22 @@ jobs:
           cache-dependency-path: gateway/package-lock.json
       - name: Install Gateway dependencies
         run: npm ci --prefix gateway
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
       # The paths map keeps vendored packages on their emitted lib/types
       # (their source needs the loose vendored compiler flags) and
       # session-format on its emitted lib/types (its durable JSON index
       # signatures need exactOptionalPropertyTypes, which the gateway's
-      # own source does not satisfy); emit those declarations with the
-      # lane's own tsc instead of a workspace build a standalone npm-ci
-      # checkout cannot produce. tsc resolves @types and bare specifiers
-      # upward from each project, so expose the gateway install's type
-      # packages and schema spec plus the vendored cosmokit on that walk.
-      # tsconfig.run.json resolves dsh-llm's /discovery and /package.json
-      # subpaths through published exports, so link the package; its bare
-      # specifier resolves through the paths map like the rest of the
-      # runtime closure.
+      # own source does not satisfy). Emit those declarations with the
+      # repository's own tsc: userdoc-http's project references pull in a
+      # host-wide graph whose third-party imports and TypeScript 6 syntax
+      # only resolve under the real workspace install, so this lane now
+      # installs it immutably instead of hand-linking node_modules rows.
+      - name: Install workspace dependencies for declaration emit
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Emit type declarations the Gateway paths consume
-        run: |
-          mkdir -p node_modules/@deepseek-ai
-          ln -s ../gateway/node_modules/@types node_modules/@types
-          ln -s ../gateway/node_modules/@standard-schema node_modules/@standard-schema
-          ln -s ../gateway/node_modules/zod node_modules/zod
-          ln -s ../../vendor/cosmokit node_modules/@deepseek-ai/cosmokit
-          ln -s ../../packages/llm/llm node_modules/@deepseek-ai/dsh-llm
-          gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/llm/llm
+        run: node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/llm/llm packages/attachment/userdoc packages/attachment/userdoc-local packages/host/userdoc-http
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their
