@@ -339,7 +339,7 @@ type ScheduleCatalogEntry = ScheduleRecord & {
 
 Remote 方法 `schedule.list({ sessionId })`、模型 `schedule_list` 和 Session 页头目录仅返回活动任务。模型视图派生的时间 `state` 与存储的生命周期 `status` 仍是不同概念。删除通过 `schedule.delete({ sessionId, id })` 使用条目的原始绑定；绑定不匹配时返回未找到。模型工具传入当前 Agent 的 Session，全局用户界面则传入所选任务的绑定。仅校验绑定并不构成调用者鉴权。无 payload 的 `schedule/changed` 事件通知客户端刷新列表；重新连接后，客户端再次获取当前状态。
 
-随发行版交付的 Web 组合将 `ui-schedule` 行停用停靠；在插件管理页启用可选实验性 bundle `@deepseek-ai/dsh-experimental-schedule-bundle` 会插入宿主行并启用 `ui-schedule`。[客户端包](../../packages/client/ui-schedule/README.zh.md) 负责目录、空状态与删除控件。页面单独筛选全部、活动和未运行任务，保留未运行任务详情及详情页签条内的原 Session 入口，并要求显式确认删除。“规则”和“发送记录”将任务设置与按需分页加载的已保存回执分开。回执与未运行状态均不确认模型执行。
+随发行版交付的 Web 组合将 `ui-schedule` 行停用停靠；在插件管理页启用可选实验性 bundle `@deepseek-ai/dsh-experimental-schedule-bundle` 会插入宿主行并启用 `ui-schedule`。[客户端包](../../packages/client/ui-schedule/README.zh.md) 负责目录、空状态与删除控件。页面单独筛选全部、活动和未运行任务，保留未运行任务详情及详情页签条内的原 Session 入口，并要求显式确认删除。“规则”和“任务运行记录”页签将任务设置与按需分页加载的已保存回执分开。回执与未运行状态均不确认模型执行。
 
 ## 修改时间
 

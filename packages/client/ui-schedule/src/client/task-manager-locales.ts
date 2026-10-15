@@ -28,7 +28,7 @@ export const en = {
   'detail.nextRun': 'Next run',
   'detail.tabs': 'Task detail views',
   'detail.rule': 'Rules',
-  'detail.records': 'Delivery records',
+  'detail.records': 'Records',
   'delivery.empty': 'No delivery record available',
   'delivery.loading': 'Loading delivery records…',
   'delivery.error': 'Could not load delivery records.',
