@@ -20,7 +20,7 @@ Status: implemented
 
 `plugins/dsh-directory-guard/tsconfig.ci.json` 仅转译发射策略包（`noCheck`、不带 ambient `types`），因为 Gateway 测试只把 `package.json` 与 `lib/` 物化到预置实例主目录中，从不执行该插件；类型保真度仍归工作区构建完成后的基础配置。该步骤运行 Gateway 自身安装的 `tsc`，因此它共享通道的 npm 安装而非工作区安装。
 
-另有两处运行时解析在 workflow 中显式供给，而不藏在包布局背后：`loadConfig` 的源码运行默认值把 `tsx/esm` 解析为仓库根下的绝对路径，因此通道把根 `tsx` 开发依赖安装到临时前缀再拷入 `node_modules/`；admin UI 通道以同样方式安装被重导出的工作区源码所导入的第三方包（`anser`、`clsx`、`immer`、`zustand`，版本读自其属主清单）。在 `gateway/admin-ui/vite.config.ts` 内，`server.deps.inline` 让 `zustand` 留在 Vite 管线中：被外置的副本会在 `dedupe` 映射之外解析它的 `react` 导入，从而加载第二个 React 实例。
+`loadConfig` 的源码运行默认值把 `tsx/esm` 解析为仓库根下的绝对路径（实例在其外孵化）；供声明发射使用的工作区安装已直接提供该开发依赖。admin UI 通道仍以临时前缀方式安装被重导出的工作区源码所导入的第三方包（`anser`、`clsx`、`immer`、`zustand`，版本读自其属主清单）。在 `gateway/admin-ui/vite.config.ts` 内，`server.deps.inline` 让 `zustand` 留在 Vite 管线中：被外置的副本会在 `dedupe` 映射之外解析它的 `react` 导入，从而加载第二个 React 实例。
 
 ## 已考虑的替代方案
 
@@ -38,5 +38,5 @@ Status: implemented
 - `pnpm install --frozen-lockfile --ignore-scripts` 之后，对发射清单（vendored 包、session-format 及其 catalog、managed-data、atomic-write、llm、userdoc、userdoc-local、userdoc-http）执行 `node_modules/.bin/tsc -b` 退出码为 0。
 - 在同一棵树上以通道自身的 npm 安装运行，`npm run typecheck --prefix gateway` 与 `npm run build:check --prefix gateway` 通过。
 - `gateway/node_modules/.bin/tsc -p plugins/dsh-directory-guard/tsconfig.ci.json` 发射 `lib/` 且退出码为 0。
-- 在同一棵树上，供给根 `tsx` 安装并发射 directory-guard 包之后，`npm test --prefix gateway` 通过。
+- 在同一棵树上，发射 directory-guard 与 steward-tools 包之后 `npm test --prefix gateway` 通过（`tsx` 从工作区安装解析）。
 - 供给四个仓库根级依赖之后，`npm test --prefix gateway/admin-ui` 与 `npm run build --prefix gateway/admin-ui` 通过。
