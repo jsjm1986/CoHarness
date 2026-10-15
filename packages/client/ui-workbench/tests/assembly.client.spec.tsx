@@ -162,9 +162,9 @@ describe('assembled workbench sidebar panel', () => {
     await waitFor(() => { expect(view.getByRole('region', { name: '工作台' })).toBeTruthy() })
     const panel = within(view.getByRole('region', { name: '工作台' }))
     // The roster reads pane order and titles from the live sessions list.
-    const beta = panel.getByRole('button', { name: /Beta个人空间 · Beta就绪/ })
+    const beta = panel.getByRole('button', { name: /Beta.*个人空间 · Beta.*就绪/ })
     expect(beta.getAttribute('aria-current')).toBe('true')
-    fireEvent.click(panel.getByRole('button', { name: /Alpha个人空间 · Alpha就绪/ }))
+    fireEvent.click(panel.getByRole('button', { name: /Alpha.*个人空间 · Alpha.*就绪/ }))
     expect(viewport.snapshot.getSnapshot().activePaneId).toBe(A)
     // Equalize writes equal weights through the viewport capability.
     fireEvent.click(panel.getByRole('button', { name: '等宽' }))
