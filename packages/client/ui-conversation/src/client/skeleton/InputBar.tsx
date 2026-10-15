@@ -7,7 +7,7 @@
  * (running/removed/promptError) are self-selected via useSession. */
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode, RefObject } from 'react'
 import clsx from 'clsx'
 import {
   IconBrowseOutline16, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
@@ -147,52 +147,67 @@ function DocumentRail({
 }
 
 /**
- * Lane for items contributed into the composer tool row. The seat is
- * clip-first: when contributed content outgrows the lane it publishes
- * `data-clipped` so items can drop secondary chrome (labels) under
- * `[data-input-extension][data-clipped]` selectors instead of slicing
- * mid-glyph. Restore probes run only when the lane actually gained room —
- * `floor` records the width at the last failed probe, because the probe
- * itself resizes the children it observes and an ungated probe would
- * oscillate every frame. All clears/re-sets settle inside one callback,
- * which the browser paints atomically, so toggling never flickers.
+ * Clip-first seat for the composer tool row: a flex child that may receive
+ * less than its content needs. While content overflows, the seat publishes
+ * `data-clipped` on itself so descendants marked `data-clip-label` drop
+ * their secondary text whole instead of letting the seat slice mid-glyph.
+ * Restore probes are gated on the parent row's width, not the seat's own:
+ * a clipped seat holds only icon content, so it cannot regrow on its own
+ * and must watch the space the row releases. `floor` records the row width
+ * at the last clip or failed probe — retrying at the same width would
+ * re-render the children it observes and re-enter every frame. All
+ * clears/re-sets settle inside one callback, which the browser paints
+ * atomically, so toggling never flickers. An open floating menu inside the
+ * seat inflates scrollWidth without being row content; the probe defers
+ * until it closes.
  */
-function ExtensionItems({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
+function ClipSeat({ className, rowRef, children, ...rest }: { className: string | undefined; rowRef: RefObject<HTMLDivElement | null>; children?: ReactNode } & Record<`data-${string}`, string | undefined>) {
   const ref = useRef<HTMLDivElement | null>(null)
   useLayoutEffect(() => {
-    const lane = ref.current
-    if (lane === null || typeof ResizeObserver !== 'function') return
-    // Lane width at the most recent clip or failed restore; -1 while the
-    // lane is unclipped so the gate below is inert.
+    const seat = ref.current
+    const row = rowRef.current
+    if (seat === null || typeof ResizeObserver !== 'function') return
+    // Row width at the most recent clip or failed restore probe; -1 while
+    // unclipped so the gate below is inert.
     let floor = -1
     const publish = (): void => {
-      if (!lane.hasAttribute('data-clipped')) {
-        if (lane.scrollWidth > lane.clientWidth) {
-          lane.setAttribute('data-clipped', '')
-          floor = lane.clientWidth
+      if (seat.querySelector('[role="menu"], [role="listbox"]') !== null) return
+      if (!seat.hasAttribute('data-clipped')) {
+        if (seat.scrollWidth > seat.clientWidth) {
+          seat.setAttribute('data-clipped', '')
+          floor = row?.clientWidth ?? seat.clientWidth
         }
         return
       }
-      // Still clipped: probe only when the lane gained width since the last
-      // probe. Shrinking neighbors hand their freed width to the lane under
-      // flex, so content changes reach the gate through lane growth too.
-      if (lane.clientWidth <= floor) return
-      floor = lane.clientWidth
-      lane.removeAttribute('data-clipped')
-      if (lane.scrollWidth > lane.clientWidth) lane.setAttribute('data-clipped', '')
+      // Still clipped: a restore probe is meaningful only once the row is
+      // wider than at the last clip/failed probe — the row releases room to
+      // the seat under flex, so row growth is the observable.
+      const room = row?.clientWidth ?? seat.clientWidth
+      if (room <= floor) return
+      floor = room
+      seat.removeAttribute('data-clipped')
+      // The unclip relayout grows the seat back toward its label content;
+      // re-clip only if it still cannot fit.
+      if (seat.scrollWidth > seat.clientWidth) seat.setAttribute('data-clipped', '')
       else floor = -1
     }
     const observer = new ResizeObserver(publish)
-    observer.observe(lane)
+    observer.observe(seat)
+    if (row !== null) observer.observe(row)
     // Slot items arrive wrapped in display:contents elements, which carry no
     // box and never fire resize entries — content edits reach the probe
     // through a subtree mutation listener instead of child observers.
     const mutations = new MutationObserver(publish)
-    mutations.observe(lane, { childList: true, subtree: true, characterData: true })
+    mutations.observe(seat, { childList: true, subtree: true, characterData: true })
     publish()
     return () => { observer.disconnect(); mutations.disconnect() }
   }, [children])
-  return <div ref={ref} className={css.extensionItems} data-input-extension={side}>{children}</div>
+  return <div ref={ref} className={className} data-clip-seat="" {...rest}>{children}</div>
+}
+
+/** Lane for items contributed into the composer tool row. */
+function ExtensionItems({ side, rowRef, children }: { side: 'left' | 'right'; rowRef: RefObject<HTMLDivElement | null>; children: ReactNode }) {
+  return <ClipSeat className={css.extensionItems} rowRef={rowRef} data-input-extension={side}>{children}</ClipSeat>
 }
 
 export type InputBarProps = ComposerBarProps
@@ -283,6 +298,7 @@ export const InputBar = memo(function InputBar({
   const cardRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
+  const toolsRowRef = useRef<HTMLDivElement | null>(null)
   const safari = useMemo(() => isSafariBrowser(navigator), [])
   const safariNativeShrinkRef = useRef(false)
   // IME guard: composition Enter picks a candidate, it must not send. The ref outlives renders;
@@ -1004,7 +1020,7 @@ export const InputBar = memo(function InputBar({
             <div ref={mirrorRef} aria-hidden className={css.mirror} data-input-mirror>{`${draft}\n`}</div>
           </div>
         </div>
-        <div className={css.row}>
+        <div ref={toolsRowRef} className={css.row}>
           <div className={css.tools}>
             <Tooltip label={t('document.attach')} side="top" delayMs={500}>
               <button
@@ -1057,17 +1073,17 @@ export const InputBar = memo(function InputBar({
                 <IconPlusOutline16 size={14} />
               </button>
             </Tooltip>
-            <div className={css.modes}>
+            <ClipSeat className={css.modes} rowRef={toolsRowRef}>
               {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}
-            </div>
+            </ClipSeat>
             {leftItems != null && (
-              <ExtensionItems side="left">{leftItems}</ExtensionItems>
+              <ExtensionItems side="left" rowRef={toolsRowRef}>{leftItems}</ExtensionItems>
             )}
           </div>
           <div className={css.trailing}>
             {rightItems != null && (
-              <ExtensionItems side="right">{rightItems}</ExtensionItems>
+              <ExtensionItems side="right" rowRef={toolsRowRef}>{rightItems}</ExtensionItems>
             )}
             {renderSlot('conversation.input.model', {
               locked: modelSeatLocked,

@@ -115,13 +115,18 @@ describe('conversation compact chrome', () => {
     // The very narrowest panes hide the context meter; compact phones keep it.
     expect(contextMeter).toMatch(/@container\s*\(max-width:\s*340px\)\s*\{[^@]*\.root\s*\{[^}]*display:\s*none/u)
     expect(contextMeter).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.root\s*\{[^}]*display:\s*inline-flex/u)
-    // Contributed-item lanes share one degrade contract: the lane publishes
-    // data-clipped while it overflows, every item drops its data-clip-label
-    // span under the shared rule, and the floor keeps one icon seat intact
-    // only while an item actually rendered (empty slot wrappers are :empty).
+    // Contributed-item lanes and the modes seat share one degrade contract:
+    // a clip seat publishes data-clipped while it overflows, every descendant
+    // marked data-clip-label drops whole under the shared rule, and the lane
+    // floor keeps one icon seat intact only while an item actually rendered
+    // (empty slot wrappers are :empty). The modes seat never clips its box —
+    // the permission and plan popups render inside it — so it degrades by
+    // label removal alone and pins at its icon content while clipped.
     expect(input).toMatch(/\.extensionItems\s*\{[^}]*overflow:\s*hidden/u)
-    expect(input).toMatch(/\.extensionItems\[data-clipped\]\s*:global\(\[data-clip-label\]\)\s*\{[^}]*display:\s*none/u)
+    expect(input).toMatch(/\[data-clip-seat\]\[data-clipped\]\s*\[data-clip-label\]\s*\{[^}]*display:\s*none/u)
     expect(input).toMatch(/\.extensionItems:has\(>\s*:not\(:empty\)\)\s*\{[^}]*min-width:\s*24px/u)
+    expect(input).toMatch(/\.modes\[data-clipped\]\s*\{[^}]*min-width:\s*max-content/u)
+    expect(permission).toMatch(/:global\(\[data-clip-seat\]\[data-clipped\]\)\s*\.trigger\s*\{[^}]*width:\s*28px/u)
     // Nothing may force the trailing group onto a second line.
     expect(input).not.toContain('flex-basis: 100%')
     expect(input).not.toMatch(/\.row:has\(\[data-model-select\]\)/u)
