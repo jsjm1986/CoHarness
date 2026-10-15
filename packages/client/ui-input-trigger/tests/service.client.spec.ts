@@ -736,11 +736,43 @@ describe('arbitrate', () => {
     expect(controller.menu.getSnapshot().open).toBe(false)
   })
 
-  it('tab drills the highlighted drillable completion while the menu is open', async () => {
+  it('tab drills the highlighted drillable completion and picks a plain one', async () => {
     const { controller, cmd } = await menuBench()
     expect(controller.arbitrate('tab', false)).toBe('consumed')
     expect(cmd.picks[0]!.candidate.name).toBe('goal')
+    expect(cmd.picks[0]!.action).toBe('drill')
     expect(controller.menu.getSnapshot().open).toBe(false)
+    // Plain row (no drill flag): Tab settles the highlighted completion.
+    controller.track('/p', 2, { tier: 'plain' }, 1)
+    await tick()
+    controller.arbitrate('down', false)
+    expect(controller.arbitrate('tab', false)).toBe('pick-highlighted')
+    expect(cmd.picks[1]!.candidate.name).toBe('plan')
+    expect(cmd.picks[1]!.action).toBe('pick')
+    expect(controller.menu.getSnapshot().open).toBe(false)
+  })
+
+  it('tab during a pending refinement is consumed: no pick, no focus traversal', async () => {
+    const picks: string[] = []
+    const cmd = deferredSource('/', 'command', {
+      onPick: (pick) => { picks.push(pick.candidate.name); return undefined },
+    })
+    const { controller } = controllerBench([cmd.source])
+    controller.track('/g', 2, { tier: 'plain' }, 1)
+    cmd.pending[0]!.resolve([{ name: 'goal' }, { name: 'plan' }])
+    await tick()
+    expect(controller.menu.getSnapshot().highlight).toEqual({ source: 'command', index: 0 })
+    // Refinement: previous rows and highlight stay visible while the fetch pends.
+    controller.track('/go', 3, { tier: 'plain' }, 2)
+    expect(controller.menu.getSnapshot().highlight).toEqual({ source: 'command', index: 0 })
+    expect(controller.arbitrate('tab', false)).toBe('consumed')
+    expect(picks).toHaveLength(0)
+    expect(controller.menu.getSnapshot().open).toBe(true)
+    // Settled: the same gesture settles the highlighted completion.
+    cmd.pending[1]!.resolve([{ name: 'goal' }])
+    await tick()
+    expect(controller.arbitrate('tab', false)).toBe('pick-highlighted')
+    expect(picks).toEqual(['goal'])
   })
 
   it('escape closes and consumes', async () => {

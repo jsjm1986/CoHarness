@@ -11,7 +11,7 @@ kind: "package-reference"
 
 分层：`src/core/` 是纯内核——`detectTrigger`、`menuReduce`／`seedGroups`／`MENU_CLOSED`、`exactMatch`，零 React／DOM／cordis；`src/client/service.ts` 是壳层，把内核接到菜单快照 store、逐 hit 候选拉取（以 generation 把关、后继请求经 `AbortSignal` 取代旧请求、失败的 source 静默丢弃并留一条 console 记录）和三条 pick 路径上。`ReferenceInsert.appearance` 可以把显示类型标为 `session`、`file` 或 `folder`，且不会改变其序列化 `ref`；图标与颜色由消费它的输入框负责。`src/types.ts` 与两个 `contract.ts` 文件是冻结的跨包约定；变更需经主线程仲裁。
 
-候选刷新尚未完成时，菜单会阻止任何陈旧高亮被提交：在高亮分组落定前 Enter 会被消费；Tab 只对标记为 `drill` 的行执行下钻，否则保留浏览器原生焦点移动。
+候选刷新尚未完成时，菜单会阻止任何陈旧高亮被提交：在高亮分组落定前 Enter 与 Tab 都会被消费。Tab 会选定高亮补全项——`drill` 行执行下钻，普通行完成选定——只有在没有高亮时才放行，保留浏览器原生焦点移动。
 
 Source 可以同步发布面包屑头部。目录候选既可以通过 Enter／点击作为原子文件夹引用落定，也可以通过 Tab、行尾箭头或面包屑显式下钻；下钻会替换 token 文本并在新目录重新追踪菜单，同时保留 source 自己的头部。
 

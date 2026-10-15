@@ -236,16 +236,20 @@ export class InputTriggerController {
         return 'pick-highlighted'
       }
       case 'tab': {
-        // Tab is the keyboard twin of a row's drill chevron. A normal row
-        // deliberately passes through so native focus traversal remains intact.
+        // Tab settles the highlighted completion: drillable rows descend,
+        // ordinary rows pick, and a pending refinement consumes the gesture
+        // rather than pick a stale row or let Tab move focus away.
         if (state.highlight === null) return 'pass'
         const group = state.groups.find(g => g.source === state.highlight?.source)
-        const item = group !== undefined && group.status === 'ready'
-          ? group.items[state.highlight.index]
-          : undefined
-        if (item?.drill !== true) return 'pass'
-        this.pick(state.highlight.source, state.highlight.index, 'drill')
-        return 'consumed'
+        if (group === undefined || group.status !== 'ready') return 'consumed'
+        const item = group.items[state.highlight.index]
+        if (item === undefined) return 'pass'
+        if (item.drill === true) {
+          this.pick(state.highlight.source, state.highlight.index, 'drill')
+          return 'consumed'
+        }
+        this.pick(state.highlight.source, state.highlight.index)
+        return 'pick-highlighted'
       }
     }
   }
