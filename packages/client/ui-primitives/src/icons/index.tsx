@@ -1,6 +1,7 @@
 /**
- * ic_ds_* icon set — Lucide-backed glyphs (lucide-react, ISC). Every glyph
- * rides currentColor and takes {size, className}; stroke weight follows the
+ * ic_ds_* icon set — Lucide-backed glyphs (lucide-react, ISC) plus a small
+ * Phosphor-backed set (MIT, path data inlined via `ph()`). Every glyph rides
+ * currentColor and takes {size, className}; Lucide stroke weight follows the
  * drawn size (2 at ≥16px, 2.2 at 14px, 2.4 at ≤12px). `aria-hidden` stays
  * absent: the a11y tree lists bare svg glyphs as `img`, which the web golden
  * snapshots depend on. A few glyphs stay custom — IconCloseFill14 (heavy
@@ -16,7 +17,6 @@ import {
   ArchiveX,
   ArrowUp,
   ArrowUpRight,
-  Blocks,
   Brain,
   ChartNoAxesColumn,
   Check,
@@ -26,7 +26,6 @@ import {
   ChevronUp,
   AppWindow,
   Box,
-  Calendar,
   ChevronsUpDown,
   Compass,
   CircleCheck,
@@ -49,8 +48,6 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
-  FolderTree,
-  Fullscreen,
   Gauge,
   GitBranch,
   Globe,
@@ -61,14 +58,11 @@ import {
   ListChecks,
   MessageSquareText,
   ListTodo,
-  LoaderCircle,
   LogOut,
-  Maximize2,
   Mic,
   Monitor,
   Moon,
   PackageCheck,
-  PanelLeft,
   Paperclip,
   Pause,
   Pencil,
@@ -80,9 +74,7 @@ import {
   ScanSearch,
   Search,
   Settings,
-  Share,
   Info,
-  Minimize2,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -99,7 +91,6 @@ import {
   TriangleAlert,
   User,
   UserRoundCog,
-  Users,
   WandSparkles,
   SquareTerminal,
   TextWrap,
@@ -132,6 +123,34 @@ const glyph =
       />
     )
 
+/** Phosphor path data on the 256 grid (MIT, © Phosphor Icons). A two-member
+ * tuple renders duotone: the secondary layer first at 45% opacity, then the
+ * primary shape — the CDS dual-layer protocol. */
+const PH = {
+  export: 'M216,112v96a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V112A16,16,0,0,1,56,96H80a8,8,0,0,1,0,16H56v96H200V112H176a8,8,0,0,1,0-16h24A16,16,0,0,1,216,112ZM93.66,69.66,120,43.31V136a8,8,0,0,0,16,0V43.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,69.66Z',
+  sidebar: ['M88,48V208H40a8,8,0,0,1-8-8V56a8,8,0,0,1,8-8Z', 'M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,152H56a8,8,0,0,0,0-16H40V120H56a8,8,0,0,0,0-16H40V88H56a8,8,0,0,0,0-16H40V56H80V200H40Zm176,48H96V56H216V200Z'],
+  calendar: ['M216,48V88H40V48a8,8,0,0,1,8-8H208A8,8,0,0,1,216,48Z', 'M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Zm-96-88v64a8,8,0,0,1-16,0V132.94l-4.42,2.22a8,8,0,0,1-7.16-14.32l16-8A8,8,0,0,1,112,120Zm59.16,30.45L152,176h16a8,8,0,0,1,0,16H136a8,8,0,0,1-6.4-12.8l28.78-38.37A8,8,0,1,0,145.07,132a8,8,0,1,1-13.85-8A24,24,0,0,1,176,136,23.76,23.76,0,0,1,171.16,150.45Z'],
+  squaresFour: ['M112,56v48a8,8,0,0,1-8,8H56a8,8,0,0,1-8-8V56a8,8,0,0,1,8-8h48A8,8,0,0,1,112,56Zm88-8H152a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V56A8,8,0,0,0,200,48Zm-96,96H56a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V152A8,8,0,0,0,104,144Zm96,0H152a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V152A8,8,0,0,0,200,144Z', 'M200,136H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48ZM104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Z'],
+  treeStructure: 'M160,112h48a16,16,0,0,0,16-16V48a16,16,0,0,0-16-16H160a16,16,0,0,0-16,16V64H128a24,24,0,0,0-24,24v32H72v-8A16,16,0,0,0,56,96H24A16,16,0,0,0,8,112v32a16,16,0,0,0,16,16H56a16,16,0,0,0,16-16v-8h32v32a24,24,0,0,0,24,24h16v16a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V160a16,16,0,0,0-16-16H160a16,16,0,0,0-16,16v16H128a8,8,0,0,1-8-8V88a8,8,0,0,1,8-8h16V96A16,16,0,0,0,160,112ZM56,144H24V112H56v32Zm104,16h48v48H160Zm0-112h48V96H160Z',
+  arrowsOut: 'M216,48V96a8,8,0,0,1-16,0V67.31l-42.34,42.35a8,8,0,0,1-11.32-11.32L188.69,56H160a8,8,0,0,1,0-16h48A8,8,0,0,1,216,48ZM98.34,146.34,56,188.69V160a8,8,0,0,0-16,0v48a8,8,0,0,0,8,8H96a8,8,0,0,0,0-16H67.31l42.35-42.34a8,8,0,0,0-11.32-11.32ZM208,152a8,8,0,0,0-8,8v28.69l-42.34-42.35a8,8,0,0,0-11.32,11.32L188.69,200H160a8,8,0,0,0,0,16h48a8,8,0,0,0,8-8V160A8,8,0,0,0,208,152ZM67.31,56H96a8,8,0,0,0,0-16H48a8,8,0,0,0-8,8V96a8,8,0,0,0,16,0V67.31l42.34,42.35a8,8,0,0,0,11.32-11.32Z',
+  arrowsIn: 'M144,104V64a8,8,0,0,1,16,0V84.69l42.34-42.35a8,8,0,0,1,11.32,11.32L171.31,96H192a8,8,0,0,1,0,16H152A8,8,0,0,1,144,104Zm-40,40H64a8,8,0,0,0,0,16H84.69L42.34,202.34a8,8,0,0,0,11.32,11.32L96,171.31V192a8,8,0,0,0,16,0V152A8,8,0,0,0,104,144Zm67.31,16H192a8,8,0,0,0,0-16H152a8,8,0,0,0-8,8v40a8,8,0,0,0,16,0V171.31l42.34,42.35a8,8,0,0,0,11.32-11.32ZM104,56a8,8,0,0,0-8,8V84.69L53.66,42.34A8,8,0,0,0,42.34,53.66L84.69,96H64a8,8,0,0,0,0,16h40a8,8,0,0,0,8-8V64A8,8,0,0,0,104,56Z',
+  cornersOut: 'M216,48V88a8,8,0,0,1-16,0V56H168a8,8,0,0,1,0-16h40A8,8,0,0,1,216,48ZM88,200H56V168a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H88a8,8,0,0,0,0-16Zm120-40a8,8,0,0,0-8,8v32H168a8,8,0,0,0,0,16h40a8,8,0,0,0,8-8V168A8,8,0,0,0,208,160ZM88,40H48a8,8,0,0,0-8,8V88a8,8,0,0,0,16,0V56H88a8,8,0,0,0,0-16Z',
+  spinnerGap: 'M136,32V64a8,8,0,0,1-16,0V32a8,8,0,0,1,16,0Zm88,88H192a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Zm-45.09,47.6a8,8,0,0,0-11.31,11.31l22.62,22.63a8,8,0,0,0,11.32-11.32ZM128,184a8,8,0,0,0-8,8v32a8,8,0,0,0,16,0V192A8,8,0,0,0,128,184ZM77.09,167.6,54.46,190.22a8,8,0,0,0,11.32,11.32L88.4,178.91A8,8,0,0,0,77.09,167.6ZM72,128a8,8,0,0,0-8-8H32a8,8,0,0,0,0,16H64A8,8,0,0,0,72,128ZM65.78,54.46A8,8,0,0,0,54.46,65.78L77.09,88.4A8,8,0,0,0,88.4,77.09Z',
+  usersThree: 'M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z',
+} as const
+
+const ph =
+  (paths: string | readonly [string, string], drawnSize: number) =>
+    ({ size = drawnSize, className, ...rest }: GlyphProps) => {
+      const [sub, main] = typeof paths === 'string' ? [undefined, paths] : paths
+      return (
+        <svg width={size} height={size} viewBox="0 0 256 256" fill="currentColor" className={className} aria-hidden={undefined} {...rest}>
+          {sub ? <path d={sub} opacity={0.45} /> : null}
+          <path d={main} />
+        </svg>
+      )
+    }
+
 /** ic_ds_new_chat_outline_16 */
 export const IconNewChatOutline16 = glyph(SquarePen, 16)
 /** ic_ds_search_outline_16 */
@@ -143,7 +162,7 @@ export const IconSettingsOutline14 = glyph(Settings, 14)
 /** ic_ds_settings_outline_16 */
 export const IconSettingsOutline16 = glyph(Settings, 16)
 /** ic_ds_panel_left_outline_16 */
-export const IconPanelLeftOutline16 = glyph(PanelLeft, 16)
+export const IconPanelLeftOutline16 = ph(PH.sidebar, 16)
 /** ic_ds_split_panes_outline_16 */
 export const IconSplitPanesOutline16 = glyph(Columns2, 16)
 /** ic_ds_ellipsis_outline_16 */
@@ -192,7 +211,7 @@ export const IconDislikeOutline16 = glyph(ThumbsDown, 16)
 /** ic_ds_dislike_fill_16 */
 export const IconDislikeFill16 = glyph(ThumbsDown, 16, true)
 /** ic_ds_share_outline_16 */
-export const IconShareOutline16 = glyph(Share, 16)
+export const IconShareOutline16 = ph(PH.export, 16)
 /** ic_ds_edit_outline_16 */
 export const IconEditOutline16 = glyph(Pencil, 16)
 /** ic_ds_think_outline_14 */
@@ -222,7 +241,7 @@ export const IconWarningOutline16 = glyph(TriangleAlert, 16)
 /** ic_ds_user_outline_16 */
 export const IconUserOutline16 = glyph(User, 16)
 /** ic_ds_users_outline_16 */
-export const IconUsersOutline16 = glyph(Users, 16)
+export const IconUsersOutline16 = ph(PH.usersThree, 16)
 /** ic_ds_send_outline_16 */
 export const IconSendOutline16 = glyph(ArrowUp, 16)
 /** ic_ds_stop_fill_16 */
@@ -230,7 +249,7 @@ export const IconStopFill16 = glyph(Square, 16, true)
 /** ic_ds_paperclip_outline_16 */
 export const IconPaperclipOutline16 = glyph(Paperclip, 16)
 /** ic_ds_loading_outline_16 */
-export const IconLoadingOutline16 = glyph(LoaderCircle, 16)
+export const IconLoadingOutline16 = ph(PH.spinnerGap, 16)
 /** ic_ds_download_outline_16 */
 export const IconDownloadOutline16 = glyph(Download, 16)
 /** ic_ds_play_outline_16 */
@@ -238,7 +257,7 @@ export const IconPlayOutline16 = glyph(Play, 16)
 /** ic_ds_pause_outline_16 */
 export const IconPauseOutline16 = glyph(Pause, 16)
 /** ic_ds_fullscreen_outline_16 */
-export const IconFullscreenOutline16 = glyph(Maximize2, 16)
+export const IconFullscreenOutline16 = ph(PH.arrowsOut, 16)
 /** ic_ds_code_outline_16 */
 export const IconCodeOutline16 = glyph(CodeXml, 16)
 /** ic_ds_cordis_plugin_outline_14 */
@@ -294,7 +313,7 @@ export const IconSparkle16 = glyph(Sparkles, 16)
 /** ic_ds_inspect_outline_12 */
 export const IconInspectOutline12 = glyph(ScanSearch, 12)
 /** ic_ds_skill_outline_16 */
-export const IconSkillOutline16 = glyph(Blocks, 16)
+export const IconSkillOutline16 = ph(PH.squaresFour, 16)
 /** ic_ds_deliver_doc_16 */
 export const IconDeliverDoc16 = glyph(FileText, 16)
 /** ic_ds_question_outline_14 */
@@ -310,7 +329,7 @@ export const IconArchiveCheckOutline16 = glyph(PackageCheck, 16)
 /** ic_ds_archive_off_outline_16 */
 export const IconArchiveOffOutline16 = glyph(ArchiveX, 16)
 /** ic_ds_workspace_tree_outline_16 */
-export const IconWorkspaceTreeOutline16 = glyph(FolderTree, 16)
+export const IconWorkspaceTreeOutline16 = ph(PH.treeStructure, 16)
 /** ic_ds_flat_list_outline_16 */
 export const IconFlatListOutline16 = glyph(List, 16)
 /** ic_ds_chevrons_up_down_outline_16 */
@@ -351,13 +370,13 @@ export const IconTerminalOutline16 = glyph(Terminal, 16)
 /** ic_ds_info_outline_16 */
 export const IconInfoOutline16 = glyph(Info, 16)
 /** ic_ds_minimize_outline_16 */
-export const IconMinimizeOutline16 = glyph(Minimize2, 16)
+export const IconMinimizeOutline16 = ph(PH.arrowsIn, 16)
 /** ic_ds_maximize_outline_16 */
-export const IconMaximizeOutline16 = glyph(Fullscreen, 16)
+export const IconMaximizeOutline16 = ph(PH.cornersOut, 16)
 /** ic_ds_restore_outline_16 */
 export const IconRestoreOutline16 = glyph(FoldHorizontal, 16)
 /** ic_ds_calendar_outline_14 */
-export const IconCalendarOutline14 = glyph(Calendar, 14)
+export const IconCalendarOutline14 = ph(PH.calendar, 14)
 /** ic_ds_compass_outline_16 */
 export const IconCompassOutline16 = glyph(Compass, 16)
 /** ic_ds_box_outline_16 */
