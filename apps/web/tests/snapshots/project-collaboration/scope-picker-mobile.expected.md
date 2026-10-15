@@ -1,24 +1,27 @@
-- menu:
+- group "Switch personal or project scope":
   - button "Close":
     - img
-  - text: Switch space 2 Payments migration Can edit
-  - button "Project settings":
+  - text: Switch space Payments migration Can edit
+  - button "Manage":
+    - text: Manage
     - img
-  - text: New conversation visibility
-  - radiogroup "New conversation visibility":
-    - radio "Shared with project" [checked]
-    - radio "Only me"
+  - text: Space settings
+  - button "New conversation visibility Shared with project":
+    - text: New conversation visibility Shared with project
+    - img
   - button "Invitations and tasks":
-    - img
     - text: Invitations and tasks
+    - img
+  - button "Project settings":
+    - text: Project settings
+    - img
+  - text: All spaces · 7
   - searchbox "Search project spaces"
-  - menuitem "Personal"
-  - separator
-  - text: Projects
-  - menuitem "Payments migration Can edit":
-    - text: Payments migration Can edit
-    - img
-  - menuitem "Audit platform Read only"
-  - menuitem "New project space":
-    - img
-    - text: New project space
+  - button "Personal Personal"
+  - button "Payments migration"
+  - button "Audit platform Read only"
+  - button "Archive space 1"
+  - button "Archive space 2"
+  - button "Archive space 3"
+  - button "Archive space 4"
+  - button "New project space"
