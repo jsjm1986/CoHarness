@@ -209,7 +209,9 @@ export function ScopeControl({
             </span>
           )}
         <span className={css.scopeName}>{project.name}</span>
-        <span className={project.kind === 'steward' ? css.scopeModeSteward : css.scopeMode}>
+        <span className={project.kind === 'steward'
+          ? css.scopeFlagWarn
+          : project.mode === 'ro' ? css.scopeFlagMark : css.scopeFlag}>
           {project.kind === 'steward'
             ? t('scope.steward')
             : project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
@@ -375,10 +377,10 @@ export function ScopeControl({
       {wide && (
         <>
           <span className={css.label}>{currentLabel}</span>
-          {/* The page's hero states the scope mode; the trigger pill only
-              flags non-default scopes — maintenance or read-only. */}
+          {/* The page's hero states the scope mode; the trigger flag only
+              marks non-default scopes — maintenance or read-only. */}
           {projectScope !== undefined && (projectScope.steward === true || projectScope.mode === 'ro') && (
-            <span className={projectScope.steward === true ? css.modeSteward : css.mode}>
+            <span className={projectScope.steward === true ? css.modeFlagWarn : css.modeFlag}>
               {projectScope.steward === true ? t('scope.steward') : t('scope.readOnly')}
             </span>
           )}

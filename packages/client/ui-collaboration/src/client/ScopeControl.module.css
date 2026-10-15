@@ -53,22 +53,33 @@
   white-space: nowrap;
 }
 
-.mode {
+/* Mode flag on the trigger: a status dot + text for non-default scopes
+   (read-only/steward), matching the pushed page's flat row grammar. The
+   dot inherits the flag's colour — muted for read-only, warn amber for
+   maintenance. */
+.modeFlag {
+  display: inline-flex;
   flex: none;
-  padding: 0 var(--dsw-space-1);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-layer-2);
+  align-items: center;
+  gap: var(--dsw-space-1);
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 18px;
 }
 
-/* Steward mode pill: warn-family amber marks maintenance scope as a caution
-   surface, matching the banner in conversation.input.dock. */
-.modeSteward {
-  composes: mode;
-  background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-label);
+.modeFlag::before,
+.scopeFlagMark::before,
+.scopeFlagWarn::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentcolor;
+  content: '';
+}
+
+.modeFlagWarn {
+  composes: modeFlag;
+  color: var(--dsw-alias-state-warn-primary);
   font-weight: 600;
 }
 
@@ -275,20 +286,25 @@
   white-space: nowrap;
 }
 
-.scopeMode {
+/* Roster mode flag: restricted scopes carry a muted dot (read-only) or a
+   warn dot (steward); the default read-write state stays plain text. */
+.scopeFlag {
+  display: inline-flex;
   flex: none;
-  padding: 0 var(--dsw-space-1);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-layer-2);
+  align-items: center;
+  gap: var(--dsw-space-1);
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 18px;
 }
 
-.scopeModeSteward {
-  composes: scopeMode;
-  background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-label);
+.scopeFlagMark {
+  composes: scopeFlag;
+}
+
+.scopeFlagWarn {
+  composes: scopeFlag;
+  color: var(--dsw-alias-state-warn-primary);
   font-weight: 600;
 }
 

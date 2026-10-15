@@ -13,8 +13,22 @@ describe('ScopeControl.module.css', () => {
     expect(css).toMatch(/\.label\s*\{[^}]*flex:\s*1 1 auto/)
     expect(css).toMatch(/\.label\s*\{[^}]*min-width:\s*0/)
     expect(css).toMatch(/\.label\s*\{[^}]*text-overflow:\s*ellipsis/)
-    expect(css).toMatch(/\.mode\s*\{[^}]*flex:\s*none/)
+    expect(css).toMatch(/\.modeFlag\s*\{[^}]*flex:\s*none/)
     expect(css).toMatch(/\.chevron\s*\{[^}]*flex:\s*none/)
+  })
+
+  it('renders mode flags as dot + text, never a filled pill', () => {
+    // The flag is a status dot inherited from the flag colour plus text;
+    // a background on either variant resurrects the boxed pill the page
+    // grammar removed.
+    const dots = css.match(/\.modeFlag::before,\s*\.scopeFlagMark::before,\s*\.scopeFlagWarn::before\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(dots).toContain('border-radius: 50%')
+    expect(dots).toContain('currentcolor')
+    for (const flag of ['.modeFlagWarn', '.scopeFlagWarn']) {
+      const rule = css.match(new RegExp(`\\${flag}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+      expect(rule).toContain('var(--dsw-alias-state-warn-primary)')
+      expect(rule).not.toContain('background')
+    }
   })
 
   it('uses a 36px rail circle when the sidebar is collapsed', () => {
