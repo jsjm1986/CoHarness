@@ -28,7 +28,7 @@ Use `dsh-client-ui-workflow-run` to inspect each durable top-level workflow run 
 <a id="durable-state-and-replay"></a>
 ## Durable state and replay
 
-`tool-workflow/run-start` creates one Context keyed by `runId`; member starts, member endings, and the run ending update that Context in log order. A history tail containing only updates remains pending until an older page supplies the unique start, after which prepend, complete replay, and live append produce the same state. A closed Turn or Step with missing terminal events presents the affected run or members as interrupted without changing the tool result.
+`tool-workflow/run-start` creates one Context keyed by `runId`; member starts, member endings, and the run ending update that Context in log order. A history tail containing only updates remains pending until an older page supplies the unique start, after which prepend, complete replay, and live append produce the same state. A run or member without terminal events stays running after its Turn or Step ends normally, because a background run outlives its Tool Step. It is presented as interrupted, without changing the tool result, once its Turn is closed after a crash or at a fork boundary.
 
 Phase groups come only from members that actually started. Exact phase strings share a group, an omitted phase is distinct from the empty string, and settlement changes status without removing or reordering members.
 
@@ -61,6 +61,7 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - Only top-level calls through `dsh-tool-workflow` produce these records; nested PTC mode calls and direct `WorkflowEngine` consumers do not.
+- A run lost without terminal events in a normally ended Turn stays running — for example a background run whose process crashed during a later Turn, or a run whose recording stopped after a failed append; the session log carries no fact that marks it stopped.
 - Navigation is intentionally live-only. Terminal members remain visible for review but never expose a cold-session opener from this node.
 - The node shows run, phase, member identity, and status only; scripts, outputs, errors, logs, usage, static topology, and controls remain outside this surface.
 

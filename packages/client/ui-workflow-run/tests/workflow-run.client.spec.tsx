@@ -140,23 +140,47 @@ describe('workflow-run Conversation Definition', () => {
     expect(workflowData(value)).toEqual(workflowData(assembler(events)))
   })
 
-  it('shows missing terminal facts as interrupted only after the owning Location closes', () => {
+  it('keeps a background run running after its Tool Step and Turn end normally', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
       at(3, 'tool-workflow/run-start', { runId: 'run-1', name: 'audit' }),
-      at(4, 'tool-workflow/agent-start', {
+      at(4, 'step/end', { turn: 1, step: 1 }),
+      at(5, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } }),
+      at(6, 'tool-workflow/agent-start', {
         runId: 'run-1', seq: 1, label: 'worker', childId: 'child-1',
       }),
     ])
-    expect(workflowData(value)?.status).toBe('running')
-    value.append(at(5, 'step/end', { turn: 1, step: 1 }))
-    value.flush()
     expect(workflowData(value)).toMatchObject({
-      status: 'interrupted',
-      phases: [{ members: [{ status: 'interrupted' }] }],
+      status: 'running',
+      phases: [{ members: [{ status: 'running' }] }],
     })
+    value.append(at(7, 'tool-workflow/agent-end', { runId: 'run-1', seq: 1, outcome: 'completed' }))
+    value.append(at(8, 'tool-workflow/run-end', { runId: 'run-1', stopReason: 'completed' }))
+    value.flush()
+    expect(workflowData(value)?.status).toBe('completed')
   })
+
+  it.each(['interrupted', 'forked'] as const)(
+    'shows missing terminal facts as interrupted once a %s closer ends the owning Turn',
+    (kind) => {
+      const value = assembler([
+        at(1, 'turn/start', { turn: 1 }),
+        at(2, 'step/start', { turn: 1, step: 1 }),
+        at(3, 'tool-workflow/run-start', { runId: 'run-1', name: 'audit' }),
+        at(4, 'tool-workflow/agent-start', {
+          runId: 'run-1', seq: 1, label: 'worker', childId: 'child-1',
+        }),
+      ])
+      expect(workflowData(value)?.status).toBe('running')
+      value.append(at(5, 'turn/end', { turn: 1, reason: { kind } }))
+      value.flush()
+      expect(workflowData(value)).toMatchObject({
+        status: 'interrupted',
+        phases: [{ members: [{ status: 'interrupted' }] }],
+      })
+    },
+  )
 
   it('retains a zero-member run as its own completed node', () => {
     const value = assembler([
@@ -195,7 +219,7 @@ describe('workflow-run Conversation Definition', () => {
       at(3, 'tool-workflow/agent-start', {
         runId: 'turn', seq: 1, label: 'open', childId: 'child-1',
       }),
-      at(4, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      at(4, 'turn/end', { turn: 1, reason: { kind: 'interrupted' } }),
     ])
     expect(workflowData(interruptedTurn)?.status).toBe('interrupted')
   })
