@@ -308,7 +308,8 @@ export class SessionProjectionRegistry extends Service {
         }
       }
     }.bind(this), 'sessionProjections.register()')
-    return () => void dispose()
+    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; keep the Cordis disposer so effects can adopt it.
+    return dispose
   }
 
   /**
