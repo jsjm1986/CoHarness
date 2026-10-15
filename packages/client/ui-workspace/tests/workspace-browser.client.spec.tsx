@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceListState, WorkspaceView,
@@ -374,7 +374,7 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getByRole('button', { name: '展开其余 2 个会话' })).toBeTruthy()
   })
 
-  it('keeps running sessions and running-descendant parents outside the idle quota', () => {
+  it('raises the watermark to cover running rows and their idle prefix at the tail', () => {
     const items = [
       ...Array.from({ length: 7 }, (_, index) => summary(`session-${index + 1}`, 10 - index)),
       summary('runner', 20, { running: true }),
@@ -386,11 +386,219 @@ describe('WorkspaceBrowser', () => {
       useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
     })
     fireEvent.click(screen.getByText('alpha'))
-    // Running rows surface at the tail even though five idle rows lead them.
+    // The trailing attention rows raise the watermark to their positions:
+    // every non-blank row fits inside it, so nothing overflows.
+    for (const item of items.slice(0, 7)) expect(screen.getByText(item.displayTitle)).toBeTruthy()
     expect(screen.getByText('runner')).toBeTruthy()
     expect(screen.getByText('parent')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /展开其余/ })).toBeNull()
+  })
+
+  it('keeps leading attention rows visible while trailing idle rows fold', () => {
+    const items = [
+      summary('runner', 20, { running: true }),
+      ...Array.from({ length: 7 }, (_, index) => summary(`session-${index + 1}`, 10 - index)),
+    ]
+    mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.getByText('runner')).toBeTruthy()
+    for (const item of items.slice(1, 5)) expect(screen.getByText(item.displayTitle)).toBeTruthy()
+    expect(screen.queryByText('session-5')).toBeNull()
+    expect(screen.getByRole('button', { name: '展开其余 3 个会话' })).toBeTruthy()
+  })
+
+  it('keeps the raised watermark after the attention ends and resets on group fold', () => {
+    const items = Array.from({ length: 12 }, (_, index) => summary(`session-${index + 1}`, 12 - index))
+    const b = mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
     expect(screen.queryByText('session-6')).toBeNull()
+
+    const withFlag = (id: string, patch: Partial<SessionSummary>) => hook(sessionState(
+      items.map(item => item.id === sid(id) ? { ...item, ...patch } : item),
+    ))
+    rerender(b, { useSessions: withFlag('session-9', { running: true }) })
+    expect(screen.getByText('session-9')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '展开其余 3 个会话' })).toBeTruthy()
+    // The watermark is monotonic: ending the run keeps the raised window.
+    rerender(b, { useSessions: withFlag('session-9', { running: false }) })
+    expect(screen.getByText('session-9')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('alpha'))
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.queryByText('session-6')).toBeNull()
+    // Waiting-for-user and unread-completion rows are attention too.
+    rerender(b, { useSessions: withFlag('session-7', { pendingInteraction: 'question' }) })
+    expect(screen.getByText('session-7')).toBeTruthy()
+    rerender(b, { useSessions: withFlag('session-8', { completed: true }) })
+    expect(screen.getByText('session-8')).toBeTruthy()
+    expect(screen.queryByText('session-9')).toBeNull()
+    // Show more keeps paging past the raised window; Show less resets to it.
+    fireEvent.click(screen.getByRole('button', { name: '展开其余 4 个会话' }))
+    expect(screen.getByText('session-12')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '收起' }))
+    expect(screen.getByText('session-8')).toBeTruthy()
+    expect(screen.queryByText('session-9')).toBeNull()
+  })
+
+  it('keeps the raised row count, not the session, when a new session pushes it down', () => {
+    const items = Array.from({ length: 12 }, (_, index) => summary(`session-${index + 1}`, 20 - index))
+    const b = mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
+    })
+    act(() => { b.store.actions.setOrderBy('manual') })
+    fireEvent.click(screen.getByText('alpha'))
+    rerender(b, {
+      useSessions: hook(sessionState(items.map(item =>
+        item.id === sid('session-9') ? { ...item, running: true } : item))),
+    })
+    rerender(b, {
+      useSessions: hook(sessionState(items.map(item =>
+        item.id === sid('session-9') ? { ...item, running: false } : item))),
+    })
+    expect(screen.getByText('session-9')).toBeTruthy()
+    const newest = summary('newest', 30)
+    // A drag landing the new row at the head pushes session-9 past the mark.
+    rerender(b, {
+      useSessions: hook(sessionState([newest, ...items])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', [newest.id, ...items.map(item => item.id)])])),
+    })
+    act(() => {
+      b.store.actions.setSessionOrder('alpha', [newest.id as string, ...items.map(item => item.id as string)])
+    })
+    // The watermark remembers a row count, so the pushed-down row folds.
+    expect(screen.getByText('session-8')).toBeTruthy()
+    expect(screen.queryByText('session-9')).toBeNull()
+    expect(screen.getByRole('button', { name: '展开其余 4 个会话' })).toBeTruthy()
+  })
+
+  it('stops automatic raises at 50 rows while Show more continues past them', () => {
+    const items = Array.from({ length: 60 }, (_, index) => summary(`session-${index + 1}`, 60 - index))
+    const b = mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    // Attention beyond row 50 cannot raise the watermark on its own — the
+    // current session included.
+    rerender(b, {
+      useSessions: hook(sessionState(items.map(item => item.id === sid('session-55')
+        ? { ...item, running: true }
+        : item), { current: sid('session-53') })),
+    })
+    expect(screen.queryByText('session-53')).toBeNull()
+    expect(screen.queryByText('session-55')).toBeNull()
+    rerender(b, {
+      useSessions: hook(sessionState(items.map(item => item.id === sid('session-50') || item.id === sid('session-55')
+        ? { ...item, running: true }
+        : item))),
+    })
+    expect(screen.getByText('session-50')).toBeTruthy()
+    expect(screen.queryByText('session-51')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '展开其余 10 个会话' }))
+    expect(screen.getByText('session-55')).toBeTruthy()
+    expect(screen.queryByText('session-56')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '展开其余 5 个会话' }))
+    expect(screen.getByText('session-60')).toBeTruthy()
+  })
+
+  it('covers the current session and a parent with a running child', () => {
+    const items = Array.from({ length: 9 }, (_, index) => summary(`session-${index + 1}`, 9 - index))
+    const child = summary('child', 0, { origin: 'subagent', parentId: sid('session-7'), running: true })
+    const b = mount({
+      useSessions: hook(sessionState([...items, child])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', [...items.map(item => item.id), child.id])])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.getByText('session-7')).toBeTruthy()
+    expect(screen.queryByText('session-8')).toBeNull()
+    expect(screen.queryByText('child')).toBeNull()
     expect(screen.getByRole('button', { name: '展开其余 2 个会话' })).toBeTruthy()
+    rerender(b, {
+      useSessions: hook(sessionState([...items, child], { current: sid('session-8') })),
+    })
+    expect(screen.getByText('session-8')).toBeTruthy()
+    expect(screen.queryByText('session-9')).toBeNull()
+    expect(screen.getByRole('button', { name: '展开其余 1 个会话' })).toBeTruthy()
+  })
+
+  it('raises the watermark to a search result beyond the initial five rows', () => {
+    const items = Array.from({ length: 17 }, (_, index) => summary(`session-${index + 1}`, 17 - index))
+    const open = vi.fn()
+    mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
+      open,
+    })
+    fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: 'session-11' } })
+    fireEvent.click(screen.getByRole('treeitem'))
+    expect(open).toHaveBeenCalledWith(sid('session-11'))
+    expect(screen.getByText('session-11')).toBeTruthy()
+    expect(screen.queryByText('session-12')).toBeNull()
+    expect(screen.getByRole('button', { name: '展开其余 6 个会话' })).toBeTruthy()
+  })
+
+  it('folding a parent Workspace resets descendant watermarks', () => {
+    const rootItems = Array.from({ length: 7 }, (_, index) => summary(`root-${index + 1}`, 30 - index))
+    const childItems = Array.from({ length: 7 }, (_, index) => summary(`child-${index + 1}`, 20 - index))
+    const b = mount({
+      useSessions: hook(sessionState([...rootItems, ...childItems])),
+      useWorkspaces: hook(workspaceState([
+        workspace('root', rootItems.map(item => item.id), 'Root'),
+        workspace('root/child', childItems.map(item => item.id), 'Child'),
+      ])),
+    })
+    act(() => { b.store.actions.setGroupBy('workspace-tree') })
+    fireEvent.click(screen.getByText('Child'))
+    const childSection = screen.getByText('Child').closest('[class*="groupSection"]') as HTMLElement
+    fireEvent.click(within(childSection).getByRole('button', { name: '展开其余 2 个会话' }))
+    fireEvent.click(screen.getAllByRole('button', { name: '展开其余 2 个会话' }).at(-1)!)
+    expect(screen.getByText('child-7')).toBeTruthy()
+    expect(screen.getByText('root-7')).toBeTruthy()
+    // Folding the child resets only its own mark; the parent's stays.
+    fireEvent.click(screen.getByText('Child'))
+    fireEvent.click(screen.getByText('Child'))
+    expect(screen.queryByText('child-6')).toBeNull()
+    expect(screen.getByText('root-7')).toBeTruthy()
+    // Folding the parent resets its subtree: the child falls back to five.
+    fireEvent.click(within(childSection).getByRole('button', { name: '展开其余 2 个会话' }))
+    fireEvent.click(screen.getByText('Root'))
+    fireEvent.click(screen.getByText('Root'))
+    expect(screen.queryByText('root-6')).toBeNull()
+    expect(screen.queryByText('child-6')).toBeNull()
+  })
+
+  it('does not raise a nested watermark while a folded ancestor hides it', () => {
+    const rootItems = [summary('root-1', 30)]
+    const childItems = Array.from({ length: 8 }, (_, index) => summary(`child-${index + 1}`, 20 - index))
+    const b = mount({
+      useSessions: hook(sessionState([...rootItems, ...childItems])),
+      useWorkspaces: hook(workspaceState([
+        workspace('root', rootItems.map(item => item.id), 'Root'),
+        workspace('root/child', childItems.map(item => item.id), 'Child'),
+      ])),
+    })
+    act(() => { b.store.actions.setGroupBy('workspace-tree') })
+    fireEvent.click(screen.getByText('Child'))
+    fireEvent.click(screen.getByText('Root'))
+    // The run below the folded ancestor cannot raise the child's watermark.
+    rerender(b, {
+      useSessions: hook(sessionState([...rootItems, ...childItems.map(item =>
+        item.id === sid('child-8') ? { ...item, running: true } : item)])),
+    })
+    rerender(b, {
+      useSessions: hook(sessionState([...rootItems, ...childItems])),
+    })
+    fireEvent.click(screen.getByText('Root'))
+    expect(screen.getByText('child-5')).toBeTruthy()
+    expect(screen.queryByText('child-6')).toBeNull()
+    expect(screen.queryByText('child-8')).toBeNull()
   })
 
   it('keeps the selected blank New Session outside the folding quota', () => {

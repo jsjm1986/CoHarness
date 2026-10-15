@@ -9,7 +9,7 @@ kind: "package-reference"
 
 共享 Workspace 浏览器与选择器插件。`WorkspaceBrowser` 填充侧边栏的 `sidebar.workspaces` slot，`WorkspacePicker` 则填充页面局部 Session Intent 主视觉区的 `conversation.hero.workspace` slot；两个界面使用同一套 Workspace 菜单和添加流程。当 conversation viewport 处于工作台模式时，浏览器隐藏自身的 Workspace/Session 列表、分节头和 rail 搜索，改为渲染其声明的 `sidebar.workspaces.workbench` 孔位——由工作台插件以面板管理界面填充。
 
-折叠的 Workspace 分区最多显示五条非空 Session，并在选中的空白 New Session 首条提示词落地前保留它作为临时行。溢出数量不计入该临时行，折叠状态下的拖拽会把可见来源保持在隐藏行之前。
+折叠的 Workspace 分区按每个分区各自的水位显示靠前的非空 Session，初始为五条，并在选中的空白 New Session 首条提示词落地前保留它作为临时行。水位会抬升以覆盖前 50 条中最后一个正在运行、有正在运行的子代、等待用户、有未读完成或是主视区当前项的 Session；从搜索打开的 Session 会把水位抬到它所在的任意位置。水位是只升不降的行数，因此运行或通知结束后这些行仍保持可见；把 Session 拖过水位的重排会隐藏它。每次点击「显示更多」把水位再抬高五条、不受 50 行上限约束，剩余不超过五条时则全部显示；最后一批之后「收起」会重置水位。折叠 Workspace 会重置它及其嵌套 Workspace 的水位，被折叠祖先隐藏的分组也无法抬升水位；重置后的水位仍会覆盖符合条件的 Session。溢出数量不计入该临时行，折叠状态下会把被拖拽行藏到溢出控件之后的放置会被拒绝。
 
 该浏览器通过全局运行时钩子将 Session 行渲染为分组或扁平形式，并负责 Workspace 添加／重命名／重排序以及 Session 重排序。每个 Workspace 会记住自身是关闭还是显示 Session；打开后默认显示五条 Session，其余条目通过临时的**展开其余**控件显示，而关闭并重新打开整个 Workspace 后会恢复为五条。从 Workspace 行创建 Session 时会先打开该分组，使 Session 状态到达后新行保持可见。Workspace 列表基线就绪后，浏览器持久化的展开状态与 Session 顺序记录只保留当前 Workspace id、Ungrouped 和单列表记账。视图选项把分组方式和每个记账各自的一份浏览器持久化 Session 顺序放在一起：真实 Workspace 从 `WorkspaceView.sessionIds` 初始化，Ungrouped 和跨 Workspace 的单列表则从最近更新时间顺序初始化。**手动排序**和**最近更新**在两种呈现方式下都可用。进入最近更新时会执行一次完整的时间排序，后续 user prompt 或 steer 会将对应 Session 置顶一次；进入手动排序则保留所有当前位置并停用后续置顶。两种模式下的拖拽都会编辑当前顺序；真实 Workspace 在手动模式下的拖拽还会更新 Host Session 记账，而 Ungrouped 和单列表因没有单一 Workspace 记账，其顺序始终只保存在浏览器本地。单列表没有父级层次，因此不显示空的左侧状态槽；Session 存在可见状态时仍保留该槽。无论采用哪种 Session 顺序，Workspace 拖拽顺序都由 Host 持久化。分组方式提供按 Workspace、按 Workspace 目录树——每个 Workspace 嵌于最近的已注册祖先下——以及单列表；三态归档筛选（隐藏、显示、仅已归档）在所有模式下生效，拖拽 Workspace 时会连同其后代在同级集合内移动。
 
