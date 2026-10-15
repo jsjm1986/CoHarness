@@ -4498,9 +4498,9 @@
         "mektpoy"
       ],
       "dupOf": null,
-      "verdict": "N",
+      "verdict": "P",
       "worth": "M",
-      "note": "用户暂停的目标不可被模型自行恢复（#3485 26%，goal 宿主 disarmed 逻辑与激活入口缺失），需核实",
+      "note": "运行时守卫已移植（#3485：goal 服务 activation 状态机 + 模型不可恢复已暂停目标 + goal/activation-changed 事件与 remotes 转发）；暂停目标的激活显示入口属 Web UI 部分，另行安排",
       "prs": []
     },
     {
@@ -9119,9 +9119,9 @@
         "imccyu"
       ],
       "dupOf": null,
-      "verdict": "N",
+      "verdict": "Y",
       "worth": "M",
-      "note": "服务重启后页面恢复：客户端 bundle rev 跨重启稳定（#4855 10%）；旧标签页需硬刷新即此缺口",
+      "note": "已移植（#4855：客户端 bundle rev 改为 artifactRevision(mtime+ctime+size)，重启后 URL 稳定、连接自动恢复、会话与草稿保留；connection-recovery/server-restart/reconnect/HMR live e2e 全过）",
       "prs": [
         {
           "pr": 4191,
@@ -13514,9 +13514,9 @@
         "tianyicui"
       ],
       "dupOf": null,
-      "verdict": "N",
+      "verdict": "Y",
       "worth": "H",
-      "note": "模型流停止且传输不响应取消时请求挂起超过空闲超时（#5629，util/timeout + 两个适配器）",
+      "note": "已移植（#5629：idle 看门狗在 deadline 结算被遗弃的 demand，util/timeout + deepseek/anthropic 适配器）",
       "prs": []
     },
     {
@@ -13531,9 +13531,9 @@
         "turtle2099"
       ],
       "dupOf": null,
-      "verdict": "P",
+      "verdict": "Y",
       "worth": "M",
-      "note": "请求扩展失败不阻断已移植（#5551）；插件包元信息不可读仍会阻断（#5554 8%）",
+      "note": "已移植（#5551 请求扩展失败不阻断 + #5554 插件包元信息逐条降级，无版本清单不再阻断 DeepSeek 请求）",
       "prs": [
         {
           "pr": 5554,
@@ -13564,9 +13564,9 @@
         "kermanx"
       ],
       "dupOf": null,
-      "verdict": "P",
+      "verdict": "Y",
       "worth": "M",
-      "note": "监听器关闭后异常已修（#5698）；Agent 关闭时资源提前释放未修（#5680 23%）",
+      "note": "已移植（#5698 监听器关闭异常 + #5680 Agent 关闭期间保留资源、teardown/dispose 拆分、e2e 覆盖关闭竞态）",
       "prs": [
         {
           "pr": 5698,
@@ -13669,9 +13669,9 @@
         "turtle2099"
       ],
       "dupOf": null,
-      "verdict": "N",
+      "verdict": "Y",
       "worth": "M",
-      "note": "后台工作流在父步骤结束后被误标中断（#5639）",
+      "note": "已移植（#5639：运行中 workflow 的 turn 照常结束不再标中断，ConversationLocation 带 turn.end）",
       "prs": [
         {
           "pr": 5639,
@@ -14335,9 +14335,9 @@
         "yudshj"
       ],
       "dupOf": null,
-      "verdict": "N",
+      "verdict": "Y",
       "worth": "H",
-      "note": "跨协议完整历史与 DeepSeek 空文本块过滤（#6108），影响重启后会话续聊与切换 DeepSeek",
+      "note": "已移植（#6108：DeepSeek 序列化丢弃空 assistant 文本块、保留 tool-result ID、跨协议历史回放测试与快照）",
       "prs": [
         {
           "pr": 6108,
@@ -14357,9 +14357,9 @@
         "turtle1999"
       ],
       "dupOf": null,
-      "verdict": "N",
+      "verdict": "Y",
       "worth": "M",
-      "note": "插件更新/重装后仍跑旧代码：HMR 替换包文件变化的插件（#5607 7%）",
+      "note": "已移植（#5607：ModuleFiles 文件身份记录 + reconcileProfile 全 profile 重新组合、recomposeProfile 发布 runtime resolution、already-installed 拒绝、restartReason/nextStep、UI 重启原因文案；preview-boot/webworker 与官方目录 Update 流在本地不存在，plugin-hmr-lifecycle e2e 需进程内 ctx 未移植）",
       "prs": [
         {
           "pr": 5607,
@@ -14466,9 +14466,9 @@
         "turtle2099"
       ],
       "dupOf": null,
-      "verdict": "N",
+      "verdict": "Y",
       "worth": "M",
-      "note": "凭据文件多余字段不再阻止启动（#6121 7%）",
+      "note": "已移植（#6121：凭据文件未知顶层键记 warning 不阻断启动，watcher 覆盖）",
       "prs": []
     },
     {
