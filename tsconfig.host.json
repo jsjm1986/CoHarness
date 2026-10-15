@@ -13,6 +13,7 @@
     "apps/web/tests/connection-recovery.e2e.ts",
     "apps/web/tests/server-restart.e2e.ts",
     "apps/web/tests/scaffold.ts",
+    "apps/web/tests/prefix-proxy.ts",
     "apps/web/tests/aria-normalize.ts",
     "apps/web/tests/aria-normalize.spec.ts",
     "apps/web/tests/expected.ts",

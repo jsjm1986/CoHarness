@@ -88,9 +88,10 @@ function fakeHttpServer(host: '127.0.0.1' | '0.0.0.0' = '127.0.0.1'): { server: 
 /** Deterministic Host Connection face for URL publication and frontend injection. */
 function provideConnection(ctx: Context): void {
   ctx.provide('connection', {
+    // Adds the process token to the given canonical root, preserving any
+    // public mount prefix the caller passed.
     authenticatedUrl(baseUrl: string) {
       const url = new URL(baseUrl)
-      url.pathname = '/'
       url.searchParams.set('token', 'test-token')
       return url.href
     },
@@ -166,6 +167,48 @@ describe('web-app runtime glue', () => {
     await ctx.fiber.dispose()
   })
 
+  it('advertises and opens the configured public root behind a prefix-stripping proxy', async () => {
+    stageDist()
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    const { server } = fakeHttpServer()
+    ctx.provide('webServer', server)
+    provideConnection(ctx)
+    const contributions: BashContribution[] = []
+    ctx.provide('shellEnv', {
+      register: (contribution: BashContribution) => {
+        contributions.push(contribution)
+        return () => {}
+      },
+    } as never)
+    provideLoader(ctx)
+    const lifecycle: string[] = []
+    vi.spyOn(console, 'log').mockImplementation((message) => { lifecycle.push(String(message)) })
+    const openBrowser = vi.fn(async (url: string) => { lifecycle.push(`open:${url}`) })
+    internals.openBrowser = openBrowser
+    apply(ctx, new Config({
+      openBrowser: true,
+      printUrl: true,
+      surfaceContext: true,
+      publicUrl: 'https://proxy.example:8443/web',
+      trustedHosts: ['proxy.example:8443'],
+    }))
+    await ctx.plugin(SystemPrompt, { personaPrefix: '' })
+    await vi.waitFor(() => { expect(openBrowser).toHaveBeenCalled() })
+
+    expect(lifecycle).toEqual([
+      'dsh web: https://proxy.example:8443/web/?token=test-token',
+      'dsh web: opening the default browser; pass --no-open to disable',
+      'open:https://proxy.example:8443/web/?token=test-token',
+    ])
+    const assembly = await ctx.systemPrompt.assemble()
+    const section = assembly.sections.find(entry => entry.name === 'app:web-surface')
+    expect(section?.text).toContain('https://proxy.example:8443/web/')
+    expect(section?.text).not.toContain('127.0.0.1')
+    const urlContribution = contributions.find(contribution => contribution.name === 'web-runtime')
+    expect(urlContribution?.resolve()).toEqual({ DSH_WEB_URL: 'https://proxy.example:8443/web/' })
+  })
+
   it('publishes no readiness side effect when printing and browser opening are disabled', async () => {
     stageDist()
     const ctx = new Context()
@@ -183,6 +226,17 @@ describe('web-app runtime glue', () => {
     expect(assembly.sections.find(entry => entry.name === 'app:web-surface')?.text)
       .toContain('rebuilding the affected Web artifacts')
     await ctx.fiber.dispose()
+  })
+
+  it('advertises the loopback URL when the composition sets publicUrl to null', async () => {
+    stageDist()
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    ctx.provide('webServer', fakeHttpServer().server)
+    provideConnection(ctx)
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    apply(ctx, new Config({ openBrowser: false, printUrl: true, surfaceContext: false, publicUrl: null as never, trustedHosts: [] }))
+    await vi.waitFor(() => { expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567/?token=test-token') })
   })
 
   it('skips the surface context when disabled (the one-shot layer): no prompt section, no bash variables', async () => {

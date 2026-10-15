@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-16-public-web-deployments.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-16-public-web-deployments.md
+/agent-note-advertised-public-http-s-web-roots:
+  en: dc578926094ee606
+  zh: 91c2790b88074292
+/agent-note-advertised-public-http-s-web-roots/problem:
+  en: 982c2131e267c975
+  zh: 62753dbc8b8e8c92
+/agent-note-advertised-public-http-s-web-roots/decision:
+  en: 1ba95dbdde7c5487
+  zh: 03c5dcec109c8029
+/agent-note-advertised-public-http-s-web-roots/alternatives-considered:
+  en: 7fdcfcbe77d63e42
+  zh: c99388b68f8d62f0
+/agent-note-advertised-public-http-s-web-roots/consequences:
+  en: 40e1875dab5cc69d
+  zh: a06aacfc62673f2c
+/agent-note-advertised-public-http-s-web-roots/testing:
+  en: 067cbc57b88ecfd3
+  zh: cccfe52559e4e1cf
