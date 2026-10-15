@@ -81,6 +81,12 @@
   animation: rail-in 150ms var(--ds-ease-in-out) backwards;
 }
 
+/* The rail-head toggle morphs in place from the wide header's control —
+   sliding it in like the other controls reads as a position jump. */
+.railIn .toggle {
+  animation-name: rail-fade-in;
+}
+
 .railIn .footArea {
   animation: rail-fade-in 150ms var(--ds-ease-in-out) backwards;
 }

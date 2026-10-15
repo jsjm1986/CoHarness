@@ -233,8 +233,10 @@ export function SidebarRoot({
                 {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <CoHarnessMascot size={24} /> })}
               </span>
             )}
-            {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
-            <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 18} />
+            {/* Rail icons render at 18 (figma rail spec); the rail-head seat
+                holds a 24px brand mark, so the hover-reveal glyph rides at 20
+                to keep the swap from shrinking the visible control. */}
+            <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 20} />
           </button>
         </Tooltip>
       </div>
