@@ -38,6 +38,23 @@ describe('StateDot', () => {
     expect(ring.getAttribute('height')).toBe('12')
   })
 
+  it('pins animations to document time zero, including after a restart', () => {
+    const animations = [{ startTime: 438 }]
+    const proto = SVGElement.prototype as { getAnimations?: () => { startTime: number }[] }
+    proto.getAnimations = () => animations
+    try {
+      const { container } = render(<StateDot state="ongoing" />)
+      // Mount pins the first start…
+      expect(animations[0]!.startTime).toBe(0)
+      // …and a reorder-or-reshow restart is re-pinned by the listener.
+      animations[0]!.startTime = 438
+      container.querySelector('rect')!.dispatchEvent(new Event('animationstart', { bubbles: true }))
+      expect(animations[0]!.startTime).toBe(0)
+    } finally {
+      delete proto.getAnimations
+    }
+  })
+
   it('rejects unknown states at the type level', () => {
     const bad = (state: StateDotState) => state
     // @ts-expect-error 'paused' is not one of the four states

@@ -18,6 +18,32 @@ const C_PIXELS: ReadonlyArray<readonly [number, number]> = [
 ]
 
 /**
+ * Pin the chase's CSS animations to document time zero. A CSS animation starts
+ * when its element is inserted and restarts when the element is moved or shown
+ * again, so chases started at different moments run out of phase; one shared
+ * start time keeps every visible loader in step while each pixel's own
+ * `animation-delay` keeps the stagger. Mount pins the first start; the
+ * element's own `animationstart` listener pins each restart.
+ * @param element - the mounted loader, or null on unmount.
+ */
+function syncSpinner(element: SVGSVGElement | null): void {
+  if (element === null) return
+  pinSpinner(element)
+  element.addEventListener('animationstart', () => { pinSpinner(element) })
+}
+
+/**
+ * Set every CSS animation in the loader's subtree to start at document time zero.
+ * @param element - the mounted loader.
+ */
+function pinSpinner(element: SVGSVGElement): void {
+  // jsdom (the unit lane) implements no Web Animations despite lib.dom's
+  // non-optional typing; the optional call leaves that lane unsynced.
+  const spinner = element as { getAnimations?: SVGSVGElement['getAnimations'] }
+  for (const animation of spinner.getAnimations?.({ subtree: true }) ?? []) animation.startTime = 0
+}
+
+/**
  * Render a state dot.
  * @param props.state - which of `done`, `warning`, `ongoing`, `error`, or `idle` to show.
  * @param props.size - outer diameter in px (default 10, the figma size).
@@ -34,6 +60,7 @@ export function StateDot({ state, size = 10, className, appearance = 'dot' }: {
   if (state === 'ongoing') {
     return (
       <svg
+        ref={syncSpinner}
         className={clsx(css.mark, className)}
         data-state="ongoing"
         width={size}
