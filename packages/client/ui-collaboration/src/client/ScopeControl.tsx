@@ -4,7 +4,7 @@ import {
   IconChevronDownOutline14, IconChevronLeftOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
   IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16, IconUsersOutline16,
   IconWarningOutline16,
-  Menu, type MenuEntry,
+  Menu, useMediaQuery, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {
@@ -96,6 +96,11 @@ export function ScopeControl({
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const [open, setOpen] = useState(false)
+  // The in-flow hub is the wide desktop sidebar's grammar; below the compact
+  // breakpoint the drawer is a transient overlay, so the control falls back
+  // to the portaled list, which Menu presents as the shared bottom sheet.
+  const phone = useMediaQuery('(max-width: 767px)')
+  const hub = wide && !phone
   const triggerRef = useRef<HTMLButtonElement>(null)
   // The menu tracks the trigger's rendered width — the sidebar is draggable,
   // so the floating list re-measures on every layout change instead of
@@ -226,7 +231,7 @@ export function ScopeControl({
       icon: <IconPlusOutline16 size={16} />,
     })
   }
-  if (!wide) {
+  if (!hub) {
     if (listInvitations !== undefined) {
       footerEntries.push({
         id: 'project:members',
@@ -251,9 +256,9 @@ export function ScopeControl({
     }
   }
 
-  // Visibility stays a menu section on the rail; the wide hub renders it as a
-  // segmented radio inside the current-space card.
-  if (!wide && projectScope?.mode === 'rw') {
+  // Visibility stays a menu section on the rail and the phone sheet; the
+  // desktop hub renders it as a segmented radio inside the current-space card.
+  if (!hub && projectScope?.mode === 'rw') {
     entries.push(
       { type: 'separator', id: 'visibility-separator' },
       { type: 'label', id: 'visibility-label', text: t('newConversation.label') },
@@ -317,10 +322,10 @@ export function ScopeControl({
       )}
     </div>
   )
-  // Wide: the sheet becomes a space hub — a persistent working surface for
-  // settings, members, invitations, and visibility above the searchable list.
-  // Rail keeps the compact floating menu header.
-  const projectSearch = wide ? (
+  // Desktop wide: the sheet becomes a space hub — a persistent working surface
+  // for settings, members, invitations, and visibility above the searchable
+  // list. Rail and the phone sheet keep the compact menu header.
+  const projectSearch = hub ? (
     <div className={css.hub}>
       <div className={css.hubHead}>
         <button
@@ -425,13 +430,14 @@ export function ScopeControl({
         items={entries}
         header={projectSearch}
         {...footerEntries.length > 0 ? { footer: footerEntries } : {}}
-        /* The expanded sidebar opens the list as an in-flow drawer above its
-           trigger — a panel inside the card, not a floating overlay. The rail
-           keeps the floating menu. */
-        portal={!wide}
-        className={wide ? css.scopeField : undefined}
-        listClassName={wide ? `${css.scopeMenu} ${css.scopeSheet}` : css.scopeMenu}
-        listStyle={wide || menuWidth === undefined ? undefined : { width: menuWidth }}
+        /* The expanded desktop sidebar opens the list as an in-flow drawer
+           above its trigger — a panel inside the card, not a floating overlay.
+           The rail and the phone keep the portaled menu, which is the shared
+           bottom sheet below the compact breakpoint. */
+        portal={!hub}
+        className={hub ? css.scopeField : undefined}
+        listClassName={hub ? `${css.scopeMenu} ${css.scopeSheet}` : css.scopeMenu}
+        listStyle={hub || menuWidth === undefined ? undefined : { width: menuWidth }}
         selectedIds={[
           currentScopeId,
           ...(projectScope?.mode === 'rw' ? [`visibility:${state.stagedVisibility}`] : []),

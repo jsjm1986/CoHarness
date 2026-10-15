@@ -31,6 +31,11 @@ describe('ScopeControl.module.css', () => {
     expect(css).toContain('min-height: var(--dsw-touch-target)')
   })
 
+  it('flattens the trigger into the footer row grammar on phones', () => {
+    expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.context,[\s\S]*\.contextSteward\s*\{[^}]*box-shadow:\s*none/)
+    expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.mode:not\(\.modeSteward\)\s*\{[^}]*display:\s*none/)
+  })
+
   it('caps the project menu and keeps its search controls tappable on phones', () => {
     expect(css).toMatch(/\.scopeMenu\s*\{[^}]*--dsh-menu-max-height:\s*min\(480px,\s*calc\(100vh - 24px\)\)/)
     expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.menuSearch\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)

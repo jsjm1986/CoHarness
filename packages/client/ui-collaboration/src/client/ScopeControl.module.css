@@ -617,3 +617,26 @@
   height: auto;
   min-height: var(--dsw-touch-target);
 }
+
+/* Phone: the footer column's scope row joins the flat hairline grammar of the
+   rows beneath it — no card surface inside the drawer. The steward warn pill
+   remains the only scope marker; roster rows carry mode pills for the rest. */
+@media (max-width: 767px) {
+  .context,
+  .contextSteward {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .context:hover:not(:disabled),
+  .context[aria-expanded='true'],
+  .contextSteward:hover:not(:disabled),
+  .contextSteward[aria-expanded='true'] {
+    background: var(--dsw-alias-interactive-bg-hover);
+    box-shadow: none;
+  }
+
+  .mode:not(.modeSteward) {
+    display: none;
+  }
+}

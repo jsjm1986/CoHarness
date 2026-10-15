@@ -286,6 +286,28 @@ describe('ScopeControl', () => {
     expect(screen.queryByText('新对话可见范围')).toBeNull()
   })
 
+  it('presents the phone sheet grammar below the compact breakpoint: no hub card, portaled list', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(max-width: 767px)',
+    }) as MediaQueryList))
+    try {
+      const view = render(<ScopeControl {...scopeProps(snapshot(), { createProject: vi.fn() })} />)
+      fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+      // The hub's card and segmented radio are desktop-sidebar grammar; the
+      // phone sheet keeps the rail's flat entries and footer actions.
+      expect(screen.queryByRole('radiogroup', { name: '新对话可见范围' })).toBeNull()
+      expect(view.container.querySelector(`.${css.currentCard}`)).toBeNull()
+      expect(screen.getByRole('menuitem', { name: /项目公开/ })).toBeTruthy()
+      expect(screen.getByRole('menuitem', { name: '新建项目空间' })).toBeTruthy()
+      // The portaled sheet renders outside the footer column, in document.body.
+      expect(view.container.querySelector('[role="menu"]')).toBeNull()
+      expect(document.body.querySelector('[role="menu"]')).not.toBeNull()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('keeps project settings discoverable for a read-only member and explains the owner boundary', async () => {
     const loadProjectConfiguration = vi.fn().mockResolvedValue({
       project: { id: 9, name: '支付重构', themePolicy: 'follow-user' },
