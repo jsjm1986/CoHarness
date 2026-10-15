@@ -253,6 +253,17 @@ export interface InspectOptions {
 /** The form one install spec takes, in pnpm's vocabulary. */
 export type InstallSpecKind = 'registry' | 'path' | 'git' | 'tarball'
 
+/**
+ * One spec read into its form and the parts an inspection needs. A git spec
+ * and a tarball URL carry the `host` pnpm fetches them from, which no registry
+ * stands in for; only their dependencies come from the registry.
+ */
+export type ParsedInstallSpec =
+  | { readonly kind: 'registry'; readonly spec: string; readonly name: string; readonly range?: string }
+  | { readonly kind: 'path'; readonly spec: string; readonly path: string }
+  | { readonly kind: 'tarball'; readonly spec: string; readonly path?: string; readonly host?: string }
+  | { readonly kind: 'git'; readonly spec: string; readonly host: string }
+
 /** Why a spec was refused before anything installed. */
 export type PluginInspectProblem =
   | 'invalid-spec'
