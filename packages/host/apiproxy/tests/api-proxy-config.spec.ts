@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
-import SessionStore from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import { GoalId } from '@deepseek-ai/dsh-goal'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -570,6 +571,23 @@ describe('settings domain', () => {
       type: 'host/remote-event',
       event: 'cordis/request-run-resolved',
       args: [resolved],
+    }])
+  })
+
+  it('forwards a goal activation edge with the exact current ref', async () => {
+    const ctx = await harness()
+    const api = createApiProxy(ctx, DEFAULTS)
+    const payload = {
+      sessionId: SessionId('session-1'),
+      goal: { id: GoalId('goal-1'), revision: 1, activation: 'disarmed' as const },
+    }
+    const frames = await collectHost(api, ['host/remote-event'], 1, async () => {
+      ctx.emit('goal/activation-changed', payload)
+    })
+    expect(frames).toEqual([{
+      type: 'host/remote-event',
+      event: 'goal/activation-changed',
+      args: [payload],
     }])
   })
 

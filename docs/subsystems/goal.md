@@ -69,6 +69,25 @@ interface GoalView extends GoalSnapshot {
 }
 ```
 
+The service also publishes process-local activation edges without changing durable state; clients consume this event for live status.
+
+```ts type-equiv
+/** Live process-local activation update forwarded to UI clients. */
+interface GoalActivationChanged {
+  /** Session whose live goal activation changed. */
+  readonly sessionId: SessionId
+  /** Current exact activation, absent when no goal is current. */
+  readonly goal?: {
+    /** Exact current goal identity. */
+    readonly id: GoalId
+    /** Exact current goal revision. */
+    readonly revision: number
+    /** Current process-local continuation state. */
+    readonly activation: GoalActivation
+  }
+}
+```
+
 ```ts type-equiv
 /**
  * The `goal` projection value: the current durable goal with its replay
@@ -285,6 +304,23 @@ Source: [`packages/goal/goal/src/index.ts`](../../packages/goal/goal/src/index.t
 <a id="goal-events"></a>
 
 ### `goal/*` events
+
+<a id="goalactivation-changed--emit"></a>
+
+#### `goal/activation-changed` — emit
+
+Process-local goal activation changed for one session.
+
+```ts cordis-catalog
+/**
+ * Process-local goal activation changed for one session.
+ * @mode emit
+ * @param payload - session id and the exact current goal activation, or no goal after a clear.
+ */
+'goal/activation-changed'(payload: GoalActivationChanged): void
+```
+
+Source: [`packages/goal/goal/src/domain.ts`](../../packages/goal/goal/src/domain.ts)
 
 <a id="goalchanged--emit"></a>
 

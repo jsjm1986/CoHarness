@@ -454,6 +454,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   CreateGoalRequest: 'goal.md',
   EditGoalRequest: 'goal.md',
   GoalBlockReason: 'goal.md',
+  GoalActivationChanged: 'goal.md',
   GoalChanged: 'goal.md',
   GoalRef: 'goal.md',
   GoalView: 'goal.md',

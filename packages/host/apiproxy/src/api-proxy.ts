@@ -156,6 +156,8 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 import type {} from '@deepseek-ai/dsh-user-approval'
 // Type-only: resolves the `schedule/changed` forward event and `ctx.get('schedule')`.
 import type {} from '@deepseek-ai/dsh-schedule/client'
+// Type-only: resolves the `goal/activation-changed` forward event.
+import type {} from '@deepseek-ai/dsh-goal'
 // Type-only: resolves `ctx.get('workingDirectory')` — optional in host compositions.
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'

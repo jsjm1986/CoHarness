@@ -34,6 +34,9 @@
       "path": "../../feedback/command-feedback"
     },
     {
+      "path": "../../goal/goal"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {
