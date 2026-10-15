@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-16-transcript-width-handle-layering.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-16-transcript-width-handle-layering.md
+/agent-note-transcript-width-handles-stay-behind-chat-content:
+  en: 986ba28cd47131de
+  zh: 0eb8afc0cb59ab10
+/agent-note-transcript-width-handles-stay-behind-chat-content/problem:
+  en: e67a71730d09b9f4
+  zh: 17e59a4ce62b98d7
+/agent-note-transcript-width-handles-stay-behind-chat-content/decision:
+  en: 68b4b8c549ac6fb7
+  zh: e08a8473c2655a14
+/agent-note-transcript-width-handles-stay-behind-chat-content/alternatives-considered:
+  en: 8d957e828a157bc3
+  zh: 4ef41b51a02e4899
+/agent-note-transcript-width-handles-stay-behind-chat-content/consequences:
+  en: 77d30468432d02d4
+  zh: 69de1006915d60d6

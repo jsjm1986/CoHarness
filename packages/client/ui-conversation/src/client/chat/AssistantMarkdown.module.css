@@ -17,6 +17,14 @@
   gap: var(--dsw-space-4);
 }
 
+/* Only the painted table outranks Conversation's z-index 0 width handle. The
+   full-width scroll wrapper and its transparent alignment padding stay below,
+   so a fitting four-column table does not disable the surrounding gutter. */
+.body :global(.md-table-wide) > table {
+  position: relative;
+  z-index: 1;
+}
+
 /* Interrupted-turn terminal marker: quiet inline tag, no animation. */
 .stopped {
   align-self: flex-start;
