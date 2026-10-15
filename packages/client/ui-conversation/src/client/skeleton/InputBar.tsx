@@ -184,9 +184,13 @@ function ExtensionItems({ side, children }: { side: 'left' | 'right'; children: 
     }
     const observer = new ResizeObserver(publish)
     observer.observe(lane)
-    for (const child of lane.children) observer.observe(child)
+    // Slot items arrive wrapped in display:contents elements, which carry no
+    // box and never fire resize entries — content edits reach the probe
+    // through a subtree mutation listener instead of child observers.
+    const mutations = new MutationObserver(publish)
+    mutations.observe(lane, { childList: true, subtree: true, characterData: true })
     publish()
-    return () => { observer.disconnect() }
+    return () => { observer.disconnect(); mutations.disconnect() }
   }, [children])
   return <div ref={ref} className={css.extensionItems} data-input-extension={side}>{children}</div>
 }
