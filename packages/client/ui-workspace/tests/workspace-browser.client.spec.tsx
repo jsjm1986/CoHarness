@@ -374,6 +374,25 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getByRole('button', { name: '展开其余 2 个会话' })).toBeTruthy()
   })
 
+  it('keeps running sessions and running-descendant parents outside the idle quota', () => {
+    const items = [
+      ...Array.from({ length: 7 }, (_, index) => summary(`session-${index + 1}`, 10 - index)),
+      summary('runner', 20, { running: true }),
+      summary('parent', 19),
+      summary('child', 18, { origin: 'subagent', parentId: sid('parent'), running: true }),
+    ]
+    mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    // Running rows surface at the tail even though five idle rows lead them.
+    expect(screen.getByText('runner')).toBeTruthy()
+    expect(screen.getByText('parent')).toBeTruthy()
+    expect(screen.queryByText('session-6')).toBeNull()
+    expect(screen.getByRole('button', { name: '展开其余 2 个会话' })).toBeTruthy()
+  })
+
   it('keeps the selected blank New Session outside the folding quota', () => {
     const ordinary = Array.from({ length: 6 }, (_, index) => summary(`session-${index + 1}`, 6 - index))
     const blank = summary('blank', 7, { blank: true })
