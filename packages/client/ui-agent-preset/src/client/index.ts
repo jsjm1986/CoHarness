@@ -20,8 +20,12 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the settings shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+// Type-only: pulls the Plugins page's SlotMap merge (the 'plugins.add.actions' entry).
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { AgentPresetLabel } from './AgentPresetLabel.tsx'
 import type { AgentPresetLabelInjected } from './AgentPresetLabel.tsx'
+import { CreatePluginMenuItem } from './CreatePluginMenuItem.tsx'
+import type { CreatePluginMenuItemInjected } from './CreatePluginMenuItem.tsx'
 import { AgentPresetRow } from './AgentPresetRow.tsx'
 import type { AgentPresetRowInjected } from './AgentPresetRow.tsx'
 import { AgentPresetSeat } from './AgentPresetSeat.tsx'
@@ -35,6 +39,7 @@ import { en, zh } from './locales.ts'
 import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController } from './settings-store.ts'
 
 export type { AgentPresetLabelInjected, AgentPresetLabelProps } from './AgentPresetLabel.tsx'
+export type { CreatePluginMenuItemInjected } from './CreatePluginMenuItem.tsx'
 export type { AgentPresetRowInjected, AgentPresetRowProps } from './AgentPresetRow.tsx'
 export type { AgentPresetSeatInjected, AgentPresetSeatProps } from './AgentPresetSeat.tsx'
 export type { AgentPresetSectionInjected, AgentPresetSectionProps } from './AgentPresetSection.tsx'
@@ -101,11 +106,12 @@ export function apply(ctx: ClientContext): void {
     return () => { for (const dispose of disposers) dispose() }
   }, 'ui-agent-preset: settings refresh')
 
-  // The settings section's conversational authoring entry: stage the
+  // The conversational authoring entries — the settings section's button and
+  // the Plugins page's add-menu item — share one launch: stage the
   // self-referential preset and land a new session on it. Bound inside the
   // conversation scope below (the seat and the session flow live there) and
-  // unbound with it, so the section's face reads the current binding per
-  // render and simply hides the button while no flow exists.
+  // unbound with it, so each surface's face reads the current binding per
+  // render and simply withholds its entry while no flow exists.
   let creatorDraft: (() => void) | undefined
 
   // The seat lives inside the conversation scope below, so the sync a
@@ -244,9 +250,14 @@ export function apply(ctx: ClientContext): void {
       // on: the chip's list-change applier composes the blank session the
       // workspace connect produces or reuses.
       creatorDraft = () => {
-        if (!section.store.getSnapshot().showPicker) return
+        // Each entry renders only after its own roster load proved the
+        // deployment offers preset selection; re-check both stores so a
+        // surface the user never opened cannot veto the other's launch.
+        const offered = section.store.getSnapshot().showPicker
+          || controller.store.getSnapshot().status === 'ready'
+        if (!offered) return
         // The introduce cue makes the chip announce the pick the user never
-        // made on this screen — the stage happened back in settings.
+        // made on this screen — the stage happened on another surface.
         seat.stage('cordis', true)
         scope.workspaces.startSession()
       }
@@ -274,6 +285,20 @@ export function apply(ctx: ClientContext): void {
         label()
       }
     }, 'ui-agent-preset: new-session chip and header label')
+
+    // The Plugins page's add menu offers the same Creator entry the settings
+    // section does: the item disposes with this scope, so its callback reads
+    // the current draft binding rather than capturing one.
+    scope.slots.inject('plugins.add.actions', () => scope.slots.register({
+      name: 'plugins.add.actions',
+      id: 'create-plugin',
+      locale: 'settings.agentPreset',
+      inject: (): CreatePluginMenuItemInjected => ({
+        hooks: { agentPresets: controller.store },
+        load: () => controller.load(),
+        startCreatorDraft: () => { creatorDraft?.() },
+      }),
+    }, CreatePluginMenuItem))
   })
 
   const sectionInjected = (): AgentPresetSectionInjected => ({
