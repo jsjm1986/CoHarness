@@ -146,6 +146,51 @@ function DocumentRail({
   )
 }
 
+/**
+ * Lane for items contributed into the composer tool row. The seat is
+ * clip-first: when contributed content outgrows the lane it publishes
+ * `data-clipped` so items can drop secondary chrome (labels) under
+ * `[data-input-extension][data-clipped]` selectors instead of slicing
+ * mid-glyph. Restore probes run only when the lane actually gained room —
+ * `floor` records the width at the last failed probe, because the probe
+ * itself resizes the children it observes and an ungated probe would
+ * oscillate every frame. All clears/re-sets settle inside one callback,
+ * which the browser paints atomically, so toggling never flickers.
+ */
+function ExtensionItems({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const lane = ref.current
+    if (lane === null || typeof ResizeObserver !== 'function') return
+    // Lane width at the most recent clip or failed restore; -1 while the
+    // lane is unclipped so the gate below is inert.
+    let floor = -1
+    const publish = (): void => {
+      if (!lane.hasAttribute('data-clipped')) {
+        if (lane.scrollWidth > lane.clientWidth) {
+          lane.setAttribute('data-clipped', '')
+          floor = lane.clientWidth
+        }
+        return
+      }
+      // Still clipped: probe only when the lane gained width since the last
+      // probe. Shrinking neighbors hand their freed width to the lane under
+      // flex, so content changes reach the gate through lane growth too.
+      if (lane.clientWidth <= floor) return
+      floor = lane.clientWidth
+      lane.removeAttribute('data-clipped')
+      if (lane.scrollWidth > lane.clientWidth) lane.setAttribute('data-clipped', '')
+      else floor = -1
+    }
+    const observer = new ResizeObserver(publish)
+    observer.observe(lane)
+    for (const child of lane.children) observer.observe(child)
+    publish()
+    return () => { observer.disconnect() }
+  }, [children])
+  return <div ref={ref} className={css.extensionItems} data-input-extension={side}>{children}</div>
+}
+
 export type InputBarProps = ComposerBarProps
 
 export const InputBar = memo(function InputBar({
@@ -1013,16 +1058,12 @@ export const InputBar = memo(function InputBar({
               {renderSlot('conversation.input.plan', { locked })}
             </div>
             {leftItems != null && (
-              <div className={css.extensionItems} data-input-extension="left">
-                {leftItems}
-              </div>
+              <ExtensionItems side="left">{leftItems}</ExtensionItems>
             )}
           </div>
           <div className={css.trailing}>
             {rightItems != null && (
-              <div className={css.extensionItems} data-input-extension="right">
-                {rightItems}
-              </div>
+              <ExtensionItems side="right">{rightItems}</ExtensionItems>
             )}
             {renderSlot('conversation.input.model', {
               locked: modelSeatLocked,

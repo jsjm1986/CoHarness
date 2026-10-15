@@ -8,22 +8,22 @@ const css = readFileSync(fileURLToPath(new URL('../src/client/StewardChip.module
 describe('StewardChip.module.css', () => {
   it('renders binary states only — the seat never gets a truncated label', () => {
     // A partially clipped CJK label reads as a defect: the chip stays rigid
-    // and jumps to its icon seat above the seat's clip point instead of
-    // shrinking or ellipsizing inside it.
+    // and jumps to its icon seat instead of shrinking or ellipsizing inside
+    // the lane.
     expect(css).toMatch(/\.chip\s*\{[^}]*flex:\s*none/)
     expect(css).toMatch(/\.icon\s*\{[^}]*flex:\s*none/)
     expect(css).toMatch(/\.label\s*\{[^}]*white-space:\s*nowrap/)
     expect(css).not.toMatch(/\.label\s*\{[^}]*text-overflow/)
   })
 
-  it('collapses to an icon seat ahead of the seat clip point', () => {
-    // The steward row carries more fixed content than a plain row, so the
-    // chip's own tier fires at 640px — before the ~560px of fixed row
-    // content reaches the lane edge — and the compact viewport still drops
-    // the label under the shared media tier.
-    const container = css.match(/@container\s*\(max-width:\s*640px\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
-    expect(container).toMatch(/\.chip\s*\{[^}]*justify-content:\s*center/)
-    expect(container).toMatch(/\.label\s*\{[^}]*display:\s*none/)
+  it('follows the lane clip signal rather than a guessed breakpoint', () => {
+    // ExtensionItems publishes `data-clipped` while contributed content
+    // overflows the clip-first lane; the chip drops to its icon seat on that
+    // signal, so it never depends on fixed row content staying under a
+    // hardcoded width.
+    expect(css).not.toMatch(/@container/)
+    expect(css).toMatch(/:global\(\[data-input-extension\]\[data-clipped\]\)\s*\.chip\s*\{[^}]*justify-content:\s*center/)
+    expect(css).toMatch(/:global\(\[data-input-extension\]\[data-clipped\]\)\s*\.label\s*\{[^}]*display:\s*none/)
     const compact = css.match(/:global\(\[data-viewport='compact'\]\)\s*\.chip\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(compact).toContain('var(--dsw-touch-target)')
     expect(css).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.label\s*\{[^}]*display:\s*none/)
