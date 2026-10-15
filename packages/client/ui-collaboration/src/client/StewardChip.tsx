@@ -40,9 +40,9 @@ export function StewardChip({ useCollaboration, t }: StewardChipProps) {
       openOnClick
       maxWidth={280}
     >
-      <button type="button" className={css.chip}>
+      <button type="button" className={css.chip} aria-label={t('steward.chip.label')}>
         <span aria-hidden="true"><IconShieldOutline16 size={14} /></span>
-        {t('steward.chip.label')}
+        <span className={css.label} aria-hidden="true">{t('steward.chip.label')}</span>
       </button>
     </Tooltip>
   )

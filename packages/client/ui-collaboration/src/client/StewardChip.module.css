@@ -6,6 +6,7 @@
 .chip {
   display: inline-flex;
   align-items: center;
+  flex: none;
   gap: var(--dsw-space-1);
   height: 22px;
   padding: 0 var(--dsw-space-2);
@@ -37,12 +38,41 @@
   outline-offset: 2px;
 }
 
+.label {
+  white-space: nowrap;
+}
+
+/* Composer-row collapse tier: inside InputBar's anonymous inline-size
+   container the chip keeps its warn tint and drops the label once the row
+   runs under the shared 480px step, matching the collapsed permission and
+   model triggers. */
+@container (max-width: 480px) {
+  .chip {
+    width: 24px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .label {
+    display: none;
+  }
+}
+
+/* The compact phone toolbar runs icon-only on its single line; the seat
+   grows to the shared touch target. */
+:global([data-viewport='compact']) .chip {
+  justify-content: center;
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+  padding: 0;
+}
+
+:global([data-viewport='compact']) .label {
+  display: none;
+}
+
 @media (pointer: coarse) {
   .chip {
     min-height: var(--dsw-touch-target);
   }
-}
-
-:global([data-viewport='compact']) .chip {
-  min-height: var(--dsw-touch-target);
 }
