@@ -47,11 +47,16 @@ describe('ScopeControl.module.css', () => {
     expect(list).toContain('margin: 0 -2px')
     expect(list).toContain('border-top: 0.5px solid var(--dsw-alias-border-l2)')
     expect(css).toMatch(/\.inlineList > \* \+ \*\s*\{[^}]*border-top:\s*0\.5px solid var\(--dsw-alias-border-l2\)/)
+    // The expanded group reads as one zone: a tonal band closed by hairlines.
+    expect(list).toContain('border-bottom: 0.5px solid var(--dsw-alias-border-l2)')
+    expect(list).toMatch(/background:\s*color-mix\(in srgb, var\(--dsw-alias-interactive-bg-hover\)/)
     const row = css.match(/\.inlineRow\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(row).toContain('min-height: var(--dsw-touch-target)')
     expect(row).toContain('0 var(--dsw-space-2) 0 26px')
-    // The current scope keeps the flat fill marker, not a raised card.
-    expect(css).toMatch(/\.inlineRowCurrent[^{]*\{[^}]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/)
+    // The current scope is the single primary row: brand-blue tint and label.
+    const current = css.match(/\.inlineRowCurrent[^{]*\{([^}]*)\}/)?.[1] ?? ''
+    expect(current).toMatch(/background:\s*color-mix\(in srgb, var\(--dsw-alias-state-business-primary\)/)
+    expect(current).toContain('color: var(--dsw-alias-state-business-primary)')
   })
 
   it('caps the project menu and keeps its search controls tappable on phones', () => {

@@ -643,9 +643,12 @@
 
 /* Phone accordion: the expanded roster lives in the footer column itself,
    indented one tree level under the head row with hairlines between rows —
-   the zero-overlay grammar. The same -2px bleed as `.trigger` keeps every
-   hairline on the column edge. A height bound leaves the head and the
-   document/settings rows visible while a long roster scrolls inside. */
+   the zero-overlay grammar. The group reads as one zone: a continuous tonal
+   band a half-step deeper than the drawer, closed by hairlines top and
+   bottom, so expansion never becomes a floating card. The same -2px bleed
+   as `.trigger` keeps every hairline on the column edge. A height bound
+   leaves the head and the document/settings rows visible while a long
+   roster scrolls inside. */
 .inlineList {
   display: flex;
   flex-direction: column;
@@ -653,6 +656,8 @@
   max-height: min(320px, calc(var(--dsw-viewport-height, 100vh) * 0.45));
   margin: 0 -2px;
   border-top: 0.5px solid var(--dsw-alias-border-l2);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+  background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover) 75%, transparent);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -695,9 +700,13 @@
   cursor: wait;
 }
 
+/* The current scope is the one primary row: a brand-blue tint plus blue
+   label inside an otherwise secondary-toned band. */
 .inlineRowCurrent,
 .inlineRowCurrent:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);
+  color: var(--dsw-alias-state-business-primary);
+  font-weight: 600;
 }
 
 .inlineLabel {
