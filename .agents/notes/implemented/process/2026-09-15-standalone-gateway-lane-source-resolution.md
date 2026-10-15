@@ -20,7 +20,7 @@ The `paths` map also points several workspace specifiers at emitted `lib/types` 
 
 `plugins/dsh-directory-guard/tsconfig.ci.json` emits the policy bundle transpile-only (`noCheck`, no ambient `types`) because Gateway tests materialize `package.json` plus `lib/` into staged instance homes and never execute the plugin; type fidelity stays with the base configs once the workspace is built. The step runs the Gateway's own installed `tsc`, so it shares the lane's npm install rather than the workspace one.
 
-Two runtime resolutions stay explicit in the workflow rather than hiding behind package layout: `loadConfig`'s source-run default resolves `tsx/esm` to an absolute path under the repo root, so the lane installs the root `tsx` devDependency into a scratch prefix and copies it into `node_modules/`; and the admin UI lane installs the third-party packages that re-exported workspace sources import (`anser`, `clsx`, `immer`, `zustand`, versions read from their owning manifests) the same way. Inside `gateway/admin-ui/vite.config.ts`, `server.deps.inline` keeps `zustand` in the Vite pipeline: an externalized copy would resolve its `react` import outside the `dedupe` map and load a second React instance.
+`loadConfig`'s source-run default resolves `tsx/esm` to an absolute path under the repo root (instances spawn outside it); the workspace install for the declaration emit provides that devDependency directly. The admin UI lane still installs the third-party packages that re-exported workspace sources import (`anser`, `clsx`, `immer`, `zustand`, versions read from their owning manifests) into a scratch prefix. Inside `gateway/admin-ui/vite.config.ts`, `server.deps.inline` keeps `zustand` in the Vite pipeline: an externalized copy would resolve its `react` import outside the `dedupe` map and load a second React instance.
 
 ## Alternatives considered
 
@@ -38,5 +38,5 @@ A root `pnpm install` plus filtered workspace builds as the lane's general strat
 - `node_modules/.bin/tsc -b` over the emit list (vendored packages, session-format and its catalog, managed-data, atomic-write, llm, userdoc, userdoc-local, userdoc-http) exits 0 after `pnpm install --frozen-lockfile --ignore-scripts`.
 - `npm run typecheck --prefix gateway` and `npm run build:check --prefix gateway` pass on the same tree with the Gateway lane's own npm install.
 - `gateway/node_modules/.bin/tsc -p plugins/dsh-directory-guard/tsconfig.ci.json` emits `lib/` and exits 0.
-- `npm test --prefix gateway` passes in the same tree once the root `tsx` install is provisioned and the directory-guard bundle is emitted.
+- `npm test --prefix gateway` passes in the same tree once the directory-guard and steward-tools bundles are emitted (`tsx` resolves from the workspace install).
 - `npm test --prefix gateway/admin-ui` and `npm run build --prefix gateway/admin-ui` pass once the four repo-level dependencies are provisioned.
