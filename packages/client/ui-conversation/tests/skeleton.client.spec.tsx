@@ -121,6 +121,8 @@ function mount(
     summaryWorkspaceId?: WorkspaceId
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** Pane session id override — encoded client keys carry their runtime target. */
+    sessionId?: SessionId
   } = {},
 ) {
   const root = sid('root')
@@ -276,9 +278,10 @@ function mount(
       )
       : (opts?.fallback ?? null)
   )) as ConversationPaneProps['renderSlotChain']
+  const paneSessionId = options.sessionId ?? SID
   const props = {
-    sessionId: SID,
-    SessionProvider: ({ children }: { children: (id: SessionId) => ReactNode }) => children(SID),
+    sessionId: paneSessionId,
+    SessionProvider: ({ children }: { children: (id: SessionId) => ReactNode }) => children(paneSessionId),
     useSession,
     useSessions: bindSnapshotSelector(sessions),
     useWorkspaces: bindSnapshotSelector(workspaces),
@@ -501,6 +504,36 @@ describe('ConversationRoot resident composer', () => {
     const personal = mount(conversationSnapshot())
     expect((personal.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
       .toBe('给智能体发消息')
+  })
+
+  it('follows the pane session\'s runtime, not the page scope', () => {
+    // Workbench panes hold other scopes' conversations: an encoded key resolves
+    // the session's project, and the steward hint follows that project only.
+    const policy: ProjectUiPolicySnapshot = {
+      scope: 'project', theme: 'follow-user', revision: 1, accountPermissions: 'standard',
+      steward: true, stewardProjectIds: [11],
+    }
+    const encoded = (id: string): SessionId =>
+      `dsh-session:v1:${encodeURIComponent(id)}` as SessionId
+    const otherScopePane = mount(
+      conversationSnapshot(), undefined, undefined,
+      { projectPolicy: policy, sessionId: encoded('[9,"s1"]') },
+    )
+    expect((otherScopePane.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
+      .toBe('给智能体发消息')
+    const personalPane = mount(
+      conversationSnapshot(), undefined, undefined,
+      { projectPolicy: policy, sessionId: encoded('[null,"s1"]') },
+    )
+    expect((personalPane.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
+      .toBe('给智能体发消息')
+    const { steward: _scopeFlag, ...offScopePolicy } = policy
+    const stewardElsewhere = mount(
+      conversationSnapshot(), undefined, undefined,
+      { projectPolicy: offScopePolicy, sessionId: encoded('[11,"s1"]') },
+    )
+    expect((stewardElsewhere.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
+      .toBe('询问维护中枢，或描述要检查的对象…')
   })
 
   it('lets the no-workspace posture win over a block', () => {

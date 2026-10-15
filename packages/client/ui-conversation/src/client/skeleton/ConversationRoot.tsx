@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import { SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
+import { parseClientSessionKey, SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationPaneSlotProps, ConversationSlotProps, InputZone,
 } from '../contract/slots.ts'
@@ -163,7 +163,17 @@ export function ConversationPane({
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
   const displaySettings = useDisplaySettings(value => value)
-  const stewardScope = useProjectPolicy(policy => policy.steward === true)
+  // The pane's steward marker follows the session's own runtime, not the page
+  // scope: a workbench pane can hold another scope's conversation. An encoded
+  // personal session is never steward; an encoded project id resolves against
+  // the roster mirror; a bare id (current-runtime session, or the hero with no
+  // session yet) lands in the active scope.
+  const paneRuntime = sessionId === undefined ? undefined : parseClientSessionKey(sessionId)?.runtime
+  const stewardScope = useProjectPolicy((policy) => {
+    if (paneRuntime?.kind === 'personal') return false
+    if (paneRuntime?.kind === 'project') return policy.stewardProjectIds?.includes(paneRuntime.projectId) === true
+    return policy.steward === true
+  })
   const displaySettingsRef = useRef(displaySettings)
   displaySettingsRef.current = displaySettings
   const rootRef = useRef<HTMLDivElement | null>(null)

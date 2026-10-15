@@ -74,6 +74,9 @@ export function apply(ctx: ClientContext): void {
       const auto = context?.autoReviewEligible === true
       projectUiPolicy?.setAccountPermissions(!snapshot.contextVerified || snapshot.scopeBusy ? 'unknown'
         : full ? auto ? 'full-and-auto' : 'full' : auto ? 'auto' : 'standard')
+      projectUiPolicy?.setStewardProjects(
+        context?.projects.filter(project => project.kind === 'steward').map(project => project.projectId) ?? [],
+      )
       if (scope?.kind !== 'project') projectUiPolicy?.set('personal')
       else projectUiPolicy?.set('project', scope.uiThemePolicy ?? 'follow-user', {
         projectId: scope.projectId,
@@ -88,6 +91,7 @@ export function apply(ctx: ClientContext): void {
       unsubscribe()
       projectUiPolicy?.setVerifiedAccountId(undefined)
       projectUiPolicy?.setAccountPermissions('unknown')
+      projectUiPolicy?.setStewardProjects([])
       collaboration.dispose()
     }
   }, 'ui-collaboration: account context')

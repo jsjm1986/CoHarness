@@ -1,6 +1,6 @@
 import { IconShieldOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { CollaborationSnapshot } from './collaboration-client.ts'
+import { conversationProject, type CollaborationSnapshot } from './collaboration-client.ts'
 import type { NS } from './locales.ts'
 import css from './StewardChip.module.css'
 
@@ -19,18 +19,23 @@ export type StewardChipProps =
   & PropsLocale<typeof NS>
 
 /**
- * The warn chip inside the composer tool row while the reserved steward space
- * is active: the chip marks the audited channel at a glance without claiming a
- * row of its own, and its tooltip — hover, keyboard focus, or a pinning click
- * — carries the full audit/approval clause. Any other scope renders nothing.
+ * The warn chip inside the composer tool row while the pane's own session
+ * belongs to the reserved steward space: the chip marks the audited channel
+ * at a glance without claiming a row of its own, and its tooltip — hover,
+ * keyboard focus, or a pinning click — carries the full audit/approval
+ * clause. The marker follows the session's runtime, not the page scope, so
+ * workbench panes holding another scope's conversations render nothing.
  * @param props - composed slot props.
- * @returns the warn chip, or null outside steward scope.
+ * @returns the warn chip, or null for sessions outside the steward space.
  */
-export function StewardChip({ useCollaboration, t }: StewardChipProps) {
-  const steward = useCollaboration(
-    snapshot => snapshot.context?.scope.kind === 'project'
-      && snapshot.context.scope.steward === true,
-  )
+export function StewardChip({ sessionId, useCollaboration, t }: StewardChipProps) {
+  const steward = useCollaboration((snapshot): boolean => {
+    const projectId = conversationProject(snapshot, sessionId)
+    return projectId !== undefined
+      && snapshot.context?.projects.some(
+        project => project.projectId === projectId && project.kind === 'steward',
+      ) === true
+  })
   if (!steward) return null
   return (
     <Tooltip
