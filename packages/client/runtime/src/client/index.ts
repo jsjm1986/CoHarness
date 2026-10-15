@@ -142,7 +142,7 @@ export {
 } from './sessions/conversation.ts'
 export { emptyAssistantBlock, IncrementalAssistantBlocks } from './sessions/partial.ts'
 export { assistantStreamFirstTokenTime, isTokenDelta } from './sessions/assistant-timing.ts'
-export { contextForm, contextProducer, sessionRecallLabels } from './sessions/context-producer.ts'
+export { contextForm, contextProducer, sessionRecallLabels, skillInvocationName } from './sessions/context-producer.ts'
 export { displayFailureMessage, isSessionPersistenceFailureMessage } from './sessions/failure-display.ts'
 export type {
   ConversationContext, ConversationContextOriginKind,

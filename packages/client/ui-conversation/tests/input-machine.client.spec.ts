@@ -723,6 +723,14 @@ describe('decorations: scanTextRefs', () => {
     expect(scanTextRefs('/unknown @commit-helper', LEX)).toEqual([])
   })
 
+  it('a "/" token continued by a path never matches, even when the name is on the lexicon', () => {
+    expect(scanTextRefs('/commit-helper/x /commit-helper/ /commit-helper.md', LEX)).toEqual([])
+  })
+
+  it('a "/" token glued to punctuation is not a reference: the host gesture is whitespace-bounded', () => {
+    expect(scanTextRefs('/commit-helper。 then /commit-helper, now', LEX)).toEqual([])
+  })
+
   it('word boundary: a trigger glued to text never matches', () => {
     expect(scanTextRefs('x/commit-helper', LEX)).toEqual([])
     expect(scanTextRefs('a@worker-1', LEX)).toEqual([])

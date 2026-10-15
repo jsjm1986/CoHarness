@@ -1152,7 +1152,7 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     expect(view.container.querySelectorAll('h1')).toHaveLength(1)
     const literal = view.getByText((_content, element) => (
-      element?.tagName === 'DIV' && element.childElementCount === 0 && element.textContent === markdown
+      element?.tagName === 'SPAN' && element.childElementCount === 0 && element.textContent === markdown
     ))
     expect(literal.querySelector('h1')).toBeNull()
 

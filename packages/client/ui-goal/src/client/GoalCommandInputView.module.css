@@ -24,6 +24,12 @@
   border-radius: 22px;
   background: var(--dsw-specific-bubble);
   color: var(--dsw-alias-label-primary);
-  font: var(--dsw-font-markdown-code);
+  /* The command echo is a user message: it inherits the body face like the
+     user bubble and rides the same chat font-size axis; the `/goal` command
+     chip, set in the code face by the shared projection, is what marks the
+     line as a command. Mirrors the user bubble in ui-conversation
+     MessageItem.module.css. */
+  font-size: var(--dsh-chat-font-size, 16px);
+  line-height: calc(var(--dsh-chat-font-size, 16px) * 1.5);
   white-space: pre-wrap;
 }

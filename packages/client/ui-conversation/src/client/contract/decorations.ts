@@ -34,6 +34,12 @@ export interface DraftDecorations {
 
 const TEXT_REF_RE = /(^|\s)([/@])([\w-]+)/g
 const FOLDER_REF_RE = /(^|\s)(@(?:"[^"\n]*\/|[^\s"]+\/))/g
+/**
+ * What may follow a `/name` token: whitespace or the draft end, the boundary
+ * the host skill gesture (`dsh-tool-skill`) requires, so `/nfs-hg/xxx`,
+ * `/plan.md`, and `/plan。` are prose, never a reference.
+ */
+const SLASH_TOKEN_END_RE = /^(?:\s|$)/
 
 /**
  * Scan draft text against the trigger lexicons.
@@ -52,6 +58,7 @@ export function scanTextRefs(
     while ((match = TEXT_REF_RE.exec(draft)) !== null) {
       const trigger = match[2] as '/' | '@'
       const name = match[3] ?? ''
+      if (trigger === '/' && !SLASH_TOKEN_END_RE.test(draft.slice(match.index + match[0].length))) continue
       if (lexicon.get(trigger)?.includes(name)) {
         const start = match.index + (match[1]?.length ?? 0)
         out.push({ start, end: start + 1 + name.length, trigger })
