@@ -1,11 +1,10 @@
 import { Readable } from 'node:stream'
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
-import type { Context } from '@deepseek-ai/cordis'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import { UserDocId, type UserDocRef, type UserDocStore } from '@deepseek-ai/dsh-userdoc'
-import { handleUserDocHttp, USERDOC_CATALOG_OVERVIEW_PATH, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH } from '../src/index.ts'
+import { handleUserDocHttp, USERDOC_CATALOG_OVERVIEW_PATH, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH, type UserDocHttpHost } from '../src/index.ts'
 
 const REF: UserDocRef = {
   docId: UserDocId('report.txt'),
@@ -49,7 +48,7 @@ function store(): UserDocStore {
   } as unknown as UserDocStore
 }
 
-function context(mode: 'ro' | 'rw' | 'missing', transfer?: (path: string, init?: RequestInit) => Promise<Response>, documentAdmin = false): Context {
+function context(mode: 'ro' | 'rw' | 'missing', transfer?: (path: string, init?: RequestInit) => Promise<Response>, documentAdmin = false): UserDocHttpHost {
   const userDocs = store()
   const authority: CollaborationAuthority = {
     participant: {
@@ -77,7 +76,7 @@ function context(mode: 'ro' | 'rw' | 'missing', transfer?: (path: string, init?:
       if (name === 'collaboration') return collaboration
       return undefined
     },
-  } as unknown as Context
+  }
 }
 
 function request(method: string, url: string, headers: Record<string, string> = {}): import('node:http').IncomingMessage {

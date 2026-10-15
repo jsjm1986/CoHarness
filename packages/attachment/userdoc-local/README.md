@@ -15,6 +15,8 @@ Reads take the store-scoped `docId` — the root-relative path with forward slas
 
 Identical in-flight listings share one filesystem scan; a caller's abort only cancels that caller, and the underlying scan stops when its last waiter leaves.
 
+The exported `LocalUserDocFs` engine carries the same filesystem operations without a Cordis `Context`, so a non-runtime host — the Gateway's local document broker — serves the identical behavior against an authorized scope root.
+
 `mediaType` is derived from the stored file extension. Text, Markdown, CSV, JSON, YAML, XML, common source files, images, PDF, and Office extensions receive presentation types; an unrecognized extension records `application/octet-stream`. It is presentation metadata: nothing here parses content or refuses an unknown format.
 
 ## Summary

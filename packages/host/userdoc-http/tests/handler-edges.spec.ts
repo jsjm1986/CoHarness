@@ -2,7 +2,6 @@ import { EventEmitter } from 'node:events'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
-import type { Context } from '@deepseek-ai/cordis'
 import {
   DOCUMENT_DIRECTORY_CONFLICT_CODE,
   DOCUMENT_DIRECTORY_NOT_EMPTY_CODE,
@@ -27,7 +26,7 @@ import {
   type UserDocRef,
   type UserDocStore,
 } from '@deepseek-ai/dsh-userdoc'
-import { handleUserDocHttp, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH } from '../src/index.ts'
+import { handleUserDocHttp, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH, type UserDocHttpHost } from '../src/index.ts'
 
 const LIMITS = {
   maxFileBytes: 8,
@@ -68,8 +67,8 @@ function store(overrides: StoreOverrides = {}): UserDocStore {
   }, overrides) as unknown as UserDocStore
 }
 
-function context(userDocs: UserDocStore): Context {
-  return { userDocs } as unknown as Context
+function context(userDocs: UserDocStore): UserDocHttpHost {
+  return { userDocs }
 }
 
 function request(method: string, url?: string, headers: Record<string, string> = {}): IncomingMessage {

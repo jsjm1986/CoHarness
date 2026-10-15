@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-15-gateway-local-document-broker.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.md
+/agent-note-gateway-local-document-broker:
+  en: 2be9c000a3fd32e5
+  zh: 000ebe926d430dd4
+/agent-note-gateway-local-document-broker/problem:
+  en: 22ec2f3b329d6515
+  zh: 6dfb7da792bc0576
+/agent-note-gateway-local-document-broker/decision:
+  en: 706a791085da5bfc
+  zh: 4fac39dc98f3a7cf
+/agent-note-gateway-local-document-broker/alternatives-considered:
+  en: ba6777e368fdf3d7
+  zh: ea8474e620163442
+/agent-note-gateway-local-document-broker/consequences:
+  en: 918f46440e444f8b
+  zh: 5e8a067da5d177ea

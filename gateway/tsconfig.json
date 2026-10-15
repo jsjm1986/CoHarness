@@ -45,6 +45,21 @@
       ],
       "@deepseek-ai/dsh-atomic-write": [
         "../packages/util/atomic-write/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-userdoc": [
+        "../packages/attachment/userdoc/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-userdoc-local": [
+        "../packages/attachment/userdoc-local/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-host-userdoc-http": [
+        "../packages/host/userdoc-http/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-home-paths": [
+        "../packages/util/home-paths/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/schemastery": [
+        "../vendor/schemastery/lib/types/index.d.ts"
       ]
     },
     "noEmit": true,

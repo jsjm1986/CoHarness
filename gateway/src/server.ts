@@ -1012,13 +1012,18 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const response = await handlers.documentScope({
           user: actor,
           request: req,
+          response: res,
           pathname,
           operation: scopedOperation,
           scope,
           signal: abort.signal,
         })
-        if (abort.signal.aborted || res.destroyed || res.writableEnded) await response.body?.cancel(abort.signal.reason)
-        else await sendGatewayResponse(res, response, cfg.upstreamResponseLimitBytes)
+        // A locally served content stream writes directly into `res` and
+        // resolves undefined; JSON routes still travel through the sender.
+        if (response !== undefined) {
+          if (abort.signal.aborted || res.destroyed || res.writableEnded) await response.body?.cancel(abort.signal.reason)
+          else await sendGatewayResponse(res, response, cfg.upstreamResponseLimitBytes)
+        }
       } catch (error: unknown) {
         if (error instanceof DocumentLeaseReleaseError) {
           cleanupFailure = error

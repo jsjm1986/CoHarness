@@ -1,7 +1,7 @@
 /** Gateway broker for copying document snapshots between authorized personal and project scopes. */
 
 import { createHash, randomUUID } from 'node:crypto'
-import type { IncomingMessage } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { basename } from 'node:path'
 import { Readable } from 'node:stream'
 import type { UserRow } from './auth.ts'
@@ -359,11 +359,13 @@ export interface GatewayDocumentScopeHandler {
   (input: {
     readonly user: UserRow
     readonly request: IncomingMessage
+    /** Live client response; a locally served content stream is written into it directly. */
+    readonly response?: ServerResponse
     readonly pathname: string
     readonly operation: GatewayDocumentScopeOperation
     readonly scope: DocumentTransferScope
     readonly signal: AbortSignal
-  }): Promise<Response>
+  }): Promise<Response | undefined>
 }
 
 /** Administrator lifecycle operation forwarded to the catalog row's runtime. */
@@ -441,6 +443,11 @@ export interface DocumentTransferDependencies {
   readonly upstreamTimeoutMs?: number
   /** Optional process, organization, and actor transfer-plan retention limits. */
   readonly transferPlanLimits?: DocumentTransferPlanLimits
+  /**
+   * Optional filesystem document broker; when present, scope/upload/admin/list
+   * operations run against the scope's document root without starting a runtime.
+   */
+  readonly local?: import('./documents-local.ts').LocalDocumentBroker
 }
 
 interface ScopeIdentity {
@@ -1603,6 +1610,18 @@ async function listDocumentsForActor(
   if (candidate.state !== undefined && candidate.state !== 'active' && candidate.state !== 'trash') {
     throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope state.')
   }
+  if (deps.local !== undefined) {
+    const parameters = new URLSearchParams()
+    if (typeof candidate.directory === 'string') parameters.set('directory', candidate.directory)
+    if (typeof candidate.cursor === 'string') parameters.set('cursor', candidate.cursor)
+    if (typeof candidate.limit === 'number') parameters.set('limit', String(candidate.limit))
+    if (typeof candidate.query === 'string' && candidate.query !== '') parameters.set('q', candidate.query)
+    if (typeof candidate.type === 'string' && candidate.type !== 'all') parameters.set('type', candidate.type)
+    if (typeof candidate.sort === 'string' && candidate.sort !== 'date-desc') parameters.set('sort', candidate.sort)
+    if (typeof candidate.state === 'string' && candidate.state !== 'active') parameters.set('state', candidate.state)
+    const listed = await deps.local.listDocuments(actor, requested, parameters, signal)
+    return projectScopeListing(listed.identity, listed.status, listed.body)
+  }
   const authorized = await authorizedScope(deps, actor, requested, 'read')
   return withRuntimeLeases(deps, [authorized.runtime], async () => {
     const runtimeUrl = new URL(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents`)
@@ -1639,10 +1658,20 @@ async function listDocumentsForActor(
       }
       throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid listing JSON.')
     }
-    if (!response.ok) {
+    return projectScopeListing(authorized.identity, response.status, body)
+  })
+}
+
+/** Validate one upstream scope listing and project it into the broker response. */
+function projectScopeListing(
+  identity: Pick<ScopeIdentity, 'kind' | 'label'>,
+  status: number,
+  body: unknown,
+): DocumentTransferListResponse {
+    if (status < 200 || status > 299) {
       const error = responseError(body)
-      const status = response.status >= 400 && response.status < 500 ? response.status : 503
-      throw new DocumentTransferError(error.code, status, error.message)
+      const mapped = status >= 400 && status < 500 ? status : 503
+      throw new DocumentTransferError(error.code, mapped, error.message)
     }
     const value = record(body)
     if (!Array.isArray(value?.documents)) {
@@ -1676,7 +1705,7 @@ async function listDocumentsForActor(
         : (() => { throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid cursor.') })()
     return {
       version: 1,
-      scope: { kind: authorized.identity.kind, label: authorized.identity.label },
+      scope: { kind: identity.kind, label: identity.label },
       documents,
       ...(limits === undefined ? {} : { limits }),
       ...(directoryId === undefined ? {} : { directoryId }),
@@ -1685,7 +1714,6 @@ async function listDocumentsForActor(
       ...(totalDocuments === undefined ? {} : { totalDocuments }),
       ...(nextCursor === undefined ? {} : { nextCursor }),
     }
-  })
 }
 
 /** Create the authenticated Gateway broker used by runtime document consumers. */
@@ -1702,7 +1730,7 @@ export function createGatewayDocumentTransferListHandler(
   return ({ user, payload, signal }) => listDocumentsForActor(deps, user, payload, signal)
 }
 
-function safeUploadSession(value: unknown): Record<string, unknown> {
+export function safeUploadSession(value: unknown): Record<string, unknown> {
   const candidate = record(value)
   const validState = candidate?.state === 'uploading' || candidate?.state === 'verifying'
     || candidate?.state === 'complete' || candidate?.state === 'failed'
@@ -1764,7 +1792,7 @@ function safeUploadSession(value: unknown): Record<string, unknown> {
   return result
 }
 
-function runtimeUploadPath(pathname: string): string {
+export function runtimeUploadPath(pathname: string): string {
   const suffix = pathname.slice(DOCUMENT_TRANSFER_UPLOADS_PATH.length)
   if (suffix !== '' && !/^\/[0-9a-f-]{36}(?:\/complete|\/chunks\/[0-9]+)?$/u.test(suffix)) {
     throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document upload path.')
@@ -1786,7 +1814,7 @@ function drainForwardedRequest(request: IncomingMessage, hasBody: boolean): void
   if (hasBody && request.complete !== true && !request.destroyed) request.resume()
 }
 
-function uploadErrorEnvelope(value: unknown): Record<string, unknown> {
+export function uploadErrorEnvelope(value: unknown): Record<string, unknown> {
   const error = responseError(value)
   return { error: { code: error.code, message: error.message } }
 }
@@ -1796,6 +1824,9 @@ export function createGatewayDocumentTransferUploadHandler(
   deps: DocumentTransferDependencies,
 ): GatewayDocumentTransferUploadHandler {
   return async ({ user, request, pathname, scope: requested, signal }) => {
+    if (deps.local !== undefined) {
+      return deps.local.serveUpload({ user, request, pathname, scope: requested, signal })
+    }
     const targetPath = runtimeUploadPath(pathname)
     const authorized = await authorizedScope(deps, user, requested, 'write')
     return withRuntimeLeases(deps, [authorized.runtime], async () => {
@@ -1848,7 +1879,7 @@ export function createGatewayDocumentTransferUploadHandler(
 /** Public prefix for full-scope document operations. */
 export const DOCUMENT_SCOPE_PATH = '/api/documents/scope'
 
-function scopeRuntimePath(operation: GatewayDocumentScopeOperation): string {
+export function scopeRuntimePath(operation: GatewayDocumentScopeOperation): string {
   switch (operation) {
     case 'list': return '/api/documents'
     case 'directories': return '/api/documents/directories'
@@ -1868,7 +1899,7 @@ function assertNeverScopeOperation(value: never): never {
   throw new Error(`unexpected document scope operation: ${String(value)}`)
 }
 
-function publicDocumentBody(value: unknown): unknown {
+export function publicDocumentBody(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(item => publicDocumentBody(item))
   if (value === null || typeof value !== 'object') return value
   const row = value as Record<string, unknown>
@@ -1908,8 +1939,11 @@ function inlinePreviewMedia(mediaType: string): boolean {
 export function createGatewayDocumentScopeHandler(
   deps: DocumentTransferDependencies,
 ): GatewayDocumentScopeHandler {
-  return async ({ user, request, operation, scope: requested, signal }) => {
+  return async ({ user, request, response: clientResponse, operation, scope: requested, signal }) => {
     signal.throwIfAborted()
+    if (deps.local !== undefined) {
+      return deps.local.serveScope({ user, request, response: clientResponse, operation, scope: requested, signal })
+    }
     const read = operation === 'list' || operation === 'directories' || operation === 'content'
       || (operation === 'trash' && (request.method ?? 'GET') === 'GET')
     const authorized = await authorizedScope(deps, user, requested, read ? 'read' : 'write')
@@ -2016,6 +2050,9 @@ export function createGatewayDocumentAdminHandler(
   deps: DocumentTransferDependencies,
 ): GatewayDocumentAdminHandler {
   return async ({ user, scope: requested, personalOwnerId, docId, action, signal }) => {
+    if (deps.local !== undefined) {
+      return deps.local.serveAdmin({ user, scope: requested, personalOwnerId, docId, action, signal })
+    }
     const authorized = await authorizedAdministratorScope(deps, user, requested, personalOwnerId)
     const release = await acquireRuntimeLease(deps, authorized.runtime)
     let handedOff = false
@@ -2071,47 +2108,54 @@ export function createDocumentTransferDirectoriesHandler(
     if (candidate?.version !== 1) throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document directory request.')
     const requested = scope(candidate.scope)
     const actor = syntheticUser(principal)
-    const authorized = await authorizedScope(deps, actor, requested, 'read')
-    return withRuntimeLeases(deps, [authorized.runtime], async () => {
-      const startedAt = Date.now()
-      const upstream = documentUpstreamSignal(deps, signal)
-      let response: Response
-      try {
-        response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/directories`, {
-          method: 'GET', headers: headersFor(authorized.runtime, authorized.assertion),
-          signal: upstream.signal,
-        })
-      } catch (error) {
-        if (signal?.aborted) throw signal.reason
-        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('directories', requested, startedAt)
-        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
-      }
-      let body: unknown
-      try {
-        body = await responseJson(response, responseLimit(deps))
-      } catch (error) {
-        if (signal?.aborted) throw signal.reason
-        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('directories', requested, startedAt)
-        if (error instanceof ResponseBodyTooLargeError) {
-          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime response is too large.')
+    const listing = async (): Promise<{ readonly status: number; readonly body: unknown; readonly identity: Pick<ScopeIdentity, 'kind' | 'label'> }> => {
+      if (deps.local !== undefined) return deps.local.listDirectories(actor, requested, signal)
+      const authorized = await authorizedScope(deps, actor, requested, 'read')
+      return withRuntimeLeases(deps, [authorized.runtime], async () => {
+        const startedAt = Date.now()
+        const upstream = documentUpstreamSignal(deps, signal)
+        let response: Response
+        try {
+          response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/directories`, {
+            method: 'GET', headers: headersFor(authorized.runtime, authorized.assertion),
+            signal: upstream.signal,
+          })
+        } catch (error) {
+          if (signal?.aborted) throw signal.reason
+          if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('directories', requested, startedAt)
+          throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
         }
-        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directory JSON.')
-      }
-      if (!response.ok) throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
-      const value = record(body)
-      if (!Array.isArray(value?.directories) || value.directories.length > 2000) {
-        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid directory listing.')
-      }
-      const directories = value.directories.map(entry => {
-        const item = record(entry)
-        if (!validRelativeId(item?.directoryId, true) || !nonEmptyString(item?.name) || item.name.length > 255
-          || /[\\/\u0000-\u001f\u007f]/u.test(item.name)) {
-          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directory metadata.')
+        let body: unknown
+        try {
+          body = await responseJson(response, responseLimit(deps))
+        } catch (error) {
+          if (signal?.aborted) throw signal.reason
+          if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('directories', requested, startedAt)
+          if (error instanceof ResponseBodyTooLargeError) {
+            throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime response is too large.')
+          }
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directory JSON.')
         }
-        return { directoryId: item.directoryId, name: item.name }
+        return { status: response.status, body, identity: authorized.identity }
       })
-      return { version: 1, scope: { kind: authorized.identity.kind, label: authorized.identity.label }, directories }
+    }
+    const listed = await listing()
+    if (listed.status < 200 || listed.status > 299) {
+      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
+    }
+    const value = record(listed.body)
+    if (!Array.isArray(value?.directories) || value.directories.length > 2000) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid directory listing.')
+    }
+    const directories = value.directories.map(entry => {
+      const item = record(entry)
+      if (!validRelativeId(item?.directoryId, true) || !nonEmptyString(item?.name) || item.name.length > 255
+        || /[\\/\u0000-\u001f\u007f]/u.test(item.name)) {
+        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directory metadata.')
+      }
+      return { directoryId: item.directoryId, name: item.name }
     })
+    return { version: 1, scope: { kind: listed.identity.kind, label: listed.identity.label }, directories }
   }
 }
 
@@ -2127,44 +2171,49 @@ export function createDocumentTransferDirectoryCreateHandler(
     }
     const requested = scope(candidate.scope)
     const actor = syntheticUser(principal)
-    const authorized = await authorizedScope(deps, actor, requested, 'write')
     const directory = candidate.directory as string
     const name = candidate.name as string
-    return withRuntimeLeases(deps, [authorized.runtime], async () => {
-      const startedAt = Date.now()
-      const upstream = documentUpstreamSignal(deps, signal)
-      let response: Response
-      try {
-        response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/folders?directory=${encodeURIComponent(directory)}&name=${encodeURIComponent(name)}`, {
-          method: 'POST', headers: headersFor(authorized.runtime, authorized.assertion),
-          signal: upstream.signal,
+    const created = deps.local !== undefined
+      ? await deps.local.createDirectory(actor, requested, directory, name, signal)
+      : await (async (): Promise<{ readonly status: number; readonly body: unknown; readonly identity: Pick<ScopeIdentity, 'kind' | 'label'> }> => {
+        const authorized = await authorizedScope(deps, actor, requested, 'write')
+        return withRuntimeLeases(deps, [authorized.runtime], async () => {
+          const startedAt = Date.now()
+          const upstream = documentUpstreamSignal(deps, signal)
+          let response: Response
+          try {
+            response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/folders?directory=${encodeURIComponent(directory)}&name=${encodeURIComponent(name)}`, {
+              method: 'POST', headers: headersFor(authorized.runtime, authorized.assertion),
+              signal: upstream.signal,
+            })
+          } catch (error) {
+            if (signal?.aborted) throw signal.reason
+            if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('folders', requested, startedAt)
+            throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target folder creation is unavailable.')
+          }
+          let body: unknown
+          try {
+            body = await responseJson(response, responseLimit(deps))
+          } catch (error) {
+            if (signal?.aborted) throw signal.reason
+            if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('folders', requested, startedAt)
+            if (error instanceof ResponseBodyTooLargeError) {
+              throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime response is too large.')
+            }
+            throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder JSON.')
+          }
+          return { status: response.status, body, identity: authorized.identity }
         })
-      } catch (error) {
-        if (signal?.aborted) throw signal.reason
-        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('folders', requested, startedAt)
-        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target folder creation is unavailable.')
-      }
-      let body: unknown
-      try {
-        body = await responseJson(response, responseLimit(deps))
-      } catch (error) {
-        if (signal?.aborted) throw signal.reason
-        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('folders', requested, startedAt)
-        if (error instanceof ResponseBodyTooLargeError) {
-          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime response is too large.')
-        }
-        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder JSON.')
-      }
-      if (!response.ok) {
-        const error = responseError(body)
-        throw new DocumentTransferError(error.code, response.status, error.message)
-      }
-      const row = record(body)
-      if (!validRelativeId(row?.directoryId, false) || !nonEmptyString(row.name)) {
-        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder metadata.')
-      }
-      return { version: 1, scope: { kind: authorized.identity.kind, label: authorized.identity.label }, directory: { directoryId: row.directoryId, name: row.name } }
-    })
+      })()
+    if (created.status < 200 || created.status > 299) {
+      const error = responseError(created.body)
+      throw new DocumentTransferError(error.code, created.status, error.message)
+    }
+    const row = record(created.body)
+    if (!validRelativeId(row?.directoryId, false) || !nonEmptyString(row.name)) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder metadata.')
+    }
+    return { version: 1, scope: { kind: created.identity.kind, label: created.identity.label }, directory: { directoryId: row.directoryId, name: row.name } }
   }
 }
 
