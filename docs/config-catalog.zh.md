@@ -733,7 +733,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-credentials-local`
 
-- `source`: [`packages/credentials/credentials-local/src/index.ts:65`](../packages/credentials/credentials-local/src/index.ts)
+- `source`: [`packages/credentials/credentials-local/src/index.ts:66`](../packages/credentials/credentials-local/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: file location and hot-reload behavior. */
