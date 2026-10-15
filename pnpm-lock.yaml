@@ -623,6 +623,9 @@ importers:
       '@deepseek-ai/dsh-client-modules':
         specifier: workspace:*
         version: link:../../packages/client/modules
+      '@deepseek-ai/dsh-client-ui-deliverables':
+        specifier: workspace:*
+        version: link:../../packages/client/ui-deliverables
       '@deepseek-ai/dsh-client-ui-dockkit':
         specifier: workspace:*
         version: link:../../packages/client/ui-dockkit
