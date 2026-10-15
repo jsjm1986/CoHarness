@@ -162,17 +162,18 @@ describe('assembled workbench sidebar panel', () => {
     await waitFor(() => { expect(view.getByRole('region', { name: '工作台' })).toBeTruthy() })
     const panel = within(view.getByRole('region', { name: '工作台' }))
     // The roster reads pane order and titles from the live sessions list.
-    const beta = panel.getByRole('button', { name: /Beta.*个人空间 · Beta.*就绪/ })
+    const beta = panel.getByRole('button', { name: /Beta.*就绪.*个人空间 · Beta/ })
     expect(beta.getAttribute('aria-current')).toBe('true')
-    fireEvent.click(panel.getByRole('button', { name: /Alpha.*个人空间 · Alpha.*就绪/ }))
+    fireEvent.click(panel.getByRole('button', { name: /Alpha.*就绪.*个人空间 · Alpha/ }))
     expect(viewport.snapshot.getSnapshot().activePaneId).toBe(A)
     // Equalize writes equal weights through the viewport capability.
     fireEvent.click(panel.getByRole('button', { name: '等宽' }))
     expect(viewport.snapshot.getSnapshot().paneRatios).toEqual([0.5, 0.5])
     // The display hole hosts the shared settings face's sidebar variant.
-    const fontSize = panel.getByRole('slider', { name: '文字大小' })
-    fireEvent.change(fontSize, { target: { value: '15' } })
+    fireEvent.click(panel.getByRole('button', { name: '减小字号' }))
     expect(scope.set).toHaveBeenCalledWith('chatFontSize', 15)
+    fireEvent.click(panel.getByRole('button', { name: '宽松' }))
+    expect(scope.set).toHaveBeenCalledWith('chatContentWidth', 960)
     // Add opens the shared picker store → the toolbar's picker dialog.
     fireEvent.click(panel.getByRole('button', { name: '添加对话' }))
     await waitFor(() => { expect(view.getByRole('dialog')).toBeTruthy() })

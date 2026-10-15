@@ -79,9 +79,10 @@ export function WorkbenchSidebar({
             const receipt = !active && summary?.completed === true
             const { unit, n } = relativeTime(summary?.updatedAt ?? now, now)
             const ago = unit === 'now' ? t('time.now') : t(`time.${unit}`, { n })
+            const workspace = identity.workspaceName === '' ? '' : ` · ${identity.workspaceName}`
+            const statusTone = receipt ? 'reply' : state === 'warning' ? 'warn' : undefined
             return (
               <div key={id} className={css.sidebarPaneRow} data-active={active || undefined} data-attention={attention || undefined} role="listitem">
-                <span className={css.sidebarPaneIndex} aria-hidden="true">{index + 1}</span>
                 <button
                   type="button"
                   className={css.sidebarPaneFocus}
@@ -89,16 +90,21 @@ export function WorkbenchSidebar({
                   title={t('focusPaneN', { n: index + 1 })}
                   onClick={() => { focusPane(id) }}
                 >
+                  <span className={css.sidebarPaneIndex} aria-hidden="true">
+                    <span className={css.sidebarPaneNum}>{index + 1}</span>
+                    <span className={css.sidebarPaneKey}>⌘{index + 1}</span>
+                  </span>
                   <ScopeTile name={identity.scopeName} tone={identity.tone} />
                   <span className={css.sidebarPaneText}>
                     <span className={css.sidebarPaneLine}>
                       <span className={css.sidebarPaneTitle}>{identity.title}</span>
                       <span className={css.sidebarPaneAgo}>{ago}</span>
                     </span>
-                    <span className={css.sidebarPaneSubtitle}>{identity.scopeName}{identity.workspaceName === '' ? '' : ` · ${identity.workspaceName}`}</span>
-                    <span className={css.sidebarPaneStatus} data-tone={state === 'warning' ? 'warn' : undefined}>
-                      <StateDot state={state} size={7} />
-                      <span>{t(status)}</span>
+                    <span className={css.sidebarPaneStatus} data-tone={statusTone}>
+                      {receipt ? <span className={css.sidebarReplyDot} aria-hidden="true" /> : <StateDot state={state} size={7} />}
+                      <span className={css.sidebarPaneStatusWord}>{receipt ? t('newReply') : t(status)}</span>
+                      <span aria-hidden="true">·</span>
+                      <span className={css.sidebarPaneScope}>{identity.scopeName}{workspace}</span>
                     </span>
                   </span>
                 </button>
@@ -112,7 +118,6 @@ export function WorkbenchSidebar({
                     <IconCloseOutline16 />
                   </button>
                 </Tooltip>
-                {receipt && <span className={css.sidebarPaneReceipt} title={t('newReply')} />}
               </div>
             )
           })}

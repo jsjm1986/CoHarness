@@ -12,7 +12,7 @@
 
 Markdown：仅在 `[data-workbench]` 下，让 `.tableScroll` 叶子盒成为 `inline-size` 查询容器，使单元格上限按分栏文本列解析为 `30cqw`；`md-table-wide` 立即可滚动，不再等悬停。查询容器之外的 `cqw` 仍按小视口解析，因此单会话渲染不受影响。
 
-侧栏：`WorkspaceBrowser` 声明子孔位 `sidebar.workspaces.workbench`，并在工作台模式下用它替换自身的 Workspace/Session 列表、分节头和 rail 搜索。`ui-workbench` 以 `WorkbenchSidebar` 填充——分栏清单（卡片结构见[栏格重设计注记](2026-10-15-workbench-pane-grid-redesign.zh.md)）、绑定共享选择器 store 的 Add、容量行内的等宽操作，以及钉在面板底部的退出控件——并在同一注册上声明 `conversation.workbench.display` 孔位。`ui-conversation` 以 `WorkbenchDisplayRow` 填充该孔位：通用显示设置行的堆叠变体，绑定同一个 `ConversationDisplaySettings` face，因此分栏旁的偏好设置与设置面板共用同一个账户 revision 栅栏。
+侧栏：`WorkspaceBrowser` 声明子孔位 `sidebar.workspaces.workbench`，并在工作台模式下用它替换自身的 Workspace/Session 列表、分节头和 rail 搜索。`ui-workbench` 以 `WorkbenchSidebar` 填充——分栏清单（行结构见[栏格重设计注记](2026-10-15-workbench-pane-grid-redesign.zh.md)）、绑定共享选择器 store 的 Add、容量行内的等宽操作，以及钉在面板底部的退出控件——并在同一注册上声明 `conversation.workbench.display` 孔位。`ui-conversation` 以 `WorkbenchDisplayRow` 填充该孔位：绑定同一个 `ConversationDisplaySettings` face 的紧凑变体——字号步进器加命名宽度分段（`紧凑 640` / `标准 748` / `宽松 960` / `占满`），替代设置面板的连续滑杆——因此分栏旁的偏好设置与设置面板共用同一个账户 revision 栅栏。
 
 ## 备选方案
 
