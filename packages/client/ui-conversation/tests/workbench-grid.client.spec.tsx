@@ -5,7 +5,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, createEvent, fireEvent, render } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId, SessionListState, WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { createConversationViewportStore } from '../src/client/viewport.ts'
 import { ConversationRoot, type ConversationRootProps } from '../src/client/skeleton/ConversationRoot.tsx'
 import { zh } from '../src/client/locales.ts'
@@ -23,7 +24,7 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
   const store = createConversationViewportStore().create()
   store.actions.replace({
     mode: 'workbench', paneIds, paneRatios: paneIds.map(() => 1 / paneIds.length),
-    collapsedIds: collapsed, activePaneId: paneIds[0],
+    collapsedIds: collapsed, activePaneId: paneIds[0]!,
   })
   const calls = {
     focus: vi.fn(), remove: vi.fn(), ratios: vi.fn(), reorder: vi.fn(),
@@ -45,11 +46,16 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     return null
   }) as ConversationRootProps['renderSlot']
   const view = render(<ConversationRoot
-    sessionId={undefined}
     SessionProvider={({ sessionId, children }) => <>{children(sessionId as SessionId)}</>}
     useStore={bindSnapshotSelector(store)}
+    actions={store.actions as ConversationRootProps['actions']}
     renderSlot={renderSlot}
     useViewportAvailable={bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} })}
+    useSessions={bindSnapshotSelector(createSnapshotStore<SessionListState>(
+      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }))}
+    useWorkspaces={bindSnapshotSelector(createSnapshotStore<WorkspaceListState>(
+      { items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined }))}
+    usePanelInfo={bindSnapshotSelector(createSnapshotStore({ activePanelId: null }))}
     onViewportFocus={calls.focus}
     onViewportRemove={calls.remove}
     onViewportRatios={calls.ratios}
@@ -80,16 +86,16 @@ describe('workbench grid', () => {
     const strip = view.container.querySelector('[data-session-pane="b"]')
     expect(strip?.hasAttribute('data-collapsed')).toBe(true)
     const owners = headers()
-    expect(owners[1].collapsed).toBe(true)
+    expect(owners[1]!.collapsed).toBe(true)
     // Collapse is offered only while another pane stays expanded.
-    expect(owners[1].collapsible).toBe(true)
-    expect(typeof owners[2].onToggleCollapse).toBe('function')
+    expect(owners[1]!.collapsible).toBe(true)
+    expect(typeof owners[2]!.onToggleCollapse).toBe('function')
   })
 
   it('refuses collapse affordance when only one pane stays expanded', () => {
     const { headers } = grid([A, B], [B])
-    expect(headers()[0].collapsible).toBe(false)
-    expect(headers()[0].solo).toBe(true)
+    expect(headers()[0]!.collapsible).toBe(false)
+    expect(headers()[0]!.solo).toBe(true)
   })
 
   it('resizes adjacent panes from the separator and equalizes on double click', () => {
@@ -131,7 +137,7 @@ describe('workbench grid', () => {
     const sectionB = view.container.querySelector('[data-session-pane="b"]')
     fireEvent.pointerDown(sectionB!)
     expect(calls.focus).toHaveBeenCalledWith(B)
-    const a = headers()[0]
+    const a = headers()[0]!
     ;(a.onSolo as () => void)()
     expect(calls.solo).toHaveBeenCalledWith(A)
     ;(a.onToggleCollapse as () => void)()

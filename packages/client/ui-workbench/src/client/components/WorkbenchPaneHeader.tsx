@@ -2,8 +2,8 @@
 import { useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  IconCloseOutline16, IconEllipsisOutline16, IconFolderOpenOutline16, IconFullscreenOutline16,
-  IconMinimizeOutline16, Menu, StateDot,
+  IconCloseOutline16, IconEllipsisOutline16, IconFolderOpenOutline16, IconMaximizeOutline16,
+  IconMinimizeOutline16, IconRestoreOutline16, Menu, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ProjectUiPolicySnapshot, SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
@@ -115,7 +115,7 @@ export function WorkbenchPaneHeader({
           title={t(maximized ? 'restore' : 'maximize')}
           onClick={(event) => { event.stopPropagation(); onMaximize() }}
         >
-          <IconFullscreenOutline16 />
+          {maximized ? <IconRestoreOutline16 /> : <IconMaximizeOutline16 />}
         </button>
         <Menu open={menuOpen} onClose={() => { setMenuOpen(false) }} align="end" portal dense
           items={[

@@ -44,11 +44,13 @@ import {
   Eye,
   FilePen,
   FileText,
+  FoldHorizontal,
   FoldVertical,
   Folder,
   FolderOpen,
   FolderPlus,
   FolderTree,
+  Fullscreen,
   Gauge,
   GitBranch,
   Globe,
@@ -350,6 +352,10 @@ export const IconTerminalOutline16 = glyph(Terminal, 16)
 export const IconInfoOutline16 = glyph(Info, 16)
 /** ic_ds_minimize_outline_16 */
 export const IconMinimizeOutline16 = glyph(Minimize2, 16)
+/** ic_ds_maximize_outline_16 */
+export const IconMaximizeOutline16 = glyph(Fullscreen, 16)
+/** ic_ds_restore_outline_16 */
+export const IconRestoreOutline16 = glyph(FoldHorizontal, 16)
 /** ic_ds_calendar_outline_14 */
 export const IconCalendarOutline14 = glyph(Calendar, 14)
 /** ic_ds_compass_outline_16 */
