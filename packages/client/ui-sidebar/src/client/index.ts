@@ -57,7 +57,7 @@ export function apply(ctx: ClientContext): void {
 
   const injectProps = (): SidebarRootInjected => ({
     hooks: {
-      viewport: ctx.get('conversationViewport')?.snapshot ?? { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} },
+      viewport: ctx.get('conversationViewport')?.snapshot ?? { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }), subscribe: () => () => {} },
       panels,
     },
     exitWorkbench: () => { ctx.get('conversationViewport')?.setMode('single') },

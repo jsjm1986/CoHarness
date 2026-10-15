@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconFolderOpenOutline16, IconLogoutOutline16,
-  IconPlusOutline16, IconTrashOutline16, Menu, Modal, StateDot,
+  IconPlusOutline16, IconSplitPanesOutline16, IconTrashOutline16, IconWarningOutline16, Menu, Modal, relativeTime, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { WorkbenchLayoutPreset } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { AddPaneResult, ConversationViewportMode, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkbenchStore } from '../stores.ts'
 import { NS } from '../locales.ts'
 import { loadWorkbenchCatalog, type WorkbenchCatalog, type WorkbenchConversation } from '../catalog.ts'
+import { ScopeTile } from './ScopeTile.tsx'
 import css from './Workbench.module.css'
 import { WorkspaceFileBrowser, type ListWorkspaceDirectory, type OpenWorkspaceResource } from './WorkspaceFileBrowser.tsx'
 
@@ -53,7 +54,7 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
  * @returns the toolbar and its controlled picker dialog.
  */
 export function WorkbenchToolbar({
-  viewport, tabbed, inline = false, useStore, actions, useSessions, useWorkspaces,
+  viewport, tabbed, inline = false, layout, onSelectLayout, useStore, actions, useSessions, useWorkspaces,
   chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
@@ -65,6 +66,13 @@ export function WorkbenchToolbar({
   const [query, setQuery] = useState('')
   const [workspace, setWorkspace] = useState('')
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
+  /** Non-focused panes asking for attention: pending interaction, in pane order. */
+  const attentionPanes = viewport.mode === 'workbench'
+    ? viewport.paneIds.filter(id => id !== (viewport.activePaneId ?? viewport.paneIds[0])
+        && sessions.byId[id]?.pendingInteraction !== undefined)
+    : []
+  const now = Date.now()
   const [workbenchDialog, setWorkbenchDialog] = useState<'create' | 'rename' | 'duplicate' | undefined>()
   const [deleteWorkbenchOpen, setDeleteWorkbenchOpen] = useState(false)
   const [workbenchName, setWorkbenchName] = useState('')
@@ -193,9 +201,53 @@ export function WorkbenchToolbar({
           { type: 'separator' as const, id: 'workbench-exit-separator' },
           { id: '__exit', label: t('exitWorkbench'), icon: <IconLogoutOutline16 /> },
         ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label={t('select')} aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { actions.toggleWorkbenchMenu() }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name || t('defaultWorkbenchName') : t('mode')} <IconChevronDownOutline14 /></button>} />
-        {viewport.mode === 'workbench' && <span className={css.paneCount} aria-label={`${viewport.paneIds.length}/4`}>{viewport.paneIds.length}/4</span>}
+        {viewport.mode === 'workbench' && (
+          <span className={css.seatDots} role="img" aria-label={t('seatCount', { used: viewport.paneIds.length, total: 4 })} title={t('seatCount', { used: viewport.paneIds.length, total: 4 })}>
+            {[0, 1, 2, 3].map(seat =>
+              <span key={seat} className={css.seatDot} data-filled={seat < viewport.paneIds.length || undefined} />)}
+          </span>
+        )}
       </div>
       <div className={css.toolbarActions}>
+        {attentionPanes.length > 0 && (
+          <button
+            type="button"
+            className={css.attentionPill}
+            onClick={() => { const first = attentionPanes[0]; if (first !== undefined) focusSession(first) }}
+          >
+            <IconWarningOutline16 />
+            {t('attention', { count: attentionPanes.length })}
+          </button>
+        )}
+        {viewport.mode === 'workbench' && onSelectLayout !== undefined && (
+          <Menu
+            open={layoutMenuOpen}
+            onClose={() => { setLayoutMenuOpen(false) }}
+            selectedId={layout}
+            align="end" portal dense
+            items={[
+              { id: 'equal', label: t('layoutEqual') },
+              { id: 'lead', label: t('layoutLead') },
+              { id: 'trail', label: t('layoutTrail') },
+              { type: 'separator' as const, id: 'layout-mode-separator' },
+              { id: 'tabbed', label: t('layoutTabbed') },
+            ]}
+            onSelect={(id) => { setLayoutMenuOpen(false); onSelectLayout(id as WorkbenchLayoutPreset) }}
+            anchor={(
+              <button
+                type="button"
+                className={css.iconAction}
+                aria-label={t('layout')}
+                title={t('layout')}
+                aria-haspopup="menu"
+                aria-expanded={layoutMenuOpen}
+                onClick={() => { setLayoutMenuOpen(open => !open) }}
+              >
+                <IconSplitPanesOutline16 />
+              </button>
+            )}
+          />
+        )}
         {filesAvailable?.() === true && openFiles !== undefined && (
           <button
             type="button"
@@ -294,6 +346,7 @@ export function WorkbenchToolbar({
             const title = conversationDisplayName(item, t('untitled'))
             /* v8 ignore next -- scopeName is always a personal or project name */
             const scopeName = (item.runtime.kind === 'project' ? item.runtime.projectName : t('personal')) ?? ''
+            const { unit, n } = relativeTime(item.updatedAt, now)
             return (
               <button
                 key={`${item.runtime.kind}:${item.runtime.kind === 'project' ? item.runtime.projectId : 'personal'}:${item.sessionId}`}
@@ -308,7 +361,9 @@ export function WorkbenchToolbar({
                     },
                   ).finally(() => { setPending(false) })
                 }}>
-                <span><strong>{title}</strong><small title={item.cwd}>{scopeName}{item.cwd === undefined ? '' : ` · ${workspaceTitleOf(item.cwd) || item.cwd}`}</small></span>
+                <ScopeTile name={scopeName} tone={item.runtime.kind === 'project' ? 'project' : 'personal'} />
+                <span className={css.candidateText}><strong>{title}</strong><small title={item.cwd}>{scopeName}{item.cwd === undefined ? '' : ` · ${workspaceTitleOf(item.cwd) || item.cwd}`}</small></span>
+                <small className={css.candidateTime}>{unit === 'now' ? t('time.now') : t(`time.${unit}`, { n })}</small>
                 {pinned ? <small className={css.rowBadge}>{t('opened')}</small> : !item.canWrite && <small className={css.rowBadge}>{t('readOnlyBadge')}</small>}
               </button>
             )

@@ -789,6 +789,9 @@ export interface ConversationPaneOwnerProps {
   workbench?: boolean
 }
 
+/** Width preset the layout menu can apply to the current pane set. */
+export type WorkbenchLayoutPreset = 'equal' | 'lead' | 'trail' | 'tabbed'
+
 /** Owner share for the root-level workbench toolbar. */
 export interface ConversationWorkbenchToolbarOwnerProps {
   /** Fit the controls into an existing session title row. */
@@ -797,6 +800,10 @@ export interface ConversationWorkbenchToolbarOwnerProps {
   viewport: ConversationViewportSnapshot
   /** Show tabs when the conversation container cannot fit parallel panes. */
   tabbed: boolean
+  /** Preset matching the current arrangement; absent for a custom layout. */
+  layout?: WorkbenchLayoutPreset | undefined
+  /** Apply a width preset or switch to the single-pane tabbed presentation. Absent in inline mode. */
+  onSelectLayout?: ((preset: WorkbenchLayoutPreset) => void) | undefined
 }
 
 /** Owner share for the empty workbench state. */
@@ -823,6 +830,16 @@ export interface ConversationWorkbenchPaneHeaderOwnerProps {
   maximized: boolean
   /** Toggle temporary full-width presentation for this pane. */
   onMaximize: () => void
+  /** Whether this pane is collapsed to its identity strip. */
+  collapsed?: boolean
+  /** Whether collapsing still leaves one expanded pane. */
+  collapsible?: boolean
+  /** Toggle the collapsed identity strip. */
+  onToggleCollapse?: () => void
+  /** Whether every other pane is collapsed behind this one. */
+  solo?: boolean
+  /** Collapse every other pane to focus this one, or restore them while solo. */
+  onSolo?: () => void
 }
 
 /** Full props of one explicit Session pane. */
@@ -845,6 +862,12 @@ export interface ConversationViewportInjected {
   onViewportFocus: (sessionId: SessionId) => void
   onViewportRemove: (sessionId: SessionId) => void
   onViewportRatios: (ratios: readonly number[]) => void
+  /** Move one pane to an absolute index in the retained order. */
+  onViewportReorder: (sessionId: SessionId, index: number) => void
+  /** Park or restore one pane's surface as an identity strip. */
+  onViewportCollapse: (sessionId: SessionId, collapsed: boolean) => void
+  /** Collapse every pane except one, or restore all when soloed. */
+  onViewportSolo: (sessionId: SessionId) => void
   onViewportMaximize: (sessionId: SessionId, maximized: boolean) => void
   onViewportEnabled: (enabled: boolean) => void
   hooks: { viewportAvailable: ObservableSnapshot<boolean> }

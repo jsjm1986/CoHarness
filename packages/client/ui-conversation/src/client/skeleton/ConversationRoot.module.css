@@ -837,5 +837,65 @@
 .workbenchUnavailable { display: grid; flex: 1; place-content: center; margin: 0; padding: var(--dsw-space-5); color: var(--dsw-alias-label-tertiary); text-align: center; }
 .workbenchPane + .workbenchPane { border-left: 0.5px solid var(--dsw-alias-border-l1); }
 .workbenchRoot > .root, .workbenchPane > .root { flex: 1; min-height: 0; height: auto; overflow: hidden; }
+
+/* Focused pane: a quiet 2px solid edge, not a halo. */
+.workbenchPane::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  z-index: 6;
+  pointer-events: none;
+}
+.workbenchPane[data-active]::before { background: var(--dsw-alias-brand-primary); }
+
+/* Collapsed panes render only the header slot's identity strip. */
+.paneBody { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; }
+.paneBody[hidden] { display: none; }
+.paneBody > .root { flex: 1; min-height: 0; height: auto; overflow: hidden; }
+
+/* Pane reorder: the dragged pane dims in place; the hovered sibling grows a
+   2px insertion edge on the drop side. */
+.workbenchPane[data-drag-source] { opacity: 0.4; }
+.workbenchPane[data-drop-target='before'] { box-shadow: inset 2px 0 0 var(--dsw-alias-brand-primary); }
+.workbenchPane[data-drop-target='after'] { box-shadow: inset -2px 0 0 var(--dsw-alias-brand-primary); }
+
 .paneSeparator { position: absolute; right: -3px; top: 0; bottom: 0; width: 6px; z-index: 5; cursor: col-resize; touch-action: none; }
-.paneSeparator:hover, .paneSeparator:focus-visible { background: var(--dsw-alias-brand-primary); outline: none; }
+.paneSeparator::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: var(--dsw-alias-border-l1);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.paneSeparator:hover::before,
+.paneSeparator:focus-visible::before,
+.paneSeparator[data-dragging]::before { opacity: 1; }
+.paneSeparator:focus-visible { outline: none; }
+.paneSeparator:focus-visible::before,
+.paneSeparator[data-dragging]::before { background: var(--dsw-alias-brand-primary); }
+.paneRatioHint {
+  position: absolute;
+  left: 50%;
+  top: var(--dsw-space-10);
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dsw-alias-fill-floating);
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+.paneSeparator[data-dragging] .paneRatioHint { opacity: 1; }

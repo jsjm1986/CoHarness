@@ -16,7 +16,7 @@ async function bench(declare = true) {
   ctx.provide('layout', layout)
   ctx.provide('sessions', sessions as never)
   ctx.provide('workspaces', workspaces as never)
-  ctx.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} } } as never)
+  ctx.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }), subscribe: () => () => {} } } as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   const slots = ctx.get('slots') as SlotRegistry
   if (declare) {

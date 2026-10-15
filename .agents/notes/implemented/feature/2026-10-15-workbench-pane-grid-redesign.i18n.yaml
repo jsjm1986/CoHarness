@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-15-workbench-pane-grid-redesign.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-workbench-pane-grid-redesign.md
+/agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder:
+  en: f483764b328d5518
+  zh: 16f3488618c01649
+/agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/problem:
+  en: efbeeeb033e8e99b
+  zh: db68e29c197d06ec
+/agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/decision:
+  en: fb718667b2b538be
+  zh: 1b6ffb4ad5ee90d0
+/agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/alternatives-considered:
+  en: 24a3090607c57198
+  zh: 196199f8ea70094f
+/agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/consequences:
+  en: 867145be74a023c0
+  zh: 0eaab412b7b6307b
+/agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/testing:
+  en: 5ef3576853b91f6c
+  zh: 7505304a73b345f5

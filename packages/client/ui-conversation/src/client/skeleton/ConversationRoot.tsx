@@ -6,7 +6,7 @@ import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { parseClientSessionKey, SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationPaneSlotProps, ConversationSlotProps, InputZone,
+  ConversationPaneSlotProps, ConversationSlotProps, InputZone, WorkbenchLayoutPreset,
 } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { CHAT_CONTENT_WIDTH_RANGE } from '../../submission-settings.ts'
@@ -536,6 +536,17 @@ export function ConversationRoot(props: ConversationRootProps) {
   }, [available, props.onViewportEnabled])
   const [maximizedId, setMaximizedId] = useState<SessionId | undefined>()
   const [width, setWidth] = useState<number | undefined>()
+  /** Single-pane tab presentation chosen from the layout preset menu. */
+  const [soloTabbed, setSoloTabbed] = useState(false)
+  /** Preset matching the last applied arrangement; cleared on manual resize. */
+  const [layoutPreset, setLayoutPreset] = useState<WorkbenchLayoutPreset | undefined>()
+  /** Separator index while its drag runs, driving the ratio readout. */
+  const [draggingSeparator, setDraggingSeparator] = useState<number | null>(null)
+  /** Drop edge while a pane drag hovers a sibling. */
+  const [dropTarget, setDropTarget] = useState<{ id: SessionId; after: boolean } | null>(null)
+  /** Pane id mid-drag, dimming its source cell. */
+  const [draggingPaneId, setDraggingPaneId] = useState<SessionId | undefined>(undefined)
+  const dragPaneId = useRef<SessionId | undefined>(undefined)
   const root = useRef<HTMLDivElement | null>(null)
   const workbench = available && viewport.mode === 'workbench'
   useEffect(() => {
@@ -555,12 +566,14 @@ export function ConversationRoot(props: ConversationRootProps) {
   }, [workbench])
   const drag = useRef<{ pointerId: number; index: number; x: number; width: number; total: number; ratios: number[] } | null>(null)
   const compact = props.compact ?? false
-  const tabbed = compact || (width !== undefined && width < 728)
+  const tabbed = compact || (width !== undefined && width < 728) || soloTabbed
   const activePane = viewport.activePaneId ?? viewport.paneIds[0]
   const maximized = maximizedId !== undefined && viewport.paneIds.includes(maximizedId) ? maximizedId : undefined
   // A selected tab always wins over a desktop-only maximization preference.
   const focusedPane = tabbed ? activePane : maximized ?? activePane
   const paneIds = (tabbed || maximized !== undefined) && focusedPane !== undefined ? [focusedPane] : viewport.paneIds
+  const collapsed = new Set(viewport.collapsedIds)
+  const expandedCount = viewport.paneIds.filter(id => !collapsed.has(id)).length
   const columns = tabbed || maximized !== undefined ? 1
     : width === undefined || width >= viewport.paneIds.length * 364 ? Math.max(1, paneIds.length) : 2
   const rows = Array.from({ length: Math.ceil(paneIds.length / columns) }, (_, row) => paneIds.slice(row * columns, (row + 1) * columns))
@@ -574,6 +587,47 @@ export function ConversationRoot(props: ConversationRootProps) {
     next[index + 1] = total - next[index]
     props.onViewportRatios(next)
   }
+  const applyLayout = (preset: WorkbenchLayoutPreset): void => {
+    setLayoutPreset(preset)
+    if (preset === 'tabbed') { setSoloTabbed(true); return }
+    setSoloTabbed(false)
+    const last = viewport.paneIds.length - 1
+    props.onViewportRatios(viewport.paneIds.map((_, index) =>
+      preset === 'lead' && index === 0 || preset === 'trail' && index === last ? 2 : 1))
+  }
+  const onPaneDragStart = (event: React.DragEvent<HTMLElement>, id: SessionId): void => {
+    const handle = event.target instanceof HTMLElement ? event.target.closest('[data-pane-drag]') : null
+    if (handle === null || collapsed.has(id)) return
+    event.dataTransfer.setData('text/plain', id)
+    event.dataTransfer.effectAllowed = 'move'
+    dragPaneId.current = id
+    setDraggingPaneId(id)
+  }
+  const onPaneDragOver = (event: React.DragEvent<HTMLElement>, id: SessionId): void => {
+    if (dragPaneId.current === undefined || dragPaneId.current === id) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    const box = event.currentTarget.getBoundingClientRect()
+    const after = event.clientX > box.left + box.width / 2
+    setDropTarget(current => current !== null && current.id === id && current.after === after ? current : { id, after })
+  }
+  const onPaneDrop = (event: React.DragEvent<HTMLElement>, id: SessionId): void => {
+    const dragged = dragPaneId.current
+    if (dragged === undefined) return
+    event.preventDefault()
+    const box = event.currentTarget.getBoundingClientRect()
+    const rest = viewport.paneIds.filter(pane => pane !== dragged)
+    const index = Math.max(0, rest.indexOf(id) + (event.clientX > box.left + box.width / 2 ? 1 : 0))
+    props.onViewportReorder(dragged, index)
+    dragPaneId.current = undefined
+    setDraggingPaneId(undefined)
+    setDropTarget(null)
+  }
+  const onPaneDragEnd = (): void => {
+    dragPaneId.current = undefined
+    setDraggingPaneId(undefined)
+    setDropTarget(null)
+  }
   if (!workbench) return available ? (
     <div className={css.workbenchRoot}>
       {props.renderSlot('conversation.pane', { compact, workbench: false, headerLeading: props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed: false, inline: true }) })}
@@ -581,25 +635,46 @@ export function ConversationRoot(props: ConversationRootProps) {
   ) : props.renderSlot('conversation.pane', { compact })
   return (
     <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
-      {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed })}
+      {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed, layout: layoutPreset, onSelectLayout: applyLayout })}
       {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', { viewport }) : (
-        <div className={css.workbenchGrid} data-workbench-grid="">
+        <div
+          className={css.workbenchGrid}
+          data-workbench-grid=""
+          style={{ gridTemplateRows: rows.map(row => row.every(id => collapsed.has(id)) ? 'auto' : 'minmax(0, 1fr)').join(' ') }}
+        >
           {rows.map((row, rowIndex) => {
             const ratioStart = rowIndex * columns
             const ratios = row.map((_, index) => viewport.paneRatios[ratioStart + index] ?? 1)
             const total = ratios.reduce((sum, ratio) => sum + ratio, 0)
+            const expandedInRow = row.filter(id => !collapsed.has(id)).length
             return (
-              <div key={rowIndex} className={css.workbenchRow} data-workbench-row="" style={{ gridTemplateColumns: ratios.map(ratio => `minmax(${row.length > 1 ? 360 : 0}px, ${ratio}fr)`).join(' ') }}>
+              <div
+                key={rowIndex}
+                className={css.workbenchRow}
+                data-workbench-row=""
+                style={{ gridTemplateColumns: row.map((id, column) => collapsed.has(id)
+                  ? '46px'
+                  : `minmax(${expandedInRow > 1 ? 360 : 0}px, ${ratios[column] ?? 1}fr)`).join(' ') }}
+              >
                 {row.map((id, column) => {
                   const index = ratioStart + column
+                  const isCollapsed = collapsed.has(id)
+                  const nextId = row[column + 1]
                   return (
                     <section
                       key={id}
                       className={css.workbenchPane}
                       data-session-pane={id}
                       data-active={id === activePane || undefined}
+                      data-collapsed={isCollapsed || undefined}
+                      data-drag-source={draggingPaneId === id || undefined}
+                      data-drop-target={dropTarget?.id === id ? (dropTarget.after ? 'after' : 'before') : undefined}
                       onPointerDown={() => { props.onViewportFocus(id) }}
                       onFocusCapture={() => { props.onViewportFocus(id) }}
+                      onDragStart={(event) => { onPaneDragStart(event, id) }}
+                      onDragOver={(event) => { onPaneDragOver(event, id) }}
+                      onDrop={(event) => { onPaneDrop(event, id) }}
+                      onDragEnd={onPaneDragEnd}
                     >
                       <props.SessionProvider sessionId={id} empty={() => <p className={css.workbenchUnavailable} role="status">{props.t('viewport.unavailable')}</p>}>
                         {() => (
@@ -615,12 +690,19 @@ export function ConversationRoot(props: ConversationRootProps) {
                                 props.onViewportMaximize(id, next)
                                 setMaximizedId(current => current === id ? undefined : id)
                               },
+                              collapsed: isCollapsed,
+                              collapsible: expandedCount > 1,
+                              onToggleCollapse: () => { props.onViewportCollapse(id, !isCollapsed) },
+                              solo: expandedCount === 1 && !isCollapsed && viewport.paneIds.length > 1,
+                              onSolo: () => { props.onViewportSolo(id) },
                             })}
-                            {props.renderSlot('conversation.pane', { compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true })}
+                            <div className={css.paneBody} hidden={isCollapsed}>
+                              {props.renderSlot('conversation.pane', { compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true })}
+                            </div>
                           </>
                         )}
                       </props.SessionProvider>
-                      {column < row.length - 1 && (
+                      {nextId !== undefined && !isCollapsed && !collapsed.has(nextId) && (
                         <div
                           className={css.paneSeparator}
                           role="separator"
@@ -630,10 +712,13 @@ export function ConversationRoot(props: ConversationRootProps) {
                           aria-valuemax={100}
                           aria-valuenow={Math.round((ratios[column] ?? 1) / total * 100)}
                           tabIndex={0}
+                          data-dragging={draggingSeparator === index || undefined}
+                          onDoubleClick={() => { props.onViewportRatios(viewport.paneIds.map(() => 1)); setLayoutPreset('equal') }}
                           onPointerDown={(event) => {
                             event.preventDefault()
                             event.stopPropagation()
                             invokePointerCapture(event.currentTarget, 'setPointerCapture', event.pointerId)
+                            setDraggingSeparator(index)
                             drag.current = {
                               pointerId: event.pointerId, index, x: event.clientX,
                               width: event.currentTarget.parentElement?.parentElement?.clientWidth ?? 1,
@@ -643,20 +728,27 @@ export function ConversationRoot(props: ConversationRootProps) {
                           onPointerMove={(event) => {
                             const current = drag.current
                             if (current === null || current.pointerId !== event.pointerId) return
+                            setLayoutPreset(undefined)
                             resize(current.index, current.ratios,
                               (event.clientX - current.x) / current.width * current.total, current.width, current.total)
                           }}
                           onPointerUp={(event) => {
                             drag.current = null
+                            setDraggingSeparator(null)
                             invokePointerCapture(event.currentTarget, 'releasePointerCapture', event.pointerId)
                           }}
-                          onPointerCancel={() => { drag.current = null }}
+                          onPointerCancel={() => { drag.current = null; setDraggingSeparator(null) }}
                           onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
                             if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
                             event.preventDefault()
+                            setLayoutPreset(undefined)
                             resize(index, viewport.paneRatios, (event.key === 'ArrowLeft' ? -0.025 : 0.025) * total, event.currentTarget.parentElement?.parentElement?.clientWidth ?? 1, total)
                           }}
-                        />
+                        >
+                          <span className={css.paneRatioHint}>
+                            {Math.round((ratios[column] ?? 1) / total * 100)} · {Math.round((ratios[column + 1] ?? 1) / total * 100)}
+                          </span>
+                        </div>
                       )}
                     </section>
                   )

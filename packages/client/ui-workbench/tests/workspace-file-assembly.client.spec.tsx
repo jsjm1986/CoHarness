@@ -33,7 +33,7 @@ it('opens an authorized workspace file through the assembled tab registry and re
       hostDescription: createSnapshotStore({ executionAuthorityRequired: false }),
       api: { workspaceFiles: { read: async () => ({ result: { ok: true, value: { path: 'a.txt', version: 'v1', offset: 1, limit: 20, eof: true, text: 'assembled content' } } }) } },
     })
-    runtime.provide('conversationViewport', { snapshot: createSnapshotStore({ mode: 'single' as const, paneIds: [], paneRatios: [] }) })
+    runtime.provide('conversationViewport', { snapshot: createSnapshotStore({ mode: 'single' as const, paneIds: [], paneRatios: [], collapsedIds: [] }) })
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
@@ -88,7 +88,7 @@ it('routes Markdown and HTML resources through the assembled authorized readers'
         },
       },
     })
-    runtime.provide('conversationViewport', { snapshot: createSnapshotStore({ mode: 'single' as const, paneIds: [], paneRatios: [] }) })
+    runtime.provide('conversationViewport', { snapshot: createSnapshotStore({ mode: 'single' as const, paneIds: [], paneRatios: [], collapsedIds: [] }) })
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
@@ -134,7 +134,7 @@ it('surfaces a changed notice without rereading and clears content on revocation
       hostDescription: createSnapshotStore({ executionAuthorityRequired: false }),
       api: { workspaceFiles: { read: reads } },
     })
-    runtime.provide('conversationViewport', { snapshot: createSnapshotStore({ mode: 'single' as const, paneIds: [], paneRatios: [] }) })
+    runtime.provide('conversationViewport', { snapshot: createSnapshotStore({ mode: 'single' as const, paneIds: [], paneRatios: [], collapsedIds: [] }) })
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
