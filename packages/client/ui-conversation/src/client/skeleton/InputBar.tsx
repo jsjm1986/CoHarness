@@ -490,7 +490,11 @@ export const InputBar = memo(function InputBar({
       return
     }
     if (e.key === 'Tab') {
-      if (keyboard.arbitrate('tab', composing) !== 'pass') e.preventDefault()
+      // Tab settles the highlighted completion and passes without one, keeping
+      // native focus traversal; Shift+Tab leaves the menu like Escape whenever
+      // it is open, highlight or not, so the two Tab gestures never disagree
+      // about consuming the draft.
+      if (keyboard.arbitrate(e.shiftKey ? 'tabBack' : 'tab', composing) !== 'pass') e.preventDefault()
       return
     }
     if (e.key === 'Escape') {
@@ -684,7 +688,13 @@ export const InputBar = memo(function InputBar({
 
   const onToggleCommandMenu = (): void => {
     const el = inputRef.current
-    if (el !== null) toggleCommandMenu?.(selectionOf(el))
+    if (el === null) return
+    // The menu is a combobox over the composer, so the keyboard has to be in
+    // the textarea before the launcher opens it: activating the button from
+    // the keyboard leaves focus on the button, and restoring it afterwards
+    // would re-track an empty draft and close the menu again.
+    el.focus({ preventScroll: true })
+    toggleCommandMenu?.(selectionOf(el))
   }
 
   // An empty or owner-blocked ordinary composer keeps Stop. A sendable draft

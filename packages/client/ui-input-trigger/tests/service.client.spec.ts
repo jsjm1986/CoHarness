@@ -775,15 +775,90 @@ describe('arbitrate', () => {
     expect(picks).toEqual(['goal'])
   })
 
-  it('escape closes and consumes', async () => {
-    const { controller } = await menuBench()
+  it('escape and shift+tab leave without picking, and the exit sticks', async () => {
+    const { controller, cmd } = await menuBench()
     expect(controller.arbitrate('escape', false)).toBe('consumed')
+    expect(cmd.picks).toHaveLength(0)
     expect(controller.menu.getSnapshot().open).toBe(false)
+
+    // Restoring the caret re-tracks the same hit: the exit holds.
+    controller.track('/g', 2, { tier: 'plain' }, 1)
+    await tick()
+    expect(controller.menu.getSnapshot().open).toBe(false)
+    controller.track('/go', 3, { tier: 'plain' }, 2)
+    await tick()
+    expect(controller.menu.getSnapshot().open).toBe(true)
+
+    // Shift+Tab is the same exit.
+    expect(controller.arbitrate('tabBack', false)).toBe('consumed')
+    expect(cmd.picks).toHaveLength(0)
+    expect(controller.menu.getSnapshot().open).toBe(false)
+  })
+
+  it('escape and shift+tab do not drill a drillable highlight', async () => {
+    const drillable = readySource('/', 'command', [{ name: 'src', drill: true }], () => undefined)
+    const { controller } = controllerBench([drillable.source])
+    controller.track('/s', 2, { tier: 'plain' }, 1)
+    await tick()
+    expect(controller.arbitrate('escape', false)).toBe('consumed')
+    controller.track('/sr', 3, { tier: 'plain' }, 1)
+    await tick()
+    expect(controller.arbitrate('tabBack', false)).toBe('consumed')
+    expect(drillable.picks).toHaveLength(0)
+  })
+
+  it('a launcher-opened menu survives the track its own focus produces', async () => {
+    const { controller } = await menuBench()
+    controller.toggleSource('command', {
+      trigger: '/', query: '', quoted: false, position: 'leading',
+      span: { start: 0, end: 0, draftRev: 0 },
+    })
+    expect(controller.menu.getSnapshot().open).toBe(true)
+
+    // Driving the menu with the keyboard focuses the composer, whose deferred
+    // caret restore re-tracks an empty draft: the menu stays.
+    controller.track('', 0, { tier: 'plain' }, 0)
+    await tick()
+    expect(controller.menu.getSnapshot().open).toBe(true)
+
+    // Typing takes the ordinary path.
+    controller.track('/g', 2, { tier: 'plain' }, 1)
+    await tick()
+    expect(controller.menu.getSnapshot().open).toBe(true)
+    expect(controller.launcher.getSnapshot()).toBeNull()
+  })
+
+  it('a settled pick keeps its menu closed while the same hit re-tracks', async () => {
+    const { controller } = await menuBench()
+    expect(controller.arbitrate('enter', false)).toBe('pick-highlighted')
+
+    // A settled command may open a surface of its own; when that closes and the
+    // caret returns, the menu must not come back for the same token.
+    controller.track('/g', 2, { tier: 'plain' }, 1)
+    await tick()
+    expect(controller.menu.getSnapshot().open).toBe(false)
+
+    controller.track('/go', 3, { tier: 'plain' }, 2)
+    await tick()
+    expect(controller.menu.getSnapshot().open).toBe(true)
+  })
+
+  it('a pointer dismissal is sticky the same way, and leaving the token re-arms it', async () => {
+    const { controller } = await menuBench()
+    controller.dismiss()
+    controller.track('/g', 2, { tier: 'plain' }, 1)
+    await tick()
+    expect(controller.menu.getSnapshot().open).toBe(false)
+
+    controller.track('plain text', 10, { tier: 'plain' }, 2)
+    controller.track('/g', 2, { tier: 'plain' }, 3)
+    await tick()
+    expect(controller.menu.getSnapshot().open).toBe(true)
   })
 
   it('IME composition passes every key untouched', async () => {
     const { controller } = await menuBench()
-    for (const key of ['up', 'down', 'enter', 'escape', 'tab'] as const) {
+    for (const key of ['up', 'down', 'enter', 'escape', 'tab', 'tabBack'] as const) {
       expect(controller.arbitrate(key, true)).toBe('pass')
     }
     expect(controller.menu.getSnapshot().open).toBe(true)

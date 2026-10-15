@@ -17,6 +17,21 @@ import type {
   PickAction, PickOutcome, InputTriggerSource, SubmitEnvelope, TriggerChar, TriggerGuard,
 } from '../types.ts'
 
+/** Token identity a dismissal sticks to: the same trigger, query, and span bounds. */
+interface DismissedHit {
+  readonly trigger: string
+  readonly query: string
+  readonly quoted: boolean
+  readonly start: number
+  readonly end: number
+}
+
+/** Whether a tracked hit is the one the user just dismissed (same token, same query). */
+function dismissedHit(dismissed: DismissedHit, hit: TriggerHit): boolean {
+  return dismissed.trigger === hit.trigger && dismissed.query === hit.query && dismissed.quoted === hit.quoted
+    && dismissed.start === hit.span.start && dismissed.end === hit.span.end
+}
+
 /** Roster access the controller borrows from the root service (registration order preserved). */
 export interface SourceRoster {
   sources(trigger: string): readonly InputTriggerSource[]
@@ -65,6 +80,13 @@ export class InputTriggerController {
 
   /** The authoritative hit: single truth for span CAS material (menu snapshot never carries it alone). */
   private hit: TriggerHit | null = null
+  /**
+   * Identity of the hit whose menu the user dismissed. A dismissal means "not
+   * this one, not now": the same token with the same query keeps its menu
+   * closed, so restoring the caret after a dismissal cannot reopen it. Typing
+   * (a new query) or moving to another token clears it.
+   */
+  private dismissed: DismissedHit | null = null
   /** Whether the current menu was reached by an in-place drill. */
   private drilled = false
   private fetch: AbortController | null = null
@@ -98,12 +120,32 @@ export class InputTriggerController {
     this.clearLauncher()
     const raw = detectTrigger(draft, caret, guard)
     if (raw === null) {
+      // A launcher-opened menu is opened by a gesture, not by a typed token:
+      // the focus it takes to drive it with the keyboard re-tracks an empty
+      // draft right away, and that track must not close what the gesture
+      // opened. The launcher flag is cleared here, so this holds for that one
+      // follow-up track only; typing or picking takes over from there.
+      if (launched) return
       this.hit = null
+      // A frozen-tier track is the submit gesture's own bookkeeping, not a new
+      // intent from the user: a command submitted after a dismissal must not
+      // re-arm the menu the dismissal closed.
+      if (guard.tier !== 'frozen') this.dismissed = null
       this.stopFetch()
       this.reduce({ type: 'close' })
       return
     }
     const hit: TriggerHit = { ...raw, span: { ...raw.span, draftRev } }
+    // A launcher-opened menu is a fresh intent: the dismissal that closed the
+    // same token earlier must not silence it.
+    if (launched) this.dismissed = null
+    if (this.dismissed !== null) {
+      if (!dismissedHit(this.dismissed, hit)) this.dismissed = null
+      else {
+        this.hit = hit
+        return
+      }
+    }
     const prev = this.menu.getSnapshot()
     const same = !launched && prev.open && prev.hit !== null
       && prev.hit.trigger === hit.trigger && prev.hit.query === hit.query
@@ -220,7 +262,11 @@ export class InputTriggerController {
         this.reduce({ type: 'move', dir: 1 })
         return 'consumed'
       }
-      case 'escape': {
+      case 'escape':
+      case 'tabBack': {
+        // Escape leaves, and Shift+Tab leaves with it: the exit gesture never
+        // settles a candidate, so it cannot consume or rewrite the draft.
+        this.rememberDismissed()
         this.stopFetch()
         this.reduce({ type: 'close' })
         return 'consumed'
@@ -348,6 +394,7 @@ export class InputTriggerController {
   /** External dismiss (e.g. pointer outside the composer area). */
   dismiss(): void {
     if (this.disposed) return
+    this.rememberDismissed()
     this.stopFetch()
     this.reduce({ type: 'close' })
   }
@@ -472,6 +519,11 @@ export class InputTriggerController {
       span: hit.span,
     })
     this.stopFetch()
+    // A settling pick is the user's decision about this token: the menu stays
+    // closed for it until the text changes, so a settled command that opens a
+    // surface of its own does not bring the menu back when that surface closes
+    // and the caret returns.
+    if (action === 'pick') this.rememberDismissed()
     this.reduce({ type: 'close' })
     // Set the drill marker after closing: the synchronous input edit may
     // re-enter track(), which must see the marker while it refreshes headers
@@ -503,6 +555,14 @@ export class InputTriggerController {
   private setHeaders(next: ReadonlyMap<string, readonly InputTriggerCrumb[]>): void {
     if (this.headers.getSnapshot().size === 0 && next.size === 0) return
     this.headers.set(next)
+  }
+
+  /** Record the open menu's identity as dismissed, so a bare re-track cannot revive it. */
+  private rememberDismissed(): void {
+    const hit = this.hit
+    this.dismissed = hit === null ? null : {
+      trigger: hit.trigger, query: hit.query, quoted: hit.quoted, start: hit.span.start, end: hit.span.end,
+    }
   }
 
   private clearLauncher(): void {
