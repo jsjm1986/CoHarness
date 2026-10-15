@@ -8,6 +8,10 @@
 
 .root {
   --dsh-sidebar-inline-padding: 12px;
+  /* Containing block for column-scoped overlays: descendants that should
+     cover the browsing region alone read the published --dsh-sidebar-region-*
+     geometry (SidebarRoot.tsx) instead of spanning the whole column. */
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;

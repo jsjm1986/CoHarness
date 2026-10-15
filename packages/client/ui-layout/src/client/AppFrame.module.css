@@ -221,7 +221,6 @@
 }
 
 .sidebarCol {
-  position: relative; /* anchors the scope push page, which covers the column */
   min-width: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);

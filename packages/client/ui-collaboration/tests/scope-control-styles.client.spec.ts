@@ -30,14 +30,16 @@ describe('ScopeControl.module.css', () => {
     expect(css).toContain('min-height: var(--dsw-touch-target)')
   })
 
-  it('covers the sidebar column as a push page on wide surfaces', () => {
-    // One rule serves both ends: the containing block is the compact drawer
-    // on phones and the positioned sidebar column on wider layouts.
+  it('covers the drawer on phones and the browsing region on wider surfaces', () => {
+    // The compact drawer keeps the edge-to-edge page; wider layouts align
+    // the page to the region box the sidebar column publishes.
     const page = css.match(/\.scopePage\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(page).toContain('position: absolute')
     expect(page).toContain('inset: 0')
     expect(page).toContain('flex-direction: column')
-    expect(page).toContain('background: var(--dsw-alias-bg-layer-1)')
+    expect(page).toContain('background: var(--dsw-specific-sidebar-fill)')
+    expect(css).toMatch(/@media \(min-width: 768px\)[\s\S]*\.scopePage\s*\{[^}]*top:\s*var\(--dsh-sidebar-region-top/)
+    expect(css).toMatch(/@media \(min-width: 768px\)[\s\S]*\.scopePage\s*\{[^}]*height:\s*var\(--dsh-sidebar-region-height/)
     // The nav bar is pinned above the scrolling view.
     const nav = css.match(/\.pageNav\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(nav).toContain('flex: none')

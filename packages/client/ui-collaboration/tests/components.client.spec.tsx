@@ -291,7 +291,7 @@ describe('ScopeControl', () => {
     expect(screen.queryByText('新对话可见范围')).toBeNull()
   })
 
-  it('pushes a full-column page on wide surfaces: no overlay, level navigation', () => {
+  it('pushes a region-aligned page on wide surfaces: no overlay, level navigation', () => {
     const switchScope = vi.fn().mockResolvedValue(undefined)
     const view = render(<ScopeControl {...scopeProps(snapshot(), { createProject: vi.fn(), switchScope })} />)
     const trigger = screen.getByRole('button', { name: '切换个人或项目空间' })

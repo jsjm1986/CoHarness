@@ -319,11 +319,12 @@
   min-height: var(--dsw-touch-target);
 }
 
-/* Push page: covers the sidebar column edge to edge — the containing block
-   is the compact drawer on phones and the sidebar column on wider layouts,
-   so one rule serves both ends. The layer-1 fill separates the page from
-   the sidebar's own fill; entering slides in from the trailing edge so the
-   push reads as navigation, not a popup. */
+/* Push page: on compact it covers the whole drawer; on wider layouts the
+   media query below shrinks it to the published browsing-region box so the
+   column's brand, controls, and foot stay in view. The fill matches the
+   column's own surface so the page reads as the column, not a card;
+   entering slides in from the trailing edge so the push reads as
+   navigation, not a popup. */
 .scopePage {
   position: absolute;
   inset: 0;
@@ -331,9 +332,21 @@
   display: flex;
   flex-direction: column;
   padding-top: var(--dsw-safe-top, 0px);
-  background: var(--dsw-alias-bg-layer-1);
+  background: var(--dsw-specific-sidebar-fill);
   color: var(--dsw-alias-label-primary);
   animation: scope-page-in var(--ds-transition-duration) var(--ds-ease-in-out);
+}
+
+/* Wider layouts keep the column's chrome in view: the page aligns to the
+   browsing region whose box the sidebar publishes as custom properties, so
+   the brand, controls, and foot stay visible around it. Below 768px the
+   drawer itself is the surface and the page keeps covering it edge to edge. */
+@media (min-width: 768px) {
+  .scopePage {
+    top: var(--dsh-sidebar-region-top, 0);
+    bottom: auto;
+    height: var(--dsh-sidebar-region-height, 100%);
+  }
 }
 
 @keyframes scope-page-in {

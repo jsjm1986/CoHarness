@@ -17,7 +17,7 @@
  * scrollbar indirection away while it is elsewhere, so a list the user is not
  * pointing at carries no bar.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   CoHarnessMascot, IconNewChatOutline16, IconPanelLeftOutline16, Tooltip,
@@ -156,6 +156,26 @@ export function SidebarRoot({
     }
   }, [pointerInside])
 
+  // The column publishes the browsing region's box as inherited custom
+  // properties so an overlay mounted deeper in the tree (the scope control's
+  // push page in the foot) can align to the region without a measurement
+  // handoff. Region height follows every chrome change above or below it
+  // (the seat is flex:1), so one ResizeObserver covers both values.
+  const region = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const seat = region.current
+    const rootEl = column.current
+    if (seat === null || rootEl === null) return
+    const publish = (): void => {
+      rootEl.style.setProperty('--dsh-sidebar-region-top', `${seat.offsetTop}px`)
+      rootEl.style.setProperty('--dsh-sidebar-region-height', `${seat.offsetHeight}px`)
+    }
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(seat)
+    return () => { observer.disconnect() }
+  }, [])
+
   return (
     <div
       ref={column}
@@ -249,8 +269,10 @@ export function SidebarRoot({
       )}
 
       {/* The browsing region fills the column between the controls and the
-          foot in both states; its rail icon column rides the same slot. */}
-      <div className={css.regionArea}>
+          foot in both states; its rail icon column rides the same slot. Its
+          box is published on the column for overlay alignment (see the
+          ResizeObserver above). */}
+      <div ref={region} className={css.regionArea}>
         {renderSlot('sidebar.workspaces', {
           wide,
           expandSidebar: () => { if (collapsed) toggleSidebar() },

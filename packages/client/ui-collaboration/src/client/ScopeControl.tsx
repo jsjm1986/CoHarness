@@ -85,8 +85,9 @@ function tileGlyph(name: string): string {
 /**
  * Render the personal/project runtime selector and project create visibility.
  * Wide modes — the desktop column and the compact drawer alike — push a page
- * over the sidebar: the trigger expands a view that covers its positioned
- * ancestor edge to edge and carries a second level for visibility staging.
+ * over the sidebar: on compact it covers the whole drawer, on wider layouts
+ * it aligns to the browsing region so the column's chrome stays in view, and
+ * it carries a second level for visibility staging.
  * The collapsed rail keeps the floating menu.
  * @param props - composed slot props.
  * @returns scope trigger plus its page or menu, or null outside Gateway collaboration.
@@ -401,14 +402,13 @@ export function ScopeControl({
   return (
     <>
       {/* The rail renders its trigger through the Menu anchor; wide owns the
-          trigger row plus the pushed page covering the sidebar column. */}
+          trigger row plus the pushed page. */}
       {wide && trigger}
       {open && wide && (
-        /* The wide surface is a push page covering the sidebar column — on
-           compact the drawer is the positioned ancestor, on wider layouts the
-           sidebar column is. The page stacks one level deep: the root carries
-           the hero, the settings group, and the roster; visibility pushes in
-           as the second level. */
+        /* The page stacks one level deep: the root carries the hero, the
+           settings group, and the roster; visibility pushes in as the second
+           level. CSS scopes the surface — whole drawer on compact, the
+           browsing region on wider layouts. */
         <div id={pageId} className={css.scopePage} role="group" aria-label={t('scope.aria')}>
           <div className={css.pageNav}>
             <button

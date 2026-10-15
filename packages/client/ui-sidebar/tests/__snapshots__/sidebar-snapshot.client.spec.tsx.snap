@@ -7,7 +7,7 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
 >
   <div
     class="root collapsed railIn quietBars"
-    style=""
+    style="--dsh-sidebar-region-top: 0px; --dsh-sidebar-region-height: 0px;"
   >
     <div
       class="logoRow"
@@ -125,7 +125,7 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
 >
   <div
     class="root quietBars"
-    style="width: 300px;"
+    style="width: 300px; --dsh-sidebar-region-top: 0px; --dsh-sidebar-region-height: 0px;"
   >
     <div
       class="logoRow"
@@ -277,7 +277,7 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
 >
   <div
     class="root quietBars"
-    style="width: 300px;"
+    style="width: 300px; --dsh-sidebar-region-top: 0px; --dsh-sidebar-region-height: 0px;"
   >
     <div
       class="logoRow"
