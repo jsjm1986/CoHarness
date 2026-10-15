@@ -781,6 +781,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   TypertSchemaFilter: 'invariants.md',
   TypertSchemaRecord: 'invariants.md',
   Reload: 'boot.md',
+  ProfileReconciliation: 'boot.md',
   PluginChange: 'boot.md',
   PluginInstallLogChunk: 'boot.md',
   PluginInstallProgress: 'boot.md',

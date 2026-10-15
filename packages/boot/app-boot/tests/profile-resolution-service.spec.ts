@@ -215,11 +215,10 @@ describe('profile package metadata service', () => {
     expectSelectedPackage(local, '2.0.0')
     const removedWorkerData = getEnvironmentData(key)
     expect(removedWorkerData).toEqual({ resolution: removed, behavior: 'enforce' })
-    expect(() => { ctx.pluginPackages.replace(relinked) }).toThrow(
-      'profile resolution: relinking "linked-plugin" requires a process restart',
-    )
+    // A link name may point to another directory once the plugins of its previous target stopped.
+    ctx.pluginPackages.replace(relinked)
     expectSelectedPackage(local, '2.0.0')
-    expect(getEnvironmentData(key)).toBe(removedWorkerData)
+    expect(getEnvironmentData(key)).toEqual({ resolution: relinked, behavior: 'enforce' })
 
     await ctx.fiber.dispose()
     contexts.pop()
@@ -239,17 +238,18 @@ describe('profile package metadata service', () => {
     await bare.plugin(PluginPackages)
     expect(bare.pluginPackages.installed).toBe(false)
     await expect(bare.pluginPackages.refresh()).rejects.toThrow(/cannot be recomputed/)
+    expect(bare.pluginPackages.resolution).toBeUndefined()
 
     const plain = new Context()
     contexts.push(plain)
-    await plain.plugin(PluginPackages, {
-      resolution: {
-        profilesDir: join(root, 'profiles'), profileDir: undefined,
-        localPackageNames: [], linkedRoots: [], entries: [],
-      },
-    })
+    const plainResolution = {
+      profilesDir: join(root, 'profiles'), profileDir: join(root, 'profiles', 'plain'),
+      localPackageNames: [], linkedRoots: [], entries: [],
+    }
+    await plain.plugin(PluginPackages, { resolution: plainResolution })
     expect(plain.pluginPackages.installed).toBe(true)
     await expect(plain.pluginPackages.refresh()).rejects.toThrow(/cannot be recomputed/)
+    expect(plain.pluginPackages.resolution?.profileDir).toBe(join(root, 'profiles', 'plain'))
 
     const computed = new Context()
     contexts.push(computed)

@@ -107,7 +107,7 @@ runtime resolution 列出它提供的包；Loader entries 组成活动插件列�
 
 添加包的调用方先完成 pnpm 事务，再构造下一代。替换操作会拒绝改变任何既有 package name 的目录或版本。调用方先发布只增加映射的后继 generation，再挂载新的 Loader 配置项；本实现不提供该包事务。挂载失败可以留下已安装但未启用的包。
 
-修改保留映射的规范化目录、版本或作用域，移除 installation 作用域映射，让新的本地包名覆盖既有映射，或让已发布的链接名指向不同目录，都需要重启，因为 Node 的 ESM Module Map、CommonJS cache、现存对象引用和运行中的 Worker 都可能保留旧模块 identity。后继 generation 可以在对应插件停止后移除 `scope: profile` 映射和本地包名，保留的 profile 映射可以更换声明锚点；[刷新 Note](2026-10-13-profile-package-refresh-and-manifest-invalidation.zh.md) 记录这些发布点。这些限制不禁止从拦截范围移除 linked root。generation 换代不声称卸载模块。
+修改保留映射的规范化目录或作用域，更改或移除 installation 作用域映射（含其版本），或让新的本地包名覆盖既有映射，都需要重启，因为 Node 的 ESM Module Map、CommonJS cache、现存对象引用和运行中的 Worker 都可能保留旧模块 identity。后继 generation 可以在对应插件停止后移除 `scope: profile` 映射和本地包名，保留的 profile 映射可以更换声明锚点、对原地升级的包还可以更改版本；不再被 profile 映射命名的 linked root 可以指向其他目标，Node 缓存的原目标真实路径会被重新定位（见[替换 Note](2026-10-16-replace-changed-package-modules-on-recomposition.zh.md)）；[刷新 Note](2026-10-13-profile-package-refresh-and-manifest-invalidation.zh.md) 记录这些发布点。generation 换代不声称卸载模块。
 
 ### 文件系统与运行时载体
 
