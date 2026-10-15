@@ -627,10 +627,14 @@ describe('codex member plugin', () => {
     const provider = ctx.subagents.getProvider('codex')!
     const resolution = vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution')
       .mockResolvedValue({ cwd: dir, target: 'local', remote: false, subprocess: ctx.subprocess })
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    const parentSession = ctx.sessions.create(SessionId('continuable-parent'), { meta: { cwd: dir } })
+    const parent = { id: parentSession.id, session: parentSession, ctx, status: 'idle' } as Agent
     await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
       cwd: dir,
       sessionId: SessionId('continuable-child'),
-      parent: { session: { header: { cwd: dir } } } as unknown as Agent,
+      parent,
       signal,
     }))).resolves.toEqual({})
     expect(resolution.mock.calls[0]![2]).toBe(dir)
