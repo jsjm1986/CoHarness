@@ -10,7 +10,7 @@ The [boot package group](../../packages/boot/README.md) owns launcher-provided p
 
 `PluginInfo` carries module identity, effective enablement and fiber phase, plus a unique `patchId` or a `readOnlyReason`.
 
-`BundleInfo` carries the package name, optional installed version, selected enablement, removal availability and optional resolution error.
+`BundleInfo` carries the package name, optional installed version, selected enablement, removal availability, optional resolution error, and, for a bundle the profile's own dependency supplies and the installation does not, `source`: that dependency as a spec `pnpm add` accepts.
 
 `InstallBundleOptions.enabled` defaults to true. False installs without selecting the bundle layer. `approvedBuilds` grants persistent script permission to the supplied pending package names before installation.
 
@@ -177,8 +177,8 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 
 /** Read the profile's installed bundles, the bundles this dsh installation supplies, and the selected names that are not bundles.
  * A dependency without a bundle patch is listed, as a `not-bundle` problem, only while it is selected.
- * @returns Package versions, manifest descriptions, rows, optional display metadata, activation selections,
- * whether the installation offers the bundle, and removal availability.
+ * @returns Package versions, manifest descriptions, the installable spec of profile dependencies, rows, optional
+ * display metadata, activation selections, whether the installation offers the bundle, and removal availability.
  */
 @Remote async listBundles(): Promise<BundleInfo[]>
 

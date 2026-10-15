@@ -1249,8 +1249,8 @@ label.registryOption {
   line-height: 22px;
 }
 
-/* The package or row identity under the title: the exact spec that installs the
-   package elsewhere, where a title of its own or a shortened name hides it. */
+/* The package or row identity under the title, where a title of its own or a
+   shortened name hides it. */
 .detailName {
   margin: 0;
   font-size: 12px;
@@ -1298,6 +1298,46 @@ label.registryOption {
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-label-secondary);
+}
+
+/* A bundle's source facts: label at the start, value at the end, one ruled line each. */
+.facts {
+  margin: 0;
+}
+
+.facts div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 44px;
+  padding: 8px 2px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.facts dt {
+  flex: none;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.facts dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.facts code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-module-platform);
+  box-decoration-break: clone;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
 }
 
 /* The way into a package's page. */

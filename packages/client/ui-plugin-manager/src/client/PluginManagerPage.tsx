@@ -469,6 +469,35 @@ function PackageCard({ pkg, t, resolveText, busy, highlighted, canManage, onOpen
 }
 
 /**
+ * Where a bundle comes from: the spec that installs it elsewhere, or built in
+ * for one whose loaded copy the installation supplies, and its version. A
+ * selected bundle that neither the profile nor the installation holds has no
+ * section.
+ */
+function SourceSection({ pkg, t }: { readonly pkg: PackageView; readonly t: Translate }): ReactNode {
+  if (pkg.source === undefined && !pkg.installed && !pkg.optional) return null
+  return (
+    <section className={css.detailSection} data-plugin-source>
+      <h4 className={css.sectionTitle}>{t('sourceTitle')}</h4>
+      <dl className={css.facts}>
+        <div>
+          <dt>{t('sourceSpec')}</dt>
+          <dd>{pkg.source === undefined ? t('sourceBuiltIn') : <code>{pkg.source}</code>}</dd>
+        </div>
+        {pkg.version === undefined
+          ? null
+          : (
+            <div>
+              <dt>{t('sourceVersion')}</dt>
+              <dd>{pkg.version}</dd>
+            </div>
+          )}
+      </dl>
+    </section>
+  )
+}
+
+/**
  * One official plugin as a card that opens its page: its icon, its title from
  * the registration, and the one-liner the entry renders in its summary view.
  */
@@ -588,9 +617,9 @@ function RowDetail({ pkg, row, t, resolveText, onBack, renderSlot, form }: {
  * One package's page: the crumb back to the list; its icon with its switch
  * and, for a package the profile installed, uninstall; its title beside its
  * version tag, its beta tag, and its problem tag; the package name the title
- * stands for, which is what installs it elsewhere; its one-liner; the Host's
- * problem when it reports one; the configuration the bundle registered for
- * itself; and its rows with their switches and configure controls.
+ * stands for; its one-liner; the Host's problem when it reports one; the
+ * configuration the bundle registered for itself; its rows with their switches
+ * and configure controls; and where it comes from.
  */
 function PackageDetail({
   pkg, t, resolveText, busy, canManage, rowBusy, configured, configure, renderSlot,
@@ -673,6 +702,7 @@ function PackageDetail({
           toggle={pkg.enabled ? { canManage, busy: row => busy || rowBusy(row), onSetEnabled: onSetRowEnabled } : undefined}
           configure={configure}
         />
+        <SourceSection pkg={pkg} t={t} />
         {renderSlot('plugins.detail.section', { subject })}
       </div>
     </div>

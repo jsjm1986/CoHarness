@@ -20,6 +20,7 @@ const BUNDLE: BundleInfo = {
   description: 'A sidebar.',
   enabled: false,
   installed: true,
+  source: 'dsh-better-sidebar@^0.16.0',
   optional: false,
   removable: true,
   rows: [{ rowId: 'sidebar', moduleName: 'dsh-better-sidebar', entryId: ROW_ENTRY }, { rowId: 'theme', moduleName: 'dsh-better-sidebar/theme' }],
@@ -152,7 +153,7 @@ it('exposes the runtime\'s account scope so the page labels the target it edits'
 describe('packageView', () => {
   it('joins a bundle with the entries its rows run as', () => {
     expect(packageView(BUNDLE, PLUGINS)).toEqual({
-      name: 'dsh-better-sidebar', version: '0.16.0', description: 'A sidebar.',
+      name: 'dsh-better-sidebar', version: '0.16.0', description: 'A sidebar.', source: 'dsh-better-sidebar@^0.16.0',
       installed: true, optional: false, enabled: false,
       rows: [
         { rowId: 'sidebar', moduleName: 'dsh-better-sidebar', entryId: ROW_ENTRY, enabled: true, phase: 'active' },

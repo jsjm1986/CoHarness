@@ -85,6 +85,8 @@ export interface PackageView {
   readonly meta?: PluginLocalizedMeta
   /** Whether the profile's own dependencies hold the package; false for a bundle the installation supplies. */
   readonly installed: boolean
+  /** Present for a profile dependency the installation does not also supply: the spec `pnpm add` accepts. */
+  readonly source?: string
   /** Whether the installation ships the bundle for the person to switch on: official, off until selected, never removable. */
   readonly optional: boolean
   /** Whether the bundle is in the profile's layer list. */
@@ -457,6 +459,7 @@ export function packageView(bundle: BundleInfo, plugins: readonly PluginInfo[]):
     enabled: bundle.enabled,
     rows,
     ...bundle.version === undefined ? {} : { version: bundle.version },
+    ...bundle.source === undefined ? {} : { source: bundle.source },
     ...bundle.description === undefined ? {} : { description: bundle.description },
     ...bundle.meta === undefined ? {} : { meta: bundle.meta },
     ...bundle.readOnlyReason === undefined ? {} : { readOnlyReason: bundle.readOnlyReason },
