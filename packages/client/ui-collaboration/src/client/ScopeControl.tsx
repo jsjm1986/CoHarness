@@ -214,7 +214,9 @@ export function ScopeControl({
           : project.mode === 'ro' ? css.scopeFlagMark : css.scopeFlag}>
           {project.kind === 'steward'
             ? t('scope.steward')
-            : project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
+            : project.canManage === true
+              ? t('scope.admin')
+              : project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
         </span>
       </span>
     ),
@@ -234,6 +236,7 @@ export function ScopeControl({
             <IconUserOutline16 size={11} />
           </span>
           <span className={css.scopeName}>{t('scope.personal')}</span>
+          <span className={css.scopeFlag}>{t('scope.personalFlag')}</span>
         </span>
       ),
       disabled: state.scopeBusy,
@@ -547,6 +550,7 @@ export function ScopeControl({
                     <IconUserOutline16 size={11} />
                   </span>
                   <span className={css.pageRowName}>{t('scope.personal')}</span>
+                  <span className={css.pageValue}>{t('scope.personalFlag')}</span>
                   {currentScopeId === 'scope:personal' && pageCheck}
                 </button>
                 {visibleProjects.map((project) => {
@@ -554,7 +558,9 @@ export function ScopeControl({
                   const selected = id === currentScopeId
                   const modeText = project.kind === 'steward'
                     ? t('scope.steward')
-                    : project.mode === 'ro' ? t('scope.readOnly') : ''
+                    : project.canManage === true
+                      ? t('scope.admin')
+                      : project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')
                   return (
                     <button
                       key={id}
@@ -579,11 +585,9 @@ export function ScopeControl({
                           </span>
                         )}
                       <span className={css.pageRowName}>{project.name}</span>
-                      {modeText !== '' && (
-                        <span className={project.kind === 'steward' ? css.pageValueWarn : css.pageValue}>
-                          {modeText}
-                        </span>
-                      )}
+                      <span className={project.kind === 'steward' ? css.pageValueWarn : css.pageValue}>
+                        {modeText}
+                      </span>
                       {selected && pageCheck}
                     </button>
                   )

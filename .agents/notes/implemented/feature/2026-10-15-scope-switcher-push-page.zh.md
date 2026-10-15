@@ -13,7 +13,7 @@ Status: implemented
 两个宽表面都把切换器渲染为绝对定位的**推入页**：紧凑端边缘到边缘盖住整个抽屉，桌面端对界到浏览区，让列的品牌、新建会话控件、面板列表与底栏保持可见。`.root`（侧栏列）声明 `position: relative`，`SidebarRoot` 把 `.regionArea` 的盒几何发布为可继承的 `--dsh-sidebar-region-top`/`--dsh-sidebar-region-height` 自定义属性——在 layout effect 中测量，并由单个 ResizeObserver 挂在 flex:1 的区域座上保持实时（周边 chrome 变化都会使它重排）。768px 以下 `.scopePage` 保持 `inset: 0`；以上则从这些变量读取 `top`/`height`。触发器保留 tile + 名称 + 模式标记（仅非默认空间显示的状态点+文字），但下箭头换成右箭头并新增 `aria-controls={pageId}`——它揭示的是一个页面，不是菜单。
 
 - **两级导航。** `pageView` 在 `root` 与 `visibility` 间切换；`pageNav`（`push`/`pop`）决定滑动方向。根页的可见性行推入第二级；返回按钮与 Escape 将其弹出，根页上的 Escape 关闭整页。关闭再开永远落在根级。
-- **根页清单。** 页导航行（返回控件 + `scope.menuTitle`）、当前空间 hero（身份 tile、名称、模式/状态 meta）、管理组（新对话可见范围 › 带暂存值、邀请 › 带待处理角标、项目设置 ›），以及全部空间组（个人 + 项目行，带身份 tile，选中项尾部勾，只读/维护标 caption 值）。项目超过四个时渲染名单搜索；注入 `project:create` 时新建入口落在页脚。
+- **根页清单。** 页导航行（返回控件 + `scope.menuTitle`）、当前空间 hero（身份 tile、名称、模式/状态 meta）、管理组（新对话可见范围 › 带暂存值、邀请 › 带待处理角标、项目设置 ›），以及全部空间组（个人 + 项目行，带身份 tile，选中项尾部勾，每行标权限值——个人/管理员/可编辑/只读为 caption，维护为琥珀）。项目超过四个时渲染名单搜索；注入 `project:create` 时新建入口落在页脚。
 - **语义跟表面走。** 页面是有标签的 `role="group"`，行是普通按钮，选中空间带 `aria-current`。空间行切换并关闭；可见性行暂存 `stagedVisibility` 但不关闭——暂存的偏好不是一次选中。
 - **`Menu` 只保留轨道路径**（`!wide`），不变：portalled 浮层列表、测宽、完整条目集。弹窗仍 portal 到 `document.body`，层叠在页面之上。
 - 身份 tile 语法原样继承：`tileGlyph`/`tileTone` 行、代理对安全的首字、维护盾 tile、圆形个人空间 tile。

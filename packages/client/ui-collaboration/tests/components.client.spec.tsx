@@ -166,7 +166,7 @@ describe('ScopeControl', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '个人空间' }))
+    fireEvent.click(screen.getByRole('button', { name: /个人空间/ }))
     expect(switchScope).toHaveBeenCalledWith({ kind: 'personal' })
 
     fireEvent.click(trigger)
@@ -226,18 +226,18 @@ describe('ScopeControl', () => {
     expect(page.className.split(/\s+/)).toContain(css.scopePage)
     const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' })
     expect(search.placeholder).toBe('搜索项目空间')
-    expect(screen.getByRole('button', { name: '个人空间' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /新建项目空间/ })).toBeTruthy()
 
     fireEvent.change(search, { target: { value: '审计' } })
     expect(screen.getByRole('button', { name: /审计平台/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '项目 1' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /项目 1可编辑/ })).toBeNull()
 
     fireEvent.change(search, { target: { value: '不存在' } })
     expect(screen.getByText('没有匹配的项目空间')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '清除项目空间搜索' }))
     expect(search.value).toBe('')
-    expect(screen.getByRole('button', { name: '项目 1' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /项目 1可编辑/ })).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('group', { name: '切换个人或项目空间' })).toBeNull()
@@ -269,11 +269,28 @@ describe('ScopeControl', () => {
     expect(stewardItem.querySelector('svg')).not.toBeNull()
     expect(stewardItem.querySelector(`span.${css.tileWarn}`)).not.toBeNull()
     const projectItem = screen.getByRole('button', { name: /支付重构/ })
-    // Ordinary read-write rows show no mode text; selection stays on the
-    // trailing check.
+    // Every row answers the member's grant: read-write reads 可编辑.
+    expect(projectItem.textContent).toContain('可编辑')
     const tile = projectItem.querySelector(`span.${css.tile}`)
     expect(tile).not.toBeNull()
     expect(tile?.textContent).toBe('支')
+  })
+
+  it('flags every roster row with the member grant: admin, read-write, read-only', () => {
+    const context: CollaborationContext = {
+      ...projectContext,
+      projects: [
+        { projectId: 9, name: '支付重构', path: '/srv/pay', mode: 'rw', canManage: true },
+        { projectId: 10, name: '审计平台', path: '/srv/audit', mode: 'ro' },
+        { projectId: 12, name: '数据看板', path: '/srv/data', mode: 'rw' },
+      ],
+    }
+    render(<ScopeControl {...scopeProps(snapshot({ context }))} />)
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    expect(screen.getByRole('button', { name: /个人空间/ }).textContent).toContain('个人')
+    expect(screen.getByRole('button', { name: /支付重构/ }).textContent).toContain('管理员')
+    expect(screen.getByRole('button', { name: /审计平台/ }).textContent).toContain('只读')
+    expect(screen.getByRole('button', { name: /数据看板/ }).textContent).toContain('可编辑')
   })
 
   it('renders a compact rail trigger and omits create visibility for read-only projects', () => {
@@ -305,10 +322,10 @@ describe('ScopeControl', () => {
       view.container.querySelector(`.${css.scopePage}`)?.id,
     )
     // Root view: hero, the settings group, the roster, and create.
-    expect(screen.getByRole('button', { name: '个人空间' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '支付重构' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('button', { name: /支付重构/ }).getAttribute('aria-current')).toBe('true')
     // The visibility row pushes the second level rather than expanding inline.
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
     expect(screen.getByText('只有创建者可以查看')).toBeTruthy()
