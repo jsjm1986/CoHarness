@@ -36,6 +36,24 @@ describe('ScopeControl.module.css', () => {
     expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.mode:not\(\.modeSteward\)\s*\{[^}]*display:\s*none/)
   })
 
+  it('renders the phone roster as an in-column accordion: indented hairline rows, bounded height', () => {
+    // The accordion is zero-overlay: no card surface, shadow, or popover
+    // positioning — just indented rows under the head inside the footer column.
+    const list = css.match(/\.inlineList\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(list).toContain('display: flex')
+    expect(list).toContain('flex-direction: column')
+    expect(list).toContain('overflow-y: auto')
+    expect(list).toContain('max-height: min(320px')
+    expect(list).toContain('margin: 0 -2px')
+    expect(list).toContain('border-top: 0.5px solid var(--dsw-alias-border-l2)')
+    expect(css).toMatch(/\.inlineList > \* \+ \*\s*\{[^}]*border-top:\s*0\.5px solid var\(--dsw-alias-border-l2\)/)
+    const row = css.match(/\.inlineRow\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(row).toContain('min-height: var(--dsw-touch-target)')
+    expect(row).toContain('0 var(--dsw-space-2) 0 26px')
+    // The current scope keeps the flat fill marker, not a raised card.
+    expect(css).toMatch(/\.inlineRowCurrent[^{]*\{[^}]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/)
+  })
+
   it('caps the project menu and keeps its search controls tappable on phones', () => {
     expect(css).toMatch(/\.scopeMenu\s*\{[^}]*--dsh-menu-max-height:\s*min\(480px,\s*calc\(100vh - 24px\)\)/)
     expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.menuSearch\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)

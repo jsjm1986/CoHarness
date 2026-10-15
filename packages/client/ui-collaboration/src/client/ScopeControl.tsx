@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  IconChevronDownOutline14, IconChevronLeftOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
-  IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16, IconUsersOutline16,
-  IconWarningOutline16,
+  IconCheckOutline16, IconChevronDownOutline14, IconChevronLeftOutline14, IconCloseFill14, IconGlobeOutline14,
+  IconSearchOutline16, IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16,
+  IconUsersOutline16, IconWarningOutline16,
   Menu, useMediaQuery, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -84,10 +84,10 @@ function tileGlyph(name: string): string {
 
 /**
  * Render the personal/project runtime selector and project create visibility.
- * The project roster is searchable, capped to a viewport-safe menu height,
- * and presented through the shared phone sheet below the compact breakpoint.
+ * The project roster is searchable, capped to a viewport-safe menu height on
+ * the rail, and expands as an in-column accordion in the phone drawer.
  * @param props - composed slot props.
- * @returns scope trigger and its portaled menu, or null outside Gateway collaboration.
+ * @returns scope trigger plus its menu or accordion group, or null outside Gateway collaboration.
  */
 export function ScopeControl({
   wide, useCollaboration, switchScope, stageVisibility,
@@ -96,11 +96,14 @@ export function ScopeControl({
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const [open, setOpen] = useState(false)
-  // The in-flow hub is the wide desktop sidebar's grammar; below the compact
-  // breakpoint the drawer is a transient overlay, so the control falls back
-  // to the portaled list, which Menu presents as the shared bottom sheet.
+  // The in-flow hub is the wide desktop sidebar's grammar. Below the compact
+  // breakpoint the drawer is a transient overlay and the control becomes an
+  // accordion: the trigger row expands an in-column group with no overlay,
+  // no scrim, and no gesture surface.
   const phone = useMediaQuery('(max-width: 767px)')
   const hub = wide && !phone
+  const inline = wide && phone
+  const inlineListId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
   // The menu tracks the trigger's rendered width — the sidebar is draggable,
   // so the floating list re-measures on every layout change instead of
@@ -222,7 +225,8 @@ export function ScopeControl({
     && loadProjectConfiguration !== undefined && setProjectThemePolicy !== undefined
   // The wide hub carries members and settings inside its header card, so the
   // pinned footer only keeps project creation. The rail menu keeps every
-  // capability as a footer entry.
+  // capability as a footer entry; the phone accordion renders the same
+  // actions as in-column rows instead.
   const footerEntries: MenuEntry[] = []
   if (createProject !== undefined) {
     footerEntries.push({
@@ -231,7 +235,7 @@ export function ScopeControl({
       icon: <IconPlusOutline16 size={16} />,
     })
   }
-  if (!hub) {
+  if (!wide) {
     if (listInvitations !== undefined) {
       footerEntries.push({
         id: 'project:members',
@@ -256,9 +260,10 @@ export function ScopeControl({
     }
   }
 
-  // Visibility stays a menu section on the rail and the phone sheet; the
-  // desktop hub renders it as a segmented radio inside the current-space card.
-  if (!hub && projectScope?.mode === 'rw') {
+  // Visibility stays a menu section on the rail; the phone accordion renders
+  // the same two choices as rows, and the desktop hub renders them as a
+  // segmented radio inside the current-space card.
+  if (!wide && projectScope?.mode === 'rw') {
     entries.push(
       { type: 'separator', id: 'visibility-separator' },
       { type: 'label', id: 'visibility-label', text: t('newConversation.label') },
@@ -324,7 +329,8 @@ export function ScopeControl({
   )
   // Desktop wide: the sheet becomes a space hub — a persistent working surface
   // for settings, members, invitations, and visibility above the searchable
-  // list. Rail and the phone sheet keep the compact menu header.
+  // list. The rail keeps the compact menu header; the phone accordion renders
+  // its own in-column rows below.
   const projectSearch = hub ? (
     <div className={css.hub}>
       <div className={css.hubHead}>
@@ -422,85 +428,241 @@ export function ScopeControl({
     </>
   )
 
+  const trigger = (
+    <button
+      type="button"
+      ref={triggerRef}
+      className={wide
+        ? `${css.trigger} ${css.context}${projectScope?.steward === true ? ` ${css.contextSteward}` : ''}`
+        : `${css.trigger} ${css.rail}`}
+      aria-label={t('scope.aria')}
+      aria-expanded={open}
+      {...(inline
+        ? { 'aria-controls': inlineListId }
+        : { 'aria-haspopup': 'menu' as const })}
+      title={scopeTitle}
+      disabled={state.scopeBusy}
+      onClick={() => { setOpen(value => !value) }}
+    >
+      {state.scopeError === undefined
+        ? currentTile(wide ? 12 : 11)
+        : <IconWarningOutline16 size={wide ? 16 : 18} />}
+      {wide && (
+        <>
+          <span className={css.label}>{currentLabel}</span>
+          {projectScope !== undefined && (
+            <span className={projectScope.steward === true ? css.modeSteward : css.mode}>
+              {projectScope.steward === true
+                ? t('scope.steward')
+                : projectScope.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
+            </span>
+          )}
+          <IconChevronDownOutline14 className={css.chevron} />
+        </>
+      )}
+    </button>
+  )
+  const inlineCheck = (
+    <span className={css.inlineCheck} aria-hidden="true"><IconCheckOutline16 size={16} /></span>
+  )
   return (
     <>
-      <Menu
-        open={open}
-        onClose={() => { setOpen(false) }}
-        items={entries}
-        header={projectSearch}
-        {...footerEntries.length > 0 ? { footer: footerEntries } : {}}
-        /* The expanded desktop sidebar opens the list as an in-flow drawer
-           above its trigger — a panel inside the card, not a floating overlay.
-           The rail and the phone keep the portaled menu, which is the shared
-           bottom sheet below the compact breakpoint. */
-        portal={!hub}
-        className={hub ? css.scopeField : undefined}
-        listClassName={hub ? `${css.scopeMenu} ${css.scopeSheet}` : css.scopeMenu}
-        listStyle={hub || menuWidth === undefined ? undefined : { width: menuWidth }}
-        selectedIds={[
-          currentScopeId,
-          ...(projectScope?.mode === 'rw' ? [`visibility:${state.stagedVisibility}`] : []),
-        ]}
-        onSelect={(id) => {
-          setOpen(false)
-          if (id === 'scope:personal') {
-            void switchScope({ kind: 'personal' })
-            return
-          }
-          if (id.startsWith('scope:project:')) {
-            void switchScope({ kind: 'project', projectId: Number(id.slice('scope:project:'.length)) })
-            return
-          }
-          if (id === 'project:create') {
-            setManagerMode('create')
-            return
-          }
-          if (id === 'project:members') {
-            setManagerMode('members')
-            return
-          }
-          if (id === 'project:settings') {
-            setProjectSettingsOpen(true)
-            return
-          }
-          stageVisibility(id.slice('visibility:'.length) as CollaborationVisibility)
-        }}
-        side="top"
-        align="start"
-        anchor={(
-          <button
-            type="button"
-            ref={triggerRef}
-            className={wide
-              ? `${css.trigger} ${css.context}${projectScope?.steward === true ? ` ${css.contextSteward}` : ''}`
-              : `${css.trigger} ${css.rail}`}
-            aria-label={t('scope.aria')}
-            aria-haspopup="menu"
-            aria-expanded={open}
-            title={scopeTitle}
-            disabled={state.scopeBusy}
-            onClick={() => { setOpen(value => !value) }}
-          >
-            {state.scopeError === undefined
-              ? currentTile(wide ? 12 : 11)
-              : <IconWarningOutline16 size={wide ? 16 : 18} />}
-            {wide && (
-              <>
-                <span className={css.label}>{currentLabel}</span>
-                {projectScope !== undefined && (
-                  <span className={projectScope.steward === true ? css.modeSteward : css.mode}>
-                    {projectScope.steward === true
-                      ? t('scope.steward')
-                      : projectScope.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
+      {inline ? (
+        /* The phone drawer expands the roster in the footer column itself:
+           an accordion group under the head row, indented one level, hairline-
+           separated — no portal, no scrim, and the row heights already meet
+           the shared touch target. */
+        <>
+          {trigger}
+          {open && (
+            <div
+              id={inlineListId}
+              className={css.inlineList}
+              role="group"
+              aria-label={t('scope.aria')}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setOpen(false)
+              }}
+            >
+              {context.projects.length > 4 && (
+                <div className={css.inlineSearch}>{searchField}</div>
+              )}
+              <button
+                type="button"
+                className={`${css.inlineRow}${currentScopeId === 'scope:personal' ? ` ${css.inlineRowCurrent}` : ''}`}
+                aria-current={currentScopeId === 'scope:personal' ? 'true' : undefined}
+                disabled={state.scopeBusy}
+                onClick={() => {
+                  setOpen(false)
+                  void switchScope({ kind: 'personal' })
+                }}
+              >
+                <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}`} aria-hidden="true">
+                  <IconUserOutline16 size={11} />
+                </span>
+                <span className={css.scopeName}>{t('scope.personal')}</span>
+                {currentScopeId === 'scope:personal' && inlineCheck}
+              </button>
+              {visibleProjects.map((project) => {
+                const id = `scope:project:${project.projectId}`
+                const selected = id === currentScopeId
+                const modeText = project.kind === 'steward'
+                  ? t('scope.steward')
+                  : project.mode === 'ro' ? t('scope.readOnly') : ''
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`${css.inlineRow}${selected ? ` ${css.inlineRowCurrent}` : ''}`}
+                    aria-current={selected ? 'true' : undefined}
+                    disabled={state.scopeBusy}
+                    onClick={() => {
+                      setOpen(false)
+                      void switchScope({ kind: 'project', projectId: project.projectId })
+                    }}
+                  >
+                    {project.kind === 'steward'
+                      ? (
+                        <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
+                          <IconShieldOutline16 size={11} />
+                        </span>
+                      )
+                      : (
+                        <span className={`${css.tile} ${tileTone(project.name)}`} aria-hidden="true">
+                          {tileGlyph(project.name)}
+                        </span>
+                      )}
+                    <span className={css.scopeName}>{project.name}</span>
+                    {modeText !== '' && (
+                      <span className={project.kind === 'steward' ? css.inlineValueWarn : css.inlineValue}>
+                        {modeText}
+                      </span>
+                    )}
+                    {selected && inlineCheck}
+                  </button>
+                )
+              })}
+              {visibleProjects.length === 0 && normalizedProjectQuery !== '' && (
+                <div className={css.inlineLabel}>{t('scope.searchEmpty')}</div>
+              )}
+              {projectScope?.mode === 'rw' && (
+                <>
+                  <div className={css.inlineLabel}>{t('newConversation.label')}</div>
+                  <button
+                    type="button"
+                    className={css.inlineRow}
+                    onClick={() => { stageVisibility('project') }}
+                  >
+                    <span className={css.inlineIcon} aria-hidden="true"><IconGlobeOutline14 size={16} /></span>
+                    <span className={css.scopeName}>{t('visibility.project')}</span>
+                    {state.stagedVisibility === 'project' && inlineCheck}
+                  </button>
+                  <button
+                    type="button"
+                    className={css.inlineRow}
+                    onClick={() => { stageVisibility('private') }}
+                  >
+                    <span className={css.inlineIcon} aria-hidden="true"><IconUserOutline16 size={16} /></span>
+                    <span className={css.scopeName}>{t('visibility.private')}</span>
+                    {state.stagedVisibility === 'private' && inlineCheck}
+                  </button>
+                </>
+              )}
+              {createProject !== undefined && (
+                <button
+                  type="button"
+                  className={`${css.inlineRow} ${css.inlineCreate}`}
+                  onClick={() => {
+                    setOpen(false)
+                    setManagerMode('create')
+                  }}
+                >
+                  <span className={css.inlineIcon} aria-hidden="true"><IconPlusOutline16 size={16} /></span>
+                  <span className={css.scopeName}>{t('manager.createAction')}</span>
+                </button>
+              )}
+              {listInvitations !== undefined && (
+                <button
+                  type="button"
+                  className={css.inlineRow}
+                  onClick={() => {
+                    setOpen(false)
+                    setManagerMode('members')
+                  }}
+                >
+                  <span className={css.inlineIcon} aria-hidden="true"><IconUsersOutline16 size={16} /></span>
+                  <span className={css.scopeName}>
+                    {currentProject?.canManage === true
+                      ? t('manager.membersAction')
+                      : t('manager.invitationsAction')}
                   </span>
-                )}
-                <IconChevronDownOutline14 className={css.chevron} />
-              </>
-            )}
-          </button>
-        )}
-      />
+                  {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
+                </button>
+              )}
+              {settingsAvailable && (
+                <button
+                  type="button"
+                  className={css.inlineRow}
+                  onClick={() => {
+                    setOpen(false)
+                    setProjectSettingsOpen(true)
+                  }}
+                >
+                  <span className={css.inlineIcon} aria-hidden="true"><IconSettingsOutline16 size={16} /></span>
+                  <span className={css.scopeName}>{t('manager.settingsAction')}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <Menu
+          open={open}
+          onClose={() => { setOpen(false) }}
+          items={entries}
+          header={projectSearch}
+          {...footerEntries.length > 0 ? { footer: footerEntries } : {}}
+          /* The expanded desktop sidebar opens the list as an in-flow drawer
+             above its trigger — a panel inside the card, not a floating
+             overlay. The rail keeps the portaled menu, which is the shared
+             bottom sheet below the compact breakpoint. */
+          portal={!hub}
+          className={hub ? css.scopeField : undefined}
+          listClassName={hub ? `${css.scopeMenu} ${css.scopeSheet}` : css.scopeMenu}
+          listStyle={hub || menuWidth === undefined ? undefined : { width: menuWidth }}
+          selectedIds={[
+            currentScopeId,
+            ...(projectScope?.mode === 'rw' ? [`visibility:${state.stagedVisibility}`] : []),
+          ]}
+          onSelect={(id) => {
+            setOpen(false)
+            if (id === 'scope:personal') {
+              void switchScope({ kind: 'personal' })
+              return
+            }
+            if (id.startsWith('scope:project:')) {
+              void switchScope({ kind: 'project', projectId: Number(id.slice('scope:project:'.length)) })
+              return
+            }
+            if (id === 'project:create') {
+              setManagerMode('create')
+              return
+            }
+            if (id === 'project:members') {
+              setManagerMode('members')
+              return
+            }
+            if (id === 'project:settings') {
+              setProjectSettingsOpen(true)
+              return
+            }
+            stageVisibility(id.slice('visibility:'.length) as CollaborationVisibility)
+          }}
+          side="top"
+          align="start"
+          anchor={trigger}
+        />
+      )}
       <ProjectManagerModal
         open={managerMode !== undefined}
         mode={managerMode ?? 'create'}
