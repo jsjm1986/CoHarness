@@ -593,7 +593,7 @@ Source: [`packages/context/execution-authority/src/types.ts:56`](../packages/con
 'goal/change': GoalChangeMeta
 ```
 
-Source: [`packages/goal/goal/src/domain.ts:66`](../packages/goal/goal/src/domain.ts)
+Source: [`packages/goal/goal/src/domain.ts:82`](../packages/goal/goal/src/domain.ts)
 
 ### `hook/*`
 
@@ -6694,7 +6694,7 @@ One of:
 
 SHA-256: `7d226b9fd95b4ba213d4237c22e930a91c3c769c95ca7f92977b9d625ba13438`
 
-Sources: [`packages/goal/goal/src/domain.ts:44`](../packages/goal/goal/src/domain.ts)
+Sources: [`packages/goal/goal/src/domain.ts:45`](../packages/goal/goal/src/domain.ts)
 
 One of:
 
@@ -6707,7 +6707,7 @@ One of:
 
 SHA-256: `cffcdc19881ab61ec0a9ce18743996f7ac44ac8889f34dfac36ae745574aa22f`
 
-Sources: [`packages/goal/goal/src/domain.ts:35`](../packages/goal/goal/src/domain.ts)
+Sources: [`packages/goal/goal/src/domain.ts:36`](../packages/goal/goal/src/domain.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6723,7 +6723,7 @@ Sources: [`packages/goal/goal/src/domain.ts:35`](../packages/goal/goal/src/domai
 
 SHA-256: `7f959241c24128b4983b559984811861dc59774b85905c8fa57c6cb0148a3dbc`
 
-Sources: [`packages/goal/goal/src/domain.ts:47`](../packages/goal/goal/src/domain.ts)
+Sources: [`packages/goal/goal/src/domain.ts:48`](../packages/goal/goal/src/domain.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6738,7 +6738,7 @@ Sources: [`packages/goal/goal/src/domain.ts:47`](../packages/goal/goal/src/domai
 
 SHA-256: `1df34a6c086866ffdc2dd9e8e5c581c3751a010cdf6b8538a7327f7a3237f0b4`
 
-Sources: [`packages/goal/goal/src/domain.ts:24`](../packages/goal/goal/src/domain.ts)
+Sources: [`packages/goal/goal/src/domain.ts:25`](../packages/goal/goal/src/domain.ts)
 
 | Property | Presence | Type |
 |---|---|---|

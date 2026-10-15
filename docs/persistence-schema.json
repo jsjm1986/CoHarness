@@ -25195,7 +25195,7 @@
         "packages/goal/goal/src/domain.ts#GoalSnapshotChangeMeta"
       ],
       "sources": [
-        "packages/goal/goal/src/domain.ts:24"
+        "packages/goal/goal/src/domain.ts:25"
       ]
     },
     {
@@ -26657,7 +26657,7 @@
         "packages/goal/goal/src/domain.ts#GoalChangeMeta"
       ],
       "sources": [
-        "packages/goal/goal/src/domain.ts:44"
+        "packages/goal/goal/src/domain.ts:45"
       ]
     },
     {
@@ -26718,7 +26718,7 @@
         "packages/goal/goal/src/domain.ts#GoalMessageSource"
       ],
       "sources": [
-        "packages/goal/goal/src/domain.ts:47"
+        "packages/goal/goal/src/domain.ts:48"
       ]
     },
     {
@@ -28044,7 +28044,7 @@
         "packages/goal/goal/src/domain.ts#GoalClearChangeMeta"
       ],
       "sources": [
-        "packages/goal/goal/src/domain.ts:35"
+        "packages/goal/goal/src/domain.ts:36"
       ]
     },
     {
