@@ -30,13 +30,19 @@ const SEEDED_PROMPT = 'Use the read tool twice in one assistant message: read a.
 
 type ProjectMode = 'ro' | 'rw'
 
-function collaborationContext(mode: ProjectMode) {
+function collaborationContext(mode: ProjectMode, extraProjects = 0) {
   return {
     user: { id: 7, username: 'lin', displayName: 'Lin', role: 'member' },
     scope: { kind: 'project', projectId: 9, projectName: 'Payments migration', mode },
     projects: [
       { projectId: 9, name: 'Payments migration', path: '/srv/payments', mode },
       { projectId: 10, name: 'Audit platform', path: '/srv/audit', mode: mode === 'ro' ? 'rw' : 'ro' },
+      ...Array.from({ length: extraProjects }, (_, index) => ({
+        projectId: 100 + index,
+        name: `Archive space ${index + 1}`,
+        path: `/srv/archive-${index + 1}`,
+        mode,
+      })),
     ],
   }
 }
@@ -75,6 +81,7 @@ function conversationDetail(
 
 async function mockGateway(page: Page, mode: ProjectMode, options: {
   scopeReady?: Promise<void>
+  extraProjects?: number
 } = {}): Promise<{
   visibilityBodies: string[]
   conversationReads: string[]
@@ -92,7 +99,7 @@ async function mockGateway(page: Page, mode: ProjectMode, options: {
     await route.fulfill({ response, json: body })
   })
   await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
-    await route.fulfill({ json: collaborationContext(mode) })
+    await route.fulfill({ json: collaborationContext(mode, options.extraProjects ?? 0) })
   })
   await page.route(/\/account\/api\/scope(?:\?.*)?$/, async (route) => {
     if (options.scopeReady !== undefined) await options.scopeReady
@@ -112,6 +119,19 @@ async function mockGateway(page: Page, mode: ProjectMode, options: {
     conversationReads.push(sessionId)
   })
   return { visibilityBodies, conversationReads, visibilityBySession }
+}
+
+/**
+ * Drive the pushed scope page: open it, stage `Only me` through the second
+ * visibility level, and close it again through the trigger.
+ */
+async function stagePrivateVisibility(page: Page): Promise<void> {
+  const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
+  const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+  await scopePage.waitFor({ timeout: 10_000 })
+  await scopePage.getByRole('button', { name: 'New conversation visibility' }).click()
+  await scopePage.getByRole('button', { name: /Only me/ }).click()
+  await scope.click()
 }
 
 async function openSeededSession(page: Page, scaffold: WebScaffold): Promise<void> {
@@ -238,13 +258,20 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
     await scope.waitFor({ timeout: 10_000 })
     expect(await scope.textContent()).toContain('Payments migration')
-    expect(await scope.textContent()).toContain('Can edit')
     await scope.click()
+    const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+    await scopePage.waitFor({ timeout: 10_000 })
+    // The grant text moved off the trigger into the page hero; the page stays
+    // bounded to the browsing region rather than floating over it.
+    expect(await scopePage.textContent()).toContain('Can edit')
+    const pageBox = await scopePage.boundingBox()
+    const viewport = page.viewportSize()
+    if (pageBox === null || viewport === null) throw new Error('scope page geometry is unavailable')
+    expect(pageBox.width).toBeLessThanOrEqual(viewport.width / 2)
     await page.getByText('New conversation visibility', { exact: true }).waitFor()
-    expect(await page.getByRole('menu').evaluate(element => getComputedStyle(element).maxHeight)).toBe('560px')
-    const scopeSnapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
+    const scopeSnapshot = await captureStableAria(page, '[class*="scopePage"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SCOPE_PICKER_EXPECTED, scopeSnapshot, MODE)
-    await page.getByRole('radio', { name: 'Only me' }).click()
+    await stagePrivateVisibility(page)
 
     const sharing = page.getByRole('button', { name: 'Manage conversation sharing' })
     await expect.poll(() => sharing.isEnabled(), { timeout: 10_000 }).toBe(true)
@@ -275,7 +302,8 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
       await scope.waitFor({ timeout: 10_000 })
       await scope.click()
-      await page.getByRole('menuitem', { name: /Audit platform/ }).click()
+      const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+      await scopePage.getByRole('button', { name: /Audit platform/ }).click()
 
       const dialog = page.getByRole('dialog', { name: 'Switching scope' })
       await dialog.waitFor({ timeout: 10_000 })
@@ -292,7 +320,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     }
   }, 60_000)
 
-  it('presents the scope picker as a bounded phone sheet', async () => {
+  it('pushes the scope picker over the phone drawer', async () => {
     page = await browser.newPage({
       viewport: { width: 390, height: 844 },
       locale: 'en-US',
@@ -300,7 +328,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       isMobile: true,
     })
     tripwire = watchConsole(page)
-    await mockGateway(page, 'rw')
+    await mockGateway(page, 'rw', { extraProjects: 4 })
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-scope-mobile'))
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -309,22 +337,21 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
     await scope.waitFor({ timeout: 10_000 })
     await scope.click()
-    const menu = page.getByRole('menu')
-    await menu.waitFor({ timeout: 10_000 })
-    // The drawer-rendered sidebar is wide, so the picker opens as an in-flow
-    // sheet above its trigger instead of a floating bottom sheet: the bound
-    // is the 560px cap, not a fixed overlay edge.
-    expect(await menu.evaluate(element => getComputedStyle(element).position)).toBe('static')
-    expect(await menu.evaluate(element => getComputedStyle(element).maxHeight)).toBe('560px')
-    expect(await menu.evaluate(element => getComputedStyle(element).overflowY)).toBe('hidden')
-    expect(await menu.locator('[class*="viewport"]').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto')
-    const search = menu.locator('input[type="search"]')
+    const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+    await scopePage.waitFor({ timeout: 10_000 })
+    // Below 768px the drawer itself is the surface: the page covers it edge
+    // to edge and its own scroll region carries the roster.
+    expect(await scopePage.evaluate(element => getComputedStyle(element).position)).toBe('absolute')
+    expect(await scopePage.locator('[class*="pageScroll"]').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto')
+    const search = scopePage.locator('input[type="search"]')
     expect(await search.count()).toBe(1)
     expect(await search.evaluate(element => getComputedStyle(element.parentElement!).minHeight)).toBe('44px')
-    const snapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[class*="scopePage"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SCOPE_PICKER_MOBILE_EXPECTED, snapshot, MODE)
     await search.fill('pay')
-    expect(await menu.getByRole('button', { name: 'Clear project-space search' }).evaluate(element => getComputedStyle(element).width)).toBe('44px')
+    expect(await scopePage.getByRole('button', { name: 'Clear project-space search' }).evaluate(element => getComputedStyle(element).width)).toBe('44px')
+    expect(await scopePage.getByRole('button', { name: /Audit platform/ }).count()).toBe(0)
+    expect(await scopePage.getByRole('button', { name: /Payments migration/ }).count()).toBe(1)
   }, 60_000)
 
   it('keeps project, preset, subagent, and utility actions on one desktop header row', async () => {
@@ -390,7 +417,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
     await scope.waitFor({ timeout: 10_000 })
     await scope.click()
-    await page.getByRole('radio', { name: 'Only me' }).click()
+    await stagePrivateVisibility(page)
 
     const before = new Set(scaffold.ctx.agents.list().map(agent => String(agent.session.id)))
     const newSession = page.getByRole('button', { name: 'New session' }).last()
