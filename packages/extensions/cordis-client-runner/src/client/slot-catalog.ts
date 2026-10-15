@@ -686,7 +686,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.pane\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-collaboration StewardDock id \'collaboration-steward-notice\'',
       'client-ui-conversation QueueDock id \'queue\'',
       'client-ui-conversation TodoDock id \'todo\'',
       'client-ui-goal GoalDock id \'goal\'',
@@ -743,6 +742,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.pane\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
+      'client-ui-collaboration StewardChip id \'collaboration-steward-notice\'',
       'client-ui-sidebar-terminal TerminalRecovery',
     ],
     replaceRisk: 'none',
