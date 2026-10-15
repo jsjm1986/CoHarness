@@ -138,7 +138,7 @@ export function SecretField(props: Pick<FieldProps, 'id' | 'label' | 'hint' | 't
         id={props.id}
         className={css.input}
         type="password"
-        autoComplete="off"
+        autoComplete="new-password"
         value={props.text}
         disabled={props.disabled}
         onChange={(event) => { props.onEdit(event.target.value) }}
