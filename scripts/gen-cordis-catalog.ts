@@ -182,6 +182,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   chatFileMentions: 'client-side slot-contract accessor (ChatFileMentions) — packages/client/ui-conversation/README.md owns the API',
   userQuestionPanels: 'client-side slot-contract accessor (UserQuestionPanels) — packages/client/ui-tool/README.md owns the API',
   commandUi: 'client-side interface-typed browser service — packages/client/ui-commands/README.md owns the API',
+  feedbackUi: 'client-side feedback dialog service — packages/client/ui-message-feedback/README.md owns the API',
   conversationViewport: 'client-side interface-typed browser viewport service — packages/client/ui-conversation/README.md owns the API',
   conversation: 'client-side interface-typed browser service — packages/client/ui-conversation/README.md owns the API',
   conversationEvents: 'client-side interface-typed registry — packages/client/runtime/README.md owns the API',

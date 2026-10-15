@@ -17,7 +17,7 @@ kind: "package-reference"
 
 ## 概述
 
-消息控件继续在 Host 拥有的 sidecar 中保存可编辑评分与备注。单独输入 `/feedback` 会打开独立的 Session 弹窗，收集分类与可选说明；`/feedback <text>` 保留命令确认结果。弹窗通过 `sessionFeedback.record` 提交，追加一条仅写日志的 `feedback/record`，并可能按部署的遥测策略触发 Session 日志投递。两条路径均不启动模型回合。提交被拒绝时保留草稿供修正，成功后显示确认。草稿按 Session 隔离，在对应作用域结束时丢弃；迟到响应不能重新打开它。
+消息控件继续在 Host 拥有的 sidecar 中保存可编辑评分与备注。单独输入 `/feedback`、点击会话标题栏的反馈图标，或调用 `feedbackUi.openSession(sessionId)` 服务，都会打开 Session 弹窗收集分类与可选说明；`/feedback <text>` 保留命令确认结果。提交追加一条仅写日志的 `feedback/record`，并可能按部署的遥测策略触发 Session 日志投递。提交被拒绝时保留草稿供修正，成功后显示确认。草稿按 Session 隔离，在对应作用域结束时丢弃；迟到响应不能重新打开它。两条路径均不启动模型回合。
 
 ## 目录
 

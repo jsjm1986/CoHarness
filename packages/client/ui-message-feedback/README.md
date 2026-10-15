@@ -17,7 +17,7 @@ The `/client` exports are the plugin body (`apply`/`inject`) and public types; c
 
 ## Summary
 
-Message controls retain editable ratings and notes in the Host-owned sidecar. A bare `/feedback` opens a separate Session dialog with a category and optional description; `/feedback <text>` keeps the command acknowledgement. Submitting the dialog uses `sessionFeedback.record`, appends one log-only `feedback/record`, and may trigger Session-log delivery under the deployment's telemetry policy. Neither path starts a model turn. A rejected submission retains its draft for correction, and success shows an acknowledgement. Drafts are isolated by Session and discarded when that Session scope ends; late replies cannot reopen them.
+Message controls retain editable ratings and notes in the Host-owned sidecar. A bare `/feedback`, the Session header's feedback icon, or the `feedbackUi.openSession(sessionId)` service opens a Session dialog with a category and optional description; `/feedback <text>` keeps the command acknowledgement. Submission records one log-only `feedback/record` and may trigger Session-log delivery under the deployment's telemetry policy. A rejected submission retains its draft; success shows an acknowledgement. Drafts are isolated by Session and discarded when that Session scope ends; late replies cannot reopen them. Neither path starts a model turn.
 
 ## Table of Contents
 

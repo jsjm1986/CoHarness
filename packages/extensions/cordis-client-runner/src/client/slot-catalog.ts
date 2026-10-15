@@ -1314,6 +1314,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.session.header\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
+      'client-ui-message-feedback SessionFeedbackAction id \'session-feedback\'',
       'client-ui-open-in-app OpenInAppAction id \'open-in-app\'',
       'client-ui-permission-presets DesktopConfirmationAction id \'desktop-confirmation\'',
       'client-ui-schedule ScheduleCatalogAction id \'schedule-catalog\'',
