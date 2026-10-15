@@ -1,6 +1,7 @@
 # Agent Note: 空间控件改为常驻于脚注列的空间中枢
 
 Status: implemented
+Archived: 2026-10-15
 
 [English](2026-10-13-scope-hub-sidebar-takeover.md) | 中文
 

@@ -19,32 +19,9 @@
   overflow: hidden;
 }
 
-/* Scope is context, not another command: a quiet surface keeps the current
-   workspace legible while the other footer rows remain flat. */
-.context {
-  background: var(--dsw-alias-bg-layer-2);
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
-}
-
 .trigger:hover:not(:disabled),
 .trigger[aria-expanded='true'] {
   background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.context:hover:not(:disabled),
-.context[aria-expanded='true'] {
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);
-}
-
-/* The steward space is a caution surface: warn-family amber marks the
-   trigger while maintenance scope is active. */
-.contextSteward {
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-warn-secondary);
-}
-
-.contextSteward:hover:not(:disabled),
-.contextSteward[aria-expanded='true'] {
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-warn-primary);
 }
 
 .trigger:disabled {
@@ -102,44 +79,11 @@
     var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
-.trigger[aria-expanded='true'] .chevron {
-  rotate: 180deg;
-}
-
-/* Keep a large project roster from pushing the menu across the whole frame;
-   Menu's scrolling viewport leaves the management actions pinned below it. */
+/* Keep a large project roster from pushing the rail menu across the whole
+   frame; Menu's scrolling viewport leaves the management actions pinned
+   below it. */
 .scopeMenu {
   --dsh-menu-max-height: min(480px, calc(100vh - 24px));
-}
-
-/* The expanded sidebar opens the list in flow above its trigger: the Menu
-   root turns into the footer column's block box and the list takes the row
-   before it. The doubled selector keeps these overrides ahead of Menu's
-   own .root/.list rules regardless of module concatenation order. */
-.scopeField.scopeField {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-/* The hub renders on the footer column itself: no surface fill, shadow, or
-   radius — the current-space card, roster rows, and pinned footer each carry
-   their own chrome. The cap keeps the trigger and Settings rows reachable in
-   short windows; the roster viewport scrolls inside the bound. The compact
-   `.list` rule reads the shared mobile-sheet token instead of
-   --dsh-menu-max-height, so the same bound is re-published through it. */
-.scopeSheet.scopeSheet {
-  order: -1;
-  position: static;
-  min-width: 0;
-  max-width: none;
-  margin-bottom: var(--dsh-sidebar-footer-row-gap, 2px);
-  border-radius: 0;
-  box-shadow: none;
-  --dsw-menu-surface-fill: transparent;
-  --dsw-menu-backdrop-filter: none;
-  --dsh-menu-max-height: min(560px, calc(100vh - 150px));
-  --dsw-mobile-sheet-max-height: var(--dsh-menu-max-height);
 }
 
 /* Identity tiles: the letter of the project on a deterministic solid tint.
@@ -178,249 +122,6 @@
   width: 28px;
   height: 28px;
   font-size: 13px;
-}
-
-/* Space hub: the wide sheet's pinned header — a persistent working surface
-   (current space, visibility, invitations, search) above the roster. */
-.hub {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dsw-space-2);
-  padding-bottom: var(--dsw-space-1);
-}
-
-.hubHead {
-  display: flex;
-  align-items: center;
-  gap: var(--dsw-space-1);
-  min-width: 0;
-}
-
-.hubHead .menuHeader {
-  padding-bottom: 0;
-}
-
-.hubBack {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--dsw-radius-xs);
-  background: transparent;
-  color: var(--dsw-alias-label-caption);
-  cursor: pointer;
-}
-
-.hubBack:hover,
-.hubBack:focus-visible {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
-}
-
-.hubCount {
-  flex: none;
-  color: var(--dsw-alias-label-caption);
-  font-size: 11px;
-  line-height: 18px;
-}
-
-/* The current-space card wears the same fill + hairline as the trigger —
-   a sibling block inside the footer column, not a raised overlay. */
-.currentCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dsw-space-2);
-  min-width: 0;
-  padding: var(--dsw-space-2);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-2);
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
-}
-
-.currentTop {
-  display: flex;
-  align-items: center;
-  gap: var(--dsw-space-2);
-  min-width: 0;
-}
-
-.currentBody {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.currentName {
-  overflow: hidden;
-  color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.currentMeta {
-  overflow: hidden;
-  color: var(--dsw-alias-label-caption);
-  font-size: 11px;
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cardAct {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--dsw-radius-sm);
-  background: transparent;
-  color: var(--dsw-alias-label-caption);
-  cursor: pointer;
-}
-
-.cardAct:hover,
-.cardAct:focus-visible {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
-}
-
-/* Visibility radio: mirrors the conversation header's segmented control —
-   a padded track with a raised pill that slides behind the checked option
-   via --dsh-vis-index. */
-.visField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dsw-space-1);
-  min-width: 0;
-}
-
-.visLabel {
-  padding: 0 var(--dsw-space-1);
-  color: var(--dsw-alias-label-caption);
-  font-size: 11px;
-  line-height: 16px;
-}
-
-.visSeg {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 3px;
-  border-radius: var(--dsw-radius-card);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.visSeg::before {
-  content: '';
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
-  width: calc((100% - 6px) / 2);
-  border-radius: var(--dsw-radius-control);
-  background: var(--dsw-alias-bg-raised);
-  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
-  box-shadow: var(--dsw-elevation-control);
-  transform: translateX(calc(var(--dsh-vis-index, 0) * 100%));
-  transition: transform var(--dsw-motion-duration-fast)
-    var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out));
-}
-
-.visOpt {
-  position: relative;
-  height: 24px;
-  padding: 0 var(--dsw-space-1);
-  border: 0;
-  border-radius: var(--dsw-radius-control);
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  text-align: center;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visOptOn {
-  color: var(--dsw-alias-label-primary);
-}
-
-.visOpt:focus-visible {
-  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: 1px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .visSeg::before {
-    transition: none;
-  }
-}
-
-/* Pending-invitation / member entry: a flat row that turns to the warn
-   family when work is waiting, matching the steward-mode treatment. */
-.invRow {
-  display: flex;
-  align-items: center;
-  gap: var(--dsw-space-2);
-  box-sizing: border-box;
-  min-height: 32px;
-  padding: 0 var(--dsw-space-2);
-  border: 0;
-  border-radius: var(--dsw-radius-md);
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.invRow:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
-}
-
-.invRow:focus-visible {
-  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: 1px;
-}
-
-.invRowWarn,
-.invRowWarn:hover {
-  background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-label);
-}
-
-.invLabel {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (pointer: coarse) {
-  .visOpt {
-    height: var(--dsw-touch-target);
-  }
-
-  .invRow {
-    min-height: var(--dsw-touch-target);
-  }
 }
 
 .sheetHead {
@@ -618,61 +319,196 @@
   min-height: var(--dsw-touch-target);
 }
 
-/* Phone: the footer column's scope row joins the flat hairline grammar of the
-   rows beneath it — no card surface inside the drawer. The steward warn pill
-   remains the only scope marker; roster rows carry mode pills for the rest. */
-@media (max-width: 767px) {
-  .context,
-  .contextSteward {
-    background: transparent;
-    box-shadow: none;
-  }
+/* Push page: covers the sidebar column edge to edge — the containing block
+   is the compact drawer on phones and the sidebar column on wider layouts,
+   so one rule serves both ends. The layer-1 fill separates the page from
+   the sidebar's own fill; entering slides in from the trailing edge so the
+   push reads as navigation, not a popup. */
+.scopePage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--dsw-safe-top, 0px);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  animation: scope-page-in var(--ds-transition-duration) var(--ds-ease-in-out);
+}
 
-  .context:hover:not(:disabled),
-  .context[aria-expanded='true'],
-  .contextSteward:hover:not(:disabled),
-  .contextSteward[aria-expanded='true'] {
-    background: var(--dsw-alias-interactive-bg-hover);
-    box-shadow: none;
-  }
-
-  .mode:not(.modeSteward) {
-    display: none;
+@keyframes scope-page-in {
+  from {
+    transform: translateX(48px);
+    opacity: 0;
   }
 }
 
-/* Phone accordion: the expanded roster lives in the footer column itself,
-   indented one tree level under the head row with hairlines between rows —
-   the zero-overlay grammar. The group reads as one zone: a continuous tonal
-   band a half-step deeper than the drawer, closed by hairlines top and
-   bottom, so expansion never becomes a floating card. The same -2px bleed
-   as `.trigger` keeps every hairline on the column edge. A height bound
-   leaves the head and the document/settings rows visible while a long
-   roster scrolls inside. */
-.inlineList {
+/* Level transitions reuse the same grammar at a shorter travel; the class
+   is re-applied per view because the scroll container remounts on change. */
+.pagePush {
+  animation: scope-view-in 160ms var(--ds-ease-in-out);
+}
+
+.pagePop {
+  animation: scope-view-out 160ms var(--ds-ease-in-out);
+}
+
+@keyframes scope-view-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+@keyframes scope-view-out {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scopePage,
+  .pagePush,
+  .pagePop {
+    animation: none;
+  }
+}
+
+/* Navigation bar: back chevron on the leading edge, the title optically
+   centered by reserving the button's footprint on the trailing edge. */
+.pageNav {
   display: flex;
-  flex-direction: column;
-  width: calc(100% + 4px);
-  max-height: min(320px, calc(var(--dsw-viewport-height, 100vh) * 0.45));
-  margin: 0 -2px;
-  border-top: 0.5px solid var(--dsw-alias-border-l2);
+  flex: none;
+  align-items: center;
+  height: 46px;
+  padding: 0 var(--dsw-space-2);
   border-bottom: 0.5px solid var(--dsw-alias-border-l2);
-  background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover) 75%, transparent);
+}
+
+.pageBack {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-state-business-primary);
+  cursor: pointer;
+}
+
+.pageBack:hover,
+.pageBack:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.pageTitle {
+  flex: 1;
+  min-width: 0;
+  padding-right: 32px;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageScroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.inlineList > * + * {
-  border-top: 0.5px solid var(--dsw-alias-border-l2);
-}
-
-.inlineRow {
+/* The hero carries the current scope's identity — tile, name, and mode —
+   plus the management shortcut when a writable project is active. */
+.pageHero {
   display: flex;
   align-items: center;
   gap: var(--dsw-space-2);
+  min-width: 0;
+  padding: var(--dsw-space-3) var(--dsw-space-3);
+}
+
+.pageHeroBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pageHeroName {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageHeroMeta {
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageManage {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding: var(--dsw-space-1) var(--dsw-space-2);
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pageManage:hover,
+.pageManage:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Section labels divide the page's two jobs: managing the current space,
+   then switching to another. */
+.pageGroup {
+  padding: var(--dsw-space-3) var(--dsw-space-3) var(--dsw-space-1);
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.pageLabel {
+  padding: var(--dsw-space-2) var(--dsw-space-3) var(--dsw-space-1);
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Page rows are the leaf grammar: flat full-bleed buttons with hairlines
+   between neighbours — no cards inside the page. */
+.pageRow {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  box-sizing: border-box;
   width: 100%;
-  min-height: var(--dsw-touch-target);
-  padding: 0 var(--dsw-space-2) 0 26px;
+  min-height: 40px;
+  padding: 4px var(--dsw-space-3);
   border: 0;
   background: transparent;
   color: var(--dsw-alias-label-primary);
@@ -682,63 +518,91 @@
   cursor: pointer;
 }
 
-.inlineRow:hover:not(:disabled) {
+.pageRow + .pageRow {
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.pageRow:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-.inlineRow:active:not(:disabled) {
+.pageRow:active:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-active);
 }
 
-.inlineRow:focus-visible {
+.pageRow:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -1px;
 }
 
-.inlineRow:disabled {
+.pageRow:disabled {
   color: var(--dsw-alias-label-caption);
   cursor: wait;
 }
 
+@media (pointer: coarse) {
+  .pageRow {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
 /* The current scope is the one primary row: a brand-blue tint plus blue
-   label inside an otherwise secondary-toned band. */
-.inlineRowCurrent,
-.inlineRowCurrent:hover:not(:disabled) {
+   label among otherwise neutral rows. */
+.pageRowCurrent,
+.pageRowCurrent:hover:not(:disabled) {
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);
   color: var(--dsw-alias-state-business-primary);
   font-weight: 600;
 }
 
-.inlineLabel {
-  padding: var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-1) 26px;
+.pageRowName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two-line variant for the visibility options: name over a caption. */
+.pageRowText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pageRowMeta {
+  overflow: hidden;
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
-  font-weight: 600;
   line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Row-end affordances: mode text appears only for non-default scopes
    (read-only/steward); selection stays on the trailing check. */
-.inlineValue {
+.pageValue {
   flex: none;
   color: var(--dsw-alias-label-caption);
   font-size: 12px;
   line-height: 18px;
 }
 
-.inlineValueWarn {
-  composes: inlineValue;
+.pageValueWarn {
+  composes: pageValue;
   color: var(--dsw-alias-state-warn-primary);
   font-weight: 600;
 }
 
-.inlineCheck {
+.pageCheck {
   display: inline-flex;
   flex: none;
   color: var(--dsw-alias-state-business-primary);
 }
 
-.inlineIcon {
+.pageIcon {
   display: inline-flex;
   flex: none;
   width: 20px;
@@ -746,13 +610,18 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* Creation stays the one accent row; management rows keep the plain grammar
-   so the badge remains the only emphasis. */
-.inlineCreate,
-.inlineCreate .inlineIcon {
+.pageDisclose {
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+}
+
+/* Creation stays the one accent row; plain rows keep the badge and the
+   disclosure chevron as their only trailing marks. */
+.pageCreate,
+.pageCreate .pageIcon {
   color: var(--dsw-alias-state-business-primary);
 }
 
-.inlineSearch {
-  padding: var(--dsw-space-1) var(--dsw-space-2) var(--dsw-space-1) 26px;
+.pageSearch {
+  padding: var(--dsw-space-1) var(--dsw-space-3);
 }

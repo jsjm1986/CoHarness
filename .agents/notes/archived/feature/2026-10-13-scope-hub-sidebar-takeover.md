@@ -1,6 +1,7 @@
 # Agent Note: Scope control becomes a persistent space hub in the footer column
 
 Status: implemented
+Archived: 2026-10-15
 
 English | [中文](2026-10-13-scope-hub-sidebar-takeover.zh.md)
 

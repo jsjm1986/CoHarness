@@ -1,6 +1,7 @@
 # Agent Note: 空间切换器改为卡片内嵌抽屉并采用身份磁贴
 
 Status: implemented
+Archived: 2026-10-15
 
 [English](2026-10-13-scope-switcher-in-card-drawer.md) | 中文
 

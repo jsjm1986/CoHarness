@@ -1,6 +1,7 @@
 # Agent Note: Scope switcher opens as an in-card drawer with identity tiles
 
 Status: implemented
+Archived: 2026-10-15
 
 English | [中文](2026-10-13-scope-switcher-in-card-drawer.zh.md)
 

@@ -1,10 +1,10 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  IconCheckOutline16, IconChevronDownOutline14, IconChevronLeftOutline14, IconCloseFill14, IconGlobeOutline14,
+  IconCheckOutline16, IconChevronLeftOutline14, IconChevronRightOutline14, IconCloseFill14, IconGlobeOutline14,
   IconSearchOutline16, IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16,
   IconUsersOutline16, IconWarningOutline16,
-  Menu, useMediaQuery, type MenuEntry,
+  Menu, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {
@@ -84,10 +84,12 @@ function tileGlyph(name: string): string {
 
 /**
  * Render the personal/project runtime selector and project create visibility.
- * The project roster is searchable, capped to a viewport-safe menu height on
- * the rail, and expands as an in-column accordion in the phone drawer.
+ * Wide modes — the desktop column and the compact drawer alike — push a page
+ * over the sidebar: the trigger expands a view that covers its positioned
+ * ancestor edge to edge and carries a second level for visibility staging.
+ * The collapsed rail keeps the floating menu.
  * @param props - composed slot props.
- * @returns scope trigger plus its menu or accordion group, or null outside Gateway collaboration.
+ * @returns scope trigger plus its page or menu, or null outside Gateway collaboration.
  */
 export function ScopeControl({
   wide, useCollaboration, switchScope, stageVisibility,
@@ -96,14 +98,12 @@ export function ScopeControl({
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const [open, setOpen] = useState(false)
-  // The in-flow hub is the wide desktop sidebar's grammar. Below the compact
-  // breakpoint the drawer is a transient overlay and the control becomes an
-  // accordion: the trigger row expands an in-column group with no overlay,
-  // no scrim, and no gesture surface.
-  const phone = useMediaQuery('(max-width: 767px)')
-  const hub = wide && !phone
-  const inline = wide && phone
-  const inlineListId = useId()
+  // The page stacks one level deep: the root lists spaces plus the settings
+  // group, and the visibility picker pushes in from the root's disclosure
+  // row. `pageNav` only steers the remount animation direction.
+  const [pageView, setPageView] = useState<'root' | 'visibility'>('root')
+  const [pageNav, setPageNav] = useState<'push' | 'pop'>('push')
+  const pageId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
   // The menu tracks the trigger's rendered width — the sidebar is draggable,
   // so the floating list re-measures on every layout change instead of
@@ -141,6 +141,28 @@ export function ScopeControl({
   useEffect(() => {
     if (!open || context?.projects.length === 0) setProjectQuery('')
   }, [open, context?.projects.length])
+  // The page always reopens at its root; Escape steps back one level before
+  // closing so the visibility picker cannot swallow the keypress.
+  useEffect(() => {
+    if (!open) {
+      setPageView('root')
+      setPageNav('push')
+    }
+  }, [open])
+  useEffect(() => {
+    if (!open || !wide) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (pageView === 'visibility') {
+        setPageNav('pop')
+        setPageView('root')
+        return
+      }
+      setOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [open, pageView, wide])
   if (state.status !== 'ready' || context === undefined
     || (context.scope.kind === 'personal' && context.projects.length === 0
       && createProject === undefined && listInvitations === undefined)) return null
@@ -223,10 +245,8 @@ export function ScopeControl({
     : context.projects.find(project => project.projectId === projectScope.projectId)
   const settingsAvailable = projectScope !== undefined && currentProject !== undefined
     && loadProjectConfiguration !== undefined && setProjectThemePolicy !== undefined
-  // The wide hub carries members and settings inside its header card, so the
-  // pinned footer only keeps project creation. The rail menu keeps every
-  // capability as a footer entry; the phone accordion renders the same
-  // actions as in-column rows instead.
+  // The rail menu pins every capability as a footer entry. The wide page
+  // renders the same actions as rows, so these entries never reach it.
   const footerEntries: MenuEntry[] = []
   if (createProject !== undefined) {
     footerEntries.push({
@@ -235,35 +255,32 @@ export function ScopeControl({
       icon: <IconPlusOutline16 size={16} />,
     })
   }
-  if (!wide) {
-    if (listInvitations !== undefined) {
-      footerEntries.push({
-        id: 'project:members',
-        label: (
-          <span className={css.entryLabel}>
-            {currentProject?.canManage === true ? t('manager.membersAction') : t('manager.invitationsAction')}
-            {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
-          </span>
-        ),
-        icon: <IconUsersOutline16 size={16} />,
-      })
-    }
-    // Keep the entry visible to every project member. The panel explains which
-    // namespaces are owner-managed, so a disabled action is understandable
-    // instead of looking like a missing feature.
-    if (settingsAvailable) {
-      footerEntries.push({
-        id: 'project:settings',
-        label: t('manager.settingsAction'),
-        icon: <IconSettingsOutline16 size={16} />,
-      })
-    }
+  if (listInvitations !== undefined) {
+    footerEntries.push({
+      id: 'project:members',
+      label: (
+        <span className={css.entryLabel}>
+          {currentProject?.canManage === true ? t('manager.membersAction') : t('manager.invitationsAction')}
+          {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
+        </span>
+      ),
+      icon: <IconUsersOutline16 size={16} />,
+    })
+  }
+  // Keep the entry visible to every project member. The panel explains which
+  // namespaces are owner-managed, so a disabled action is understandable
+  // instead of looking like a missing feature.
+  if (settingsAvailable) {
+    footerEntries.push({
+      id: 'project:settings',
+      label: t('manager.settingsAction'),
+      icon: <IconSettingsOutline16 size={16} />,
+    })
   }
 
-  // Visibility stays a menu section on the rail; the phone accordion renders
-  // the same two choices as rows, and the desktop hub renders them as a
-  // segmented radio inside the current-space card.
-  if (!wide && projectScope?.mode === 'rw') {
+  // The rail menu stages visibility inline; the page pushes it one level
+  // deep from the settings group instead.
+  if (projectScope?.mode === 'rw') {
     entries.push(
       { type: 'separator', id: 'visibility-separator' },
       { type: 'label', id: 'visibility-label', text: t('newConversation.label') },
@@ -327,99 +344,8 @@ export function ScopeControl({
       )}
     </div>
   )
-  // Desktop wide: the sheet becomes a space hub — a persistent working surface
-  // for settings, members, invitations, and visibility above the searchable
-  // list. The rail keeps the compact menu header; the phone accordion renders
-  // its own in-column rows below.
-  const projectSearch = hub ? (
-    <div className={css.hub}>
-      <div className={css.hubHead}>
-        <button
-          type="button"
-          className={css.hubBack}
-          aria-label={t('manager.close')}
-          onClick={() => { setOpen(false) }}
-        >
-          <IconChevronLeftOutline14 size={14} />
-        </button>
-        <div className={css.menuHeader}>{t('scope.menuTitle')}</div>
-        <span className={css.hubCount}>{context.projects.length}</span>
-      </div>
-      <div className={css.currentCard}>
-        <div className={css.currentTop}>
-          {state.scopeError === undefined
-            ? currentTile(15, true)
-            : <IconWarningOutline16 size={16} />}
-          <span className={css.currentBody}>
-            <span className={css.currentName}>{currentLabel}</span>
-            <span className={css.currentMeta}>{currentMeta}</span>
-          </span>
-          {settingsAvailable && (
-            <button
-              type="button"
-              className={css.cardAct}
-              aria-label={t('manager.settingsAction')}
-              onClick={() => {
-                setOpen(false)
-                setProjectSettingsOpen(true)
-              }}
-            >
-              <IconSettingsOutline16 size={14} />
-            </button>
-          )}
-        </div>
-        {projectScope?.mode === 'rw' && (
-          <div className={css.visField}>
-            <span className={css.visLabel}>{t('newConversation.label')}</span>
-            <div
-              className={css.visSeg}
-              role="radiogroup"
-              aria-label={t('newConversation.label')}
-              style={{ '--dsh-vis-index': state.stagedVisibility === 'private' ? 1 : 0 } as CSSProperties}
-            >
-              <button
-                type="button"
-                role="radio"
-                aria-checked={state.stagedVisibility === 'project'}
-                className={`${css.visOpt}${state.stagedVisibility === 'project' ? ` ${css.visOptOn}` : ''}`}
-                title={t('visibility.project.description')}
-                onClick={() => { stageVisibility('project') }}
-              >
-                {t('visibility.project')}
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={state.stagedVisibility === 'private'}
-                className={`${css.visOpt}${state.stagedVisibility === 'private' ? ` ${css.visOptOn}` : ''}`}
-                title={t('visibility.private.description')}
-                onClick={() => { stageVisibility('private') }}
-              >
-                {t('visibility.private')}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      {listInvitations !== undefined && (
-        <button
-          type="button"
-          className={`${css.invRow}${invitationCount > 0 ? ` ${css.invRowWarn}` : ''}`}
-          onClick={() => {
-            setOpen(false)
-            setManagerMode('members')
-          }}
-        >
-          <IconUsersOutline16 size={14} />
-          <span className={css.invLabel}>
-            {currentProject?.canManage === true ? t('manager.membersAction') : t('manager.invitationsAction')}
-          </span>
-          {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
-        </button>
-      )}
-      {searchField}
-    </div>
-  ) : (
+  // The rail menu keeps the compact header — a title plus the search field.
+  const menuHeader = (
     <>
       <div className={css.sheetHead}>
         <div className={css.menuHeader}>{t('scope.menuTitle')}</div>
@@ -432,13 +358,11 @@ export function ScopeControl({
     <button
       type="button"
       ref={triggerRef}
-      className={wide
-        ? `${css.trigger} ${css.context}${projectScope?.steward === true ? ` ${css.contextSteward}` : ''}`
-        : `${css.trigger} ${css.rail}`}
+      className={wide ? css.trigger : `${css.trigger} ${css.rail}`}
       aria-label={t('scope.aria')}
       aria-expanded={open}
-      {...(inline
-        ? { 'aria-controls': inlineListId }
+      {...(wide
+        ? { 'aria-controls': pageId }
         : { 'aria-haspopup': 'menu' as const })}
       title={scopeTitle}
       disabled={state.scopeBusy}
@@ -450,186 +374,251 @@ export function ScopeControl({
       {wide && (
         <>
           <span className={css.label}>{currentLabel}</span>
-          {projectScope !== undefined && (
+          {/* The page's hero states the scope mode; the trigger pill only
+              flags non-default scopes — maintenance or read-only. */}
+          {projectScope !== undefined && (projectScope.steward === true || projectScope.mode === 'ro') && (
             <span className={projectScope.steward === true ? css.modeSteward : css.mode}>
-              {projectScope.steward === true
-                ? t('scope.steward')
-                : projectScope.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
+              {projectScope.steward === true ? t('scope.steward') : t('scope.readOnly')}
             </span>
           )}
-          <IconChevronDownOutline14 className={css.chevron} />
+          <IconChevronRightOutline14 className={css.chevron} />
         </>
       )}
     </button>
   )
-  const inlineCheck = (
-    <span className={css.inlineCheck} aria-hidden="true"><IconCheckOutline16 size={16} /></span>
+  const pageCheck = (
+    <span className={css.pageCheck} aria-hidden="true"><IconCheckOutline16 size={16} /></span>
   )
+  const pageDisclose = <IconChevronRightOutline14 className={css.pageDisclose} size={14} />
+  const goBack = (): void => {
+    if (pageView === 'visibility') {
+      setPageNav('pop')
+      setPageView('root')
+      return
+    }
+    setOpen(false)
+  }
   return (
     <>
-      {inline ? (
-        /* The phone drawer expands the roster in the footer column itself:
-           an accordion group under the head row, indented one level, hairline-
-           separated — no portal, no scrim, and the row heights already meet
-           the shared touch target. */
-        <>
-          {trigger}
-          {open && (
-            <div
-              id={inlineListId}
-              className={css.inlineList}
-              role="group"
-              aria-label={t('scope.aria')}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') setOpen(false)
-              }}
+      {/* The rail renders its trigger through the Menu anchor; wide owns the
+          trigger row plus the pushed page covering the sidebar column. */}
+      {wide && trigger}
+      {open && wide && (
+        /* The wide surface is a push page covering the sidebar column — on
+           compact the drawer is the positioned ancestor, on wider layouts the
+           sidebar column is. The page stacks one level deep: the root carries
+           the hero, the settings group, and the roster; visibility pushes in
+           as the second level. */
+        <div id={pageId} className={css.scopePage} role="group" aria-label={t('scope.aria')}>
+          <div className={css.pageNav}>
+            <button
+              type="button"
+              className={css.pageBack}
+              aria-label={t('manager.close')}
+              onClick={goBack}
             >
-              {context.projects.length > 4 && (
-                <div className={css.inlineSearch}>{searchField}</div>
-              )}
-              <button
-                type="button"
-                className={`${css.inlineRow}${currentScopeId === 'scope:personal' ? ` ${css.inlineRowCurrent}` : ''}`}
-                aria-current={currentScopeId === 'scope:personal' ? 'true' : undefined}
-                disabled={state.scopeBusy}
-                onClick={() => {
-                  setOpen(false)
-                  void switchScope({ kind: 'personal' })
-                }}
-              >
-                <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}`} aria-hidden="true">
-                  <IconUserOutline16 size={11} />
-                </span>
-                <span className={css.scopeName}>{t('scope.personal')}</span>
-                {currentScopeId === 'scope:personal' && inlineCheck}
-              </button>
-              {visibleProjects.map((project) => {
-                const id = `scope:project:${project.projectId}`
-                const selected = id === currentScopeId
-                const modeText = project.kind === 'steward'
-                  ? t('scope.steward')
-                  : project.mode === 'ro' ? t('scope.readOnly') : ''
-                return (
+              <IconChevronLeftOutline14 size={16} />
+            </button>
+            <span className={css.pageTitle}>
+              {pageView === 'visibility' ? t('newConversation.label') : t('scope.menuTitle')}
+            </span>
+          </div>
+          <div key={pageView} className={`${css.pageScroll} ${pageNav === 'pop' ? css.pagePop : css.pagePush}`}>
+            {pageView === 'visibility' ? (
+              <>
+                <button
+                  type="button"
+                  className={css.pageRow}
+                  onClick={() => { stageVisibility('project') }}
+                >
+                  <span className={css.pageIcon} aria-hidden="true"><IconGlobeOutline14 size={16} /></span>
+                  <span className={css.pageRowText}>
+                    <span className={css.pageRowName}>{t('visibility.project')}</span>
+                    <span className={css.pageRowMeta}>{t('visibility.project.description')}</span>
+                  </span>
+                  {state.stagedVisibility === 'project' && pageCheck}
+                </button>
+                <button
+                  type="button"
+                  className={css.pageRow}
+                  onClick={() => { stageVisibility('private') }}
+                >
+                  <span className={css.pageIcon} aria-hidden="true"><IconUserOutline16 size={16} /></span>
+                  <span className={css.pageRowText}>
+                    <span className={css.pageRowName}>{t('visibility.private')}</span>
+                    <span className={css.pageRowMeta}>{t('visibility.private.description')}</span>
+                  </span>
+                  {state.stagedVisibility === 'private' && pageCheck}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className={css.pageHero}>
+                  {state.scopeError === undefined
+                    ? currentTile(15, true)
+                    : <IconWarningOutline16 size={18} />}
+                  <span className={css.pageHeroBody}>
+                    <span className={css.pageHeroName}>{currentLabel}</span>
+                    <span className={css.pageHeroMeta}>{currentMeta}</span>
+                  </span>
+                  {settingsAvailable && (
+                    <button
+                      type="button"
+                      className={css.pageManage}
+                      onClick={() => {
+                        setOpen(false)
+                        setProjectSettingsOpen(true)
+                      }}
+                    >
+                      {t('scope.manage')}
+                      {pageDisclose}
+                    </button>
+                  )}
+                </div>
+                {(projectScope?.mode === 'rw' || listInvitations !== undefined || settingsAvailable) && (
+                  <div className={css.pageGroup}>{t('scope.settingsGroup')}</div>
+                )}
+                {projectScope?.mode === 'rw' && (
                   <button
-                    key={id}
                     type="button"
-                    className={`${css.inlineRow}${selected ? ` ${css.inlineRowCurrent}` : ''}`}
-                    aria-current={selected ? 'true' : undefined}
-                    disabled={state.scopeBusy}
+                    className={css.pageRow}
                     onClick={() => {
-                      setOpen(false)
-                      void switchScope({ kind: 'project', projectId: project.projectId })
+                      setPageNav('push')
+                      setPageView('visibility')
                     }}
                   >
-                    {project.kind === 'steward'
-                      ? (
-                        <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
-                          <IconShieldOutline16 size={11} />
-                        </span>
-                      )
-                      : (
-                        <span className={`${css.tile} ${tileTone(project.name)}`} aria-hidden="true">
-                          {tileGlyph(project.name)}
+                    <span className={css.pageRowName}>{t('newConversation.label')}</span>
+                    <span className={css.pageValue}>
+                      {state.stagedVisibility === 'project' ? t('visibility.project') : t('visibility.private')}
+                    </span>
+                    {pageDisclose}
+                  </button>
+                )}
+                {listInvitations !== undefined && (
+                  <button
+                    type="button"
+                    className={css.pageRow}
+                    onClick={() => {
+                      setOpen(false)
+                      setManagerMode('members')
+                    }}
+                  >
+                    <span className={css.pageRowName}>
+                      {currentProject?.canManage === true
+                        ? t('manager.membersAction')
+                        : t('manager.invitationsAction')}
+                    </span>
+                    {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
+                    {pageDisclose}
+                  </button>
+                )}
+                {settingsAvailable && (
+                  <button
+                    type="button"
+                    className={css.pageRow}
+                    onClick={() => {
+                      setOpen(false)
+                      setProjectSettingsOpen(true)
+                    }}
+                  >
+                    <span className={css.pageRowName}>{t('manager.settingsAction')}</span>
+                    {pageDisclose}
+                  </button>
+                )}
+                <div className={css.pageGroup}>
+                  {t('scope.allSpaces')} · {context.projects.length + 1}
+                </div>
+                {context.projects.length > 4 && (
+                  <div className={css.pageSearch}>{searchField}</div>
+                )}
+                <button
+                  type="button"
+                  className={`${css.pageRow}${currentScopeId === 'scope:personal' ? ` ${css.pageRowCurrent}` : ''}`}
+                  aria-current={currentScopeId === 'scope:personal' ? 'true' : undefined}
+                  disabled={state.scopeBusy}
+                  onClick={() => {
+                    setOpen(false)
+                    void switchScope({ kind: 'personal' })
+                  }}
+                >
+                  <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}`} aria-hidden="true">
+                    <IconUserOutline16 size={11} />
+                  </span>
+                  <span className={css.pageRowName}>{t('scope.personal')}</span>
+                  {currentScopeId === 'scope:personal' && pageCheck}
+                </button>
+                {visibleProjects.map((project) => {
+                  const id = `scope:project:${project.projectId}`
+                  const selected = id === currentScopeId
+                  const modeText = project.kind === 'steward'
+                    ? t('scope.steward')
+                    : project.mode === 'ro' ? t('scope.readOnly') : ''
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`${css.pageRow}${selected ? ` ${css.pageRowCurrent}` : ''}`}
+                      aria-current={selected ? 'true' : undefined}
+                      disabled={state.scopeBusy}
+                      onClick={() => {
+                        setOpen(false)
+                        void switchScope({ kind: 'project', projectId: project.projectId })
+                      }}
+                    >
+                      {project.kind === 'steward'
+                        ? (
+                          <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
+                            <IconShieldOutline16 size={11} />
+                          </span>
+                        )
+                        : (
+                          <span className={`${css.tile} ${tileTone(project.name)}`} aria-hidden="true">
+                            {tileGlyph(project.name)}
+                          </span>
+                        )}
+                      <span className={css.pageRowName}>{project.name}</span>
+                      {modeText !== '' && (
+                        <span className={project.kind === 'steward' ? css.pageValueWarn : css.pageValue}>
+                          {modeText}
                         </span>
                       )}
-                    <span className={css.scopeName}>{project.name}</span>
-                    {modeText !== '' && (
-                      <span className={project.kind === 'steward' ? css.inlineValueWarn : css.inlineValue}>
-                        {modeText}
-                      </span>
-                    )}
-                    {selected && inlineCheck}
-                  </button>
-                )
-              })}
-              {visibleProjects.length === 0 && normalizedProjectQuery !== '' && (
-                <div className={css.inlineLabel}>{t('scope.searchEmpty')}</div>
-              )}
-              {projectScope?.mode === 'rw' && (
-                <>
-                  <div className={css.inlineLabel}>{t('newConversation.label')}</div>
+                      {selected && pageCheck}
+                    </button>
+                  )
+                })}
+                {visibleProjects.length === 0 && normalizedProjectQuery !== '' && (
+                  <div className={css.pageLabel}>{t('scope.searchEmpty')}</div>
+                )}
+                {createProject !== undefined && (
                   <button
                     type="button"
-                    className={css.inlineRow}
-                    onClick={() => { stageVisibility('project') }}
+                    className={`${css.pageRow} ${css.pageCreate}`}
+                    onClick={() => {
+                      setOpen(false)
+                      setManagerMode('create')
+                    }}
                   >
-                    <span className={css.inlineIcon} aria-hidden="true"><IconGlobeOutline14 size={16} /></span>
-                    <span className={css.scopeName}>{t('visibility.project')}</span>
-                    {state.stagedVisibility === 'project' && inlineCheck}
+                    <span className={css.pageIcon} aria-hidden="true"><IconPlusOutline16 size={16} /></span>
+                    <span className={css.pageRowName}>{t('manager.createAction')}</span>
                   </button>
-                  <button
-                    type="button"
-                    className={css.inlineRow}
-                    onClick={() => { stageVisibility('private') }}
-                  >
-                    <span className={css.inlineIcon} aria-hidden="true"><IconUserOutline16 size={16} /></span>
-                    <span className={css.scopeName}>{t('visibility.private')}</span>
-                    {state.stagedVisibility === 'private' && inlineCheck}
-                  </button>
-                </>
-              )}
-              {createProject !== undefined && (
-                <button
-                  type="button"
-                  className={`${css.inlineRow} ${css.inlineCreate}`}
-                  onClick={() => {
-                    setOpen(false)
-                    setManagerMode('create')
-                  }}
-                >
-                  <span className={css.inlineIcon} aria-hidden="true"><IconPlusOutline16 size={16} /></span>
-                  <span className={css.scopeName}>{t('manager.createAction')}</span>
-                </button>
-              )}
-              {listInvitations !== undefined && (
-                <button
-                  type="button"
-                  className={css.inlineRow}
-                  onClick={() => {
-                    setOpen(false)
-                    setManagerMode('members')
-                  }}
-                >
-                  <span className={css.inlineIcon} aria-hidden="true"><IconUsersOutline16 size={16} /></span>
-                  <span className={css.scopeName}>
-                    {currentProject?.canManage === true
-                      ? t('manager.membersAction')
-                      : t('manager.invitationsAction')}
-                  </span>
-                  {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
-                </button>
-              )}
-              {settingsAvailable && (
-                <button
-                  type="button"
-                  className={css.inlineRow}
-                  onClick={() => {
-                    setOpen(false)
-                    setProjectSettingsOpen(true)
-                  }}
-                >
-                  <span className={css.inlineIcon} aria-hidden="true"><IconSettingsOutline16 size={16} /></span>
-                  <span className={css.scopeName}>{t('manager.settingsAction')}</span>
-                </button>
-              )}
-            </div>
-          )}
-        </>
-      ) : (
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {!wide && (
         <Menu
           open={open}
           onClose={() => { setOpen(false) }}
           items={entries}
-          header={projectSearch}
+          header={menuHeader}
           {...footerEntries.length > 0 ? { footer: footerEntries } : {}}
-          /* The expanded desktop sidebar opens the list as an in-flow drawer
-             above its trigger — a panel inside the card, not a floating
-             overlay. The rail keeps the portaled menu, which is the shared
-             bottom sheet below the compact breakpoint. */
-          portal={!hub}
-          className={hub ? css.scopeField : undefined}
-          listClassName={hub ? `${css.scopeMenu} ${css.scopeSheet}` : css.scopeMenu}
-          listStyle={hub || menuWidth === undefined ? undefined : { width: menuWidth }}
+          /* The rail keeps the portaled menu, which is the shared bottom
+             sheet below the compact breakpoint. */
+          portal
+          listClassName={css.scopeMenu}
+          listStyle={menuWidth === undefined ? undefined : { width: menuWidth }}
           selectedIds={[
             currentScopeId,
             ...(projectScope?.mode === 'rw' ? [`visibility:${state.stagedVisibility}`] : []),

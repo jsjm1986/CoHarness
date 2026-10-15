@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-15-scope-switcher-push-page.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-scope-switcher-push-page.md
+/agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column:
+  en: 50be87b614162869
+  zh: f2d8a6ffe0fbb0a5
+/agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column/problem:
+  en: e81aa0404e565dff
+  zh: 33ad1a97b1eed6e4
+/agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column/decision:
+  en: a0f417e2486c412e
+  zh: 3d9bf2accc00e80f
+/agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column/alternatives-considered:
+  en: c5c8d895a6501ae3
+  zh: f119a5d75f9b6333
+/agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column/consequences:
+  en: 0480d28da50840ef
+  zh: 878061c44df45acd
+/agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column/testing:
+  en: 1fc97c45f3e5dba9
+  zh: 6bb5bbb348b2d184
