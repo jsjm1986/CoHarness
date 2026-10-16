@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-16-resume-load-before-closers.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-16-resume-load-before-closers.md
+/agent-note-resume-commits-cold-recovery-through-load-before-reading-the-log:
+  en: 9ef0166f9211d870
+  zh: 9e2e6e5942e4ea06
+/agent-note-resume-commits-cold-recovery-through-load-before-reading-the-log/problem:
+  en: 7216b7665d3e2fce
+  zh: f7343928da00962a
+/agent-note-resume-commits-cold-recovery-through-load-before-reading-the-log/decision:
+  en: 3c6528fa079c004e
+  zh: 67749d27ea52701c
+/agent-note-resume-commits-cold-recovery-through-load-before-reading-the-log/alternatives-considered:
+  en: ba161819359731dd
+  zh: 3dd716145fa302a0
+/agent-note-resume-commits-cold-recovery-through-load-before-reading-the-log/consequences:
+  en: fe3212048f33fb10
+  zh: df4499abe889de2c
