@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { assembleContextFor } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Session, SESSION_FORMAT_VERSION, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -486,9 +487,25 @@ it('reads the saved default depth at each delegation without remounting the tool
       },
     })
     await ctx.plugin(tool, { provider: 'capture-depth' })
+    const { agent } = await ctx.agents.create({ sessionId: SessionId('live-depth-context') })
+    const initial = await ctx.systemPrompt.assemble(assembleContextFor(agent))
+    expect(initial.contexts.find(part => part.name === 'tool:subagent:depth')?.text)
+      .toBe('')
     await callSubagent(ctx, { description: 'first', prompt: 'work' })
     await ctx.settings.update(SUBAGENT_SETTINGS_NAMESPACE, { maxDepth: 5 })
+    const updated = ctx.systemPrompt.refreshContext(initial, assembleContextFor(agent))
+    expect(updated.contexts.find(part => part.name === 'tool:subagent:depth')?.text)
+      .toBe('')
     await callSubagent(ctx, { description: 'second', prompt: 'work' })
+    await ctx.settings.update(SUBAGENT_SETTINGS_NAMESPACE, { maxDepth: 0 })
+    const disabled = ctx.systemPrompt.refreshContext(initial, assembleContextFor(agent))
+    expect(disabled.contexts.find(part => part.name === 'tool:subagent:depth')?.text)
+      .toBe('Delegation depth for `subagent`: current 0, maximum 0, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.')
+    expect(disabled.sections).toEqual(initial.sections)
+    expect(disabled.tools).toEqual(initial.tools)
+    await ctx.settings.update(SUBAGENT_SETTINGS_NAMESPACE, { maxDepth: 2 })
+    expect(ctx.systemPrompt.refreshContext(disabled, assembleContextFor(agent))
+      .contexts.find(part => part.name === 'tool:subagent:depth')?.text).toBe('')
     await ctx.settings.update(SUBAGENT_SETTINGS_NAMESPACE, { maxDepth: 0 })
     await callSubagent(ctx, { description: 'disabled', prompt: 'work' })
     expect(depths).toEqual([1, 5, 0])

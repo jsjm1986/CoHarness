@@ -111,6 +111,26 @@ Use subagent in the background by default. Start independent delegations togethe
 
 只要 section 文本与工具存在性不变，前缀就保持稳定；移除工具或更改 section 会建立不同的父级前缀。
 
+### 运行时深度上下文
+
+#### 模型看到什么
+
+当调用方 agent 达到或超过某个可见工具的有效数值深度上限时，一条可选的运行时上下文快照会告知它直接完成工作。每次请求都会重新解析上限，包括设置变更或会话恢复之后。隐藏工具与 `provider-managed` 上限不贡献深度文本。对于深度为一、上限为一的子 agent:
+
+##### 深度上限提示
+
+```markdown
+Delegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.
+```
+
+#### Token 影响
+
+每个达到上限的工具向 user 角色运行时上下文快照贡献一条简短文本。未变化的快照不会重复追加；低于上限的 agent 不接收额外文本。`includeRuntimeContext: false` 会抑制这条提示，但不改变运行时的深度拦截。
+
+#### KV Cache 影响
+
+深度变化不改变系统提示词或工具 schema。更新后的运行时上下文追加在既有历史之后；如果模型仍尝试委派，提供方依然会拦截。
+
 ### 前台结果
 
 #### 模型看到什么

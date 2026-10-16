@@ -65,6 +65,21 @@
 /deepseek-ai-dsh-tool-subagent/model-experience/system-prompt/kv-cache-effect:
   en: 5f2491d0ee8f440c
   zh: 14c06b9fe7096e09
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context:
+  en: 1e58e87365d88e45
+  zh: 7648aa3b3865057f
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context/what-the-model-sees:
+  en: fde048c427103086
+  zh: 85695e55a5f87ba4
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context/what-the-model-sees/depth-limit-notice:
+  en: 0ae8dbcee66d0cd6
+  zh: 5a69283739ae59e0
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context/token-effect:
+  en: dae9cd59b9649b5a
+  zh: d63aecea02a2f9e6
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context/kv-cache-effect:
+  en: 9e6e8bc993992908
+  zh: 3e02cf6ea7a95ebe
 /deepseek-ai-dsh-tool-subagent/model-experience/foreground-result:
   en: d83f1f25a3719c54
   zh: 445ca808e28dc936

@@ -110,6 +110,26 @@ One short fixed section per continuable instance, paid on every parent request w
 
 Prefix-stable while the section text and tool presence are unchanged; removing the tool or changing the section establishes a different parent prefix.
 
+### Runtime depth context
+
+#### What the model sees
+
+When the calling agent reaches or exceeds a visible tool's effective numeric depth cap, an optional runtime-context snapshot tells it to do the work directly. The cap is resolved again at each request, including after settings changes or session resume. Hidden tools and `provider-managed` limits contribute no depth text. For a child at depth one with a cap of one:
+
+##### Depth-limit notice
+
+```markdown
+Delegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.
+```
+
+#### Token effect
+
+One short contribution per capped tool joins the user-role runtime-context snapshot. Unchanged snapshots are not appended again; agents below the cap receive no additional text. `includeRuntimeContext: false` suppresses this notice without changing runtime depth enforcement.
+
+#### KV Cache effect
+
+Depth changes do not alter the system prompt or tool schemas. Updated runtime context appends after existing history; the provider still enforces the cap if the model attempts delegation.
+
 ### Foreground result
 
 #### What the model sees
