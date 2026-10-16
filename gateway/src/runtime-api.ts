@@ -1616,6 +1616,7 @@ export function createRuntimeApiHandler(
             payload.kind,
             payload.interactionId,
             payload.outcome,
+            typeof payload.callId === 'string' ? payload.callId : undefined,
           ),
         })
         return true
