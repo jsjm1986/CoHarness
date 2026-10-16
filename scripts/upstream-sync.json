@@ -252,6 +252,10 @@
         "packages/client/ui-primitives/src/file-size.ts"
       ]
     },
+    "client/ui-project-activity": {
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/feature/2026-10-17-project-activity-feed.md"
+    },
     "client/ui-reference": {
       "sovereignty": "adapted"
     },

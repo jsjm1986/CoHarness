@@ -22,6 +22,7 @@ The Web GUI gains a project activity tab showing what each member sent and which
 - [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
@@ -44,3 +45,13 @@ None — the plugin performs no model-visible operation.
 - **Human rows only** — the feed lists member messages and picked answers; automatic jobs, webhook turns, permission-mode changes, and approval execution logs are excluded by design. Approval rows need a different reader question and remain deferred.
 - **No read position** — a per-member "last seen" marker is deferred; there is no unread state or notification surface.
 - **Pre-link answers lack anchors** — answers claimed before `call_id` persistence (migration 056) render without the question text and do not navigate to the result frame.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

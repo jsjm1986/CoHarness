@@ -178,6 +178,7 @@ flowchart TD
     pkg_client_ui_plan["client-ui-plan"]
     pkg_client_ui_plugin_manager["client-ui-plugin-manager"]
     pkg_client_ui_primitives["client-ui-primitives"]
+    pkg_client_ui_project_activity["client-ui-project-activity"]
     pkg_client_ui_reference["client-ui-reference"]
     pkg_client_ui_renderer["client-ui-renderer"]
     pkg_client_ui_schedule["client-ui-schedule"]
@@ -1854,6 +1855,11 @@ flowchart TD
   pkg_client_ui_permission_presets --> pkg_client_ui_input_trigger
   pkg_client_ui_permission_presets --> pkg_client_ui_settings
   pkg_client_ui_permission_presets --> pkg_permission_presets
+  pkg_client_ui_project_activity --> pkg_client_locale
+  pkg_client_ui_project_activity --> pkg_client_runtime
+  pkg_client_ui_project_activity --> pkg_client_ui_conversation
+  pkg_client_ui_project_activity --> pkg_client_ui_sidebar_right
+  pkg_client_ui_project_activity --> pkg_session
   pkg_client_ui_schedule --> pkg_api_remotes
   pkg_client_ui_schedule --> pkg_client_connection
   pkg_client_ui_schedule --> pkg_client_locale
@@ -2248,6 +2254,7 @@ flowchart TD
 | [`client-ui-message-feedback`](../packages/client/ui-message-feedback) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-commands`](../packages/client/ui-commands), [`client-ui-conversation`](../packages/client/ui-conversation), [`command-feedback`](../packages/feedback/command-feedback), [`message-feedback`](../packages/feedback/message-feedback), [`typert-protocol`](../packages/typert/protocol) |
 | [`client-ui-model-selection`](../packages/client/ui-model-selection) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-commands`](../packages/client/ui-commands), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-input-trigger`](../packages/client/ui-input-trigger) |
 | [`client-ui-permission-presets`](../packages/client/ui-permission-presets) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-commands`](../packages/client/ui-commands), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-settings`](../packages/client/ui-settings), [`permission-presets`](../packages/interaction/permission-presets) |
+| [`client-ui-project-activity`](../packages/client/ui-project-activity) | `client` | [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-sidebar-right`](../packages/client/ui-sidebar-right), [`session`](../packages/core/session) |
 | [`client-ui-schedule`](../packages/client/ui-schedule) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-sidebar`](../packages/client/ui-sidebar), [`client-ui-sidebar-right`](../packages/client/ui-sidebar-right), [`client-ui-tool`](../packages/client/ui-tool), [`client-ui-workspace`](../packages/client/ui-workspace), [`schedule`](../packages/schedule/schedule), [`session`](../packages/core/session), [`util-values`](../packages/util/values) |
 | [`client-ui-sidebar-browser`](../packages/client/ui-sidebar-browser) | `client` | [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-sidebar-right`](../packages/client/ui-sidebar-right), [`session`](../packages/core/session) |
 | [`client-ui-sidebar-terminal`](../packages/client/ui-sidebar-terminal) | `client` | [`api-remotes`](../packages/api/remotes), [`api-terminal-controller`](../packages/api/terminal-controller), [`client-locale`](../packages/client/locale), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-sidebar-right`](../packages/client/ui-sidebar-right), [`client-ui-theme`](../packages/client/ui-theme), [`session`](../packages/core/session) |
