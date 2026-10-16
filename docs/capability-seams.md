@@ -24,6 +24,9 @@ flowchart LR
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
   svc_pluginManager["ctx.pluginManager<br/>Current-profile plugin and bundle management"]
+  pkg_plugin_market["plugin-market"]
+  svc_pluginMarket["ctx.pluginMarket<br/>Plugin market index reader"]
+  pkg_client_ui_plugin_market["client-ui-plugin-market"]
   pkg_ui_plugin_manager["ui-plugin-manager"]
   svc_pluginRegistryProbe["ctx.pluginRegistryProbe<br/>Registry reachability probing for the install dialog"]
   svc_profileContext["ctx.profileContext<br/>Launcher-owned profile data"]
@@ -366,6 +369,7 @@ flowchart LR
   pkg_plan_mode --> svc_planMode
   pkg_plugin_manager --> svc_pluginManagementAuthorization
   pkg_plugin_manager --> svc_pluginManager
+  pkg_plugin_market --> svc_pluginMarket
   pkg_ptc_runtime --> svc_ptcRuntime
   pkg_ptc_runtime_node --> svc_ptcRuntime
   pkg_pwsh_local --> svc_shell
@@ -503,6 +507,8 @@ flowchart LR
   svc_pluginManagementAuthorization --> pkg_cordis_host_runner
   svc_pluginManagementAuthorization --> pkg_plugin_manager
   svc_pluginManager --> pkg_plugin_manager
+  svc_pluginMarket --> pkg_client_ui_plugin_market
+  svc_pluginMarket --> pkg_plugin_market
   svc_pluginRegistryProbe --> pkg_ui_plugin_manager
   svc_profileContext --> pkg_plugin_manager
   svc_ptcRuntime --> pkg_tools
@@ -630,6 +636,7 @@ flowchart LR
 | `ctx.pluginManagementAuthorization` | `seam` | [`plugin-manager`](../packages/boot/plugin-manager) | [`gateway-execution`](../packages/context/gateway-execution) | [`plugin-manager`](../packages/boot/plugin-manager), [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | Managed runtimes require current administrator authority before profile and dynamic-plugin operations, including queued changes. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | Owns module and exact configuration watchers; application mutations share its queue and automatic reloads await the application file lock. |
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |
+| `ctx.pluginMarket` | `core` | [`plugin-market`](../packages/boot/plugin-market) | - | [`client-ui-plugin-market`](../packages/client/ui-plugin-market), [`plugin-market`](../packages/boot/plugin-market) | - | Fetches and validates the index sources the user configures; installation goes through the plugin manager. |
 | `ctx.pluginRegistryProbe` | `core` | `ui-plugin-manager` | - | `ui-plugin-manager` | - | Races the configured public registries through the Host fetch proxy and caches the first answer the Plugins-page install dialog can preselect. |
 | `ctx.profileContext` | `core` | [`app-boot`](../packages/boot/app-boot) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | The dsh launcher supplies data-only profile locations and composition inputs; reload scheduling belongs to dsh-hmr. |
 | `ctx.officeToPdf` | `core` | [`office-to-pdf`](../packages/document/office-to-pdf) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | Authorized deferred source reads feed a bounded Host converter using the declared native engine or Node WASM. |

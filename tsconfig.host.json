@@ -134,6 +134,7 @@
     "apps/web/tests/workflow-run.e2e.ts",
     "apps/web/stress-tests/reasoning-chunks.stress.ts",
     "apps/cli/tests/**/*.ts",
+    "apps/plugin-market-generator/tests/**/*.ts",
     "examples/*/src/**/*.ts",
     "examples/*/start.ts",
     "examples/*/tests/**/*.ts",
@@ -184,6 +185,7 @@
     { "path": "./vendor/logger-console" },
     { "path": "./packages/util/brand" },
     { "path": "./packages/util/package-manifest" },
+    { "path": "./packages/util/plugin-market-index" },
     { "path": "./packages/util/http-proxy" },
     { "path": "./packages/util/lazy-require" },
     { "path": "./packages/util/launch-environment" },
@@ -360,6 +362,7 @@
     { "path": "./packages/boot/workspace-dependencies" },
     { "path": "./packages/boot/hmr" },
     { "path": "./packages/boot/plugin-manager" },
+    { "path": "./packages/boot/plugin-market" },
     { "path": "./packages/sdk/server" },
     { "path": "./packages/examples/jsonrpc-demo" },
     { "path": "./packages/test-support/llm-replay" },
@@ -394,6 +397,7 @@
     { "path": "./packages/experimental/speech-to-text-sensevoice" },
     { "path": "./packages/experimental/api-speech-to-text" },
     { "path": "./packages/experimental/voice-input-bundle" },
+    { "path": "./packages/experimental/plugin-market-bundle" },
     { "path": "./packages/experimental/schedule-bundle" },
     { "path": "./packages/experimental/tool-agent-team" },
     { "path": "./packages/browser-use/browser-use" },
@@ -432,6 +436,7 @@
     { "path": "./packages/lsp/lsp" },
     { "path": "./packages/lsp/lsp-stdio" },
     { "path": "./packages/lsp/tool-lsp" },
-    { "path": "./apps/cli" }
+    { "path": "./apps/cli" },
+    { "path": "./apps/plugin-market-generator" }
   ]
 }

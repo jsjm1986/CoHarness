@@ -86,19 +86,19 @@ describe('ui-plugin-manager browser plugin', () => {
     const navigation = entry.store.create()
     b.ctx.pluginNavigation.openBundle('dsh-navigation-test')
     expect(b.panelInfo.getSnapshot().activePanelId).toBe(PANEL_ID)
-    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'package', name: 'dsh-navigation-test' } })
+    expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'package', name: 'dsh-navigation-test' } })
     b.selectPanel(null)
-    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'list' } })
+    expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'list' } })
     b.selectPanel(PANEL_ID)
-    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'list' } })
+    expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'list' } })
     b.ctx.pluginNavigation.openBundle('dsh-navigation-test')
     // A caller naming an official plugin opens that plugin's own page.
     b.ctx.pluginNavigation.openItem('speech-to-text')
     expect(b.panelInfo.getSnapshot().activePanelId).toBe(PANEL_ID)
-    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'item', id: 'speech-to-text' } })
+    expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'item', id: 'speech-to-text' } })
     removeRoot()
     b.selectPanel(null)
-    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'item', id: 'speech-to-text' } })
+    expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'item', id: 'speech-to-text' } })
   })
 
   it('shares refresh failures with the overlay after navigation and releases both registrations across reloads', async () => {
@@ -155,7 +155,7 @@ describe('ui-plugin-manager browser plugin', () => {
     expect(b.selectPanel).toHaveBeenCalledWith(PANEL_ID)
     const entry = b.slots.entries('main')[0]!
     assert(entry.store && 'create' in entry.store)
-    expect(entry.store.create().getSnapshot()).toEqual({ view: { kind: 'package', name: 'dsh-navigation-test' } })
+    expect(entry.store.create().getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'package', name: 'dsh-navigation-test' } })
     expect(entry.component).toBe(PluginManagerPage)
     expect(entry.options).toMatchObject({ key: PANEL_ID })
     expect(entry.locale).toBe(NS)

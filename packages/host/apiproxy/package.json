@@ -111,6 +111,7 @@
     "@deepseek-ai/dsh-goal-round-driver": "workspace:*",
     "@deepseek-ai/dsh-jobs-local": "workspace:*",
     "@deepseek-ai/dsh-plugin-manager": "workspace:*",
+    "@deepseek-ai/dsh-plugin-market": "workspace:*",
     "@deepseek-ai/dsh-sandbox-policy": "workspace:*",
     "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:*",
     "@deepseek-ai/dsh-storage": "workspace:*",

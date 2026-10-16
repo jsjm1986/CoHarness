@@ -57,8 +57,16 @@ const publishedRepositoryUrl = 'git+https://github.com/deepseek-ai/deepseek-harn
 const experimentalPackageDirectory = /^packages\/experimental\/[^/]+$/
 /** npm namespace reserved for experimental packages. */
 const experimentalPackageNamePrefix = '@deepseek-ai/dsh-experimental-'
-/** Ordinary directories whose packages this repository publishes: one release member each. */
-const standardReleaseMemberDirectory = /^(?:packages\/(?!experimental\/)[^/]+\/[^/]+|apps\/(?!desktop(?:-host)?$)[^/]+|vendor\/[^/]+)$/
+/** Private reference tool run from the repository; it publishes no files. */
+const pluginMarketGeneratorDirectory = 'apps/plugin-market-generator'
+/**
+ * Ordinary directories whose packages this repository publishes: one release member each. The reference plugin
+ * market generator is a private repository tool, not a published application.
+ */
+const standardReleaseMemberDirectory = new RegExp(
+  `^(?:packages/(?!experimental/)[^/]+/[^/]+|apps/(?!desktop(?:-host)?$|${pluginMarketGeneratorDirectory.slice('apps/'.length)}$)[^/]+|vendor/[^/]+)$`,
+  'u',
+)
 /** Installable application assembled by electron-builder rather than published to npm. */
 const desktopApplicationDirectory = 'apps/desktop'
 const localArtifactDirs = new Set(['node_modules'])
@@ -217,6 +225,9 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // The JSONL backend resolves its private verification Worker relative to
   // import.meta.url; it is shipped without a public package subpath.
   '@deepseek-ai/dsh-session-persistence-jsonl': ['lib/worker.cjs'],
+  // The plugin market parses fetched indexes in a private Worker resolved
+  // relative to import.meta.url; it is shipped without a public package subpath.
+  '@deepseek-ai/dsh-plugin-market': ['lib/worker.cjs'],
   // Local sovereignty: the fork's SQLite backend ships its schema resources
   // and zstd dictionary beside the lib.
   '@deepseek-ai/dsh-session-persistence-sqlite': [
@@ -487,6 +498,7 @@ export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): st
   }
 
   if (dir.startsWith('apps/') && dir !== desktopApplicationDirectory
+    && dir !== pluginMarketGeneratorDirectory
     && !isPrivateWorkspaceDirectory(dir) && manifest.name?.startsWith('@deepseek-ai/')) {
     const expectedFiles = appPackageFiles[manifest.name]
     if (expectedFiles === undefined) {

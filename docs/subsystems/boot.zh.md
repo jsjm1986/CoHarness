@@ -255,6 +255,56 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 
 Source: [`packages/boot/plugin-manager/src/index.ts`](../../packages/boot/plugin-manager/src/index.ts)
 
+<a id="ctxpluginmarket--pluginmarket"></a>
+
+### `ctx.pluginMarket` — `PluginMarket`
+
+Fetches, validates, and caches configured market indexes; annotates entries with the profile's installation facts.
+
+```ts cordis-catalog
+/**
+ * List the configured index sources without fetching them.
+ * @returns every source in order, with the title of its last successful read and, when the last read failed, its error.
+ */
+@Remote listIndexes(): MarketIndexSummary[]
+
+/**
+ * Replace the configured index sources through Settings, without remounting this service.
+ * `plugin-market/changed` announces the committed list. A URL already configured is kept as written, so a client can
+ * add or remove sources beside one that `listIndexes` reports as unusable.
+ * @param urls - index URLs in display order.
+ * @throws {RemoteError} `plugin-market/invalid-index-url` for an invalid new URL or a repeated URL;
+ * `plugin-market/settings-unavailable` without Settings.
+ */
+@Remote async setIndexes(urls: string[]): Promise<void>
+
+/**
+ * Return one page of the plugins of a configured index that match a query. Concurrent reads of a URL share one
+ * fetch; a successful document is reused for `cacheTtlMs` unless `refresh` is set. Matching and ordering read only
+ * the document; installation status and compatibility are computed for the returned page on every call.
+ * @param url - a configured index URL.
+ * @param query - text, filters, order, page, and whether to bypass the cached document.
+ * @returns the index header, the page's plugins with each plugin's default version and installation status and each
+ *   version's compatibility and install arguments, the number of matches, and the next page's offset.
+ * @throws {RemoteError} `plugin-market/invalid-query`, `plugin-market/unknown-index`, `plugin-market/invalid-index-url`,
+ *   `plugin-market/fetch-failed`, or `plugin-market/invalid-index`.
+ */
+@Remote async search(url: string, query: MarketQuery): Promise<MarketSearchResult>
+
+/**
+ * Read one plugin of a configured index, using the cached document as `search` does.
+ * @param url - a configured index URL.
+ * @param name - the plugin's package name.
+ * @returns the plugin with its default version, installation status, and annotated versions; undefined when the
+ *   index does not list it.
+ * @throws {RemoteError} `plugin-market/unknown-index`, `plugin-market/invalid-index-url`, `plugin-market/fetch-failed`,
+ *   or `plugin-market/invalid-index`.
+ */
+async entry(url: string, name: string): Promise<MarketListingEntry | undefined>
+```
+
+Source: [`packages/boot/plugin-market/src/index.ts`](../../packages/boot/plugin-market/src/index.ts)
+
 <a id="ctxpluginregistryprobe--pluginregistryprobe"></a>
 
 ### `ctx.pluginRegistryProbe` — `PluginRegistryProbe`
@@ -396,4 +446,24 @@ An installation moved between its Host phases. `installing` is announced once wh
 ```
 
 Source: [`packages/boot/plugin-manager/src/types.ts`](../../packages/boot/plugin-manager/src/types.ts)
+
+<a id="plugin-market-events"></a>
+
+### `plugin-market/*` events
+
+<a id="plugin-marketchanged--emit"></a>
+
+#### `plugin-market/changed` — emit
+
+The configured index sources changed.
+
+```ts cordis-catalog
+/**
+ * The configured index sources changed.
+ * @mode emit
+ */
+'plugin-market/changed'(): void
+```
+
+Source: [`packages/boot/plugin-market/src/types.ts`](../../packages/boot/plugin-market/src/types.ts)
 <!-- END GENERATED cordis-surface -->

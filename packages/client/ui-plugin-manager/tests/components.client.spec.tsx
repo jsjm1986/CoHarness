@@ -14,10 +14,11 @@ import { createNavigationStore } from '../src/client/navigation-store.ts'
 import { PluginManagerPage } from '../src/client/PluginManagerPage.tsx'
 import { PluginRefreshToast } from '../src/client/PluginRefreshToast.tsx'
 import type { PluginManagerPageProps } from '../src/client/index.ts'
+import type { PluginTab } from '../src/client/tab-ledger.ts'
 import type { ConfigLedger } from '../src/client/config-ledger.ts'
 import { rowKey, type InstallState, type PackageRow, type PackageView, type PluginManagerState } from '../src/client/manager-store.ts'
 import { INSTALL_GIT_EXAMPLE, INSTALL_PATH_EXAMPLE, en, zh, type PluginManagerLocaleKey } from '../src/client/locales.ts'
-import type { PluginActivationOwnerProps, PluginDetailProps, PluginsSubject } from '../src/client/slot-contract.ts'
+import type { PluginActivationOwnerProps, PluginDetailProps, PluginTabProps, PluginsSubject } from '../src/client/slot-contract.ts'
 
 afterEach(cleanup)
 
@@ -45,10 +46,10 @@ function row(overrides: Partial<PackageRow> = {}): PackageRow {
   return { entryId: 'include:sidebar' as PluginEntryId, rowId: 'sidebar', moduleName: 'dsh-better-sidebar', enabled: true, phase: 'active', ...overrides }
 }
 
-const INCOMPATIBLE = { name: 'dsh-late', version: '2.0.0', runtimeVersion: '0.1.0', peers: { '@deepseek-ai/dsh': '^0.2.0', '@deepseek-ai/dsh-core': '^0.2.0' } }
+const INCOMPATIBLE = { name: 'dsh-late', version: '2.0.0', runtimeVersion: '0.1.0', requirements: { '@deepseek-ai/dsh': '^0.2.0', '@deepseek-ai/dsh-core': '^0.2.0' } }
 /** The English sentence an incompatibility of {@link INCOMPATIBLE}, optionally renamed, reads as. */
 const incompatibleText = (name = INCOMPATIBLE.name): string => en.reasonIncompatibleVersion
-  .replace('{plugin}', `${name}@2.0.0`).replace('{runtime}', '0.1.0').replace('{peers}', '@deepseek-ai/dsh ^0.2.0, @deepseek-ai/dsh-core ^0.2.0')
+  .replace('{plugin}', `${name}@2.0.0`).replace('{runtime}', '0.1.0').replace('{requirements}', '@deepseek-ai/dsh ^0.2.0, @deepseek-ai/dsh-core ^0.2.0')
 const MIRROR = 'https://registry.npmmirror.com/'
 const OFFICIAL = 'https://registry.npmjs.org/'
 
@@ -83,7 +84,7 @@ const READY: PluginManagerState = {
  * (a list slot's cell is empty), the view asked for — `detail` for a detail
  * contribution — and the owner props.
  */
-type SlotBodies = Record<string, (view: 'summary' | 'page' | 'activation' | 'detail', owner: unknown, form?: ConfigPageForm) => ReactNode>
+type SlotBodies = Record<string, (view: 'summary' | 'page' | 'activation' | 'detail' | 'add' | 'tab', owner: unknown, form?: ConfigPageForm) => ReactNode>
 
 /** The subject a detail contribution was rendered with. */
 function subjectOf(owner: unknown): PluginsSubject | undefined {
@@ -103,7 +104,7 @@ function configFormStub(): ConfigPageForm {
 
 function renderTab(
   state: Partial<PluginManagerState> = {}, config: Partial<ConfigLedger> = {},
-  bodies: SlotBodies = {}, forms: Record<string, ConfigPageForm> = {},
+  bodies: SlotBodies = {}, forms: Record<string, ConfigPageForm> = {}, tabs: readonly PluginTab[] = [],
   sync: ClientEntryState = { syncing: false, failures: [] },
   scopePolicy: ProjectUiPolicySnapshot = { scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'unknown' },
 ) {
@@ -114,10 +115,12 @@ function renderTab(
   const resolveText: PluginManagerPageProps['resolveText'] = text => locale.resolveText(text)
   const store = createSnapshotStore<PluginManagerState>({ ...READY, ...state })
   const ledger = createSnapshotStore<ConfigLedger>({ ...NO_CONFIG, ...config })
+  const tabLedger = createSnapshotStore<readonly PluginTab[]>(tabs)
   const actions = {
     ensure: vi.fn(),
     refresh: vi.fn(),
     openInstall: vi.fn(),
+    installFrom: vi.fn(),
     closeInstall: vi.fn(),
     editInstallSpec: vi.fn(),
     runInstall: vi.fn(),
@@ -154,6 +157,7 @@ function renderTab(
     ...actions,
     usePluginManager: bindSnapshotSelector(store),
     useConfigLedger: bindSnapshotSelector(ledger),
+    usePluginTabs: bindSnapshotSelector(tabLedger),
     useClientSync: bindSnapshotSelector(createSnapshotStore<ClientEntryState>(sync)),
     useScopePolicy: bindSnapshotSelector(createSnapshotStore<ProjectUiPolicySnapshot>(scopePolicy)),
     useConfigurations: bindSnapshotSelector(createSnapshotStore<SettingsMirrorSnapshot>({
@@ -176,6 +180,8 @@ function renderTab(
       const body = bodies[`${name}:${opts?.only ?? opts?.entryKey ?? ''}`]
       if (body === undefined) return null
       if (name === 'plugins.bundle.activation') return body('activation', owner)
+      if (name === 'plugins.add.actions') return body('add', owner)
+      if (name === 'plugins.tab') return body('tab', owner)
       if (name.startsWith('plugins.detail.')) return body('detail', owner)
       if (!('view' in owner) || (owner.view !== 'summary' && owner.view !== 'page')) {
         throw new Error('Plugin configuration fixture requires a summary or page view')
@@ -194,6 +200,7 @@ function renderTab(
   const { rerender, unmount } = render(contents())
   return {
     navigation,
+    setTabs: (next: readonly PluginTab[]) => { act(() => { tabLedger.set(next) }) },
     hidePage: () => { showPage = false; rerender(contents()) },
     props,
     unmount,
@@ -209,14 +216,129 @@ function renderTab(
 }
 
 describe('PluginManagerPage', () => {
+  it('shows no tabs without contributions, and switches between Installed and a contributed tab', () => {
+    const { actions, navigation, setTabs, set } = renderTab({ packages: [pkg()] }, {}, {
+      'plugins.tab:discover': (_view, owner) => {
+        const tab = owner as PluginTabProps
+        return (
+          <>
+            <button type="button" onClick={() => { tab.install({ spec: 'dsh-a@1.0.0', registry: 'https://r.example/', title: 'Alpha', version: '1.0.0' }) }}>Discover install</button>
+            <button type="button" onClick={() => { tab.openPackage('dsh-better-sidebar') }}>Discover open</button>
+          </>
+        )
+      },
+    })
+    expect(screen.queryByRole('tablist')).toBeNull()
+    setTabs([{ id: 'discover', label: 'Discover' }])
+    expect(screen.getByRole('tab', { name: en.installedTab }).getAttribute('aria-selected')).toBe('true')
+    expect(document.querySelector('[data-plugin-group="bundles"]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Discover' }))
+    expect(navigation.getSnapshot().tab).toBe('discover')
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe(screen.getByRole('tab', { name: 'Discover' }).id)
+    expect(document.querySelector('[data-plugin-group="bundles"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: en.refresh })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Discover install' }))
+    expect(actions.installFrom).toHaveBeenCalledWith({ spec: 'dsh-a@1.0.0', registry: 'https://r.example/', title: 'Alpha', version: '1.0.0' })
+    fireEvent.click(screen.getByRole('button', { name: 'Discover open' }))
+    expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'package', name: 'dsh-better-sidebar' } })
+    expect(document.querySelector('[data-plugin-detail="dsh-better-sidebar"]')).not.toBeNull()
+    // A detail page hides the tabs; a contributed tab that leaves the ledger falls back to Installed.
+    expect(screen.queryByRole('tablist')).toBeNull()
+    act(() => { navigation.actions.setView({ kind: 'list' }); navigation.actions.setTab('discover') })
+    setTabs([])
+    expect(document.querySelector('[data-plugin-group="bundles"]')).not.toBeNull()
+    expect(navigation.getSnapshot().tab).toBe('installed')
+    // Enabling a bundle an install added highlights its card, so the page shows Installed.
+    setTabs([{ id: 'discover', label: 'Discover' }])
+    fireEvent.click(screen.getByRole('tab', { name: 'Discover' }))
+    expect(screen.getByRole('tabpanel', { name: 'Discover' })).toBeTruthy()
+    set({ highlight: 'dsh-better-sidebar' })
+    expect(navigation.getSnapshot().tab).toBe('installed')
+    expect(screen.getByRole('tabpanel', { name: en.installedTab })).toBeTruthy()
+  })
+
+  it('keeps the Installed tab panel through loading and follows a contributed tab back to its list', () => {
+    const { navigation, set } = renderTab({ status: 'loading', packages: [] }, {}, {
+      'plugins.tab:discover': (_view, owner) => (
+        <button type="button" onClick={() => { (owner as PluginTabProps).openPackage('dsh-better-sidebar') }}>Discover open</button>
+      ),
+    }, {}, [{ id: 'discover', label: 'Discover' }])
+    const installed = screen.getByRole('tab', { name: en.installedTab })
+    expect(document.getElementById(installed.getAttribute('aria-controls') as string)?.getAttribute('role')).toBe('tabpanel')
+    set({ status: 'ready', packages: [] })
+    expect(screen.getByRole('tabpanel', { name: en.installedTab }).textContent).toBe(en.empty)
+    set({ packages: [pkg()] })
+    fireEvent.click(screen.getByRole('tab', { name: 'Discover' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discover open' }))
+    expect(document.querySelector('[data-plugin-detail="dsh-better-sidebar"]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: en.backToList }))
+    expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'list' } })
+  })
+
+  it('shows a confirmed version by name above its spec, as a check and a refusal with retry, without the spec form or another registry', () => {
+    const confirmed: InstallState = { ...IDLE_INSTALL, open: true, spec: 'dsh-a@1.0.0', confirmed: { title: 'Alpha', version: '1.0.0' }, registries: REGISTRIES }
+    const { actions, set } = renderTab({ install: { ...confirmed, phase: 'checking' } })
+    const dialog = screen.getByRole('dialog', { name: en.installConfirmedTitle })
+    expect([...dialog.querySelectorAll('[data-install-subject] p')].map(line => line.textContent))
+      .toEqual(['Alpha', en.installVersion.replace('{version}', '1.0.0'), 'dsh-a@1.0.0'])
+    expect(screen.getByRole('status').textContent).toBe(en.installChecking)
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByRole('button', { name: en.retry })).toBeNull()
+    set({ install: { ...confirmed, inputError: { problem: 'not-found', reason: 'dsh-a' } } })
+    expect(screen.getByRole('dialog', { name: en.installConfirmedRefused })).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toBe(en.installProblemNotFound.replace('{reason}', 'dsh-a'))
+    fireEvent.click(screen.getByRole('button', { name: en.retry }))
+    expect(actions.runInstall).toHaveBeenCalledOnce()
+    set({ install: { ...confirmed, inputError: { problem: 'network', reason: 'r', registries: [null, MIRROR] } } })
+    expect(screen.getByRole('alert').textContent).toMatch(/^No registry could be reached/)
+    set({ install: { ...confirmed, registries: null, inputError: { problem: 'not-found', reason: 'dsh-a' } } })
+    expect(screen.getByRole('alert')).toBeTruthy()
+    set({ install: confirmed })
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('dialog', { name: en.installConfirmedTitle })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.installRun }))
+    expect(actions.runInstall).toHaveBeenCalledTimes(2)
+    fireEvent.click(screen.getAllByRole('button', { name: en.close }).at(-1)!)
+    expect(actions.closeInstall).toHaveBeenCalled()
+    set({
+      install: {
+        ...confirmed, phase: 'failed', subject: { spec: 'dsh-a@1.0.0', status: 'accepted', kind: 'registry', bundle: true, registry: null },
+        failure: { reason: 'failed', kind: 'network', failedAt: 'registry' },
+      },
+    })
+    expect(screen.queryByRole('button', { name: en.installChangeRegistry })).toBeNull()
+    // No edit to return to after a failure, and no GitHub mirror recovery, which reopens the spec form.
+    expect(screen.queryByRole('button', { name: en.installEditAria })).toBeNull()
+    set({
+      install: {
+        ...confirmed, phase: 'failed',
+        subject: { spec: 'git+https://github.com/o/r.git#abc', status: 'accepted', kind: 'git', bundle: null, registry: null, host: 'github.com' },
+        failure: { reason: 'failed', kind: 'network', failedAt: 'spec-host' },
+      },
+    })
+    expect(screen.getByText(en.installFailedTitle)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.installUseGithubMirror })).toBeNull()
+    // A Git spec checks without a name or version; the confirmed name and version head the card, above the spec.
+    expect([...document.querySelectorAll('[data-install-subject] p')].map(line => line.textContent))
+      .toEqual(['Alpha', en.installSubjectGit, en.installVersion.replace('{version}', '1.0.0'), 'git+https://github.com/o/r.git#abc'])
+    set({
+      install: {
+        ...confirmed, phase: 'running', requestId: 'r' as never,
+        subject: { spec: 'dsh-a@1.0.0', status: 'accepted', kind: 'registry', bundle: true, registry: null },
+      },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.cancel }))
+    expect(actions.cancelInstall).toHaveBeenCalledOnce()
+  })
+
   it('surfaces this page\'s module-sync state and routes its retry without touching Host enablement', () => {
     const idle = renderTab()
     expect(document.querySelector('[data-client-sync-failure]')).toBeNull()
     idle.unmount()
-    const syncing = renderTab({}, {}, {}, {}, { syncing: true, failures: [] })
+    const syncing = renderTab({}, {}, {}, {}, [], { syncing: true, failures: [] })
     expect(screen.getByText('Syncing plugins on this page…')).toBeDefined()
     syncing.unmount()
-    const failed = renderTab({}, {}, {}, {}, { syncing: false, failures: [{ id: 'dsh-x', message: 'import failed' }] })
+    const failed = renderTab({}, {}, {}, {}, [], { syncing: false, failures: [{ id: 'dsh-x', message: 'import failed' }] })
     const panel = document.querySelector('[data-client-sync-failure]')!
     expect(within(panel as HTMLElement).getByText('dsh-x: import failed')).toBeDefined()
     fireEvent.click(within(panel as HTMLElement).getByRole('button', { name: 'Retry this page' }))
@@ -228,15 +350,15 @@ describe('PluginManagerPage', () => {
     const unverified = renderTab()
     expect(document.querySelector('[data-plugin-scope-line]')).toBeNull()
     unverified.unmount()
-    const personal = renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+    const personal = renderTab({}, {}, {}, {}, [], { syncing: false, failures: [] },
       { scope: 'personal', theme: 'follow-user', revision: 1, accountPermissions: 'standard' })
     expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopePersonal)
     personal.unmount()
-    const named = renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+    const named = renderTab({}, {}, {}, {}, [], { syncing: false, failures: [] },
       { scope: 'project', theme: 'follow-user', revision: 1, accountPermissions: 'standard', projectId: 4, projectName: 'Rig' })
     expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopeProject.replace('{name}', 'Rig'))
     named.unmount()
-    renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+    renderTab({}, {}, {}, {}, [], { syncing: false, failures: [] },
       { scope: 'project', theme: 'follow-user', revision: 1, accountPermissions: 'standard', projectId: 4 })
     expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopeProjectUnnamed)
   })

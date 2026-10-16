@@ -103,6 +103,7 @@
     { "path": "./packages/client/ui-permission-presets" },
     { "path": "./packages/client/ui-plan" },
     { "path": "./packages/client/ui-plugin-manager/tsconfig.client.json" },
+    { "path": "./packages/client/ui-plugin-market" },
     { "path": "./packages/client/ui-settings-plugins" },
     { "path": "./packages/client/ui-user-questions" },
     { "path": "./packages/client/ui-trajectory" },

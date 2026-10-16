@@ -64,6 +64,8 @@ import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
+import type PluginMarket from '@deepseek-ai/dsh-plugin-market'
+import * as PluginMarketTools from '@deepseek-ai/dsh-plugin-market/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
 import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
@@ -216,6 +218,18 @@ const TOOL_PACKAGES: ToolPackage[] = [
       ctx.provide('pluginManager', {} as PluginManager)
       await ctx.plugin(SandboxPolicy)
       await ctx.plugin(PluginManagerTools)
+    },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-plugin-market',
+    dir: 'plugin-market',
+    source: 'packages/boot/plugin-market/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.pluginMarket'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never fetches an index.
+      ctx.provide('pluginMarket', {} as PluginMarket)
+      await ctx.plugin(PluginMarketTools)
     },
   },
   {

@@ -6,6 +6,7 @@
 import { REMOTE_SESSION_POLICIES, remoteSessionId } from './api/remote-session-routing.ts'
 import { hostSessionLifecycle } from './session-lifecycle.ts'
 import type {} from '@deepseek-ai/dsh-plugin-manager'
+import type {} from '@deepseek-ai/dsh-plugin-market'
 import { randomUUID } from 'node:crypto'
 import { createDesktopApi } from './desktop.ts'
 import { createWorkspaceChangesApi } from './workspace-changes.ts'

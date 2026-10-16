@@ -16,6 +16,9 @@
       "path": "./tsconfig.session-controller.json"
     },
     {
+      "path": "../../boot/plugin-market"
+    },
+    {
       "path": "../../context/collaboration"
     },
     {

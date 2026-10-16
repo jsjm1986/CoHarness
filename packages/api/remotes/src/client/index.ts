@@ -11,6 +11,7 @@ import scheduleRemote from '@deepseek-ai/dsh-schedule/remote'
 import fileReferencesRemote from '@deepseek-ai/dsh-file-reference/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import pluginManagerRemote from '@deepseek-ai/dsh-plugin-manager/remote'
+import pluginMarketRemote from '@deepseek-ai/dsh-plugin-market/remote'
 import pluginRegistryProbeRemote from '@deepseek-ai/dsh-client-ui-plugin-manager/remote'
 import messageFeedbackRemote from '@deepseek-ai/dsh-message-feedback/remote'
 import permissionPresetsRemote from '@deepseek-ai/dsh-permission-presets/remote'
@@ -27,6 +28,11 @@ export type {
   ReadOnlyReason, Registry, RestartReason,
 } from '@deepseek-ai/dsh-plugin-manager/types'
 export type {} from '@deepseek-ai/dsh-plugin-manager/remote'
+export type {} from '@deepseek-ai/dsh-plugin-market/remote'
+export type {
+  MarketCompatibility, MarketIndexSummary, MarketInstallation, MarketInstallationStatus, MarketListingEntry, MarketListingVersion,
+  MarketQuery, MarketSearchResult, MarketSort,
+} from '@deepseek-ai/dsh-plugin-market/types'
 export type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/remote'
 export type { PluginInventorySnapshot } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 export type {} from '@deepseek-ai/dsh-agent-presets/remote'
@@ -157,7 +163,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
-      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, pluginRegistryProbeRemote, messageFeedbackRemote,
+      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote,
+      messageFeedbackRemote,
       permissionPresetsRemote, sessionFeedbackRemote,
       sessionReferencesRemote, subagentsRemote, scheduleRemote, userQuestionsRemote,
     ]) {
