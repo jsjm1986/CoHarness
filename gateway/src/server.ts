@@ -1698,6 +1698,32 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       return
     }
 
+    if (pathname === '/account/api/activity' && req.method === 'GET') {
+      if (resolved.context.scope.kind !== 'project' || deps.collaboration === undefined) {
+        send(res, 400, '{"error":"project-scope-required"}', 'application/json')
+        return
+      }
+      const params = new URL(req.url ?? '/', 'http://x').searchParams
+      const limitValue = params.get('limit')
+      const limit = limitValue === null ? 50 : Number(limitValue)
+      if (!Number.isSafeInteger(limit) || limit <= 0) {
+        send(res, 400, '{"error":"invalid-limit"}', 'application/json')
+        return
+      }
+      const before = params.get('before') ?? undefined
+      try {
+        send(res, 200, JSON.stringify(await deps.collaboration.listActivity(
+          user.id, resolved.context.scope.projectId, { limit, before })), 'application/json')
+      } catch (error) {
+        if (error instanceof CollaborationDeniedError) {
+          send(res, error.code === 'not-member' ? 403 : 404, JSON.stringify({ error: error.code }), 'application/json')
+          return
+        }
+        throw error
+      }
+      return
+    }
+
     const conversationRoute = pathname.match(/^\/account\/api\/conversations\/([^/]+)$/)
     if (conversationRoute !== null && deps.collaboration !== undefined) {
       try {

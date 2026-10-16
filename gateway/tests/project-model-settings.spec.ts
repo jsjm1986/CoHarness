@@ -43,7 +43,7 @@ async function setup() {
       return value === null ? [] : [value]
     },
     access: () => { throw new Error('unused') }, listConversations: () => [], readableSessionIds: () => [],
-    setVisibility: () => { throw new Error('unused') }, claimInteraction: () => false,
+    setVisibility: () => { throw new Error('unused') }, claimInteraction: () => false, listActivity: async () => ({ items: [] }),
   }
   projects.setMember(project.id, member.id, 'rw')
   const view = () => ({

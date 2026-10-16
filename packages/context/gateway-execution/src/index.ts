@@ -501,14 +501,15 @@ export class GatewayExecution extends ExecutionAuthority {
    * @param answer - validated answer which the caller will deliver to the tool.
    * @returns whether this responder owns the committed answer.
    */
-  async answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance): Promise<boolean> {
+  async answer(session: Session, questionId: ExecutionQuestionId, answer: unknown,
+    scope?: ExecutionInheritance, callId?: string): Promise<boolean> {
     const principal = this.dependencies.ctx.gatewayRuntime.interactive()
     if (principal === undefined || principal.claims.purpose !== undefined) throw this.denied('execute', 'A verified answerer is required.')
     if (scope?.scopeId === undefined && this.mirror(session).state.scopeId !== undefined) {
       throw this.denied('execute', 'The question execution scope is unavailable. Cancel the legacy question before continuing.')
     }
     await this.register(session)
-    const value = await this.post('/question', { sessionId: session.id, questionId, answer, scopeId: scope?.scopeId }, principal)
+    const value = await this.post('/question', { sessionId: session.id, questionId, answer, scopeId: scope?.scopeId, callId }, principal)
     if (typeof value !== 'object' || value === null || !('claimed' in value) || typeof value.claimed !== 'boolean') {
       throw new TypeError('invalid Gateway question claim')
     }

@@ -330,9 +330,10 @@ abstract stamp(session: Session, message: UserMessage): Promise<UserMessage>
  * @param questionId - exact pending question identity verified by the transport.
  * @param answer - parser-validated answer.
  * @param scope - exact execution captured when the question opened.
+ * @param callId - tool call id of the pending question, when the transport carries one.
  * @returns whether the caller owns this answer, including an identical retry.
  */
-abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance): Promise<boolean>
+abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance, callId?: string): Promise<boolean>
 
 /**
  * Preserve captured execution identity across an asynchronous callback.

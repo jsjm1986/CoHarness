@@ -943,9 +943,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'immutable input with verified origin reference.',
       },
       {
-        signature: 'abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance): Promise<boolean>',
+        signature: 'abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance, callId?: string): Promise<boolean>',
         description: 'Claim a verified human answer and include its responder before delivery.',
-        parameters: [{ name: 'session', description: 'Session owning the live question.' }, { name: 'questionId', description: 'exact pending question identity verified by the transport.' }, { name: 'answer', description: 'parser-validated answer.' }, { name: 'scope', description: 'exact execution captured when the question opened.' }],
+        parameters: [{ name: 'session', description: 'Session owning the live question.' }, { name: 'questionId', description: 'exact pending question identity verified by the transport.' }, { name: 'answer', description: 'parser-validated answer.' }, { name: 'scope', description: 'exact execution captured when the question opened.' }, { name: 'callId', description: 'tool call id of the pending question, when the transport carries one.' }],
         returns: 'whether the caller owns this answer, including an identical retry.',
       },
       {
@@ -4956,7 +4956,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CollaborationAuthority',
-    declaration: 'export interface CollaborationAuthority {\n    readonly participant: CollaborationParticipant;\n    readonly expiresAt: number;\n    readonly signal: AbortSignal;\n    authorize(sessionId: SessionId, action: CollaborationAction): Promise<CollaborationAccess>;\n    readableSessionIds(sessionIds: readonly SessionId[]): Promise<ReadonlySet<SessionId>>;\n    claimInteraction(sessionId: SessionId, kind: CollaborationInteractionKind, interactionId: string, outcome: unknown): Promise<boolean>;\n}',
+    declaration: 'export interface CollaborationAuthority {\n    readonly participant: CollaborationParticipant;\n    readonly expiresAt: number;\n    readonly signal: AbortSignal;\n    authorize(sessionId: SessionId, action: CollaborationAction): Promise<CollaborationAccess>;\n    readableSessionIds(sessionIds: readonly SessionId[]): Promise<ReadonlySet<SessionId>>;\n    claimInteraction(sessionId: SessionId, kind: CollaborationInteractionKind, interactionId: string, outcome: unknown, callId?: string): Promise<boolean>;\n}',
   },
   {
     name: 'CollaborationInteractionKind',

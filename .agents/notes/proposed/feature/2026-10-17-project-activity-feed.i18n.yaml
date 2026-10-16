@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for 2026-10-17-project-activity-feed.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-10-17-project-activity-feed.md
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input:
+  en: 64f5af806145d2b7
+  zh: 1372e1d5ee1a566a
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/problem:
+  en: 355eb700fcfe1102
+  zh: 98808c588911a8b3
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision:
+  en: 39da47c78a8f4229
+  zh: 559d825459f3b241
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/recorded-content:
+  en: 350dde048fd162d5
+  zh: c5ad4bb815f31bc3
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/derivation-query-time-not-a-derived-table:
+  en: 7674f9c22b2bb65b
+  zh: 745b08da9d549e66
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/server-surface:
+  en: 75dd7c7e2aa75515
+  zh: 9b008157bfa2ebde
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/client-surface:
+  en: d21a4c9bca7fd967
+  zh: 5c097c96d03d2ba1
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/presentation-reviewed-html-mock:
+  en: 133d268a587816a4
+  zh: 69822e8ee858d5f7
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/alternatives-considered:
+  en: 436636b1978a454d
+  zh: 21ba3f9839761b67
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/consequences:
+  en: d4b121dc92ed6d80
+  zh: 49fdbb8375218c4f
+/agent-note-project-activity-feed-a-human-facing-record-of-member-input/required-verification:
+  en: 70cfa17dc297fa5c
+  zh: 2deafc7f7b675cc0
