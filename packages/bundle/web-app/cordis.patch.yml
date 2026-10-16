@@ -323,6 +323,11 @@
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'
 
+    # Shared-project activity feed: member messages and chosen answers in the
+    # right Sidebar; the tab type registers only while project scope is active.
+    - id: ui-project-activity
+      name: '@deepseek-ai/dsh-client-ui-project-activity'
+
     # Per-message feedback: Like/Dislike plus an optional note in the
     # assistant-message action strip, over the messageFeedback Remote.
     - id: workspace-changes

@@ -116,6 +116,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-jobs': { kind: 'none', reason: 'Browser-side read-only projection of ctx.jobs records; dsh-tool-jobs owns the model-facing behavior.' },
   'packages/client/ui-schedule': { kind: 'none', reason: 'Browser-side catalog, editing, and deletion of Host Schedule records; dsh-schedule owns the model-facing tools and delivery.' },
   'packages/client/ui-workflow-run': { kind: 'none', reason: 'Browser-side UI plugin layer; renders durable workflow records without changing model context.' },
+  'packages/client/ui-project-activity': { kind: 'none', reason: 'Browser-side read-only projection of member messages and chosen answers; nothing it renders enters a model request.' },
   'packages/client/ui-input-trigger': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-reference': { kind: 'indirect', reason: 'Browser-side reference selection delegates file guidance and session snapshot preparation to Host-owned providers.' },
   'packages/client/ui-commands': { kind: 'indirect', reason: 'The dispatch paths trigger the host command.execute RPC; each command handler\'s host package owns any model-visible effect.' },

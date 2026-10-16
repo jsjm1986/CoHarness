@@ -227,6 +227,8 @@
       "@deepseek-ai/dsh-client-ui-permission-presets": ["./packages/client/ui-permission-presets/src"],
       "@deepseek-ai/dsh-client-ui-plan": ["./packages/client/ui-plan/src"],
       "@deepseek-ai/dsh-client-ui-plugin-manager": ["./packages/client/ui-plugin-manager/src"],
+      "@deepseek-ai/dsh-client-ui-project-activity": ["./packages/client/ui-project-activity/src"],
+      "@deepseek-ai/dsh-client-ui-project-activity/client": ["./packages/client/ui-project-activity/src/client"],
       "@deepseek-ai/dsh-client-ui-dockkit": ["./packages/client/ui-dockkit/src"],
       "@deepseek-ai/dsh-client-ui-primitives": ["./packages/client/ui-primitives/src"],
       "@deepseek-ai/dsh-client-ui-reference": ["./packages/client/ui-reference/src"],

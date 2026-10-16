@@ -57,6 +57,7 @@
     "apps/web/tests/cold-blank-session.e2e.ts",
     "apps/web/tests/responsive-shell.e2e.ts",
     "apps/web/tests/project-collaboration.e2e.ts",
+    "apps/web/tests/project-activity.e2e.ts",
     "apps/web/tests/document-manager.e2e.ts",
     "apps/web/tests/chat-sender-attribution.e2e.ts",
     "apps/web/tests/stats-paged-history.e2e.ts",
