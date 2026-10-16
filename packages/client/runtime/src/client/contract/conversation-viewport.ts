@@ -13,6 +13,8 @@ export interface ConversationViewportSnapshot {
   paneIds: readonly SessionId[]
   activePaneId?: SessionId
   paneRatios: readonly number[]
+  /** Panes parked as identity strips; presentation posture, never persisted to a saved workbench. */
+  collapsedIds: readonly SessionId[]
 }
 
 /** Result of adding one Session to a bounded pane set. */
@@ -50,6 +52,22 @@ export interface ConversationViewport {
    * @param direction - adjacent position; moving past an end is a no-op.
    */
   move(sessionId: SessionId, direction: 'previous' | 'next'): void
+  /** Move one pane to an absolute position, keeping its width preference.
+   * @param sessionId - existing pane to move; absent panes are ignored.
+   * @param index - insertion index in the order the pane would have without it; out-of-range clamps to the ends.
+   */
+  reorder(sessionId: SessionId, index: number): void
+  /** Park or restore a pane's conversation surface while keeping it pinned.
+   * Collapse is presentation posture: not persisted, and the last expanded
+   * pane is never collapsed.
+   * @param sessionId - existing pane; absent panes are ignored.
+   * @param collapsed - park the surface as an identity strip when true.
+   */
+  setCollapsed(sessionId: SessionId, collapsed: boolean): void
+  /** Collapse every pane except one, or restore all when it is already the only expanded pane.
+   * @param sessionId - pane that stays expanded.
+   */
+  soloPane(sessionId: SessionId): void
   /** Normalize positive width weights; invalid weights receive equal defaults.
    * @param ratios - width weights in pane order.
    */

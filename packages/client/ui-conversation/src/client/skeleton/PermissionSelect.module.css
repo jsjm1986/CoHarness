@@ -100,6 +100,15 @@
   }
 }
 
+/* Clip-seat degrade: while the owning composer seat reports `data-clipped`,
+   the shared contract hides the label and chevron; the trigger then carries
+   the glyph alone as the same 28px icon seat the container tier uses. */
+:global([data-clip-seat][data-clipped]) .trigger {
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+}
+
 /* Compact phones carry the seat as an icon-only control on the single
    toolbar line: the permission glyph alone (its mark already varies by
    level); the aria-label still names the mode. */

@@ -301,10 +301,13 @@
   overflow: hidden;
 }
 
-/* Match Session search's pulse without coupling the two feature packages. */
+/* Directional sweep (same 105° diagonal band the documents skeleton paints):
+   a highlight that travels reads as progress where a flat opacity pulse only
+   reads as blinking. */
 .skeletonFill {
-  background: var(--dsw-alias-bg-skeleton);
-  animation: dsh-plugin-skeleton 2s cubic-bezier(0.36, 0, 0.64, 1) infinite;
+  background: linear-gradient(105deg, var(--dsw-alias-bg-layer-1), var(--dsw-alias-bg-layer-2), var(--dsw-alias-bg-layer-1));
+  background-size: 200% 100%;
+  animation: dsh-plugin-skeleton 1.2s ease-in-out infinite;
 }
 
 /* Keep each real text line's height; center the shorter painted bar within it. */
@@ -332,9 +335,8 @@
 }
 
 @keyframes dsh-plugin-skeleton {
-  0% { opacity: 1; }
-  40% { opacity: 0.6; }
-  80%, 100% { opacity: 1; }
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

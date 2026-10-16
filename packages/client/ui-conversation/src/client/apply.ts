@@ -44,7 +44,7 @@ import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
 import { ConversationPane, ConversationRoot } from './skeleton/ConversationRoot.tsx'
-import { ConversationViewportController, createConversationViewportStore } from './viewport.ts'
+import { ConversationViewportController, createConversationViewportStore, WORKBENCH_PANE_LIMIT } from './viewport.ts'
 import type { ShortcutCommandId, ShortcutFixedCommand } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { installStopShortcut } from './stop-shortcut.ts'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
@@ -354,6 +354,53 @@ export function apply(ctx: Context): void {
     for (const command of fixedInputs) {
       scope.effect(() => scope.shortcuts.registerFixed(command), `ui-conversation: ${command.id}`)
     }
+    // Pane navigation commands: primary+digit on desktop, primary+alt+digit on
+    // Web where ⌘1-9 already owns browser tab switching.
+    for (let index = 0; index < WORKBENCH_PANE_LIMIT; index += 1) {
+      const position = index + 1
+      scope.effect(() => scope.shortcuts.register({
+        id: `workbench.pane${position}` as ShortcutCommandId,
+        label: () => t('shortcut.focusPane', { index: position }),
+        aliases: [`focus pane ${position}`],
+        defaults: {
+          'desktop:macos': { code: `Digit${position}`, modifiers: ['primary'] },
+          'desktop:windows': { code: `Digit${position}`, modifiers: ['primary'] },
+          'desktop:linux': { code: `Digit${position}`, modifiers: ['primary'] },
+          'web:macos': { code: `Digit${position}`, modifiers: ['primary', 'alt'] },
+          'web:windows': { code: `Digit${position}`, modifiers: ['primary', 'alt'] },
+        },
+        regions: ['page', 'editable'], modals: [],
+        resolve: () => {
+          const state = viewport.snapshot.getSnapshot()
+          const id = state.paneIds[index]
+          if (state.mode !== 'workbench' || id === undefined) {
+            return { status: 'blocked', reason: t('shortcut.noPane', { index: position }) }
+          }
+          return { status: 'handled', run: () => { viewport.focus(id) } }
+        },
+      }), `ui-conversation: workbench.pane${position}`)
+    }
+    scope.effect(() => scope.shortcuts.register({
+      id: 'workbench.solo' as ShortcutCommandId,
+      label: () => t('shortcut.soloPane'),
+      aliases: ['solo pane', 'focus current pane'],
+      defaults: {
+        'desktop:macos': { code: 'Digit0', modifiers: ['primary'] },
+        'desktop:windows': { code: 'Digit0', modifiers: ['primary'] },
+        'desktop:linux': { code: 'Digit0', modifiers: ['primary'] },
+        'web:macos': { code: 'Digit0', modifiers: ['primary', 'alt'] },
+        'web:windows': { code: 'Digit0', modifiers: ['primary', 'alt'] },
+      },
+      regions: ['page', 'editable'], modals: [],
+      resolve: () => {
+        const state = viewport.snapshot.getSnapshot()
+        const id = state.activePaneId ?? state.paneIds[0]
+        if (state.mode !== 'workbench' || id === undefined || state.paneIds.length < 2) {
+          return { status: 'blocked', reason: t('shortcut.notWorkbench') }
+        }
+        return { status: 'handled', run: () => { viewport.soloPane(id) } }
+      },
+    }), 'ui-conversation: workbench.solo')
     scope.effect(() => installStopShortcut(scope.shortcuts, sessions, stop), 'ui-conversation: fixed stop input')
     scope.effect(() => {
       const command: ShortcutFixedCommand = {
@@ -402,6 +449,9 @@ export function apply(ctx: Context): void {
       onViewportFocus: (id) => { viewport.focus(id) },
       onViewportRemove: (id) => { viewport.remove(id); layout.closeDetails(id) },
       onViewportRatios: (ratios) => { viewport.setPaneRatios(ratios) },
+      onViewportReorder: (id, index) => { viewport.reorder(id, index) },
+      onViewportCollapse: (id, collapsed) => { viewport.setCollapsed(id, collapsed) },
+      onViewportSolo: (id) => { viewport.soloPane(id) },
       onViewportMaximize: (_id, maximized) => { if (maximized) layout.closeDetails() },
       onViewportEnabled: (enabled) => { viewport.setEnabled(enabled) },
     }),

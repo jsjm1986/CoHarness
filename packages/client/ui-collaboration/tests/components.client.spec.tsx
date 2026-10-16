@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { ConversationShareAction, type ConversationShareActionProps } from '../src/client/ConversationShareAction.tsx'
 import { LogoutButton, type LogoutButtonProps } from '../src/client/LogoutButton.tsx'
 import logoutCss from '../src/client/LogoutButton.module.css'
@@ -543,9 +545,18 @@ describe('ReadOnlyComposer', () => {
 })
 
 describe('StewardChip', () => {
-  function chipProps(state: CollaborationSnapshot): StewardChipProps {
+  const stewardContext: CollaborationContext = {
+    ...projectContext,
+    scope: { kind: 'project', projectId: 11, projectName: '维护中枢', mode: 'rw', steward: true },
+    projects: [
+      ...projectContext.projects,
+      { projectId: 11, name: '维护中枢', path: '/srv/steward', mode: 'rw', kind: 'steward' },
+    ],
+  }
+
+  function chipProps(state: CollaborationSnapshot, sessionId = 'child'): StewardChipProps {
     return {
-      sessionId: 'child',
+      sessionId,
       useSession: vi.fn(), useSessions: vi.fn(), useWorkspaces: vi.fn(),
       useCollaboration: <T,>(selector: (snapshot: CollaborationSnapshot) => T): T => selector(state),
       t,
@@ -553,20 +564,12 @@ describe('StewardChip', () => {
   }
 
   it('marks the audited maintenance channel inside steward scope', () => {
-    const stewardContext: CollaborationContext = {
-      ...projectContext,
-      scope: { kind: 'project', projectId: 11, projectName: '维护中枢', mode: 'rw', steward: true },
-    }
     render(<StewardChip {...chipProps(snapshot({ context: stewardContext }))} />)
     const chip = screen.getByRole('button', { name: '维护通道' })
     expect(chip.querySelector('svg')).not.toBeNull()
   })
 
   it('reveals the full audit and approval clause from the chip', async () => {
-    const stewardContext: CollaborationContext = {
-      ...projectContext,
-      scope: { kind: 'project', projectId: 11, projectName: '维护中枢', mode: 'rw', steward: true },
-    }
     render(<StewardChip {...chipProps(snapshot({ context: stewardContext }))} />)
     fireEvent.click(screen.getByRole('button', { name: '维护通道' }))
     const tip = screen.getByRole('tooltip')
@@ -585,6 +588,37 @@ describe('StewardChip', () => {
     const loading = snapshot({ contextVerified: false })
     delete loading.context
     const view = render(<StewardChip {...chipProps(loading)} />)
+    expect(view.container.childElementCount).toBe(0)
+  })
+
+  // A workbench pane can hold another scope's conversation: the marker follows
+  // the session's encoded runtime, never the page scope.
+  it('marks a steward-space pane while another scope is active', () => {
+    const otherScope: CollaborationContext = {
+      ...stewardContext,
+      scope: { kind: 'project', projectId: 9, projectName: '支付重构', mode: 'rw' },
+    }
+    render(<StewardChip {...chipProps(
+      snapshot({ context: otherScope }),
+      clientSessionKey({ kind: 'project', projectId: 11 }, 'child' as SessionId),
+    )} />)
+    expect(screen.getByRole('button', { name: '维护通道' })).not.toBeNull()
+  })
+
+  it('renders nothing for another scope\'s session inside steward scope', () => {
+    const view = render(<StewardChip {...chipProps(
+      snapshot({ context: stewardContext }),
+      clientSessionKey({ kind: 'project', projectId: 9 }, 'child' as SessionId),
+    )} />)
+    expect(view.container.childElementCount).toBe(0)
+    expect(screen.queryByRole('button', { name: '维护通道' })).toBeNull()
+  })
+
+  it('renders nothing for a personal session inside steward scope', () => {
+    const view = render(<StewardChip {...chipProps(
+      snapshot({ context: stewardContext }),
+      clientSessionKey({ kind: 'personal' }, 'child' as SessionId),
+    )} />)
     expect(view.container.childElementCount).toBe(0)
   })
 })

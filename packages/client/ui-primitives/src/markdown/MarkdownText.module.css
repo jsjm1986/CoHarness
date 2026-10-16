@@ -7,6 +7,14 @@
   overflow-wrap: anywhere;
   font: var(--dsw-font-markdown-base);
   color: var(--dsw-alias-label-primary);
+  /* Avoid short last lines (orphans) in wrapped paragraphs; ignored where
+     unsupported. */
+  text-wrap: pretty;
+}
+
+/* Multi-line headings balance their lines instead of running to the edge. */
+.markdown :is(h1, h2, h3, h4, h5, h6) {
+  text-wrap: balance;
 }
 
 .markdown strong {

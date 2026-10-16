@@ -88,7 +88,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     useCurrentSessions: selector => baseSessions(selector),
     useWorkspaces: hook(workspaceState([])),
     usePanelInfo: hook({ activePanelId: null }),
-    useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [] }),
+    useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     startSession: vi.fn(),

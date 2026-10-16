@@ -1,5 +1,5 @@
-/* Workbench-sidebar display controls: the same settings face stacked to fit
-   the sidebar's single-column width. */
+/* Workbench-sidebar display controls: a font stepper and named width segments
+   stacked to fit the sidebar's single-column width. */
 
 .controls {
   display: flex;
@@ -22,44 +22,160 @@
 .control {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dsw-space-2);
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 18px;
 }
 
-.controlRow {
-  display: flex;
-  align-items: center;
-  gap: var(--dsw-space-2);
-  min-width: 0;
-}
-
-.controlRow input {
-  flex: 1;
-  min-width: 0;
-  accent-color: var(--dsw-alias-state-business-primary);
-}
-
-.controlRow output {
+.controlLabel {
   flex: none;
-  min-width: 40px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: var(--dsw-alias-label-primary);
 }
 
-.fillToggle {
+/* Font stepper: minus / value / plus inside one hairline capsule. */
+.stepper {
+  display: inline-flex;
+  flex: none;
+  align-items: stretch;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  corner-shape: round;
+  overflow: hidden;
+}
+
+.stepButton {
   display: inline-flex;
   align-items: center;
-  gap: var(--dsw-space-1);
+  justify-content: center;
+  width: 26px;
+  min-height: 24px;
+  border: 0;
+  padding: 0;
+  background: transparent;
   color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.fillToggle input {
-  margin: 0;
-  accent-color: var(--dsw-alias-state-business-primary);
+.stepButton:not(:disabled):hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.stepButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stepButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: -2px;
+}
+
+.stepValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 0 var(--dsw-space-1);
+  border-inline: 0.5px solid var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Width presets: quiet text segments; the active one inverts to a filled chip. */
+.segmented {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  corner-shape: round;
+}
+
+/* Measured sliding thumb: carries the active fill so selection travels
+   instead of blink-switching. Slight overshoot reads as a settle, not a
+   bounce. */
+.segmentThumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  border-radius: var(--dsw-radius-sm);
+  corner-shape: round;
+  background: var(--dsw-alias-state-business-primary);
+  pointer-events: none;
+  transition: transform 240ms cubic-bezier(0.34, 1.35, 0.64, 1),
+    width 240ms cubic-bezier(0.34, 1.35, 0.64, 1);
+}
+
+.segment {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  corner-shape: round;
+  padding: 0 var(--dsw-space-2);
+  background: transparent;
+  color: var(--dsw-alias-label-caption);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  /* The chip inverts on selection; easing the paint hand-off plus a press
+     settle gives the state change weight without a measured indicator. */
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+}
+
+.segment:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.segment:not(:disabled):hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* The sliding thumb paints the active fill; the segment only marks its text. */
+.segment[data-on] {
+  color: var(--dsw-alias-label-primary-inverted);
+  font-weight: 600;
+}
+
+.segment:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmentThumb,
+  .segment {
+    transition: none;
+  }
+
+  .segment:active:not(:disabled) {
+    transform: none;
+  }
 }

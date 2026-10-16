@@ -55,6 +55,10 @@
   color: var(--dsw-alias-state-warn-primary);
   font-size: 13px;
   line-height: 18px;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .dot {
@@ -63,6 +67,45 @@
   border-radius: 50%;
   corner-shape: round;
   background: var(--dsw-alias-state-warn-primary);
+  /* A waiting decision breathes; the pulse dies the moment it is answered. */
+  animation: dsh-approval-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes dsh-approval-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
+/* Answered frame: the card settles — strip recolors to the recorded outcome,
+   body dims, the breathing stops. */
+.card[data-answered='allowed-once'] .strip {
+  background: var(--dsw-alias-tint-success);
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.card[data-answered='allowed-once'] .dot {
+  background: var(--dsw-alias-state-success-primary);
+  animation: none;
+}
+
+.card[data-answered='rejected'] .strip {
+  background: var(--dsw-alias-tint-error);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.card[data-answered='rejected'] .dot {
+  background: var(--dsw-alias-state-error-primary);
+  animation: none;
+}
+
+.card[data-answered] .body {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+  }
 }
 
 /* Scroll region: an agent's justification and its command are unbounded model
@@ -81,6 +124,8 @@
   max-height: var(--dsh-composer-text-max-height);
   overflow-y: auto;
   padding: var(--dsw-space-3) var(--dsw-space-4) 0;
+  transition: opacity var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 /* The model's justification is the panel's message, not a footnote. */

@@ -1,7 +1,9 @@
 - button "Select workbench":
   - text: My workbench
   - img
-- text: 3/4
+- img "3 of 4 panes in use"
+- button "Layout":
+  - img
 - button "Add conversation":
   - img
   - text: Add conversation

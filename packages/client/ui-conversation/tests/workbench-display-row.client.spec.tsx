@@ -49,24 +49,31 @@ describe('WorkbenchDisplayRow', () => {
   it('stacks width, font size, and fill controls bound to the shared settings face', () => {
     const b = mount()
     publishReady(b.scope)
-    fireEvent.change(screen.getByRole('slider', { name: 'Text size' }), { target: { value: '16' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Increase font size' }))
     expect(b.props.setFontSize).toHaveBeenCalledWith(16)
     expect(b.scope.set).toHaveBeenCalledWith('chatFontSize', 16)
-    fireEvent.change(screen.getByRole('slider', { name: 'Content width' }), { target: { value: '700' } })
-    expect(b.props.setWidth).toHaveBeenCalledWith(700)
-    expect(b.scope.set).toHaveBeenCalledWith('chatContentWidth', 700)
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Fill' }))
+    // The write published back through the snapshot, so decrease steps from 16.
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease font size' }))
+    expect(b.props.setFontSize).toHaveBeenCalledWith(15)
+    // A stored custom width lights no preset; picking one writes the preset value.
+    expect(screen.getByRole('group', { name: 'Content width' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Relaxed' }))
+    expect(b.props.setWidth).toHaveBeenCalledWith(960)
+    expect(b.props.setFullWidth).toHaveBeenCalledWith(false)
+    expect(b.scope.set).toHaveBeenCalledWith('chatContentWidth', 960)
+    fireEvent.click(screen.getByRole('button', { name: 'Fill' }))
     expect(b.props.setFullWidth).toHaveBeenCalledWith(true)
     expect(b.scope.set).toHaveBeenCalledWith('chatFullWidth', true)
-    // Fill mode disables the pixel slider and reports the fill state.
-    expect(screen.getByRole('slider', { name: 'Content width' })).toHaveProperty('disabled', true)
+    // Fill mode marks the Fill segment and clears preset selection.
+    expect(screen.getByRole('button', { name: 'Fill' })).toHaveProperty('ariaPressed', 'true')
+    expect(screen.getByRole('button', { name: 'Relaxed' })).toHaveProperty('ariaPressed', 'false')
   })
 
   it('keeps controls disabled and surfaces the loading notice before settings are ready', () => {
     mount()
     expect(screen.getByText(/Loading display settings/)).toBeDefined()
-    expect(screen.getByRole('slider', { name: 'Text size' })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('checkbox', { name: 'Fill' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Increase font size' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Fill' })).toHaveProperty('disabled', true)
   })
 
   it('reports read-only scopes and write failures through the notice line', () => {
@@ -76,7 +83,7 @@ describe('WorkbenchDisplayRow', () => {
       b.scope.publish({ writable: false, writableReason: 'project' })
     })
     expect(screen.getByText(/Project settings are managed/)).toBeDefined()
-    expect(screen.getByRole('slider', { name: 'Text size' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Increase font size' })).toHaveProperty('disabled', true)
     act(() => {
       b.scope.publish({ writable: true, writableReason: undefined, write: { status: 'error', code: 'x', message: 'x' } })
     })

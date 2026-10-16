@@ -7,12 +7,13 @@
  * (running/removed/promptError) are self-selected via useSession. */
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode, RefObject } from 'react'
 import clsx from 'clsx'
 import {
   IconBrowseOutline16, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
   IconSendOutline16, IconStopFill16,
   IconWarningOutline16, ReferenceIcon, Toast, Tooltip, useMediaQuery,
+  FileTypeIcon, classifyFileType,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -104,8 +105,12 @@ function DocumentRail({
             role="listitem"
             data-document-id={document.id}
             data-document-status={document.status}
+            data-doc-kind={classifyFileType(document.name)}
             title={failed ? document.error : document.name}
           >
+            <span className={css.documentBadge} aria-hidden>
+              <FileTypeIcon path={document.name} size={18} />
+            </span>
             <div className={css.documentBody}>
               <span className={css.documentName}>{document.name}</span>
               <span className={css.documentStatus}>{status}</span>
@@ -131,7 +136,7 @@ function DocumentRail({
             <Tooltip label={t('document.remove')} side="top" delayMs={500}>
               <button
                 type="button"
-                className={css.documentAction}
+                className={clsx(css.documentAction, css.documentActionRemove)}
                 aria-label={t('document.removeNamed', { name: document.name })}
                 onMouseDown={keepFocus}
                 onClick={() => { onRemove(document.id) }}
@@ -144,6 +149,70 @@ function DocumentRail({
       })}
     </div>
   )
+}
+
+/**
+ * Clip-first seat for the composer tool row: a flex child that may receive
+ * less than its content needs. While content overflows, the seat publishes
+ * `data-clipped` on itself so descendants marked `data-clip-label` drop
+ * their secondary text whole instead of letting the seat slice mid-glyph.
+ * Restore probes are gated on the parent row's width, not the seat's own:
+ * a clipped seat holds only icon content, so it cannot regrow on its own
+ * and must watch the space the row releases. `floor` records the row width
+ * at the last clip or failed probe — retrying at the same width would
+ * re-render the children it observes and re-enter every frame. All
+ * clears/re-sets settle inside one callback, which the browser paints
+ * atomically, so toggling never flickers. An open floating menu inside the
+ * seat inflates scrollWidth without being row content; the probe defers
+ * until it closes.
+ */
+function ClipSeat({ className, rowRef, children, ...rest }: { className: string | undefined; rowRef: RefObject<HTMLDivElement | null>; children?: ReactNode } & Record<`data-${string}`, string | undefined>) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const seat = ref.current
+    const row = rowRef.current
+    if (seat === null || typeof ResizeObserver !== 'function') return
+    // Row width at the most recent clip or failed restore probe; -1 while
+    // unclipped so the gate below is inert.
+    let floor = -1
+    const publish = (): void => {
+      if (seat.querySelector('[role="menu"], [role="listbox"]') !== null) return
+      if (!seat.hasAttribute('data-clipped')) {
+        if (seat.scrollWidth > seat.clientWidth) {
+          seat.setAttribute('data-clipped', '')
+          floor = row?.clientWidth ?? seat.clientWidth
+        }
+        return
+      }
+      // Still clipped: a restore probe is meaningful only once the row is
+      // wider than at the last clip/failed probe — the row releases room to
+      // the seat under flex, so row growth is the observable.
+      const room = row?.clientWidth ?? seat.clientWidth
+      if (room <= floor) return
+      floor = room
+      seat.removeAttribute('data-clipped')
+      // The unclip relayout grows the seat back toward its label content;
+      // re-clip only if it still cannot fit.
+      if (seat.scrollWidth > seat.clientWidth) seat.setAttribute('data-clipped', '')
+      else floor = -1
+    }
+    const observer = new ResizeObserver(publish)
+    observer.observe(seat)
+    if (row !== null) observer.observe(row)
+    // Slot items arrive wrapped in display:contents elements, which carry no
+    // box and never fire resize entries — content edits reach the probe
+    // through a subtree mutation listener instead of child observers.
+    const mutations = new MutationObserver(publish)
+    mutations.observe(seat, { childList: true, subtree: true, characterData: true })
+    publish()
+    return () => { observer.disconnect(); mutations.disconnect() }
+  }, [children])
+  return <div ref={ref} className={className} data-clip-seat="" {...rest}>{children}</div>
+}
+
+/** Lane for items contributed into the composer tool row. */
+function ExtensionItems({ side, rowRef, children }: { side: 'left' | 'right'; rowRef: RefObject<HTMLDivElement | null>; children: ReactNode }) {
+  return <ClipSeat className={css.extensionItems} rowRef={rowRef} data-input-extension={side}>{children}</ClipSeat>
 }
 
 export type InputBarProps = ComposerBarProps
@@ -234,6 +303,7 @@ export const InputBar = memo(function InputBar({
   const cardRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
+  const toolsRowRef = useRef<HTMLDivElement | null>(null)
   const safari = useMemo(() => isSafariBrowser(navigator), [])
   const safariNativeShrinkRef = useRef(false)
   // IME guard: composition Enter picks a candidate, it must not send. The ref outlives renders;
@@ -955,7 +1025,7 @@ export const InputBar = memo(function InputBar({
             <div ref={mirrorRef} aria-hidden className={css.mirror} data-input-mirror>{`${draft}\n`}</div>
           </div>
         </div>
-        <div className={css.row}>
+        <div ref={toolsRowRef} className={css.row}>
           <div className={css.tools}>
             <Tooltip label={t('document.attach')} side="top" delayMs={500}>
               <button
@@ -1008,21 +1078,17 @@ export const InputBar = memo(function InputBar({
                 <IconPlusOutline16 size={14} />
               </button>
             </Tooltip>
-            <div className={css.modes}>
+            <ClipSeat className={css.modes} rowRef={toolsRowRef}>
               {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}
-            </div>
+            </ClipSeat>
             {leftItems != null && (
-              <div className={css.extensionItems} data-input-extension="left">
-                {leftItems}
-              </div>
+              <ExtensionItems side="left" rowRef={toolsRowRef}>{leftItems}</ExtensionItems>
             )}
           </div>
           <div className={css.trailing}>
             {rightItems != null && (
-              <div className={css.extensionItems} data-input-extension="right">
-                {rightItems}
-              </div>
+              <ExtensionItems side="right" rowRef={toolsRowRef}>{rightItems}</ExtensionItems>
             )}
             {renderSlot('conversation.input.model', {
               locked: modelSeatLocked,

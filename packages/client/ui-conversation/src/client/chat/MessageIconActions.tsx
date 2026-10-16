@@ -77,7 +77,7 @@ export function MessageIconActions({
       copyTimer.current = window.setTimeout(() => {
         copyTimer.current = null
         setCopied(false)
-      }, 1000)
+      }, 2500)
     })
   }, [copied, text])
   // The dot is decorative and stays hidden, but its margins separate the
