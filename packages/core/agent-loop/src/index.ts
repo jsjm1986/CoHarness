@@ -988,6 +988,12 @@ export class AgentLoop extends Service implements AgentFactory {
             id,
             (abandoned) => { void abandoned.close() },
           )
+          // Commit cold recovery through the load contract first: coordinator
+          // backends durably repair an interrupted tail during load, so the
+          // handle read below observes the repaired log and no closer append
+          // follows. Backends whose load only views the log still hand back
+          // the raw events, and the synthetic closers append as before.
+          await raceAbort(persistence.load(id), fused, id)
           // Semantic crash repair is the agent layer's job: persistence hands
           // back the physically valid log; an interrupted final turn receives
           // synthetic closers (missing tool errors, step/end, turn/end) that
