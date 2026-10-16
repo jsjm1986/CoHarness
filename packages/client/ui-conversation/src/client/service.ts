@@ -786,6 +786,16 @@ export class ConversationController extends Service implements IConversation {
   }
 }
 
+/**
+ * Whether a browser-declared MIME selects the image draft path (all other files
+ * take the document path).
+ * @param value - the browser's declared MIME type.
+ * @returns whether the file is an accepted raster image.
+ */
+export function isImageMediaType(value: string): boolean {
+  return value === 'image/png' || value === 'image/jpeg' || value === 'image/webp' || value === 'image/gif'
+}
+
 function imageMediaType(value: string): ImageMediaType {
   switch (value) {
     case 'image/png':

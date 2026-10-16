@@ -39,6 +39,10 @@ const NATIVE_SET_START = Object.getOwnPropertyDescriptor(Range.prototype, 'setSt
 
 const SCTX = {} as ClientContext
 const SID = 's1' as SessionId
+const CONTINUABLE_CHILD = {
+  address: { parentSessionId: 'parent' as SessionId, childSessionId: SID, mode: 'continuable' as const },
+  parentAvailable: true,
+}
 
 function snapshotOf(overrides: Partial<ConversationSnapshot> = {}): ConversationSnapshot {
   return {
@@ -265,6 +269,59 @@ function attachmentOwner(slotCalls: readonly { key: string; owner: unknown }[]):
 }
 
 describe('image draft rail', () => {
+  it.each([false, true])('accepts pasted and dropped images for a continuable child (running=%s)', async (running) => {
+    const addImages = vi.fn(() => null)
+    const { textarea, shell, slotCalls, view } = bench({ subagent: CONTINUABLE_CHILD, running, addImages })
+    const image = new File([Uint8Array.of(1, 2, 3)], 'pixel.png', { type: 'image/png' })
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: [{ kind: 'file', type: image.type, getAsFile: () => image }],
+        getData: () => '一起发送的文字',
+      },
+    })
+    expect(addImages).toHaveBeenCalledWith([image])
+    expect(shell.snapshot.draft).toBe('一起发送的文字')
+    expect(attachmentOwner(slotCalls).canAcceptDrop).toBe(true)
+    act(() => { attachmentOwner(slotCalls).onAddImages([image]) })
+    expect(addImages).toHaveBeenCalledTimes(2)
+    // Paste and drop intake stay open while the pickers — which would admit
+    // generic files and folder references a child cannot use — stay closed.
+    expect(view.container.querySelector<HTMLButtonElement>('button[aria-label="添加图片或文档"]')!.disabled).toBe(true)
+    expect(view.container.querySelector<HTMLButtonElement>('button[aria-label="从文档库选择"]')!.disabled).toBe(true)
+    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')!.disabled).toBe(true)
+  })
+
+  it.each([
+    ['a generic file', new File(['text'], 'notes.txt', { type: 'text/plain' })],
+    ['an unsupported image', new File(['<svg/>'], 'drawing.svg', { type: 'image/svg+xml' })],
+    ['an empty-type file', new File([], 'folder', { type: '' })],
+  ])('refuses the entire child attachment batch containing %s', (_name, unsupported) => {
+    const addImages = vi.fn(() => null)
+    const addDocuments = vi.fn(() => null)
+    const { slotCalls, view, shell } = bench({ subagent: CONTINUABLE_CHILD, addImages, addDocuments, draft: '保留草稿' })
+    const image = new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })
+    act(() => {
+      attachmentOwner(slotCalls).onAddImages([image, unsupported])
+    })
+    expect(addImages).not.toHaveBeenCalled()
+    expect(addDocuments).not.toHaveBeenCalled()
+    expect(view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF 格式的图片')
+    expect(shell.snapshot.draft).toBe('保留草稿')
+  })
+
+  it.each([
+    ['an offline parent', { ...CONTINUABLE_CHILD, parentAvailable: false }],
+    ['a one-shot child', { ...CONTINUABLE_CHILD, address: { ...CONTINUABLE_CHILD.address, mode: 'one-shot' as const } }],
+  ])('keeps attachment intake closed for %s', (_name, subagent) => {
+    const addImages = vi.fn(() => null)
+    const { slotCalls } = bench({ subagent, addImages })
+    expect(attachmentOwner(slotCalls).canAcceptDrop).toBe(false)
+    act(() => {
+      attachmentOwner(slotCalls).onAddImages([new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })])
+    })
+    expect(addImages).not.toHaveBeenCalled()
+  })
+
   it('collects clipboard files while preserving text from a mixed paste', () => {
     const addImages = vi.fn(() => null)
     const { textarea, shell } = bench({ addImages })
@@ -282,7 +339,10 @@ describe('image draft rail', () => {
     expect(shell.snapshot.draft).toBe('同时粘贴的文字')
   })
 
-  it('pre-checks projected limits at intake: whole-batch refusal with product copy, none added', () => {
+  it.each([
+    ['ordinary session', {}],
+    ['continuable child', { subagent: CONTINUABLE_CHILD }],
+  ])('pre-checks projected image limits for %s: whole-batch refusal with product copy', (_name, session) => {
     const limits = {
       maxImageBytes: 1024 * 1024,
       maxImagesPerMessage: 2,
@@ -296,13 +356,13 @@ describe('image draft rail', () => {
       act(() => { attachmentOwner(result.slotCalls).onAddImages(files) })
     }
     // Count: three at once over a two-image limit → the whole batch refused.
-    const overCount = bench({ addImages: vi.fn(() => null), imageLimits: limits })
+    const overCount = bench({ ...session, addImages: vi.fn(() => null), imageLimits: limits })
     intake(overCount, [png(8, 'a.png'), png(8, 'b.png'), png(8, 'c.png')])
     expect(overCount.view.getByRole('alert').textContent).toContain('一条消息最多添加 2 张图片')
     expect(overCount.props.addImages).not.toHaveBeenCalled()
     cleanup()
     // Per-file bytes.
-    const overFile = bench({ addImages: vi.fn(() => null), imageLimits: limits })
+    const overFile = bench({ ...session, addImages: vi.fn(() => null), imageLimits: limits })
     intake(overFile, [png(1024 * 1024 + 1, 'big.png')])
     expect(overFile.view.getByRole('alert').textContent).toContain('单张图片不能超过 1MB')
     expect(overFile.props.addImages).not.toHaveBeenCalled()
@@ -310,13 +370,13 @@ describe('image draft rail', () => {
     // Aggregate bytes across the existing rail plus the new batch.
     const held = new File([new ArrayBuffer(1024 * 1024 * 1.5)], 'held.png', { type: 'image/png' })
     const attachment = { kind: 'image' as const, id: 'draft-1' as DraftAttachmentId, file: held, previewUrl: 'blob:held' }
-    const overTotal = bench({ addImages: vi.fn(() => null), imageLimits: limits, attachments: [attachment] })
+    const overTotal = bench({ ...session, addImages: vi.fn(() => null), imageLimits: limits, attachments: [attachment] })
     intake(overTotal, [png(1024 * 1024, 'more.png')])
     expect(overTotal.view.getByRole('alert').textContent).toContain('图片总大小超过 2MB')
     expect(overTotal.props.addImages).not.toHaveBeenCalled()
     cleanup()
     // Within every limit: the batch passes through to addImages.
-    const within = bench({ addImages: vi.fn(() => null), imageLimits: limits })
+    const within = bench({ ...session, addImages: vi.fn(() => null), imageLimits: limits })
     const fits = png(16, 'fits.png')
     intake(within, [fits])
     expect(within.props.addImages).toHaveBeenCalledWith([fits])

@@ -29,6 +29,7 @@ import { resolveSubmitMode } from '../contract/composer-submission.ts'
 import { deriveDecorations } from '../contract/decorations.ts'
 import type { DraftDecorations } from '../contract/decorations.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
+import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
 import { SessionSettingsSheet, type SessionSettingsSection, type SessionSettingsSectionId } from './SessionSettingsSheet.tsx'
@@ -655,11 +656,18 @@ export const InputBar = memo(function InputBar({
   }, [addDocuments, showToast])
 
   const intakeFiles = useCallback((files: readonly File[]): void => {
+    if (locked || machineBusy || (subagent !== null && !continuable) || files.length === 0) return
+    // Child prompts support images, but not generic file receipts or the
+    // document-browser fallback. Refuse mixed batches before intake.
+    if (continuable && files.some(file => !isImageMediaType(file.type))) {
+      showToast(t('image.unsupportedType'))
+      return
+    }
     const images = files.filter(file => file.type.startsWith('image/'))
     const documents = files.filter(file => !file.type.startsWith('image/'))
     intakeImages(images)
     intakeDocuments(documents)
-  }, [intakeDocuments, intakeImages])
+  }, [continuable, intakeDocuments, intakeImages, locked, machineBusy, subagent, showToast, t])
 
   const onFileInputChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const files = [...(event.currentTarget.files ?? [])]
@@ -668,7 +676,8 @@ export const InputBar = memo(function InputBar({
     intakeFiles(files)
   }
 
-  const canAcceptDrop = active && !locked && !machineBusy && (addImages !== undefined || addDocuments !== undefined)
+  const canAcceptDrop = active && (subagent === null || continuable) && !locked && !machineBusy
+    && (addImages !== undefined || addDocuments !== undefined)
 
   const onSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>): void => {
     // Any caret/selection gesture ends a live paste attempt (the machine
@@ -972,7 +981,7 @@ export const InputBar = memo(function InputBar({
                 type="button"
                 className={css.add}
                 aria-label={t('document.attach')}
-                disabled={locked || machineBusy || addDocuments === undefined}
+                disabled={locked || machineBusy || addDocuments === undefined || subagent !== null}
                 onMouseDown={keepFocus}
                 onClick={() => { fileInputRef.current?.click() }}
               >
@@ -984,7 +993,7 @@ export const InputBar = memo(function InputBar({
                 type="button"
                 className={css.add}
                 aria-label={t('document.browse')}
-                disabled={locked || machineBusy}
+                disabled={locked || machineBusy || subagent !== null}
                 onMouseDown={keepFocus}
                 onClick={() => {
                   if (typeof window !== 'undefined') {
@@ -1000,6 +1009,7 @@ export const InputBar = memo(function InputBar({
               className={css.fileInput}
               type="file"
               multiple
+              disabled={subagent !== null}
               tabIndex={-1}
               aria-hidden="true"
               onChange={onFileInputChange}
