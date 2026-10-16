@@ -1015,6 +1015,8 @@ export interface Config {
   minSpeechSeconds: number
   /** Silence separating two speech segments. */
   minSilenceSeconds: number
+  /** Recording audio restored ahead of the first VAD segment, which cold start reports late; zero disables it. */
+  vadOnsetPaddingSeconds: number
   /** Maximum decoded WAV bytes accepted by the private worker. */
   maxAudioBytes: number
   /** Deadline for runtime preparation and cold model loading. */
@@ -2229,7 +2231,10 @@ export interface Config {
 ```ts config-catalog
 /** Index sources and fetch limits. */
 export interface Config {
-  /** Index URLs in display order; `setIndexes` persists the `plugin-market` settings namespace over this base without remounting the service. */
+  /**
+   * Index URLs in display order; `setIndexes` persists the `plugin-market` settings namespace over this base
+   * without remounting the service.
+   */
   indexes: Volatile<string[]>
   /** Deadline for one index fetch, including the body. */
   fetchTimeoutMs: number
