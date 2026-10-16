@@ -13,7 +13,7 @@ import {
   type ServerResponse as RpcServerResponse,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { bridge, type FetchHandler } from './http-bridge.ts'
-import { header, isTrustedApiRequest } from './api-request-trust.ts'
+import { header, isRemoteAuthority, isTrustedApiRequest } from './api-request-trust.ts'
 import { API_PATH } from './api-path.ts'
 import type { BrowserAuth } from './browser-auth.ts'
 import type {
@@ -56,6 +56,12 @@ export interface HostConnectionHandle {
   readonly rpc: HostConnectionRpc
   /** Streaming HTTP registry. */
   readonly http: HostConnectionHttp
+
+  /**
+   * Whether this deployment accepts authorities beyond loopback: true only
+   * when a validated `trustedHosts` entry names a non-loopback hostname.
+   */
+  readonly allowsRemoteAuthorities: boolean
 
   /**
    * Apply Connection's Host/Origin fence and browser authentication to one
@@ -114,6 +120,8 @@ export class HostConnectionService extends Service implements HostConnectionHand
   private readonly interceptors = new Map<string, ConnectionRpcInterceptor>()
   private readonly httpPrefixes = new Map<string, ConnectionHttpRegistration>()
 
+  readonly allowsRemoteAuthorities: boolean
+
   /**
    * Provide the Host half over the active HTTP server.
    * @param ctx - owning Connection plugin context.
@@ -126,6 +134,12 @@ export class HostConnectionService extends Service implements HostConnectionHand
     private readonly browserAuth: BrowserAuth,
   ) {
     super(ctx, 'connection')
+    this.allowsRemoteAuthorities = trustedHosts.some(isRemoteAuthority)
+  }
+
+  /** Active Web carrier's bind address; absent when no Web carrier is mounted. */
+  private get bindHost(): string | undefined {
+    return this.ctx.get('webServer')?.host
   }
 
   /** Streaming HTTP registry scoped to the Context reading this service. */
@@ -170,7 +184,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
   authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
     // The fence precedes every admission: a deployment provider's admit must
     // never launder a foreign Host or cross-site Origin past the browser fence.
-    if (!isTrustedApiRequest(request, this.trustedHosts)) {
+    if (!isTrustedApiRequest(request, this.trustedHosts, this.bindHost)) {
       response.writeHead(403)
       response.end('forbidden')
       return false
@@ -281,7 +295,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
     kind: 'http' | 'upgrade',
   ): ConnectionRequestRejection {
     if (authority === 'loopback') return isTrustedApiRequest(request, []) ? undefined : 403
-    if (!isTrustedApiRequest(request, this.trustedHosts)) return 403
+    if (!isTrustedApiRequest(request, this.trustedHosts, this.bindHost)) return 403
     const decision = this.providerDecision({
       headers: request.headers, method: request.method, url: request.url, kind,
     })

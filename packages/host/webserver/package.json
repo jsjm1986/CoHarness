@@ -38,6 +38,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:~",
     "compression": "^1.8.1",
+    "ipaddr.js": "^2.5.0",
     "negotiator": "^1.0.0"
   },
   "devDependencies": {

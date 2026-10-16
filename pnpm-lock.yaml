@@ -8610,6 +8610,9 @@ importers:
       compression:
         specifier: ^1.8.1
         version: 1.8.1(supports-color@9.4.0)
+      ipaddr.js:
+        specifier: ^2.5.0
+        version: 2.5.0
       negotiator:
         specifier: ^1.0.0
         version: 1.1.0

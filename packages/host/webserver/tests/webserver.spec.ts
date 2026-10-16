@@ -3,7 +3,9 @@
  * vendored Loader mounts the webserver row, and every assertion observes the
  * user-visible HTTP surface of the running server (routing precedence, index
  * taps, optional response compression, fallback-seat semantics, per-request
- * error containment, teardown).
+ * error containment, teardown). The bind-address schema and both address
+ * predicates are asserted directly, before any server binds; one wildcard load
+ * denial goes through the real Loader.
  */
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
@@ -16,7 +18,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context, FiberState } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import HttpServer, { renderIndexInjections } from '../src/index.ts'
+import HttpServer, { isLoopbackHost, normalizeBindAddress, renderIndexInjections } from '../src/index.ts'
 
 let root: string | undefined
 let context: Context | undefined
@@ -29,13 +31,13 @@ afterEach(async () => {
 })
 
 /** Write a cordis.yml with one webserver row, then boot it through the real Loader. */
-async function loadComposition(port = 0, gzip = false): Promise<Context> {
+async function loadComposition(port = 0, gzip = false, host = '127.0.0.1'): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'dsh-webserver-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
     "- name: '@deepseek-ai/dsh-host-webserver'",
     '  config:',
-    "    host: '127.0.0.1'",
+    `    host: '${host}'`,
     `    port: ${String(port)}`,
     ...(gzip
       ? [
@@ -98,6 +100,67 @@ async function upgrade(port: number, path: string): Promise<ReturnType<typeof co
 }
 
 describe('real Loader composition', () => {
+  it('accepts one concrete IP literal, keeping an IPv6 zone for listen', () => {
+    for (const host of ['127.0.0.1', '10.1.2.3', '0.1.2.3', '::1', 'fd00::1', '::ffff:10.1.2.3', '::ffff:0.1.2.3', '0:0:0:0:0:0:0:1', 'fe80::1%lo', '::0.0.0.1', '::0.0.0.1%lo', '::127.0.0.1']) {
+      expect(HttpServer.Config({ host, port: 0 }).host).toBe(host)
+    }
+  })
+
+  it('rejects every wildcard spelling by address value, not by text', () => {
+    // Every spelling node:net accepts that parses to the unspecified address:
+    // IPv4 any, IPv6 any in long and short forms, IPv4-compatible, and the
+    // IPv4-mapped forms of IPv4 any, with or without a zone.
+    for (const host of [
+      '0.0.0.0', '::', '::0', '0000::', '0::', '0:0:0:0:0:0:0:0', '::0.0.0.0', '::0.0.0.0%lo', '::%lo',
+      '::ffff:0.0.0.0', '::ffff:0:0', '::ffff:0000:0000', '0:0:0:0:0:ffff:0:0',
+      '0:0:0:0:0:ffff:0.0.0.0', '::ffff:0.0.0.0%eth0',
+    ]) {
+      expect(() => HttpServer.Config({ host, port: 0 })).toThrow(
+        /is an unspecified \(wildcard\) address, which is not supported/,
+      )
+    }
+    for (const host of ['localhost', 'example.com', '*', '[::]', '[fd00::1]', '10.1.2.3/8']) {
+      expect(() => HttpServer.Config({ host, port: 0 }))
+        .toThrow(/is not a concrete IPv4 or IPv6 address literal/)
+    }
+  })
+
+  it('denies the IPv4-mapped wildcard through the real plugin load, not only the predicate', async () => {
+    // The Loader is nontransactional: a rejected config leaves a FAILED fiber
+    // whose await carries the schema error rather than rejecting loader.await().
+    const denied = await loadComposition(0, false, '::ffff:0.0.0.0')
+    const entry = [...denied.loader.entries()].find(e => e.options.name === '@deepseek-ai/dsh-host-webserver')
+    expect(entry?.fiber?.state).toBe(FiberState.FAILED)
+    await expect(entry?.fiber?.await()).rejects.toThrow(/is an unspecified \(wildcard\) address/)
+  })
+
+  it('classifies loopback bind addresses from the parsed value, including mapped and zone forms', () => {
+    for (const host of ['127.0.0.1', '127.8.9.10', '127.5.5.5', '::1', '0:0:0:0:0:0:0:1', '::ffff:127.0.0.1', '::ffff:7f00:1', '::1%lo', '::0.0.0.1', '::0.0.0.1%lo']) {
+      expect(isLoopbackHost(host)).toBe(true)
+    }
+    // A dotted-quad tail is the address's own low 32 bits, never an IPv4 tail:
+    // ::127.0.0.1 is the unrelated IPv6 address ::7f00:1, not IPv4 loopback.
+    for (const host of ['10.1.2.3', '::ffff:10.1.2.3', 'fd00::1', 'fe80::1%lo', '::2', 'localhost', '::127.0.0.1', '::127.0.0.1%lo', '::0.0.0.2']) {
+      expect(isLoopbackHost(host)).toBe(false)
+    }
+  })
+
+  it('reads a dotted-quad IPv6 tail as the address it names', () => {
+    const rows: [string, string][] = [
+      ['::0.0.0.1', '::1'],
+      ['::0.0.0.1%lo', '::1'],
+      ['::127.0.0.1', '::7f00:1'],
+      ['::1', '::1'],
+      ['10.1.2.3', '10.1.2.3'],
+      // Genuinely IPv4-mapped literals keep their IPv4 form for a browser URL.
+      ['::ffff:127.0.0.1', '127.0.0.1'],
+      ['::ffff:7f00:1', '127.0.0.1'],
+      ['::ffff:10.1.2.3', '10.1.2.3'],
+    ]
+    for (const [host, text] of rows) expect(normalizeBindAddress(host)).toBe(text)
+    expect(() => normalizeBindAddress('localhost')).toThrow(/is not a concrete IPv4 or IPv6 address literal/)
+  })
+
   it('compresses eligible socket responses without touching stream or range semantics', { timeout: 60_000 }, async () => {
     expect(HttpServer.Config({ host: '127.0.0.1', port: 0 })).toEqual({
       host: '127.0.0.1',

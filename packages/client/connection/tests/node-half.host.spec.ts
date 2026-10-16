@@ -28,8 +28,10 @@ import { provideBrowserCredentials } from './browser-credentials.ts'
 function fakeHttpServer(
   routes: WebRoute[],
   upgrades: WebUpgradeRoute[],
-): Pick<WebServer, 'register' | 'registerUpgrade' | 'tapIndex' | 'port'> {
+  host = '127.0.0.1',
+): Pick<WebServer, 'register' | 'registerUpgrade' | 'tapIndex' | 'port' | 'host'> {
   return {
+    host,
     register(route) {
       if (routes.some(candidate => candidate.kind === route.kind && candidate.path === route.path)) {
         throw new Error(`duplicate route ${route.path}`)
@@ -96,6 +98,7 @@ function fakeResponse(): {
 async function mounted(
   config?: ConnectionConfig,
   apiProxy: ApiProxy = {} as unknown as ApiProxy,
+  bindHost = '127.0.0.1',
 ): Promise<{
   ctx: Context
   routes: WebRoute[]
@@ -107,7 +110,7 @@ async function mounted(
   const routes: WebRoute[] = []
   const upgrades: WebUpgradeRoute[] = []
   provideBrowserCredentials(ctx)
-  ctx.provide('webServer', fakeHttpServer(routes, upgrades) as WebServer)
+  ctx.provide('webServer', fakeHttpServer(routes, upgrades, bindHost) as WebServer)
   ctx.provide('apiProxy', apiProxy)
   const fiber = ctx.plugin({ inject: [...inject], apply }, config)
   await fiber.await()
@@ -183,6 +186,32 @@ describe('connection node half', () => {
     await expect(fiber).rejects.toThrow(/not a bare host\[:port\] authority/)
     expect(routes).toHaveLength(0)
     expect(upgrades).toHaveLength(0)
+  })
+
+  it('reports allowsRemoteAuthorities from validated trustedHosts only', async () => {
+    const cases: { trustedHosts: string[]; expected: boolean }[] = [
+      { trustedHosts: ['127.0.0.1', 'localhost', '[::1]'], expected: false },
+      { trustedHosts: ['harness.example'], expected: true },
+      { trustedHosts: ['127.0.0.1', 'harness.example'], expected: true },
+    ]
+    for (const { trustedHosts, expected } of cases) {
+      const deployment = await mounted({ trustedHosts })
+      try {
+        expect(deployment.connection.allowsRemoteAuthorities, trustedHosts.join(',')).toBe(expected)
+      } finally {
+        await deployment.dispose()
+      }
+    }
+  })
+
+  it('accepts the bind address of the mounted web carrier port-lessly', async () => {
+    const { connection, dispose } = await mounted({ trustedHosts: ['harness.example'] }, undefined, '10.1.2.3')
+    try {
+      const bound = browserCookie(connection, '10.1.2.3:3080')
+      expect(connection.requestRejection(fakeRequest({ host: '10.1.2.3:3080', cookie: bound }))).toBeUndefined()
+    } finally {
+      await dispose()
+    }
   })
 
   it('registers one HTTP route plus one upgrade route per downlink and removes all three with the fiber', async () => {

@@ -7,8 +7,9 @@
 #
 # The web-startup plugin injects `cmdlineArgs` and provides `webStartup` as an
 # ordinary Cordis service. Rows configured from flags inject that service, so
-# Loader resolves their expressions only after it exists. The web runtime then
-# provides bind-dependent `webRuntime` values to the trust fence.
+# Loader resolves their expressions only after it exists. The web-runtime row
+# validates the advertised public URL; Connection reads invocation authorities
+# directly from `webStartup`.
 # `dsh --profile web --help` provides no `webStartup`, so no server binds.
 
 # ── surface-specific values the base deliberately omits ─────────────────────
@@ -135,7 +136,8 @@
     # webStartup provider, with these deployment fallbacks. The dist is served
     # by the web-runtime row below through the fallback seat. Routing and
     # browser-facing asset paths do not depend on the advertised URL, which the
-    # web-runtime row owns.
+    # web-runtime row owns; Connection reads trust authorities from webStartup.
+    # This row rejects wildcard binds.
     - id: webserver
       name: '@deepseek-ai/dsh-host-webserver'
       inject: [webStartup]
@@ -152,9 +154,8 @@
     # section and the bash runtime variable, prints the URL line, and opens the
     # canonical URL after the full Loader tree settles and the required-
     # entry audit passes. Invocation-only values come from the webStartup
-    # provider; the advertised application URL is this row's `publicUrl` (the
-    # loopback URL when unset). After the server binds, this row samples LAN
-    # trust once and provides `webRuntime`. A complete agent-preset persona
+    # provider; the advertised application URL is this row's `publicUrl`,
+    # otherwise the bind-address URL. A complete agent-preset persona
     # suppresses the prompt section for that agent while retaining the
     # host-owned shell variable.
     - id: web-runtime
@@ -165,7 +166,6 @@
         printUrl: true
         publicUrl: !!js ctx.webStartup.publicUrl
         surfaceContext: true
-        trustedHosts: !!js ctx.webStartup.trustedHosts
 
     # Live graph delivery keeps open pages aligned with Loader changes.
     # Only development rebuilds require recurring artifact stat polls.
@@ -185,16 +185,16 @@
 
     # Owns both ends of the web transport: node half binds the gateway to the
     # webserver under /api; browser half is the fetch/SSE client. Every API
-    # request and upgrade passes the loopback plus trustedHosts policy; an
-    # advertised public URL contributes nothing to it.
+    # request and upgrade passes the loopback, listener-bind, or trustedHosts
+    # policy; an advertised public URL contributes nothing to it.
     - id: connection
       name: '@deepseek-ai/dsh-client-connection'
-      inject: [webRuntime]
+      inject: [webStartup]
       config:
-        # LAN literals derived from the active bind plus --trusted-host extras.
-        # A deployment adding authorities keeps this expression and concatenates
-        # its literals, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
-        trustedHosts: !!js ctx.webRuntime.trustedHosts
+        # Keep invocation authorities (each --trusted-host value) when adding
+        # deployment values, for example: ['app.internal', ...ctx.webStartup.trustedHosts].
+        # The listener's bind IP is accepted separately from this list.
+        trustedHosts: !!js ctx.webStartup.trustedHosts
 
     - id: terminal-controller
       name: '@deepseek-ai/dsh-api-terminal-controller'

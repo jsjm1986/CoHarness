@@ -22,7 +22,7 @@ dsh --profile web --public-url https://app.example/ui/ --trusted-host app.exampl
 
 ## Trust the authority browsers use
 
-The fence accepts loopback plus every authority `--trusted-host` names. A browser that reaches the deployment under any other authority gets 403 for every API call, however correct the proxy is, so name the browser-visible authority with `--trusted-host`; advertising it with `--public-url` is display only and does not admit it. An entry without a port matches any port, which suits a tunnel that binds a different one each time. The fence only admits the request; the launch token in the printed URL and the signed session cookie authenticate it.
+The fence accepts loopback, the listener's own bind address, and every authority `--trusted-host` names. A browser that reaches the deployment under any other authority gets 403 for every API call, however correct the proxy is, so name the browser-visible authority with `--trusted-host`; advertising it with `--public-url` is display only and does not admit it. An entry without a port matches any port, which suits a tunnel that binds a different one each time. The fence only admits the request; the launch token in the printed URL and the signed session cookie authenticate it.
 
 Neither the advertised URL nor the fence protects the listening port itself, so restrict the port to the trusted proxy or network.
 
@@ -30,4 +30,4 @@ Neither the advertised URL nor the fence protects the listening port itself, so 
 
 Terminate TLS at the proxy. An `http://` advertised root sends the launch token and the session cookie unencrypted, and an `https://` root encrypts only the browser-to-proxy leg. The printed URL carries a process credential, so share it only with intended users.
 
-The [Web app reference](../../../packages/bundle/web-app/README.md#public-deployments) owns the `--public-url` and `--trusted-host` command-line contract and the `publicUrl` and `trustedHosts` fields.
+The [Web app reference](../../../packages/bundle/web-app/README.md#public-deployments) documents the `--public-url` and `--trusted-host` command-line options. In the Web profile, `publicUrl` configures the `web-runtime` row; `trustedHosts` configures the [Connection row](../../../packages/client/connection/README.md).

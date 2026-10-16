@@ -106,6 +106,16 @@ describe('web command-line provider', () => {
     expect(observed.exits).toEqual([])
   })
 
+  // The webserver suite owns the wildcard spellings; the CLI only has to
+  // refuse them by address value before any consumer activates.
+  it.each(['0.0.0.0', '::ffff:0.0.0.0'])('rejects wildcard --host %s before activating consumers', async (host) => {
+    const { values, observed } = await bootProvider(['--host', host])
+    expect(observed.out).toContain(`error: --host ${host} is an unspecified (wildcard) address`)
+    expect(values).toBeUndefined()
+    expect(observed.readerConfig).toBeUndefined()
+    expect(observed.exits).toEqual([1])
+  })
+
   it('leaves deployment values to each consumer when flags omit them', async () => {
     const { values, observed } = await bootProvider([])
     expect(values).toEqual({ openBrowser: true, trustedHosts: [] })
@@ -131,14 +141,6 @@ describe('web command-line provider', () => {
   it('rejects a non-numeric port before the consumer activates', async () => {
     const { values, observed } = await bootProvider(['--port', 'abc'])
     expect(observed.out).toContain('--port must be a number')
-    expect(values).toBeUndefined()
-    expect(observed.readerConfig).toBeUndefined()
-    expect(observed.exits).toEqual([1])
-  })
-
-  it('rejects the intentionally unsupported all-interfaces host before the consumer activates', async () => {
-    const { values, observed } = await bootProvider(['--host', '0.0.0.0'])
-    expect(observed.out).toContain('--host 0.0.0.0 is intentionally not supported yet for safety: it would expose remote code execution to the network; use 127.0.0.1 instead')
     expect(values).toBeUndefined()
     expect(observed.readerConfig).toBeUndefined()
     expect(observed.exits).toEqual([1])

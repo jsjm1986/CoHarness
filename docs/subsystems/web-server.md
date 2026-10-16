@@ -31,8 +31,17 @@ Match order is fixed: exact table first, then longest matching prefix, then the 
 ```ts type-equiv
 /** Web server listen and response-compression config. */
 interface Config {
-  /** Listen host; the two supported values are loopback and all-interfaces. */
-  host: '127.0.0.1' | '0.0.0.0'
+  /**
+   * Listen address: a concrete IPv4 or IPv6 literal of one local interface,
+   * for example the container's own Pod address from `hostname -i`. A loopback
+   * literal (any address in 127/8, `::1`, or a mapped form of either) keeps the
+   * server on this machine; any other literal serves the network that address
+   * belongs to over plain HTTP, because the carrier adds no TLS. The
+   * unspecified address — IPv4 any, IPv6 any, and the IPv4-mapped forms of
+   * IPv4 any — is rejected at load: it would expose the port on every interface
+   * at once.
+   */
+  host: string
   /** Listen port; zero requests an OS-assigned port. */
   port: number
   /** Response compression for socket-backed HTTP requests. @default 'none' */
@@ -44,7 +53,7 @@ interface Config {
 }
 ```
 
-`host` accepts only `127.0.0.1` (default posture) and `0.0.0.0` (deliberate network exposure); there is no TLS, auth, or origin policy, so a non-loopback bind exposes the server to that network. `compression` defaults to `none`; the shipped Web bundle selects gzip level 1 with a 1024-byte threshold. The dist location is an assembly fact of the frontend plugin that claims the seat.
+No composition can bind every interface at once: the unspecified address is rejected at load. The exported `isWildcardHost` and `isLoopbackHost` classify a bind address from its parsed value, and an IPv6 `%zone` is kept for `listen` while classification reads the address alone. The carrier itself owns no TLS, authentication, or Origin policy, so a non-loopback bind serves plain HTTP on that network unless the composition supplies those controls. `compression` defaults to `none`; the shipped Web bundle selects gzip level 1 with a 1024-byte threshold. The shipped `dsh web` command selects loopback by default and accepts one concrete `--host` address, warning at startup when the bind is not loopback; its Connection plugin supplies Host/Origin checks plus browser-session authentication for every Host API route and stream, and the bind address plus `--trusted-host` govern which browser Host is accepted; `--public-url` changes only the advertised URL. Other compositions own their bind and route-authentication policy. The dist location is an assembly fact of the frontend plugin that claims the seat.
 
 ## The service
 

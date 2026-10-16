@@ -22,7 +22,7 @@ dsh --profile web --public-url https://app.example/ui/ --trusted-host app.exampl
 
 ## 信任浏览器使用的 authority
 
-栅栏接受 loopback，以及每个由 `--trusted-host` 点名的 authority。浏览器若以其他任何 authority 访问部署，无论代理多么正确，每个 API 调用都会得到 403，因此请用 `--trusted-host` 点名浏览器可见的 authority；用 `--public-url` 公告它只是展示，并不等于接纳。不带端口的条目匹配任意端口，适合每次绑定不同端口的隧道。栅栏只放行请求；打印 URL 中的启动 token 与签名会话 cookie 才完成认证。
+栅栏接受 loopback、监听器自身的 bind 地址，以及每个由 `--trusted-host` 点名的 authority。浏览器若以其他任何 authority 访问部署，无论代理多么正确，每个 API 调用都会得到 403，因此请用 `--trusted-host` 点名浏览器可见的 authority；用 `--public-url` 公告它只是展示，并不等于接纳。不带端口的条目匹配任意端口，适合每次绑定不同端口的隧道。栅栏只放行请求；打印 URL 中的启动 token 与签名会话 cookie 才完成认证。
 
 无论是公告 URL 还是栅栏都不保护监听端口本身，因此请把端口限制在可信代理或网络内。
 
@@ -30,4 +30,4 @@ dsh --profile web --public-url https://app.example/ui/ --trusted-host app.exampl
 
 在代理处终止 TLS。`http://` 公告根会以明文发送启动 token 与会话 cookie，而 `https://` 根只加密浏览器到代理这一段。打印的 URL 携带进程凭据，只应与预期用户分享。
 
-[Web 应用参考](../../../packages/bundle/web-app/README.zh.md#public-deployments)负责 `--public-url` 与 `--trusted-host` 的命令行约定，以及 `publicUrl` 与 `trustedHosts` 字段。
+[Web 应用参考](../../../packages/bundle/web-app/README.zh.md#public-deployments)记录了 `--public-url` 与 `--trusted-host` 命令行选项。在 Web profile 中，`publicUrl` 配置 `web-runtime` 行；`trustedHosts` 配置 [Connection 行](../../../packages/client/connection/README.zh.md)。

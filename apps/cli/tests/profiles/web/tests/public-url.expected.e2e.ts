@@ -1,4 +1,4 @@
-/** Built Web-profile acceptance for the advertised public root and browser authentication behind a prefix-stripping proxy. */
+/** Built Web-profile acceptance for concrete bind addresses, the advertised public root, and browser authentication. */
 
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { request as httpRequest, type IncomingMessage } from 'node:http'
@@ -9,6 +9,7 @@ import { Readable } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { execa } from 'execa'
 import { describe, expect, it } from 'vitest'
+import { probeNonLoopbackIpv4, probeZonedLoopback } from '../../../../../../scripts/test-non-loopback-address.ts'
 import { startPrefixProxy } from '../../../../../../apps/web/tests/prefix-proxy.ts'
 import { PROCESS_SHUTDOWN_TIMEOUT_MS } from '../../../../src/process-shutdown.ts'
 
@@ -18,6 +19,18 @@ const builtArtifactsExist = existsSync(dshBin)
 
 /** Browser-facing mount the reference proxy serves and strips. */
 const MOUNT = '/tools/dsh/'
+
+const NON_LOOPBACK_IPV4 = builtArtifactsExist ? await probeNonLoopbackIpv4() : undefined
+
+const ZONED_LOOPBACK = builtArtifactsExist ? await probeZonedLoopback() : undefined
+
+/**
+ * Every spelling that binds IPv6 loopback. `::0.0.0.1` is the same address as
+ * `::1`, and the zoned rows reuse the probed scope on that same address.
+ */
+const IPV6_LOOPBACKS = ZONED_LOOPBACK === undefined
+  ? ['::1', '::0.0.0.1']
+  : ['::1', '::0.0.0.1', ZONED_LOOPBACK, ZONED_LOOPBACK.replace('::1%', '::0.0.0.1%')]
 
 /** One live Web child, as `execa` types it. */
 type WebChild = ReturnType<typeof spawnWeb>
@@ -156,7 +169,8 @@ function expectCleanExit(stopped: StoppedWeb): void {
 
 /**
  * One HTTP request that connects to an explicit transport address while
- * presenting an explicit browser-facing authority, as a proxy would.
+ * presenting an explicit browser-facing authority, so a concrete-bind case can
+ * dial the bound address instead of loopback.
  */
 async function request(
   dial: string, port: number, path: string, host: string, method: 'GET' | 'POST', cookie?: string,
@@ -190,7 +204,7 @@ async function exchange(
   return { cookie: setCookie.split(';', 1)[0]!, setCookie }
 }
 
-describe.skipIf(!builtArtifactsExist)('dsh Web profile advertised public root', () => {
+describe.skipIf(!builtArtifactsExist)('dsh Web profile bind address and advertised root', () => {
   it('serves authenticated requests at the advertised mount and at loopback', async () => {
     await withWeb(['--public-url', `http://gateway.example${MOUNT.slice(0, -1)}`, '--trusted-host', 'gateway.example'], async (web) => {
       expect(web.startup.origin).toBe('http://gateway.example')
@@ -216,6 +230,91 @@ describe.skipIf(!builtArtifactsExist)('dsh Web profile advertised public root', 
         await proxy.close()
       }
       expectCleanExit(await web.stop())
+    })
+  })
+
+  it.skipIf(NON_LOOPBACK_IPV4 === undefined)('serves the bound address and a declared authority, refusing any other name', async () => {
+    const trustedHost = 'dsh-direct.example'
+    await withWeb(['--host', NON_LOOPBACK_IPV4!, '--trusted-host', trustedHost], async (web) => {
+      expect(web.startup.origin).toBe(`http://${NON_LOOPBACK_IPV4!}:${String(web.port)}`)
+      expect(web.startup.pathname).toBe('/')
+      const token = web.startup.searchParams.get('token')
+      expect(token).not.toBeNull()
+      const authority = `${NON_LOOPBACK_IPV4!}:${String(web.port)}`
+      const { cookie, setCookie } = await exchange(NON_LOOPBACK_IPV4!, web.port, `/${web.startup.search}`, authority)
+      // The carrier is plain HTTP, where a browser never returns a Secure cookie.
+      expect(setCookie).not.toContain('; Secure')
+      const authenticated = await request(NON_LOOPBACK_IPV4!, web.port, '/api/session.create', authority, 'POST', cookie)
+      expect(authenticated.status).toBe(200)
+      expect(await authenticated.json()).toMatchObject({ result: { ok: true } })
+
+      // A declared authority is admitted without being advertised; any other
+      // name for the same socket is a rebound Host.
+      const declared = `${trustedHost}:${String(web.port)}`
+      const declaredSession = await exchange(NON_LOOPBACK_IPV4!, web.port, `/${web.startup.search}`, declared)
+      const viaDeclared = await request(NON_LOOPBACK_IPV4!, web.port, '/api/session.create', declared, 'POST', declaredSession.cookie)
+      expect(viaDeclared.status).toBe(200)
+      await viaDeclared.arrayBuffer()
+      const rebound = await request(NON_LOOPBACK_IPV4!, web.port, '/api/session.create', `evil.example:${String(web.port)}`, 'POST', cookie)
+      expect(rebound.status).toBe(403)
+      await rebound.arrayBuffer()
+
+      const stopped = await web.stop()
+      expectCleanExit(stopped)
+      expect(stopped.stderr).toContain(`listening on ${NON_LOOPBACK_IPV4!} over plain HTTP`)
+      expect(stopped.stderr).not.toContain(token!)
+    })
+  })
+
+
+  it.skipIf(NON_LOOPBACK_IPV4 === undefined)('warns about the plain-HTTP bind even when an HTTPS root is advertised', async () => {
+    await withWeb(['--host', NON_LOOPBACK_IPV4!, '--public-url', 'https://app.example/', '--trusted-host', 'app.example'], async (web) => {
+      expect(web.startup.origin).toBe('https://app.example')
+      expect(web.startup.host).toBe('app.example')
+      const token = web.startup.searchParams.get('token')
+      expect(token).not.toBeNull()
+      const { cookie } = await exchange(NON_LOOPBACK_IPV4!, web.port, `/${web.startup.search}`, 'app.example')
+      const authenticated = await request(NON_LOOPBACK_IPV4!, web.port, '/api/session.create', 'app.example', 'POST', cookie)
+      expect(authenticated.status).toBe(200)
+      expect(await authenticated.json()).toMatchObject({ result: { ok: true } })
+
+      const stopped = await web.stop()
+      expectCleanExit(stopped)
+      expect(stopped.stderr).toContain(`listening on ${NON_LOOPBACK_IPV4!} over plain HTTP`)
+    })
+  })
+
+  it.each([
+    '::ffff:127.0.0.1',
+    '::ffff:7f00:1',
+  ])('prints an IPv4 root for mapped loopback %s and serves it', async (host) => {
+    await withWeb(['--host', host], async (web) => {
+      expect(web.startup.origin).toBe(`http://127.0.0.1:${String(web.port)}`)
+      const { cookie } = await exchange(web.startup.hostname, web.port, `/${web.startup.search}`, web.startup.host)
+      const authenticated = await request(
+        web.startup.hostname, web.port, '/api/session.create', web.startup.host, 'POST', cookie,
+      )
+      expect(authenticated.status).toBe(200)
+      expect(await authenticated.json()).toMatchObject({ result: { ok: true } })
+
+      const stopped = await web.stop()
+      expectCleanExit(stopped)
+      expect(stopped.stderr).not.toContain('plain HTTP')
+    })
+  })
+
+  it.each(IPV6_LOOPBACKS)('prints the IPv6 loopback root for %s and serves it', async (host) => {
+    await withWeb(['--host', host], async (web) => {
+      expect(web.startup.origin).toBe(`http://[::1]:${String(web.port)}`)
+      const authority = `[::1]:${String(web.port)}`
+      const { cookie } = await exchange('::1', web.port, `/${web.startup.search}`, authority)
+      const authenticated = await request('::1', web.port, '/api/session.create', authority, 'POST', cookie)
+      expect(authenticated.status).toBe(200)
+      expect(await authenticated.json()).toMatchObject({ result: { ok: true } })
+
+      const stopped = await web.stop()
+      expectCleanExit(stopped)
+      expect(stopped.stderr).not.toContain('plain HTTP')
     })
   })
 })

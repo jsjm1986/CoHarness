@@ -8,11 +8,12 @@
 
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse, Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
+import { isIP, type AddressInfo } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import compressionMiddleware from 'compression'
+import ipaddr from 'ipaddr.js'
 import Negotiator from 'negotiator'
 import { renderIndexInjections, type IndexInjection } from './injections.ts'
 
@@ -57,8 +58,17 @@ export interface WebUpgradeRoute {
 
 /** Web server listen and response-compression config. */
 export interface Config {
-  /** Listen host; the two supported values are loopback and all-interfaces. */
-  host: '127.0.0.1' | '0.0.0.0'
+  /**
+   * Listen address: a concrete IPv4 or IPv6 literal of one local interface,
+   * for example the container's own Pod address from `hostname -i`. A loopback
+   * literal (any address in 127/8, `::1`, or a mapped form of either) keeps the
+   * server on this machine; any other literal serves the network that address
+   * belongs to over plain HTTP, because the carrier adds no TLS. The
+   * unspecified address — IPv4 any, IPv6 any, and the IPv4-mapped forms of
+   * IPv4 any — is rejected at load: it would expose the port on every interface
+   * at once.
+   */
+  host: string
   /** Listen port; zero requests an OS-assigned port. */
   port: number
   /** Response compression for socket-backed HTTP requests. @default 'none' */
@@ -84,6 +94,85 @@ type NodeMiddleware = (
   res: ServerResponse,
   next: () => void,
 ) => void
+
+/** Dotted-quad tail of the IPv6 mixed notation: `::0.0.0.1`, `1:2:3:4:5:6:127.0.0.1`. */
+const IPV4_TAIL = /^(.*:)(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+
+/**
+ * Rewrite a dotted-quad tail as the two hex groups holding the same bytes.
+ * ipaddr.js 2.5.0 reads an all-zero prefix plus a quad (`::0.0.0.1`) as the
+ * IPv4-mapped form `::ffff:0:1`, while `getaddrinfo` — and so `listen` — reads
+ * that tail as the low 32 bits of the address itself, which makes `::0.0.0.1`
+ * the loopback literal `::1`. Parsing the rewritten text keeps the parsed value
+ * equal to the value the socket binds.
+ */
+function withHexTail(host: string): string {
+  const tail = IPV4_TAIL.exec(host)
+  if (tail === null) return host
+  const [, head = '', a = '', b = '', c = '', d = ''] = tail
+  const high = ((Number(a) << 8) | Number(b)).toString(16)
+  const low = ((Number(c) << 8) | Number(d)).toString(16)
+  return `${head}${high}:${low}`
+}
+
+/**
+ * Parse a concrete IP literal, normalizing IPv4-mapped IPv6 to IPv4.
+ * `node:net` decides what a value must look like for `listen` to accept it, and
+ * a trailing `%zone` (a local interface selector, never address text) comes off
+ * before parsing; the value handed to `listen` keeps its zone.
+ */
+function parseIpLiteral(host: string): ipaddr.IPv4 | ipaddr.IPv6 | undefined {
+  if (isIP(host) === 0) return undefined
+  const zoneAt = host.indexOf('%')
+  const parsed = ipaddr.parse(withHexTail(zoneAt === -1 ? host : host.slice(0, zoneAt)))
+  return parsed instanceof ipaddr.IPv6 && parsed.isIPv4MappedAddress() ? parsed.toIPv4Address() : parsed
+}
+
+/** Rejection for a bind address that is no concrete IP literal. */
+function notLiteralError(value: string): Error {
+  return new Error(`webserver: host ${JSON.stringify(value)} is not a concrete IPv4 or IPv6 address literal`)
+}
+
+/** ipaddr's IPv4 unspecified range covers all of 0/8; only the all-zero address binds every interface. */
+function isWildcardAddress(parsed: ipaddr.IPv4 | ipaddr.IPv6): boolean {
+  const parts = parsed instanceof ipaddr.IPv4 ? parsed.octets : parsed.parts
+  return parts.every(part => part === 0)
+}
+
+/**
+ * Whether a bind address requests every interface at once.
+ * @param host - bind address from configuration.
+ * @returns true for IPv4 any, IPv6 any, and an IPv4-mapped form of IPv4 any.
+ */
+export function isWildcardHost(host: string): boolean {
+  const parsed = parseIpLiteral(host)
+  return parsed !== undefined && isWildcardAddress(parsed)
+}
+
+/**
+ * Whether a bind address names the local loopback authority.
+ * @param host - bind address from configuration.
+ * @returns true for any address in 127/8, `::1`, and their IPv4-mapped forms.
+ */
+export function isLoopbackHost(host: string): boolean {
+  const parsed = parseIpLiteral(host)
+  return parsed !== undefined && parsed.range() === 'loopback'
+}
+
+/**
+ * Canonical text of the address a bind literal names: IPv4 and IPv4-mapped
+ * literals read as dotted quad, every other literal as its compressed IPv6
+ * value. The text names the address `listen` binds, so `::0.0.0.1` reads as
+ * `::1`. A `%zone` selects an interface and never appears in the text.
+ * @param host - concrete IPv4 or IPv6 literal, with or without a zone.
+ * @returns the address text, ready to be a URL host.
+ * @throws when `host` is no concrete IPv4 or IPv6 address literal.
+ */
+export function normalizeBindAddress(host: string): string {
+  const parsed = parseIpLiteral(host)
+  if (parsed === undefined) throw notLiteralError(host)
+  return parsed.toString()
+}
 
 /** Build the maintained gzip middleware without exposing response policy to route owners. */
 function createGzipMiddleware(config: ResolvedConfig): NodeMiddleware {
@@ -124,7 +213,14 @@ function createGzipMiddleware(config: ResolvedConfig): NodeMiddleware {
  */
 export class WebServer extends Service {
   static Config: z<Config> = z.object({
-    host: z.union([z.const('127.0.0.1'), z.const('0.0.0.0')]).required(),
+    host: z.transform(z.string(), (value) => {
+      const parsed = parseIpLiteral(value)
+      if (parsed === undefined) throw notLiteralError(value)
+      if (isWildcardAddress(parsed)) {
+        throw new Error(`webserver: host ${JSON.stringify(value)} is an unspecified (wildcard) address, which is not supported: binding every interface would expose remote code execution to the network; bind one concrete IPv4 or IPv6 address of a local interface instead`)
+      }
+      return value
+    }).required(),
     port: z.natural().max(65535).required(),
     compression: z.union([z.const('none'), z.const('gzip')]).default(DEFAULT_COMPRESSION),
     compressionLevel: z.number().step(1).min(0).max(9).default(DEFAULT_COMPRESSION_LEVEL),
@@ -152,7 +248,7 @@ export class WebServer extends Service {
     return this.listenedPort
   }
 
-  /** The configured bind host (the loopback or all-interfaces literal). */
+  /** The configured bind address (one concrete local interface). */
   get host(): Config['host'] {
     return this.config.host
   }
