@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-skill-office",
-  "description": "Bundled Word, PowerPoint, and Excel workflows and structural checks",
+  "description": "Bundled Word, PowerPoint, and Excel workflows and LibreOffice Kit operations",
   "version": "0.1.5-alpha.1.coharness.1",
   "publishConfig": {
     "access": "public"
