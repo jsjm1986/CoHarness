@@ -73,6 +73,34 @@ describe('Client inspect providers', () => {
     expect(snapshotCalls).toEqual([undefined, 'root', 'missing'])
   })
 
+  it('serves Factory nodes under the factory: selector and in the forest', async () => {
+    const ctx = new Context()
+    const child = { type: 'slot', name: 'provider.factory.child', kind: 'single', scope: 'root', children: [], occupants: [] }
+    const factory = {
+      type: 'factory', name: 'provider.factory', scope: 'root', registrant: 'test', children: [child],
+    }
+    ctx.provide('slots', {
+      snapshot: (requested?: string) => {
+        if (requested === undefined) return [factory]
+        return requested === 'factory:provider.factory' ? [factory] : []
+      },
+    } as never)
+    const slots = provider(ctx, 'Slots')
+
+    const all = await slots.query('listSubTree', undefined, QUERY_CONTEXT) as {
+      trees: { type: string; name: string; children: { type: string; name: string }[] }[]
+    }
+    expect(all.trees).toEqual([{
+      type: 'factory', name: 'provider.factory', scope: 'root',
+      children: [{ type: 'slot', name: 'provider.factory.child', kind: 'single', scope: 'root', children: [] }],
+    }])
+
+    const exact = await slots.query('listSubTree', { root: 'factory:provider.factory' }, QUERY_CONTEXT) as {
+      selected: { type: string; name: string; scope: string }
+    }
+    expect(exact.selected).toMatchObject({ type: 'factory', name: 'provider.factory', scope: 'root' })
+  })
+
   it('fails loudly when the Slots service is absent', async () => {
     const ctx = new Context()
     await expect(async () => provider(ctx, 'Slots').query('listSubTree', undefined, QUERY_CONTEXT)).rejects.toThrow('Slots service is not running')

@@ -217,7 +217,7 @@ export function ConversationSessionHeader({
  */
 export function ConversationSession({
   sessionId, useSession, useInput, inputActions, useStore, actions,
-  renderSlot, views, bindDraftMirror, releaseSessionImages, compact = false,
+  renderSlot, views, bindDraftMirror, releaseSessionImages, compact = false, view,
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
@@ -243,13 +243,14 @@ export function ConversationSession({
   }, [releaseSessionImages, sessionId])
 
   if (blank && composerPhase === 'blank') return null
+  const viewId = view ?? active?.id
   return (
     <div className={css.viewArea}>
-      {active !== undefined && renderSlot('conversation.view', {
+      {viewId !== undefined && renderSlot('conversation.view', {
         compact,
         inspect,
         onInspectDone: () => { actions.setInspect(null) },
-      }, { only: active.id })}
+      }, { only: viewId })}
     </div>
   )
 }

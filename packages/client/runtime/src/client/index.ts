@@ -239,7 +239,8 @@ declare module '@deepseek-ai/cordis' {
       next: () => Promise<boolean>,
     ): Promise<boolean>
     /**
-     * A slot's definition or registration set changed.
+     * An ordinary Slot's definition or entry registration set changed. Factory
+     * definitions publish through `subscribeFactory()` instead.
      * @mode emit
      * @param key - the mutated SlotMap key.
      */

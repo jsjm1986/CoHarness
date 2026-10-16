@@ -25,7 +25,7 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 
 文档上传、完成后的引用和草稿删除都跟随所寻址 Session 的 runtime。可恢复上传的全部 HTTP 与 XHR 请求携带同一个已验证账号和 runtime，恢复元数据按该归属隔离。Session 所有者失效时，不能回退到页面引导 runtime 的文档存储。
 
-根作用域的 `conversation` 入口声明 `conversation.pane`（允许当前 Session 缺席的对话树），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。旧布局等待完整身份验证时发布 `pendingIdentity`，在对账完成前拒绝布局编辑，不会把未保存的改动报告为成功。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
+根作用域的 `conversation` 入口声明 `conversation.content`（允许当前 Session 缺席的 Component Factory，其 `views` 局部位置默认渲染 `conversation.session`），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。旧布局等待完整身份验证时发布 `pendingIdentity`，在对账完成前拒绝布局编辑，不会把未保存的改动报告为成功。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
 
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 

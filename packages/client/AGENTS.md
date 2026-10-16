@@ -45,7 +45,7 @@ The stack has one-way knowledge, settled in the [web client architecture note](.
 
 1. **Data object layer** (`runtime`, React-free): `ConnectionController` → `SessionManager` → `Session` own all business state (event windows, streaming accumulation, reconnect machine), and the snapshot-store engine (zustand/immer, `defineStore`, `shallowEqual`) lives here too — store products are bare observable sources with no hook members. Zero React imports — grep-assertable.
 2. **Render machinery** (`ui-renderer`, dynamic plugin): all ctx-to-React integration — slot renderer/outlets, `SessionProvider`, and the uSES adapter. Every hook is composed here at the binding site from bare sources; production business code carries no ui-renderer value dependency.
-3. **Presentation components** (plugin packages' `src/client/`, pure props): consumables, expected to be rewritten wholesale. Business logic must not leak into them; everything arrives through the four props shares.
+3. **Presentation components** (plugin packages' `src/client/`, pure props): consumables, expected to be rewritten wholesale. Business logic must not leak into them; everything arrives through the derived props shares.
 
 Non-negotiables across the layers:
 
@@ -104,7 +104,7 @@ The seam is `loader.internal = modules`: cordis reaches plugin code through `Ent
 
 ## Directory regime (plugin packages)
 
-One UI feature = one plugin package (`src/client/` browser half). A multi-domain package splits where its code could later become separate packages — ui-conversation is the example: `contract/` (the only shared API), domain directories that never make runtime/value imports from a sibling domain, and `apply.ts` as the single cross-domain assembly point; erased type-only references may name an implementation-owned projection and add no browser module edge or runtime cost. `scripts/verify-client-domain-graph.ts` enforces the levels and treats only explicit package roots such as `WorkspaceBrowser.tsx` as additional assembly points. Registration goes through `slots.register` in `apply` — never module-level side effects.
+One UI feature = one plugin package (`src/client/` browser half). A multi-domain package splits where its code could later become separate packages — ui-conversation is the example: `contract/` (the only shared API), domain directories that never make runtime/value imports from a sibling domain, and `apply.ts` as the single cross-domain assembly point; erased type-only references may name an implementation-owned projection and add no browser module edge or runtime cost. `scripts/verify-client-domain-graph.ts` enforces the levels and treats only explicit package roots such as `WorkspaceBrowser.tsx` as additional assembly points. Registration goes through `slots.register` or `slots.registerFactory` in `apply` — never module-level side effects.
 
 ## Styling
 
@@ -142,8 +142,8 @@ Bringing up a new `packages/client/<name>` plugin package (ui-workspace is a com
 
 ## New component checklist
 
-1. Compose through register: add the slot to `SlotMap`, declare it in its parent entry's `children`, and register your component — see the [slot system standard](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md). No other composition route exists.
-2. Type the props as the four shares (`PropsRuntime` & `PropsRenderSlots` & `PropsStore` & inject face) — derive, don't hand-write. Shared/surviving state goes in a `createXXXStore()` factory declared at register; component-private state stays local.
+1. Compose through `register`: add the slot to `SlotMap`, declare it in its parent entry's `children`, and register your component. Use a Component Factory only for a reusable assembly rendered independently under unrelated parents; see the [slot system standard](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md).
+2. Type ordinary props from the five shares (`PropsRuntime` & `PropsRenderSlots` & `PropsRenderFactories` & `PropsStore` & inject face), and use the derived `Factory*PropsOf` aliases for Factory Components. Shared or remount-surviving state goes in a declared store; component-private state stays local.
 3. Component tests feed props directly (`createXXXStore().create()` for the store data; plain stubs for framework hooks) and assert behavior without render machinery.
 4. Tokens only in CSS; Chinese product copy; English comments.
 5. `pnpm run test:gui` green; if the component changes visible assembled output, also run `DSH_SNAPSHOT=replay pnpm run test:web`.

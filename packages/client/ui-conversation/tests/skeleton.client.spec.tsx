@@ -4,7 +4,7 @@
 // owned draft, and the history-first hero workspace picker.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { createElement, type ComponentType, type ReactNode } from 'react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, SessionCreateError,
@@ -12,7 +12,10 @@ import {
 import type {
   ConversationSnapshot, ProjectUiPolicySnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationPaneProps, ConversationPaneProps as ConversationRootProps } from '../src/client/skeleton/ConversationRoot.tsx'
+import type {
+  ConversationContentOwnProps as ConversationPaneProps,
+  ConversationContentOwnProps as ConversationRootProps,
+} from '../src/client/skeleton/ConversationRoot.tsx'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
@@ -20,7 +23,7 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 import { createChatStore } from '../src/client/stores.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en, zh } from '../src/client/locales.ts'
-import { ConversationPane as ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
+import { ConversationContent as ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
@@ -296,6 +299,12 @@ function mount(
     inputActions,
     renderSlot,
     renderSlotChain,
+    useFactorySlot: ((
+      _name: string,
+      fallback: ComponentType<{ compact?: boolean; renderSlot: ConversationRootProps['renderSlot'] }>,
+    ) => (localProps: { compact?: boolean }) =>
+      createElement(fallback, { ...localProps, renderSlot })) as ConversationRootProps['useFactorySlot'],
+    renderFactorySlot: (() => null) as ConversationRootProps['renderFactorySlot'],
     selectWorkspace: retargetWorkspace,
     t,
   } as ConversationRootProps

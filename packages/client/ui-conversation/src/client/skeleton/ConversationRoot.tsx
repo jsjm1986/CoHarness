@@ -6,7 +6,7 @@ import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationPaneSlotProps, ConversationSlotProps, InputZone,
+  ConversationContentProps, ConversationSlotProps, ConversationViewsProps, InputZone,
 } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { CHAT_CONTENT_WIDTH_RANGE } from '../../submission-settings.ts'
@@ -167,14 +167,20 @@ function WidthHandle(props: {
 
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
-export type ConversationPaneProps = ConversationPaneSlotProps
+export type ConversationContentOwnProps = ConversationContentProps
+
+/** Default `views` position: the session view ring under the stored selection. */
+function ConversationSessionView({ renderSlot, compact = false }: ConversationViewsProps) {
+  return <>{renderSlot('conversation.session', { compact })}</>
+}
 
 /** Render one Session's complete conversation surface. */
-export function ConversationPane({
+export function ConversationContent({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
   useDisplaySettings, useProjectPolicy, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace,
-  t, compact = false, active = true, workbench = false, headerLeading,
-}: ConversationPaneProps) {
+  t, useFactorySlot, variant = 'main', compact = false, active = true, workbench = false, headerLeading,
+}: ConversationContentOwnProps) {
+  const Views = useFactorySlot('views', ConversationSessionView)
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
   const pending = useSession(s => s.pending) ?? []
@@ -489,20 +495,20 @@ export function ConversationPane({
   return (
     <div
       ref={rootResizeRef}
-      className={clsx(css.root, workbench && css.workbenchPane)}
+      className={clsx(css.root, workbench && css.workbenchPane, variant === 'embedded' && css.embeddedBody)}
       data-phase={phase}
       data-chat-fill={displaySettings.chatFullWidth || undefined}
       style={widthStyle}
     >
-      {renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
+      {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
       <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
         <div className={css.scrollBody} data-conversation-scroll="">
-          {renderSlot('conversation.session', { compact })}
+          {sessionId === undefined ? null : <Views compact={compact} />}
           {composerSeat}
         </div>
         {/* Width handles only while a transcript is on screen; the hero has no
             content column to size. Both edges write the one centered width. */}
-        {phase === 'active' && !workbench && (['left', 'right'] as const).map(side => (
+        {phase === 'active' && !workbench && variant !== 'embedded' && (['left', 'right'] as const).map(side => (
           <WidthHandle
             key={side}
             side={side}
@@ -592,9 +598,9 @@ export function ConversationRoot(props: ConversationRootProps) {
   }
   if (!workbench) return available ? (
     <div className={css.workbenchRoot}>
-      {props.renderSlot('conversation.pane', { compact, workbench: false, headerLeading: props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed: false, inline: true }) })}
+      {props.renderFactorySlot('conversation.content', { variant: 'main', compact, workbench: false, headerLeading: props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed: false, inline: true }) })}
     </div>
-  ) : props.renderSlot('conversation.pane', { compact })
+  ) : props.renderFactorySlot('conversation.content', { variant: 'main', compact })
   return (
     <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
       {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed })}
@@ -632,7 +638,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                                 setMaximizedId(current => current === id ? undefined : id)
                               },
                             })}
-                            {props.renderSlot('conversation.pane', { compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true })}
+                            {props.renderFactorySlot('conversation.content', { variant: 'main', compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true })}
                           </>
                         )}
                       </props.SessionProvider>

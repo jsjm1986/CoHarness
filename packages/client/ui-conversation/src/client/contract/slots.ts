@@ -2,7 +2,8 @@
 import type { ReactNode, RefObject } from 'react'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {
-  InjectFace, MaybeSnapshotSelectorHook, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
+  FactoryComponentPropsOf, FactoryLocalComponentPropsOf, InjectFace, MaybeSnapshotSelectorHook,
+  PropsLocale, PropsRenderFactories, PropsRenderSlots, PropsRuntime, PropsStore,
   SlotHookFactory, SnapshotSelectorHook,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
@@ -94,8 +95,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /** Auxiliary-panel control bound to this exact conversation pane. */
     'conversation.session.header.corner': { kind: 'single'; scope: 'session' }
-    /** One explicit Session pane rendered by the conversation viewport. */
-    'conversation.pane': { kind: 'single'; scope: 'session-maybe'; owner: ConversationPaneOwnerProps }
     /** Workbench controls rendered above the multi-pane surface. */
     'conversation.workbench.toolbar': { kind: 'single'; scope: 'root'; owner: ConversationWorkbenchToolbarOwnerProps }
     /** Empty state rendered when the workbench has no selected panes. */
@@ -356,6 +355,38 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     useInput: MaybeSnapshotSelectorHook<InputState>
     inputActions: InputActions | undefined
   }
+
+  interface SlotFactoryMap {
+    /**
+     * Reusable Conversation content instantiated by presentation hosts: the
+     * resident shell and every workbench pane render one occurrence each, and
+     * embedded hosts (the sidebar chat) substitute the `views` local
+     * Component to pin a fixed view.
+     */
+    'conversation.content': {
+      scope: 'session-maybe'
+      props: ConversationContentInputProps
+      children: {
+        'conversation.session': { kind: 'single'; scope: 'session' }
+        'conversation.session.header': { kind: 'single'; scope: 'session' }
+        'conversation.composer': { kind: 'chain'; scope: 'session' }
+        'conversation.composer.bar': { kind: 'single'; scope: 'session-maybe' }
+        'conversation.input.overlay': { kind: 'list'; scope: 'session' }
+        'conversation.input.dock': { kind: 'list'; scope: 'session' }
+        'conversation.composer.dock': { kind: 'list'; scope: 'session' }
+        'conversation.input.left': { kind: 'list'; scope: 'session' }
+        'conversation.input.right': { kind: 'list'; scope: 'session' }
+        'conversation.hero.brand.mark': { kind: 'single'; scope: 'root' }
+        'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
+        'conversation.hero.agentPreset': { kind: 'single'; scope: 'root' }
+      }
+      inject: ConversationInjected
+      locale: 'conversation'
+      slots: {
+        views: { scope: 'session'; props: ConversationViewsInputProps }
+      }
+    }
+  }
 }
 
 /** Owner share of the hero agent-preset chip: the shell supplies nothing. */
@@ -368,6 +399,8 @@ export interface HeroAgentPresetOwnerProps {
 export interface ConversationSessionOwnerProps {
   /** Whether the shell is using the compact phone presenter. */
   compact?: boolean
+  /** Pin the view ring to one fixed view id instead of the stored selection. */
+  view?: string
   /**
    * Wrap the view ring in the transcript scrollport that also hosts the
    * sticky composer seat (whole `'conversation.composer'` chain output).
@@ -777,8 +810,10 @@ export interface HeroBrandMarkOwnerProps {
  * + composer chain/bar + input-region + hero picker slots) & store & injected
  * shares & the locale seat.
  */
-/** Owner share of one explicit Session pane. */
-export interface ConversationPaneOwnerProps {
+/** Host-supplied input for one reusable Conversation content occurrence. */
+export interface ConversationContentInputProps {
+  /** Presentation variant: the resident/workbench panes are `main`; embedded hosts pass `embedded`. */
+  variant?: 'main' | 'embedded'
   /** Optional root-owned navigation for the session header. */
   headerLeading?: ReactNode
   /** Whether the shell is using the compact phone presenter. */
@@ -787,6 +822,12 @@ export interface ConversationPaneOwnerProps {
   active?: boolean
   /** Whether this pane is rendered inside the multi-session Workbench. */
   workbench?: boolean
+}
+
+/** Values passed from shared content to its occurrence-selected view position. */
+export interface ConversationViewsInputProps {
+  /** Whether the shell is using the compact phone presenter. */
+  compact?: boolean
 }
 
 /** Owner share for the root-level workbench toolbar. */
@@ -825,20 +866,11 @@ export interface ConversationWorkbenchPaneHeaderOwnerProps {
   onMaximize: () => void
 }
 
-/** Full props of one explicit Session pane. */
-export type ConversationPaneSlotProps =
-  PropsRuntime<'conversation.pane'> & PropsRenderSlots<
-    | 'conversation.session' | 'conversation.session.header'
-    | 'conversation.composer' | 'conversation.composer.bar'
-    | 'conversation.input.overlay'
-    | 'conversation.input.dock' | 'conversation.composer.dock'
-    | 'conversation.input.left' | 'conversation.input.right'
-    | 'conversation.hero.brand.mark'
-    | 'conversation.hero.workspace'
-    | 'conversation.hero.agentPreset'
-  >
-  & InjectFace<ConversationInjected>
-  & PropsLocale<'conversation'>
+/** Full props of the reusable Conversation Factory definition. */
+export type ConversationContentProps = FactoryComponentPropsOf<'conversation.content'>
+
+/** Full props of the Factory's caller-selectable Conversation view position. */
+export type ConversationViewsProps = FactoryLocalComponentPropsOf<'conversation.content', 'views'>
 
 /** Root viewport navigation and plugin-availability callbacks. */
 export interface ConversationViewportInjected {
@@ -853,11 +885,12 @@ export interface ConversationViewportInjected {
 /** Full props of the current-session or multi-pane conversation host. */
 export type ConversationSlotProps =
   PropsRuntime<'main'> & PropsRenderSlots<
-    'conversation.pane' | 'conversation.workbench.toolbar' | 'conversation.workbench.empty'
+    'conversation.workbench.toolbar' | 'conversation.workbench.empty'
     | 'conversation.workbench.pane.header'
   >
   & PropsStore<ReturnType<typeof createConversationViewportStore>>
   & InjectFace<ConversationViewportInjected>
+  & PropsRenderFactories
   & PropsLocale<'conversation'>
 
 /** Full strict-session body props: per-session store, view ring, and draft mirror. */

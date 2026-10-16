@@ -43,7 +43,7 @@ import { StatsPills, type StatsPillsInjected } from './chat/StatsPills.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
-import { ConversationPane, ConversationRoot } from './skeleton/ConversationRoot.tsx'
+import { ConversationContent, ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationViewportController, createConversationViewportStore } from './viewport.ts'
 import type { ShortcutCommandId, ShortcutFixedCommand } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { installStopShortcut } from './stop-shortcut.ts'
@@ -417,7 +417,6 @@ export function apply(ctx: Context): void {
     locale: NS,
     store: viewportStore,
     children: {
-      'conversation.pane': { kind: 'single', scope: 'session-maybe' },
       'conversation.workbench.toolbar': { kind: 'single', scope: 'root' },
       'conversation.workbench.empty': { kind: 'single', scope: 'root' },
       'conversation.workbench.pane.header': { kind: 'list', scope: 'session' },
@@ -452,8 +451,9 @@ export function apply(ctx: Context): void {
     }
   }, 'ui-conversation: conversation viewport capability')
 
-  slots.register({
-    name: 'conversation.pane',
+  slots.registerFactory({
+    name: 'conversation.content',
+    scope: 'session-maybe',
     locale: NS,
     children: {
       'conversation.session': { kind: 'single', scope: 'session' },
@@ -468,6 +468,9 @@ export function apply(ctx: Context): void {
       'conversation.hero.brand.mark': { kind: 'single', scope: 'root' },
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
       'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
+    },
+    slots: {
+      views: { scope: 'session' },
     },
     inject: (sessionId: SessionId | undefined): ConversationInjected => ({
       hooks: {
@@ -492,7 +495,7 @@ export function apply(ctx: Context): void {
       },
       setDisplayWidth: (value) => { displaySettings.setWidth(value) },
     }),
-  }, ConversationPane)
+  }, ConversationContent)
 
   // The strict session body fills the resident scrollport without owning it;
   // the Hero/composer path therefore stays fixed while the first blank

@@ -81,7 +81,7 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   // The host face (store resolution) exists only inside the installed
   // renderer, so materialize it the way the shell does.
   runtime.renderRoot()
-  const entryOf = (key: 'main' | 'conversation.pane' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
+  const entryOf = (key: 'main' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
     runtime.slots.entries(key)[0]!
   /** Resolve store instance + call the inject the way the outlet would. */
   const conversationApi = (id: SessionId) => {
@@ -99,8 +99,8 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
     return { instance, injected }
   }
   const residentApi = (id: SessionId | undefined) => {
-    const entry = entryOf('conversation.pane')
-    return (entry.inject as unknown as (sessionId: SessionId | undefined) => ConversationInjected)(id)
+    const definition = runtime.factoryOf('conversation.content')
+    return (definition.inject as unknown as (sessionId: SessionId | undefined) => ConversationInjected)(id)
   }
   const composerApi = (id: SessionId | undefined) => {
     const entry = entryOf('conversation.composer.bar')
@@ -342,7 +342,7 @@ describe('conversation slot inject API', () => {
     await vi.waitFor(() => {
       expect(b.runtime.sessions.calls.filter(c => c.method === 'open')).toHaveLength(1)
     })
-    expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openWorkspace', args: ['workspace-1', undefined] })
+    expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openWorkspace', args: ['workspace-1'] })
     expect(state.getSnapshot().draft).toBe('carry me')
     // Cross-session history entry: the draft remains in the old session unless
     // the caller explicitly confirms the discard flow.

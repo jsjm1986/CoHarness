@@ -103,6 +103,17 @@
    column's chrome; keep only a small rhythm around the strip. */
 .workbenchPane .header { padding: var(--dsw-space-2) var(--dsw-space-3); }
 
+/* Embedded occurrences (sidebar chat): the host's column is narrower than a
+   main pane, so the chat content and composer budgets tighten and there are
+   no width handles to leave edge room for. */
+.embeddedBody {
+  overflow: hidden;
+  --dsh-chat-content-width: min(calc(100% - 32px), 920px);
+  --dsh-composer-card-max-width: min(calc(100% - 16px), 952px);
+  --dsh-composer-side-clearance: 8px;
+  --dsh-composer-dock-inset: 8px;
+}
+
 /* The header's one centered group: status dot, breadcrumb strip, and the
    titleMeta suffix. `leading` (workbench toolbar) anchors the left edge, the
    view tabs and action groups the right, so identity centers between the

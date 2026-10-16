@@ -13,7 +13,7 @@ const CLIENT_SERVICES: Readonly<Record<string, readonly string[]>> = {
   layout: ['toggleSidebar', 'openDetails', 'closeDetails'],
   locale: ['getLocale', 'getSnapshot', 'subscribe', 'setLocale', 'register', 'bind'],
   sessions: ['setSubagentCatalogOpen', 'refreshSubagents', 'search', 'fork', 'scope', 'binding', 'open', 'openSubagent'],
-  slots: ['register', 'inject'],
+  slots: ['register', 'registerFactory', 'inject'],
   theme: ['getTheme', 'setTheme', 'setFontSize', 'register', 'overrideTokens'],
   timer: ['debounce', 'interval', 'throttle', 'timeout'],
   workspaces: [

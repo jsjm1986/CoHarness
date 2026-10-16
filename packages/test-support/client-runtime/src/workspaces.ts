@@ -56,7 +56,7 @@ export class TestWorkspaces implements IWorkspaces {
    * @returns the connected session id.
    */
   async connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId> {
-    this.calls.push({ method: 'connectWorkspace', args: [workspaceId, options] })
+    this.calls.push({ method: 'connectWorkspace', args: options === undefined ? [workspaceId] : [workspaceId, options] })
     const stub = this.stubs.get('connectWorkspace')
     if (stub !== undefined) return await (stub(workspaceId, options) as Promise<SessionId>)
     return `session-of-${workspaceId}` as SessionId
@@ -70,7 +70,7 @@ export class TestWorkspaces implements IWorkspaces {
    * @returns the session id selected by the history-first entry flow.
    */
   async openWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId> {
-    this.calls.push({ method: 'openWorkspace', args: [workspaceId, options] })
+    this.calls.push({ method: 'openWorkspace', args: options === undefined ? [workspaceId] : [workspaceId, options] })
     const stub = this.stubs.get('openWorkspace')
     if (stub !== undefined) return await (stub(workspaceId, options) as Promise<SessionId>)
     return `session-of-${workspaceId}` as SessionId
@@ -82,7 +82,7 @@ export class TestWorkspaces implements IWorkspaces {
    * @param options - draft initialization and failure observer for the landed Session.
    */
   startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void {
-    this.calls.push({ method: 'startSession', args: [workspaceId, options] })
+    this.calls.push({ method: 'startSession', args: [workspaceId, options].filter(arg => arg !== undefined) })
     this.stubs.get('startSession')?.(workspaceId, options)
   }
 

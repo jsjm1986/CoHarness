@@ -20,7 +20,7 @@ dsh web GUI 的浏览器侧：shell 启动、浏览器与宿主通信、共享 U
 | [`hmr/`](hmr/README.zh.md) | 在开发期间刷新客户端插件。 |
 | [`locale/`](locale/README.zh.md) | 提供本地化偏好与消息词典。 |
 | [`test-runtime/`](../test-support/client-runtime/README.zh.md) | 为客户端功能包提供共享的仓库测试支持。 |
-| [`ui-slots/`](ui-slots/README.zh.md) | 定义 UI 功能注册和组合扩展 slot 的方式。 |
+| [`ui-slots/`](ui-slots/README.zh.md) | 定义类型化扩展 Slots 与可复用 Component Factory。 |
 | [`ui-theme/`](ui-theme/README.zh.md) | 应用所选颜色主题。 |
 | [`ui-primitives/`](ui-primitives/README.zh.md) | 提供共享 React 控件、图标和内容渲染器。 |
 | [`ui-attachment/`](ui-attachment/README.zh.md) | 注册输入框与消息图片的附件呈现。 |

@@ -103,6 +103,11 @@ describe('apply wiring', () => {
     expect(b.slots.spec('conversation.hero.brand.mark')).toEqual({ kind: 'single', scope: 'root' })
     expect(b.slots.spec('conversation.hero.workspace')).toEqual({ kind: 'single', scope: 'root' })
     expect(b.slots.spec('conversation.hero.agentPreset')).toEqual({ kind: 'single', scope: 'root' })
+    // The conversation body is a session-maybe Factory: its strict-session
+    // `views` local position defaults to the conversation.session entry.
+    expect(b.slots.snapshot('factory:conversation.content')).toMatchObject([{
+      type: 'factory', name: 'conversation.content', scope: 'session-maybe',
+    }])
     expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual([
       'transcript-view', 'link-opening', 'composer-enter', 'conversation-display', 'performance-usage',
     ])

@@ -10,8 +10,6 @@ flowchart LR
   cfg["packages/bundle/base/cordis.patch.yml<br/>cordis.yml"]
   plugin_dsh_base_tool_plugin_manager["tool-plugin-manager<br/>@deepseek-ai/dsh-plugin-manager/tools"]
   cfg --> plugin_dsh_base_tool_plugin_manager
-  plugin_dsh_base_tool_plugin_market["tool-plugin-market<br/>@deepseek-ai/dsh-plugin-market/tools"]
-  cfg --> plugin_dsh_base_tool_plugin_market
   plugin_dsh_base_plugin_manager["plugin-manager<br/>@deepseek-ai/dsh-plugin-manager"]
   cfg --> plugin_dsh_base_plugin_manager
   plugin_dsh_base_timer["timer<br/>@deepseek-ai/cordis-plugin-timer"]
@@ -193,7 +191,6 @@ flowchart LR
 | Plugin id | Package / module |
 | --- | --- |
 | `tool-plugin-manager` | `@deepseek-ai/dsh-plugin-manager/tools` |
-| `tool-plugin-market` | `@deepseek-ai/dsh-plugin-market/tools` |
 | `plugin-manager` | `@deepseek-ai/dsh-plugin-manager` |
 | `timer` | `@deepseek-ai/cordis-plugin-timer` |
 | `hmr` | `@deepseek-ai/dsh-hmr` |

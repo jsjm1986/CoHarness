@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-slots/README.md
 /:
-  en: ba477020f63a3dc4
+  en: d06d6e7a10f9a420
   zh: 0a51af1cad6486b4
 /deepseek-ai-dsh-client-ui-slots:
-  en: 586ffe2e96867e1a
-  zh: d5d22fccf50f40dd
+  en: 757335397ca37eae
+  zh: 9ae17d45a0233f67
 /deepseek-ai-dsh-client-ui-slots/summary:
   en: 486631f9cc7b5d6f
   zh: 61fdcd066fcd1402

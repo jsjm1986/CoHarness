@@ -18,7 +18,7 @@ Status: implemented
 
 `ThemePresenter` 拥有六个 body 变量(`--dsh-content-font-size`、`--dsh-code-font-size`、`--dsh-terminal-font-size`、`--dsh-font-family-{text,code,terminal}`),在提交点写入或移除。Host 索引引导在 shell 挂载前把持久字号与字族写到 `body` 上,使首屏及 `bootstrapFontSizes`/`bootstrapFontFamilies` 与作用域随后采纳的值一致。markdown 字阶经 `--dsh-content-font-delta` 与 `--dsh-code-font-delta` 跟随设置,锚定本分叉的本地字阶而非上游绝对值。侧栏终端消费自身角色且不替换存活中的 xterm 实例,仅在可见可写终端的几何变化时重排版。
 
-**作用域 decode 解析账户裸层。** `account-or-host` 绑定声明 `decode: decodeThemeSection`,将每份 section 经 `ThemeSettingsSchema` 解析。账户偏好镜像可能发布早于字体字段的 section(其 `ui-theme` 白名单仅含 `preference`),而复合合并在 Host 层尚未就绪时会把这份裸 section 透出;schema 解析会补齐缺失字段,使两条通道上的 `getSnapshot().value` 都维持文档所述的"schema 解析后 section"契约([字段路由](2026-10-03-account-or-host-field-routing.md))。
+**作用域 decode 解析账户裸层。** `account-or-host` 绑定声明 `decode: decodeThemeSection`,将每份 section 经 `ThemeSettingsSchema` 解析。账户偏好镜像可能发布早于字体字段的 section(其 `ui-theme` 白名单仅含 `preference`),而复合合并在 Host 层尚未就绪时会把这份裸 section 透出;schema 解析会补齐缺失字段,使两条通道上的 `getSnapshot().value` 都维持文档所述的"schema 解析后 section"契约([字段路由](../bug-fix/2026-10-03-account-or-host-field-routing.zh.md))。
 
 ## Alternatives considered
 
