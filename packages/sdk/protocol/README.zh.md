@@ -38,13 +38,17 @@ DeepSeek Harness SDK 运行时的共享协议格式（wire format）：一个按
 |---|---|---|
 | client→server | `initialize` | `InitializeParams` → `InitializeResult` |
 | client→server | `session/prompt` | `SessionPromptParams` → `SessionPromptResult`（持久入队回执） |
+| client→server | `session/resume` | `SessionResumeParams` → `{}` |
+| client→server | `session/wait` | `SessionWaitParams` → `{}` |
+| client→server | `session/working-directory/get` | `SessionWorkingDirectoryParams` → `SessionWorkingDirectoryResult` |
+| client→server | `session/working-directory/set` | `SessionWorkingDirectorySetParams` → `SessionWorkingDirectoryResult` |
 | client→server | `shutdown` | 无参数 → `{}` |
 | server→client | `session.event` | `SessionEventNotification`（运行时内每个会话，不过滤） |
 | server→client | `session.status` | `SessionStatusNotification`（整个 agent（智能体）的 `running`/`idle` 转换） |
 | server→client | `subagent.started` | `SubagentStartedNotification` |
 | server→client | `subagent.finished` | `SubagentFinishedNotification`（仅进程内运行） |
 
-`HarnessSdkRequestMap` 与 `HarnessSdkNotificationMap` 按方法名索引这些类型。`SessionPromptResult.messageId` 标识已排队的 `UserMessage`；它不标识后续的助手消息、轮次结束或提示词结果。客户端根据自己对活动区间的所有权，组合持续开放的 `session.event` 流与 agent 级的 `session.status`。`SubagentFinishedNotification.lastAssistantMessage` 包含子 agent 最后一条非空 assistant 消息；若不存在这类消息，则包含其累积的 assistant 文本；子 agent 两种输出均未产生时，该字段缺省。`InitializeParams.maxTokens` 是可选的正的安全整数，用于限制 SDK 创建的 agent 及其进程内后代的每次对话模型输出；省略时会应用所选适配器的确切模型默认值，否则提供方行为保持不变。通知载荷类型依赖 `SessionEvent`（`dsh-session`）、`ContentBlock`（`dsh-llm`）与 `SubagentStopReason`（`dsh-subagent`）——协议以完整会话日志封套进行流式传输，因此会话词汇是协议格式约定的一部分。`serverInfo.name` 的协议值固定为 `deepseek-harness-sdk-runtime`。
+`HarnessSdkRequestMap` 与 `HarnessSdkNotificationMap` 按方法名索引这些类型。`SessionPromptResult.messageId` 标识已排队的 `UserMessage`；它不标识后续的助手消息、轮次结束或提示词结果。客户端根据自己对活动区间的所有权，组合持续开放的 `session.event` 流与 agent 级的 `session.status`。`session/wait` 接受已有 SDK 会话的 `{ sessionId }`，在根 Agent 持续空闲且活跃的受管理后代工作结束后返回 `{}`；带有停放输入的空闲后代保持驻留，不阻塞这次等待，未知 id 以及没有后续终止事件记录的 Agent 运行时错误都会使请求失败。等待期间提交的通知在同一传输上先于响应到达。`session/resume` 接受非空的持久化 `{ sessionId }`，恢复该会话后返回 `{}`；它要求先完成初始化并使用原持久化存储，不发送新输入，会话缺失、不可读、不兼容或被占用时请求失败且不创建替代会话。`SubagentFinishedNotification.lastAssistantMessage` 包含子 agent 最后一条非空 assistant 消息；若不存在这类消息，则包含其累积的 assistant 文本；子 agent 两种输出均未产生时，该字段缺省。`InitializeParams.maxTokens` 是可选的正的安全整数，用于限制 SDK 创建的 agent 及其进程内后代的每次对话模型输出；省略时会应用所选适配器的确切模型默认值，否则提供方行为保持不变。通知载荷类型依赖 `SessionEvent`（`dsh-session`）、`ContentBlock`（`dsh-llm`）与 `SubagentStopReason`（`dsh-subagent`）——协议以完整会话日志封套进行流式传输，因此会话词汇是协议格式约定的一部分。`serverInfo.name` 的协议值固定为 `deepseek-harness-sdk-runtime`。
 
 <a id="invariants"></a>
 ## 不变量

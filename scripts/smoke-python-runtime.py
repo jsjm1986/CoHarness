@@ -94,6 +94,8 @@ RESTART_SECOND_PROMPT = "Complete the second isolated Python SDK process turn."
 RESTART_SECOND_TEXT = "PROCESS_TWO_OK"
 RESTART_FIRST_SESSION_ID = "process-one"
 RESTART_SECOND_SESSION_ID = "process-two"
+RESUME_PROMPT = "Continue the first Python SDK session after restarting the runtime."
+RESUME_TEXT = "RESUMED_PROCESS_OK"
 RECOVERY_PROMPT = "Run three todo updates; the scheduler will reject the second call."
 RECOVERY_CONTINUE_PROMPT = "Continue after the scheduler failure without repeating any tools."
 RECOVERY_TEXT = "SCHEDULER_RECOVERY_OK"
@@ -453,6 +455,7 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
         MCP_PROMPT,
         RESTART_FIRST_PROMPT,
         RESTART_SECOND_PROMPT,
+        RESUME_PROMPT,
         PROFILE_PLUGIN_PROMPT,
         AUTHORING_PROMPT,
         DYNAMIC_TOOLS_PROMPT,
@@ -481,6 +484,8 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
         return tool_call_chunks("advanced-native", "snapshot_double", {"value": 21})
     if prompt == RESTART_FIRST_PROMPT:
         return text_chunks(RESTART_FIRST_TEXT)
+    if prompt == RESUME_PROMPT:
+        return text_chunks(RESUME_TEXT)
     if prompt == DYNAMIC_TOOLS_PROMPT:
         assert_advertised_tool(body, "read")
         if "snapshot_ping" in advertised_tool_names(body):
@@ -1703,7 +1708,7 @@ def smoke_sdk_snapshot_mode(
 
 
 def smoke_sdk_restart_snapshot(base_url: str, executable: Path, update_snapshots: bool) -> None:
-    """Snapshot two isolated sessions across complete SDK runtime restarts."""
+    """Check isolated sessions and explicit history restoration across runtime restarts."""
     from deepseek_harness import DeepSeekHarness
 
     with tempfile.TemporaryDirectory(prefix="dsh-sdk-restart-") as temporary:
@@ -1713,8 +1718,8 @@ def smoke_sdk_restart_snapshot(base_url: str, executable: Path, update_snapshots
         patch = write_advanced_profile_patch(root, "restart.patch.yml", sessions)
         first_request = len(MockModelHandler.requests)
 
-        def run(prompt: str, session_id: str) -> "RunResult":
-            with DeepSeekHarness(
+        def connect() -> DeepSeekHarness:
+            return DeepSeekHarness(
                 provider="deepseek-official",
                 model="smoke-model",
                 cwd=str(root),
@@ -1728,11 +1733,12 @@ def smoke_sdk_restart_snapshot(base_url: str, executable: Path, update_snapshots
                 api_key="sk-keyless-smoke",
                 base_url=base_url,
                 request_timeout_seconds=60,
-            ) as harness:
-                return harness.run(prompt, session_id=session_id)
+            )
 
-        first = run(RESTART_FIRST_PROMPT, RESTART_FIRST_SESSION_ID)
-        second = run(RESTART_SECOND_PROMPT, RESTART_SECOND_SESSION_ID)
+        with connect() as harness:
+            first = harness.run(RESTART_FIRST_PROMPT, session_id=RESTART_FIRST_SESSION_ID)
+        with connect() as harness:
+            second = harness.run(RESTART_SECOND_PROMPT, session_id=RESTART_SECOND_SESSION_ID)
         requests = MockModelHandler.requests[first_request:]
         if len(requests) != 2:
             raise AssertionError(f"restart snapshot expected two model requests: {requests}")
@@ -1767,6 +1773,45 @@ def smoke_sdk_restart_snapshot(base_url: str, executable: Path, update_snapshots
             files, update_snapshots, RESTART_SNAPSHOT_DIRECTORY, RESTART_SNAPSHOT_FILENAMES,
             native_writer_output=True,
         )
+
+        before_resume = logs[RESTART_FIRST_SESSION_ID]
+        with connect() as harness:
+            session = harness.resume_session(RESTART_FIRST_SESSION_ID)
+            if session.id != RESTART_FIRST_SESSION_ID:
+                raise AssertionError(f"resume changed the saved identity: {session.id}")
+            if len(MockModelHandler.requests) != first_request + 2:
+                raise AssertionError("resume sent a model request before receiving new input")
+            resumed = session.run(RESUME_PROMPT)
+
+        requests = MockModelHandler.requests[first_request + 2:]
+        if len(requests) != 1 or resumed.final_response != RESUME_TEXT:
+            raise AssertionError(f"resumed turn failed: {resumed.final_response!r}, {requests}")
+        messages = requests[0].get("messages")
+        if not isinstance(messages, list):
+            raise AssertionError(f"resumed model request has no messages: {requests[0]}")
+        for role, expected in (
+            ("user", RESTART_FIRST_PROMPT),
+            ("assistant", RESTART_FIRST_TEXT),
+            ("user", RESUME_PROMPT),
+        ):
+            if not any(
+                isinstance(message, dict)
+                and message.get("role") == role
+                and expected in message_text(message.get("content"))
+                for message in messages
+            ):
+                raise AssertionError(f"resumed model history has no {role} message: {expected}")
+        logs = read_session_logs(sessions)
+        if set(logs) != expected_ids:
+            raise AssertionError(f"resume created an unexpected durable session: {sorted(logs)}")
+        restored = logs[RESTART_FIRST_SESSION_ID]
+        if restored[:len(before_resume)] != before_resume:
+            raise AssertionError("resume replaced the saved session log instead of appending")
+        turns = [record for record in restored if record.get("type") == "turn/end"]
+        if [record["data"]["turn"] for record in turns] != [1, 2]:
+            raise AssertionError(f"resume did not continue the saved turn sequence: {turns}")
+        if RESUME_TEXT not in render_jsonl(restored):
+            raise AssertionError("resumed response was not appended to the saved session")
 
 
 def smoke_sdk_scheduler_recovery(base_url: str, executable: Path, update_snapshots: bool) -> None:
