@@ -48,7 +48,7 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
   const view = render(<ConversationRoot
     SessionProvider={({ sessionId, children }) => <>{children(sessionId as SessionId)}</>}
     useStore={bindSnapshotSelector(store)}
-    actions={store.actions as ConversationRootProps['actions']}
+    actions={store.actions}
     renderSlot={renderSlot}
     useViewportAvailable={bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} })}
     useSessions={bindSnapshotSelector(createSnapshotStore<SessionListState>(

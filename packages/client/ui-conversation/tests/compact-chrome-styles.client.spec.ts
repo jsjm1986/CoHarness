@@ -124,7 +124,7 @@ describe('conversation compact chrome', () => {
     // the permission and plan popups render inside it — so it degrades by
     // label removal alone and pins at its icon content while clipped.
     expect(input).toMatch(/\.extensionItems\s*\{[^}]*overflow:\s*hidden/u)
-    expect(input).toMatch(/\[data-clip-seat\]\[data-clipped\]\s*\[data-clip-label\]\s*\{[^}]*display:\s*none/u)
+    expect(input).toMatch(/\[data-clip-seat\]\[data-clipped\]\s*\[data-clip-label\]\s*\{[^}]*position:\s*absolute[^}]*opacity:\s*0/u)
     expect(input).toMatch(/\.extensionItems:has\(>\s*:not\(:empty\)\)\s*\{[^}]*min-width:\s*24px/u)
     expect(input).toMatch(/\.modes\[data-clipped\]\s*\{[^}]*min-width:\s*max-content/u)
     expect(permission).toMatch(/:global\(\[data-clip-seat\]\[data-clipped\]\)\s*\.trigger\s*\{[^}]*width:\s*28px/u)

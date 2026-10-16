@@ -205,6 +205,14 @@ function ClipSeat({ className, rowRef, children, ...rest }: { className: string 
     const mutations = new MutationObserver(publish)
     mutations.observe(seat, { childList: true, subtree: true, characterData: true })
     publish()
+    // The mount-time probe can run before the label's face finishes loading;
+    // a late font swap changes scrollWidth without touching any observed box,
+    // and the row-floor gate would hold a stale clipped bit forever.
+    void document.fonts?.ready.then(() => {
+      seat.removeAttribute('data-clipped')
+      floor = -1
+      publish()
+    })
     return () => { observer.disconnect(); mutations.disconnect() }
   }, [children])
   return <div ref={ref} className={className} data-clip-seat="" {...rest}>{children}</div>

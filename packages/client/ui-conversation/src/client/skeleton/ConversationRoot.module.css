@@ -880,11 +880,12 @@
 .paneRatioHint {
   position: absolute;
   left: 50%;
-  top: var(--dsw-space-10);
+  top: 40px;
   transform: translateX(-50%);
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--dsw-alias-fill-floating);
+  corner-shape: round;
+  background: var(--dsw-alias-bg-raised);
   border: 0.5px solid var(--dsw-alias-border-l1);
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;

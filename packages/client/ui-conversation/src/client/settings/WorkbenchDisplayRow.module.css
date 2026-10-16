@@ -39,7 +39,7 @@
   display: inline-flex;
   flex: none;
   align-items: stretch;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
   corner-shape: round;
   overflow: hidden;
@@ -82,7 +82,7 @@
   justify-content: center;
   min-width: 44px;
   padding: 0 var(--dsw-space-1);
-  border-inline: 1px solid var(--dsw-alias-border-l1);
+  border-inline: 0.5px solid var(--dsw-alias-border-l1);
   color: var(--dsw-alias-label-primary);
   font-variant-numeric: tabular-nums;
 }
@@ -95,7 +95,7 @@
   align-items: center;
   gap: 2px;
   padding: 2px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
   corner-shape: round;
 }
@@ -155,7 +155,7 @@
 
 /* The sliding thumb paints the active fill; the segment only marks its text. */
 .segment[data-on] {
-  color: var(--dsw-alias-state-business-label, #fff);
+  color: var(--dsw-alias-label-primary-inverted);
   font-weight: 600;
 }
 

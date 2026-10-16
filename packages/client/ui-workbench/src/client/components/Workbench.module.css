@@ -93,7 +93,7 @@
 }
 .paneState[data-tone='waiting'] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
 .paneState[data-tone='newReply'] { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-accent-tint); }
-.receiptDot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-business-primary); }
+.receiptDot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; corner-shape: round; background: var(--dsw-alias-state-business-primary); }
 
 /* Header actions ride in on pointer or keyboard approach; an active pane
    keeps them pinned so the focus target stays stable. */
@@ -256,10 +256,10 @@
 .sidebarCount { color: var(--dsw-alias-label-caption); font-size: 11px; font-variant-numeric: tabular-nums; }
 /* Hairline row list: rows divide on fine rules; the active row reads via a
    business-blue tint fill with an inked title — no card chrome or edge tick. */
-.sidebarPanes { display: flex; flex-direction: column; border-top: 1px solid var(--dsw-alias-border-l1); }
+.sidebarPanes { display: flex; flex-direction: column; border-top: 0.5px solid var(--dsw-alias-border-l1); }
 .sidebarEmpty { margin: var(--dsw-space-1) var(--dsw-space-2); color: var(--dsw-alias-label-caption); font-size: 12px; }
 
-.sidebarPaneRow { position: relative; display: flex; border-bottom: 1px solid var(--dsw-alias-border-l1); transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
+.sidebarPaneRow { position: relative; display: flex; border-bottom: 0.5px solid var(--dsw-alias-border-l1); transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .sidebarPaneRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .sidebarPaneRow[data-active] { background: var(--dsw-alias-state-business-tertiary); }
 .sidebarPaneRow[data-active] .sidebarPaneTitle { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
@@ -300,7 +300,7 @@
 .sidebarPaneClose:hover { color: var(--dsw-alias-state-error-primary); }
 .sidebarPaneClose:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -1px; }
 /* Add affordance closes the row list with the same hairline rule. */
-.sidebarAdd { display: flex; align-items: center; gap: var(--dsw-space-2); width: 100%; padding: 7px var(--dsw-space-2) 6px; border: 0; border-bottom: 1px solid var(--dsw-alias-border-l1); background: transparent; color: var(--dsw-alias-label-caption); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.sidebarAdd { display: flex; align-items: center; gap: var(--dsw-space-2); width: 100%; padding: 7px var(--dsw-space-2) 6px; border: 0; border-bottom: 0.5px solid var(--dsw-alias-border-l1); background: transparent; color: var(--dsw-alias-label-caption); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .sidebarAdd:not(:disabled):hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .sidebarAdd:disabled { opacity: 0.5; cursor: default; }
 .sidebarAdd:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }

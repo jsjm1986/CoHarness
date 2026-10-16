@@ -17,6 +17,7 @@ function harness() {
   const opened: SessionId[] = []
   const staged: SessionId[][] = []
   const navigation = new NavigationController()
+  const clear = vi.fn()
   const sessions = {
     beginNavigation: () => navigation.begin(),
     list,
@@ -24,10 +25,10 @@ function harness() {
       opened.push(sessionId)
       list.set({ ...list.getSnapshot(), current: sessionId })
     },
-    clear: vi.fn(),
+    clear,
     setAdditionalStaged: (ids: readonly SessionId[]) => { staged.push([...ids]) },
   } as unknown as ISessions
-  return { list, sessions, opened, staged }
+  return { list, sessions, opened, staged, clear }
 }
 
 beforeEach(() => { localStorage.clear() })
@@ -192,7 +193,7 @@ describe('ConversationViewportController', () => {
     viewport.remove(id('a'))
     viewport.remove(id('b'))
     expect(viewport.snapshot.getSnapshot()).not.toHaveProperty('activePaneId')
-    expect(h.sessions.clear).toHaveBeenCalledOnce()
+    expect(h.clear).toHaveBeenCalledOnce()
     viewport.dispose()
     viewport.dispose()
     expect(viewport.add(id('a'))).toEqual({ ok: false, reason: 'unknown' })

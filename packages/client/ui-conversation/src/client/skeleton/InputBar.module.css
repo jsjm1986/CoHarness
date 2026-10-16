@@ -483,9 +483,17 @@
 /* Shared degrade contract: while a clip seat (`data-clip-seat`) clips,
    every descendant marked `data-clip-label` hides its secondary text. Items
    keep their own seat shape under the flag; only label removal is owned
-   here so no item can regress into partial-glyph rendering. */
+   here so no item can regress into partial-glyph rendering. The label is
+   withdrawn from layout rather than removed from the tree: assistive output
+   keeps the seat's full wording on every platform and at every clip
+   boundary. */
 [data-clip-seat][data-clipped] [data-clip-label] {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Wide gaps between the tool seats and between the mode chips so the pill
