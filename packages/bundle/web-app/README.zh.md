@@ -11,7 +11,7 @@ dsh 浏览器表层组合包。[`cordis.patch.yml`](cordis.patch.yml) 叠加在 
 
 ## 概述
 
-运行 `dsh --profile web`，打开提供聊天、模型与设置管理以及会话历史的交互式浏览器 GUI。它使用与其他 dsh 表层相同的模型访问、工具与安全默认值。启动时会打印带认证信息的 URL，通常还会打开默认浏览器；SSH 会话和 `--no-open` 需要你手动打开。你可以更改端口、允许额外 authority，并绑定一个具体的本机 IP；通配地址会被拒绝。跨机访问使用在剥离前缀的代理之后公告的 HTTP(S) URL，或在非 loopback bind 上提供明文 HTTP。一次性的命令行任务应使用 `dsh-headless`。
+运行 `dsh --profile web`，打开提供聊天、模型与设置管理以及会话历史的浏览器 GUI。它使用与其他 dsh 表层相同的模型访问、工具与安全默认值。启动时会打印带认证信息的 URL，通常还会打开默认浏览器；SSH 会话和 `--no-open` 需要你手动打开。更改端口、允许额外 authority、绑定一个具体的本机 IP，并用自己提供的证书直接提供 HTTPS；通配地址会被拒绝。跨机访问使用剥离前缀代理后公告的 HTTP(S) URL、监听器 TLS，或非 loopback bind 上的明文 HTTP。一次性的命令行任务应使用 `dsh-headless`。
 
 ## 目录
 
@@ -27,7 +27,9 @@ dsh 浏览器表层组合包。[`cordis.patch.yml`](cordis.patch.yml) 叠加在 
 <a id="public-deployments"></a>
 ## 监听、信任与公开部署
 
-默认情况下 GUI 只在 loopback 上监听。只有 `--host` 会改变监听器：它接受一个具体的本机 IPv4 或 IPv6 地址，绝不接受通配地址。非 loopback 监听器以明文 HTTP 服务并在启动时告警，即使前面有 HTTPS `--public-url`。Host/Origin 栅栏接受 bind IP 本身；其他非 loopback authority 需要 `--trusted-host`。启动令牌交换与签名会话 cookie 对每个 API 方法和 WebSocket 流进行认证。
+默认情况下 GUI 只在 loopback 上监听，只接受本机的连接。只有 `--host` 会改变监听器：它接受一个具体的本机 IPv4 或 IPv6 地址，绝不接受通配地址。未启用 TLS 的非 loopback 监听器以明文 HTTP 服务并在启动时告警，即使前面有 HTTPS `--public-url`。Host/Origin 栅栏接受 bind IP 本身；其他非 loopback authority 需要 `--trusted-host`，因此远端浏览器要么经由剥离前缀的代理访问 GUI，要么通过以可信主机名呈现的端口转发客户端访问。启动令牌交换与签名会话 cookie 对每个 API 方法和 WebSocket 流进行认证。
+
+同时传入 `--tls-cert` 与 `--tls-key`，监听器便以 HTTPS 而非明文 HTTP 提供服务。两者各指定一个相对进程工作目录解析的文件：证书文件包含完整证书链，密钥文件为不带口令的 PEM 私钥。它们属于同一个设置——只提供一个会报用法错误，两个都不提供则保持明文 HTTP 默认值。文件缺失、不可读、为空，或不是有效的证书与密钥对时启动失败；绝不回退到 HTTP。监听器运行期间不会重新读取这些材料，因此更换证书需要重新加载监听器或重启进程。DSH 不签发、不续期也不监视任何证书：没有 ACME 客户端、没有自签名兜底，也没有重定向监听器。浏览器使用自己的信任库与主机名匹配，因此浏览器不信任的证书，或其 subject alternative name 未覆盖你所访问 authority 的证书，会在页面加载前失败。默认端口仍为 3080，且 `--tls-cert`/`--tls-key` 不跟随 `--public-url`：监听器的证书覆盖浏览器实际访问的 authority。TLS 不改变授权模型：Connection 仍认证每个请求并仍校验 Host/Origin，且只要接收请求的监听器提供 HTTPS，它所签发的会话 cookie 就带 `Secure`。
 
 容器可以绑定其 Pod 地址并公告前置的入口：
 
@@ -73,7 +75,8 @@ Web 使用共享的有界 normal 默认值，在首次请求后最多再重试�
 ## 已知限制与延期工作
 
 - **前端 dist 必须已构建**：对 dist 的 `require.resolve` 在激活时明确报错并给出构建提示；没有从源码直接服务的回退路径。
-- **监听器没有 TLS**：由终止 TLS 的代理保护外部链路；HTTP 公告根会以明文发送凭据。
+- **TLS 需自行启用且不代管**：只有传入 `--tls-cert` 与 `--tls-key`（完整证书链与不带口令的密钥）时监听器才提供 HTTPS；DSH 从不获取、续期或监视证书，更换文件需要重新加载监听器或重启进程。浏览器必须信任该证书，其名称必须覆盖你所访问的 authority，且证书与 `--public-url` 相互独立。
+- **未启用 TLS 时外部链路是明文 HTTP**：请用终止 TLS 的代理保护它，不要在不受信任的网络上发送启动 URL。
 - **只观测交接启动**：平台 opener 接受 spawn 后即结束观察，但 Windows 会等待其短生命周期 PowerShell launcher 退出；之后的浏览器退出不会上报，已打印 URL 仍是手动访问的回退路径。
 - **SSH 转发持有浏览器 URL**：没有公告根时，打印的 URL 指向远端宿主机的 bind 地址端点（loopback bind 时为 loopback）；自动交接会被跳过，SSH 客户端或编辑器必须暴露并打开其本地转发地址。
 - **不支持绑定所有网络接口**：通配 `--host`（包括 Linux 读取为 IPv4 any 的 IPv4-mapped 形式）在启动时因安全原因被拒绝；应绑定本机接口的一个具体 IPv4 或 IPv6 地址。

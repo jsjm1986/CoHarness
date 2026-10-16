@@ -11,7 +11,7 @@ The dsh browser-surface bundle. [`cordis.patch.yml`](cordis.patch.yml) rides ove
 
 ## Summary
 
-Run `dsh --profile web` to open an interactive browser GUI with chat, model and settings management, and session history. It uses the same model access, tools, and safety defaults as other dsh surfaces. Startup prints an authenticated URL and normally opens the default browser; SSH sessions and `--no-open` require manual opening. You can change the port, allow extra authorities, and bind one concrete local IP; wildcard addresses are rejected. Remote access uses an advertised HTTP(S) URL behind a prefix-stripping proxy or plain HTTP on a non-loopback bind. Use `dsh-headless` for one-shot command-line tasks.
+Run `dsh --profile web` to open a browser GUI with chat, model and settings management, and session history. It uses the same model access, tools, and safety defaults as other dsh surfaces. Startup prints an authenticated URL and normally opens the default browser; SSH sessions and `--no-open` require manual opening. Change the port, allow extra authorities, bind one concrete local IP, and serve HTTPS from a certificate you supply; wildcard addresses are rejected. Remote access uses an advertised HTTP(S) URL behind a prefix-stripping proxy, listener TLS, or plain HTTP on a non-loopback bind. Use `dsh-headless` for one-shot command-line tasks.
 
 ## Table of Contents
 
@@ -27,7 +27,9 @@ Run `dsh --profile web` to open an interactive browser GUI with chat, model and 
 <a id="public-deployments"></a>
 ## Listening, trust, and public deployments
 
-By default the GUI listens on loopback. Only `--host` changes the listener: it accepts one concrete local IPv4 or IPv6 address, never a wildcard. A non-loopback listener serves plain HTTP and warns at startup, even when an HTTPS `--public-url` fronts it. The Host/Origin fence accepts the bind IP itself; other non-loopback authorities require `--trusted-host`. The launch-token exchange and signed session cookie authenticate every API method and WebSocket stream.
+By default the GUI listens on loopback and accepts connections from this machine only. Only `--host` changes the listener: it accepts one concrete local IPv4 or IPv6 address, never a wildcard. A non-loopback listener without TLS serves plain HTTP and warns at startup, even when an HTTPS `--public-url` fronts it. The Host/Origin fence accepts the bind IP itself; other non-loopback authorities require `--trusted-host`, so a remote browser reaches the GUI behind a prefix-stripping proxy or through a port-forwarding client that presents a trusted hostname. The launch-token exchange and signed session cookie authenticate every API method and WebSocket stream.
+
+Pass `--tls-cert` and `--tls-key` together to serve HTTPS from the listener instead of plain HTTP. Each names a file resolved against the process working directory: the certificate file holds the full chain and the key file an unencrypted PEM private key. The flags are one setting — supplying only one is a usage error, and supplying neither keeps the plain-HTTP default. Startup fails when a file is missing, unreadable, empty, or not a valid certificate-and-key pair; it never falls back to HTTP. Nothing re-reads the material while the listener runs, so serving a different certificate needs a listener reload or a process restart. DSH issues, renews, and watches nothing: there is no ACME client, no self-signed fallback, and no redirect listener. The browser applies its own trust store and host-name matching, so a certificate the browser does not trust, or one whose subject alternative names miss the authority you open, fails before the page loads. The default port stays 3080, and `--tls-cert`/`--tls-key` do not follow `--public-url`: the listener's certificate covers the authority browsers dial. TLS changes nothing about authority: Connection still authenticates every request and still checks Host/Origin, and the session cookie it mints is `Secure` whenever the receiving listener serves HTTPS.
 
 A container can bind its Pod address and advertise the ingress that fronts it:
 
@@ -71,7 +73,8 @@ Source and Web sections follow first-party reusable instructions. Different chec
 ## Known Limitations and Deferred Work
 
 - **The frontend dist must be built** — `require.resolve` of the dist fails loud at activation with a build hint; there is no source-serving fallback.
-- **The listener has no TLS** — protect the external leg with a TLS-terminating proxy; an HTTP advertised root sends credentials without encryption.
+- **TLS is opt-in and unmanaged** — the listener serves HTTPS only when `--tls-cert` and `--tls-key` name a full chain and its unencrypted key; DSH never obtains, renews, or watches certificates, and a changed file needs a listener reload or a process restart. The browser must trust that certificate, its names must cover the authority you open, and the certificate is independent of `--public-url`.
+- **Without TLS the external leg is plain HTTP** — protect it with a TLS-terminating proxy, and do not send the launch URL over a network you do not trust.
 - **Only handoff startup is observable** — observation ends when the platform opener accepts spawn, except that Windows waits for its short-lived PowerShell launcher to exit; a later browser exit is not reported, and the printed URL remains the manual fallback.
 - **SSH forwarding owns the browser URL** — without an advertised root the printed URL names the remote host's bind-address endpoint (loopback for a loopback bind); automatic handoff is suppressed, and the SSH client or editor must expose and open its local forwarded address.
 - **Binding all network interfaces is not supported** — a wildcard `--host`, including the IPv4-mapped forms Linux reads as IPv4 any, is rejected at startup for safety; bind one concrete IPv4 or IPv6 address of a local interface instead.

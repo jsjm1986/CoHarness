@@ -53,6 +53,32 @@ describe('isTrustedApiRequest', () => {
     }), [])).toBe(false)
   })
 
+  it('compares Origin and Host under the Origin scheme, so HTTPS default ports normalize like HTTP ones', () => {
+    // A browser omits the default port it dialed, while a proxy or a direct
+    // client may still write it in Host: both spellings name one authority.
+    expect(isTrustedApiRequest(request({ host: 'harness.internal:443', origin: 'https://harness.internal' }), ['harness.internal'])).toBe(true)
+    expect(isTrustedApiRequest(request({ host: 'harness.internal:443', origin: 'https://harness.internal:443' }), ['harness.internal'])).toBe(true)
+    expect(isTrustedApiRequest(request({ host: 'harness.internal', origin: 'https://harness.internal:443' }), ['harness.internal'])).toBe(true)
+    expect(isTrustedApiRequest(request({ host: 'harness.internal:80', origin: 'http://harness.internal' }), ['harness.internal'])).toBe(true)
+    // A TLS-terminating proxy forwards the browser's https Origin to a plain-HTTP upstream.
+    expect(isTrustedApiRequest(request({ host: 'harness.internal', origin: 'https://harness.internal' }), ['harness.internal'])).toBe(true)
+    // A real hostname or port difference still decides, in both directions.
+    expect(isTrustedApiRequest(request({ host: 'harness.internal:443', origin: 'https://harness.internal:444' }), ['harness.internal'])).toBe(false)
+    expect(isTrustedApiRequest(request({ host: 'harness.internal:80', origin: 'https://harness.internal' }), ['harness.internal'])).toBe(false)
+    expect(isTrustedApiRequest(request({ host: 'harness.internal:443', origin: 'http://harness.internal' }), ['harness.internal'])).toBe(false)
+    expect(isTrustedApiRequest(request({ host: 'harness.internal:443', origin: 'https://evil.example' }), ['harness.internal'])).toBe(false)
+    // Cross-site labelling outranks a purely spelling-level match.
+    expect(isTrustedApiRequest(request({
+      host: 'harness.internal:443',
+      origin: 'https://harness.internal',
+      'sec-fetch-site': 'cross-site',
+    }), ['harness.internal'])).toBe(false)
+    // Only http(s) names this listener; opaque and other schemes never compare as an authority.
+    for (const origin of ['ftp://harness.internal', 'file://harness.internal', 'ws://harness.internal', 'null']) {
+      expect(isTrustedApiRequest(request({ host: 'harness.internal', origin }), ['harness.internal']), origin).toBe(false)
+    }
+  })
+
   it('accepts a declared public authority: exact on host:port entries, any port on port-less entries', () => {
     const headers = { host: 'harness.internal:3080', origin: 'http://harness.internal:3080' }
     expect(isTrustedApiRequest(request(headers), ['harness.internal:3080'])).toBe(true)

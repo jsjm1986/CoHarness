@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-host-webserver",
-  "description": "Web route-registration plugin: HTTP and upgrade routes, structured index injections, and static dist fallback; knows no harness concepts",
+  "description": "Web route-registration plugin: HTTP(S) and upgrade routes, an optional TLS listener, structured index injections, and static dist fallback; knows no harness concepts",
   "version": "0.1.5-alpha.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -45,6 +45,7 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-invariants": "workspace:*",
     "@types/compression": "^1.8.1",
-    "@types/negotiator": "^0.6.5"
+    "@types/negotiator": "^0.6.5",
+    "selfsigned": "^4.0.1"
   }
 }

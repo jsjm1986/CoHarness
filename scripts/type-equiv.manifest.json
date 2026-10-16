@@ -1762,6 +1762,11 @@
       "source": "packages/host/webserver/src/index.ts"
     },
     {
+      "doc": "docs/subsystems/web-server.md",
+      "symbol": "TlsConfig",
+      "source": "packages/host/webserver/src/index.ts"
+    },
+    {
       "doc": "docs/subsystems/storage.md",
       "symbol": "StorageForms",
       "source": "packages/storage/storage/src/index.ts"

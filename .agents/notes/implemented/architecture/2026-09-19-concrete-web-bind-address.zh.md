@@ -14,7 +14,7 @@ Web 监听器只接受 `127.0.0.1` 或 `0.0.0.0`。通配绑定会暴露机器�
 
 浏览器 Host/Origin 栅栏接受监听器自身的绑定 IP 字面量作为任意端口上的 `Host`，独立于 `trustedHosts` 并忽略 zone。拨号该字面量的浏览器把它作为 `Host` 呈现，该字面量不是重绑目标，Origin 与跨站检查仍然生效。解析到该地址的 DNS 名称、其他接口与代理 authority 仍需 `--trusted-host`。Connection 直接从 `webStartup` 提供方读取调用 authority；`webRuntime` 服务与 LAN 采样不再存在。
 
-公告 URL 对 mapped 回环绑定使用 IPv4，为其他 IPv6 绑定加方括号、剥离回环 zone，并因 zone 不能出现在 URL 中而要求带 zone 的非回环绑定显式提供 `--public-url`。非回环绑定提供明文 HTTP，即使前置 HTTPS 的 `--public-url` 也会在启动时警告。`web-runtime` 是必需的启动条目，因此绑定失败会使启动失败，而不是留下一个没有监听器的静默进程。
+公告 URL 对 mapped 回环绑定使用 IPv4，为其他 IPv6 绑定加方括号、剥离回环 zone，并因 zone 不能出现在 URL 中而要求带 zone 的非回环绑定显式提供 `--public-url`。未启用 TLS 的非回环绑定提供明文 HTTP，即使前置 HTTPS 的 `--public-url` 也会在启动时警告。`web-runtime` 是必需的启动条目，因此绑定失败会使启动失败，而不是留下一个没有监听器的静默进程。
 
 ## 备选方案
 
@@ -27,6 +27,8 @@ Web 监听器只接受 `127.0.0.1` 或 `0.0.0.0`。通配绑定会暴露机器�
 ## 影响
 
 操作者只暴露 `--host` 点名的接口，并无需额外配置即可通过该字面量访问监听器；其他每个远程 authority 都是一个 `--trusted-host` 决定。曾绑定 `0.0.0.0` 的组合在加载时失败，并给出点名被拒绝拼写的消息。纯 IPv6 主机得到端到端支持，包括打印与打开的 URL。
+
+[原生 HTTPS 监听器决策](2026-09-23-native-https-web-listener.zh.md)取代本说明仅支持 HTTP 传输的前提。非回环警告只适用于未启用 TLS 的监听器；绑定地址校验与 authority 接纳保持不变。
 
 ## 测试
 

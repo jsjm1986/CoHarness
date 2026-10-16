@@ -35,7 +35,7 @@ dsh rescue
 
 | Profile | 参数 |
 |---|---|
-| `web` | `--host`、`--port`、`--public-url`、可重复的 `--trusted-host`、`--no-open` |
+| `web` | `--host`、`--port`、`--tls-cert`、`--tls-key`、`--public-url`、可重复的 `--trusted-host`、`--no-open` |
 | `headless` | 任务文本，作为位置参数 |
 | `sdk` | 无选项；stdio 携带 JSON-RPC 协议 |
 | `sdk-minimal` | 无选项；stdio 携带相同的 JSON-RPC 协议 |
@@ -104,18 +104,19 @@ dsh --profile tui
 
 ## Web Profile
 
-`dsh web` 使用 profile 简写。启动器先解析自身的 flag，其余 flag 属于 web 应用，由组合包中的普通提供方解析。`--host` 和 `--port` 覆盖监听器的组合取值。host 必须是一个具体的本机地址，而不是通配地址（`--host 0.0.0.0` 会以用法错误退出）；`hostname -i` 可能列出多个，因此应传入一个。可重复的 `--trusted-host` 值会收进 `ctx.webStartup.trustedHosts`；部署表达式可以拼接自己的 authority。`--no-open` 则只对本次调用关闭默认浏览器交接。`--public-url <url>` 公告唯一的 HTTP(S) 应用根——可带转发前缀——替代监听器的 bind 地址 URL（loopback bind 时为 loopback）。它不授予信任，因此浏览器可见的 authority 仍需用 `--trusted-host` 点名；[在反向代理之后发布 Web UI](../../../docs/user/guide/public-deployments.zh.md)列出了前置代理必须提供的内容。每次启动的客户端插件传输都会跟随 Host 实时图变化。只有设置 `DSH_CLIENT_HMR=1` 并单独运行 `pnpm run dev:web` 构建器时，才启用产物轮询。
+`dsh web` 使用 profile 简写。启动器先解析自身的 flag，其余 flag 属于 web 应用，由组合包中的普通提供方解析。`--host` 与 `--port` 覆盖监听器的组合取值，`--tls-cert`/`--tls-key` 则设置监听器的 `tls` 证书对。host 必须是一个具体的本机地址，而不是通配地址（`--host 0.0.0.0` 会以用法错误退出）；`hostname -i` 可能列出多个，因此应传入一个。可重复的 `--trusted-host` 值会收进 `ctx.webStartup.trustedHosts`；部署表达式可以拼接自己的 authority。`--no-open` 则只对本次调用关闭默认浏览器交接。`--public-url <url>` 公告唯一的 HTTP(S) 应用根——可带转发前缀——替代监听器的 bind 地址 URL（loopback bind 时为 loopback）。它不授予信任，因此浏览器可见的 authority 仍需用 `--trusted-host` 点名；[在反向代理之后发布 Web UI](../../../docs/user/guide/public-deployments.zh.md)列出了前置代理必须提供的内容。`--tls-cert <file>` 与 `--tls-key <file>` 让监听器以 HTTPS 取代明文 HTTP 提供服务。它们属于同一个设置：要么都给，要么都不给；两者各是相对进程工作目录解析的路径。证书文件包含完整证书链（含中间证书），密钥文件为不带口令的 PEM 私钥。文件缺失、不可读、为空或无效时启动失败，且绝不回退到 HTTP；由于载体只读取一次文件，且既不获取、不续期也不监视证书，替换后的证书对只有在重新加载监听器或重启进程后才生效。HTTPS 同样不授予信任：浏览器必须信任该证书并访问其名称覆盖的 authority，Connection 仍认证每个请求并校验 Host/Origin，而由于接收请求的监听器提供 HTTPS，会话 cookie 带 `Secure`。默认端口仍为 3080，`--public-url` 仍是相互独立的公告。每次启动的客户端插件传输都会跟随 Host 实时图变化。只有设置 `DSH_CLIENT_HMR=1` 并单独运行 `pnpm run dev:web` 构建器时，才启用产物轮询。
 
 ```sh
 dsh web
 dsh web --host "$(hostname -i | awk '{print $1}')" --public-url https://app.example/ --trusted-host app.example
+dsh web --tls-cert ./server-chain.pem --tls-key ./server-key.pem
 dsh web --no-open
 dsh web --patch ./extra.cordis.yml
 dsh web --dump-config
 dsh web --help
 ```
 
-生产 Web 运行器需要已构建的包和前端产物（`pnpm run build`）。配置了 `--public-url` 时打印公告根，否则打印监听器的 bind 地址 URL（默认 `http://127.0.0.1:3080`）。Host/Origin 栅栏直接接受 bind IP；代理或 DNS authority 仍需 `--trusted-host`。启动行与默认浏览器交接都等待完整 Loader 配置树结算。继承的 `SSH_CONNECTION` 或 `SSH_TTY` 非空时会跳过浏览器打开，但启动行仍会打印。本机交接前会打印英文提示 `dsh web: opening the default browser; pass --no-open to disable`；若操作系统交接失败，stderr 会说明原因并指向启动 URL，服务器仍继续运行。
+生产 Web 运行器需要已构建的包和前端产物（`pnpm run build`）。配置了 `--public-url` 时打印公告根，否则打印采用监听器协议的绑定地址 URL（默认为 `http://127.0.0.1:3080`，配置 TLS 时为 `https://`）。Host/Origin 栅栏直接接受 bind IP；代理或 DNS authority 仍需 `--trusted-host`。启动行与默认浏览器交接都等待完整 Loader 配置树结算。继承的 `SSH_CONNECTION` 或 `SSH_TTY` 非空时会跳过浏览器打开，但启动行仍会打印。本机交接前会打印英文提示 `dsh web: opening the default browser; pass --no-open to disable`；若操作系统交接失败，stderr 会说明原因并指向启动 URL，服务器仍继续运行。
 
 进程关闭时，插件树最多有 5 秒完成 dispose。首次收到 `SIGINT` 或 `SIGTERM` 时会开始优雅排空：`SIGTERM` 是监督进程发出的常规停止请求，在所有运行模式下都以 0 退出；`SIGINT` 则报告 130。第二次收到信号时会立即强制退出。如果一次性运行在正常结束时已经卡在 dispose 阶段，第一次按下 `Ctrl+C` 就会直接升级为强制退出，而不会被忽略。
 

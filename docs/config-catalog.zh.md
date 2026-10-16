@@ -524,11 +524,9 @@ export interface ConnectionConfig {
   }
   /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
-   * port-less `host` matching any port. The /api trust fence refuses any
-   * request whose Host is neither loopback nor listed here, so a
-   * non-loopback (`0.0.0.0`) deployment must declare the names it is reached
-   * by (the dsh CLI derives the machine's LAN IP literals itself). An entry
-   * that is not a bare, canonical authority fails the plugin load.
+   * port-less `host` matching any port. The fence accepts loopback and the
+   * listener's own bind IP independently; other remote authorities require
+   * an entry here. A non-canonical or non-bare authority fails plugin load.
    */
   trustedHosts?: string[]
   /** Absolute browser-session lifetime in days. Default: 30. */
@@ -1402,30 +1400,50 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-webserver`
 
-- `source`: [`packages/host/webserver/src/index.ts:60`](../packages/host/webserver/src/index.ts)
+- `source`: [`packages/host/webserver/src/index.ts:76`](../packages/host/webserver/src/index.ts)
 
 ```ts config-catalog
-/** Web server listen and response-compression config. */
+/** Web server listen, TLS, and response-compression config. */
 export interface Config {
   /**
    * Listen address: a concrete IPv4 or IPv6 literal of one local interface,
    * for example the container's own Pod address from `hostname -i`. A loopback
    * literal (any address in 127/8, `::1`, or a mapped form of either) keeps the
    * server on this machine; any other literal serves the network that address
-   * belongs to over plain HTTP, because the carrier adds no TLS. The
-   * unspecified address — IPv4 any, IPv6 any, and the IPv4-mapped forms of
-   * IPv4 any — is rejected at load: it would expose the port on every interface
-   * at once.
+   * belongs to, over plain HTTP unless `tls` is set. The unspecified address —
+   * IPv4 any, IPv6 any, and the IPv4-mapped forms of IPv4 any — is rejected at
+   * load: it would expose the port on every interface at once.
    */
   host: string
   /** Listen port; zero requests an OS-assigned port. */
   port: number
+  /**
+   * Serve HTTPS with this certificate and key instead of plain HTTP. Both files
+   * are read once, before the listener binds: an unreadable or empty file,
+   * invalid PEM, or a key that does not match the certificate rejects
+   * initialization rather than falling back to HTTP. The material is never
+   * re-read, so replacing a certificate takes a reload. Omitted or null listens
+   * over plain HTTP.
+   */
+  tls?: TlsConfig
   /** Response compression for socket-backed HTTP requests. @default 'none' */
   compression?: 'none' | 'gzip'
   /** Gzip DEFLATE level from 0 through 9. @default 1 */
   compressionLevel?: number
   /** Minimum known response length eligible for gzip; unknown-length streams are eligible. @default 1024 */
   compressionThresholdBytes?: number
+}
+
+/**
+ * TLS material for the HTTPS listener: one certificate chain file and the
+ * private key file it pairs with. Both hold PEM text and both resolve against
+ * the process working directory.
+ */
+export interface TlsConfig {
+  /** Certificate chain file, leaf certificate first, PEM, no passphrase. */
+  certFile: string
+  /** Private key file for the chain's leaf certificate; unencrypted PEM. */
+  keyFile: string
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-host-webserver -->

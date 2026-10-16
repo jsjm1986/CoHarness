@@ -59,9 +59,10 @@ function stageDist(): string {
 
 /** Web carrier without a network listener. */
 function fakeHttpServer(host = '127.0.0.1'): { server: WebServer } {
-  const server: Pick<WebServer, 'host' | 'port' | 'registerFallback' | 'applyIndexTaps'> = {
+  const server: Pick<WebServer, 'host' | 'port' | 'protocol' | 'registerFallback' | 'applyIndexTaps'> = {
     host,
     port: 4567,
+    protocol: 'http:',
     registerFallback: () => () => {},
     applyIndexTaps: (html: string) => html,
   }

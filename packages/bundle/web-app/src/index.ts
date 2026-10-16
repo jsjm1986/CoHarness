@@ -7,7 +7,7 @@
  * harness-source and web-surface prompt sections, the bash-visible web runtime
  * variable, the process-token URL line, and the default-browser handoff. An
  * advertised `publicUrl` replaces the published bind-address URL. Non-loopback
- * binds trigger a plain-HTTP exposure warning. App command-line values arrive
+ * HTTP binds trigger an exposure warning. App command-line values arrive
  * through the `webStartup` service expressions in the bundle patch.
  * @module @deepseek-ai/dsh-web-app
  */
@@ -120,7 +120,7 @@ function localWebUrl(ctx: Context): string {
     throw new Error('web-app: webServer service missing while resolving Web runtime')
   }
   const host = advertisedBindHost(webServer.host)
-  return `http://${isIP(host) === 6 ? `[${host}]` : host}:${String(port)}`
+  return `${webServer.protocol}//${isIP(host) === 6 ? `[${host}]` : host}:${String(port)}`
 }
 
 /**
@@ -241,8 +241,7 @@ export function apply(ctx: Context, config: Config): void {
   const publicUrl = config.publicUrl ?? undefined
   const boundHost = ctx.webServer.host
   if (publicUrl === undefined) advertisedBindHost(boundHost)
-  // The bound transport remains plain HTTP even when publicUrl uses HTTPS.
-  if (!isLoopbackHost(boundHost)) {
+  if (ctx.webServer.protocol === 'http:' && !isLoopbackHost(boundHost)) {
     console.warn(`dsh web: listening on ${boundHost} over plain HTTP; restrict this port to a trusted proxy or network`)
   }
   // The bind URL belongs to this host. Under SSH, the operator reaches it

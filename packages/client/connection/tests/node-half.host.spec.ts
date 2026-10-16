@@ -29,9 +29,11 @@ function fakeHttpServer(
   routes: WebRoute[],
   upgrades: WebUpgradeRoute[],
   host = '127.0.0.1',
-): Pick<WebServer, 'register' | 'registerUpgrade' | 'tapIndex' | 'port' | 'host'> {
+  protocol: WebServer['protocol'] = 'http:',
+): Pick<WebServer, 'register' | 'registerUpgrade' | 'tapIndex' | 'port' | 'host' | 'protocol'> {
   return {
     host,
+    protocol,
     register(route) {
       if (routes.some(candidate => candidate.kind === route.kind && candidate.path === route.path)) {
         throw new Error(`duplicate route ${route.path}`)
@@ -99,6 +101,7 @@ async function mounted(
   config?: ConnectionConfig,
   apiProxy: ApiProxy = {} as unknown as ApiProxy,
   bindHost = '127.0.0.1',
+  protocol: WebServer['protocol'] = 'http:',
 ): Promise<{
   ctx: Context
   routes: WebRoute[]
@@ -110,7 +113,7 @@ async function mounted(
   const routes: WebRoute[] = []
   const upgrades: WebUpgradeRoute[] = []
   provideBrowserCredentials(ctx)
-  ctx.provide('webServer', fakeHttpServer(routes, upgrades, bindHost) as WebServer)
+  ctx.provide('webServer', fakeHttpServer(routes, upgrades, bindHost, protocol) as WebServer)
   ctx.provide('apiProxy', apiProxy)
   const fiber = ctx.plugin({ inject: [...inject], apply }, config)
   await fiber.await()
@@ -235,6 +238,40 @@ describe('connection node half', () => {
       expect(state.body).toBe('upgrade required')
     }
     await dispose()
+  })
+
+  it('uses the TLS default port for markerless exact-authority grants', async () => {
+    const { connection, dispose } = await mounted({ trustedHosts: ['tls.example:443', 'plain.example:80'] }, undefined, '127.0.0.1', 'https:')
+    try {
+      expect(connection.requestRejection(fakeRequest({ host: 'tls.example' }))).toBe(401)
+      expect(connection.requestRejection(fakeRequest({ host: 'plain.example' }))).toBe(403)
+      expect(connection.requestRejection(fakeRequest({ host: 'tls.example:444' }))).toBe(403)
+    } finally {
+      await dispose()
+    }
+  })
+
+  it('marks the minted browser cookie Secure from the mounted listener protocol', async () => {
+    for (const [protocol, secure] of [['http:', false], ['https:', true]] as const) {
+      const { connection, dispose } = await mounted(undefined, undefined, '127.0.0.1', protocol)
+      try {
+        const url = new URL(connection.authenticatedUrl('http://127.0.0.1:3080'))
+        const exchanged = fakeResponse()
+        connection.authorizeIndex(
+          fakeRequest({ host: '127.0.0.1:3080', 'x-forwarded-proto': secure ? 'http' : 'https' }, `${url.pathname}${url.search}`),
+          exchanged.response,
+        )
+        const setCookie = exchanged.state.headers?.['set-cookie']
+        expect(setCookie?.endsWith('; Secure'), protocol).toBe(secure)
+        if (setCookie === undefined) throw new Error('browser token exchange did not set a cookie')
+        expect(connection.requestRejection(fakeRequest({
+          host: '127.0.0.1:3080',
+          cookie: setCookie.split(';', 1)[0]!,
+        }))).toBeUndefined()
+      } finally {
+        await dispose()
+      }
+    }
   })
 
   it('rejects an untrusted WebSocket upgrade before protocol negotiation', async () => {

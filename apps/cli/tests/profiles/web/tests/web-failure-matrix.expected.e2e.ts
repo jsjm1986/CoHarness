@@ -174,6 +174,32 @@ function exit(result: { timedOut: boolean; signal?: string | undefined; exitCode
 }
 
 describe.skipIf(!built)('Web process failure matrix', () => {
+  it('exits on unreadable TLS material without opening a listener', async () => {
+    const f = fixture()
+    const missingCert = join(f.root, 'missing-cert.pem')
+    const listenerProbe = join(f.root, 'listen-probe.mjs')
+    const listening = join(f.root, 'listening')
+    writeFileSync(listenerProbe, [
+      "import { Server } from 'node:net'",
+      "import { appendFileSync } from 'node:fs'",
+      'const listen = Server.prototype.listen',
+      'Server.prototype.listen = function (...args) {',
+      `  this.once('listening', () => appendFileSync(${JSON.stringify(listening)}, 'listening\\n'))`,
+      '  return Reflect.apply(listen, this, args)',
+      '}',
+      '',
+    ].join('\n'))
+    const app = start(f, ['--tls-cert', missingCert, '--tls-key', missingCert], ['--import', pathToFileURL(listenerProbe).href])
+    try {
+      const result = await app.child
+      exit(result, 1)
+      expect(result.stderr).toContain(missingCert)
+      expect(existsSync(listening)).toBe(false)
+    } finally {
+      exit(await app.close(), 1)
+    }
+  })
+
   it('rejects a non-loopback zone bind through the required Web runtime before readiness', async () => {
     const f = fixture()
     const host = 'fe80::1%dsh-test'

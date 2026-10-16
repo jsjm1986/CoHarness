@@ -8629,6 +8629,9 @@ importers:
       '@types/negotiator':
         specifier: ^0.6.5
         version: 0.6.5
+      selfsigned:
+        specifier: ^4.0.1
+        version: 4.0.1
 
   packages/identity/anonymous-user-id:
     devDependencies:
@@ -19861,6 +19864,10 @@ packages:
     resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
+  node-forge@1.4.0:
+    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+    engines: {node: '>= 6.13.0'}
+
   node-int64@0.4.0:
     resolution: {integrity: sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==}
 
@@ -20402,6 +20409,10 @@ packages:
 
   search-insights@2.17.3:
     resolution: {integrity: sha512-RQPdCYTa8A68uM2jwxoY842xDhvx3E5LFL1LxvxCNMev4o5mLuokczhzjAgGwUZBAmOKZknArSxLKmXtIi2AxQ==}
+
+  selfsigned@4.0.1:
+    resolution: {integrity: sha512-QVGzJryYPB7ctpYxoK4DDvH4kFf23wtBl0s6km/wN+JCWLqjutdyWaiXHwSg3B3ftDOFfu0B7FWRVNH0xNn6rw==}
+    engines: {node: '>=10'}
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
@@ -26847,6 +26858,8 @@ snapshots:
       fetch-blob: 3.2.0
       formdata-polyfill: 4.0.10
 
+  node-forge@1.4.0: {}
+
   node-int64@0.4.0: {}
 
   node-pty@1.2.0-beta.15(patch_hash=b40ae545608897914bd25fb009c97eeac478c34e8a910298ddcb01b746534bb0):
@@ -27462,6 +27475,10 @@ snapshots:
       regexp-ast-analysis: 0.7.1
 
   search-insights@2.17.3: {}
+
+  selfsigned@4.0.1:
+    dependencies:
+      node-forge: 1.4.0
 
   semver@6.3.1: {}
 

@@ -14,7 +14,7 @@ The Web listener accepted `127.0.0.1` or `0.0.0.0`. A wildcard bind exposed ever
 
 The browser Host/Origin fence accepts the listener's own bind IP literal as `Host` on any port, independently of `trustedHosts` and ignoring the zone. A browser dialing that literal presents it as `Host`, the literal is no rebinding target, and the Origin and cross-site checks still apply. DNS names resolving to the address, other interfaces, and proxy authorities still require `--trusted-host`. Connection reads the invocation authorities directly from the `webStartup` provider; the `webRuntime` service and LAN sampling no longer exist.
 
-The advertised URL uses IPv4 for mapped loopback binds, brackets other IPv6 binds, drops a loopback zone, and requires `--public-url` for a zoned non-loopback bind because a zone cannot appear in a URL. A non-loopback bind serves plain HTTP and warns at startup even when an HTTPS `--public-url` fronts it. `web-runtime` is a required startup entry, so a bind failure fails startup instead of leaving a silent listener-less process.
+The advertised URL uses IPv4 for mapped loopback binds, brackets other IPv6 binds, drops a loopback zone, and requires `--public-url` for a zoned non-loopback bind because a zone cannot appear in a URL. A non-loopback bind without TLS serves plain HTTP and warns at startup even when an HTTPS `--public-url` fronts it. `web-runtime` is a required startup entry, so a bind failure fails startup instead of leaving a silent listener-less process.
 
 ## Alternatives considered
 
@@ -27,6 +27,8 @@ The advertised URL uses IPv4 for mapped loopback binds, brackets other IPv6 bind
 ## Consequences
 
 An operator exposes exactly the interfaces named by `--host` and reaches the listener through that literal without further configuration; every other remote authority is a `--trusted-host` decision. Compositions that bound `0.0.0.0` fail at load with a message naming the rejected spelling. IPv6-only hosts are supported end to end, including the printed and opened URL.
+
+The [native HTTPS listener decision](2026-09-23-native-https-web-listener.md) supersedes this note's HTTP-only transport assumption. The non-loopback warning applies only without TLS; bind-address validation and authority admission remain unchanged.
 
 ## Testing
 

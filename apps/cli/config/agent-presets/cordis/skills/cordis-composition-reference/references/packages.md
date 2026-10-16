@@ -254,7 +254,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-host-open-in-app` | yes | Host half of open-in-app: resolved application catalog, icons, and the launch endpoint as three webServer routes |
 | `@deepseek-ai/dsh-host-plugin-inventory` | no | Read-only Remote projection of current Cordis Loader plugin state |
 | `@deepseek-ai/dsh-host-userdoc-http` | no | Streaming browser HTTP consumer for user-uploaded documents |
-| `@deepseek-ai/dsh-host-webserver` | yes | Web route-registration plugin: HTTP and upgrade routes, structured index injections, and static dist fallback; knows no harness concepts |
+| `@deepseek-ai/dsh-host-webserver` | yes | Web route-registration plugin: HTTP(S) and upgrade routes, an optional TLS listener, structured index injections, and static dist fallback; knows no harness concepts |
 
 ## interaction
 
