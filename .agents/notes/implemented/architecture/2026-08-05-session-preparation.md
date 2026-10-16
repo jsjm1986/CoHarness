@@ -12,7 +12,7 @@ Fresh creation and persisted resume also reached the same publication boundary t
 
 ## Decision
 
-`SessionPreparation` owns one exact unpublished `Session` until publication or rollback. It is a Session lifecycle object, not an Agent lifecycle or activation object. Fresh creation wraps the result of `SessionStore.prepare()`; persisted resume obtains a preparation from `SessionPersistence.prepare()`.
+`SessionPreparation` owns one exact unpublished `Session` until publication or rollback. It is a Session lifecycle object, not an Agent lifecycle or activation object. Fresh creation wraps the result of `SessionStore.prepare()`; persisted resume keeps its write handle, commits cold recovery through `SessionPersistence.load()`, and seeds `SessionStore.prepare()` from the stored log.
 
 The Agent loop consumes both forms through one setup-and-publication pipeline: it acquires the preparation, builds the private Agent context around `preparation.session`, awaits optional setup, publishes that exact Session and Agent, and disposes the preparation on every exit. Publication transfers the live lifecycle to the existing Session and Agent stores; `SessionPreparation` itself owns no Agent behavior.
 
@@ -30,11 +30,11 @@ The legacy `load(id)` API uses the same preparation and repair machinery, then d
 
 ## History and resume reuse
 
-History reads use `inspect()`, so repeated pages borrow the same immutable prepared state without activating an Agent. A later resume uses `prepare()` and receives the exact Session retained by inspection; it does not read, decompress, parse, clone, validate, or freeze the complete log again.
+History reads use `inspect()`, so repeated pages borrow the same immutable prepared state without activating an Agent. A later `prepare()` reserves the exact Session retained by inspection; it does not read, decompress, parse, clone, validate, or freeze the complete log again. Agent resume is not a reservation consumer: it keeps its write handle, commits cold recovery through `load()`, and seeds `SessionStore.prepare()` from the stored prefix.
 
 If the durable log changes after inspection, its revision changes. The next history read or resume discards a retained ready Session and materializes the new log, so an old event graph cannot be associated with a newer snapshot revision. A source already claimed by an in-flight resume is not evicted: its exclusive owner keeps it through publication or release, and concurrent history may borrow the same immutable view.
 
-Cold continuable-subagent access follows the same path. Descriptor authorization first inspects the child, then `ctx.agents.resume()` reserves and publishes the retained Session. This preserves the lifecycle and authorization rules in the [continuable subagent conversation decision](../feature/2026-07-28-continuable-subagent-conversations.md) while removing its duplicate cold read.
+Cold continuable-subagent access inspects the child for descriptor authorization before `ctx.agents.resume()` takes the write handle and commits repair through `load()`, so an inspection-retained source can supply the repair commit instead of a second cold materialization. This preserves the lifecycle and authorization rules in the [continuable subagent conversation decision](../feature/2026-07-28-continuable-subagent-conversations.md).
 
 ## Boundaries
 
@@ -47,7 +47,7 @@ Cold continuable-subagent access follows the same path. Descriptor authorization
 
 ## Verification
 
-The shared persistence contract pins non-mutating balanced cold inspection and later repair. `persistence.spec.ts` and `preparations.spec.ts` pin same-id in-flight sharing, exact Session reuse across inspect and prepare, revision-triggered refresh before history and resume, single repair commit, exclusive reservation, release after failed setup, ready-entry LRU eviction, append rejection during reservation, and publication of only the reserved Session. Backend tests pin that full and lightweight reads use the same revision identity. Agent-loop and continuable-subagent tests pin the common publication pipeline and inspection-to-resume path across cancellation and teardown.
+The shared persistence contract pins non-mutating balanced cold inspection and later repair. `persistence.spec.ts` and `preparations.spec.ts` pin same-id in-flight sharing, exact Session reuse across inspect and prepare, revision-triggered refresh before history and resume, single repair commit, exclusive reservation, release after failed setup, ready-entry LRU eviction, append rejection during reservation, and publication of only the reserved Session. Backend tests pin that full and lightweight reads use the same revision identity. Agent-loop resume tests pin the `load`-before-read ordering and the handle-held publication pipeline; continuable-subagent tests pin descriptor inspection before resume.
 
 ## Alternatives considered
 
