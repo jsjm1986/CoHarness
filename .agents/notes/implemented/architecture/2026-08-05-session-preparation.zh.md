@@ -12,7 +12,7 @@ Status: implemented
 
 ## 决策
 
-`SessionPreparation` 持有一个精确的未发布 `Session`，直至发布或回滚。它属于 Session 生命周期，不属于 agent 生命周期或激活机制。新建流程包装 `SessionStore.prepare()` 的结果；持久化恢复则从 `SessionPersistence.prepare()` 取得准备对象。
+`SessionPreparation` 持有一个精确的未发布 `Session`，直至发布或回滚。它属于 Session 生命周期，不属于 agent 生命周期或激活机制。新建流程包装 `SessionStore.prepare()` 的结果；持久化恢复保留其写句柄，经 `SessionPersistence.load()` 提交冷恢复，再以已存日志为种子调用 `SessionStore.prepare()`。
 
 agent loop（智能体循环）通过同一条设置与发布流水线消费这两种形式：先取得准备对象，围绕 `preparation.session` 构建私有 agent 上下文，等待可选设置完成，再发布该精确 Session 和 agent，并在所有退出路径上对准备对象执行 dispose（资源释放）。发布后，实时生命周期由现有 Session 与 agent 存储接管；`SessionPreparation` 本身不负责任何 agent 行为。
 
@@ -30,11 +30,11 @@ agent loop（智能体循环）通过同一条设置与发布流水线消费这�
 
 ## 历史与恢复复用
 
-历史读取使用 `inspect()`，因此重复分页可以借用同一份不可变准备状态，而不会激活 agent。后续恢复调用 `prepare()`，直接取得检查阶段保留的精确 Session；系统不会再次完整读取、解压、解析、复制、验证或冻结日志。
+历史读取使用 `inspect()`，因此重复分页可以借用同一份不可变准备状态，而不会激活 agent。后续 `prepare()` 直接预留检查阶段保留的精确 Session；系统不会再次完整读取、解压、解析、复制、验证或冻结日志。agent 恢复本身不消费预留：它保留写句柄，经 `load()` 提交冷恢复，再以已存前缀为种子调用 `SessionStore.prepare()`。
 
 如果持久日志在检查后发生变化，其 revision 也会变化。下一次历史读取或恢复会丢弃保留且处于就绪阶段的 Session，并实体化新日志，因此旧事件对象图不会被关联到较新的快照 revision。已经由进行中恢复操作取得的源不会被淘汰：其独占所有者会持有它直至发布或释放，并发历史读取可以借用同一个不可变视图。
 
-冷 continuable subagent 访问沿用同一路径。系统先检查子会话并完成 descriptor 授权，再由 `ctx.agents.resume()` 预留并发布保留的 Session。这样既遵循 [continuable subagent 会话决策](../feature/2026-07-28-continuable-subagent-conversations.zh.md)中的生命周期与授权规则，也消除了重复冷读。
+冷 continuable subagent 访问先检查子会话并完成 descriptor 授权，随后 `ctx.agents.resume()` 取得写句柄并经 `load()` 提交修复，使检查阶段保留的源可以直接供应修复提交，而非再次冷实体化。这仍遵循 [continuable subagent 会话决策](../feature/2026-07-28-continuable-subagent-conversations.zh.md)中的生命周期与授权规则。
 
 ## 边界
 
@@ -47,7 +47,7 @@ agent loop（智能体循环）通过同一条设置与发布流水线消费这�
 
 ## 验证
 
-共享持久化约定规定冷检查不得修改存储且须保持配平，并覆盖后续修复。`persistence.spec.ts` 与 `preparations.spec.ts` 覆盖同 id 进行中读取共享、检查与准备之间的精确 Session 复用、在历史读取与恢复前由 revision 触发刷新、修复只提交一次、独占预留、设置失败后释放、就绪项 LRU 淘汰、预留期间拒绝 append，以及只允许发布预留 Session。后端测试覆盖完整读取与轻量读取使用同一 revision 身份。agent loop 与 continuable subagent 测试覆盖统一发布流水线，以及取消和清理期间从检查到恢复的路径。
+共享持久化约定规定冷检查不得修改存储且须保持配平，并覆盖后续修复。`persistence.spec.ts` 与 `preparations.spec.ts` 覆盖同 id 进行中读取共享、检查与准备之间的精确 Session 复用、在历史读取与恢复前由 revision 触发刷新、修复只提交一次、独占预留、设置失败后释放、就绪项 LRU 淘汰、预留期间拒绝 append，以及只允许发布预留 Session。后端测试覆盖完整读取与轻量读取使用同一 revision 身份。agent loop 恢复测试覆盖 `load` 先于读取的顺序以及持有句柄的发布流水线；continuable subagent 测试覆盖恢复前的 descriptor 检查。
 
 ## 考虑过的替代方案
 
