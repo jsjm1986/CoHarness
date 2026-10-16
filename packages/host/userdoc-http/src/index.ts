@@ -2112,7 +2112,7 @@ export async function handleUserDocHttp(host: UserDocHttpHost, req: UserDocReque
         res.end()
         return
       }
-      const trash = (host.userDocs as unknown as { trash?: (id: UserDocId) => Promise<unknown> }).trash
+      const trash = (host.userDocs as { trash?: (id: UserDocId) => Promise<unknown> }).trash
       if (typeof trash === 'function') {
         try {
           await trash.call(host.userDocs, docId)

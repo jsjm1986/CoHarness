@@ -50,7 +50,7 @@ describe('web e2e: Session draft initialization', () => {
     tripwires.push(watchConsole(page))
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-    await page.waitForFunction(() => (window as unknown as { __draftInit?: DraftInitHandle }).__draftInit !== undefined)
+    await page.waitForFunction(() => (window as typeof window & { __draftInit?: DraftInitHandle }).__draftInit !== undefined)
     return page
   }
 
@@ -59,7 +59,7 @@ describe('web e2e: Session draft initialization', () => {
     options: { prompt?: string; clearPreviousDraft?: boolean },
   ): Promise<void> {
     await page.evaluate(([wid, opts]) => {
-      const handle = (window as unknown as { __draftInit?: DraftInitHandle }).__draftInit
+      const handle = (window as typeof window & { __draftInit?: DraftInitHandle }).__draftInit
       if (handle === undefined) throw new Error('The shipped Workspace apply has not been observed')
       handle.startSession(wid, opts)
     }, [workspaceId, options] as const)

@@ -1,55 +1,99 @@
 /**
- * Host-rendered theme bootstrap for the browser's pre-plugin interval. Each
- * index response embeds the current durable built-in preference; the browser
- * resolves only `system`, then writes the same DOM fields ui-layout's
- * ThemePresenter owns after the client plugin tree activates.
+ * Theme bootstrap rows for the browser's pre-plugin interval. Each index
+ * render embeds the current durable built-in preference, font sizes, and
+ * font-family lists. Head CSS colors the document canvas before script
+ * execution; the body script installs the palette selector and font variables
+ * that the client presenters adopt.
  */
 
-import { DEFAULT_PREFERENCE, type ThemePreference } from './theme-settings.ts'
-
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
+import {
+  DEFAULT_FONT_SIZES, DEFAULT_PREFERENCE, FONT_ROLES, FONT_SIZE_SPECS, fontFamilyVariable, normalizeFontFamily,
+  type FontFamilies, type FontSizes, type ThemePreference,
+} from './theme-settings.ts'
 
-/** Build the inline script for one schema-validated built-in preference. */
-function bootThemeScript(preference: ThemePreference): string {
-  return `<script>(() => {
+const LIGHT_BACKGROUND = '#fff'
+const DARK_BACKGROUND = '#151517'
+
+/** CSS that colors the document canvas before any script executes. */
+function bootThemeStyle(preference: ThemePreference): string {
+  const light = `:root{color-scheme:light}body{background-color:${LIGHT_BACKGROUND};--dsh-boot-bg:${LIGHT_BACKGROUND}}`
+  const dark = `:root{color-scheme:dark}body{background-color:${DARK_BACKGROUND};--dsh-boot-bg:${DARK_BACKGROUND}}`
+  if (preference === 'light') return light
+  if (preference === 'dark') return dark
+  return `${light}@media(prefers-color-scheme:dark){${dark}}`
+}
+
+/** Build the body script that installs the palette selector and font variables. */
+function bootThemeBodyScript(preference: ThemePreference, fontSizes: FontSizes, fontFamilies: FontFamilies): string {
+  const sizes = FONT_ROLES.map(role =>
+    `\n  document.body.style.setProperty(${JSON.stringify(FONT_SIZE_SPECS[role].variable)}, ${JSON.stringify(`${fontSizes[role]}px`)})`).join('')
+  const families = FONT_ROLES.flatMap((kind) => {
+    const list = normalizeFontFamily(fontFamilies[kind])
+    return list === '' ? [] : [`\n  document.body.style.setProperty(${JSON.stringify(fontFamilyVariable(kind))}, ${JSON.stringify(list)})`]
+  }).join('')
+  return `(() => {
   const preference = ${JSON.stringify(preference)}
   const systemDark = preference === 'system'
     && typeof matchMedia !== 'undefined'
     && matchMedia('(prefers-color-scheme: dark)').matches
   const dark = preference === 'dark' || systemDark
-  document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
-  document.body.toggleAttribute('data-ds-dark-theme', dark)
-})()</script>`
+  document.documentElement.dataset.dsThemeSource = preference
+  document.body.toggleAttribute('data-ds-dark-theme', dark)${sizes}${families}
+})()`
 }
 
 /**
- * Insert the theme bootstrap immediately after the opening body tag, before
- * the shell mount and module script. Body-less fragments receive it at the
- * end, where the HTML parser has already synthesized a body.
+ * Theme bootstrap rows: head CSS colors the document canvas before
+ * first paint, then the body script installs the palette selector and font
+ * size and font families before the shell mount and module script.
+ * @param preference - Current Host-backed built-in preference.
+ * @param fontSizes - Current Host-backed font sizes in px by role.
+ * @param fontFamilies - Current Host-backed font lists; each is normalized before embedding.
+ * @returns head and body script rows in execution order.
+ */
+export function bootThemeInjections(
+  preference: ThemePreference = DEFAULT_PREFERENCE,
+  fontSizes: FontSizes = DEFAULT_FONT_SIZES,
+  fontFamilies: FontFamilies = { text: '', code: '', terminal: '' },
+): IndexInjection[] {
+  return [
+    { kind: 'style', text: bootThemeStyle(preference) },
+    { kind: 'script', placement: 'body', text: bootThemeBodyScript(preference, fontSizes, fontFamilies) },
+  ]
+}
+
+/**
+ * Insert the theme bootstrap into a raw index document, before the shell
+ * mount and module script. Body-less fragments receive it at the end, where
+ * the HTML parser has already synthesized a body.
  * @param html - Raw application index HTML.
  * @param preference - Current Host-backed built-in preference.
+ * @param fontSizes - Current Host-backed font sizes in px by role.
+ * @param fontFamilies - Current Host-backed font lists.
  * @returns HTML containing the theme bootstrap.
  */
 export function injectBootTheme(
   html: string,
   preference: ThemePreference = DEFAULT_PREFERENCE,
+  fontSizes: FontSizes = DEFAULT_FONT_SIZES,
+  fontFamilies: FontFamilies = { text: '', code: '', terminal: '' },
 ): string {
-  const script = bootThemeScript(preference)
-  const body = /<body(?:\s[^>]*)?>/i.exec(html)
-  if (body === null) return `${html}${script}`
-  const at = body.index + body[0].length
-  return `${html.slice(0, at)}${script}${html.slice(at)}`
+  const styled = injectHead(html, `<style>${bootThemeStyle(preference)}</style>`)
+  return injectBody(styled, `<script>${bootThemeBodyScript(preference, fontSizes, fontFamilies)}</script>`)
 }
 
-/**
- * Build the structured body-row form used by the shared webserver renderer.
- * @param preference - the schema-validated persisted theme preference.
- * @returns one body script injection for the shared renderer.
- */
-export function bootThemeInjection(preference: ThemePreference = DEFAULT_PREFERENCE): IndexInjection {
-  const html = injectBootTheme('<body></body>', preference)
-  const body = /<body>([\s\S]*)<\/body>/i.exec(html)?.[1]
-  if (body === undefined) throw new Error('client-ui-theme: failed to build theme injection')
-  const text = body.replace(/^<script>|<\/script>$/g, '')
-  return { kind: 'script', placement: 'body', text }
+/** Insert one head row before the head closes; head-less fragments receive it at the start. */
+function injectHead(html: string, row: string): string {
+  const close = /<\/head>/i.exec(html)
+  if (close === null) return `${row}${html}`
+  return `${html.slice(0, close.index)}${row}${html.slice(close.index)}`
+}
+
+/** Insert one body row immediately after the opening body tag; body-less fragments receive it at the end. */
+function injectBody(html: string, row: string): string {
+  const open = /<body(?:\s[^>]*)?>/i.exec(html)
+  if (open === null) return `${html}${row}`
+  const at = open.index + open[0].length
+  return `${html.slice(0, at)}${row}${html.slice(at)}`
 }

@@ -247,6 +247,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'id', description: 'a registered theme id or `system`; unknown ids throw.' }],
       },
       {
+        signature: 'setFontSize(role: FontRole, px: number): void',
+        description: 'Change one role\'s font size. Accepted values are written through the settings scope and emit `theme/change`.',
+        parameters: [{ name: 'role', description: 'font role.' }, { name: 'px', description: 'integer px within the role\'s `FONT_SIZE_SPECS` range; out-of-range or fractional values throw.' }],
+      },
+      {
         signature: 'register(definition: ThemeDefinition): () => void',
         description: 'Register a theme. Duplicate id throws (single occupant per id; the built-in pair counts; `system` is a preference, not a registrable id).',
         parameters: [{ name: 'definition', description: 'theme id, colorScheme, and alias-token overrides.' }],
@@ -581,6 +586,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'EntryKeyOf',
     declaration: 'export type EntryKeyOf<K extends keyof SlotMap & string> = SlotMap[K] extends {\n    kind: \'keyed\';\n    keyProps: infer P extends object;\n} ? keyof P & string : string;',
+  },
+  {
+    name: 'FontFamilies',
+    declaration: 'export type FontFamilies = Readonly<Record<FontRole, string>>;',
+  },
+  {
+    name: 'FontRole',
+    declaration: 'export type FontRole = typeof FONT_ROLES[number];',
+  },
+  {
+    name: 'FontSizes',
+    declaration: 'export type FontSizes = Readonly<Record<FontRole, number>>;',
   },
   {
     name: 'GlobalStandardProps',
@@ -964,7 +981,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ThemeSnapshot',
-    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n    projectOverride?: \'light\' | \'dark\';\n}',
+    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    fontSizes: FontSizes;\n    fontFamilies: FontFamilies;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n    projectOverride?: \'light\' | \'dark\';\n}',
   },
   {
     name: 'ThemeTokenModes',

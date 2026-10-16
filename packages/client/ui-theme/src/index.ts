@@ -3,10 +3,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { bootThemeInjection, injectBootTheme } from './boot-theme.ts'
+import { bootThemeInjections, injectBootTheme } from './boot-theme.ts'
 import {
-  DEFAULT_PREFERENCE, THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema,
-  type ThemePreference, type ThemeSettings,
+  DEFAULT_PREFERENCE, FONT_SIZE_SPECS, THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema,
+  type FontFamilies, type FontSizes, type ThemePreference, type ThemeSettings,
 } from './theme-settings.ts'
 
 export {
@@ -16,13 +16,23 @@ export {
 
 const THEME_NAMESPACE = settingsNamespace(THEME_SETTINGS_NAMESPACE)
 
-/** Read the registered preference or use the schema default without a settings provider. */
-function readPreference(ctx: Context): ThemePreference {
+/** Snapshot the durable theme section, or schema defaults without a settings provider. */
+function readSettings(ctx: Context): { preference: ThemePreference; fontSizes: FontSizes; fontFamilies: FontFamilies } {
   const settings = ctx.get('settings')
-  if (settings === undefined) return DEFAULT_PREFERENCE
-  const section = settings.get(THEME_NAMESPACE) as ThemeSettings | undefined
-  if (section === undefined) return DEFAULT_PREFERENCE
-  return section.preference
+  const section = settings === undefined ? undefined : settings.get(THEME_NAMESPACE) as ThemeSettings | undefined
+  return {
+    preference: section?.preference ?? DEFAULT_PREFERENCE,
+    fontSizes: {
+      text: section?.fontSize ?? FONT_SIZE_SPECS.text.default,
+      code: section?.codeFontSize ?? FONT_SIZE_SPECS.code.default,
+      terminal: section?.terminalFontSize ?? FONT_SIZE_SPECS.terminal.default,
+    },
+    fontFamilies: {
+      text: section?.textFontFamily ?? '',
+      code: section?.codeFontFamily ?? '',
+      terminal: section?.terminalFontFamily ?? '',
+    },
+  }
 }
 
 /**
@@ -39,11 +49,15 @@ export function apply(ctx: Context): void {
   ctx.inject(['webServer'], (httpCtx) => {
     if (typeof httpCtx.webServer.renderIndex === 'function') {
       httpCtx.on('webserver/index-inject', (table) => {
-        table.push(bootThemeInjection(readPreference(ctx)))
+        const { preference, fontSizes, fontFamilies } = readSettings(ctx)
+        table.push(...bootThemeInjections(preference, fontSizes, fontFamilies))
       })
     } else {
       httpCtx.effect(
-        () => httpCtx.webServer.tapIndex(html => injectBootTheme(html, readPreference(ctx))),
+        () => httpCtx.webServer.tapIndex((html) => {
+          const { preference, fontSizes, fontFamilies } = readSettings(ctx)
+          return injectBootTheme(html, preference, fontSizes, fontFamilies)
+        }),
         'client-ui-theme: legacy initial theme bootstrap',
       )
     }

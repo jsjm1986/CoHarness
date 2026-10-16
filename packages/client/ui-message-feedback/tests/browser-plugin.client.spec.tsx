@@ -123,9 +123,9 @@ describe('ui-message-feedback browser plugin', () => {
       const header = b.ctx.slots.entries('conversation.session.header.utilities')
         .find(entry => entry.options.id === 'session-feedback')
       expect(header).toMatchObject({ locale: 'feedback' })
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as (id: SessionId) => FeedbackDialogInjected
       const dialog = injectDialog(sid('s1'))
-      const open = header?.inject as unknown as (id: SessionId) => SessionFeedbackActionInjected
+      const open = header?.inject as (id: SessionId) => SessionFeedbackActionInjected
       open(sid('s1')).openFeedback()
       expect(dialog.hooks.dialog.getSnapshot().target).toEqual({ kind: 'session' })
       // The service opens the same draft for plugins that hold no slot reach.
@@ -139,7 +139,7 @@ describe('ui-message-feedback browser plugin', () => {
     const b = await bench()
     await b.fiber.await()
     try {
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as (id: SessionId) => FeedbackDialogInjected
       const one = injectDialog(sid('s1'))
       const two = injectDialog(sid('s2'))
       const action = b.decorations[0]?.ui
@@ -161,7 +161,7 @@ describe('ui-message-feedback browser plugin', () => {
     try {
       b.detach(sid('gone'))
       expect(() => b.entry()!.inject!(sid('gone'))).toThrow(/requires a retained Session: gone/)
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as (id: SessionId) => FeedbackDialogInjected
       expect(() => injectDialog(sid('gone'))).toThrow(/requires a retained Session: gone/)
     } finally { await b.fiber.dispose() }
   })
@@ -170,7 +170,7 @@ describe('ui-message-feedback browser plugin', () => {
     const b = await bench()
     await b.fiber.await()
     try {
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as (id: SessionId) => FeedbackDialogInjected
       const dialog = injectDialog(sid('s1'))
       const decoration = b.decorations[0]
       const action = decoration?.ui
@@ -191,7 +191,7 @@ describe('ui-message-feedback browser plugin', () => {
     const b = await bench()
     await b.fiber.await()
     try {
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as (id: SessionId) => FeedbackDialogInjected
       const dialog = injectDialog(sid('s1'))
       const action = b.decorations[0]?.ui
       if (action?.kind !== 'action') throw new Error('feedback action was not registered')
@@ -221,7 +221,7 @@ describe('ui-message-feedback browser plugin', () => {
       const firstScope = b.mint(sid('s1'))
       const first = b.entry()!.inject!(sid('s1'))
       await first.ensure()
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as (id: SessionId) => FeedbackDialogInjected
       const dialog = injectDialog(sid('s1'))
       const action = b.decorations[0]?.ui
       if (action?.kind !== 'action') throw new Error('feedback action was not registered')

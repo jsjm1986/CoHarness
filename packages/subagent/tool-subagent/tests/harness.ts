@@ -112,7 +112,7 @@ export async function callSubagent(
   // `{ agent: undefined }` (test the no-agent path). Under
   // exactOptionalPropertyTypes the key is omitted rather than set to undefined.
   const fallback = ctx.get('agents') === undefined
-    ? { id: SessionId('call-parent'), options: {}, session: Session.create(SessionId('call-parent')) } as unknown as Agent
+    ? { id: SessionId('call-parent'), options: {}, session: Session.create(SessionId('call-parent')) } as Agent
     : (await ctx.agents.create({ sessionId: SessionId(`tool-call-parent-${++setupAgentCounter}`) })).agent
   const agent = 'agent' in over ? over.agent : setupAgents.get(ctx) ?? fallback
   return ctx.tools.execute({

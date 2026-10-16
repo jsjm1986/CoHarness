@@ -14,6 +14,11 @@ class MemorySettings extends SettingsProvider {
   }
 }
 
+const DEFAULT_SECTION = {
+  preference: DEFAULT_PREFERENCE, fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+  textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+}
+
 describe('ui-theme host', () => {
   it('registers, validates, and disposes the durable theme namespace with its fiber', async () => {
     const ctx = new Context()
@@ -21,10 +26,16 @@ describe('ui-theme host', () => {
     const fiber = ctx.plugin({ apply })
     await fiber.await()
     const ns = settingsNamespace(THEME_SETTINGS_NAMESPACE)
-    expect(ctx.settings.get(ns)).toEqual({ preference: DEFAULT_PREFERENCE })
-    await ctx.settings.update(ns, { preference: 'dark' })
-    expect(ctx.settings.get(ns)).toEqual({ preference: 'dark' })
+    expect(ctx.settings.get(ns)).toEqual(DEFAULT_SECTION)
+    await ctx.settings.update(ns, { preference: 'dark', fontSize: 10, codeFontSize: 16, codeFontFamily: '"Iosevka"' })
+    expect(ctx.settings.get(ns)).toEqual({ ...DEFAULT_SECTION, preference: 'dark', fontSize: 10, codeFontSize: 16, codeFontFamily: '"Iosevka"' })
+    await ctx.settings.update(ns, { fontSize: 22 })
+    expect(ctx.settings.get(ns)).toMatchObject({ fontSize: 22 })
     await expect(ctx.settings.update(ns, { preference: 'sepia' })).rejects.toThrow()
+    await expect(ctx.settings.update(ns, { fontSize: 9 })).rejects.toThrow()
+    await expect(ctx.settings.update(ns, { fontSize: 23 })).rejects.toThrow()
+    await expect(ctx.settings.update(ns, { codeFontSize: 17 })).rejects.toThrow()
+    await expect(ctx.settings.update(ns, { terminalFontSize: 9 })).rejects.toThrow()
     await fiber.dispose()
     expect(ctx.settings.describe().map(row => row.ns)).not.toContain(ns)
   })

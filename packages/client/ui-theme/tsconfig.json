@@ -21,6 +21,9 @@
       "path": "../ui-settings"
     },
     {
+      "path": "../shortcuts/tsconfig.client.json"
+    },
+    {
       "path": "../ui-slots"
     },
     {

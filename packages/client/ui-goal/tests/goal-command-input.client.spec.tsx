@@ -124,7 +124,7 @@ describe('goal command input projection', () => {
         data: { commandId: 'command-goal', text: '/goal ship it', time: 1_700_000_000_000 },
       },
       t,
-    } as unknown as Parameters<typeof GoalCommandInputView>[0]
+    } as Parameters<typeof GoalCommandInputView>[0]
     const view = render(<GoalCommandInputView {...props} />)
     const bubble = view.getByRole('group', { name: '命令输入' })
 
@@ -143,7 +143,7 @@ describe('goal command input projection', () => {
         data: { commandId: 'command-goal', text: '/goal 检查 /goal 的语法', time: 1_700_000_000_000 },
       },
       t,
-    } as unknown as Parameters<typeof GoalCommandInputView>[0]
+    } as Parameters<typeof GoalCommandInputView>[0]
     const view = render(<GoalCommandInputView {...props} />)
     const bubble = view.getByRole('group', { name: '命令输入' })
     expect(bubble.textContent).toBe('/goal 检查 /goal 的语法')
@@ -159,7 +159,7 @@ describe('goal command input projection', () => {
         data: { commandId: 'command-goal', text: '/goal', time: 1_700_000_000_000 },
       },
       t,
-    } as unknown as Parameters<typeof GoalCommandInputView>[0]
+    } as Parameters<typeof GoalCommandInputView>[0]
     const view = render(<GoalCommandInputView {...props} />)
     const bubble = view.getByRole('group', { name: '命令输入' })
 

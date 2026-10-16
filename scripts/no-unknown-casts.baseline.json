@@ -382,7 +382,6 @@
     "2e78263d16d54ccfd8d322bcdf1bf738bd8134e15c24063ece9a1d1b52f4ebd9": 1
   },
   "packages/bundle/web-app/tests/web-app.spec.ts": {
-    "450588d1194e7d52501d786af54d449d01a026f0cb014484d3d054c7d0bb407a": 1,
     "d3e42793d23f7db944c16b863d9679951dc9b30cc7f118f7ce9abf0723e8424f": 1
   },
   "packages/client/connection/src/browser-auth.ts": {
@@ -658,10 +657,6 @@
     "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 1,
     "434a6267a444f7aa1745daf28c17606df674e9490d372abac243dae1c08a3a60": 1
   },
-  "packages/client/ui-goal/tests/goal-command-input.client.spec.tsx": {
-    "1c1b6199197153a573f0fe4407b8558555422b0d50dbbba17b25b3ca93c61c4d": 1,
-    "c94a4dd0df97005875a97b9228b3f536765ee6d31872ee05e69677da27086124": 1
-  },
   "packages/client/ui-input-trigger/tests/apply.client.spec.ts": {
     "fc590cb703f599e5bb15f23909cedddeb2a77cb2cad0d4b9b8e664a62c46f44e": 1
   },
@@ -675,8 +670,7 @@
     "d0d7b677da65df97240f713995e20d0642ef32cf056864b11f2f4879a0d9e878": 1
   },
   "packages/client/ui-message-feedback/tests/browser-plugin.client.spec.tsx": {
-    "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 1,
-    "0f1db2d8a42b2f1c98c7aee947c9d5171fa73d0dc7167c213a0dc0c3b7fa4289": 5
+    "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 1
   },
   "packages/client/ui-message-feedback/tests/controller.client.spec.ts": {
     "49be998ed5ab4eaaf970fc42cc7f5ff0d4cbcc9ac3d45362edfb7b7e7712d404": 1
@@ -1605,15 +1599,12 @@
     "016337c62f55ffcdfc006da693aaf9bb20c3bb49260939c0d50191117c48934e": 1,
     "195c78230a8bbe0d654f43b6d153d129d1bf080280fc49b9fee8d78c58078718": 1,
     "3731644758b2a2bcc522000c131faf6cb3654e9f19e01c27e29dd7a033f2849e": 4,
-    "38a7cf3dfd5da2f739390f5b233b97731f3bfa1ac3a51fdb8e1594735764bb80": 5,
     "654a05ce6f8a384331abf1ccf5c5af6a93bc1db02c1d39e33869d49f4b0adfb4": 1,
     "89b33a57a7c77261a02116dd015c08d9e6a5b1efb5ba0ebf49bc68a21e7f120a": 1,
-    "b121cee14635b00f7891217013e4682493cf96f676710be60722fdf8b862aea3": 1,
-    "b822f82ff20629f2242a089fdc104d574c68bb54022239f7fe9c7b05f1dc997b": 5
+    "b121cee14635b00f7891217013e4682493cf96f676710be60722fdf8b862aea3": 1
   },
   "packages/host/userdoc-http/tests/acl.spec.ts": {
     "076069822699c64a8252709b218aa27ac63234586fc8adc4ee77385a9fe24030": 1,
-    "160f7f33b8372b2aef0ebade8567f29f5bf7f5c6cd6e6850da86024dbe4bf009": 1,
     "8bc675ff72c8d4566c585affd6dfacd49ce8f767260777f9f227d655caef5d91": 1,
     "b121cee14635b00f7891217013e4682493cf96f676710be60722fdf8b862aea3": 1,
     "efd88b9417cbf6a0ff1a4f0ce590c4a6749e69dabed36e01ddb5467be0347879": 1,
@@ -1623,8 +1614,7 @@
     "6079e687ee1ea1bb2be6d44d2e8cccbeca8ba2d09646cbbb77bec7cf2f75583d": 1,
     "68836547cd067520f2447315680fa3bbf6c17f82cde040ebf6188830727cbc39": 1,
     "8bc675ff72c8d4566c585affd6dfacd49ce8f767260777f9f227d655caef5d91": 1,
-    "ea7a25cca2cc0919b0e2bd60117c9822ba9712edf6dde05b6ece608bc45ba5b5": 1,
-    "ec33bf4a8e0ed2d68cd94626c237a581c196a33cf5ab744dd224e5b9896aceba": 1
+    "ea7a25cca2cc0919b0e2bd60117c9822ba9712edf6dde05b6ece608bc45ba5b5": 1
   },
   "packages/host/userdoc-http/tests/loader-composition.spec.ts": {
     "8bc675ff72c8d4566c585affd6dfacd49ce8f767260777f9f227d655caef5d91": 1,
@@ -1911,12 +1901,11 @@
     "71fa45c63f1d2dc12e6a4da1120a9ca227ef1b1ffbce510cd0d8847d85f278c0": 9,
     "80fa2ee81263d11fc1fafe6b7dbb608e8ed6e7c7e8e7fa3e726b600e82425294": 1,
     "82025e3228e5dab025f1c3434c0303baf066b7f40f30352764abc7374a693928": 1,
-    "9234f1edeb197a3cc5e423e04ea3b9d79da97e1f231db0bca529810ab3e0d100": 1,
     "926edbfe0199937da6ec9d119cfd16f6cbc674a242de8f433980da6e6ea8b13b": 1,
     "9b52ca4ca1a86eb1d34576ca3c210d2e09677553e2a0b0e505675782034c147e": 1,
     "9c3213cd8f09df05b9aceba2033b68f6b61c1abe2231167622ef3fa462d77424": 1,
     "a03ef245e286d905868294bee2e81ac282cfa0a5161a1edd6d8b0aa167932fb6": 1,
-    "ae0162b189937f84fb9a162eabbc7496f7e196c00e960aef4fe8e5b3e4b87d8d": 4,
+    "ae0162b189937f84fb9a162eabbc7496f7e196c00e960aef4fe8e5b3e4b87d8d": 3,
     "d54d74835af1518a4723a7cc803efc0d4e8e337ebb80b813b6ef76bdb813be17": 1
   },
   "packages/session-query/session-log-export/tests/client-apply.client.spec.tsx": {
@@ -2446,9 +2435,6 @@
   "packages/subagent/tool-subagent/src/index.ts": {
     "11233be4a60a9dfb99acc5fbf90c5185c2101516379f3224866557301bbb048c": 1,
     "7fe58280287ff63d40e979e72329f975e11015a95e9a8eec207a5a78748d3c89": 4
-  },
-  "packages/subagent/tool-subagent/tests/harness.ts": {
-    "1a2098d6ff345b66d13f9822385af407ac03acdabeb607c2bd18a75987c410a5": 1
   },
   "packages/subagent/tool-subagent/tests/model-selection.spec.ts": {
     "4000017f1f3dabd4bdf8eb91120cf4ff0dd09bad89d4683151f4785974d204a5": 5,

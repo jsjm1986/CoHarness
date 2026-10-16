@@ -3,20 +3,20 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-theme/README.md
 /:
-  en: fd4f83e364708ecb
+  en: 40f306d0fc90f330
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-ui-theme:
-  en: ac95a4f257819416
-  zh: 20d1861193972db0
+  en: 9bdf66062c9b271d
+  zh: 3373597e4fbcd41a
 /deepseek-ai-dsh-client-ui-theme/summary:
-  en: 9a8f4c7be246a765
-  zh: e6e8683f300d13c6
+  en: d5fdae71305e3859
+  zh: d7d1acad7b56c9a4
 /deepseek-ai-dsh-client-ui-theme/table-of-contents:
   en: d183711522cef212
   zh: f7f87c30433eb7d7
 /deepseek-ai-dsh-client-ui-theme/settings-authority-and-compatibility:
-  en: ded1b558fd33f877
-  zh: 8c928c14ca43bf70
+  en: 366c6868eefd3960
+  zh: 1985b3858b491d90
 /deepseek-ai-dsh-client-ui-theme/invariants:
   en: 2008e91f0cf11e38
   zh: 8a334bcc19d49150
