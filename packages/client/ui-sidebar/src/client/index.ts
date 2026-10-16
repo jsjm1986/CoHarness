@@ -62,8 +62,13 @@ export function apply(ctx: ClientContext): void {
     },
     exitWorkbench: () => { ctx.get('conversationViewport')?.setMode('single') },
     // The shell's New Session button rides the runtime's shared action
-    // (current Session Workspace, then recent Workspace).
-    startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId) },
+    // (current Session Workspace, then recent Workspace). The Conversation
+    // reset cannot ride the session-list subscription — the no-workspace
+    // clear and a same-session reuse emit no selection change.
+    startSession: (workspaceId) => {
+      ctx.layout.selectPanel(null)
+      ctx.workspaces.startSession(workspaceId)
+    },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
     selectPanel: (id) => { ctx.layout.selectPanel(id) },
   })

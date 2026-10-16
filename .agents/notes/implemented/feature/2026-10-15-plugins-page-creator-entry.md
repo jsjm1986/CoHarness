@@ -16,6 +16,8 @@ The conversational plugin-authoring flow — stage the `cordis` preset, open a b
 
 The launch guard reads both surfaces' evidence: the section store's `showPicker` or the shared roster's ready status. An entry the user never opened cannot veto a launch the opened one already proved possible.
 
+Launching from a main panel requires an explicit return to the Conversation. `layout.selectPanel(null)` runs inside `creatorDraft` before `startSession`: a no-workspace clear and a same-session reuse emit no selection change, so the panel would otherwise stay mounted over the draft. The same gap existed on the shell's New Session button and the Workspace browser's start actions; both now reset the panel at the gesture — in `ui-sidebar`'s injection and the shared `uiWorkspace.startSession` face — matching the reset `openSession` already performed on commit.
+
 ## Alternatives considered
 
 **A hardcoded Creator item inside `ui-plugin-manager`.** The Plugins page would import agent-preset concepts — roster state, the `cordis` id, seat staging — inverting the layering the slot system exists for. The page owns the menu chrome; the preset plugin owns the entry.
@@ -26,7 +28,7 @@ The launch guard reads both surfaces' evidence: the section store's `showPicker`
 
 ## Consequences
 
-`ui-agent-preset` gains a type-only edge to `dsh-client-ui-plugin-manager` for the `plugins.add.actions` SlotMap merge — peer plus dev, no runtime import. The Creator entry is now reachable from two surfaces with identical launch semantics, and a deployment that hides mode selection sees the menu item disabled with its reason, not absent. The entry disposes with the conversation scope that binds `creatorDraft`, so the face reads the current binding rather than capturing one.
+`ui-agent-preset` gains type-only edges to `dsh-client-ui-plugin-manager` (the `plugins.add.actions` SlotMap merge) and `dsh-client-ui-layout` (the `ctx.layout` merge) — matching peer plus dev declarations, no runtime imports. The Creator entry is now reachable from two surfaces with identical launch semantics, and a deployment that hides mode selection sees the menu item disabled with its reason, not absent. The entry disposes with the conversation scope that binds `creatorDraft`, so the face reads the current binding rather than capturing one.
 
 ## Testing
 

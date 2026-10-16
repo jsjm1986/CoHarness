@@ -199,12 +199,19 @@ describe('GoalService creation and replay', () => {
 
   it('disarms live activation during serial creation', async () => {
     const { ctx, agent, session } = await harness()
+    const activations: Array<{ activation: string | undefined; id: string | undefined; revision: number | undefined }> = []
+    ctx.on('goal/activation-changed', ({ goal }) => {
+      activations.push({ activation: goal?.activation, id: goal?.id, revision: goal?.revision })
+    })
     let goal = ctx.goals.create(agent, { objective: 'stay stopped after resume' })
     expect(goal.activation).toBe('armed')
     await agentEvents(ctx, agent).serial('agent/created', { source: 'resume' })
     expect(ctx.goals.get(agent)?.activation).toBe('disarmed')
     goal = ctx.goals.resume(agent, goal)
     expect(goal).toMatchObject({ phase: 'active', activation: 'armed', revision: 2 })
+    expect(activations.map(entry => entry.activation)).toEqual(['armed', 'disarmed', 'armed'])
+    expect(activations.map(entry => entry.id)).toEqual([goal.id, goal.id, goal.id])
+    expect(activations.map(entry => entry.revision)).toEqual([1, 1, 2])
     expect(() => foldGoal(session.snapshotEvents())).not.toThrow()
   })
 

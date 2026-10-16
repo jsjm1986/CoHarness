@@ -4,8 +4,7 @@ import { join } from 'node:path'
 import { execa } from 'execa'
 import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
 import { classifyInstallFailure } from './install-failure.ts'
-import type { ParsedInstallSpec } from './install-spec.ts'
-import type { PackageResult } from './types.ts'
+import type { PackageResult, ParsedInstallSpec } from './types.ts'
 
 /** Deadline, diagnostics and cancellation for one read-only GitHub check. */
 export interface GithubConnectionOptions {

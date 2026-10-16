@@ -3,7 +3,8 @@
  * payloads, message attribution, replay folds, and the scoped `goal/changed`
  * event. Kept separate from ./types.ts (the pure client-safe outlet) because
  * these declarations pull dsh-agent, dsh-llm, and cordis into the program —
- * the one-program-per-side layout forbids that on client aggregates.
+ * the one-program-per-side layout forbids that on client aggregates; the
+ * client-forwarded `goal/activation-changed` event lives in ./types.ts.
  * @module @deepseek-ai/dsh-goal
  */
 

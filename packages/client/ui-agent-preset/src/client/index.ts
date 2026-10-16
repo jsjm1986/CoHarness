@@ -1,9 +1,10 @@
 /**
- * Agent-preset surface plugin, browser half — four surfaces over one roster:
+ * Agent-preset surface plugin, browser half — five surfaces over one roster:
  * a General-settings row for the default preset, a chip on the new-session
  * screen for the session about to start, a read-only label in the session
- * header, and a settings section that manages the roster (copy, delete,
- * default, and the way into a preset's own files).
+ * header, a settings section that manages the roster (copy, delete,
+ * default, and the way into a preset's own files), and a Creator entry in
+ * the Plugins page's add menu.
  *
  * A running session keeps the composition it began with (the host refuses to
  * adopt an existing session under a different preset). That is what splits
@@ -22,6 +23,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the Plugins page's SlotMap merge (the 'plugins.add.actions' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+// Type-only: pulls the shell layout's Context merge (ctx.layout) for the
+// panel reset a new-session gesture performs.
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { AgentPresetLabel } from './AgentPresetLabel.tsx'
 import type { AgentPresetLabelInjected } from './AgentPresetLabel.tsx'
 import { CreatePluginMenuItem } from './CreatePluginMenuItem.tsx'
@@ -259,6 +263,10 @@ export function apply(ctx: ClientContext): void {
         // The introduce cue makes the chip announce the pick the user never
         // made on this screen — the stage happened on another surface.
         seat.stage('cordis', true)
+        // The draft lands on the Conversation surface: a global main panel
+        // (the Plugins page this entry lives on) would otherwise stay mounted
+        // over it — the panel only yields when the session selection changes.
+        ctx.get('layout')?.selectPanel(null)
         scope.workspaces.startSession()
       }
       const chip = scope.slots.register({

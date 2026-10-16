@@ -45,7 +45,7 @@ kind: "package-reference"
 
 每次变更都会追加持久的 `goal/change` 事件，其中携带变更后的完整快照；clear 使用带 revision 的 tombstone。因此，goal 状态不依赖 inbox 放置、领取、准入或丢弃。会话日志是唯一的持久权威。
 
-严格回放只从 `goal/change` 派生生命周期变更，并拒绝形状错误、不连续 revision、非法生命周期转换、每目标时间戳非单调，以及不连续的已准入 Goal Round。只有来源为 goal 且已准入的 `user/message` 事件会推进正数 Round。挂钟时间倒退时，变更时间戳会限制在不早于上一次目标更新的值。增量回放会把游标保留在第一个损坏事件处；`goal/changed` 会在持久事件提交后触发，监听器失败会被隔离处理。
+严格回放只从 `goal/change` 派生生命周期变更，并拒绝形状错误、不连续 revision、非法生命周期转换、每目标时间戳非单调，以及不连续的已准入 Goal Round。只有来源为 goal 且已准入的 `user/message` 事件会推进正数 Round。挂钟时间倒退时，变更时间戳会限制在不早于上一次目标更新的值。增量回放会把游标保留在第一个损坏事件处；`goal/changed` 会在持久事件提交后触发，监听器失败会被隔离处理。`goal/activation-changed` 在不改变持久状态的情况下，转发携带精确当前 ref 的进程本地 `armed`／`disarmed` 边界；clear 后则不携带 goal。
 
 组合 `dsh-session-projection` 时，服务读取注册表主动驱动的 `goal` 状态，以常数时间取得当前状态并复用检查点。没有该可选注册表的组合继续使用本地增量缓存，因此 headless 组装保留原有依赖集合与行为。
 

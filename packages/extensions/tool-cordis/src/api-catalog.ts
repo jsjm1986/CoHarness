@@ -691,13 +691,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'rebuilt(id: string): string | undefined',
-        description: 'Publish one completed bundle generation (the HMR watch\'s registration hook — the only entry point through which build changes reach the graph).',
+        description: 'Publish one completed bundle generation (the HMR watch\'s registration hook — the only entry point through which build changes reach the graph). Unchanged mtime, ctime and size preserve the graph without reading the bundle.',
         parameters: [{ name: 'id', description: 'entry id (package name).' }],
-        returns: 'the new rev, or undefined for an unknown id.',
+        returns: 'the current artifact rev, or undefined for an unknown id.',
       },
       {
         signature: 'onRebuilt(listener: (id: string, rev: string) => void): () => void',
-        description: 'Subscribe to bundle rebuilds; fires only when the re-hash changed the rev.',
+        description: 'Subscribe to bundle rebuilds; fires only when artifact metadata changes the rev.',
         parameters: [{ name: 'listener', description: 'receives the entry id and its new bundle rev.' }],
         returns: 'the unsubscriber.',
       },
@@ -1267,6 +1267,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Read direct module dependency URLs from the active Node loader.',
         parameters: [{ name: 'url', description: 'Module URL.' }],
         returns: 'Linked module URLs, or an empty list for an uncached module.',
+      },
+      {
+        signature: 'async reconcileProfile(requiredIds: readonly string[] = []): Promise<ProfileReconciliation>',
+        description: 'Recompose the profile from its manifest and patch files, replacing running plugins whose loaded files below the profile directory or its linked package targets changed on disk, and publishing its runtime resolution. Changed modules are evicted and the Loader entries running them stop; app-boot\'s recomposeProfile then publishes the resolution, applies the generation, starts the stopped entries with the current files and configuration, imports entries whose import failed again, and judges activation. Afterwards the modules below the mappings the recomposition dropped are evicted, so a removed or deselected package is imported afresh when it returns. Callers run inside runExclusive.',
+        parameters: [{ name: 'requiredIds', description: 'Entry ids whose inactive state is reported as a failure even when it predates this call.' }],
+        returns: 'Inactive-entry diagnostics, the changed modules that load after a restart, and a profile-wide restart reason.',
+        throws: ['The patch read, publication, preparation, apply, or activation failure of the recomposition, including a replacement plugin that fails to load or start, whose previous code no longer runs.'],
       },
     ],
   },
@@ -4276,6 +4283,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'target', description: 'the resolved target about to be written.' }, { name: 'actor', description: 'the opaque tool-execution context the decider keys off.' }],
   },
   {
+    name: 'goal/activation-changed',
+    mode: 'emit',
+    signature: '\'goal/activation-changed\'(payload: GoalActivationChanged): void',
+    summary: 'Process-local goal activation changed for one session.',
+    description: 'Process-local goal activation changed for one session.',
+    parameters: [{ name: 'payload', description: 'session id and the exact current goal activation, or no goal after a clear.' }],
+  },
+  {
     name: 'goal/changed',
     mode: 'emit',
     signature: '\'goal/changed\'(this: import(\'@deepseek-ai/dsh-scope\').Scoped<Agent>, payload: { agent: Agent; change: GoalChanged }): void',
@@ -4921,11 +4936,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ChangeResult',
-    declaration: 'export interface ChangeResult {\n    changed: boolean;\n    application: \'applied\' | \'restart-required\' | \'overridden\' | \'failed\' | \'cancelled\';\n    stage: \'install\' | \'enable\' | \'remove\';\n    target: string;\n    enabled?: boolean;\n    error?: ManagementError;\n    warnings?: string[];\n    packageResult?: PackageResult;\n    bundle?: string;\n    version?: string;\n    pendingBuilds?: string[];\n    approvedBuilds?: string[];\n    registries?: Registry[];\n    failedAt?: \'registry\' | \'spec-host\';\n}',
+    declaration: 'export interface ChangeResult {\n    changed: boolean;\n    application: \'applied\' | \'restart-required\' | \'overridden\' | \'failed\' | \'cancelled\';\n    restartReason?: RestartReason;\n    stage: \'install\' | \'enable\' | \'remove\';\n    target: string;\n    enabled?: boolean;\n    error?: ManagementError;\n    warnings?: string[];\n    packageResult?: PackageResult;\n    bundle?: string;\n    version?: string;\n    pendingBuilds?: string[];\n    approvedBuilds?: string[];\n    registries?: Registry[];\n    failedAt?: \'registry\' | \'spec-host\';\n}',
   },
   {
     name: 'ClientArtifactBaseline',
-    declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly size: number;\n}',
+    declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly ctimeMs: number;\n    readonly size: number;\n}',
   },
   {
     name: 'ClientResponse',
@@ -5456,6 +5471,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type GoalActivation = \'armed\' | \'disarmed\';',
   },
   {
+    name: 'GoalActivationChanged',
+    declaration: 'export interface GoalActivationChanged {\n    readonly sessionId: SessionId;\n    readonly goal?: {\n        readonly id: GoalId;\n        readonly revision: number;\n        readonly activation: GoalActivation;\n    };\n}',
+  },
+  {
     name: 'GoalBlockReason',
     declaration: 'export interface GoalBlockReason {\n    readonly code: string;\n    readonly message: string;\n}',
   },
@@ -5837,7 +5856,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ManagementError',
-    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'ambiguous-install\' | \'not-bundle\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'incompatible-version\' | \'operation-error\';\n    diagnostic?: string;\n    incompatible?: IncompatiblePlugin[];\n}',
+    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'already-installed\' | \'ambiguous-install\' | \'not-bundle\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'incompatible-version\' | \'operation-error\';\n    diagnostic?: string;\n    incompatible?: IncompatiblePlugin[];\n}',
   },
   {
     name: 'ManualCompactAgentContext',
@@ -6012,6 +6031,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface PackageResult {\n    exitCode: number;\n    output: string;\n    truncated: boolean;\n    logPath: string;\n    kind?: PluginInstallFailureKind;\n    timedOut?: boolean;\n    incompatible?: IncompatiblePlugin[];\n}',
   },
   {
+    name: 'PendingModule',
+    declaration: 'export interface PendingModule {\n    url: string;\n    reason: \'host-module\' | \'unmanaged-plugin\' | \'module-comparison\';\n}',
+  },
+  {
     name: 'PermissionCatalog',
     declaration: 'export interface PermissionCatalog {\n    options: PresetOption[];\n}',
   },
@@ -6150,6 +6173,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ProfilePnpmInvocation',
     declaration: 'export interface ProfilePnpmInvocation {\n    readonly command: string;\n    readonly args: readonly string[];\n    readonly env: Readonly<Record<string, string>>;\n}',
+  },
+  {
+    name: 'ProfileReconciliation',
+    declaration: 'export interface ProfileReconciliation {\n    warnings: string[];\n    pending: PendingModule[];\n    restartReason?: \'module-comparison\' | \'package-moved\';\n}',
   },
   {
     name: 'ProjectionChangeListener',
@@ -6338,6 +6365,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResolveUserDocTarget',
     declaration: 'export interface ResolveUserDocTarget {\n    name: string;\n    directoryId?: UserDocDirectoryId;\n}',
+  },
+  {
+    name: 'RestartReason',
+    declaration: 'export type RestartReason = \'no-hmr\' | \'package-moved\' | \'host-module\' | \'unmanaged-plugin\' | \'module-comparison\';',
   },
   {
     name: 'RestoredSessionOptions',

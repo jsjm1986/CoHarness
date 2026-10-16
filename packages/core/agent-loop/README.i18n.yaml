@@ -18,8 +18,8 @@
   en: 84ddef3e30b22560
   zh: 324d4a65ec82c114
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/public-api:
-  en: 01d2756821246165
-  zh: 8895a2cc4ba47164
+  en: 6713c5dd6f6ea66f
+  zh: 598dbb76ea19d903
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/injected-services:
   en: 174543e4b0f52e85
   zh: d0c1371fbc538db0
@@ -78,8 +78,8 @@
   en: 1750eea3cc5bf2d8
   zh: cd3dfe31be5dedec
 /dsh-agent-loop/known-limitations-and-deferred-work:
-  en: f22f810de2ed5afb
-  zh: 7ac5dffc1d3bb165
+  en: dd90cc276137032e
+  zh: e5d76cc7554e072f
 /dsh-agent-loop/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

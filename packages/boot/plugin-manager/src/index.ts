@@ -13,16 +13,16 @@ import { TypertRemoteService, Remote, RemoteError, remoteErrorOf } from '@deepse
 import { pluginEntryId, readPluginInventory } from '@deepseek-ai/dsh-host-plugin-inventory'
 import {
   readPluginMeta, readProfileManifest, resolveBundleDir, loadOverlayPatches, composeEntries,
-  reconcileProfilePatches, readProfilePatches, OPTIONAL_BUNDLES, bundlePatchPaths,
+  readProfilePatches, OPTIONAL_BUNDLES, bundlePatchPaths,
   evaluatePluginCompatibility, readProfileCompatibility, readProfileVersionExemptions,
-  setProfileVersionExemption, PROFILE_COMPATIBILITY_FILENAME,
+  setProfileVersionExemption, PROFILE_COMPATIBILITY_FILENAME, ResolutionRestartRequired,
 } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-hmr'
 import type { ProfileContext, ProfileManifest } from '@deepseek-ai/dsh-app-boot'
 import { bundleManifest, readProfileRegistry, registryArguments, runProfilePnpm, saveManifest, viewProfilePackage } from './operations.ts'
 import { installationStream } from './install-stream.ts'
 import { classifyInstallFailure } from './install-failure.ts'
-import { InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts'
+import { dependencySpec, InvalidInstallSpecError, parseInstallSpec } from './install-spec.ts'
 import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryPlan } from './registry.ts'
 import { writePluginEnabled } from './patch.ts'
 import { applyDesiredState, readDesiredState } from './desired-state.ts'
@@ -33,11 +33,11 @@ import type {
   BundleInfo, BundleRowInfo, ChangeResult, InspectOptions, InstallBundleOptions, ManagementError, PackageResult, PluginChange,
   PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress,
   PluginInstallRequestId, PluginInstallFrame, PluginManagementAccess, PluginManagementCapability, PluginRegistries,
-  PluginSpecInspection, PluginManagementAuthorization, Registry,
+  PluginSpecInspection, PluginManagementAuthorization, ParsedInstallSpec, Registry,
 } from './types.ts'
 export type * from './types.ts'
 export { classifyInstallFailure, type InstallFailureFacts } from './install-failure.ts'
-export { InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts'
+export { InvalidInstallSpecError, parseInstallSpec } from './install-spec.ts'
 
 /** The pnpm executable, registries, and limits for diagnostics, lookups and connection checks. */
 export interface Config {
@@ -161,6 +161,40 @@ function printedError(printed: string): string {
   return [code, message].filter((part): part is string => typeof part === 'string').join('  ')
 }
 
+/** What applying the saved profile reports into a change result. */
+type Reload = Pick<ChangeResult, 'warnings' | 'restartReason'>
+
+/** The bundles a profile manifest selects. */
+function bundleSelection(manifest: ProfileManifest): readonly string[] {
+  return manifest.dsh?.profile?.bundles ?? []
+}
+
+/**
+ * The package an installation spec names before pnpm runs: a registry name, a local directory's manifest name, or the
+ * dependency saved with this git or tarball spec, compared as the plugin list shows saved specs.
+ * @param spec The installation spec.
+ * @param dependencies The profile's saved dependencies.
+ * @param profileDir The profile directory saved local paths are relative to.
+ * @returns The package name, or `undefined` when only the installation tells it.
+ */
+function specPackageName(spec: string, dependencies: Readonly<Record<string, string>>, profileDir: string): string | undefined {
+  const parsed = parsedForRegistry(spec)
+  if (parsed.kind === 'registry') return parsed.name
+  if (parsed.kind === 'path') return packageName(parsed.path)
+  const specs = parsed.kind === 'tarball' && parsed.path !== undefined ? [spec, `file:${parsed.path}`] : [spec]
+  return Object.entries(dependencies).find(([dependency, saved]) => specs.includes(dependencySpec(dependency, saved, profileDir)))?.[0]
+}
+
+/** The package name a local directory declares, or `undefined` without a readable manifest. */
+function packageName(dir: string): string | undefined {
+  try {
+    return readProfileManifest('dsh', dir).name
+  } catch (_error) {
+    // pnpm reports the unreadable directory itself.
+    return undefined
+  }
+}
+
 /** The spec's form, for deciding whether a failed attempt was the registry's; a form the parser refuses has no host of its own. */
 function parsedForRegistry(spec: string): ParsedInstallSpec {
   try {
@@ -198,6 +232,11 @@ export class PluginManager extends TypertRemoteService {
   })
   /** Management bundles remain protected if their files become unreadable. */
   private readonly managementBundles = new Set<string>()
+  /**
+   * The registry each package was last installed from by this manager in this process. pnpm verifies lockfile tarball
+   * URLs against its default registry unless they belong to a named registry, so a later removal names it again.
+   */
+  private readonly installedFrom = new Map<string, Registry>()
   private readonly ownerEntryId: string | undefined
   private readonly packageOperations = new Set<Promise<unknown>>()
   private readonly profile: ProfileContext
@@ -295,7 +334,7 @@ export class PluginManager extends TypertRemoteService {
     await this.authorize()
     return this.change(result => this.configure(async () => {
       await setProfileVersionExemption(this.profile.dir, packageVersion, runtimeVersion, enabled, acceptRisk === true)
-      result.warnings = await this.reload()
+      Object.assign(result, await this.reload())
     }), { stage: 'enable', target: packageVersion, enabled }, 'bundle')
   }
 
@@ -409,7 +448,7 @@ export class PluginManager extends TypertRemoteService {
     const manifest = readProfileManifest('dsh', this.profile.dir)
     const installation = JSON.parse(readFileSync(this.profile.installAnchor, 'utf8')) as InstallationManifest
     const known = new Set([
-      ...manifest.dsh?.profile?.bundles ?? [], ...Object.keys(manifest.dependencies ?? {}), ...Object.keys(installation.dependencies ?? {}),
+      ...bundleSelection(manifest), ...Object.keys(manifest.dependencies ?? {}), ...Object.keys(installation.dependencies ?? {}),
     ])
     const plan = registryPlan(options?.registry, await this.registries())
     const registry = plan[0] as Registry
@@ -488,7 +527,7 @@ export class PluginManager extends TypertRemoteService {
       if (row === undefined) throw new ManagementFailure('unknown-plugin')
       if (row.readOnlyReason !== undefined) throw new ManagementFailure(row.readOnlyReason)
       await writePluginEnabled(this.profile.patchPath, row.patchId, row.moduleName, enabled)
-      result.warnings = await this.reload(enabled ? [row.patchId] : [])
+      Object.assign(result, await this.reload(enabled ? [row.patchId] : []))
       const current = (await this.listPlugins()).find(item => item.entryId === id)
       return current?.enabled !== enabled && this.ownerContext.get('hmr') !== undefined ? 'overridden' : undefined
     }), { stage: 'enable', target: id, enabled }, 'plugin')
@@ -504,9 +543,7 @@ export class PluginManager extends TypertRemoteService {
     await this.authorize()
     return this.change(result => this.configure(async () => {
       await this.selectBundle(name, enabled)
-      if (enabled) await this.refreshPackages()
-      result.warnings = await this.reload(enabled ? this.bundleRows(name).map(row => row.id) : [])
-      if (!enabled && this.ownerContext.get('hmr') !== undefined) await this.refreshPackages()
+      Object.assign(result, enabled ? await this.publishAndReload(this.bundleRows(name).map(row => row.id)) : await this.reload())
     }), { stage: 'enable', target: name, enabled }, 'bundle')
   }
 
@@ -546,12 +583,17 @@ export class PluginManager extends TypertRemoteService {
     const result = this.change(async (result) => {
       if (spec.trim() === '' || spec.startsWith('-')) throw new ManagementFailure('invalid-spec')
       if (stopped()) throw new InstallCancelledError()
+      const before = readProfileManifest('dsh', this.profile.dir).dependencies ?? {}
+      // With HMR, an installed package is removed before another version is installed, so its plugins stop first.
+      const known = specPackageName(spec, before, this.profile.dir)
+      if (this.ownerContext.get('hmr') !== undefined && known !== undefined && Object.hasOwn(before, known)) {
+        throw new ManagementFailure('already-installed')
+      }
       if (options?.approvedBuilds !== undefined) {
         await approveBuilds(this.profile.dir, options.approvedBuilds)
         result.approvedBuilds = options.approvedBuilds
       }
       const files = await this.readRestoredFiles()
-      const before = readProfileManifest('dsh', this.profile.dir).dependencies ?? {}
       let name: string
       let version: string | undefined
       try {
@@ -574,11 +616,13 @@ export class PluginManager extends TypertRemoteService {
         // The last run is the result's; the registries asked stay listed whatever the outcome.
         const plan = registryPlan(options?.registry, await this.registries())
         let run: PackageResult | undefined
+        let used: Registry = null
         for (const [index, registry] of plan.entries()) {
           if (index > 0) await this.restoreFiles(files)
           // A stop that landed while the files went back, or before the first run, starts no run with a dead signal.
           if (stopped()) throw new InstallCancelledError()
           result.registries.push(registry)
+          used = registry
           announce('installing', { registry, index: index + 1, total: plan.length })
           run = await this.runPnpm(['add', spec, ...registryArguments(registry)], operationSignal, requestId)
           result.packageResult = run
@@ -613,8 +657,11 @@ export class PluginManager extends TypertRemoteService {
         }
         const after = readProfileManifest('dsh', this.profile.dir).dependencies ?? {}
         const installed = Object.keys(after).filter(name => before[name] !== after[name])
-        // Registry retries can retain the saved range after a partial installation.
-        if (installed.length === 0) installed.push(...Object.keys(after).filter(name => spec === name || spec.startsWith(`${name}@`)))
+        // Without HMR a repeated installation can leave the saved dependency as it was.
+        if (installed.length === 0) {
+          const local = specPackageName(spec, after, this.profile.dir)
+          if (local !== undefined && Object.hasOwn(after, local)) installed.push(local)
+        }
         const target = installed[0]
         if (installed.length !== 1 || target === undefined) throw new ManagementFailure('ambiguous-install')
         name = target
@@ -625,6 +672,7 @@ export class PluginManager extends TypertRemoteService {
         if (compatibility !== undefined && !compatibility.exempted) throw new ManagementFailure('incompatible-version', [incompatiblePlugin(compatibility)])
         for (const file of bundlePatchPaths(dir, manifest.dsh.bundle)) loadOverlayPatches('dsh', file)
         version = manifest.version
+        this.installedFrom.set(name, used)
         await this.authorize()
         if (stopped()) throw new InstallCancelledError()
       } catch (error) {
@@ -641,9 +689,11 @@ export class PluginManager extends TypertRemoteService {
       return this.configure(async () => {
         if (stopped()) throw new InstallCancelledError()
         if (options?.enabled !== false) await this.selectBundle(name, true)
-        if (Object.hasOwn(before, name)) return 'restart-required'
-        await this.refreshPackages()
-        if (options?.enabled !== false) result.warnings = await this.reload()
+        // Without HMR the replaced package's plugins keep running until the restart the result already reports.
+        if (Object.hasOwn(before, name) && this.ownerContext.get('hmr') === undefined) return
+        // A selected bundle's own rows must start.
+        const selected = bundleSelection(readProfileManifest('dsh', this.profile.dir)).includes(name)
+        Object.assign(result, await this.publishAndReload(selected ? this.bundleRows(name).map(row => row.id) : []))
       })
     }, { stage: 'install', target: spec, enabled: options?.enabled !== false }, 'install')
     control.result = result
@@ -716,7 +766,7 @@ export class PluginManager extends TypertRemoteService {
         const contributions = bundle.error === undefined ? this.bundleRows(name) : []
         if (bundle.enabled) {
           await this.selectBundle(name, false)
-          result.warnings = await this.reload()
+          Object.assign(result, await this.reload())
         }
         if ([...this.ctx.loader.entries()].some(entry => entry.fiber?.uid != null
           && contributions.some(row => row.id === entry.options.id && row.name === entry.options.name))) {
@@ -727,11 +777,15 @@ export class PluginManager extends TypertRemoteService {
       if (!installed) return
       signal?.throwIfAborted()
       await this.authorize()
-      result.packageResult = await this.runPnpm(['remove', name], signal)
+      // `pnpm remove` takes no `--registry` option; the generic configuration flag sets the same setting. A package
+      // installed before this process started is removed with the registry an installation asks first.
+      const registry = this.installedFrom.has(name) ? this.installedFrom.get(name) : this.configuredRegistries.registry
+      result.packageResult = await this.runPnpm(['remove', name, ...typeof registry === 'string' ? [`--config.registry=${registry}`] : []], signal)
       if (result.packageResult.exitCode !== 0 || result.packageResult.timedOut === true) {
         throw new Error(result.packageResult.output)
       }
-      await this.configure(() => this.refreshPackages())
+      this.installedFrom.delete(name)
+      Object.assign(result, await this.configure(() => this.publishAndReload()))
     }, { stage: 'remove', target: name }, 'remove')
   }
 
@@ -824,7 +878,7 @@ export class PluginManager extends TypertRemoteService {
 
   private async selectBundle(name: string, enabled: boolean): Promise<void> {
     const manifest = readProfileManifest('dsh', this.profile.dir)
-    const previous = manifest.dsh?.profile?.bundles ?? []
+    const previous = bundleSelection(manifest)
     if (enabled) this.assertBundlePreservesManagement(name)
     if (enabled || !previous.includes(name)) {
       const metadata = bundleManifest(name, this.profile.dir, this.profile.installAnchor)
@@ -896,21 +950,49 @@ export class PluginManager extends TypertRemoteService {
     return hmr === undefined ? apply() : hmr.runExclusive(apply)
   }
 
+  /**
+   * Publish the profile's runtime resolution without HMR, unless a deselected startup bundle still runs and needs the
+   * current table. A publication that needs a restart waits for the restart the result already reports.
+   */
   private async refreshPackages(): Promise<void> {
-    if (this.ownerContext.get('hmr') === undefined) {
-      const selected = readProfileManifest('dsh', this.profile.dir).dsh?.profile?.bundles ?? []
-      // Deselected startup bundles still run without HMR and need the existing package table.
-      if (this.profile.startedBundles.some(name => !selected.includes(name))) return
+    const selected = bundleSelection(readProfileManifest('dsh', this.profile.dir))
+    // Deselected startup bundles still run without HMR and need the existing package table.
+    if (this.profile.startedBundles.some(name => !selected.includes(name))) return
+    try {
+      const packages = this.ownerContext.get('pluginPackages')
+      // A link-mode launch has no interception to republish; its materialized node_modules already changed on disk.
+      // A dropped mapping's bundle is not running: the guard above keeps the table while a deselected startup bundle runs.
+      if (packages?.resolution !== undefined && packages.installed) await packages.refresh()
+    } catch (error) {
+      if (!(error instanceof ResolutionRestartRequired)) throw error
     }
-    const packages = this.ownerContext.get('pluginPackages')
-    // A link-mode launch has no interception to republish; its materialized node_modules already changed on disk.
-    if (packages?.installed !== true) return
-    await packages.refresh()
   }
 
-  private async reload(requiredIds: readonly string[] = []): Promise<string[]> {
-    if (this.ownerContext.get('hmr') === undefined) return []
-    return reconcileProfilePatches(this.ownerContext.root, readProfilePatches('dsh', this.profile), 'dsh', requiredIds)
+  /**
+   * Apply a package change: without HMR, publish the runtime resolution when that is safe, then {@link reload}.
+   * @param requiredIds Entry ids that must start.
+   * @returns The reload's outcome.
+   */
+  private async publishAndReload(requiredIds: readonly string[] = []): Promise<Reload> {
+    if (this.ownerContext.get('hmr') === undefined) await this.refreshPackages()
+    return this.reload(requiredIds)
+  }
+
+  /**
+   * Apply the saved profile; with HMR it recomposes live, including the runtime resolution.
+   * @param requiredIds Entry ids that must start.
+   * @returns Warnings about entries that were already inactive, and why the change waits for a restart, if it does.
+   */
+  private async reload(requiredIds: readonly string[] = []): Promise<Reload> {
+    const hmr = this.ownerContext.get('hmr')
+    if (hmr === undefined) {
+      // Startup-only profiles recompose at restart; the saved patches still have to compose.
+      composeEntries([readProfilePatches('dsh', this.profile)])
+      return { warnings: [] }
+    }
+    const { warnings, pending, restartReason } = await hmr.reconcileProfile(requiredIds)
+    const restart = restartReason ?? pending[0]?.reason
+    return restart === undefined ? { warnings } : { warnings, restartReason: restart }
   }
 
   /** The state-store revision this profile last observed; undefined until the first publish. */
@@ -928,9 +1010,12 @@ export class PluginManager extends TypertRemoteService {
       await this.authorize()
       const before = this.diskState()
       const result: ChangeResult = { ...request, changed: false,
-        application: this.ownerContext.get('hmr') !== undefined ? 'applied' : 'restart-required' }
+        ...this.ownerContext.get('hmr') !== undefined ? { application: 'applied' } : { application: 'restart-required', restartReason: 'no-hmr' } }
       try {
-        result.application = await operation(result) ?? result.application
+        const outcome = await operation(result)
+        if (outcome !== undefined) result.application = outcome
+        // A reload that waits for a restart leaves the change saved but not applied.
+        else if (result.application === 'applied' && result.restartReason !== undefined) result.application = 'restart-required'
       } catch (error) {
         if (error instanceof InstallCancelledError) {
           result.application = 'cancelled'
@@ -939,6 +1024,7 @@ export class PluginManager extends TypertRemoteService {
           result.error = managementError(error)
         }
       }
+      if (result.application !== 'restart-required') delete result.restartReason
       result.changed = before !== this.diskState()
       this.ownerContext.emit('plugin-manager/changed', { reason })
       return result
@@ -986,7 +1072,13 @@ export class PluginManager extends TypertRemoteService {
           await applyDesiredState(this.profile.dir, this.profile.patchPath, desired)
         }, { waitMs: this.lockWaitMs })
         try {
-          result.warnings = [...result.warnings ?? [], ...await this.reload()]
+          const { warnings, restartReason } = await this.reload()
+          result.warnings = [...result.warnings ?? [], ...warnings ?? []]
+          // A convergence that waits for a restart marks the change the same way a direct reload does.
+          if (restartReason !== undefined) {
+            result.restartReason = restartReason
+            if (result.application === 'applied') result.application = 'restart-required'
+          }
         } catch (error) {
           // Converging to a composition whose rows cannot all activate reports
           // as a reload error; the files already carry the store's state, so

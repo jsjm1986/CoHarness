@@ -2,7 +2,6 @@ import { Readable } from 'node:stream'
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
-import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import { UserDocId, type UserDocRef, type UserDocStore } from '@deepseek-ai/dsh-userdoc'
 import { handleUserDocHttp, USERDOC_CATALOG_OVERVIEW_PATH, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH, type UserDocHttpHost } from '../src/index.ts'
 
@@ -72,7 +71,7 @@ function context(mode: 'ro' | 'rw' | 'missing', transfer?: (path: string, init?:
         identity: { kind: 'project', id: 41, generation: 1 },
         ...(transfer === undefined ? {} : { request: transfer }),
         ...(documentAdmin ? { current: () => ({ claims: { user: { role: 'admin' }, purpose: 'document-admin' } }) } : {}),
-      } as GatewayRuntime
+      }
       if (name === 'collaboration') return collaboration
       return undefined
     },

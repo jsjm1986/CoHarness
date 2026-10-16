@@ -1083,7 +1083,8 @@
       "sovereignty": "tracked"
     },
     "util/timeout": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md"
     },
     "util/values": {
       "sovereignty": "adapted"

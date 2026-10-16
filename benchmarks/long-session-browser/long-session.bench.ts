@@ -194,8 +194,11 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           const firstMarker = await waitForReplyMarker(page, FIRST)
           const first = performance.now() - started
           // Keep focus across submission; mouse actionability must not delay the input probe.
+          // insertText delivers the probe in one trusted input event: per-keypress
+          // driver roundtrips measure CDP wire latency under stream load, not the
+          // composer's echo latency this budget guards.
           const input = await measure(page, async () => {
-            await page.keyboard.type('next synthetic question')
+            await page.keyboard.insertText('next synthetic question')
             await expect.poll(() => composer.textContent()).toBe('next synthetic question')
           })
           const inputOverlapped = await composer.getAttribute('data-benchmark-input-overlap') === 'true'

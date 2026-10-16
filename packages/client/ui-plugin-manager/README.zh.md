@@ -103,7 +103,7 @@ Host 入口通过生成的 Remote 接口暴露 `pluginRegistryProbe.fastest()`�
 
 ### store
 
-`PluginManagerController` 拥有组合包视图、忙碌键、提示、安装进度和卸载确认。每次读取先问清单 Host 是否管理着 profile，再把 `listBundles` 与 `listPlugins` 合成每个组合包一份视图，其行携带存活条目的启停状态与 fiber 阶段。它合并重叠读取，在操作后、收到 `plugin-manager/changed` 时以及重连后刷新，并在销毁后忽略晚到结果。安装输出按 job id 分组。安装对话框沿 `idle → checking → starting → running → done | failed` 推进，`cancelling` 与 `applying` 按 Host 的报告呈现，安装或取消响应丢失时进入 `unconfirmed`；已确认的 `applying` 阶段不会倒退。通过 `waitForInstall` 恢复结果，无活动请求时结束为 `unknown`；checking 与所有活动阶段使用 ongoing，最终页面使用 done 或 error。检查在一个 `AbortController` 下运行，返回编辑或关闭会中止它并丢弃其结果；运行只能通过 `pluginManager.cancelInstall` 停止。关闭会隐藏任务而保留其状态。如果取消请求先于安装到达，在进度或输出确认该请求后会再次请求取消。Host 无法应用的变更、要等重启的变更、被更高层覆盖的变更，都是会自行消失的 toast。
+`PluginManagerController` 拥有组合包视图、忙碌键、提示、安装进度和卸载确认。每次读取先问清单 Host 是否管理着 profile，再把 `listBundles` 与 `listPlugins` 合成每个组合包一份视图，其行携带存活条目的启停状态与 fiber 阶段。它合并重叠读取，在操作后、收到 `plugin-manager/changed` 时以及重连后刷新，并在销毁后忽略晚到结果。安装输出按 job id 分组。安装对话框沿 `idle → checking → starting → running → done | failed` 推进，`cancelling` 与 `applying` 按 Host 的报告呈现，安装或取消响应丢失时进入 `unconfirmed`；已确认的 `applying` 阶段不会倒退。通过 `waitForInstall` 恢复结果，无活动请求时结束为 `unknown`；checking 与所有活动阶段使用 ongoing，最终页面使用 done 或 error。检查在一个 `AbortController` 下运行，返回编辑或关闭会中止它并丢弃其结果；运行只能通过 `pluginManager.cancelInstall` 停止。关闭会隐藏任务而保留其状态。如果取消请求先于安装到达，在进度或输出确认该请求后会再次请求取消。Host 无法应用的变更、要等重启的变更（Host 给出原因时会一并说明）、被更高层覆盖的变更，都是会自行消失的 toast。
 
 ### 配置 slot
 

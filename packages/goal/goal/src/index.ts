@@ -264,9 +264,7 @@ export class GoalService extends TypertRemoteService {
       defaultMaxGoalRounds: resolveMaxGoalRounds(config.defaultMaxGoalRounds ?? 256),
     }
     ctx.on('agent/created', ({ agent }) => {
-      const cache = this.caches.get(agent.session)
-      if (cache !== undefined) cache.activation = 'disarmed'
-      this.runtimeState(agent.session).activation = 'disarmed'
+      this.setActivation(agent.session, 'disarmed')
     })
     // The projection unit is optional so the compact/headless composition can
     // keep using the local incremental fold. Assemblies with the registry use
@@ -277,12 +275,10 @@ export class GoalService extends TypertRemoteService {
     ctx.on('session/event', (session, event) => {
       if (event.type !== 'goal/change') return
       const runtime = this.runtimeState(session)
-      runtime.activation = runtime.pendingActivation !== undefined
+      this.setActivation(session, runtime.pendingActivation !== undefined
         && SessionSeq(runtime.pendingActivation.offset) === event.seq
         ? runtime.pendingActivation.activation
-        : 'disarmed'
-      const cache = this.caches.get(session)
-      if (cache !== undefined) cache.activation = runtime.activation
+        : 'disarmed')
     })
   }
 
@@ -313,17 +309,13 @@ export class GoalService extends TypertRemoteService {
    */
   disarm(agent: Agent): GoalView | undefined {
     this.assertLive(agent)
+    this.setActivation(agent.session, 'disarmed')
     const projected = this.projected(agent.session)
     if (projected !== undefined) {
-      const runtime = this.runtimeState(agent.session)
-      runtime.activation = 'disarmed'
-      const cache = this.caches.get(agent.session)
-      if (cache !== undefined) cache.activation = 'disarmed'
-      return this.viewProjection(projected.current, runtime.activation)
+      return this.viewProjection(projected.current, this.runtimeState(agent.session).activation)
     }
     const cache = this.cache(agent.session)
     this.sync(agent.session, cache)
-    cache.activation = 'disarmed'
     return this.view(cache)
   }
 
@@ -542,6 +534,41 @@ export class GoalService extends TypertRemoteService {
     return runtime
   }
 
+  /**
+   * Publish one process-local activation edge when it actually changes.
+   * Sessions detached from a SessionStore never publish `session/event`, so
+   * both trackers are consulted: the runtime map and the incremental cache.
+   */
+  private setActivation(session: Session, activation: GoalActivation): void {
+    const runtime = this.runtimeState(session)
+    const cache = this.caches.get(session)
+    if (runtime.activation === activation
+      && (cache === undefined || cache.activation === activation)) return
+    runtime.activation = activation
+    if (cache !== undefined) cache.activation = activation
+    const projections = this.ctx.get('sessionProjections')
+    let goal: GoalView | undefined
+    if (projections !== undefined) {
+      const state = projections.stateOf(session, 'goal')
+      if (state !== undefined && state.failure === null) {
+        goal = this.viewProjection(state.current, activation)
+      }
+    } else if (cache !== undefined) {
+      this.sync(session, cache)
+      goal = this.view(cache)
+    }
+    this.ctx.emit('goal/activation-changed', {
+      sessionId: session.id,
+      ...goal === undefined ? {} : {
+        goal: {
+          id: goal.id,
+          revision: goal.revision,
+          activation: goal.activation,
+        },
+      },
+    })
+  }
+
   /** Incrementally observe durable events and reconcile local activation intent. */
   private sync(session: Session, cache: GoalCache): void {
     while (cache.observedSeq < session.seq) {
@@ -660,6 +687,9 @@ export class GoalService extends TypertRemoteService {
     try {
       agent.session.append('goal/change', change)
       this.sync(agent.session, cache)
+      // Attached sessions already published this edge from the `session/event`
+      // reconciliation; detached sessions publish it here.
+      this.setActivation(agent.session, activation)
     } finally {
       cache.pendingActivation = undefined
       runtime.pendingActivation = undefined

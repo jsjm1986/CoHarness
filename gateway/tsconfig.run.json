@@ -6,8 +6,8 @@
   // keeps only runnable targets. Every workspace specifier the spawned
   // gateway loads maps to the emitted `lib/types` entry, because published
   // `.` exports point at bundled `lib` output a standalone checkout cannot
-  // produce; the `dsh-llm` link still serves its `/discovery` and
-  // `/package.json` subpath exports, which already target emitted files.
+  // produce; `dsh-llm` subpaths map to their emitted targets for the same
+  // reason, and `dsh-llm/package.json` resolves the manifest itself.
   "compilerOptions": {
     "target": "es2023",
     "module": "nodenext",
@@ -22,6 +22,8 @@
       "@deepseek-ai/dsh-brand": ["../packages/util/brand/lib/types/index.js"],
       "@deepseek-ai/dsh-compaction-image-offload/projection": ["../packages/compaction/compaction-image-offload/lib/types/projection.js"],
       "@deepseek-ai/dsh-llm": ["../packages/llm/llm/lib/types/index.js"],
+      "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/lib/types/discovery.js"],
+      "@deepseek-ai/dsh-llm/package.json": ["../packages/llm/llm/package.json"],
       "@deepseek-ai/dsh-managed-data": ["../packages/util/managed-data/lib/types/index.js"],
       "@deepseek-ai/dsh-scope": ["../packages/core/scope/lib/types/index.js"],
       "@deepseek-ai/dsh-session": ["../packages/core/session/lib/types/index.js"],

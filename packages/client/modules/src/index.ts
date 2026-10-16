@@ -23,7 +23,7 @@
  * @module @deepseek-ai/dsh-client-modules
  */
 
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
@@ -62,6 +62,8 @@ export interface ClientArtifactBaseline {
   readonly path: string
   /** Bundle modification time in milliseconds. */
   readonly mtimeMs: number
+  /** Bundle status-change time in milliseconds, including writes that preserve mtime. */
+  readonly ctimeMs: number
   /** Bundle size in bytes. */
   readonly size: number
 }
@@ -196,21 +198,21 @@ function clientExportOf(pkgName: string, exportsField: unknown): string | undefi
   throw new Error(`client-modules: ${pkgName} exports["./client"] must be a string or an object with a string default`)
 }
 
-/** sha1 content hash shortened to 12 hex chars (combo / graph / rebuilt-artifact rev). */
-function shortHash(input: string | Buffer): string {
+/** sha1 metadata hash shortened to 12 hex chars. */
+function shortHash(input: string): string {
   return createHash('sha1').update(input).digest('hex').slice(0, HASH_REVISION_LENGTH)
 }
 
 /** Hash several response fields without allowing bytes to move across field boundaries. */
-function framedHash(domain: string, parts: readonly Buffer[]): string {
+function framedHash(domain: string, parts: readonly string[]): string {
   const hash = createHash('sha1').update(domain).update('\0')
-  for (const part of parts) hash.update(`${String(part.byteLength)}:`).update(part)
+  for (const part of parts) hash.update(`${String(Buffer.byteLength(part))}:`).update(part)
   return hash.digest('hex').slice(0, HASH_REVISION_LENGTH)
 }
 
-/** Hash one completed build generation observed through its entry artifact. */
-function artifactRevision(bundle: Buffer, baseline: ClientArtifactBaseline): string {
-  return framedHash('plugin-artifact', [bundle, Buffer.from(String(baseline.mtimeMs))])
+/** Identify an entry's build from filesystem metadata without hashing its contents. */
+function artifactRevision(baseline: ClientArtifactBaseline): string {
+  return framedHash('plugin-artifact', [String(baseline.mtimeMs), String(baseline.ctimeMs), String(baseline.size)])
 }
 
 /** Absolute response key for one ordered plugin-file list on the shared combo route. */
@@ -366,8 +368,8 @@ function lazyBody(produce: () => Buffer): () => Promise<Buffer> {
 /** Derive one combo revision from the ordered immutable row revisions. */
 function comboRevision(resources: readonly ComboResource[]): string {
   return framedHash('combo', resources.flatMap(resource => [
-    Buffer.from(resource.id),
-    Buffer.from(resource.rev),
+    resource.id,
+    resource.rev,
   ]))
 }
 
@@ -574,8 +576,6 @@ export class ClientModuleRegistry extends Service {
   private readonly rebuildListeners = new Set<(id: string, rev: string) => void>()
   private readonly graphListeners = new Set<() => void>()
   private readonly dirty = new Set<string>()
-  private readonly initialRevisionNonce = randomBytes(8).toString('hex')
-  private nextInitialRevision = 0
   private responses = new Map<string, LazyResponse>()
   private batchResponses = new Map<string, LazyResponse>()
   /** One prior graph generation covers a request racing the HMR recomposition that replaced its URL. */
@@ -678,17 +678,18 @@ export class ClientModuleRegistry extends Service {
   /**
    * Publish one completed bundle generation (the HMR watch's registration
    * hook — the only entry point through which build changes reach the graph).
+   * Unchanged mtime, ctime and size preserve the graph without reading the bundle.
    * @param id - entry id (package name).
-   * @returns the new rev, or undefined for an unknown id.
+   * @returns the current artifact rev, or undefined for an unknown id.
    */
   rebuilt(id: string): string | undefined {
     const record = this.table.get(id)
     if (record === undefined) return undefined
     const baseline = this.captureArtifactBaseline(record.meta.clientPath)
-    const bundle = readFileSync(record.meta.clientPath)
-    const rev = artifactRevision(bundle, baseline)
-    record.baseline = baseline
+    const rev = artifactRevision(baseline)
     if (rev === record.entry.rev) return rev
+    const bundle = readFileSync(record.meta.clientPath)
+    record.baseline = baseline
     record.entry = graphRow(id, rev, record.meta)
     record.bundle = bundle
     this.composed = this.compose()
@@ -706,7 +707,7 @@ export class ClientModuleRegistry extends Service {
   }
 
   /**
-   * Subscribe to bundle rebuilds; fires only when the re-hash changed the rev.
+   * Subscribe to bundle rebuilds; fires only when artifact metadata changes the rev.
    * @param listener - receives the entry id and its new bundle rev.
    * @returns the unsubscriber.
    */
@@ -910,13 +911,9 @@ export class ClientModuleRegistry extends Service {
     return {
       path: clientPath,
       mtimeMs: bundle.mtimeMs,
+      ctimeMs: bundle.ctimeMs,
       size: bundle.size,
     }
-  }
-
-  /** Allocate an opaque initial row revision without inspecting artifact bytes. */
-  private allocateInitialRevision(): string {
-    return `${this.initialRevisionNonce}-${String(this.nextInitialRevision++)}`
   }
 
   /**
@@ -1007,10 +1004,9 @@ export class ClientModuleRegistry extends Service {
     const source = sources[0]
     if (source === undefined) return this.table.delete(packageName)
     if (this.table.get(packageName)?.sourceKey === source.sourceKey) return false
-    // The opaque initial rev rides the row until HMR observes a file change;
-    // a fiber restart from the same source reuses the existing row.
+    // Startup and HMR share revisions so unchanged artifacts survive a server restart.
     const snapshot = this.initialBundleSnapshot(packageName, source.meta.clientPath)
-    const rev = this.allocateInitialRevision()
+    const rev = artifactRevision(snapshot.baseline)
     this.table.set(packageName, {
       entry: graphRow(packageName, rev, source.meta),
       loaderName: source.loaderName,

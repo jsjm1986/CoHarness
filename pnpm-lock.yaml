@@ -2827,6 +2827,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: workspace:*
         version: link:../ui-conversation
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: workspace:*
+        version: link:../ui-layout
       '@deepseek-ai/dsh-client-ui-plugin-manager':
         specifier: workspace:*
         version: link:../ui-plugin-manager
@@ -3925,6 +3928,9 @@ importers:
       '@deepseek-ai/dsh-invariants':
         specifier: workspace:*
         version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-remote-mock':
+        specifier: workspace:*
+        version: link:../../test-support/remote-mock
       '@types/react':
         specifier: ~19.2.7
         version: 19.2.18

@@ -792,9 +792,9 @@ describe('PluginManagerController', () => {
     controller.installProgress({ requestId, phase: 'applying' })
     controller.appendLog({ requestId, jobId: 'old', argv: [], cwd: '/p', stream: 'stdout', text: 'late' })
     expect(state().install).toMatchObject({ phase: 'starting', runs: [] })
-    second.resolve(ok({ ...APPLIED, application: 'restart-required', bundle: 'slow' }))
+    second.resolve(ok({ ...APPLIED, application: 'restart-required', restartReason: 'no-hmr', bundle: 'slow' }))
     await vi.waitFor(() => { expect(state().install.phase).toBe('done') })
-    expect(state().install).toMatchObject({ installed: 'slow', restartRequired: true })
+    expect(state().install).toMatchObject({ installed: 'slow', restartRequired: true, restartReason: 'no-hmr' })
   })
 
   it.each(['too-late', 'not-running', 'offline'] as const)('keeps a stop the Host answered %s apart from a stopped run', async (status) => {

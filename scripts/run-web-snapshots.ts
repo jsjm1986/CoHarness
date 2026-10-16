@@ -9,6 +9,7 @@ import {
 
 const serialFiles = [
   'apps/web/tests/hmr-live.e2e.ts',
+  'apps/web/tests/client-plugin-live.e2e.ts',
   'apps/web/tests/cordis-tool-round.e2e.ts',
   // These suites own long-lived browser/session state and need separate Vitest processes.
   'apps/web/tests/agent-preset-selection.e2e.ts',

@@ -595,7 +595,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'goal/change': GoalChangeMeta
 ```
 
-来源：[`packages/goal/goal/src/domain.ts:66`](../packages/goal/goal/src/domain.ts)
+来源：[`packages/goal/goal/src/domain.ts:67`](../packages/goal/goal/src/domain.ts)
 
 ### `hook/*`
 
@@ -6696,7 +6696,7 @@ SHA-256: `390eed1028aba02774f14408647acec10ec5516e97d4f15ecde2b9989d5a69f2`
 
 SHA-256: `7d226b9fd95b4ba213d4237c22e930a91c3c769c95ca7f92977b9d625ba13438`
 
-来源：[`packages/goal/goal/src/domain.ts:44`](../packages/goal/goal/src/domain.ts)
+来源：[`packages/goal/goal/src/domain.ts:45`](../packages/goal/goal/src/domain.ts)
 
 以下类型之一：
 
@@ -6709,7 +6709,7 @@ SHA-256: `7d226b9fd95b4ba213d4237c22e930a91c3c769c95ca7f92977b9d625ba13438`
 
 SHA-256: `cffcdc19881ab61ec0a9ce18743996f7ac44ac8889f34dfac36ae745574aa22f`
 
-来源：[`packages/goal/goal/src/domain.ts:35`](../packages/goal/goal/src/domain.ts)
+来源：[`packages/goal/goal/src/domain.ts:36`](../packages/goal/goal/src/domain.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -6725,7 +6725,7 @@ SHA-256: `cffcdc19881ab61ec0a9ce18743996f7ac44ac8889f34dfac36ae745574aa22f`
 
 SHA-256: `7f959241c24128b4983b559984811861dc59774b85905c8fa57c6cb0148a3dbc`
 
-来源：[`packages/goal/goal/src/domain.ts:47`](../packages/goal/goal/src/domain.ts)
+来源：[`packages/goal/goal/src/domain.ts:48`](../packages/goal/goal/src/domain.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -6740,7 +6740,7 @@ SHA-256: `7f959241c24128b4983b559984811861dc59774b85905c8fa57c6cb0148a3dbc`
 
 SHA-256: `1df34a6c086866ffdc2dd9e8e5c581c3751a010cdf6b8538a7327f7a3237f0b4`
 
-来源：[`packages/goal/goal/src/domain.ts:24`](../packages/goal/goal/src/domain.ts)
+来源：[`packages/goal/goal/src/domain.ts:25`](../packages/goal/goal/src/domain.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -6758,7 +6758,7 @@ SHA-256: `1df34a6c086866ffdc2dd9e8e5c581c3751a010cdf6b8538a7327f7a3237f0b4`
 
 SHA-256: `84ac8c1a66ffc697262e181f42e851259eae14038c113ca329fb4700ccdb1f7c`
 
-来源：[`packages/goal/goal/src/types.ts:51`](../packages/goal/goal/src/types.ts)
+来源：[`packages/goal/goal/src/types.ts:55`](../packages/goal/goal/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -6771,7 +6771,7 @@ SHA-256: `84ac8c1a66ffc697262e181f42e851259eae14038c113ca329fb4700ccdb1f7c`
 
 SHA-256: `b8327af7ee5767952d1300cb4f03b7fc04197ae5ba275e13981c689ff7506172`
 
-来源：[`packages/goal/goal/src/types.ts:44`](../packages/goal/goal/src/types.ts)
+来源：[`packages/goal/goal/src/types.ts:48`](../packages/goal/goal/src/types.ts)
 
 以下类型之一：
 
@@ -6786,7 +6786,7 @@ SHA-256: `b8327af7ee5767952d1300cb4f03b7fc04197ae5ba275e13981c689ff7506172`
 
 SHA-256: `0b6d718c693fdf7f06dcccb0bcbbabe78cc63514eafc62d6b2a3899735279d6f`
 
-来源：[`packages/goal/goal/src/types.ts:19`](../packages/goal/goal/src/types.ts)
+来源：[`packages/goal/goal/src/types.ts:23`](../packages/goal/goal/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -6799,7 +6799,7 @@ SHA-256: `0b6d718c693fdf7f06dcccb0bcbbabe78cc63514eafc62d6b2a3899735279d6f`
 
 SHA-256: `6bbe793f6a93dc8d50a4d4d3fbb6f8ed15650bcb7e151d28669628f7b7c3fc25`
 
-来源：[`packages/goal/goal/src/types.ts:59`](../packages/goal/goal/src/types.ts)
+来源：[`packages/goal/goal/src/types.ts:63`](../packages/goal/goal/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -8425,7 +8425,7 @@ SHA-256: `57f3f606ff8b6c84d9c443faace9d1dd10cca0354f37a4f515ef075f7c351b90`
 
 SHA-256: `4cd48f3e5108bd6ebedf7301c3638839b8b2b9db8dbd493974177fbdeb91a01b`
 
-来源：[`packages/attachment/attachment/src/brand.ts:6`](../packages/attachment/attachment/src/brand.ts) · [`packages/attachment/userdoc/src/brand.ts:15`](../packages/attachment/userdoc/src/brand.ts) · [`packages/compaction/compaction/src/brand.ts:4`](../packages/compaction/compaction/src/brand.ts) · [`packages/context/execution-authority/src/types.ts:6`](../packages/context/execution-authority/src/types.ts) · [`packages/context/execution-authority/src/types.ts:9`](../packages/context/execution-authority/src/types.ts) · [`packages/core/session/src/types.ts:25`](../packages/core/session/src/types.ts) · [`packages/deliverables/workspace-changes/src/types.ts:6`](../packages/deliverables/workspace-changes/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:21`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:33`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:9`](../packages/experimental/agent-team/src/types.ts) · [`packages/feedback/message-feedback/src/types.ts:14`](../packages/feedback/message-feedback/src/types.ts) · [`packages/goal/goal/src/types.ts:16`](../packages/goal/goal/src/types.ts) · [`packages/host/apiproxy/src/api/rpc.ts:19`](../packages/host/apiproxy/src/api/rpc.ts) · [`packages/interaction/commands/src/brand.ts:31`](../packages/interaction/commands/src/brand.ts) · [`packages/interaction/user-approval/src/types.ts:17`](../packages/interaction/user-approval/src/types.ts) · [`packages/llm/llm-retry/src/brand.ts:4`](../packages/llm/llm-retry/src/brand.ts) · [`packages/llm/llm/src/brand.ts:16`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:31`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:43`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:67`](../packages/llm/llm/src/brand.ts) · [`packages/schedule/schedule/src/types.ts:14`](../packages/schedule/schedule/src/types.ts) · [`packages/session/session-title/src/index.ts:29`](../packages/session/session-title/src/index.ts) · [`packages/webhook/webhook/src/brand.ts:12`](../packages/webhook/webhook/src/brand.ts) · [`packages/webhook/webhook/src/brand.ts:6`](../packages/webhook/webhook/src/brand.ts) · [`packages/webhook/webhook/src/brand.ts:9`](../packages/webhook/webhook/src/brand.ts) · [`packages/workflow/workflow/src/types.ts:13`](../packages/workflow/workflow/src/types.ts)
+来源：[`packages/attachment/attachment/src/brand.ts:6`](../packages/attachment/attachment/src/brand.ts) · [`packages/attachment/userdoc/src/brand.ts:15`](../packages/attachment/userdoc/src/brand.ts) · [`packages/compaction/compaction/src/brand.ts:4`](../packages/compaction/compaction/src/brand.ts) · [`packages/context/execution-authority/src/types.ts:6`](../packages/context/execution-authority/src/types.ts) · [`packages/context/execution-authority/src/types.ts:9`](../packages/context/execution-authority/src/types.ts) · [`packages/core/session/src/types.ts:25`](../packages/core/session/src/types.ts) · [`packages/deliverables/workspace-changes/src/types.ts:6`](../packages/deliverables/workspace-changes/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:21`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:33`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:9`](../packages/experimental/agent-team/src/types.ts) · [`packages/feedback/message-feedback/src/types.ts:14`](../packages/feedback/message-feedback/src/types.ts) · [`packages/goal/goal/src/types.ts:20`](../packages/goal/goal/src/types.ts) · [`packages/host/apiproxy/src/api/rpc.ts:19`](../packages/host/apiproxy/src/api/rpc.ts) · [`packages/interaction/commands/src/brand.ts:31`](../packages/interaction/commands/src/brand.ts) · [`packages/interaction/user-approval/src/types.ts:17`](../packages/interaction/user-approval/src/types.ts) · [`packages/llm/llm-retry/src/brand.ts:4`](../packages/llm/llm-retry/src/brand.ts) · [`packages/llm/llm/src/brand.ts:16`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:31`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:43`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:67`](../packages/llm/llm/src/brand.ts) · [`packages/schedule/schedule/src/types.ts:14`](../packages/schedule/schedule/src/types.ts) · [`packages/session/session-title/src/index.ts:29`](../packages/session/session-title/src/index.ts) · [`packages/webhook/webhook/src/brand.ts:12`](../packages/webhook/webhook/src/brand.ts) · [`packages/webhook/webhook/src/brand.ts:6`](../packages/webhook/webhook/src/brand.ts) · [`packages/webhook/webhook/src/brand.ts:9`](../packages/webhook/webhook/src/brand.ts) · [`packages/workflow/workflow/src/types.ts:13`](../packages/workflow/workflow/src/types.ts)
 
 `string`
 

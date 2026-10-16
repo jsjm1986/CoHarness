@@ -11,6 +11,7 @@ const policy = loadWebTestPolicy(root)
 const exact = [...policy.smokeScenarios, 'goal-bar.e2e.ts'].sort()
 const expectedSerial = [
   'hmr-live.e2e.ts',
+  'client-plugin-live.e2e.ts',
   'cordis-tool-round.e2e.ts',
   'agent-preset-selection.e2e.ts',
   'composer-model-mobile.e2e.ts',
@@ -21,7 +22,7 @@ const expectedSerial = [
 ].map(file => `${WEB_TESTS_ROOT}${file}`)
 
 describe('browser execution plan', () => {
-  it('keeps all eight independent owners and every other scenario in the full pool', () => {
+  it('keeps all nine independent owners and every other scenario in the full pool', () => {
     const plan = createWebSnapshotPlan(root, [], {})
     expect(plan.mode).toBe('full')
     expect(plan.serial).toEqual(expectedSerial)

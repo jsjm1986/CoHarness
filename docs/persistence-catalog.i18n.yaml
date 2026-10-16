@@ -114,8 +114,8 @@
   en: d990c355971ee24c
   zh: d990c355971ee24c
 /session-persistence-event-catalog/events/goal/goal-change-log-only:
-  en: 7e0afb095dd19448
-  zh: 03f4adce713dc24a
+  en: 21f5a30fe077aa31
+  zh: fd1ac0e60d1e7262
 /session-persistence-event-catalog/events/hook:
   en: 8d6fa78d450a0e56
   zh: 8d6fa78d450a0e56
@@ -1689,29 +1689,29 @@
   en: caedf5500d1c8a88
   zh: d95cdefd328beaff
 /session-persistence-event-catalog/resolved-persistence-types/packages-goal-goal-src-domain-ts-goalchangemeta:
-  en: 614685aa0c761441
-  zh: d9d6471a5f9cbb60
+  en: 40f6dd975949b056
+  zh: 9465d6cbf04a7231
 /session-persistence-event-catalog/resolved-persistence-types/packages-goal-goal-src-domain-ts-goalclearchangemeta:
-  en: 2047638ab5be2eae
-  zh: 0340078e42f5f0b0
+  en: 18195b65036a1ce5
+  zh: 4d51f347c3641027
 /session-persistence-event-catalog/resolved-persistence-types/packages-goal-goal-src-domain-ts-goalmessagesource:
-  en: d22a0cc061e50986
-  zh: 548e129fe161398c
+  en: 61986db912a0bac6
+  zh: e3dc6e208743310a
 /session-persistence-event-catalog/resolved-persistence-types/packages-goal-goal-src-domain-ts-goalsnapshotchangemeta:
-  en: b1f7553338f589f1
-  zh: 9a8882d445fd3642
+  en: 3429f680610819f4
+  zh: 55b7e3f98492c7d3
 /session-persistence-event-catalog/resolved-persistence-types/packages-goal-goal-src-types-ts-goalblockreason:
-  en: 172d835fbe3176b2
-  zh: 7d96c12ac4a527a6
+  en: 5964c872697d6b28
+  zh: 4c58931966a592a3
 /session-persistence-event-catalog/resolved-persistence-types/packages-goal-goal-src-types-ts-goalphase:
-  en: b12830ece2173714
-  zh: eb61af4225643542
+  en: 3d35141539616114
+  zh: 904be8d4e5a4613f
 /session-persistence-event-catalog/resolved-persistence-types/packages-goal-goal-src-types-ts-goalref:
-  en: 1520ebae4b9a2001
-  zh: fffc45b2840ed275
+  en: 513af0e9c895a9de
+  zh: f01451b8c0a40ba7
 /session-persistence-event-catalog/resolved-persistence-types/packages-goal-goal-src-types-ts-goalsnapshot:
-  en: 6c1f930842bed640
-  zh: 389599a90c68711a
+  en: 01a75d9b490961d3
+  zh: 2a3c4b16d77cea57
 /session-persistence-event-catalog/resolved-persistence-types/packages-hooks-hook-protocol-src-types-ts-hookdialect:
   en: bde1bd9486faecde
   zh: fd113f2436cacd79
@@ -2091,8 +2091,8 @@
   en: 0b147e2d585f4bed
   zh: 0b147e2d585f4bed
 /session-persistence-event-catalog/resolved-persistence-types/string:
-  en: 9c772d8478d30588
-  zh: a09ec61d21516d0b
+  en: dfeb33a1de5ad1ab
+  zh: fa25356a68e1e16e
 /session-persistence-event-catalog/resolved-persistence-types/subagent:
   en: 8d350135ec71a3f1
   zh: 8d350135ec71a3f1
