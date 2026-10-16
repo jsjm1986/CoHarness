@@ -12,7 +12,7 @@ wheel 包会安装 `dsh` 控制台命令和 `deepseek_harness_runtime` Python �
 
 每个目标还要求 `<executable-stem>-office/`，其中 stem 不含 `.exe`。该目录包含完整的已安装 Office 包及其依赖，保留引擎资源、清单、许可证、源码清单与辅助程序权限。复制可执行文件时必须一并复制此目录。缺少目标引擎会使 sidecar 构建失败，错误会指出其 npm 包名与目标平台／架构。
 
-每个 wheel 还包含 `<platform>-<arch>/primary-runtime/`（CPython、锁定版本的 Office Python 库、独立 Node 和 pnpm）及同级 `office-skills/`（三个默认工作流与共用检查脚本）。它们是可重定位的普通文件，不嵌入可执行文件。共享构建器为全部五个 wheel 目标选择原生归档，并在对应构建主机上执行冒烟检查。打包与已安装运行时定位会拒绝缺失资源、平台不符的元数据及 Python 或 Node 执行权限丢失。较短的平台目录避免在 Windows Python DLL 路径中重复可执行文件名称。
+每个 wheel 还包含 `<platform>-<arch>/primary-runtime/`（CPython、锁定版本的 Office Python 库、独立 Node 和 pnpm）及同级 `office-skills/`（七个 Office 技能目录）。它们是可重定位的普通文件，不嵌入可执行文件。共享构建器为全部五个 wheel 目标选择原生归档，并在对应构建主机上执行冒烟检查。打包与已安装运行时定位会拒绝缺失资源、平台不符的元数据及 Python 或 Node 执行权限丢失。较短的平台目录避免在 Windows Python DLL 路径中重复可执行文件名称。
 
 随包入口 `runtime-bootstrap.mjs` 通过 `DSH_BUNDLED_PRIMARY_RUNTIME` 提供载体默认路径，为 Office kit 解析相邻的 `<executable-stem>-office/` 包目录，并在 `dsh` CLI 运行前分发 `DSH_SUBPROCESS_RUNNER` 与 PTC worker 模式。`sdk` profile 在未设置 `DSH_PRIMARY_RUNTIME` 时使用内置 primary runtime；显式路径覆盖它，空字符串禁用查询与 Office 提供方。外部 payload 保持 `primary-runtime/` 与同级 `office-skills/` 布局。加载后的技能给出内置 Node 与伴随 Office CLI 的绝对路径；自定义的纯 Python payload 必须配置 `skill-office.config.cli: false` 或提供 `skill-office.config.node`。SDK 原位读取 Python，不复制到 `DSH_HOME`。源码与仅供开发的 Node 载体没有随包默认路径，需显式设置 `DSH_PRIMARY_RUNTIME`。
 
@@ -23,7 +23,7 @@ wheel 包会安装 `dsh` 控制台命令和 `deepseek_harness_runtime` Python �
   disabled: true
 ```
 
-Office 操作技能通过提供方在加载时追加的绝对路径，调用随附的 Node 可执行文件与 LibreOffice Kit CLI。解释器与 CLI 的选择，以及成套替换 skill 集合与共用检查脚本的方法，见 [Office 提供方](../../packages/skill/skill-office/README.zh.md#use-this-package)。任意 skill 集合通过文件系统 skill 提供方加载。配置 patch 在进程启动时生效；切换 skills 无需重建 runtime wheel 或 Python 环境。
+Office 操作技能通过提供方在加载时追加的绝对路径，调用随附的 Node 可执行文件与 LibreOffice Kit CLI。解释器与 CLI 的选择，以及成套替换 skill 集合的方法，见 [Office 提供方](../../packages/skill/skill-office/README.zh.md#use-this-package)。任意 skill 集合通过文件系统 skill 提供方加载。配置 patch 在进程启动时生效；切换 skills 无需重建 runtime wheel 或 Python 环境。
 
 仓库构建还会物化仅限开发的 `runtime/node/` 载体。它在系统 Node 22.19 或更高版本上运行 `node runtime/node/runtime-bootstrap.mjs`。系统不会自动选择它，而且 wheel 包与 sdist 均不包含它。
 

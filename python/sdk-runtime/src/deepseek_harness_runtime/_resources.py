@@ -28,7 +28,7 @@ def validate_resources(root: Path | zipfile.Path, target: str) -> None:
     executable = python_root / ("python.exe" if platform == "win32" else "bin/python3")
     packages = python_root / ("Lib/site-packages" if platform == "win32" else f"lib/python{version.rsplit('.', 1)[0]}/site-packages")
     node = root / "primary-runtime/dependencies/node/bin" / ("node.exe" if platform == "win32" else "node")
-    required = [executable, node, root / "office-skills/scripts/check_office.py"]
+    required = [executable, node]
     required.extend(root / f"office-skills/office-{kind}/SKILL.md" for kind in ("docx", "pptx", "xlsx"))
     for path in required:
         if not path.is_file():

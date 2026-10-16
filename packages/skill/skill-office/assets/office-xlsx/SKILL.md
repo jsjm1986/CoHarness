@@ -9,6 +9,8 @@ Follow an explicit user or applicable AGENTS.md requirement for an environment o
 
 Keep scripts, working files, and outputs in the task workspace. The runtime and skill directory are shared read-only resources. Save to a new workbook unless the user requests an in-place edit.
 
+Name Python scripts for their task, such as `edit_xlsx.py`; avoid module names such as `inspect.py`, `openpyxl.py`, or `pandas.py` that shadow imported libraries.
+
 ## Read and modify
 
 Use `openpyxl` for existing XLSX workbooks and targeted cell or style changes. Load with `data_only=False` when formulas must survive. Inspect sheet names, the affected cell types, formulas, styles, merged ranges, and referenced ranges before editing. Check the saved file by reopening it, including unchanged content that the request requires preserving.
@@ -41,22 +43,10 @@ Do not rename `.xls`, `.xlsb`, encrypted files, or macro-enabled files to `.xlsx
 
 ## Check and deliver
 
-Run the shared structural checker when `office-check` is available:
-
-Run the shared checker after saving. Resolve `<skill-directory>` from the loaded skill's `resourceBase.path`; do not substitute an ad hoc ZIP check when the script is available.
-
-In PowerShell, prefix the quoted Python executable with `&`. Resolve the checker path relative to this skill directory.
-
-```text
-"<python>" "<skill-directory>/../scripts/check_office.py" <workbook.xlsx> --out <checks.json>
-```
-
-It checks ZIP/XML integrity and internal relationships, and reports sheet names, populated-cell counts, and formula counts. Repeated `--contains TEXT` arguments check string cells and sheet names, and `--count N` checks sheet count. `--contains` excludes numeric cells and does not validate formula results; verify those separately with openpyxl. The checker does not calculate formulas or judge workbook appearance. Compare relevant values, types, formulas, styles, and totals with the task's source data.
-
-If the Python checker cannot run, use an already configured environment to check the ZIP/XML package and internal relationships. Report the missing environment if those checks cannot run; do not claim structural validation.
+Reopen the saved workbook with openpyxl and verify the requested sheet names, values, types, formulas, styles, and totals against the source data, including unchanged content that must be preserved. These checks do not calculate formulas or judge workbook appearance.
 
 Load `office-render` for requested images or visual inspection and whenever the user's primary task targets appearance, including cell fill colors, text alignment, spacing, or sizing. These appearance changes require rendering even without a separate visual-check request, unless the user explicitly skips it. New workbooks and data or formula edits do not require rendering solely because they include incidental basic formatting. In particular, bold headers and number formats accompanying data edits do not require loading `office-render` or running its commands.
 
-Load `office-recalculate` when refreshed calculated values are needed and `office-export-pdf` for PDF output. Deliver after structural and data checks pass and the required operations finish.
+Load `office-recalculate` when refreshed calculated values are needed and `office-export-pdf` for PDF output. Deliver after the requested data checks pass and the required operations finish.
 
 Call `present({"files":[{"path":"report.xlsx"}]})` with the actual final workbook path. It exposes the current source file without copying or preserving its bytes, so keep that file in place and omit intermediate scripts and reports unless requested. If `present` is unavailable, use the session's supported file delivery method.

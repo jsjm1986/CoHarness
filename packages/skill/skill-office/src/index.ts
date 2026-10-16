@@ -1,4 +1,4 @@
-/** Bundled Office workflows and filesystem resources for document authoring and checks. */
+/** Bundled Office workflows and filesystem resources for document authoring and operations. */
 
 import { readFileSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -14,7 +14,7 @@ const SKILL_NAMES = ['office', 'office-docx', 'office-pptx', 'office-xlsx', 'off
 
 /** Office skill resource location. */
 export interface Config {
-  /** Absolute assets directory containing skill folders and shared scripts; defaults to packaged assets. */
+  /** Absolute assets directory containing skill folders; defaults to packaged assets. */
   assetRoot?: string
   /** Standalone Node executable; defaults to the current executable outside Electron and SEA. */
   node?: string
@@ -69,9 +69,6 @@ function officeRuntime(config: Config): string {
 export function apply(ctx: Context, config: Config = {}): void {
   const assetRoot = config.assetRoot ?? fileURLToPath(new URL('../assets/', import.meta.url))
   if (!isAbsolute(assetRoot)) throw new Error('skill-office: assetRoot must be an absolute directory')
-  if (!statSync(join(assetRoot, 'scripts', 'check_office.py')).isFile()) {
-    throw new Error('skill-office: assets must contain scripts/check_office.py')
-  }
   const candidates: SkillCandidate[] = SKILL_NAMES.map((skillName) => {
     const directory = join(assetRoot, skillName)
     const path = join(directory, 'SKILL.md')

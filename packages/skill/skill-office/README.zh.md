@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-目录列出 Office 路由及六个创作或操作技能，完整说明按需加载。创作技能使用选定的 Python 和共享检查脚本；操作技能提供配置的 Node 与 LibreOffice Kit CLI 路径。SDK 和 Desktop 分别挂载技能提供者和依赖查询。
+目录列出 Office 路由及六个创作或操作技能，完整说明按需加载。创作技能使用选定的 Python 库；操作技能提供配置的 Node 与 LibreOffice Kit CLI 路径。SDK 和 Desktop 分别挂载技能提供者和依赖查询。
 
 ## 目录
 
@@ -26,7 +26,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-在技能注册表和 `dsh-tool-skill` 旁挂载技能提供者。提供者负责说明和检查器资源；操作技能在加载时附加解释器和 CLI 的绝对路径。
+在技能注册表和 `dsh-tool-skill` 旁挂载技能提供者。提供者负责技能说明；操作技能在加载时附加解释器和 CLI 的绝对路径。
 
 ```yaml
 - name: '@deepseek-ai/dsh-skill-office'
@@ -35,7 +35,7 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `assetRoot` | 载体资源或包内 `assets/` | 包含七个技能目录及共享 `scripts/` 的绝对路径。 |
+| `assetRoot` | 载体资源或包内 `assets/` | 包含七个技能目录的绝对路径。 |
 | `node` | 宿主 Node.js | 操作技能使用的独立 Node 可执行程序；打包载体显式提供。 |
 | `cli` | 已安装 Kit CLI | CLI 入口的绝对路径；`false` 禁用操作执行。 |
 
@@ -77,10 +77,6 @@ flowchart TD
 
 新建文件以及内容、数据或公式修改，不会仅因附带基础格式调整而需要渲染。预览图片保存在工作区内随机命名的私有临时目录中，并在检查后删除；回复以文字说明检查结果，不链接这些图片。PDF 导出校验命令结果和 `%PDF-` 签名，不另外查找 PDF 阅读工具。操作结束后，已加载的说明仍属于会话历史。图中描述各端常规预设，不改变 minimal 或 sdk-minimal 的纯 shell 定义。
 
-### 结构检查
-
-`"<python>" "<skill-directory>/../scripts/check_office.py" <file> --out <report.json>` 读取 DOCX、PPTX 和 XLSX，不修改源文件。共享 Python 检查器验证 ZIP/XML 和内部关系、汇总文档结构，并可检查必需文本或幻灯片／工作表数量。它仅依赖 Python 标准库。无效文件和报告写入失败会返回 JSON 失败报告。结构检查成功不代表外观、功能保留或公式计算值通过验证。
-
 -----
 
 <a id="understand-the-implementation"></a>
@@ -97,7 +93,7 @@ flowchart TD
 |---|---|
 | [`src/index.ts`](src/index.ts) | 注册资源并返回原始技能正文。 |
 
-| [`assets/`](assets/) | 路由、六个子技能与只读 OOXML 检查器。 |
+| [`assets/`](assets/) | 路由与六个子技能。 |
 
 </details>
 
@@ -125,8 +121,8 @@ flowchart TD
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- 提供者不安装创作库。检查器需要 Python 3.9 或更新版本。
-- LibreOffice 输出可能不同于原生 Office 应用；结构检查无法认证外观。
+- 提供者不安装创作库。
+- LibreOffice 输出可能不同于原生 Office 应用。
 - 旧格式、加密和启用宏的文件需要适用的独立工作流。
 
 <a id="dev-note"></a>

@@ -989,7 +989,6 @@ def smoke_sdk_authoring(base_url: str, executable: Path, update_snapshots: bool)
                 subprocess.run([
                     str(python), "-I", "-B", str(Path(__file__).parent / "primary-runtime/smoke.py"),
                     json.dumps(manifest["pythonPackages"]), manifest["python"],
-                    str(resources / "office-skills/scripts/check_office.py"),
                 ], check=True, timeout=120,
                     env={name: value for name, value in os.environ.items()
                          if not re.search(r"KEY|SECRET|TOKEN|PASSWORD", name, re.I)})

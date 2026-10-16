@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The catalog lists the Office router and six authoring or operation skills. Full instructions load on demand. Authoring skills use the selected Python and shared checker script; operation skills supply the configured Node and LibreOffice Kit CLI paths. SDK and Desktop mount the skill provider and dependency query separately.
+The catalog lists the Office router and six authoring or operation skills. Full instructions load on demand. Authoring skills use the selected Python libraries; operation skills supply the configured Node and LibreOffice Kit CLI paths. SDK and Desktop mount the skill provider and dependency query separately.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ The catalog lists the Office router and six authoring or operation skills. Full 
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount the skill provider beside the skill registry and `dsh-tool-skill`. The provider supplies instructions and checker resources; operation skills append absolute interpreter and CLI paths when loaded.
+Mount the skill provider beside the skill registry and `dsh-tool-skill`. The provider supplies skill instructions; operation skills append absolute interpreter and CLI paths when loaded.
 
 ```yaml
 - name: '@deepseek-ai/dsh-skill-office'
@@ -35,7 +35,7 @@ Mount the skill provider beside the skill registry and `dsh-tool-skill`. The pro
 
 | Field | Default | Meaning |
 |---|---|---|
-| `assetRoot` | Carrier resources or packaged `assets/` | Absolute directory containing the seven skill folders and shared `scripts/`. |
+| `assetRoot` | Carrier resources or packaged `assets/` | Absolute directory containing the seven skill folders. |
 | `node` | Host Node.js | Standalone Node executable for operation skills; packaged carriers supply it explicitly. |
 | `cli` | Installed Kit CLI | Absolute CLI entry; `false` disables operation execution. |
 
@@ -77,10 +77,6 @@ flowchart TD
 
 New files and content, data, or formula edits do not require rendering solely because they include incidental basic formatting. Preview images use a private, randomly named temporary directory inside the workspace and are removed after inspection; replies report the inspection in text without linking them. PDF export validates the command result and `%PDF-` signature without searching for PDF readers. Loaded instructions remain in session history after an operation finishes. The diagram describes ordinary presets across supported clients; it does not change the shell-only definition of minimal or sdk-minimal.
 
-### Structural checks
-
-`"<python>" "<skill-directory>/../scripts/check_office.py" <file> --out <report.json>` reads DOCX, PPTX, and XLSX without changing the source. The shared Python checker validates ZIP/XML and internal relationships, summarizes document structure, and optionally checks required text or slide/sheet counts. It requires only the Python standard library. Invalid files and report-write failures return a JSON failure report. Structural success does not establish appearance, feature preservation, or calculated formula values.
-
 -----
 
 <a id="understand-the-implementation"></a>
@@ -97,7 +93,7 @@ The provider registers no tools or activation projection. Loaded skill results r
 |---|---|
 | [`src/index.ts`](src/index.ts) | Resource registration and unchanged skill bodies. |
 
-| [`assets/`](assets/) | Router, six subskills, and read-only OOXML checker. |
+| [`assets/`](assets/) | Router and six subskills. |
 
 </details>
 
@@ -125,8 +121,8 @@ Skill results append to history without changing tool declarations, and loaded t
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The provider does not install authoring libraries. The checker needs Python 3.9 or later.
-- LibreOffice output can differ from native Office applications; structural checks cannot certify appearance.
+- The provider does not install authoring libraries.
+- LibreOffice output can differ from native Office applications.
 - Legacy, encrypted, and macro-enabled files need an appropriate separate workflow.
 
 <a id="dev-note"></a>

@@ -106,7 +106,7 @@ export function smokePrimaryRuntime(root: string): void {
   const options = { stdio: 'inherit', timeout: 120_000, env: snapshotChildEnvironment('replay', {}) } as const
   execFileSync(entries.python, ['-I', '-c', 'import decimal, xml.parsers.expat, lzma, uuid, numpy, pandas; assert numpy.arange(4).sum() == 6; assert pandas.DataFrame({"n": [1, 2]}).n.sum() == 3'], options)
   execFileSync(entries.python, ['-I', '-B', join(import.meta.dirname, 'smoke-primary-runtime.py'), JSON.stringify(manifest.pythonPackages),
-    manifest.components.python, resolve(import.meta.dirname, '../../packages/skill/skill-office/assets/scripts/check_office.py')], options)
+    manifest.components.python], options)
   execFileSync(entries.python, ['-I', '-B', '-m', 'pip', 'check'], options)
   execFileSync(entries.node, ['-e', `if (process.versions.node !== ${JSON.stringify(manifest.components.node)}) process.exit(1)`], options)
   const pnpmVersion = execFileSync(entries.node, [entries.pnpm, '--version'], { ...options, stdio: 'pipe', encoding: 'utf8' }).trim()

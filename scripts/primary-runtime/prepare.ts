@@ -215,7 +215,7 @@ export function smokePrimaryRuntime(root: string, environment: NodeJS.ProcessEnv
   const options = { stdio: 'inherit', timeout: 120_000, env: environment } as const
   execFileSync(entries.python, ['-I', '-B', '-c', 'import decimal, xml.parsers.expat, lzma, uuid, numpy, pandas; assert numpy.arange(4).sum() == 6; assert pandas.DataFrame({"n": [1, 2]}).n.sum() == 3'], options)
   execFileSync(entries.python, ['-I', '-B', join(import.meta.dirname, 'smoke.py'), JSON.stringify(manifest.pythonPackages),
-    manifest.python, join(dirname(root), 'office-skills', 'scripts', 'check_office.py')], options)
+    manifest.python], options)
   execFileSync(entries.python, ['-I', '-B', '-m', 'pip', 'check'], options)
   if (entries.node !== undefined) execFileSync(entries.node, ['-e', `if (process.versions.node !== ${JSON.stringify(manifest.node)}) process.exit(1)`], options)
   if (entries.pnpm !== undefined && entries.node !== undefined) execFileSync(entries.node, [entries.pnpm, '--version'], options)

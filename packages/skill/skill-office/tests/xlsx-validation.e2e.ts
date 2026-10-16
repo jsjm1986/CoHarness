@@ -186,7 +186,6 @@ else:
         ? answer.data.message.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('\n').slice(0, 800) : undefined })
     expect(loaded, diagnostic).toContain('office-xlsx')
     expect(calls.some(call => call.name === 'load_workspace_dependencies'), diagnostic).toBe(true)
-    expect(commands, diagnostic).toContain('check_office.py')
     if (kind === 'formula') {
       expect(loaded, diagnostic).toContain('office-recalculate')
     }

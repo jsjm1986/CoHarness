@@ -94,8 +94,6 @@ it('copies complete Office resources outside the application archive and removes
   try {
     const source = join(root, 'package', 'assets')
     const destination = join(root, 'Contents', 'Resources', 'runtime', 'office-skills')
-    await mkdir(join(source, 'scripts'), { recursive: true })
-    await writeFile(join(source, 'scripts', 'check_office.py'), 'print("checker")\n')
     for (const name of ['office-docx', 'office-pptx', 'office-xlsx']) {
       await mkdir(join(source, name))
       await writeFile(join(source, name, 'SKILL.md'), `# ${name}\n`)
@@ -106,7 +104,6 @@ it('copies complete Office resources outside the application archive and removes
     for (const name of ['office-docx', 'office-pptx', 'office-xlsx']) {
       expect(await readFile(join(destination, name, 'SKILL.md'), 'utf8')).toBe(`# ${name}\n`)
     }
-    expect(await readFile(join(destination, 'scripts', 'check_office.py'), 'utf8')).toBe('print("checker")\n')
     await expect(readFile(join(destination, 'obsolete.py'))).rejects.toMatchObject({ code: 'ENOENT' })
   } finally { await rm(root, { recursive: true, force: true }) }
 })

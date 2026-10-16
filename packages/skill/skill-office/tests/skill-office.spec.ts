@@ -136,11 +136,8 @@ describe('bundled Office skills', () => {
       await ctx.plugin(SkillRegistry)
       expect(() => { SkillOffice.apply(ctx, { assetRoot: 'assets' }) }).toThrow('absolute directory')
       await cp(assets, root, { recursive: true })
-      await rm(join(root, 'scripts', 'check_office.py'))
-      await cp(join(assets, 'office-docx'), join(root, 'scripts', 'check_office.py'), { recursive: true })
-      expect(() => { SkillOffice.apply(ctx, { assetRoot: root }) }).toThrow('scripts/check_office.py')
-      await rm(join(root, 'scripts', 'check_office.py'), { recursive: true })
-      await cp(join(assets, 'scripts', 'check_office.py'), join(root, 'scripts', 'check_office.py'))
+      await rm(join(root, 'office-docx', 'SKILL.md'))
+      expect(() => { SkillOffice.apply(ctx, { assetRoot: root }) }).toThrow('SKILL.md')
       await writeFile(join(root, 'office-docx', 'SKILL.md'), '# Missing frontmatter\ndescription: body text\n')
       expect(() => { SkillOffice.apply(ctx, { assetRoot: root }) }).toThrow('has no YAML frontmatter')
       for (const header of ['', 'null', 'scalar', 'name: office-docx', 'description: 3', 'description: ""']) {
