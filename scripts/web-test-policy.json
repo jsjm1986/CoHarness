@@ -79,6 +79,7 @@
     "plugin-install-approve.e2e.ts": "settings",
     "produced-file-mentions.e2e.ts": "conversation",
     "produced-files.e2e.ts": "documents",
+    "project-activity.e2e.ts": "workbench",
     "project-collaboration.e2e.ts": "workbench",
     "ptc-round.e2e.ts": "conversation",
     "pwa-manifest.e2e.ts": "shell",
