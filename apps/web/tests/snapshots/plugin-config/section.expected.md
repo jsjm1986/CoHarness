@@ -3,9 +3,11 @@
 - button "插件说明":
   - img
 - button "刷新" [disabled]
-- button "添加插件" [disabled]:
-  - img
-  - text: 添加插件
+- group "添加插件":
+  - button "添加插件" [disabled]:
+    - img
+    - text: 添加插件
+  - button "选择添加插件方式" [disabled]
 - status: 本部署没有可管理的 profile，无法安装或启停插件。
 - heading "插件配置" [level=3]
 - text: "5"
