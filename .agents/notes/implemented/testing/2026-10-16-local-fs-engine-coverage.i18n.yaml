@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-16-local-fs-engine-coverage.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-16-local-fs-engine-coverage.md
+/agent-note-local-document-engine-coverage-closes-over-shared-scan-and-lifecycle-branches:
+  en: f97e45687695e4d3
+  zh: e7a57fa432bddf6b
+/agent-note-local-document-engine-coverage-closes-over-shared-scan-and-lifecycle-branches/problem:
+  en: 84a27605a8d113ee
+  zh: 7710b4a40a841f5d
+/agent-note-local-document-engine-coverage-closes-over-shared-scan-and-lifecycle-branches/decision:
+  en: 9defee67973318ef
+  zh: c3f99bfeaacff797
+/agent-note-local-document-engine-coverage-closes-over-shared-scan-and-lifecycle-branches/alternatives-considered:
+  en: ce3784590fb49415
+  zh: c08a3a733e554726
+/agent-note-local-document-engine-coverage-closes-over-shared-scan-and-lifecycle-branches/consequences:
+  en: 17a96249c5b9e2ea
+  zh: 4e47decf90c779dc
