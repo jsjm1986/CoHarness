@@ -16,6 +16,7 @@ import type { ReadWorkspaceFileData } from '../html/read-relative.ts'
 import type { ExcelLimits } from '../excel/model.ts'
 import type {} from '../excel/locales.ts'
 import type { NS } from '../locales.ts'
+import type { ZoomLabels, ZoomPreference } from '../zoom/types.ts'
 
 /** Readers and metadata belong to the existing authorized workspace service. */
 export interface WorkspaceFileTabInjected {
@@ -115,7 +116,12 @@ export function WorkspaceFileTab(props:
     reload,
     revoke,
   }), [metadata, reload, revoke])
-  const pdfView = useMemo(() => ({ page: 1 }), [request])
+  const pdfView = useMemo((): { page: number; zoom?: ZoomPreference } => ({ page: 1 }), [request])
+  const fileView = useMemo((): { zoom?: ZoomPreference } => ({}), [request])
+  const zoomLabels = useMemo((): ZoomLabels => ({
+    controls: t('zoomControls'), menu: t('zoomMenu'), out: t('zoomOut'), into: t('zoomIn'),
+    fitWidth: t('zoomFitWidth'), value: percent => t('zoomValue', { percent }),
+  }), [t])
   const params = tab.navigation.params
   const line = params !== undefined && 'line' in params ? params.line : undefined
   if (!tab.visible) return null
@@ -135,5 +141,7 @@ export function WorkspaceFileTab(props:
     key={key} request={request} resource={resource} read={readPreview} markdownT={markdownT}
     close={() => { tab.actions.close() }} labels={{ ...actions, loading: t('previewLoading') }} />
   return <WorkspaceFilePreview key={key} request={request} initialLine={line} read={readPreview} readBytes={readBytesPreview}
-    resource={resource} close={() => { tab.actions.close() }} labels={{ close: t('previewClose'), reload: t('previewReload'), previous: t('previewPrevious'), next: t('previewNext'), loading: t('previewLoading'), changed: t('previewChanged'), binary: t('previewBinary') }} />
+    resource={resource} close={() => { tab.actions.close() }} zoomLabels={zoomLabels} view={fileView}
+    labels={{ close: t('previewClose'), reload: t('previewReload'), previous: t('previewPrevious'), next: t('previewNext'), loading: t('previewLoading'), changed: t('previewChanged'), binary: t('previewBinary'),
+      imageAlt: name => t('previewImage', { name }), imageFailed: t('previewImageFailed') }} />
 }

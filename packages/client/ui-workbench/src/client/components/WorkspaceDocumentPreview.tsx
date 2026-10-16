@@ -7,6 +7,8 @@ import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runti
 import { FontNotice } from '../office/FontNotice.tsx'
 import type {} from '../office/locales.ts'
 import type {} from '../pdf/locales.ts'
+import { ZoomViewport, zoomSurfaceClass } from '../zoom/ZoomViewport.tsx'
+import type { ZoomPreference } from '../zoom/types.ts'
 import type { WorkspacePreviewResource } from './WorkspaceFileTab.tsx'
 import css from './Workbench.module.css'
 
@@ -39,7 +41,7 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
   pdfT: PropsLocale<'sidebarPdf'>['t']
   officeT: PropsLocale<'sidebarOffice'>['t']
   close: () => void
-  view: { page: number }
+  view: { page: number; zoom?: ZoomPreference }
   labels: { close: string; reload: string; changed: string }
 }) {
   const { metadata, revoke } = resource
@@ -93,7 +95,7 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
   const code = (error as { code?: unknown } | undefined)?.code
   const failure = error === undefined ? metadata.error : { message: error.message, code: typeof code === 'string' ? code : undefined }
   const message = failure === undefined ? undefined : describeFailure(failure, officeT)
-  return <section aria-label={request.path} className={css.filePreview}>
+  return <section aria-label={request.path} className={`${css.filePreview} ${css.filePreviewZoom}`}>
     <div className={css.filePreviewActions}>
       <Button size="sm" onClick={close}>{labels.close}</Button>
       <Button size="sm" disabled={pending || denied || reloading || metadata.status === 'loading'} onClick={() => { void reload() }}>{labels.reload}</Button>
@@ -103,7 +105,8 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
     {!denied && data !== undefined && result !== undefined && <>
       <FontNotice resourceAddress={request.address} sourceVersion={result.version} fonts={result.missingFonts} t={officeT} />
       <Suspense fallback={<p role="status">{pdfT('loading')}</p>}>
-        <PdfBody data={data} signal={lifetime.signal} t={pdfT} view={view} />
+        <PdfBody data={data} signal={lifetime.signal} t={pdfT} view={view}
+          ZoomViewport={ZoomViewport} zoomSurfaceClass={zoomSurfaceClass} />
       </Suspense>
     </>}
     {!denied && data === undefined && (pending || metadata.status === 'loading') && <p role="status">{officeT('loading')}</p>}

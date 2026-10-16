@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-17-unified-document-zoom-controls.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-unified-document-zoom-controls.md
+/agent-note-unified-document-zoom-controls:
+  en: dbdbd65322cc3800
+  zh: d44ff091b2ff731d
+/agent-note-unified-document-zoom-controls/problem:
+  en: 874c92832ad61bb3
+  zh: 4d8a15abd9b0dcb1
+/agent-note-unified-document-zoom-controls/decision:
+  en: ec3af3c2a8812db0
+  zh: cebe8be6ff08be11
+/agent-note-unified-document-zoom-controls/alternatives-considered:
+  en: 67e18987abfb06f4
+  zh: ab79d6573f095314
+/agent-note-unified-document-zoom-controls/consequences:
+  en: 417d7d86859c8d31
+  zh: 67a5effa68565103
+/agent-note-unified-document-zoom-controls/verification:
+  en: 37c1716ce30b6f56
+  zh: 472f71681ec346b3

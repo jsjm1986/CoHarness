@@ -65,6 +65,9 @@ export const zh = {
   previewLoading: '正在读取 Workspace 文件…',
   previewChanged: '文件已更改，请重新加载以查看当前内容。',
   previewBinary: '二进制内容（Base64）',
+  previewImage: '图片预览：{name}',
+  previewImageFailed: '无法显示这张图片',
+  zoomControls: '缩放控件', zoomMenu: '选择缩放比例', zoomOut: '缩小', zoomIn: '放大', zoomFitWidth: '适应宽度', zoomValue: '{percent}%',
   files: 'Workspace 文件', filesRoot: 'Workspace 根目录', filesUp: '返回上一级', filesEmpty: '此目录为空', filesDirectory: '目录 ', filesTruncated: '目录内容已按上限截断',
 } as const
 
@@ -130,6 +133,9 @@ export const en = {
   previewLoading: 'Reading Workspace file…',
   previewChanged: 'This file changed. Reload to see its current content.',
   previewBinary: 'Binary content (Base64)',
+  previewImage: 'Image preview: {name}',
+  previewImageFailed: 'This image could not be displayed.',
+  zoomControls: 'Zoom controls', zoomMenu: 'Choose zoom', zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomFitWidth: 'Fit width', zoomValue: '{percent}%',
   files: 'Workspace files', filesRoot: 'Workspace root', filesUp: 'Up one level', filesEmpty: 'This directory is empty', filesDirectory: 'Directory ', filesTruncated: 'Directory listing is truncated',
 } as const
 

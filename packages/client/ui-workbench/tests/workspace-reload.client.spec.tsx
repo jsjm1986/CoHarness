@@ -36,6 +36,11 @@ const fileRequest = (path: string): WorkspaceResourceOpenRequest => ({
 const labels = {
   close: 'Close', reload: 'Reload', previous: 'Previous', next: 'Next', loading: 'Loading',
   changed: 'Changed; reload', binary: 'Binary (Base64)',
+  imageAlt: (name: string) => `Image preview: ${name}`, imageFailed: 'This image could not be displayed.',
+}
+const zoomLabels = {
+  controls: 'Zoom controls', menu: 'Choose zoom', out: 'Zoom out', into: 'Zoom in',
+  fitWidth: 'Fit width', value: (percent: number) => `${String(percent)}%`,
 }
 const htmlT = (key: string): string => (htmlEn as Record<string, string>)[key] ?? key
 
@@ -112,7 +117,8 @@ describe('explicit reload under a held metadata stat', () => {
       path: request.path, offset, limit: 2, text: `${version}:${offset}`, eof: true, version,
     }))
     const view = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
-      <WorkspaceFilePreview request={request} read={read} resource={resource} close={vi.fn()} labels={labels} />
+      <WorkspaceFilePreview request={request} read={read} resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels}
+        view={{}} />
     }</PreviewResourceBinding>)
     try {
       await waitFor(() => { expect(view.getByText('v1:1')).toBeTruthy() })
@@ -145,7 +151,8 @@ describe('explicit reload under a held metadata stat', () => {
       return { path: request.path, offset: 0, bytes: 'AAEC', eof: true, version }
     })
     const view = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
-      <WorkspaceFilePreview request={request} read={read} readBytes={readBytes} resource={resource} close={vi.fn()} labels={labels} />
+      <WorkspaceFilePreview request={request} read={read} readBytes={readBytes} resource={resource} close={vi.fn()} labels={labels}
+        zoomLabels={zoomLabels} view={{}} />
     }</PreviewResourceBinding>)
     try {
       await waitFor(() => {
@@ -157,7 +164,7 @@ describe('explicit reload under a held metadata stat', () => {
       fireEvent.click(view.getByRole('button', { name: 'Reload' }))
       await h.statEntered.promise
       await Promise.resolve()
-      expect(read).toHaveBeenCalledTimes(1)
+      expect(read).not.toHaveBeenCalled()
       expect(readBytes).toHaveBeenCalledTimes(1)
       act(() => { h.stat.resolve({ sessionId: id, path: request.path, type: 'file', version: 'v2', bytes: 30, changed: false }) })
       await waitFor(() => { expect(reads).toHaveLength(2) })

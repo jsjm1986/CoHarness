@@ -328,7 +328,7 @@ describe('ui-theme apply', () => {
     keyboard.press()
     host.publish({ value: section, revision: 2 })
     expect(theme.getTheme().fontSizes).toEqual({ text: 15, code: 12, terminal: 14 })
-    write.resolve()
+    write.resolve(undefined)
     await vi.waitFor(() => { expect(theme.getTheme().fontSizes).toEqual({ text: 14, code: 11, terminal: 13 }) })
   })
 

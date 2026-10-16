@@ -172,7 +172,7 @@ describe('ThemeRuntime', () => {
     host.publish({ value: { ...SECTION, terminalFontSize: 15 }, revision: 2 })
     expect(theme.getTheme().fontSizes).toEqual({ text: 14, code: 13, terminal: 13 })
     host.publish({ value: { ...SECTION, codeFontSize: 13, terminalFontSize: 15 }, revision: 3 })
-    write.resolve()
+    write.resolve(undefined)
     await vi.waitFor(() => { expect(theme.getTheme().fontSizes).toEqual({ text: 14, code: 13, terminal: 15 }) })
   })
 

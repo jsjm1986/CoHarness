@@ -19,7 +19,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold,
   seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { newEnglishPage, revealDocumentZoom, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workspace-files', import.meta.url))
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
@@ -27,6 +27,8 @@ const CHANGED_EXPECTED = join(SNAPSHOT_DIR, 'changed.expected.md')
 const LINKED_LINE_EXPECTED = join(SNAPSHOT_DIR, 'linked-line.expected.md')
 const MARKDOWN_EXPECTED = join(SNAPSHOT_DIR, 'markdown.expected.md')
 const MODE = webSnapshotMode()
+const TINY_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
 const FILE_NAME = 'notes.txt'
 const FIRST_CONTENT = 'alpha line\n'
 const SECOND_CONTENT = 'beta line\n'
@@ -81,6 +83,12 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await mkdir(join(workspaceDir, 'assets'), { recursive: true })
     await writeFile(join(workspaceDir, 'assets/app.js'), 'document.body.dataset.packed = "yes"\n')
     await writeFile(join(workspaceDir, 'page.html'), '<!doctype html><p>HTML body</p><script src="assets/app.js"></script>\n')
+    await writeFile(join(workspaceDir, 'pixel.png'), TINY_PNG)
+    await writeFile(join(workspaceDir, 'large.svg'), [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">',
+      '<rect width="1200" height="1600" fill="#3366ff"/>',
+      '</svg>',
+    ].join(''))
     const workspace = await scaffold.ctx.workspaceRegistry.create(workspaceDir)
     const sessionId = await seedSession(scaffold, seed, 'ws-files', undefined, workspaceDir)
     await workspace.attachSession(sessionId)
@@ -161,8 +169,47 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).click()
     await preview.waitFor({ timeout: 15_000 })
 
+    // A small image keeps its intrinsic size under fit width; a wide SVG shrinks
+    // to the pane until a fixed zoom restores horizontal overflow inside the
+    // zoom viewport's own scrollport.
+    await filesButton.click()
+    await browserDialog.getByRole('treeitem', { name: 'pixel.png' }).click()
+    const pixelRegion = page.getByRole('region', { name: 'pixel.png', exact: true })
+    const pixelImage = pixelRegion.locator('[data-workspace-file-image]')
+    await pixelImage.waitFor({ state: 'visible', timeout: 15_000 })
+    expect(await pixelImage.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(1)
+    await expect.poll(async () => (await pixelImage.boundingBox())!.width).toBeCloseTo(1, 0)
+    let imageZoom = await revealDocumentZoom(page, pixelRegion)
+    await expect.poll(() => imageZoom.innerText()).toBe('100%')
+    await imageZoom.click()
+    await page.getByRole('menuitem', { name: '200%', exact: true }).click()
+    await expect.poll(async () => (await pixelImage.boundingBox())!.width).toBeCloseTo(2, 0)
+
+    await filesButton.click()
+    await browserDialog.getByRole('treeitem', { name: 'large.svg' }).click()
+    const svgRegion = page.getByRole('region', { name: 'large.svg', exact: true })
+    const svgImage = svgRegion.locator('[data-workspace-file-image]')
+    await svgImage.waitFor({ state: 'visible', timeout: 15_000 })
+    expect(await svgImage.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(1200)
+    const fittedWidth = (await svgImage.boundingBox())!.width
+    expect(fittedWidth).toBeLessThan(1200)
+    const imageScrollport = svgRegion.locator('[data-document-zoom-scrollport]')
+    expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(false)
+    imageZoom = await revealDocumentZoom(page, svgRegion)
+    await imageZoom.click()
+    await page.getByRole('menuitem', { name: '100%', exact: true }).click()
+    await expect.poll(async () => (await svgImage.boundingBox())!.width).toBeCloseTo(1200, 0)
+    expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true)
+    imageZoom = await revealDocumentZoom(page, svgRegion)
+    await imageZoom.click()
+    await page.getByRole('menuitem', { name: 'Fit width', exact: true }).click()
+    await expect.poll(async () => (await svgImage.boundingBox())!.width).toBeCloseTo(fittedWidth, 0)
+    expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(false)
+
     // A present observation with a fresh version marks the open resource
     // changed; the page content stays until Reload.
+    await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).click()
+    await preview.waitFor({ timeout: 15_000 })
     await writeFile(join(workspaceDir, FILE_NAME), SECOND_CONTENT)
     await emitObservation(sessionId, FILE_NAME, true)
     const changedBadge = previewDialog.locator('[data-workspace-file-changed]')

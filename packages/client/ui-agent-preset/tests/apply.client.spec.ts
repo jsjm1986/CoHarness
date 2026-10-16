@@ -664,7 +664,7 @@ describe('ui-agent-preset apply', () => {
     const entry = slots.entries('plugins.add.actions')[0]!
     expect(entry.component).toBe(CreatePluginMenuItem)
     expect(entry.options).toMatchObject({ id: 'create-plugin' })
-    const face = (entry.inject as () => CreatePluginMenuItemInjected)()
+    const face = callInject(entry) as CreatePluginMenuItemInjected
     await face.load()
     face.startCreatorDraft()
     // The menu shares the section's launch: its own fresh roster read alone

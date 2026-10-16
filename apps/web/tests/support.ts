@@ -137,6 +137,38 @@ export async function saveFailureDom(page: Page, name: string): Promise<void> {
   }
 }
 
+/** Wait for device resolution, subject to the page bitmap allocation limit. */
+export async function expectPdfResolution(canvas: Locator): Promise<void> {
+  await expect.poll(() => canvas.evaluate((node) => {
+    const bitmap = node as HTMLCanvasElement
+    const width = Number.parseFloat(bitmap.style.getPropertyValue('--pdf-page-width'))
+    const height = Number.parseFloat(bitmap.style.getPropertyValue('--pdf-page-height'))
+    const expected = Math.min(bitmap.getBoundingClientRect().width * window.devicePixelRatio,
+      Math.sqrt(16_777_216 * width / height))
+    return Math.abs(bitmap.width - expected)
+  })).toBeLessThanOrEqual(1)
+}
+
+/** Move into the bottom reveal zone and wait for the shared zoom control. */
+export async function revealDocumentZoom(page: Page, preview: Locator): Promise<Locator> {
+  const frame = preview.locator('[data-document-zoom-frame]')
+  const bounds = await frame.boundingBox()
+  if (bounds === null) throw new Error('document zoom frame has no bounds')
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height - 8)
+  const controls = preview.locator('[data-document-zoom-controls]')
+  await expect.poll(() => controls.getAttribute('data-document-zoom-visible')).toBe('true')
+  return preview.getByRole('button', { name: 'Choose zoom', exact: true })
+}
+
+/** Leave the bottom reveal zone and wait for the delayed dismissal. */
+export async function hideDocumentZoom(page: Page, preview: Locator): Promise<void> {
+  const frame = preview.locator('[data-document-zoom-frame]')
+  const bounds = await frame.boundingBox()
+  if (bounds === null) throw new Error('document zoom frame has no bounds')
+  await page.mouse.move(bounds.x + 8, bounds.y + 8)
+  await expect.poll(() => preview.locator('[data-document-zoom-controls]').getAttribute('data-document-zoom-visible')).toBeNull()
+}
+
 /**
  * Assert a visible tooltip paints above the element a user would read through
  * it: both probes must land inside the bubble's subtree. The bubble ignores
