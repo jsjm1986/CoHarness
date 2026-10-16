@@ -14799,7 +14799,7 @@
     },
     {
       "area": "packages/util/timeout",
-      "status": "retain",
+      "status": "adapt",
       "localOwner": "packages/util/timeout",
       "commitScope": [
         "packages/util/timeout/"
@@ -14812,7 +14812,7 @@
         "packages/util/timeout/README.i18n.yaml",
         "packages/util/timeout/package.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/util/timeout",
