@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-26-ptc-chat-subcall-rows.md
 /agent-note-ptc-mode-chat-rendering-sub-calls-as-native-rows-under-the-parent:
-  en: e3b52c6570465b4e
-  zh: 4222f9730960742d
+  en: 5e0398dd5ed72f71
+  zh: 344d809737f839d9
 /agent-note-ptc-mode-chat-rendering-sub-calls-as-native-rows-under-the-parent/problem:
   en: 5229ecef36fb3db7
   zh: f4bc88e00e4781f5

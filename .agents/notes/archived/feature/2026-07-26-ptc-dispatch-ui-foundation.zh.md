@@ -1,6 +1,7 @@
 # Agent Note: PTC mode 的 UI 基础——run_code 的 description 参数，以及与原生同等保真的分发日志
 
 Status: implemented
+Archived: 2026-10-17
 
 [English](2026-07-26-ptc-dispatch-ui-foundation.md) | 中文
 

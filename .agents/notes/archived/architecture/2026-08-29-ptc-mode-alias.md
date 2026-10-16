@@ -1,6 +1,7 @@
 # Agent Note: Accept PTC as the canonical tool presentation name
 
 Status: implemented
+Archived: 2026-10-17
 
 English | [中文](2026-08-29-ptc-mode-alias.zh.md)
 

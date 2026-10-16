@@ -1,6 +1,7 @@
 # Agent Note: 按 agent 的工具呈现方式，以及 `ptc` 预设
 
 Status: implemented
+Archived: 2026-10-17
 
 [English](2026-08-05-per-agent-tool-presentation.md) | 中文
 

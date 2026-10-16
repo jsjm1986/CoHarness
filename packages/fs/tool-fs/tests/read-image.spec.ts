@@ -108,7 +108,7 @@ async function setup(options: SetupOptions = {}) {
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime, { mode: options.toolMode ?? 'native' })
-  if (options.toolMode === 'ptc' || options.toolMode === 'both') {
+  if (options.toolMode === 'ptc') {
     await ctx.plugin(FakeRuntime)
   }
   await ctx.plugin(LocalFileSystem, { cwd: dir })

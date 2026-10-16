@@ -610,6 +610,40 @@ async function verifySessionQuerySpill(log: string, spillRoot: string, locatorRo
   })
 }
 
+/** Preserve successful native, program, direct-child, and workflow execution in one flow. */
+function verifyAdvancedToolchain(logs: readonly SessionLog[]): void {
+  expect(logs).toHaveLength(3)
+  const events = parseSessionLog(logs[0]!.content)
+  const calls = events.flatMap(event => event.type === 'tool/call' ? [event.data.name] : [])
+  expect(calls).toEqual(['cordis_inspect_list', 'run_code', 'subagent', 'workflow', 'cordis_inspect_list'])
+  const results = events.flatMap(event => event.type === 'tool/result' ? [event.data.message] : [])
+  expect(results).toHaveLength(5)
+  expect(results.every(result => result.isError === false)).toBe(true)
+  const dispatches = events.flatMap(event => event.type === 'tool/ptc-dispatch' ? [event.data] : [])
+  expect(dispatches).toEqual([expect.objectContaining({ name: 'cordis_inspect_list', isError: false })])
+  const textOf = (index: number) => results[index]!.content
+    .flatMap(block => block.type === 'text' ? [block.text] : []).join('')
+  expect(JSON.parse(textOf(1))).toEqual(['Service', 'Event', 'Config', 'Builtin', 'Tool'])
+  expect(textOf(2)).toBe('DIRECT_CHILD_OK')
+  const completions = events.flatMap(event => event.type === 'user/message'
+    && event.data.source.kind === 'subagent-settled' ? [{
+      sender: event.data.source.senderSessionId,
+      text: event.data.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('\n'),
+    }] : [])
+  expect(completions).toHaveLength(0)
+  expect(textOf(3)).toContain('WORKFLOW_CHILD_OK')
+  expect(finalTextFromSession(logs[1]!.content)).toBe('DIRECT_CHILD_OK')
+  expect(finalTextFromSession(logs[2]!.content)).toBe('WORKFLOW_CHILD_OK')
+  const headers = events.flatMap(event => event.type === 'request/header' ? [event.data.header] : [])
+  expect(headers).toHaveLength(3)
+  expect(headers[1]!.tools?.map(tool => tool.name)).toEqual(['run_code'])
+  for (const header of [headers[0]!, headers[2]!]) {
+    const names = header.tools?.map(tool => tool.name) ?? []
+    expect(names).toEqual(expect.arrayContaining(['cordis_inspect_list', 'subagent', 'workflow']))
+    expect(names).not.toContain('run_code')
+  }
+}
+
 /** Require real resource results and literal instructions before recording or replay succeeds. */
 function verifyMcpResources(log: string, ptc: boolean): void {
   const events = parseSessionLog(log)
@@ -1205,6 +1239,7 @@ describe('headless recorded-session snapshots', () => {
               expect(results.every(result => result.isError === false)).toBe(true)
               expect(log).toContain('# Office task routing')
             }
+            if (scenario.name === 'advanced-toolchain') verifyAdvancedToolchain(actualLogs)
             if (scenario.name === 'session-query-spill') {
               await verifySessionQuerySpill(actualLogs[0]!.content, spillRoot, locatorRoot)
             }

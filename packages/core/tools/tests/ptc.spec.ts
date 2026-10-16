@@ -133,11 +133,13 @@ async function runCode(
 }
 
 describe('mode-aware wire contribution', () => {
+  it('rejects an unsupported presentation mode in configuration', () => {
+    expect(() => ToolRuntime.Config({ mode: 'both' } as never)).toThrow()
+  })
+
   it.each([
     { mode: 'ptc', language: 'typescript' },
-    { mode: 'both', language: 'typescript' },
     { mode: 'ptc', language: 'python' },
-    { mode: 'both', language: 'python' },
   ] as const)('preserves literal braces in the $language SDK under $mode', async ({ mode, language }) => {
     const { ctx, systemPrompt } = await setup({ mode, runtime: { language } })
     try {
@@ -205,16 +207,6 @@ describe('mode-aware wire contribution', () => {
     expect(names.indexOf('tools:ptc-only')).toBeLessThan(names.indexOf('tools:sdk'))
   })
 
-  it("mode 'both' omits the run_code-only rule, because native calls do execute there", async () => {
-    const { ctx, systemPrompt } = await setup({ mode: 'both' })
-    registerEcho(ctx)
-    const assembly = await systemPrompt.assemble()
-    // Registered (the deployment is non-native) but empty, so the renderer
-    // drops it: `both` executes the native call the rule would forbid.
-    expect(assembly.sections.find(section => section.name === 'tools:ptc-only')?.text).toBe('')
-    expect(assembly.tools.map(tool => tool.name)).toContain('echo')
-  })
-
   it('projects deeply nested output schemas into the PTC mode SDK without structured-clone recursion', async () => {
     const { ctx, systemPrompt } = await setup({ mode: 'ptc' })
     let output: JsonSchemaNode = { type: 'string' }
@@ -239,7 +231,8 @@ describe('mode-aware wire contribution', () => {
     expect(sdk).toContain('deep_output: string | null')
   })
 
-  it.each(['ptc', 'both'] as const)('treats expert assembly output as authoritative in mode %s', async (mode) => {
+  it('treats expert assembly output as authoritative in mode ptc', async () => {
+    const mode = 'ptc'
     const { ctx, systemPrompt } = await setup({ mode })
     registerEcho(ctx)
     ctx.on('system-prompt/assemble', async (_assembly, _context, next) => {
@@ -256,7 +249,8 @@ describe('mode-aware wire contribution', () => {
     expect(assembly.tools.some(tool => tool.name === RUN_CODE_NAME)).toBe(false)
   })
 
-  it.each(['ptc', 'both'] as const)('lets one scope shadow the default SDK section in mode %s', async (mode) => {
+  it('lets one scope shadow the default SDK section in mode ptc', async () => {
+    const mode = 'ptc'
     const { ctx, systemPrompt } = await setup({ mode })
     registerEcho(ctx)
     const { scope, agent } = await mintAgentScope(ctx)
@@ -272,15 +266,8 @@ describe('mode-aware wire contribution', () => {
     expect(global.sections.find(section => section.name === 'tools:sdk')?.text).toContain('declare const tools:')
   })
 
-  it("mode 'both' contributes every native schema plus run_code, and the SDK section", async () => {
-    const { ctx, systemPrompt } = await setup({ mode: 'both' })
-    registerEcho(ctx)
-    const assembly = await systemPrompt.assemble()
-    expect(assembly.tools.map(tool => tool.name)).toEqual(['echo', RUN_CODE_NAME])
-    expect(assembly.sections.some(section => section.name === 'tools:sdk')).toBe(true)
-  })
-
-  it.each(['ptc', 'both'] as const)('keeps the run_code transport outside scoped allow-list filtering in mode %s', async (mode) => {
+  it('keeps the run_code transport outside scoped allow-list filtering in mode ptc', async () => {
+    const mode = 'ptc'
     const { ctx, systemPrompt, runtime } = await setup({ mode })
     registerEcho(ctx, 'echo')
     registerEcho(ctx, 'hidden')
@@ -288,9 +275,7 @@ describe('mode-aware wire contribution', () => {
     const lift = scope.ctx.tools.restrict({ allow: ['echo'] })
 
     const assembly = await systemPrompt.assemble({ scope: agent })
-    expect(assembly.tools.map(tool => tool.name)).toEqual(mode === 'ptc'
-      ? [RUN_CODE_NAME]
-      : ['echo', RUN_CODE_NAME])
+    expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
     const sdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text
     expect(sdk).toContain('echo: {')
     expect(sdk).not.toContain('hidden:')
@@ -305,12 +290,11 @@ describe('mode-aware wire contribution', () => {
 
     lift()
     const unrestricted = await systemPrompt.assemble({ scope: agent })
-    expect(unrestricted.tools.map(tool => tool.name)).toEqual(mode === 'ptc'
-      ? [RUN_CODE_NAME]
-      : ['echo', 'hidden', RUN_CODE_NAME])
+    expect(unrestricted.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
   })
 
-  it.each(['ptc', 'both'] as const)('keeps the run_code transport outside scoped deny-list filtering in mode %s', async (mode) => {
+  it('keeps the run_code transport outside scoped deny-list filtering in mode ptc', async () => {
+    const mode = 'ptc'
     const { ctx, systemPrompt, runtime } = await setup({ mode })
     registerEcho(ctx, 'denied')
     registerEcho(ctx, 'kept')
@@ -318,9 +302,7 @@ describe('mode-aware wire contribution', () => {
     scope.ctx.tools.restrict({ deny: ['denied'] })
 
     const assembly = await systemPrompt.assemble({ scope: agent })
-    expect(assembly.tools.map(tool => tool.name)).toEqual(mode === 'ptc'
-      ? [RUN_CODE_NAME]
-      : ['kept', RUN_CODE_NAME])
+    expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
     const sdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text
     expect(sdk).not.toContain('denied:')
     expect(sdk).toContain('kept: {')
@@ -334,7 +316,8 @@ describe('mode-aware wire contribution', () => {
     expect(result.content).toEqual([{ type: 'text', text: 'kept' }])
   })
 
-  it.each(['ptc', 'both'] as const)('reserves run_code against scoped shadows and explicit restrictions in mode %s', async (mode) => {
+  it('reserves run_code against scoped shadows and explicit restrictions in mode ptc', async () => {
+    const mode = 'ptc'
     const { ctx, systemPrompt } = await setup({ mode })
     const { scope, agent } = await mintAgentScope(ctx)
     const impostor = defineContentToolFixture({
@@ -371,7 +354,8 @@ describe('mode-aware wire contribution', () => {
     expect(result.content).toEqual([{ type: 'text', text: '(run_code completed with no output)' }])
   })
 
-  it.each(['ptc', 'both'] as const)('keeps run_code in the toolOrder universe without exposing it as a restriction target in mode %s', async (mode) => {
+  it('keeps run_code in the toolOrder universe without exposing it as a restriction target in mode ptc', async () => {
+    const mode = 'ptc'
     const { ctx, systemPrompt } = await setup({
       mode,
       toolOrder: [RUN_CODE_NAME, '<unlisted-tools>'],
@@ -380,13 +364,11 @@ describe('mode-aware wire contribution', () => {
     const { agent } = await mintAgentScope(ctx)
 
     const assembly = await systemPrompt.assemble({ scope: agent })
-    expect(assembly.tools.map(tool => tool.name)).toEqual(mode === 'ptc'
-      ? [RUN_CODE_NAME]
-      : [RUN_CODE_NAME, 'echo'])
+    expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
   })
 
-  it("never exposes run_code to programs, even under mode 'both' (no recursive dispatch path)", async () => {
-    const { ctx, runtime } = await setup({ mode: 'both' })
+  it('never exposes run_code to programs (no recursive dispatch path)', async () => {
+    const { ctx, runtime } = await setup({ mode: 'ptc' })
     registerEcho(ctx)
     runtime.behavior = (request) => {
       expect(request.bindings[0]!.errorClass).toEqual({
@@ -436,22 +418,8 @@ describe('mode-aware wire contribution', () => {
     expect(sdk?.text).toContain('class Tools(Protocol):')
     expect(sdk?.text).toContain('async def echo(self, args:')
     expect(sdk?.text).toContain('top-level `await`')
-  })
-
-  it("assembles under a python runtime in mode 'both' as well, SDK and schema together", async () => {
-    // `both` reaches the same wireSchemas/requirePtcRuntime/SDK-section code
-    // as `ptc`, so this pins the mode-by-language matrix rather than a
-    // separate path — including that the `wireSchemas` projection behind
-    // `assembly.tools` picks the Python flavor under `both` instead of hitting
-    // the flavor-table guard.
-    const { ctx, systemPrompt } = await setup({ mode: 'both', runtime: { language: 'python' } })
-    registerEcho(ctx)
-    const assembly = await systemPrompt.assemble()
-    expect(assembly.sections.find(section => section.name === 'tools:sdk')?.text).toContain('class Tools(Protocol):')
-    const runCodeSchema = assembly.tools.find(tool => tool.name === RUN_CODE_NAME)
-    expect(runCodeSchema?.description).toContain('Execute a Python program')
-    // `both` keeps the native tools alongside run_code; `ptc` does not.
-    expect(assembly.tools.map(tool => tool.name)).toContain('echo')
+    expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
+    expect(assembly.tools[0]?.description).toContain('Execute a Python program')
   })
 
   it('emits a TypeScript-flavored run_code schema under a typescript runtime', async () => {
@@ -1427,7 +1395,7 @@ describe('the run_code dispatch bridge', () => {
   })
 
   it('keeps sub-call contexts when run_code fails after the nested dispatch', async () => {
-    const { ctx, runtime } = await setup({ mode: 'both' })
+    const { ctx, runtime } = await setup({ mode: 'ptc' })
     registerEcho(ctx)
     ctx.on('tools/post-execute', (exec, _result, next): Promise<PostToolDecision> => {
       if (exec.name !== 'echo') return next()
@@ -2105,7 +2073,7 @@ describe('per-agent presentation', () => {
 
     // Two answers to "which form does the model see" is a contradiction, and
     // silently keeping either one would make the composition unreadable.
-    expect(() => scope.ctx.tools.presentAs('both'))
+    expect(() => scope.ctx.tools.presentAs('native'))
       .toThrow('conflicts with "ptc" already declared')
   })
 
@@ -2128,10 +2096,10 @@ describe('per-agent presentation', () => {
     const { ctx, systemPrompt } = await setup({ mode: 'native', runtime: false })
     registerEcho(ctx)
     const { scope, agent } = await mintAgentScope(ctx)
-    scope.ctx.tools.presentAs('both')
+    scope.ctx.tools.presentAs('ptc')
 
     await expect(systemPrompt.assemble({ scope: agent }))
-      .rejects.toThrow('mode "both" requires a PTC runtime')
+      .rejects.toThrow('mode "ptc" requires a PTC runtime')
   })
 })
 

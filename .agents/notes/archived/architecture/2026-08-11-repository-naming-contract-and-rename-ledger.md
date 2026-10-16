@@ -1,6 +1,7 @@
 # Agent Note: Repository naming contract and pre-release rename ledger
 
 Status: implemented
+Archived: 2026-10-17
 
 English | [中文](2026-08-11-repository-naming-contract-and-rename-ledger.zh.md)
 

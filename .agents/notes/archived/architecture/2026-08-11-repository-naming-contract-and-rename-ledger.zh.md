@@ -1,6 +1,7 @@
 # Agent Note: 仓库命名约定与预发布重命名清单
 
 Status: implemented
+Archived: 2026-10-17
 
 [English](2026-08-11-repository-naming-contract-and-rename-ledger.md) | 中文
 

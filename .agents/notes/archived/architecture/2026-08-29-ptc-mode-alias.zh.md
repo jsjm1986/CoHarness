@@ -1,6 +1,7 @@
 # Agent Note: 接受 PTC 作为工具呈现的规范名称
 
 Status: implemented
+Archived: 2026-10-17
 
 [English](2026-08-29-ptc-mode-alias.md) | 中文
 

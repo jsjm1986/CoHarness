@@ -1,6 +1,7 @@
 # Agent Note: Per-agent tool presentation, and the `ptc` preset
 
 Status: implemented
+Archived: 2026-10-17
 
 English | [中文](2026-08-05-per-agent-tool-presentation.zh.md)
 

@@ -4,7 +4,7 @@ Status: implemented
 
 [English](2026-07-26-ptc-chat-subcall-rows.md) | 中文
 
-> 范围：Web chat 视图如何渲染一个 `run_code` 轮次，即 PTC mode UI 栈的客户端侧部分，构建在[宿主侧基础](2026-07-26-ptc-dispatch-ui-foundation.zh.md)之上（携带完整内容的 `tool/ptc-dispatch`、必填的 `description` 参数）。本篇所依托的 slot 模型归 [toolview 溶解](../architecture/2026-07-23-toolview-dissolution.zh.md)所有。
+> 范围：Web chat 视图如何渲染一个 `run_code` 轮次，即 PTC mode UI 栈的客户端侧部分，构建在[宿主侧基础](../../archived/feature/2026-07-26-ptc-dispatch-ui-foundation.md)之上（携带完整内容的 `tool/ptc-dispatch`、必填的 `description` 参数）。本篇所依托的 slot 模型归 [toolview 溶解](../architecture/2026-07-23-toolview-dissolution.zh.md)所有。
 
 ## 问题
 

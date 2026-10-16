@@ -49,7 +49,6 @@ const EDITING_CORDIS_SKILL = fileURLToPath(new URL(
 const PTC_CONFIG = fileURLToPath(new URL('../ptc.cordis.yml', import.meta.url))
 const PTC_IMAGE_CONFIG = fileURLToPath(new URL('../ptc-image.cordis.yml', import.meta.url))
 const PTC_WORKSPACE_CONTEXT_CONFIG = fileURLToPath(new URL('../ptc-workspace-context.cordis.yml', import.meta.url))
-const BOTH_MODE_CONFIG = fileURLToPath(new URL('../both-mode.cordis.yml', import.meta.url))
 const WORKSPACE_CONTEXT_CONFIG = fileURLToPath(new URL('../agent-instructions.cordis.yml', import.meta.url))
 const ADVANCED_CONFIG = fileURLToPath(new URL('../advanced.cordis.yml', import.meta.url))
 const FS_CONFIG = fileURLToPath(new URL('../fs.cordis.yml', import.meta.url))
@@ -590,14 +589,6 @@ const SCENARIO_CASES: ScenarioCase[] = [
     name: 'ptc-workspace-context',
     hasModelTurn: true,
     configPath: PTC_WORKSPACE_CONTEXT_CONFIG,
-  },
-  // `both` owns its own expected prompt rather than sharing ptc-turn's:
-  // the two modes agree on every section except the run_code-only rule, which
-  // `both` must NOT state because its native calls do execute.
-  {
-    name: 'both-mode-turn',
-    hasModelTurn: true,
-    configPath: BOTH_MODE_CONFIG,
   },
   // Machine permission scenarios use an explicit deployment policy; there is
   // no session-scoped UI picker on the automation protocol.

@@ -1,6 +1,7 @@
 # Agent Note: PTC mode UI foundation — run_code description and native-parity dispatch logging
 
 Status: implemented
+Archived: 2026-10-17
 
 English | [中文](2026-07-26-ptc-dispatch-ui-foundation.zh.md)
 

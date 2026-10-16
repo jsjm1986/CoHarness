@@ -1,5 +1,5 @@
 ---
-description: "Agent-plane presentation selector: composes one agent's tools as PTC, native, or both"
+description: "Agent-plane presentation selector: composes one agent's tools as PTC or native"
 kind: "package-reference"
 ---
 
@@ -7,11 +7,11 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The row an [agent preset](../../preset/agent-presets/README.md) carries to say which form of its tools the model sees: `native` (every schema), `ptc` (only `run_code` plus a generated TypeScript SDK), or `both`; `code` remains an accepted compatibility alias.
+The row an [agent preset](../../preset/agent-presets/README.md) carries to say which form of its tools the model sees: `native` (every schema) or `ptc` (only `run_code` plus a generated TypeScript SDK).
 
 ## Summary
 
-Use `dsh-agent-tool-presentation` in an [agent preset](../../preset/agent-presets/README.md) to fix whether models see every native tool schema, only `run_code` with a generated SDK, or both forms. Each preset can choose independently, so native and PTC agents can share one process without sharing tool catalogs. Selecting `ptc` or `both` requires a compatible PTC runtime; a deployment without one rejects the preset at mount time before its first prompt. The `mode` field is required when this package is present, while omitting the package keeps the deployment default.
+Use `dsh-agent-tool-presentation` in an [agent preset](../../preset/agent-presets/README.md) to fix whether models see every native tool schema or only `run_code` with a generated SDK. Each preset can choose independently, so native and PTC agents can share one process without sharing tool catalogs. Selecting `ptc` requires a compatible PTC runtime; a deployment without one rejects the preset at mount time before its first prompt. The `mode` field is required when this package is present, while omitting the package keeps the deployment default.
 
 ## Table of Contents
 

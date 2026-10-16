@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/agent-tool-presentation/README.md
 /:
-  en: bec65c5696b06f64
+  en: 01dc876624b59496
   zh: 61495d48365178df
 /dsh-agent-tool-presentation:
-  en: f6615cbac6b53e23
-  zh: b120b984e9b1fa0d
+  en: 749aa521c79c561b
+  zh: 08ac1a91d481acae
 /dsh-agent-tool-presentation/summary:
-  en: aa73e921ddf92d72
-  zh: 474c415bd2e27c96
+  en: 20a20c3c8379a774
+  zh: 7cdda8da6ef29d1e
 /dsh-agent-tool-presentation/table-of-contents:
   en: 96386d6e896771a4
   zh: fb8868d66b348ac8

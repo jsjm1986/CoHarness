@@ -6,11 +6,11 @@
   en: fab100837d641f85
   zh: 61495d48365178df
 /dsh-tools:
-  en: 4eeb46552dda7fc5
-  zh: 91feaea3326fe043
+  en: 94a6620b61030c73
+  zh: bc94aa529044ce6f
 /dsh-tools/summary:
-  en: 19679f9c1953baaf
-  zh: 65dec1ccab4e532b
+  en: 8c0a34155997a980
+  zh: ae6031db472b33e3
 /dsh-tools/table-of-contents:
   en: 5a203bd4ee50a995
   zh: 0547dbfef2bc2437
@@ -18,8 +18,8 @@
   en: 865a7c4b99798db9
   zh: fbbeac098ef8d930
 /dsh-tools/service-toolruntime-ctx-key-tools/config:
-  en: 49d3e9eb20a5341e
-  zh: ea820ff4829ed5ff
+  en: 4d2cd8b8039aa8f2
+  zh: 0650ccec45a134a7
 /dsh-tools/service-toolruntime-ctx-key-tools/public-api:
   en: 0165751a44af8686
   zh: 86e8fa9f5f32aa84
@@ -48,8 +48,8 @@
   en: c2b88769f183e8c9
   zh: 7840bf3b6dab2bfa
 /dsh-tools/service-toolruntime-ctx-key-tools/ptc-mode:
-  en: ba0760906cb03e5e
-  zh: 6c553abf056f10b4
+  en: 901a1a1779900b34
+  zh: cc6e558e14fa5a3b
 /dsh-tools/service-toolruntime-ctx-key-tools/parallel-execution:
   en: 2761c50026965892
   zh: 3b6aee27f794d9ab
@@ -72,8 +72,8 @@
   en: eaefd7303f22977d
   zh: 9c425f9501128224
 /dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/what-the-model-sees:
-  en: ded2d4fca7d15cab
-  zh: befc42f701394a00
+  en: cdd3b6d08ae2720b
+  zh: b2e15c624bcc95ea
 /dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/what-the-model-sees/typescript-ptc-mode-sdk-instructions-with-bash:
   en: 3a8df15e4ae32f9e
   zh: fc4a800ba363e835
@@ -96,8 +96,8 @@
   en: f5d5f97a153f7c70
   zh: 3df78525d1db9020
 /dsh-tools/known-limitations-and-deferred-work:
-  en: b4360828806a37dc
-  zh: 335f0537bea31c4b
+  en: f4c41736f9e0e91a
+  zh: 2c92bff24f29cbe8
 /dsh-tools/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

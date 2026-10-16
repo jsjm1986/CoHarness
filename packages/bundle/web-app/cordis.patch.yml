@@ -31,7 +31,7 @@
 
 - id: tools
   config:
-    # TEMPORARY workaround: DSH_TOOLS_MODE (native|ptc|code|both) opts a whole dsh
+    # TEMPORARY workaround: DSH_TOOLS_MODE (native|ptc) opts a whole dsh
     # process into PTC mode while per-session tool-presentation selection is being
     # designed; unset keeps the schema default (native). Remove the env seam
     # once the web UI owns the choice per session.
