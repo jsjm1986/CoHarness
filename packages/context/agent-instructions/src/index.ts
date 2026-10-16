@@ -19,6 +19,7 @@ import type {} from '@deepseek-ai/dsh-session-projection'
 import type { ToolExecution, ToolExecutionResult, ToolExecutionToken } from '@deepseek-ai/dsh-tools'
 import { Config, resolveConfig, workspaceBaselineIdentity, type ResolvedConfig } from './config.ts'
 import { findProjectRoot, loadBaselineInstructionSet } from './files.ts'
+import { trimmedInstructionDigest } from './digest.ts'
 import {
   applyInstructionVersionUpdates,
   baselineInstructionState,
@@ -28,8 +29,7 @@ import {
   type InstructionVersionCache,
   type AgentInstructionSource,
 } from './state.ts'
-import { trimmedInstructionDigest } from './digest.ts'
-import { instructionScopeKey, scopeForDisplayPath, type AgentInstructionChange } from './render.ts'
+import { instructionCandidateGroup, instructionScopeKey, scopeForDisplayPath, type AgentInstructionChange } from './render.ts'
 
 export { Config, name }
 /** Services required by workspace instruction projection. */
@@ -142,6 +142,7 @@ export function apply(ctx: Context, config: Config): void {
       const instructions = await loadBaselineInstructionSet({
         cwd,
         dshHome: resolved.dshHome,
+        agentsHome: resolved.agentsHome,
         projectRootMarkers: resolved.projectRootMarkers,
         maxBytes: resolved.maxBytes,
         maxSourceBytes: resolved.maxSourceBytes,
@@ -153,19 +154,20 @@ export function apply(ctx: Context, config: Config): void {
       }, fileSystem)
       const baseline = baselineInstructionState(instructions?.included ?? [])
       const observedBaseline = baselineInstructionState(instructions?.observed ?? [])
-      const includedDigestsByDir = new Map<string, Set<string>>()
+      const includedDigestsByGroup = new Map<string, Set<string>>()
       for (const file of instructions?.included ?? []) {
-        const directory = scopeForDisplayPath(file.displayPath)
-        const digests = includedDigestsByDir.get(directory) ?? new Set<string>()
+        const group = instructionCandidateGroup(scopeForDisplayPath(file.displayPath))
+        const digests = includedDigestsByGroup.get(group) ?? new Set<string>()
         digests.add(trimmedInstructionDigest(file.content))
-        includedDigestsByDir.set(directory, digests)
+        includedDigestsByGroup.set(group, digests)
       }
       // A duplicate inherits its winner's budget omission. Only duplicates of
-      // retained content remain eligible for promotion during reconciliation.
+      // represented content remain eligible for promotion during reconciliation.
       const excludedScopes = new Set(observedBaseline.changes.keys())
       for (const scope of baseline.changes.keys()) excludedScopes.delete(scope)
       for (const file of instructions?.deduped ?? []) {
-        if (includedDigestsByDir.get(scopeForDisplayPath(file.displayPath))?.has(trimmedInstructionDigest(file.content))) {
+        const group = instructionCandidateGroup(scopeForDisplayPath(file.displayPath))
+        if (includedDigestsByGroup.get(group)?.has(trimmedInstructionDigest(file.content))) {
           excludedScopes.delete(instructionScopeKey(file.displayPath))
         }
       }

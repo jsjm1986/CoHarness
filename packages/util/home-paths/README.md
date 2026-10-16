@@ -11,7 +11,7 @@ Shared filesystem path helpers for DeepSeek Harness user data.
 
 ## Summary
 
-`@deepseek-ai/dsh-home-paths` lets package authors resolve one DeepSeek Harness data root and derive child paths from it. An explicit path wins over `$DSH_HOME`, which wins over `~/.dsh`; blank environment values are ignored. Its public helpers can render the root without revealing an absolute machine path, expand only bare or current-user tilde forms, and canonicalize watch targets whose final components do not yet exist. Use it as a direct library dependency, not through `cordis.yml`.
+`@deepseek-ai/dsh-home-paths` lets package authors resolve the DeepSeek Harness data root and the shared agent configuration root their consumers read. An explicit path wins over the environment variable, which wins over the default under the operating-system home; blank environment values are ignored. Its public helpers can render the root without revealing an absolute machine path, expand only bare or current-user tilde forms, and canonicalize watch targets whose final components do not yet exist. Use it as a direct library dependency, not through `cordis.yml`.
 
 ## Table of Contents
 
@@ -34,6 +34,10 @@ Shared filesystem path helpers for DeepSeek Harness user data.
 `DSH_HOME_DIR_NAME` owns the default user-data directory name: `.dsh`.
 
 `defaultDshHome()` returns the default DeepSeek Harness home by joining the operating-system home directory with `.dsh`, using Node's platform path rules.
+
+`resolveAgentsHome()` resolves the shared agent configuration root with the same precedence, blank-value handling, and tilde expansion: a configured path, `$DSH_AGENTS_HOME` (`AGENTS_HOME_ENV`), then `~/.agents` (`AGENTS_HOME_DIR_NAME`). The root is deliberately outside `$DSH_HOME` because other agent tools share it; `dsh-agent-instructions` reads its user-global `AGENTS.md`, and `dsh-skill-filesystem` scans its `skills/` directory. `defaultAgentsHome()` returns the default `~/.agents` root.
+
+`agentsHomeDisplay()` renders that root symbolically: `~/.agents` for the default, `$DSH_AGENTS_HOME` for any configured root. Neither display form leaks an absolute machine path.
 
 `expandHomePath()` expands `~`, `~/...`, and Windows-style `~\...` prefixes against the operating-system home directory. It leaves non-tilde paths and `~user/...` untouched.
 

@@ -26470,7 +26470,7 @@
         "packages/context/agent-instructions/src/state.ts#AgentInstructionSource"
       ],
       "sources": [
-        "packages/context/agent-instructions/src/state.ts:38"
+        "packages/context/agent-instructions/src/state.ts:40"
       ]
     },
     {
@@ -26812,7 +26812,7 @@
         "packages/context/agent-instructions/src/render.ts#AgentInstructionChange"
       ],
       "sources": [
-        "packages/context/agent-instructions/src/render.ts:47"
+        "packages/context/agent-instructions/src/render.ts:53"
       ]
     },
     {
