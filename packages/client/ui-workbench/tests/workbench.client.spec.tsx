@@ -8,6 +8,7 @@ import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
 import { WorkbenchSidebar } from '../src/client/components/WorkbenchSidebar.tsx'
+import { paneIdentity, ScopeTile } from '../src/client/components/ScopeTile.tsx'
 import { WorkbenchToolbar } from '../src/client/components/WorkbenchToolbar.tsx'
 import { createWorkbenchStore } from '../src/client/stores.ts'
 import { zh } from '../src/client/locales.ts'
@@ -871,5 +872,131 @@ describe('workbench sidebar panel', () => {
   it('shows the empty hint in single mode', () => {
     sidebar(props(), { mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })
     expect(screen.getByText('暂无分栏')).toBeTruthy()
+  })
+
+  it('renders a completed unfocused pane as a reply receipt', () => {
+    const p = props()
+    act(() => {
+      p.sessionsStore.update((draft) => {
+        draft.byId[SID_B]!.completed = true
+        draft.byId[SID_B]!.running = false
+        draft.byId[SID_B]!.updatedAt = Date.now() - 3_600_000
+      })
+    })
+    sidebar(p)
+    expect(screen.getAllByText('新回复').length).toBeGreaterThan(0)
+    expect(document.querySelector('[data-tone="reply"]')).toBeTruthy()
+  })
+})
+
+describe('pane identity and chrome branches', () => {
+  const stubs = () => ({
+    useSession: (() => undefined) as never, useProjection: () => undefined,
+    useInput: (() => undefined) as never, inputActions: {} as never, t,
+  })
+
+  it('resolves steward, project, and personal tones with their scope fallbacks', () => {
+    const p = props()
+    const workspaces = p.workspacesStore.getSnapshot()
+    const summary = p.sessionsStore.getSnapshot().byId[SID_A]!
+    const stewardPolicy: ProjectUiPolicySnapshot = { scope: 'project', theme: 'follow-user', revision: 0, accountPermissions: 'standard', stewardProjectIds: [9] }
+    expect(paneIdentity(clientSessionKey({ kind: 'project', projectId: 9 }, SID_A), summary, workspaces, stewardPolicy, '个人空间', '未命名对话').tone).toBe('steward')
+    expect(paneIdentity(clientSessionKey({ kind: 'project', projectId: 7 }, SID_A), { ...summary, workspaceName: 'Team' }, workspaces, stewardPolicy, '个人空间', '未命名对话').scopeName).toBe('Team')
+    const personalPolicy: ProjectUiPolicySnapshot = { scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'standard' }
+    const project = paneIdentity(clientSessionKey({ kind: 'project', projectId: 7 }, SID_A), summary, workspaces, personalPolicy, '个人空间', '未命名对话')
+    expect(project.tone).toBe('project')
+    expect(project.scopeName).toBe('')
+    expect(project.workspaceName).toBe('alpha')
+    const cwdOnly = paneIdentity('orphan' as SessionId, summary, { ...workspaces, items: [] }, personalPolicy, '个人空间', '未命名对话')
+    expect(cwdOnly.tone).toBe('personal')
+    expect(cwdOnly.workspaceName).toBe('alpha')
+    const stewardFallback = paneIdentity('orphan' as SessionId, summary, workspaces, { ...personalPolicy, steward: true }, '个人空间', '未命名对话')
+    expect(stewardFallback.tone).toBe('steward')
+    const personal = paneIdentity(clientSessionKey({ kind: 'personal' }, SID_A), summary, workspaces, personalPolicy, '个人空间', '未命名对话')
+    expect(personal.tone).toBe('personal')
+    expect(paneIdentity('missing' as SessionId, undefined, workspaces, personalPolicy, '个人空间', '未命名对话').title).toBe('未命名对话')
+  })
+
+  it('draws each scope tile tone, the empty-name dot, and merged classes', () => {
+    render(<>
+      <ScopeTile name="Personal" tone="personal" />
+      <ScopeTile name="Ops" tone="steward" />
+      <ScopeTile name="ops" tone="project" className="extra" />
+      <ScopeTile name="  " tone="project" />
+    </>)
+    expect(document.querySelectorAll('[data-scope-tone="personal"] svg').length).toBe(1)
+    expect(document.querySelectorAll('[data-scope-tone="steward"] svg').length).toBe(1)
+    expect(screen.getByText('O').closest('[data-scope-tone]')?.getAttribute('data-scope-tone')).toBe('project')
+    expect(document.querySelector('.extra')).toBeTruthy()
+    expect(screen.getAllByText('·').length).toBe(1)
+    cleanup()
+    vi.stubGlobal('Intl', { ...Intl, Segmenter: class { segment() { return { [Symbol.iterator]: () => ({ next: () => ({ done: true, value: undefined }) }) } } } })
+    render(<ScopeTile name="x" tone="project" />)
+    expect(screen.getByText('·')).toBeTruthy()
+  })
+
+  it('shows a receipt dot and routes files and solo menu actions', async () => {
+    const p = props()
+    act(() => {
+      p.sessionsStore.update((draft) => {
+        draft.byId[SID_B]!.completed = true
+        draft.byId[SID_B]!.running = false
+      })
+    })
+    const openFiles = vi.fn()
+    const onSolo = vi.fn()
+    render(<WorkbenchPaneHeader {...p} {...stubs()} sessionId={SID_B} active={false}
+      onFocus={vi.fn()} onClose={vi.fn()} maximized={false} onMaximize={vi.fn()}
+      replacePane={vi.fn()} movePane={vi.fn()}
+      filesAvailable={() => true} openFiles={openFiles} onSolo={onSolo} />)
+    expect(screen.getByText('新回复')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '更多面板操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Workspace 文件' }))
+    expect(openFiles).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: '更多面板操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '专注此面板' }))
+    expect(onSolo).toHaveBeenCalledOnce()
+    cleanup()
+    const q = props()
+    const exitSolo = vi.fn()
+    render(<WorkbenchPaneHeader {...q} {...stubs()} sessionId={SID_B} active={false}
+      onFocus={vi.fn()} onClose={vi.fn()} maximized={false} onMaximize={vi.fn()}
+      replacePane={vi.fn()} movePane={vi.fn()} solo={true} onSolo={exitSolo} />)
+    fireEvent.click(screen.getByRole('button', { name: '更多面板操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '退出专注' }))
+    expect(exitSolo).toHaveBeenCalledOnce()
+  })
+
+  it('renders the collapsed strip with focus or collapse callbacks and the collapsible action', () => {
+    const p = props()
+    const onFocus = vi.fn()
+    render(<WorkbenchPaneHeader {...p} {...stubs()} sessionId={SID_A} active={false} collapsed={true}
+      onFocus={onFocus} onClose={vi.fn()} maximized={false} onMaximize={vi.fn()}
+      replacePane={vi.fn()} movePane={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '展开面板' }))
+    expect(onFocus).toHaveBeenCalledOnce()
+    cleanup()
+    const q = props()
+    act(() => {
+      q.sessionsStore.update((draft) => {
+        draft.byId[SID_B]!.completed = true
+        draft.byId[SID_B]!.running = false
+      })
+    })
+    const onToggleCollapse = vi.fn()
+    render(<WorkbenchPaneHeader {...q} {...stubs()} sessionId={SID_B} active={false} collapsed={true} collapsible={true}
+      onFocus={vi.fn()} onClose={vi.fn()} maximized={false} onMaximize={vi.fn()}
+      onToggleCollapse={onToggleCollapse}
+      replacePane={vi.fn()} movePane={vi.fn()} />)
+    expect(document.querySelector('[data-collapsed]')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '展开面板' }))
+    expect(onToggleCollapse).toHaveBeenCalledOnce()
+    cleanup()
+    render(<WorkbenchPaneHeader {...props()} {...stubs()} sessionId={SID_A} active={false}
+      onFocus={vi.fn()} onClose={vi.fn()} maximized={false} onMaximize={vi.fn()}
+      collapsible={true} onToggleCollapse={onToggleCollapse}
+      replacePane={vi.fn()} movePane={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '收起面板' }))
+    expect(onToggleCollapse).toHaveBeenCalledTimes(2)
   })
 })
