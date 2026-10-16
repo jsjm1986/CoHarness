@@ -384,7 +384,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
         resolveEnded()
       })
     })
-    const input = page.getByRole('textbox', { name: 'Message the agent' })
+    const input = page.getByRole('textbox', { name: 'Message COHARNESS' })
     await input.fill(FOLLOWUP)
     await input.press('Enter')
     await expect.poll(
@@ -466,7 +466,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       .click()
     await openSubagentCatalog(page, '3 subagents')
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
-    await page.getByRole('textbox', { name: 'Message the agent' }).waitFor()
+    await page.getByRole('textbox', { name: 'Message COHARNESS' }).waitFor()
     const forkResponse = page.waitForResponse(response =>
       new URL(response.url()).pathname === '/api/session.fork')
     await page.getByRole('button', { name: 'Branch into a new conversation' }).last().click()

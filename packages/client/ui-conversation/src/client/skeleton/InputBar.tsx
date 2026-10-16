@@ -13,6 +13,7 @@ import {
   IconBrowseOutline16, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
   IconSendOutline16, IconStopFill16,
   IconWarningOutline16, ReferenceIcon, Toast, Tooltip, useMediaQuery,
+  FileTypeIcon, classifyFileType,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -104,8 +105,12 @@ function DocumentRail({
             role="listitem"
             data-document-id={document.id}
             data-document-status={document.status}
+            data-doc-kind={classifyFileType(document.name)}
             title={failed ? document.error : document.name}
           >
+            <span className={css.documentBadge} aria-hidden>
+              <FileTypeIcon path={document.name} size={18} />
+            </span>
             <div className={css.documentBody}>
               <span className={css.documentName}>{document.name}</span>
               <span className={css.documentStatus}>{status}</span>
@@ -131,7 +136,7 @@ function DocumentRail({
             <Tooltip label={t('document.remove')} side="top" delayMs={500}>
               <button
                 type="button"
-                className={css.documentAction}
+                className={clsx(css.documentAction, css.documentActionRemove)}
                 aria-label={t('document.removeNamed', { name: document.name })}
                 onMouseDown={keepFocus}
                 onClick={() => { onRemove(document.id) }}

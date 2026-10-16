@@ -565,6 +565,21 @@ export function ConversationRoot(props: ConversationRootProps) {
     return () => { observer.disconnect(); if (frame !== undefined) cancelAnimationFrame(frame) }
   }, [workbench])
   const drag = useRef<{ pointerId: number; index: number; x: number; width: number; total: number; ratios: number[] } | null>(null)
+  // Esc mid-drag abandons the gesture: the live ratios roll back to the
+  // snapshot taken at pointerdown and the captured pointer's remaining moves
+  // no-op against the cleared drag record.
+  useEffect(() => {
+    if (draggingSeparator === null) return
+    const onEscape = (event: globalThis.KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      const snapshot = drag.current
+      drag.current = null
+      setDraggingSeparator(null)
+      if (snapshot !== null) props.onViewportRatios(snapshot.ratios)
+    }
+    window.addEventListener('keydown', onEscape, true)
+    return () => { window.removeEventListener('keydown', onEscape, true) }
+  }, [draggingSeparator, props.onViewportRatios])
   const compact = props.compact ?? false
   const tabbed = compact || (width !== undefined && width < 728) || soloTabbed
   const activePane = viewport.activePaneId ?? viewport.paneIds[0]

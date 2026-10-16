@@ -2,3 +2,37 @@
   min-width: 0;
   padding: 4px 12px 0;
 }
+
+/* Composer-local halo: while a file drag is over the window the card wears
+   the accept tint, so the drop target is unmistakable — the full-viewport
+   DropOverlay announces the gesture, this ring owns the destination. The
+   element mounts inside the composer card (position: relative) and never
+   sees a pointer. */
+.cardHalo {
+  position: absolute;
+  inset: -3px;
+  z-index: 1;
+  border: 1.5px solid var(--dsw-alias-state-business-primary);
+  border-radius: 25px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent),
+    0 0 28px color-mix(in srgb, var(--dsw-alias-state-business-primary) 22%, transparent);
+  pointer-events: none;
+  animation: dsh-composer-halo-in 180ms var(--dsw-motion-ease-out-expo, ease-out) both;
+}
+
+.cardHalo[data-blocked] {
+  border-color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 5%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent);
+}
+
+@keyframes dsh-composer-halo-in {
+  from { opacity: 0; transform: scale(0.99); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardHalo {
+    animation: none;
+  }
+}

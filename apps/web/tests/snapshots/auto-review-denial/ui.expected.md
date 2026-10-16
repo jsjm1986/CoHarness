@@ -31,7 +31,7 @@
 - button "Bash Rejected by Auto review":
   - img
   - text: Bash Rejected by Auto review
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":
@@ -93,7 +93,7 @@
 - button "Inspect":
   - img
   - text: Inspect
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":
@@ -166,7 +166,7 @@
     - tab "Schema"
     - tab "Timing"
   - tabpanel "Result": "AutoReviewDeniedError: AUTO_REVIEW_DENIED Error: Auto review rejected tool \"bash\"; its body was not executed"
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

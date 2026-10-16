@@ -90,10 +90,13 @@ export function ComposerAttachments({
   return (
     <>
       {dragActive && (
-        <DropOverlay
-          disabled={!canAcceptDrop}
-          labels={dropOverlayLabels(t, canAcceptDrop, dropLimits)}
-        />
+        <>
+          <div className={css.cardHalo} data-blocked={canAcceptDrop ? undefined : true} aria-hidden />
+          <DropOverlay
+            disabled={!canAcceptDrop}
+            labels={dropOverlayLabels(t, canAcceptDrop, dropLimits)}
+          />
+        </>
       )}
       {railItems.length > 0 && (
         <div className={css.rail}>

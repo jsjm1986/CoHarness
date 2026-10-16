@@ -133,24 +133,51 @@
   padding: 0 var(--dsw-space-3);
 }
 
-/* Attachment chips (beautifului PromptBar chip, MIT): h-26 radius 6 on the
-   inset surface with an elevation hairline, pop-in on mount. */
+/* Attachment tiles (beautifului PromptBar chip grammar, MIT): a compact
+   two-line card with a type-tinted badge instead of the bare text chip. The
+   inset surface and elevation hairline stay; pop-in on mount. */
 .documentItem {
   display: flex;
   align-items: center;
-  gap: var(--dsw-space-1);
+  gap: var(--dsw-space-2);
   min-width: 0;
   max-width: min(100%, 280px);
   box-sizing: border-box;
-  height: 26px;
-  padding: 0 6px 0 var(--dsw-space-2);
+  min-height: 48px;
+  padding: var(--dsw-space-2) 8px var(--dsw-space-2) var(--dsw-space-2);
   border: 0;
-  border-radius: var(--dsw-radius-chip);
+  border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-inset);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
   box-shadow: var(--dsw-elevation-stroke);
   color: var(--dsw-alias-label-secondary);
+  --dsh-doc-tint: var(--dsw-alias-bg-layer-2);
   animation: chip-pop-in var(--dsw-motion-duration-pop, 200ms) var(--dsw-motion-ease-out-strong, ease) backwards;
+}
+
+/* Type tint mirrors FileTypeIcon's per-kind palette so the badge wash always
+   matches the glyph it frames. */
+.documentItem[data-doc-kind='code'],
+.documentItem[data-doc-kind='html'],
+.documentItem[data-doc-kind='markdown'] { --dsh-doc-tint: var(--dsw-static-deepseek-500); }
+.documentItem[data-doc-kind='excel'] { --dsh-doc-tint: var(--dsw-static-green-500); }
+.documentItem[data-doc-kind='folder'] { --dsh-doc-tint: var(--dsw-static-amber-400); }
+.documentItem[data-doc-kind='image'],
+.documentItem[data-doc-kind='video'] { --dsh-doc-tint: rgb(139 118 246); }
+.documentItem[data-doc-kind='pdf'] { --dsh-doc-tint: var(--dsw-static-red-600); }
+.documentItem[data-doc-kind='ppt'] { --dsh-doc-tint: var(--dsw-static-amber-500); }
+.documentItem[data-doc-kind='word'] { --dsh-doc-tint: var(--dsw-static-deepseek-450); }
+.documentItem[data-doc-kind='other'] { --dsh-doc-tint: var(--dsw-static-neutral-bluish-300); }
+
+.documentBadge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--dsw-radius-sm);
+  background: color-mix(in srgb, var(--dsh-doc-tint) 12%, transparent);
 }
 
 @keyframes chip-pop-in {
@@ -237,6 +264,12 @@
 
 .documentAction:hover {
   background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+/* Removal is the chip's only destructive action; its hover answers in the
+   error hue so the destructive read arrives before the click, not after. */
+.documentActionRemove:hover {
+  color: var(--dsw-alias-state-error-primary);
 }
 
 /* Floating overlay anchor (menu / popupSelect shell): entries position

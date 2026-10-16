@@ -1,5 +1,6 @@
 /** Space identity tile shared by pane headers, the sidebar roster, and the picker. */
 import { parseClientSessionKey, workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
+import { IconShieldOutline16, IconUserOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   ProjectUiPolicySnapshot, SessionId, SessionListState, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -50,8 +51,10 @@ export function paneIdentity(
   return { title: summary?.displayTitle ?? untitled, scopeName, workspaceName, tone }
 }
 
-/** Render a 20px tinted space tile with the scope's initial.
- * @param props.name - scope display name; the first character renders.
+/** Render a 20px tinted space tile with the scope's mark: the personal and
+ * steward tiles carry the same user/shield icons the scope switcher draws;
+ * only project tiles fall back to the name's initial.
+ * @param props.name - scope display name; the first character renders on project tiles.
  * @param props.tone - personal / project / steward tint.
  * @param props.className - extra placement class.
  * @returns the tile element (decorative; pair with visible scope text). */
@@ -66,7 +69,9 @@ export function ScopeTile({ name, tone, className }: {
     : (new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(trimmed)[Symbol.iterator]().next().value?.segment ?? '·').toUpperCase()
   return (
     <span className={className === undefined ? css.scopeTile : `${css.scopeTile} ${className}`} data-scope-tone={tone} aria-hidden="true">
-      {glyph}
+      {tone === 'personal' ? <IconUserOutline16 size={12} />
+        : tone === 'steward' ? <IconShieldOutline16 size={12} />
+          : glyph}
     </span>
   )
 }

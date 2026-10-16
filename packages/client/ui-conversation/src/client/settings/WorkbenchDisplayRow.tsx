@@ -1,4 +1,5 @@
 /** Workbench-sidebar display preferences: a stacked variant of the general display row. */
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationKey } from '../locales.ts'
 import { CHAT_FONT_SIZE_RANGE } from '../../submission-settings.ts'
@@ -33,6 +34,30 @@ export function WorkbenchDisplayRow({ useDisplaySettings, setWidth, setFullWidth
   const fontLabel: ConversationKey = 'settings.display.fontSize'
   const widthLabel: ConversationKey = 'settings.display.width'
   const fontSize = snapshot.chatFontSize
+  const segmentedRef = useRef<HTMLSpanElement | null>(null)
+  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null)
+  // offsetLeft/offsetWidth read against the segmented box's padding edge —
+  // the same origin an absolutely positioned thumb uses, so no conversion.
+  // Re-measured after every render (labels settle, fonts swap, the active
+  // segment's bold weight widens it) and whenever the box resizes.
+  useLayoutEffect(() => {
+    const host = segmentedRef.current
+    if (host === null) return
+    const measure = (): void => {
+      const on = host.querySelector<HTMLElement>('[data-on]')
+      const next = on === null || on.offsetWidth === 0 ? null : { left: on.offsetLeft, width: on.offsetWidth }
+      setThumb(current => (
+        current === next
+        || (current !== null && next !== null && current.left === next.left && current.width === next.width)
+          ? current
+          : next
+      ))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(host)
+    return () => { observer.disconnect() }
+  })
   return (
     <div className={css.controls}>
       {notice === undefined ? null : (
@@ -66,7 +91,14 @@ export function WorkbenchDisplayRow({ useDisplaySettings, setWidth, setFullWidth
       </div>
       <div className={css.control}>
         <span className={css.controlLabel}>{t(widthLabel)}</span>
-        <span className={css.segmented} role="group" aria-label={t(widthLabel)}>
+        <span className={css.segmented} role="group" aria-label={t(widthLabel)} ref={segmentedRef}>
+          {thumb !== null && (
+            <span
+              className={css.segmentThumb}
+              style={{ transform: `translateX(${thumb.left}px)`, width: thumb.width }}
+              aria-hidden
+            />
+          )}
           {WIDTH_PRESETS.map(preset => (
             <button
               key={preset.key}

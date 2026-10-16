@@ -35,7 +35,7 @@
   - text: Bash Print alpha to stdout
 - paragraph: partial
 - status: Deep diving...
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

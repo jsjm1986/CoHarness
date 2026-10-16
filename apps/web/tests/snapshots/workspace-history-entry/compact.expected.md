@@ -22,7 +22,7 @@
   - button:
     - img
 - group "Message time and speed": "{{clock}}"
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

@@ -500,10 +500,10 @@ describe('ConversationRoot resident composer', () => {
       .toBe('询问维护中枢，或描述要检查的对象…')
     const ordinary = mount(conversationSnapshot(), undefined, undefined, { projectPolicy: policy() })
     expect((ordinary.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
-      .toBe('给智能体发消息')
+      .toBe('给COHARNESS发送消息')
     const personal = mount(conversationSnapshot())
     expect((personal.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
-      .toBe('给智能体发消息')
+      .toBe('给COHARNESS发送消息')
   })
 
   it('follows the pane session\'s runtime, not the page scope', () => {
@@ -520,13 +520,13 @@ describe('ConversationRoot resident composer', () => {
       { projectPolicy: policy, sessionId: encoded('[9,"s1"]') },
     )
     expect((otherScopePane.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
-      .toBe('给智能体发消息')
+      .toBe('给COHARNESS发送消息')
     const personalPane = mount(
       conversationSnapshot(), undefined, undefined,
       { projectPolicy: policy, sessionId: encoded('[null,"s1"]') },
     )
     expect((personalPane.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
-      .toBe('给智能体发消息')
+      .toBe('给COHARNESS发送消息')
     const { steward: _scopeFlag, ...offScopePolicy } = policy
     const stewardElsewhere = mount(
       conversationSnapshot(), undefined, undefined,

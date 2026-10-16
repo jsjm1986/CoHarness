@@ -62,6 +62,9 @@
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-bg-layer-2);
 }
+/* Personal is the round blue user tile — the same mark the scope switcher
+   draws (tileRound + tileBlue) so the pane reads its space at a glance. */
+.scopeTile[data-scope-tone='personal'] { border-radius: 50%; corner-shape: round; color: var(--dsw-static-blue-600); background: var(--dsw-static-blue-100); }
 .scopeTile[data-scope-tone='project'] { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-accent-tint); }
 .scopeTile[data-scope-tone='steward'] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
 
@@ -136,7 +139,11 @@
 /* Tabbed mode keeps one row: the pane strip is a flex item that scrolls
    sideways rather than wrapping into a second band. */
 .toolbar[data-tabbed] { min-height: 40px; }
-.tabs { display: flex; flex: 1; min-width: 0; gap: var(--dsw-space-1); overflow-x: auto; scrollbar-width: none; --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
+/* Horizontal edge fades stand in for the hidden scrollbar: a clipped tab
+   reads as continuing past the edge instead of ending on a hard clip. The
+   8px bands stay inside a tab button's own 10px side padding, so end tabs
+   keep their glyphs fully opaque at either scroll stop. */
+.tabs { display: flex; flex: 1; min-width: 0; gap: var(--dsw-space-1); overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs button { display: flex; align-items: center; gap: var(--dsw-space-2); flex: 0 0 auto; max-width: 220px; overflow: hidden; padding: 8px 10px; border: 0; background: transparent; color: var(--dsw-alias-label-secondary); white-space: nowrap; cursor: pointer; transition: color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)), box-shadow var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .tabs button:hover { color: var(--dsw-alias-label-primary); }

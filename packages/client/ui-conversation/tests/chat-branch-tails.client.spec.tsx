@@ -239,7 +239,11 @@ describe('MessageItem arms', () => {
     const done = screen.getByRole('button', { name: '复制成功' })
     fireEvent.click(done)
     expect(writeText).toHaveBeenCalledTimes(1)
-    act(() => { vi.advanceTimersByTime(1000) })
+    // The confirmation dwell is 2.5s: still settled just inside the window,
+    // reverted once it elapses.
+    act(() => { vi.advanceTimersByTime(2499) })
+    expect(screen.getByRole('button', { name: '复制成功' })).toBeTruthy()
+    act(() => { vi.advanceTimersByTime(1) })
     expect(screen.getByRole('button', { name: '复制' })).toBeTruthy()
   })
 

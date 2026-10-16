@@ -37,17 +37,12 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
           </div>
         </span>
         <svg
-          class="lucide lucide-panel-left lucide-sidebar panelIcon"
-          data-content="1bd2ace7"
-          fill="none"
+          class="panelIcon"
+          data-content="489e47d5"
+          fill="currentColor"
           height="20"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          viewBox="0 0 24 24"
+          viewBox="0 0 256 256"
           width="20"
-          xmlns="http://www.w3.org/2000/svg"
         />
       </button>
     </div>
@@ -184,17 +179,12 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
         type="button"
       >
         <svg
-          class="lucide lucide-panel-left lucide-sidebar panelIcon"
-          data-content="1bd2ace7"
-          fill="none"
+          class="panelIcon"
+          data-content="489e47d5"
+          fill="currentColor"
           height="16"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          viewBox="0 0 24 24"
+          viewBox="0 0 256 256"
           width="16"
-          xmlns="http://www.w3.org/2000/svg"
         />
       </button>
     </div>
@@ -336,17 +326,12 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
         type="button"
       >
         <svg
-          class="lucide lucide-panel-left lucide-sidebar panelIcon"
-          data-content="1bd2ace7"
-          fill="none"
+          class="panelIcon"
+          data-content="489e47d5"
+          fill="currentColor"
           height="16"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          viewBox="0 0 24 24"
+          viewBox="0 0 256 256"
           width="16"
-          xmlns="http://www.w3.org/2000/svg"
         />
       </button>
     </div>
