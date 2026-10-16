@@ -1,6 +1,6 @@
 # Agent Note: Project activity feed — a human-facing record of member input
 
-Status: proposed
+Status: implemented
 
 English | [中文](2026-10-17-project-activity-feed.zh.md)
 
@@ -30,13 +30,13 @@ The one durable gap is the `callId` on the claim row: `question/requested` carri
 
 ### Server surface
 
-`GET /account/api/projects/:projectId/activity?cursor=<keyset>&limit=<n>` on the Gateway, beside `/account/api/conversations`. The handler checks project membership, applies the `listConversations` visibility clause to the owning root conversation, and returns a normalized `ProjectActivityItem` list. Browsers call it with the session cookie like every other collaboration read.
+`GET /account/api/activity?before=<keyset>&limit=<n>` on the Gateway, beside `/account/api/conversations`. The handler requires the caller's resolved account scope to be a project, applies the `listConversations` visibility clause to the owning root conversation, and returns a normalized `ProjectActivityItem` list. Browsers call it with the session cookie like every other collaboration read.
 
 ### Client surface
 
-- `packages/client/ui-project-activity` registers a `sidebarRightTabs` tab type plus `sidebar.right.pane.tab` and `sidebar.right.pane.tab.title` slots, mirroring `ui-sidebar-terminal`. The row ships `disabled: true` in the web-app composition and is enabled by `PROJECT_RUNTIME_PATCH`, so personal spaces stay clean and project spaces get the tab by default.
-- The panel fetches via a package-private `fetch` client (`credentials: 'same-origin'`), resolving the project id from the collaboration context like `conversationProject` does.
-- Jumping uses two behaviors: a conversation name focuses or opens the pane (`conversationViewport.replaceActive`); an entry calls a new `ConversationViewport.reveal(sessionId, seq)` — the viewport focuses the pane and publishes a reveal request; the owning `ChatView` subscribes, locates the turn containing `seq`, loads history through the existing `loadHistoryUntil`, and scrolls to the row. This is the only new cross-plugin capability.
+- `packages/client/ui-project-activity` registers a `sidebarRightTabs` tab type plus `sidebar.right.pane.tab` and `sidebar.right.pane.tab.title` slots, mirroring `ui-sidebar-terminal`. The web-app composition keeps the row enabled; the apply body subscribes to `projectUiPolicy` and mounts or disposes the tab definition on each scope transition, so the guide entry and any open tab appear only in project scope — there is no static per-space patch.
+- The panel fetches via a package-private `fetch` client (`credentials: 'same-origin'`); the route resolves the project from the caller's active account scope, so no project id travels on the wire.
+- Jumping uses two behaviors: a conversation name focuses or opens the pane (`conversationViewport.replaceActive`); an entry calls the new `ConversationViewport.reveal(sessionId, seq)` — the viewport focuses the pane and publishes a reveal request; the owning `ChatView` subscribes through the inject `hooks` face, locates the turn containing `seq`, loads history through the existing `loadHistoryUntil`, and scrolls to the row. Feed rows carry wire session ids; the plugin translates them to the runtime-scoped client identity through `sessions.keyFor` before calling either method. This is the only new cross-plugin capability.
 
 ### Presentation (reviewed HTML mock)
 
@@ -55,8 +55,8 @@ L1 hairline list: day → conversation → entry rows separated by 0.5px `border
 - Historical question answers display responder + selected answer without a question link until claims start carrying `call_id`.
 - The reveal mechanism benefits any future deep-link feature.
 
-## Required verification
+## Testing
 
-- Postgres tests for `listActivity`: message attribution, answer join and question extraction, visibility exclusion (private, non-member, steward gate), keyset pagination ordering, `call_id NULL` fallback.
-- REAL-composition test for the client plugin and a keyless web scenario for the panel (grouping, filter, jump affordance, empty state).
-- `reveal` covered by a client test asserting focus + scroll request publication; ChatView consumption through the existing navigation contract tests.
+- `packages/client/ui-project-activity/tests/apply.client.spec.ts` covers scope-gated tab registration/disposal, grouping, member filtering, pagination, and reveal's `sessions.keyFor` translation.
+- `apps/web/tests/project-activity.e2e.ts` boots the real web composition over a mocked Gateway, seeds a conversation, renders the feed (message, question, chosen answer), and clicks a row to land on the logged event.
+- `listActivity` SQL semantics (visibility clause, answer join, keyset order) run in the Gateway Postgres lane on CI.

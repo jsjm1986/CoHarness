@@ -1,6 +1,6 @@
 # Agent Note: 项目动态记录——面向人的成员输入视图
 
-Status: proposed
+Status: implemented
 
 [English](2026-10-17-project-activity-feed.md) | 中文
 
@@ -30,13 +30,13 @@ Status: proposed
 
 ### 服务端
 
-Gateway 新增 `GET /account/api/projects/:projectId/activity?cursor=<keyset>&limit=<n>`，与 `/account/api/conversations` 并列。处理器校验项目成员身份，对所属根会话应用 `listConversations` 的可见性条件，返回规范化的 `ProjectActivityItem` 列表。浏览器与其他协作读操作一样携带会话 cookie 调用。
+Gateway 新增 `GET /account/api/activity?before=<keyset>&limit=<n>`，与 `/account/api/conversations` 并列。处理器要求调用者的账户 scope 已解析为项目，对所属根会话应用 `listConversations` 的可见性条件，返回规范化的 `ProjectActivityItem` 列表。浏览器与其他协作读操作一样携带会话 cookie 调用。
 
 ### 客户端
 
-- `packages/client/ui-project-activity` 注册 `sidebarRightTabs` 标签类型以及 `sidebar.right.pane.tab`、`sidebar.right.pane.tab.title` 插槽，与 `ui-sidebar-terminal` 同形。该客户端行在 web-app 组合中以 `disabled: true` 装载，再由 `PROJECT_RUNTIME_PATCH` 启用——个人空间默认无此标签，项目空间默认出现。
-- 面板通过包内私有 `fetch` 客户端（`credentials: 'same-origin'`）拉取，参照 `conversationProject` 从协作上下文解析 projectId。
-- 跳转分两级：点会话名聚焦或打开窗格（`conversationViewport.replaceActive`）；点条目调用新增的 `ConversationViewport.reveal(sessionId, seq)`——viewport 聚焦窗格并发布 reveal 请求；所属 `ChatView` 订阅后定位包含该 `seq` 的 turn，经既有 `loadHistoryUntil` 加载历史并滚动到对应行。这是本次唯一新增的跨插件能力。
+- `packages/client/ui-project-activity` 注册 `sidebarRightTabs` 标签类型以及 `sidebar.right.pane.tab`、`sidebar.right.pane.tab.title` 插槽，与 `ui-sidebar-terminal` 同形。web-app 组合中的行保持启用；apply 体订阅 `projectUiPolicy`，在每次 scope 切换时挂载或释放标签定义——Guide 入口与已打开的标签只在项目空间出现，没有按空间划分的静态补丁。
+- 面板通过包内私有 `fetch` 客户端（`credentials: 'same-origin'`）拉取；路由从调用者的活动账户 scope 解析项目，projectId 不上线路。
+- 跳转分两级：点会话名聚焦或打开窗格（`conversationViewport.replaceActive`）；点条目调用新增的 `ConversationViewport.reveal(sessionId, seq)`——viewport 聚焦窗格并发布 reveal 请求；所属 `ChatView` 经 inject `hooks` 面订阅，定位包含该 `seq` 的 turn，经既有 `loadHistoryUntil` 加载历史并滚动到对应行。Feed 行携带线路 sessionId；插件先经 `sessions.keyFor` 翻译为 runtime 作用域的客户端标识，再调用这两个方法。这是本次唯一新增的跨插件能力。
 
 ### 呈现（已评审 HTML 稿）
 
@@ -55,8 +55,8 @@ L1 细线列表：日 → 会话 → 条目，行间 0.5px `border-l1` 分隔；
 - 历史提问回答在认领携带 `call_id` 之前显示回答者 + 选中答案，不带提问关联。
 - reveal 机制惠及未来任何深链能力。
 
-## 需要的验证
+## 测试
 
-- `listActivity` 的 Postgres 测试：消息署名、回答连接与提问提取、可见性排除（私有、非成员、steward 门禁）、keyset 分页顺序、`call_id NULL` 兜底。
-- 客户端插件的 REAL-composition 测试与面板的 keyless Web 场景（分组、筛选、跳转 affordance、空态）。
-- `reveal` 由客户端测试覆盖（聚焦 + 滚动请求发布）；ChatView 的消费走既有 navigation 契约测试。
+- `packages/client/ui-project-activity/tests/apply.client.spec.ts` 覆盖 scope 门控的标签注册/释放、分组、成员筛选、分页，以及 reveal 的 `sessions.keyFor` 翻译。
+- `apps/web/tests/project-activity.e2e.ts` 在 mock Gateway 上启动真实 Web 组合，种子化一个会话，渲染 feed（消息、提问、选中回答），并点击行落到对应日志事件。
+- `listActivity` 的 SQL 语义（可见性条件、回答连接、keyset 顺序）由 CI 的 Gateway Postgres 通道运行。
