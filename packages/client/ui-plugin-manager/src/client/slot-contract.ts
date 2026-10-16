@@ -2,7 +2,8 @@
  * The slots the Plugins page declares for other plugins. Three carry a
  * plugin's own configuration: the official plugins listed in the page's
  * Configuration group, one bundle's configuration on its page, and one row's
- * configuration opened from that row. Three more take contributions to any detail page —
+ * configuration opened from that row. One takes additional add-plugin paths
+ * for the header's add menu. Three more take contributions to any detail page —
  * its head actions, the badges beside its title, and the sections under its
  * own content — from a plugin that has something to say about bundles, rows,
  * or official plugins it does not own. A registrant merges this contract with
@@ -73,8 +74,16 @@ export interface PluginActivationOwnerProps {
   readonly onOpenDetails: () => void
 }
 
+/** Add-plugin menu actions, independent of any selected bundle or Session. */
+export interface PluginAddActionsProps {
+  /** Close the add-plugin menu before starting the contributed action. */
+  readonly onDismiss: () => void
+}
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /** Additional MenuItemButton rows after installation: 72px high, with a title and a description capped at two lines. */
+    'plugins.add.actions': { kind: 'list'; scope: 'root'; owner: PluginAddActionsProps }
     /** Optional guidance after the user enables a bundle from the list, keyed by npm package name. */
     'plugins.bundle.activation': { kind: 'keyed'; scope: 'root'; owner: PluginActivationOwnerProps }
     /**
