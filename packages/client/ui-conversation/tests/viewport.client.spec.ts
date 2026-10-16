@@ -27,7 +27,7 @@ function harness() {
     },
     clear,
     setAdditionalStaged: (ids: readonly SessionId[]) => { staged.push([...ids]) },
-  } as unknown as ISessions
+  } as Partial<ISessions> as ISessions
   return { list, sessions, opened, staged, clear }
 }
 
