@@ -19,6 +19,7 @@ import type { PendingInteractionStatus } from './pending.ts'
 // the 'title' projection key this manager projects into list rows (and any
 // useProjection('title') consumer reads). Zero value imports by construction.
 import type {} from '@deepseek-ai/dsh-session-title/client'
+import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import { Notifier } from './notifier.ts'
 import { ProjectionValueStore } from './projection-store.ts'
 import { hasConversationContent, Session } from './session.ts'
@@ -347,6 +348,15 @@ export class SessionManager {
       }
     }
     return undefined
+  }
+
+  /**
+   * Read cached projection values for a Session that may exist only in a loaded subagent catalog.
+   * @param sessionId - Session whose control or history baseline supplied projections.
+   * @returns current values, or undefined before any projection store exists.
+   */
+  projectionValues(sessionId: SessionId): Readonly<Partial<SessionProjectionMap>> | undefined {
+    return this.projectionStores.get(sessionId)?.values()
   }
 
   // ---- Instance management ----

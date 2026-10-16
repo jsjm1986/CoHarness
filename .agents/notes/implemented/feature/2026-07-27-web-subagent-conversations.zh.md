@@ -45,6 +45,8 @@ Figma 中的 [subagent 列表](https://www.figma.com/design/jRBBK7zBgcszdVWQ0Fh5
 
 选择一行后，系统会先记录其确切地址，再打开常驻客户端 `Session`。历史分页、事件 fold、工具渲染意图、title 与实时 mux 归并都会复用普通对话机制。面包屑导航使用目录 label，只会沿 `origin: 'subagent'` 行的父链接逐级回溯，包含第一个普通 owner，并让普通 fork 保持单层。从已寻址 subagent 创建 fork 时，会生成具有直接源谱系的普通 fork，并将其附加到最近拥有 Workspace 的祖先。目录是一棵 ARIA 树，支持懒加载式 ArrowRight／ArrowLeft 展开与折叠、线性 ArrowUp／ArrowDown 导航、Home／End、Escape 以及焦点恢复。
 
+同一个页头行还可以把 child 作为 `dsh-resource://subagentchat/session/<childSessionId>?parent=<parentSessionId>&mode=<mode>&host=<hostSessionId>` 在右侧 Sidebar 打开，其中 `host` 是拥有该 tab 的右侧栏所在 Session，使按 Session 进行的资源校验能够接受该地址。打开时优先使用独立分栏；无法分栏时回退到当前分栏。tab 所在 Session 会在 occurrence 生命周期内保留 host，刷新直接 parent 目录，并保留 child 的 `SessionReference` 直到 tab 记录关闭；tab 通过 `sidebar.chat.conversation` 渲染共享 `conversation.content` Component Factory，把局部 View 固定为 Chat 并省略主 Conversation 的页头，因此主对话与嵌入式对话共用一套组装，而不共享布局界面。
+
 one-shot 行始终会用文案替代输入框，说明执行记录为只读。可继续行仅在 `parentAvailable` 为 false 且 child 未在运行时如此；parent 离线但仍在运行的 child 保留普通输入框，并禁用其输入区和 Send 操作，让独立的 Stop 保持可达，停止后只读替代恢复。parent 在线时，即使 child 正在运行，Enter 和 Send 也会准入另一个 FIFO 轮次，而独立的 Stop 经由 `subagent.interrupt` 路由（[中断约定](2026-08-06-continuable-subagent-interrupt.zh.md)）。提示词失败会通过普通错误行为保留草稿。
 
 已寻址 child 视图不提供绑定到 agent 的辅助控件。具体而言，模型选择器与 `/model` contribution 不会调用普通 `session.models` 或 `session.selectModel`；Host 也会拒绝任何意外调用，而不是在直接 parent 继续执行路径之外激活持久化 child 历史。

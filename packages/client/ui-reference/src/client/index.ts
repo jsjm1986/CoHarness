@@ -85,10 +85,12 @@ export function apply(ctx: ClientContext): void {
       const now = Date.now()
       const home = retained.hostDescription?.getSnapshot()?.home
       const listed = sessions.list.getSnapshot().byId
+      // Resolver candidates carry original Host IDs; `byId` is keyed by
+      // runtime-qualified browser keys, so key them into this session's runtime.
+      const runtime = sessions.runtimeIdentityFor?.(session.sessionId)
       const sessionRows = sessionItems.map((candidate) => {
-        const summary = listed[candidate.sessionId]
-        const child = summary?.origin === 'subagent'
-          && sessions.subagentAddress(candidate.sessionId)?.parentSessionId === session.sessionId
+        const summary = listed[sessions.keyFor?.(candidate.sessionId, runtime) ?? candidate.sessionId]
+        const child = summary?.origin === 'subagent' && summary.parentId === session.sessionId
         return {
           child,
           row: sessionCandidate(

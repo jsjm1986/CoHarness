@@ -13,6 +13,8 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
@@ -73,9 +75,9 @@
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
-- button "Add images or documents":
+- button "Add images or documents" [disabled]:
   - img
-- button "Choose from Documents":
+- button "Choose from Documents" [disabled]:
   - img
 - button "Commands":
   - img

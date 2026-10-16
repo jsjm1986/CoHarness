@@ -575,7 +575,8 @@
     "b121cee14635b00f7891217013e4682493cf96f676710be60722fdf8b862aea3": 1
   },
   "packages/client/ui-conversation/tests/apply-inject.client.spec.tsx": {
-    "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 8
+    "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 7,
+    "261cd24d1d5267f03778f141fa6dbc61d88d2a66e870fb41ac55f483b975376a": 1
   },
   "packages/client/ui-conversation/tests/chat-branch-tails.client.spec.tsx": {
     "56c7f5efeca0875ba0cf966491542bbf2cc8506d4fb4f07a473a31a32d58a0ef": 1
@@ -795,7 +796,16 @@
     "f891c1ec4197820931632ec3c78287d7b70e3cd46ed8bcdc8283c1891731647c": 1
   },
   "packages/client/ui-subagent/tests/conversation-ui.client.spec.tsx": {
-    "66544a147ba56981cffcfcd4ec57abf14ed35139b096f3e2a6d3c97d98c2e5e2": 1
+    "cf63494e096ba0372772ff56ba75f6e5da1b2fe92f84fc3f6b4dead2969000be": 1
+  },
+  "packages/client/ui-subagent/tests/sidebar-chat.client.spec.tsx": {
+    "25f168747e976f83cdfa89e4f0502de2b323df9b33b3cdb9059f6511508c6aaf": 1,
+    "73bb663a58735e107fee8140a575e49d980aafb9ae48e90ec2494b7e5a73c998": 1,
+    "9fe5203965e5ff62ab3b914bbcbb5229a5146bf9b12839d99684742579b0f30f": 1,
+    "a58931bb6027c2afb0735d7de494a0a0cf98ad085fbd31093fd6d6937f2b6fc6": 1,
+    "a9e9564a2950306216cb4c1fdbacaddf597939e343c577e2cdb84bc3ef4537d5": 1,
+    "d6e336631cdae41950386c5aee7b2fb252fd368bed75070e520875a4b4799bfb": 1,
+    "ffb048df32b10bac91f37b55c618701aa0f9d24c5b5504a3d3f953dc8b7cc7fb": 1
   },
   "packages/client/ui-theme/tests/apply.client.spec.ts": {
     "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 1
@@ -1372,7 +1382,8 @@
     "463dd61bf42165d77fd5d1d62cf689b2d41531528254cd4865f01f4fa1d96092": 1,
     "cd87b1aaa1c6654187092e950e8e3e31dc3246c914a553802e91d7ffac43758f": 1,
     "d470f11b9753557d36e52dcc1e2ce1157944fe476c3cc0d430cf9575d7bc5305": 1,
-    "d513598748767304a49e495ac89be92ab699e22deb9d57e25d3cc8b1d6d19b29": 2
+    "d513598748767304a49e495ac89be92ab699e22deb9d57e25d3cc8b1d6d19b29": 2,
+    "e9ed591c66dcf1bd6eac4a95f1cd595cc54f32eb88c0dc366aa81d1c2c28f947": 1
   },
   "packages/extensions/cordis-host-runner/src/guard.ts": {
     "36691dc989a80820dbf2664e1a53e808478d5a8ac12e074c2ea57f912e53e448": 1,

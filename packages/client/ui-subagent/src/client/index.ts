@@ -3,10 +3,12 @@ import type {
   ClientContext, SessionId, SubagentAddress,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { SubagentHeaderLineage, type SubagentCatalogInjected } from './SubagentHeaderLineage.tsx'
 import {
   SubagentReadOnlyComposer, type SubagentReadOnlyMatch,
 } from './SubagentReadOnlyComposer.tsx'
+import { registerSidebarChat, subagentChatAddress } from './sidebar-chat/index.tsx'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { en, NS, zh, type SubagentKey } from './locales.ts'
 
@@ -24,8 +26,8 @@ export type {
   SubagentReadOnlyComposerProps, SubagentReadOnlyMatch,
 } from './SubagentReadOnlyComposer.tsx'
 
-/** Required services for conversation slots and session navigation. */
-export const inject = ['sessions', 'slots', 'locale']
+/** Required services for conversation slots, session navigation, and the Sidebar chat. */
+export const inject = ['sessions', 'slots', 'locale', 'sidebarRight', 'sidebarRightTabs']
 
 /** Claim the composer for one-shot history or an unavailable continuation owner. */
 function selectReadOnlySubagent(owner: ComposerChainProps): SubagentReadOnlyMatch | null {
@@ -45,10 +47,17 @@ function selectReadOnlySubagent(owner: ComposerChainProps): SubagentReadOnlyMatc
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-subagent: dictionaries')
+  registerSidebarChat(ctx, ctx.locale.bind(NS))
   const sessions = ctx.sessions
-  const catalogActions = (_parentSessionId: SessionId): SubagentCatalogInjected => ({
+  const catalogActions = (hostSessionId: SessionId): SubagentCatalogInjected => ({
     openChild(address: SubagentAddress) {
       sessions.openSubagent(address)
+    },
+    openChildAside(address: SubagentAddress) {
+      ctx.sidebarRight.openResource(subagentChatAddress(address, hostSessionId), {
+        kind: 'subagentchat',
+        preferNewPane: true,
+      })
     },
     refresh(parentSessionId: SessionId) {
       void sessions.refreshSubagents(parentSessionId)

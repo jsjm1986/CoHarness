@@ -1065,8 +1065,11 @@ export class SessionRuntime implements ISessions {
         const child = subagentsByParent[address.parentSessionId]?.entries
           .find(entry => entry.kind === 'child' && entry.id === childId)
         if (child?.kind !== 'child') break
-        const displayTitle = child.label ?? childId
         const summary = byId[childId]
+        const projectionValues = summary?.projectionValues ?? this.manager.projectionValues(childId)
+        const projectedTitle = projectionValues?.title
+        const title = typeof projectedTitle === 'string' && projectedTitle !== '' ? projectedTitle : undefined
+        const displayTitle = title ?? child.label ?? childId
         if (summary === undefined) {
           byId[childId] = {
             id: childId,
@@ -1076,9 +1079,15 @@ export class SessionRuntime implements ISessions {
             running: child.activity === 'running',
             blank: false,
             updatedAt: 0,
+            ...(projectionValues === undefined ? {} : { projectionValues }),
+            ...(title === undefined ? {} : { title }),
           }
-        } else if (summary.displayTitle !== displayTitle) {
-          byId[childId] = { ...summary, displayTitle }
+        } else if (summary.displayTitle !== displayTitle || summary.projectionValues !== projectionValues) {
+          byId[childId] = {
+            ...summary,
+            displayTitle,
+            ...(projectionValues === undefined ? {} : { projectionValues }),
+          }
         }
         const parent = byId[address.parentSessionId]
         if (parent !== undefined && parent.origin !== 'subagent') break
