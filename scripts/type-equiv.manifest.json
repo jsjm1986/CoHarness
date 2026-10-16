@@ -215,7 +215,7 @@
     {
       "doc": "docs/subsystems/goal.md",
       "symbol": "GoalActivationChanged",
-      "source": "packages/goal/goal/src/domain.ts"
+      "source": "packages/goal/goal/src/types.ts"
     },
     {
       "doc": "docs/subsystems/goal.md",

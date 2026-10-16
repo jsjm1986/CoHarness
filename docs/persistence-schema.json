@@ -24854,7 +24854,7 @@
         "packages/goal/goal/src/types.ts#GoalRef"
       ],
       "sources": [
-        "packages/goal/goal/src/types.ts:19"
+        "packages/goal/goal/src/types.ts:23"
       ]
     },
     {
@@ -25915,7 +25915,7 @@
         "packages/experimental/agent-team/src/types.ts:33",
         "packages/experimental/agent-team/src/types.ts:9",
         "packages/feedback/message-feedback/src/types.ts:14",
-        "packages/goal/goal/src/types.ts:16",
+        "packages/goal/goal/src/types.ts:20",
         "packages/host/apiproxy/src/api/rpc.ts:19",
         "packages/interaction/commands/src/brand.ts:31",
         "packages/interaction/user-approval/src/types.ts:17",
@@ -26389,7 +26389,7 @@
         "packages/goal/goal/src/types.ts#GoalSnapshot"
       ],
       "sources": [
-        "packages/goal/goal/src/types.ts:59"
+        "packages/goal/goal/src/types.ts:63"
       ]
     },
     {
@@ -26839,7 +26839,7 @@
         "packages/goal/goal/src/types.ts#GoalBlockReason"
       ],
       "sources": [
-        "packages/goal/goal/src/types.ts:51"
+        "packages/goal/goal/src/types.ts:55"
       ]
     },
     {
@@ -27786,7 +27786,7 @@
         "packages/goal/goal/src/types.ts#GoalPhase"
       ],
       "sources": [
-        "packages/goal/goal/src/types.ts:44"
+        "packages/goal/goal/src/types.ts:48"
       ]
     },
     {
