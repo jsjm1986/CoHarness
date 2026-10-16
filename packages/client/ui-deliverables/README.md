@@ -52,7 +52,7 @@ No companion is published: the UI projects durable events and authorized read re
 
 #### What the model sees
 
-A static system-prompt section asks the model to name primary outputs, show supporting images inline with `![alt](<path>)` and offer hover-previewable image links with `[label](<path>)`, keep Markdown file destinations in angle brackets, and link every mention of an existing file to its working-directory-relative or absolute path. Link labels use filenames or concise aliases, with optional line locations. Legacy inline-code references still resolve exact paths and unique basenames. The `present` tool independently owns the delivery schema and result text.
+A static system-prompt section asks the model to prefer showing primary results in the final response, reserve `present` for separate file deliverables — especially Office documents, spreadsheets, and slide decks — with at most four files per call, show supporting images inline with `![alt](<path>)` and offer hover-previewable image links with `[label](<path>)` plus a companion file link for clients that cannot render images inline, keep Markdown file destinations in angle brackets, and link every mention of an existing file to its working-directory-relative or absolute path. Link labels use filenames or concise aliases, with optional line locations. Legacy inline-code references still resolve exact paths and unique basenames.
 
 #### Token effect
 
