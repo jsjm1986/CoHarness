@@ -53,7 +53,7 @@ The retained prompt names the JSON-quoted objective and `round/maxGoalRounds`, t
 <a id="idle-checkpoint"></a>
 ## Idle checkpoint
 
-At whole-agent idle, durable goal phase and revision are authoritative. An active, armed goal with capacity reserves its next round; completion, pause, blocking, and edits suppress continuation. The driver does not classify the preceding activity by correlating the goal message with `turn/end`, so provider errors and token limits are not prompt-level goal outcomes.
+At whole-agent idle, durable goal phase and revision are authoritative. An active, armed goal with capacity reserves its next round once the agent's progressing descendants settle when the subagent service is loaded; completion, pause, blocking, and edits suppress continuation. The driver does not classify the preceding activity by correlating the goal message with `turn/end`, so provider errors and token limits are not prompt-level goal outcomes.
 
 <a id="lifecycle-and-durability"></a>
 ## Lifecycle and durability
