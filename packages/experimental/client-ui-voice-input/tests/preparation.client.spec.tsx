@@ -9,6 +9,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { PreparationCard, VoicePluginsItem, VoicePreparation } from '../src/client/PreparationCard.tsx'
 import type { VoiceInputProps } from '../src/client/VoiceInput.tsx'
 import type { SpeechReadiness } from '../src/client/readiness.ts'
+import { Recording } from '../src/client/audio.ts'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(() => { cleanup(); vi.useRealTimers() })
@@ -120,6 +121,8 @@ it('persists settings and reports disconnection in the detail card', async () =>
   } })
   const configure = vi.fn<VoiceInputProps['configure']>(async () => {})
   const props = { useSpeechReadiness: bindSnapshotSelector(store), configure, t,
+    useMicrophoneDevice: bindSnapshotSelector(createSnapshotStore({ id: '', label: '' })),
+    selectMicrophone: vi.fn(), createRecording: () => new Recording(() => {}),
     prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}) }
   const view = render(<VoicePreparation {...props} />)
   fireEvent.change(screen.getByLabelText(zh.provider), { target: { value: 'cloud' } })
@@ -188,6 +191,8 @@ it('answers only its one-liner for the Plugins page summary, the full surface on
     providers: [{ id, name: 'SenseVoiceSmall', location: 'host-local', languages: ['auto'], preparation: { phase: 'ready' } }],
   } })
   const props = { useSpeechReadiness: bindSnapshotSelector(store), configure: vi.fn(async () => {}),
+    useMicrophoneDevice: bindSnapshotSelector(createSnapshotStore({ id: '', label: '' })),
+    selectMicrophone: vi.fn(), createRecording: () => new Recording(() => {}),
     prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}), t, view: 'summary' as const,
     ...globalStandard }
   render(<VoicePluginsItem {...props} />)

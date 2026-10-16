@@ -11,6 +11,7 @@ const policy = loadWebTestPolicy(root)
 const exact = [...policy.smokeScenarios, 'goal-bar.e2e.ts'].sort()
 const expectedSerial = [
   'hmr-live.e2e.ts',
+  'client-plugin-live.e2e.ts',
   'cordis-tool-round.e2e.ts',
   'agent-preset-selection.e2e.ts',
   'composer-model-mobile.e2e.ts',

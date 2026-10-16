@@ -42,6 +42,7 @@
     "@deepseek-ai/dsh-client-web": "workspace:*",
     "@deepseek-ai/dsh-cmdline": "workspace:*",
     "@deepseek-ai/dsh-credentials": "workspace:*",
+    "@deepseek-ai/dsh-experimental-speech-to-text": "workspace:*",
     "@deepseek-ai/dsh-gateway-execution": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-pwsh-local": "workspace:*",

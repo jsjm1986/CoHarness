@@ -1,0 +1,23 @@
+- text: COHARNESS Preview
+- button "Choose workspace":
+  - img
+  - text: workspace
+  - img
+- button "Standard mode":
+  - img
+  - text: Standard mode
+  - img
+- textbox "Describe what you want to build": "Use the bash tool to run exactly: echo WEB_E2E_OK. Then reply with the single word DONE and stop."
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Start recording":
+  - img
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message"

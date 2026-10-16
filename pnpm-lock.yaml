@@ -687,6 +687,9 @@ importers:
       '@deepseek-ai/dsh-credentials':
         specifier: workspace:*
         version: link:../../packages/credentials/credentials
+      '@deepseek-ai/dsh-experimental-speech-to-text':
+        specifier: workspace:*
+        version: link:../../packages/experimental/speech-to-text
       '@deepseek-ai/dsh-gateway-execution':
         specifier: workspace:*
         version: link:../../packages/context/gateway-execution

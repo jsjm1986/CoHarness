@@ -125,6 +125,7 @@
     "turn-tail-actions.e2e.ts": "conversation",
     "user-terminal.e2e.ts": "conversation",
     "vite-entry.e2e.ts": "shell",
+    "voice-input.e2e.ts": "conversation",
     "web-search-round.e2e.ts": "conversation",
     "webhook.e2e.ts": "conversation",
     "workbench.e2e.ts": "workbench",
@@ -214,9 +215,14 @@
     ],
     "apps/web/tests/webhook.overlay.yml": [
       "webhook.e2e.ts"
+    ],
+    "snapshots/web/fresh-round-trip/session.v3.jsonl": [
+      "voice-input.e2e.ts"
     ]
   },
   "packages": {
+    "api/terminal-controller": "conversation",
+    "boot/plugin-manager": "settings",
     "client/hmr": "shell",
     "client/locale": "all",
     "client/shortcuts": [
@@ -265,6 +271,7 @@
     "client/ui-permission-presets": "settings",
     "client/ui-plan": "conversation",
     "client/ui-plugin-manager": "settings",
+    "client/ui-plugin-market": "settings",
     "client/ui-primitives": "all",
     "client/ui-reference": "conversation",
     "client/ui-renderer": "all",
@@ -285,6 +292,7 @@
     ],
     "client/ui-sidebar-browser": "documents",
     "client/ui-sidebar-right": "all",
+    "client/ui-sidebar-terminal": "conversation",
     "client/ui-skill": "conversation",
     "client/ui-slots": "all",
     "client/ui-subagent": "subagent",
@@ -313,6 +321,7 @@
     "experimental/client-ui-agent-team": "subagent",
     "experimental/client-ui-voice-input": "conversation",
     "goal/goal": "conversation",
+    "host/plugin-inventory": "settings",
     "interaction/permission-presets": "settings",
     "llm/token-meter": "conversation",
     "plan/plan-mode": "conversation",
@@ -323,10 +332,6 @@
     "session/session-turn-outline": "workbench",
     "subagent/subagent": "subagent",
     "todo/tool-todo": "conversation",
-    "client/ui-sidebar-terminal": "conversation",
-    "api/terminal-controller": "conversation",
-    "boot/plugin-manager": "settings",
-    "host/plugin-inventory": "settings",
     "webhook/webhook": "all",
     "webhook/webhook-github": "conversation"
   },

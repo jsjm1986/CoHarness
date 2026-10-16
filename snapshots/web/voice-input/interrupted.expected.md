@@ -1,0 +1,16 @@
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"'
+- button "Cancel":
+  - img
+- status "Recording was interrupted. Please try again."
+- button "Record again":
+  - img
+- button "Select model, current DeepSeek-V4-Flash"
+- button "6% of context used": 6%
+- button "Send message" [disabled]
