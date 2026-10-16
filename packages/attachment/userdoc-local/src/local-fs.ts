@@ -89,7 +89,6 @@ export class SharedRead<T> {
         reject(abortError(signal))
       }
       signal.addEventListener('abort', onAbort, { once: true })
-      if (signal.aborted) onAbort()
       void this.promise.then((value) => {
         signal.removeEventListener('abort', onAbort)
         release(false)
@@ -194,7 +193,7 @@ export class LocalUserDocFs {
       const task = Promise.resolve().then(() => purgeDueDocuments(this.root)).catch(() => {
         // A later sweep retries after a transient filesystem failure.
       }).then(() => undefined).finally(() => {
-        if (this.trashSweepTask === task) this.trashSweepTask = undefined
+        this.trashSweepTask = undefined
       })
       this.trashSweepTask = task
     }, this.sweepIntervalMs)
@@ -231,7 +230,7 @@ export class LocalUserDocFs {
       // A prewarm can race a temporarily unavailable legacy root. Do not pin
       // the rejected promise forever; the next request must be able to retry
       // initialization after the filesystem recovers.
-      if (this.ready === ready) this.ready = undefined
+      this.ready = undefined
       throw error
     })
     this.ready = ready
