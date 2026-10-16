@@ -84,16 +84,7 @@ export interface PackageManifest {
   main?: string
   types?: string
   bin?: string | Record<string, string>
-  exports?: Record<
-    string,
-    | string
-    | {
-      types?: string
-      default?: string
-    }
-    | null
-    | undefined
-  >
+  exports?: Record<string, ExportTarget | undefined>
   files?: string[]
   icon?: string
   publishConfig?: { access?: string }
@@ -106,6 +97,9 @@ export interface PackageManifest {
     bundle?: DshBundleManifest
   }
 }
+
+/** Node package export target: a path, a fallback list, a conditional map, or an exclusion. */
+export type ExportTarget = string | readonly ExportTarget[] | { readonly [condition: string]: ExportTarget | undefined } | null
 
 /** One workspace manifest and its repo-relative path. */
 export interface WorkspaceManifest {
@@ -198,7 +192,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-client-ui-sidebar-documentpreview': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
   // Workbench loads its PDF renderer and spreadsheet parser/renderer on demand, including licensed Worker assets.
-  '@deepseek-ai/dsh-client-ui-workbench': ['lib/client.excel.js', 'lib/client.LazyExcelBody.js', 'lib/client.pdf.js'],
+  '@deepseek-ai/dsh-client-ui-workbench': ['lib/client.excel.js', 'lib/client.frontmatter-fields.js', 'lib/client.LazyExcelBody.js', 'lib/client.pdf.js'],
   // TODO(alpha.2): restore 'lib/apply-injections.js' when the worker-page
   // index-injection interpreter is ported with its first consumer.
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],
@@ -269,7 +263,7 @@ function sameStringList(actual: readonly string[] | undefined, expected: readonl
 }
 
 /**
- * Compute canonical publication patterns, including the declared icon and exported locale JSON resources.
+ * Compute canonical publication patterns, including declared and exported icon paths and exported locale JSON resources.
  * @param manifest - workspace package manifest.
  * @returns the icon and deduplicated locale targets followed by runtime and declaration payloads.
  */
@@ -286,8 +280,15 @@ export function expectedDshPackageFiles(manifest: PackageManifest): readonly str
     ...bundleFiles,
     ...(manifest.name ? packageFileExtras[manifest.name] ?? [] : []),
   ]
-  return [
+  const targets = (value: ExportTarget | undefined): string[] => typeof value === 'string' ? [value]
+    : typeof value === 'object' && value !== null ? Object.values(value).flatMap(targets) : []
+  const icons = [
     ...typeof manifest.icon === 'string' ? [manifest.icon.replace(/^\.\//u, '')] : [],
+    ...Object.entries(manifest.exports ?? {}).filter(([key]) => /^\.\/(?:.+\/)?icon$/u.test(key))
+      .flatMap(([, target]) => targets(target)).filter(icon => icon.startsWith('./')).map(icon => icon.slice(2)),
+  ]
+  return [
+    ...new Set(icons),
     ...[...localeFiles].sort(),
     'lib/index.js',
     // Packages with an invariant export publish its runtime as a separate
@@ -330,6 +331,15 @@ export function expectedDshPackageFiles(manifest: PackageManifest): readonly str
   ]
 }
 
+/** Fields of a conditional export; scalar and list targets have no named conditions. */
+function exportFields(value: ExportTarget | undefined): { readonly [condition: string]: ExportTarget | undefined } | undefined {
+  return typeof value !== 'object' || value === null || isExportList(value) ? undefined : value
+}
+
+function isExportList(value: ExportTarget): value is readonly ExportTarget[] {
+  return Array.isArray(value)
+}
+
 /** Whether one conditional export exactly names the generated runtime and declaration pair. */
 function hasExportPair(
   manifest: PackageManifest,
@@ -337,19 +347,16 @@ function hasExportPair(
   types: string,
   runtime: string,
 ): boolean {
-  const entry = manifest.exports?.[subpath]
-  return typeof entry === 'object'
-    && entry !== null
-    && entry.types === types
-    && entry.default === runtime
+  const entry = exportFields(manifest.exports?.[subpath])
+  return entry?.types === types && entry.default === runtime
 }
 
 /** Runtime target of an export entry: conditional `default`, or the bare-string shorthand. */
 function exportDefault(manifest: PackageManifest, subpath: string): string | undefined {
   const entry = manifest.exports?.[subpath]
   if (typeof entry === 'string') return entry
-  if (typeof entry === 'object' && entry !== null) return entry.default
-  return undefined
+  const target = exportFields(entry)?.default
+  return typeof target === 'string' ? target : undefined
 }
 
 /** Whether any export's runtime default points into the tsc-emitted lib/types tree. */
@@ -516,16 +523,14 @@ export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): st
     if (manifest.types !== 'lib/types/index.d.ts') {
       errors.push(`${label}: package.json must set "types": "lib/types/index.d.ts"`)
     }
-    const rootExport = manifest.exports?.['.']
-    const rootEntry = typeof rootExport === 'object' && rootExport !== null ? rootExport : undefined
+    const rootEntry = exportFields(manifest.exports?.['.'])
     if (rootEntry?.types !== './lib/types/index.d.ts') {
       errors.push(`${label}: package.json exports["."].types must be "./lib/types/index.d.ts"`)
     }
     if (rootEntry?.default !== './lib/index.js') {
       errors.push(`${label}: package.json exports["."].default must be "./lib/index.js"`)
     }
-    const invariantRaw = manifest.exports?.['./invariant']
-    const invariantExport = typeof invariantRaw === 'object' && invariantRaw !== null ? invariantRaw : undefined
+    const invariantExport = exportFields(manifest.exports?.['./invariant'])
     if (invariantExport?.types !== undefined && invariantExport.types !== './lib/types/invariant.d.ts') {
       errors.push(`${label}: package.json exports["./invariant"].types must be "./lib/types/invariant.d.ts"`)
     }

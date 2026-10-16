@@ -139,12 +139,12 @@ Append-only, prefix-stable, replacing, or independent behavior, including the ex
 
 各字段先独立回退，再按页面规则格式化技术名称；回退优先经过现有 locale 语言链：
 
-- 标题：locale `meta.title` → `package.json.name` → 完整 Cordis 插件名。
-- 描述：locale `meta.description` → `package.json.description` → 不显示描述。
+- 标题：locale `meta.title` → 包根插件的 `package.json.name` → 完整 Cordis 插件名。
+- 描述：locale `meta.description` → 包根插件的 `package.json.description` → 不显示描述。
 
-导出 `<包名>/locale/en.json` 供 locale 查询；需要包字段回退或声明图标时，开放 `<包名>/package.json`。
+导出 `<包名>/locale/en.json` 供 locale 查询；需要包字段回退或声明图标时，开放 `<包名>/package.json`。`<包名>/search` 这样的子路径插件不是包，从不读取 `package.json`，即使导出了 `./search/package.json`；它用 `./search/locale/*.json` 提供文本，用 `./search/icon` 提供图片。
 
-要在组合包卡片、详情和组件行显示图片，在该导出清单顶层设置 `"icon": "./icon.svg"`，并将图片加入 `files`。路径相对于声明清单所在目录，独立导出的插件清单也遵循此规则。支持不超过 256 KiB 的 SVG、PNG、JPEG（`.jpg`/`.jpeg`）和 WebP 文件。绝对路径、URL、目录外路径，以及解析到目录外的符号链接均被拒绝。图片不需要单独导出，且必须自包含；SVG 作为图片渲染，不作为内联 HTML。Host 返回 data URL，不激活插件。声明无效或文件不可读时，显示元信息诊断并保留有效文本；图片缺失或无法解码时使用面板的默认插画。
+要在组合包卡片、详情和组件行显示图片，包根插件在导出清单顶层设置 `"icon": "./icon.svg"`，或在省略该字段时导出 `./icon`。子路径插件导出自己的图标，例如 `"./search/icon": "./search.svg"`。将每张图片加入 `files`。清单 `icon` 相对于清单所在目录；绝对路径、URL、目录外路径，以及解析到目录外的符号链接均被拒绝。导出的图标像 locale 资源一样经 Node exports 解析，且必须位于所属包内。支持不超过 256 KiB 的 SVG、PNG、JPEG（`.jpg`/`.jpeg`）和 WebP 文件。图片必须自包含；SVG 作为图片渲染，不作为内联 HTML。Host 返回 data URL，不激活插件。声明无效或文件不可读时，显示元信息诊断并保留有效文本，不再尝试导出的图标；图片缺失或无法解码时使用面板的默认插画。
 
 已安装 bundle 的卡片和详情、组件列表与配置详情、设置中的插件清单都展示这些元信息，包括禁用插件和预设内插件。读取时不激活插件。
 

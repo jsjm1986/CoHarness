@@ -137,12 +137,12 @@ Keep language files together in `locale/`, with `en.json` as the discovery entry
 
 Fields fall back independently before view-specific name formatting, using the existing locale language chain first:
 
-- Title: locale `meta.title` → `package.json.name` → complete Cordis plugin name.
-- Description: locale `meta.description` → `package.json.description` → no description.
+- Title: locale `meta.title` → `package.json.name` for a package-root plugin → complete Cordis plugin name.
+- Description: locale `meta.description` → `package.json.description` for a package-root plugin → no description.
 
-Export `<package name>/locale/en.json` for locale lookup; expose `<package name>/package.json` for package-field fallback or an icon declaration.
+Export `<package name>/locale/en.json` for locale lookup; expose `<package name>/package.json` for package-field fallback or an icon declaration. A subpath plugin such as `<package name>/search` is not a package and never reads a `package.json`, even one exported at `./search/package.json`; it uses `./search/locale/*.json` for text and `./search/icon` for its image.
 
-For an image on bundle cards, details, and component rows, set top-level `"icon": "./icon.svg"` in that exported manifest and include the image in `files`. The path is relative to the declaring manifest's directory, including for independently exported plugin manifests. SVG, PNG, JPEG (`.jpg`/`.jpeg`), and WebP files are supported up to 256 KiB. Absolute paths, URLs, paths outside that directory, and symlinks resolving outside it are rejected. Images need no separate export and must be self-contained; SVG is rendered as an image, not inline HTML. The Host returns a data URL without activating the plugin. Invalid declarations or unreadable files produce a metadata diagnostic while retaining valid text; missing or undecodable images use the panel's default artwork.
+For an image on bundle cards, details, and component rows, a package-root plugin sets top-level `"icon": "./icon.svg"` in its exported manifest, or exports `./icon` when that field is omitted. A subpath plugin exports its own icon, such as `"./search/icon": "./search.svg"`. Include each image in `files`. A manifest `icon` is relative to the manifest's directory; absolute paths, URLs, paths outside that directory, and symlinks resolving outside it are rejected. An exported icon resolves through Node exports like locale resources and must remain inside its package. SVG, PNG, JPEG (`.jpg`/`.jpeg`), and WebP files are supported up to 256 KiB. Images must be self-contained; SVG is rendered as an image, not inline HTML. The Host returns a data URL without activating the plugin. Invalid declarations or unreadable files produce a metadata diagnostic while retaining valid text, without trying the export; missing or undecodable images use the panel's default artwork.
 
 Installed bundle cards and details, component lists and configuration details, and Settings' plugin inventory display this metadata, including disabled and preset plugins. Reads do not activate plugins.
 

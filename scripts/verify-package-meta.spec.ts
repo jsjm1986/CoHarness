@@ -44,49 +44,89 @@ it('does not require locale resources for exported package name and description'
   expect(packageMetaProblems(root)).toEqual([])
 })
 
-it.each([undefined, ['art'], ['art/*.svg'], ['./art/icon.svg']])('accepts a published package icon without locale resources: %j', (files) => {
-  manifest({ icon: './art/icon.svg', files })
-  file('art/icon.svg', '<svg/>')
+it.each(['legacy.svg', './legacy.svg'])('accepts a manifest-only icon %s', (icon) => {
+  manifest({ icon, files: ['legacy.svg'] })
+  file('legacy.svg', 'legacy')
   expect(packageMetaProblems(root)).toEqual([])
 })
 
-it.each([{ files: ['lib'] }, { files: ['art', '!art/icon.svg'] }])('rejects an icon omitted from package publication: %j', ({ files }) => {
-  manifest({ icon: './art/icon.svg', files })
-  file('art/icon.svg', '<svg/>')
-  expect(packageMetaProblems(root).join('\n')).toContain('files must include art/icon.svg')
+it('reads the manifest image and still rejects an unresolvable lower-priority export', () => {
+  manifest({ icon: './legacy.svg', files: ['legacy.svg'],
+    exports: { './package.json': './package.json', './icon': '../invalid.svg' } })
+  file('legacy.svg', 'legacy')
+  expect(packageMetaProblems(root)).toEqual([`${join(dir, 'package.json')}: exports["./icon"] must resolve to a file`])
 })
 
-it.each([null, false, 1, '', './icon.gif', '/tmp/icon.svg', './missing.png', '../outside.svg'])('validates icon declarations without locale resources: %j', (icon) => {
-  manifest({ icon })
-  file('../outside.svg', '<svg/>')
+it.each([['display'], ['display/manifest.json'], ['display/logo.svg']])
+('checks publication of remapped legacy manifests and their images: %j', (...files) => {
+  manifest({ files,
+    exports: { './package.json': './display/manifest.json' } })
+  json('display/manifest.json', { icon: './logo.svg' })
+  file('display/logo.svg', 'legacy')
+  const problems = packageMetaProblems(root).join('\n')
+  if (files.includes('display')) expect(problems).toBe('')
+  else expect(problems).toContain(`files must include ${files.includes('display/manifest.json') ? 'display/logo.svg' : 'display/manifest.json'}`)
+})
+
+it('requires the root manifest icon declaration to remain accessible', () => {
+  manifest({ icon: './legacy.svg', files: ['legacy.svg'],
+    exports: { './icon': './legacy.svg' } })
+  file('legacy.svg', 'legacy')
+  expect(packageMetaProblems(root).join('\n')).toContain('exports must expose its icon declaration')
+})
+
+it.each([null, false, '', './missing.svg'])('diagnoses legacy icon %j despite a valid fallback export', (icon) => {
+  manifest({ icon, files: ['fallback.svg'],
+    exports: { './package.json': './package.json', './icon': './fallback.svg' } })
+  file('fallback.svg', 'fallback')
   expect(packageMetaProblems(root).join('\n')).toContain('Plugin metadata for @test/plugin:')
 })
 
-it('requires the root icon declaration to be exported', () => {
-  manifest({ icon: './icon.svg', exports: { '.': './entry.js' }, files: ['icon.svg'] })
-  file('icon.svg', '<svg/>')
-  expect(packageMetaProblems(root).join('\n')).toContain('exports must expose its icon declaration through @test/plugin/package.json')
-})
-
-it.each([
-  { './search/package.json': './resources/search/manifest.json' },
-  { './*/package.json': './resources/*/manifest.json' },
-  { './*': './resources/*' },
-])('validates icons of independent exported manifests: %j', (exports) => {
-  manifest({ exports, files: ['resources'] })
-  const document = './*' in exports ? 'resources/search/package.json' : 'resources/search/manifest.json'
-  json(document, { icon: './icon.webp' })
-  file('resources/search/icon.webp', 'webp')
+it.each([undefined, ['art'], ['art/*.webp'], ['./art/icon.webp']])('accepts an exported icon without other resources: %j', (files) => {
+  manifest({ exports: { './icon': './art/icon.webp' }, files })
+  file('art/icon.webp', 'image')
   expect(packageMetaProblems(root)).toEqual([])
-  json(document, { icon: './missing.png' })
-  expect(packageMetaProblems(root).join('\n')).toContain('missing.png')
 })
 
-it('requires publication of both an exported icon manifest and its image', () => {
-  manifest({ exports: { './search/package.json': './resources/search.json' }, files: ['resources/icon.svg'] })
-  json('resources/search.json', { icon: './icon.svg' })
-  file('resources/icon.svg', '<svg/>')
-  expect(packageMetaProblems(root).join('\n')).toContain('files must include resources/search.json')
+it.each([['lib'], ['art', '!art/icon.webp']])('rejects an exported icon omitted from publication: %j', (...files) => {
+  manifest({ exports: { './icon': './art/icon.webp' }, files })
+  file('art/icon.webp', 'image')
+  expect(packageMetaProblems(root).join('\n')).toContain('files must include art/icon.webp')
+})
+
+it.each([false, 1, '', './icon.gif', '/tmp/icon.svg', './missing.png', '../outside.svg'])('validates exported icon targets: %j', (icon) => {
+  manifest({ exports: { './icon': icon } })
+  expect(packageMetaProblems(root).join('\n')).toMatch(/Plugin metadata for @test\/plugin:|exports\["\.\/icon"\] must resolve to a file/u)
+})
+
+it.each([['assets'], ['lib']])('checks publication of the Node-selected conditional icon: %j', (...files) => {
+  manifest({ exports: { './icon': { import: './assets/logo.webp', default: './missing.gif' } }, files })
+  file('assets/logo.webp', 'image')
+  const problems = packageMetaProblems(root)
+  if (files.includes('assets')) expect(problems).toEqual([])
+  else expect(problems.join('\n')).toContain('files must include assets/logo.webp')
+})
+
+it('ignores package.json exported at a subpath plugin address', () => {
+  manifest({ exports: { './search': './search.js', './search/package.json': './broken.json' } })
+  file('broken.json', '{')
+  expect(packageMetaProblems(root)).toEqual([])
+})
+
+it.each([['search.svg'], ['lib']])('reads and publishes a subpath icon export: %j', (...files) => {
+  manifest({ icon: './root.svg', exports: { './package.json': './package.json', './search': './search.js', './search/icon': './search.svg' },
+    files: ['root.svg', ...files] })
+  file('root.svg', 'root')
+  file('search.svg', 'search')
+  const problems = packageMetaProblems(root)
+  if (files.includes('search.svg')) expect(problems).toEqual([])
+  else expect(problems).toEqual([`${join(dir, 'package.json')}: files must include search.svg`])
+})
+
+it('requires publication of a remapped package manifest', () => {
+  manifest({ exports: { './package.json': './resources/display.json' }, files: ['lib'] })
+  json('resources/display.json', { name: 'Display' })
+  expect(packageMetaProblems(root).join('\n')).toContain('files must include resources/display.json')
 })
 
 it('ignores icon-like fields in unrelated source JSON', () => {
@@ -488,4 +528,13 @@ it('reports metadata failures from more than one workspace package', () => {
   const problems = packageMetaProblems(root).join('\n')
   expect(problems).toContain('@test/plugin')
   expect(problems).toContain('@test/second')
+})
+
+it.each([[], ['locale']])('rejects a display manifest in build output without reading it: locales %j', (...locales) => {
+  manifest({ exports: { './package.json': './lib/display.json', ...locales.length > 0 ? { './locale/*.json': './locale/*.json' } : {} }, files: ['lib', 'locale'] })
+  if (locales.length > 0) json('locale/en.json', { meta: { title: 'Plugin' } })
+  file('lib/display.json', '{')
+  const problems = packageMetaProblems(root).join('\n')
+  expect(problems).toContain('@test/plugin/package.json: display manifest must resolve to source JSON')
+  expect(problems).not.toContain('Plugin metadata for')
 })
