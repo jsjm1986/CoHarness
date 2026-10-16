@@ -2296,9 +2296,6 @@
   "packages/skill/skill-filesystem/tests/skill-filesystem.spec.ts": {
     "ddd151d938fb348a08f4633dddc6052d708b06952c9b9bab0b3b0f9132d638b7": 1
   },
-  "packages/skill/skill-office/tests/skill-office.spec.ts": {
-    "154da39139a0074bad3d13a624e5fa62d1f7ce19dc8b9c28a73af3263cd7f10e": 1
-  },
   "packages/skill/skill/tests/skill.spec.ts": {
     "0166546b07456dbfb8e79af5fd97d72bf4ed2cbe6f6847c06f169967d53d7d9a": 2,
     "138acc1c7a8ca06c545f59db3a0f12e2814711ae41ed699f9ecdf30c00a2921a": 1,

@@ -23,7 +23,7 @@ Skill selection is independent of delivery: project, custom-directory, and user 
   disabled: true
 ```
 
-To replace the three Office workflows and shared checker as a set, patch `skill-office.config.assetRoot` to another absolute resource directory. Use the filesystem skill provider for arbitrary skill collections. Configuration patches apply at process startup; changing skills does not require rebuilding the runtime wheel or Python environment.
+Office operation skills call the bundled Node executable and LibreOffice Kit CLI through absolute paths the provider appends at load. See the [Office provider](../../packages/skill/skill-office/README.md#use-this-package) for interpreter and CLI selection and for replacing the skill collection and shared checker. Use the filesystem skill provider for arbitrary skill collections. Configuration patches apply at process startup; changing skills does not require rebuilding the runtime wheel or Python environment.
 
 Repository builds also materialize a dev-only `runtime/node/` carrier. It runs `node runtime/node/runtime-bootstrap.mjs` on system Node 22.19 or newer. It is never selected automatically and is excluded from wheels and sdists.
 

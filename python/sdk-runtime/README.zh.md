@@ -23,7 +23,7 @@ wheel 包会安装 `dsh` 控制台命令和 `deepseek_harness_runtime` Python �
   disabled: true
 ```
 
-要成套替换三个 Office 工作流与共用检查脚本，可将 `skill-office.config.assetRoot` 配置为另一个绝对资源目录。任意 skill 集合通过文件系统 skill 提供方加载。配置 patch 在进程启动时生效；切换 skills 无需重建 runtime wheel 或 Python 环境。
+Office 操作技能通过提供方在加载时追加的绝对路径，调用随附的 Node 可执行文件与 LibreOffice Kit CLI。解释器与 CLI 的选择，以及成套替换 skill 集合与共用检查脚本的方法，见 [Office 提供方](../../packages/skill/skill-office/README.zh.md#use-this-package)。任意 skill 集合通过文件系统 skill 提供方加载。配置 patch 在进程启动时生效；切换 skills 无需重建 runtime wheel 或 Python 环境。
 
 仓库构建还会物化仅限开发的 `runtime/node/` 载体。它在系统 Node 22.19 或更高版本上运行 `node runtime/node/runtime-bootstrap.mjs`。系统不会自动选择它，而且 wheel 包与 sdist 均不包含它。
 

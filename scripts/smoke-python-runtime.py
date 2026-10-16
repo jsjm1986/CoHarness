@@ -11,6 +11,7 @@ import json
 import os
 import queue
 import re
+import runpy
 import secrets
 import shutil
 import subprocess
@@ -117,6 +118,11 @@ MINIMAL_SNAPSHOT_DIRECTORY = (
 if IS_WINDOWS:
     MINIMAL_SNAPSHOT_DIRECTORY /= "win-x64"
 MINIMAL_SNAPSHOT_FILENAMES = ("model-visible.json",)
+AUTHORING_SNAPSHOT_DIRECTORY = (
+    Path(__file__).resolve().parent / "snapshots" / "python-sdk-single-exe" / "authoring"
+)
+if IS_WINDOWS:
+    AUTHORING_SNAPSHOT_DIRECTORY /= "win-x64"
 # The agent loop's dynamic runtime-context snapshot is the one model-visible message this
 # expected output cannot carry: the same composition emits it on macOS and not on Linux
 # (deepseek-harness#2488), and the file must replay on both. Everything else is compared.
@@ -964,8 +970,10 @@ def smoke_sdk_authoring(base_url: str, executable: Path, update_snapshots: bool)
             requests = MockModelHandler.requests[first:]
             assert len(requests) == 2, requests
             prompt = json.dumps(requests[0], ensure_ascii=False)
-            for name in ("office-docx", "office-pptx", "office-xlsx"):
+            assert ("- `office`:" in prompt) == (mode != "disabled"), mode
+            for name in ("office-docx", "office-pptx", "office-xlsx", "office-render", "office-recalculate", "office-export-pdf"):
                 assert (name in prompt) == (mode != "disabled"), (mode, name)
+            assert "render --input" not in prompt and "libreofficeKit" not in prompt, mode
             assert ("CUSTOM_OFFICE_DOCX" in prompt) == (mode == "replacement"), mode
             tool_result = next(block for message in requests[1]["messages"]
                                for block in message.get("content", [])
@@ -986,22 +994,29 @@ def smoke_sdk_authoring(base_url: str, executable: Path, update_snapshots: bool)
                     env={name: value for name, value in os.environ.items()
                          if not re.search(r"KEY|SECRET|TOKEN|PASSWORD", name, re.I)})
                 schema = next(tool for tool in requests[0]["tools"] if tool.get("name") == "load_workspace_dependencies")
-                visible = {"tool": schema, "result": {**dependencies, "python": "{{python}}", "pythonPackages": "{{site-packages}}",
+                catalogs = [message_text(message.get("content", [])) for message in requests[0]["messages"]
+                            if "<available_skills>" in message_text(message.get("content", []))]
+                assert len(catalogs) == 1, catalogs
+                for actual, token in snapshot_directory_replacements(root, "{{cwd}}"):
+                    catalogs = [catalog.replace(actual, token) for catalog in catalogs]
+                visible = {"tool": schema, "catalogs": catalogs, "result": {**dependencies, "python": "{{python}}", "pythonPackages": "{{site-packages}}",
                            **{name: "{{" + name + "}}" for name in ("node", "nodePackages", "pnpm")}}}
                 compare_snapshot_files(
                     {"model-visible.json": json.dumps(visible, indent=2, ensure_ascii=False) + "\n"},
-                    update_snapshots, Path(__file__).parent / "snapshots/python-sdk-single-exe/authoring",
+                    update_snapshots, AUTHORING_SNAPSHOT_DIRECTORY,
                     ("model-visible.json",),
                 )
     print("smoke-python-runtime: bundled Python, default skills, replacement and disabled skills passed")
 
 
 def smoke_sdk_office(executable: Path) -> None:
-    """Relocate the wheel payload and convert a real DOCX with the target platform engine."""
+    """Exercise the relocated profile's bundled Office API and shell commands."""
     from deepseek_harness import DeepSeekHarness
 
-    with tempfile.TemporaryDirectory(prefix="dsh-sdk-office-") as temporary:
-        root = Path(temporary).resolve()
+    checks_path = Path(__file__).resolve().parent / "fixtures/office-render.py"
+    checks = runpy.run_path(checks_path)
+    artifacts = os.environ.get("DSH_OFFICE_TEST_ARTIFACTS")
+    with checks["workspace"](None if artifacts is None else Path(artifacts), prefix="dsh-sdk-office-") as root:
         relocated = root / executable.name
         stem = executable.name.removesuffix(".exe")
         resources = executable.with_name(stem.removeprefix("deepseek-harness-sdk-runtime-"))
@@ -1025,14 +1040,18 @@ def smoke_sdk_office(executable: Path) -> None:
             raise AssertionError(f"Office sidecar must contain only {expected_backend}: {engines}")
         plugin = root / "office.mjs"
         shutil.copy2(Path(__file__).resolve().parent / "fixtures/python-sdk-office.mjs", plugin)
-        document = root / "document.docx"
-        with zipfile.ZipFile(document, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            archive.writestr("[Content_Types].xml", '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')
-            archive.writestr("_rels/.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')
-            archive.writestr("word/document.xml", '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Python Office wheel</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>')
-            # LibreOffice's OOXML reader refuses a document part without its
-            # relationships part, even when the part has no relationships.
-            archive.writestr("word/_rels/document.xml.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')
+        documents = checks["copy_documents"](root)
+        document = documents["docx"]
+
+        environment = {key: value for key, value in os.environ.items()
+                       if not key.startswith("DSH_") and not any(part in key.upper() for part in ("KEY", "SECRET", "TOKEN", "PASSWORD"))}
+        environment.update(PATH="")
+        node = office / "node/bin" / ("node.exe" if native.startswith("win32-") else "node")
+        cli = adapter.parent / "lib/cli.js"
+        checks["render_cli"](
+            [str(node), str(cli)], documents, root, expected_backend, environment,
+            check_content=False,
+        )
 
         mode = expected_backend
         output = root / f"{mode}.pdf"
@@ -1042,7 +1061,8 @@ def smoke_sdk_office(executable: Path) -> None:
             "id": "python-sdk-office-smoke",
             "inject": ["skills"],
             "name": plugin.as_uri(),
-            "config": {"input": str(document), "output": str(output), "result": str(result_path)},
+            "config": {"input": str(document), "output": str(output), "result": str(result_path),
+                       "imageInput": str(documents["pptx"]), "imageOutput": str(root / "node-pptx")},
         }]}]))
         with DeepSeekHarness(
             provider="deepseek-official",
@@ -1054,9 +1074,9 @@ def smoke_sdk_office(executable: Path) -> None:
             api_key="sk-keyless-smoke",
             base_url="http://127.0.0.1:9",
             env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
-            # The startup plugin awaits a converter with a 120-second deadline before JSON-RPC is ready.
-            initialize_timeout_seconds=180,
-            request_timeout_seconds=180,
+            # Startup performs three serial Office operations with 120-second engine deadlines.
+            initialize_timeout_seconds=480,
+            request_timeout_seconds=480,
         ):
             pass
         result = json.loads(result_path.read_text())
@@ -1064,6 +1084,7 @@ def smoke_sdk_office(executable: Path) -> None:
             raise AssertionError(f"Office conversion did not use {expected_backend}: {result}")
         if not result["moduleUrl"].startswith(office.as_uri() + "/"):
             raise AssertionError(f"Office module was not loaded from the relocated wheel: {result}")
+        checks["check_render_manifest"](result["images"], expected_backend)
         pdf = output.read_bytes()
         if len(pdf) < 100 or not pdf.startswith(b"%PDF-"):
             raise AssertionError(f"Office conversion produced an invalid PDF at {output}")

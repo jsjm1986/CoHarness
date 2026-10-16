@@ -1,0 +1,11 @@
+version: 1
+scenario: office-progressive-ptc
+profile: headless
+platform: posix
+composition: office-progressive-ptc
+recording: authored
+header:
+  class: office-progressive-ptc
+  pin: true
+workspace:
+  setup: office-retired-ptc

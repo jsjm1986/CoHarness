@@ -2956,7 +2956,7 @@ export interface Config {
 ```ts config-catalog
 /** Office skill resource location. */
 export interface Config {
-  /** Absolute assets directory containing the three skill folders and shared scripts; defaults to packaged assets. */
+  /** Absolute assets directory containing skill folders and shared scripts; defaults to packaged assets. */
   assetRoot?: string
   /** Standalone Node executable; defaults to the current executable outside Electron and SEA. */
   node?: string

@@ -177,6 +177,7 @@ function contextOf(logs: readonly string[]): NormalizeContext {
   return {
     sessionIds: headers.flatMap(header => typeof header.id === 'string' ? [header.id] : []),
     cwd: typeof headers[0]?.cwd === 'string' ? headers[0].cwd : '\0missing-cwd\0',
+    cwdAliases: [typeof headers[0]?.cwd === 'string' ? headers[0].cwd.split(sep).join('/') : ''],
   }
 }
 
@@ -238,6 +239,9 @@ async function writeSessionFixtures(
   const replacements = mode === 'refresh'
     ? refreshFixtureReplacements(actualLogs.map(harvested), prior)
     : []
+  for (const replacement of [...replacements]) {
+    if (replacement.from === ctx.cwd) replacements.push({ from: ctx.cwd.split(sep).join('/'), to: replacement.to })
+  }
   const fresh = actualLogs.map((log, index) => {
     const stable = tokenizeSessionFixtureCwd(mode === 'refresh'
       ? stabilizeRefreshLog(log.content, prior[index] as string, replacements, ctx)
@@ -479,6 +483,15 @@ const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
   },
   async 'office-skills'(cwd) {
     await cp(join(repoRoot, 'packages/skill/skill-office/assets'), join(cwd, 'office-skills'), { recursive: true })
+    // A copied macOS Node binary cannot find its adjacent libnode.dylib.
+    const nodePath = process.execPath.replaceAll("'", "'\\''")
+    await writeFile(join(cwd, 'office-node'), `#!/bin/sh\nexec '${nodePath}' "$@"\n`, { mode: 0o755 })
+    await copyFile(join(repoRoot, 'packages/skill/skill-office/node_modules/@deepseek-ai/libreoffice-kit/lib/cli.js'), join(cwd, 'office-cli.js'))
+  },
+  async 'office-retired-ptc'(cwd) {
+    await workspaceSetups['office-skills']!(cwd)
+    // Keep the removed-tool error without process-specific stack locations.
+    await writeFile(join(cwd, 'office-ptc-node'), '#!/bin/sh\nexec "$(dirname "$0")/office-node" --stack-trace-limit=0 "$@"\n', { mode: 0o755 })
   },
   async 'editing-cordis-skill'(cwd) {
     const target = join(cwd, '.dsh', 'skills', 'editing-cordis-compositions', 'SKILL.md')
@@ -1184,6 +1197,13 @@ describe('headless recorded-session snapshots', () => {
               const saved = await readFile(join(cwd, '.dsh/profiles/headless/cordis.patch.yml'), 'utf8')
               expect(saved).toContain('id: demo')
               expect(saved).toContain('disabled: false')
+            }
+            if (scenario.name.startsWith('office-progressive-')) {
+              const log = actualLogs[0]!.content
+              const results = parseSessionLog(log).flatMap(event => event.type === 'tool/result' ? [event.data.message] : [])
+              expect(results).toHaveLength(4)
+              expect(results.every(result => result.isError === false)).toBe(true)
+              expect(log).toContain('# Office task routing')
             }
             if (scenario.name === 'session-query-spill') {
               await verifySessionQuerySpill(actualLogs[0]!.content, spillRoot, locatorRoot)

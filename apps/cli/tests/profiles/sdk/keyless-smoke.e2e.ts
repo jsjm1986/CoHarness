@@ -494,8 +494,11 @@ it.each(['unset', 'empty', 'bundled', 'full', 'python-only', 'python-only-no-cli
   }, () => stderr)
   const names = (requests[0]!.tools as { name: string }[]).map(value => value.name)
   expect(names.includes('load_workspace_dependencies')).toBe(enabled)
+  expect(JSON.stringify(requests[0]!.messages).includes('`office`')).toBe(enabled && mode !== 'missing-assets')
+  expect(names).not.toContain('office_tools')
+  expect(names).not.toContain('render_document')
   for (const name of ['office-docx', 'office-pptx', 'office-xlsx']) {
-    expect(JSON.stringify(requests[0]!.messages).includes(name)).toBe(enabled && mode !== 'missing-assets' && mode !== 'python-only')
+    expect(JSON.stringify(requests[0]!.messages).includes(name)).toBe(enabled && mode !== 'missing-assets')
   }
   if (mode === 'wrong-type') {
     expect(requests).toHaveLength(2)
@@ -524,7 +527,7 @@ it.each(['unset', 'empty', 'bundled', 'full', 'python-only', 'python-only-no-cli
       expect.objectContaining({ role: 'user', content }),
     ]))
   }
-  if (mode === 'python-only') expect(stderr).toContain('node')
+  if (mode === 'python-only') expect(stderr).not.toContain('ENOENT')
   if (mode === 'missing-assets') expect(stderr).toContain('check_office.py')
   await send(3, 'shutdown')
   const exit = await child
