@@ -4168,7 +4168,7 @@ export type ApprovalPolicy = 'ask' | 'never'
 
 ## `@deepseek-ai/dsh-userdoc-local`
 
-- `source`: [`packages/attachment/userdoc-local/src/index.ts:181`](../packages/attachment/userdoc-local/src/index.ts)
+- `source`: [`packages/attachment/userdoc-local/src/index.ts:97`](../packages/attachment/userdoc-local/src/index.ts)
 
 ```ts config-catalog
 /** Local document backend configuration. */
