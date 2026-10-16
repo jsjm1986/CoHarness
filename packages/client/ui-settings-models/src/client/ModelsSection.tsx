@@ -71,7 +71,7 @@ type ModelsRenderSlot = PropsRenderSlots<ModelsChildSlots>['renderSlot']
 
 export type ModelsSectionProps = Partial<SettingsSectionOwnerProps>
   & Partial<InjectFace<ModelsSectionInjected>>
-  & { renderSlot?: ModelsRenderSlot }
+  & PropsRenderSlots<ModelsChildSlots>
 
 type ModelsSectionFace = InjectFace<ModelsSectionInjected> & Partial<SettingsSectionOwnerProps>
 
@@ -164,6 +164,21 @@ export function needsSetup(row: ProviderRow, anyUsable: boolean): boolean {
   return row.credential?.configured !== true
 }
 
+/**
+ * The provider-card seat's credential fact: the reference this page would
+ * use for the row — the profile's `apiKeyEnv`, or the page's own derived
+ * reference while the profile names none — confirmed configured. The
+ * derived half keeps the seat consistent with the editor on the
+ * add-provider draft, whose dormant row names no reference yet.
+ * @param row - the joined provider row.
+ * @returns whether the seat may report a configured key.
+ */
+function keyConfiguredOf(row: ProviderRow): boolean {
+  return row.apiKeyEnv !== undefined
+    ? row.credential?.configured === true
+    : row.derivedCredential?.configured === true
+}
+
 function targetOf(row: ProviderRow, managementScope: 'personal' | 'organization' | 'project', projectId?: number): EditorTarget {
   const managedRef = deriveKeyRef(row.entry.provider, managementScope, projectId)
   const credentialRef = row.apiKeyEnv !== undefined
@@ -203,12 +218,11 @@ export function providerCopy(template: string, target: ProviderIdentity): string
  * @returns the section, or null while the shell has not injected yet.
  */
 export function ModelsSection(props: ModelsSectionProps): ReactNode {
-  const { controller, useSnapshot, api, discoverModels, schema, t } = props
+  const { controller, useSnapshot, api, discoverModels, schema, t, renderSlot } = props
   if (
     controller === undefined || useSnapshot === undefined || api === undefined
     || discoverModels === undefined || schema === undefined || t === undefined
   ) return null
-  const renderSlot = props.renderSlot ?? (() => null)
   return (
     <Loaded
       injected={{
@@ -455,7 +469,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                 })}
                 {renderSlot(
                   'settings.models.provider-card',
-                  { provider: row.entry, configured: row.configured, keyConfigured: row.credential?.configured === true },
+                  { provider: row.entry, configured: row.configured, keyConfigured: keyConfiguredOf(row) },
                   { entryKey: row.entry.settingsNs },
                 )}
               </li>
@@ -535,7 +549,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
               </div>
               {renderSlot(
                 'settings.models.provider-card',
-                { provider: row.entry, configured: row.configured, keyConfigured: credentialConfigured },
+                { provider: row.entry, configured: row.configured, keyConfigured: keyConfiguredOf(row) },
                 { entryKey: row.entry.settingsNs },
               )}
               {open
@@ -598,7 +612,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                 ? null
                 : renderSlot(
                   'settings.models.provider-card',
-                  { provider: addRow.entry, configured: addRow.configured, keyConfigured: addRow.credential?.configured === true },
+                  { provider: addRow.entry, configured: addRow.configured, keyConfigured: keyConfiguredOf(addRow) },
                   { entryKey: addRow.entry.settingsNs },
                 )}
             </div>

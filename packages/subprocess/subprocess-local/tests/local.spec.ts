@@ -2,7 +2,9 @@ import { PassThrough } from 'node:stream'
 import os from 'node:os'
 import { syncBuiltinESMExports } from 'node:module'
 import { describe, expect, it, vi } from 'vitest'
-import { basename, dirname, relative, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessSpawnSpec, SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from '@deepseek-ai/dsh-subprocess'
@@ -487,6 +489,64 @@ describe('LocalSubprocessRuntime', () => {
     }
   })
 
+  it('allocates Windows terminals through the console host node-pty ships', async () => {
+    const exitListeners: ((event: { exitCode: number; signal?: number }) => void)[] = []
+    const terminal = {
+      pid: 123,
+      onData: () => ({ dispose: () => {} }),
+      onExit: (listener: (event: { exitCode: number; signal?: number }) => void) => {
+        exitListeners.push(listener)
+        return { dispose: () => {} }
+      },
+      write: () => {},
+      kill: () => {},
+    }
+    const nodePtySpawn = vi.fn(() => terminal)
+    const inspector = {
+      foregroundPgid: () => undefined,
+      isStdinWaiting: () => false,
+      snapshot: () => ({ tree: () => [], session: () => [], alive: () => false }),
+      isAlive: () => false,
+      signalGroup: () => {},
+      signalProcess: () => {},
+    }
+    vi.resetModules()
+    mockWin32ForIsolatedRuntime()
+    mockNodePtyForIsolatedRuntime(nodePtySpawn)
+    vi.doMock('../src/process-inspector.ts', async importOriginal => ({
+      ...await importOriginal<typeof import('../src/process-inspector.ts')>(),
+      createProcessInspector: () => inspector,
+    }))
+    let fiber: { dispose(): Promise<void> } | undefined
+    try {
+      const { default: IsolatedLocalSubprocessRuntime } = await import('../src/index.ts')
+      const ctx = new Context()
+      fiber = await ctx.plugin(IsolatedLocalSubprocessRuntime)
+      const runtime = ctx.subprocess as InstanceType<typeof IsolatedLocalSubprocessRuntime>
+      runtime.terminalInspector = inspector
+      const spawn = async (platform: NodeJS.Platform): Promise<SubprocessTerminalHandle> => {
+        runtime.internals = { platform }
+        return runtime.spawnTerminal({
+          argv: ['shell'], cwd: process.cwd(), rows: 24, cols: 80, terminalType: 'dumb', graceMs: 1,
+        })
+      }
+
+      const windows = await spawn('win32')
+      expect(nodePtySpawn).toHaveBeenLastCalledWith('shell', [], expect.objectContaining({ useConptyDll: true }))
+      const posix = await spawn('darwin')
+      expect(nodePtySpawn).toHaveBeenLastCalledWith('shell', [], expect.not.objectContaining({ useConptyDll: true }))
+
+      for (const listener of exitListeners) listener({ exitCode: 0 })
+      await Promise.all([windows.done, posix.done])
+    } finally {
+      await fiber?.dispose()
+      unmockLazyRequireForIsolatedRuntime()
+      vi.doUnmock('../src/process-inspector.ts')
+      unmockWin32ForIsolatedRuntime()
+      vi.resetModules()
+    }
+  })
+
   it('wraps Linux terminals in the selected scope and binds owner liveness', async () => {
     let exitListener: ((event: { exitCode: number; signal?: number }) => void) | undefined
     let launcherRunning: (() => boolean) | undefined
@@ -742,6 +802,35 @@ describe('LocalSubprocessRuntime', () => {
     expect(result.exitCode).toBe(0)
     expect(handle.collected.stdout!.readFrom(0).text).toBe('managed\n')
     await fiber.dispose()
+  })
+
+  it('logs one error through the plugin logger when a spill cannot be written and keeps the tail', async () => {
+    const removedDir = mkdtempSync(join(tmpdir(), 'dsh-subprocess-removed-'))
+    rmSync(removedDir, { recursive: true, force: true })
+    const ctx = new Context()
+    const logged = vi.spyOn(ctx.logger, 'error').mockImplementation(() => {})
+    const fiber = await ctx.plugin(LocalSubprocessRuntime)
+    const runtime = ctx.subprocess as LocalSubprocessRuntime
+    runtime.internals = { spillDir: removedDir }
+    try {
+      const handle = runtime.spawn(spec('', {
+        argv: [process.execPath, '-e', 'process.stdout.write("x".repeat(4096))'],
+        stdio: { stdin: 'ignore', stdout: { maxBytes: 16, spill: { maxBytes: 1_000_000 } }, stderr: 'pipe' },
+      }))
+      const result = await handle.done
+      expect(result.exitCode).toBe(0)
+      const stdout = handle.collected.stdout!.readFrom(0)
+      expect(stdout.text).toBe('x'.repeat(16))
+      expect(stdout.lossy).toBe(true)
+      expect(stdout.spillPath).toBeUndefined()
+      expect(logged).toHaveBeenCalledOnce()
+      const [message, error] = logged.mock.calls[0] as [string, NodeJS.ErrnoException]
+      expect(message).toContain('could not write the complete stdout stream')
+      expect(message).toContain('temporary-file cleaner')
+      expect(error.code).toBe('ENOENT')
+    } finally {
+      await fiber.dispose()
+    }
   })
 
   it('warns once when ordinary spawns use the weaker macOS fallback', async () => {

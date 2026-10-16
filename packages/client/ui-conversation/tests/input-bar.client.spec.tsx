@@ -1518,6 +1518,19 @@ describe('strips and variants', () => {
     expect(view.container.querySelector('[class*="hero"]')).not.toBeNull()
   })
 
+  it('keeps exactly one phase marker on the input node across the hero → composer flip', () => {
+    const { view, textarea, props, sink } = bench({ variant: 'hero', draft: 'hello' })
+    expect(view.container.querySelectorAll('[data-phase]')).toHaveLength(1)
+    expect(textarea.getAttribute('data-phase')).toBe('plain')
+    view.rerender(<InputBar {...props} variant="composer" />)
+    // The flip reuses the mounted textarea: the marker, the draft, and the
+    // submit path all ride through on the same node.
+    expect(view.container.querySelector('textarea')).toBe(textarea)
+    expect(view.container.querySelectorAll('[data-phase]')).toHaveLength(1)
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(sink).toHaveBeenCalledWith('hello', [], [], 'queue', expect.any(AbortSignal))
+  })
+
   it('renders overlay anchor and left/right slot items', () => {
     const { view } = bench({
       overlay: <i data-testid="ov" />,

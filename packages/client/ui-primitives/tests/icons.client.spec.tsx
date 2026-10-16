@@ -17,7 +17,7 @@ const iconNames = Object.keys(icons)
 
 describe('ic_ds_ icon set', () => {
   it('exports the full icon set (the ic_ds_* catalog plus the glyphs local packages moved here)', () => {
-    expect(iconNames.length).toBe(109)
+    expect(iconNames.length).toBe(112)
   })
 
   it.each(iconNames)('%s renders an svg with currentColor fills and no hardcoded palette', (name) => {
@@ -67,15 +67,40 @@ describe('FishLogo', () => {
   })
 })
 
-describe('CoHarnessMark', () => {
-  it('renders the independent collaboration mark at the requested square size', () => {
-    const { container } = render(<primitives.CoHarnessMark size={34} className="brand" />)
+describe('CoHarnessMascot', () => {
+  it('renders the firefly mark with a single accent-colored abdomen', () => {
+    const { container } = render(<primitives.CoHarnessMascot size={40} className="hero" />)
     const svg = container.querySelector('svg')!
-    expect(svg.getAttribute('width')).toBe('34')
-    expect(svg.getAttribute('height')).toBe('34')
-    expect(svg.getAttribute('data-brand')).toBe('coharness')
-    expect(svg.getAttribute('class')).toBe('brand')
+    expect(svg.getAttribute('width')).toBe('40')
+    expect(svg.getAttribute('height')).toBe('40')
+    expect(svg.getAttribute('data-brand')).toBe('coharness-mascot')
+    expect(svg.classList.contains('hero')).toBe(true)
     expect(container.innerHTML).toContain('currentColor')
+    expect(container.innerHTML).toContain('coh-mascot-accent')
+    expect(container.querySelector('style')!.innerHTML).toContain('#2563eb')
+    expect(container.querySelector('style')!.innerHTML).toContain('#6b93ff')
+  })
+
+  it('gives the busy variant flapping wings, a breathing lamp, and reduced-motion off', () => {
+    const { container } = render(<primitives.CoHarnessMascot busy />)
+    const svg = container.querySelector('svg')!
+    expect(svg.classList.contains('coh-mascot-busy')).toBe(true)
+    expect(container.querySelector('.coh-mascot-wing-l')).not.toBeNull()
+    expect(container.querySelector('.coh-mascot-wing-r')).not.toBeNull()
+    expect(container.querySelector('.coh-mascot-lamp')).not.toBeNull()
+    const style = container.querySelector('style')!.innerHTML
+    expect(style).toContain('coh-mascot-flap-l')
+    expect(style).toContain('prefers-reduced-motion')
+  })
+
+  it('gives the ambient variant the same wing/lamp rig at the slower tempo', () => {
+    const { container } = render(<primitives.CoHarnessMascot ambient />)
+    const svg = container.querySelector('svg')!
+    expect(svg.classList.contains('coh-mascot-ambient')).toBe(true)
+    expect(svg.classList.contains('coh-mascot-busy')).toBe(false)
+    expect(container.querySelector('.coh-mascot-wing-l')).not.toBeNull()
+    expect(container.querySelector('.coh-mascot-lamp')).not.toBeNull()
+    expect(container.querySelector('style')!.innerHTML).toContain('.coh-mascot-ambient{--flap')
   })
 })
 

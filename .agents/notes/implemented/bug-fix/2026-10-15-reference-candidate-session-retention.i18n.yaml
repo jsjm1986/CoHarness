@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-reference-candidate-session-retention.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-reference-candidate-session-retention.md
+/agent-note-candidates-retain-the-browsing-session-and-rows-carry-distinguishing-detail-only:
+  en: 1cbfe783fc4a553b
+  zh: 555fd4e99531d7cf
+/agent-note-candidates-retain-the-browsing-session-and-rows-carry-distinguishing-detail-only/problem:
+  en: 575b67ef2c1754ba
+  zh: 71c08cba19df1301
+/agent-note-candidates-retain-the-browsing-session-and-rows-carry-distinguishing-detail-only/decision:
+  en: 8bb401c92e427722
+  zh: 52ca50bbedded7ca
+/agent-note-candidates-retain-the-browsing-session-and-rows-carry-distinguishing-detail-only/alternatives-considered:
+  en: 6738dab6aeea259d
+  zh: c1995af253dbb771
+/agent-note-candidates-retain-the-browsing-session-and-rows-carry-distinguishing-detail-only/consequences:
+  en: 1dca02f74d68939b
+  zh: 0e3119c3f93d83cd
+/agent-note-candidates-retain-the-browsing-session-and-rows-carry-distinguishing-detail-only/verification:
+  en: dec79a4950b5c6d9
+  zh: 1b4b4b0966f56ae7
+/agent-note-candidates-retain-the-browsing-session-and-rows-carry-distinguishing-detail-only/related:
+  en: 987a77dc77c3faf8
+  zh: 29cfb9b20f59d454

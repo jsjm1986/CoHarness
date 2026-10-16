@@ -81,3 +81,20 @@
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary);
 }
+
+@media (max-width: 767px) {
+  .section {
+    max-width: none;
+  }
+
+  .search input {
+    height: var(--dsw-touch-target);
+  }
+
+  /* Rows ride the shared compact row rhythm; the hover fill stays. */
+  .row {
+    min-height: var(--dsw-touch-target);
+    padding: var(--dsw-space-2) 0;
+    border-radius: 0;
+  }
+}

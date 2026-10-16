@@ -99,9 +99,9 @@ turn/end
 
 Input reaches the driver through one inbox. Some messages wake it immediately; injected context waits in the inbox until another message does.
 
-`agent/pre-step` decides what the model sees. Listeners may rewrite the claimed messages or reject them outright; a rejected or empty first claim still closes a durable turn that spent no step, so the log records the attempt. Each step reads the prompt sections and tool schemas that plugins registered.
+`agent/pre-step` decides what the model sees. Listeners may rewrite the claimed messages or reject them outright; a rejected or empty first claim still closes a durable turn that spent no step, so the log records the attempt. Each step reads the prompt sections and tool schemas that plugins registered, and each request-admission attempt refreshes registered runtime context — the accepted assembly's sections, schemas, and variables stay bound while provider-supplied context text is re-evaluated and committed as a fresh snapshot.
 
-Details: the [sequence diagram](agent-lifecycle.md), the [tool pipeline](tool-execution-pipeline.md), and [cancellation and error recovery](subsystems/core.md#the-agent-handle). AgentLoop publication awaits serial `agent/created` initialization within its rollback handler; this is the sole startup initialization event, and setup and publication hold waking input in maintenance until success.
+Details: the [sequence diagram](agent-lifecycle.md), the [tool pipeline](tool-execution-pipeline.md), and [cancellation and error recovery](subsystems/core.md#the-agent-handle). AgentLoop publication awaits serial `agent/created` initialization within its rollback handler; this is the sole startup initialization event, and setup and publication hold waking input in maintenance until success. Unload retains resources through Agent teardown; [agent-loop](../packages/core/agent-loop/README.md#understand-the-implementation) defines ordering.
 
 Permanent Session removal preserves the lifecycle owner: reservations fence new work, plugins can veto busy resources, and durable deletion follows confirmed idle release. Ordinary cancellation is unchanged. The [idle purge decision](../.agents/notes/implemented/architecture/2026-09-27-idle-session-purge.md) defines the ordering and failure behavior.
 
@@ -110,6 +110,8 @@ Permanent Session removal preserves the lifecycle owner: reservations fence new 
 The session log is the source of the context the model sees. `deriveMessages()` projects model history from it, and raw `assistant/chunk` events preserve replay and UI fidelity. Fork, resume, transcripts, telemetry, and persistence all derive from this stream.
 
 **Model-visible means logged.** Anything that reaches a model request must be reconstructable from the log, and a runtime invariant asserts it. This is why a new model-visible input requires a new session event: extend `SessionEventMap` and render from the log.
+
+[Working directories](subsystems/working-directory.md) supply user context and execution paths without changing original project identity, sandbox write roots, or existing process directories.
 
 ## Capability seams
 

@@ -155,6 +155,21 @@ flowchart LR
   svc_sessionProjections["ctx.sessionProjections<br/>Session projection units"]
   pkg_session_projection_cache["session-projection-cache"]
   svc_sessionProjectionCache["ctx.sessionProjectionCache<br/>Persisted projection cache"]
+  pkg_working_directory["working-directory"]
+  svc_workingDirectory["ctx.workingDirectory<br/>Session working directory"]
+  pkg_tool_fs_search["tool-fs-search"]
+  pkg_tool_lsp["tool-lsp"]
+  pkg_tool_pwsh["tool-pwsh"]
+  pkg_tool_bash_persistent["tool-bash-persistent"]
+  pkg_tool_pwsh_persistent["tool-pwsh-persistent"]
+  pkg_terminal_bash["terminal-bash"]
+  pkg_api_terminal_controller["api-terminal-controller"]
+  pkg_agent_instructions["agent-instructions"]
+  pkg_tool_present["tool-present"]
+  pkg_workflow_ptc["workflow-ptc"]
+  pkg_tool_working_directory["tool-working-directory"]
+  pkg_sdk_jsonrpc_server["sdk-jsonrpc-server"]
+  pkg_experimental_browser_use_runtime["experimental-browser-use-runtime"]
   pkg_skill["skill"]
   svc_skills["ctx.skills<br/>Skill provider registry"]
   pkg_sandbox_windows_acl["sandbox-windows-acl"]
@@ -180,7 +195,6 @@ flowchart LR
   pkg_subprocess_local["subprocess-local"]
   pkg_bash_local["bash-local"]
   pkg_bash_sandbox["bash-sandbox"]
-  pkg_terminal_bash["terminal-bash"]
   pkg_lsp_stdio["lsp-stdio"]
   pkg_subagent_acp["subagent-acp"]
   pkg_subagent_codex["subagent-codex"]
@@ -188,12 +202,10 @@ flowchart LR
   pkg_shell["shell"]
   svc_shell["ctx.shell<br/>Bash executor seam"]
   pkg_pwsh_local["pwsh-local"]
-  pkg_tool_pwsh["tool-pwsh"]
   pkg_shell_env["shell-env"]
   svc_shellEnv["ctx.shellEnv<br/>Managed bash environment registry"]
   pkg_terminal["terminal"]
   svc_terminals["ctx.terminals<br/>Persistent PTY session registry"]
-  pkg_api_terminal_controller["api-terminal-controller"]
   svc_terminalController["ctx.terminalController<br/>User-terminal control remote service"]
   svc_userTerminalAuthorization["ctx.userTerminalAuthorization<br/>User-terminal authorization policy"]
   svc_userTerminalAdministration["ctx.userTerminalAdministration<br/>User-terminal administration policy"]
@@ -257,12 +269,10 @@ flowchart LR
   svc_clientModules["ctx.clientModules<br/>Client plugin graph host"]
   pkg_workflow["workflow"]
   svc_workflowEngine["ctx.workflowEngine<br/>Workflow script engine"]
-  pkg_workflow_ptc["workflow-ptc"]
   pkg_tool_workflow["tool-workflow"]
   pkg_lsp["lsp"]
   svc_lsp["ctx.lsp<br/>Language-server navigation seam"]
   pkg_lsp_local["lsp-local"]
-  pkg_tool_lsp["tool-lsp"]
   svc_apiProxy["ctx.apiProxy<br/>Host API dispatch"]
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
@@ -425,6 +435,7 @@ flowchart LR
   pkg_webserver --> svc_webServer
   pkg_workflow --> svc_workflowEngine
   pkg_workflow_ptc --> svc_workflowEngine
+  pkg_working_directory --> svc_workingDirectory
   pkg_workspace --> svc_workspaceRegistry
   pkg_workspace_changes --> svc_workspaceChanges
   svc_agentDefaultModel --> pkg_headless
@@ -584,6 +595,30 @@ flowchart LR
   svc_webhookRuntime --> pkg_webhook_github
   svc_workflowEngine --> pkg_tool_ralph
   svc_workflowEngine --> pkg_tool_workflow
+  svc_workingDirectory --> pkg_agent_instructions
+  svc_workingDirectory --> pkg_api_terminal_controller
+  svc_workingDirectory --> pkg_experimental_auto_review
+  svc_workingDirectory --> pkg_experimental_browser_use_runtime
+  svc_workingDirectory --> pkg_file_reference_local
+  svc_workingDirectory --> pkg_hooks_claude_code
+  svc_workingDirectory --> pkg_hooks_codex
+  svc_workingDirectory --> pkg_host_apiproxy
+  svc_workingDirectory --> pkg_sdk_jsonrpc_server
+  svc_workingDirectory --> pkg_subagent
+  svc_workingDirectory --> pkg_terminal_bash
+  svc_workingDirectory --> pkg_tool_bash
+  svc_workingDirectory --> pkg_tool_bash_persistent
+  svc_workingDirectory --> pkg_tool_fs
+  svc_workingDirectory --> pkg_tool_fs_search
+  svc_workingDirectory --> pkg_tool_lsp
+  svc_workingDirectory --> pkg_tool_present
+  svc_workingDirectory --> pkg_tool_pwsh
+  svc_workingDirectory --> pkg_tool_pwsh_persistent
+  svc_workingDirectory --> pkg_tool_skill
+  svc_workingDirectory --> pkg_tool_terminal
+  svc_workingDirectory --> pkg_tool_working_directory
+  svc_workingDirectory --> pkg_tools
+  svc_workingDirectory --> pkg_workflow_ptc
   svc_workspaceRegistry --> pkg_apiproxy
   svc_fs -. event gate .-> pkg_fs_observation_policy
 ```
@@ -638,6 +673,7 @@ flowchart LR
 | `ctx.commands` | `core` | [`commands`](../packages/interaction/commands) | - | - | - | Plugins register direct human commands without sending invocations to the model. |
 | `ctx.sessionProjections` | `core` | [`session-projection`](../packages/session/session-projection) | - | [`tool-todo`](../packages/todo/tool-todo), [`session-title`](../packages/session/session-title), [`host-apiproxy`](../packages/host/apiproxy) | - | Domains register state-driven fold units; the eager drive keeps per-session watermark states and api-proxy serves baselines and pushes changed values. |
 | `ctx.sessionProjectionCache` | `core` | [`session-projection-cache`](../packages/session/session-projection-cache) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | Durably checkpoints projection unit states per session (throttled + turn/end/detach mandatory points) and serves the cold-read ladder: cache row + persistence tail replay, so listings never load full logs. |
+| `ctx.workingDirectory` | `seam` | [`working-directory`](../packages/session/working-directory) | [`working-directory`](../packages/session/working-directory) | [`tools`](../packages/core/tools), [`tool-fs`](../packages/fs/tool-fs), [`tool-fs-search`](../packages/fs/tool-fs-search), [`tool-lsp`](../packages/lsp/tool-lsp), [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh), [`tool-bash-persistent`](../packages/shell/tool-bash-persistent), [`tool-pwsh-persistent`](../packages/shell/tool-pwsh-persistent), [`terminal-bash`](../packages/terminal/terminal-bash), [`tool-terminal`](../packages/terminal/tool-terminal), [`api-terminal-controller`](../packages/api/terminal-controller), [`tool-skill`](../packages/skill/tool-skill), [`agent-instructions`](../packages/context/agent-instructions), [`file-reference-local`](../packages/context/file-reference-local), [`tool-present`](../packages/deliverables/tool-present), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`workflow-ptc`](../packages/workflow/workflow-ptc), [`tool-working-directory`](../packages/session/tool-working-directory), [`subagent`](../packages/subagent/subagent), [`sdk-jsonrpc-server`](../packages/sdk/server), [`experimental-auto-review`](../packages/experimental/auto-review), [`experimental-browser-use-runtime`](../packages/experimental/browser-use-runtime), [`host-apiproxy`](../packages/host/apiproxy) | - | One Session projection owns the effective execution directory, contained under the original project tree; the Session-scoped filesystem validates changes and required runtime context reports them. |
 | `ctx.skills` | `seam` | [`skill`](../packages/skill/skill) | [`sandbox-windows-acl`](../packages/sandbox/sandbox-windows-acl), [`skill-badge`](../packages/skill/skill-badge), [`skill-filesystem`](../packages/skill/skill-filesystem), [`skill-office`](../packages/skill/skill-office) | [`tool-skill`](../packages/skill/tool-skill) | - | Merges provider skill catalogs; tool-skill renders the session-prefix catalog and loads complete skill bodies. |
 | `ctx.agents` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`acp`](../packages/acp/acp), `subagent-inprocess` | - | Owns live Agent handles, the create/resume factory seam, and process-local initiator propagation. |
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`headless`](../packages/bundle/headless), [`host-apiproxy`](../packages/host/apiproxy) | - | Layers the default ModelSelection through settings so direct and Host-backed Agent entry points share one state owner. |

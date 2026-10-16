@@ -8,6 +8,10 @@
 
 .root {
   --dsh-sidebar-inline-padding: 12px;
+  /* Containing block for column-scoped overlays: descendants that should
+     cover the browsing region alone read the published --dsh-sidebar-region-*
+     geometry (SidebarRoot.tsx) instead of spanning the whole column. */
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -96,13 +100,16 @@
    right edge; the rail gives every control the same base left anchor before
    the shared entry translation is applied. */
 .logoRow {
+  position: relative;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--dsw-space-2);
   height: 60px;
-  padding: var(--dsw-space-2) 0 var(--dsw-space-2) var(--dsw-space-1);
+  /* Reserve the floating toggle's footprint (28px at right space-1) so the
+     brand lockup centers in the remaining content box, not the raw row. */
+  padding: var(--dsw-space-2) calc(var(--dsw-space-1) + 28px) var(--dsw-space-2) var(--dsw-space-1);
   margin-bottom: var(--dsw-space-2);
   box-sizing: border-box;
   overflow: hidden;
@@ -124,12 +131,28 @@
   min-width: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   overflow: hidden;
   padding: 0;
   border: none;
   background: transparent;
   color: inherit;
   cursor: pointer;
+}
+
+/* Expanded only: float the collapse toggle off the flow so the lockup
+   centers on the full row width. The collapsed rail keeps the toggle in
+   flow — there it rests as the brand mark itself. */
+.toggle {
+  position: absolute;
+  top: 50%;
+  right: var(--dsw-space-1);
+  transform: translateY(-50%);
+}
+
+.collapsed .toggle {
+  position: static;
+  transform: none;
 }
 
 /* Mark and name are independent slots; the shell owns their shared baseline,
@@ -162,8 +185,11 @@
 }
 
 .fallbackBrandName {
-  font-size: 17px;
-  letter-spacing: 0px;
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   white-space: nowrap;
 }
 
@@ -526,7 +552,11 @@
 :global([data-viewport='compact']) .logoRow {
   height: auto;
   min-height: var(--dsw-touch-target);
-  padding-inline: 0;
+  padding-block: var(--dsw-space-1);
+  /* Mirror the floating toggle's footprint on the left so the lockup
+     centers on the drawer's true width — the asymmetric reserve put the
+     wordmark visibly left of center. */
+  padding-inline: calc(var(--dsw-space-1) + var(--dsw-touch-target));
   margin-bottom: var(--dsw-space-1);
 }
 
@@ -541,6 +571,27 @@
 
 :global([data-viewport='compact']) .newSession {
   min-height: var(--dsw-touch-target);
+  margin-inline: 0;
+  margin-bottom: var(--dsw-space-1);
+  /* The drawer's primary action reads as the platform-primary fill, not the
+     neutral control slab — on a full-width phone CTA the grey reads as a
+     disabled band rather than a button. */
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-foreground);
+}
+
+:global([data-viewport='compact']) .newSession:hover {
+  background: var(--dsw-alias-button-primary-hover);
+}
+
+/* The panel nav column (plugins et al.) is a secondary cluster under the
+   primary CTA: tighten its lead and let rows edge-align with the list. */
+:global([data-viewport='compact']) .panelList {
+  margin-bottom: var(--dsw-space-1);
+}
+
+:global([data-viewport='compact']) .panelRow {
+  min-height: 40px;
   margin-inline: 0;
 }
 

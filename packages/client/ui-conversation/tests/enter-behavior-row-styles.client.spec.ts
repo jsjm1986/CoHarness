@@ -30,9 +30,10 @@ function mediaBody(query: string): string {
 }
 
 describe('SettingsSelectRow.module.css compact', () => {
-  it('stacks the title above the selector under 768px', () => {
+  it('keeps the title and trailing accessory selector on one row under 768px', () => {
     const compact = mediaBody('(max-width: 767px)')
-    expect(compact).toContain('flex-direction: column')
-    expect(compact).toContain('var(--dsw-touch-target)')
+    expect(compact).not.toContain('flex-direction: column')
+    expect(compact).toContain('align-self: center')
+    expect(compact).toContain('min-height: var(--dsw-touch-target)')
   })
 })

@@ -6,6 +6,11 @@ const CLIENT_FACE_INCLUDE: readonly string[] = []
 /** Packages exempted from automatic Client/Host treatment despite declaring `dsh.client`. */
 const CLIENT_FACE_EXCLUDE: readonly string[] = []
 
+/** Required Cordis services whose Host imports are type-only. */
+const REQUIRED_SERVICE_PEERS = {
+  '@deepseek-ai/dsh-api-terminal-controller': ['@deepseek-ai/dsh-subprocess'],
+} as const satisfies Readonly<Record<string, readonly string[]>>
+
 /** Host-only packages whose peer relays are deliberately flattened. */
 const HOST_DEPENDENCY_PACKAGES: readonly string[] = [
   '@deepseek-ai/dsh-llm',
@@ -53,6 +58,7 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
 /** Runtime exports that require every consumer to resolve the provider's shared peer instance. */
 const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-agent-presets': ['environmentForAgent'],
+  '@deepseek-ai/dsh-fs': ['FsError'],
   '@deepseek-ai/dsh-client-connection': ['createRpcStreamHttpHandler', 'RPC_STREAM_PATH'],
   '@deepseek-ai/dsh-commands/brand': ['CommandDefinitionId'],
   '@deepseek-ai/dsh-host-apiproxy': ['DEFAULT_HISTORY_PAGE_TARGET_BYTES', 'toFetchHandler'],
@@ -60,7 +66,6 @@ const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-scope': ['scopeOf', 'scopeTarget'],
   '@deepseek-ai/dsh-session-format/surface': ['SESSION_SURFACE_EVENT_TYPES'],
   '@deepseek-ai/dsh-settings': ['settingsNamespace'],
-  '@deepseek-ai/dsh-subprocess': ['SubprocessExecutableNotFoundError'],
 } as const satisfies HostDependencyExports
 
 /** Exact import specifier to reviewed runtime exports. */
@@ -71,6 +76,7 @@ export interface PackageDependencyPolicy {
   readonly clientFaceInclude: readonly string[]
   readonly clientFaceExclude: readonly string[]
   readonly hostPackages: readonly string[]
+  readonly requiredServicePeers?: Readonly<Record<string, readonly string[]>>
   readonly configurationOnlyDevDependencies: Readonly<Record<string, readonly string[]>>
   readonly duplicateSafePackages?: readonly string[]
   readonly safeHostDependencyExports: HostDependencyExports
@@ -82,6 +88,7 @@ export const PACKAGE_DEPENDENCY_POLICY: PackageDependencyPolicy = {
   clientFaceInclude: CLIENT_FACE_INCLUDE,
   clientFaceExclude: CLIENT_FACE_EXCLUDE,
   hostPackages: HOST_DEPENDENCY_PACKAGES,
+  requiredServicePeers: REQUIRED_SERVICE_PEERS,
   configurationOnlyDevDependencies: CONFIGURATION_ONLY_DEV_DEPENDENCIES,
   duplicateSafePackages: DUPLICATE_SAFE_PACKAGES,
   safeHostDependencyExports: SAFE_HOST_DEPENDENCY_EXPORTS,

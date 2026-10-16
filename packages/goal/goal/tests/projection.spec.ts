@@ -10,7 +10,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -221,6 +221,9 @@ describe('goal projection unit', () => {
     const foreignKind = { type: 'goal/change', seq: 4, time: 5, data: { kind: 'not-a-goal-change' } } as never
     expect(applyGoalProjection(state, foreignKind).failure).toMatch(/invalid kind/)
 
+    const failed = { ...state, failure: 'stop replay' }
+    expect(applyGoalProjection(failed, foreignKind)).toBe(failed)
+
     const missingTimestamps = {
       ...state,
       current: { ...current, createdAt: undefined, updatedAt: undefined },
@@ -231,13 +234,16 @@ describe('goal projection unit', () => {
 
   it('fails host goal access when the projection retained a replay failure', async () => {
     const bench = await harness(true)
+    bench.ctx.goals.create(bench.agent, { objective: 'poisoned replay' })
     const failure = 'goal replay failed at session event 0: invalid restored goal stream'
     const state = bench.ctx.sessionProjections.stateOf(bench.session, 'goal')
     expect(state).toBeDefined()
     Object.assign(state!, { failure })
 
+    // The disarm edge must not rethrow a retained replay failure.
+    await agentEvents(bench.ctx, bench.agent).serial('agent/created', { source: 'resume' })
     expect(() => bench.ctx.goals.get(bench.agent)).toThrow(failure)
-    expect(bench.tailValues().goal).toBeNull()
+    expect(bench.tailValues().goal).toMatchObject({ goal: { objective: 'poisoned replay' } })
   })
 
   it('has no goal key when the goal service is not composed', async () => {

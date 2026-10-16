@@ -38,6 +38,22 @@ function isCompactionCheckpoint(event: Parameters<ConversationNodeDefinition['ma
   return source.kind === 'compact-checkpoint'
 }
 
+/** Context presentation shared by user-role injections and developer messages. */
+function contextMessage(
+  event: Pick<ContextMessageNode, 'seq' | 'time'>,
+  message: Pick<ContextMessageNode, 'content' | 'source'>,
+): ContextMessageNode {
+  return {
+    kind: 'context',
+    seq: event.seq,
+    time: event.time,
+    content: message.content,
+    source: message.source,
+    producer: contextProducer(message.source),
+    form: contextForm(message.source),
+  }
+}
+
 /** User, steering, and injected-context message classification Definition. */
 export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   kind: 'input-message',
@@ -50,17 +66,7 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   start: (_context, match, reader) => {
     if (match.event.type !== 'user/message') throw new Error('input-message start requires user/message')
     const event = match.event
-    if (event.data.source.kind !== 'user') {
-      return {
-        kind: 'context',
-        seq: event.seq,
-        time: event.time,
-        content: event.data.content,
-        source: event.data.source,
-        producer: contextProducer(event.data.source),
-        form: contextForm(event.data.source),
-      }
-    }
+    if (event.data.source.kind !== 'user') return contextMessage(event, event.data)
     const claimed = reader.previous<InboxState>('inbox-next-step')?.state.currentClaimed.has(String(event.data.id)) === true
     return claimed
       ? {
@@ -87,10 +93,25 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   },
 }
 
+/** Developer history uses the input-message lifecycle and context presentation. */
+export const developerMessageDefinition: ConversationNodeDefinition<MessageNode> = {
+  ...messageDefinition,
+  kind: 'developer-message',
+  match: event => event.type === 'developer/message'
+    ? { id: String(event.data.message.id), role: 'start' }
+    : null,
+  start: (_context, match) => {
+    const event = match.event
+    if (event.type !== 'developer/message') throw new Error('developer-message start requires developer/message')
+    return contextMessage(event, event.data.message)
+  },
+}
+
 /**
- * Register the user, steering, and injected-context message contribution.
+ * Register user, steering, injected-context, and developer message contributions.
  * @param ctx - owning UI Conversation context.
  */
 export function registerMessageConversationNode(ctx: Context): void {
   ctx.conversationEvents.register(messageDefinition)
+  ctx.conversationEvents.register(developerMessageDefinition)
 }

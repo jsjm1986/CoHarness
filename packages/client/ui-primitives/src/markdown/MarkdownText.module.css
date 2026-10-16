@@ -94,9 +94,10 @@
 
 .markdown a {
   /* deepsuite markdown.css uses brand-text (blue in newDesign); this sheet
-     keeps design-platform brand-text as near-black, so links use the blue
-     business-primary alias instead. */
-  color: var(--dsw-alias-state-business-primary);
+     keeps design-platform brand-text as near-black, so links use the
+     dedicated link alias instead. */
+  color: var(--dsw-alias-link);
+  font-weight: 500;
   transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
   position: relative;
   text-decoration: none;
@@ -109,34 +110,28 @@
   margin-right: -3px;
 }
 
-/* Animated underline (beautifului .animated-underline, MIT): a 1px
-   currentColor bar draws left-to-right on hover, offset 3px below the
-   baseline. */
-.markdown a::after {
-  content: '';
-  position: absolute;
-  left: -3px;
-  right: -3px;
-  bottom: -1px;
-  height: 1px;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 280ms var(--dsw-motion-ease-out-expo, var(--ds-ease-in-out));
-}
-
-.markdown a:hover::after,
-.markdown a:focus::after {
-  transform: scaleX(1);
-}
-
 .markdown a:hover,
 .markdown a:focus {
   outline: none;
+  text-decoration: underline dotted var(--dsw-alias-link);
+  text-underline-offset: 3px;
 }
 
 .markdown a:focus-visible {
   box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
+}
+
+/* Leading link-category glyph inside anchors, file mentions, and
+   URL-promoted inline code: outline glyphs ride the link's currentColor.
+   1.1em keeps the glyph proportional to the surrounding text's size (it
+   shrinks with the code chip's 0.875em); the small negative offset seats
+   its optical center on the cap height. */
+.linkIcon {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.25em;
+  margin-right: 5px;
 }
 
 .markdown :where(ul, ol) {
@@ -189,10 +184,9 @@
 }
 
 .markdown blockquote {
-  border-left: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent);
+  border-left: 2px solid var(--dsw-alias-label-caption);
   margin: var(--dsw-space-4) 0 0;
   padding-left: 14px;
-  color: var(--dsw-alias-label-secondary);
 }
 
 .markdown pre {
@@ -207,10 +201,11 @@
   box-sizing: border-box;
   font: var(--dsw-font-markdown-code);
   font-family: var(--ds-font-family-code);
-  font-size: 0.9em !important;
+  font-size: 0.875em !important;
   background-color: var(--dsw-alias-markdown-inline-code);
-  border-radius: 4px;
-  padding: 0.125em 0.25em;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  padding: 0 5px;
 }
 
 .markdown :where(h1, h2, h3, h4, h5, h6) code {
@@ -233,8 +228,6 @@
   max-width: 100%;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  border: 0.5px solid var(--dsw-alias-border-l1);
-  border-radius: 10px;
 }
 
 /* Inside a workbench pane the scroller becomes the cell-cap query container,
@@ -278,11 +271,9 @@
 
 .tableScroll th {
   text-align: start;
-  padding: 10px var(--dsw-space-3);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+  padding: 10px var(--dsw-space-4);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
   border-top: none;
-  background: var(--dsw-alias-bg-inset);
-  color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-markdown-table-head);
   max-width: 320px;
   max-width: min(30cqw, 320px);
@@ -290,8 +281,8 @@
 }
 
 .tableScroll td {
-  padding: 10px var(--dsw-space-3);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+  padding: 10px var(--dsw-space-4);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
   font: var(--dsw-font-markdown-table);
   max-width: 320px;
   max-width: min(30cqw, 320px);
@@ -300,16 +291,11 @@
 
 .tableScroll th:first-child,
 .tableScroll td:first-child {
-  padding-left: var(--dsw-space-3);
+  padding-left: 0;
 }
 
-.tableScroll td:last-child,
-.tableScroll th:last-child {
-  padding-right: var(--dsw-space-3);
-}
-
-.tableScroll tbody tr:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+.tableScroll td:last-child {
+  padding-right: 0;
 }
 
 .tableScroll table code {
@@ -343,8 +329,8 @@
 }
 
 /* Inline file mention: the same link language this sheet gives anchors (and
-   thereby URL-promoted inline code) — link-blue at rest, underline only on
-   hover/focus. An underline at rest reads badly inside the code chip, where
+   thereby URL-promoted inline code) — link-blue at rest, dotted underline only
+   on hover/focus. An underline at rest reads badly inside the code chip, where
    it collides with monospace descenders and the pill background. */
 .fileMention {
   margin: 0;
@@ -352,7 +338,8 @@
   border: none;
   background: none;
   font: inherit;
-  color: var(--dsw-alias-state-business-primary);
+  font-weight: 500;
+  color: var(--dsw-alias-link);
   text-decoration: none;
   cursor: pointer;
 }
@@ -365,7 +352,7 @@
 .fileMention:hover,
 .fileMention:focus {
   outline: none;
-  text-decoration: underline var(--dsw-alias-state-business-primary);
+  text-decoration: underline dotted var(--dsw-alias-link);
   text-underline-offset: 3px;
 }
 
@@ -417,12 +404,7 @@
 
 .compact a:hover,
 .compact a:focus,
-.compact .fileLink {
-  max-width: 100%;
-  text-align: inherit;
-}
-
-.fileMention:hover,
+.compact .fileMention:hover,
 .compact .fileMention:focus {
   text-decoration-color: currentColor;
 }
@@ -505,4 +487,30 @@
 
 .compact :global(.katex-display) {
   margin: 4px 0;
+}
+
+.imageButton {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  vertical-align: middle;
+  cursor: zoom-in;
+}
+.imageButton .image { max-width: min(100%, 640px); max-height: 360px; }
+.imageButton:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 3px;
+}
+.previewName {
+  display: block;
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
 }

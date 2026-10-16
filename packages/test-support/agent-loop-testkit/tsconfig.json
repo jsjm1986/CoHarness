@@ -24,10 +24,16 @@
       "path": "../../core/tools"
     },
     {
+      "path": "../../fs/fs-local"
+    },
+    {
       "path": "../../llm/llm"
     },
     {
       "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../session/working-directory"
     },
     {
       "path": "../../../vendor/cordis"

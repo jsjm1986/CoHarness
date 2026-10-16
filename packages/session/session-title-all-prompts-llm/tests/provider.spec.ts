@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import LlmRuntime, { createUserMessage, LlmAdapter  } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
-import SessionTitleService from '@deepseek-ai/dsh-session-title'
+import SessionTitleService, { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title'
 import * as providerPlugin from '@deepseek-ai/dsh-session-title-all-prompts-llm'
 
 class RecordingAdapter extends LlmAdapter {
@@ -37,7 +37,8 @@ describe('all-messages LLM title provider', () => {
       content: [{ type: 'text', text: 'inherited prompt' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     seeded.append('session/title', {
-      title: 'Inherited fallback', messageSeqs: [inherited.seq], source: { kind: 'fallback' },
+      title: 'Inherited provider title', messageSeqs: [inherited.seq],
+      source: { kind: 'provider', provider: SessionTitleProviderId('seed-provider') },
     })
     seeded.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 

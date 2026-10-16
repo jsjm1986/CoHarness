@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import * as agentCore from '@deepseek-ai/dsh-agent-spine-demo'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import * as jsonrpc from '../src/index.ts'
 
@@ -65,6 +66,7 @@ async function mountPlugin(
   } = {},
 ): Promise<ApplyHarness> {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx, storageDir)
   await ctx.plugin(agentCore, { workspaceContext: false })
   await ctx.plugin(JsonlSessionPersistence, { root: storageDir })
   await new Promise(resolve => setTimeout(resolve, 50))

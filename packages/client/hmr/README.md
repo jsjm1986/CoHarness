@@ -60,7 +60,7 @@ This section explains how the reload chain is built; observable behavior is cove
 
 ### Design concept
 
-The Host half watches each package's stamped entry artifact and serves `/plugins/events`. It forwards existing graph-change and rebuilt notifications; every new connection receives the current full graph. A graph describes the browser’s desired entries and carries no Host cleanup-completion guarantee. Host activation and cleanup remain owned by the Host lifecycle. The entry bytes plus completed-build timestamp identify the revision; unchanged artifacts require no content read. The browser half delegates both frame kinds to Client Modules, which serializes entry changes and waits for browser resource cleanup.
+The Host half watches each package's stamped entry artifact and serves `/plugins/events`. It forwards existing graph-change and rebuilt notifications; every new connection receives the current full graph. A graph describes the browser’s desired entries and carries no Host cleanup-completion guarantee. Host activation and cleanup remain owned by the Host lifecycle. The entry's mtime, ctime, and size identify the revision without hashing its contents; unchanged metadata requires no content read. Host restarts over unchanged artifacts keep the same revisions, so reconnecting the graph stream does not replace browser plugins. The browser half delegates both frame kinds to Client Modules, which serializes entry changes and waits for browser resource cleanup.
 
 ### The browser swap
 

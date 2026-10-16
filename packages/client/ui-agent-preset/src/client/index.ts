@@ -1,9 +1,10 @@
 /**
- * Agent-preset surface plugin, browser half — four surfaces over one roster:
+ * Agent-preset surface plugin, browser half — five surfaces over one roster:
  * a General-settings row for the default preset, a chip on the new-session
  * screen for the session about to start, a read-only label in the session
- * header, and a settings section that manages the roster (copy, delete,
- * default, and the way into a preset's own files).
+ * header, a settings section that manages the roster (copy, delete,
+ * default, and the way into a preset's own files), and a Creator entry in
+ * the Plugins page's add menu.
  *
  * A running session keeps the composition it began with (the host refuses to
  * adopt an existing session under a different preset). That is what splits
@@ -20,8 +21,15 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the settings shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+// Type-only: pulls the Plugins page's SlotMap merge (the 'plugins.add.actions' entry).
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+// Type-only: pulls the shell layout's Context merge (ctx.layout) for the
+// panel reset a new-session gesture performs.
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { AgentPresetLabel } from './AgentPresetLabel.tsx'
 import type { AgentPresetLabelInjected } from './AgentPresetLabel.tsx'
+import { CreatePluginMenuItem } from './CreatePluginMenuItem.tsx'
+import type { CreatePluginMenuItemInjected } from './CreatePluginMenuItem.tsx'
 import { AgentPresetRow } from './AgentPresetRow.tsx'
 import type { AgentPresetRowInjected } from './AgentPresetRow.tsx'
 import { AgentPresetSeat } from './AgentPresetSeat.tsx'
@@ -35,6 +43,7 @@ import { en, zh } from './locales.ts'
 import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController } from './settings-store.ts'
 
 export type { AgentPresetLabelInjected, AgentPresetLabelProps } from './AgentPresetLabel.tsx'
+export type { CreatePluginMenuItemInjected } from './CreatePluginMenuItem.tsx'
 export type { AgentPresetRowInjected, AgentPresetRowProps } from './AgentPresetRow.tsx'
 export type { AgentPresetSeatInjected, AgentPresetSeatProps } from './AgentPresetSeat.tsx'
 export type { AgentPresetSectionInjected, AgentPresetSectionProps } from './AgentPresetSection.tsx'
@@ -101,11 +110,12 @@ export function apply(ctx: ClientContext): void {
     return () => { for (const dispose of disposers) dispose() }
   }, 'ui-agent-preset: settings refresh')
 
-  // The settings section's conversational authoring entry: stage the
+  // The conversational authoring entries — the settings section's button and
+  // the Plugins page's add-menu item — share one launch: stage the
   // self-referential preset and land a new session on it. Bound inside the
   // conversation scope below (the seat and the session flow live there) and
-  // unbound with it, so the section's face reads the current binding per
-  // render and simply hides the button while no flow exists.
+  // unbound with it, so each surface's face reads the current binding per
+  // render and simply withholds its entry while no flow exists.
   let creatorDraft: (() => void) | undefined
 
   // The seat lives inside the conversation scope below, so the sync a
@@ -142,7 +152,7 @@ export function apply(ctx: ClientContext): void {
         }
     }, (sessionId, agentPreset) => {
       scope.sessions.noteAgentPreset(sessionId as never, agentPreset)
-    }, ctx.settingsScope.developerTools.enabled)
+    })
     seatRef = seat
 
     const panes = new Map<SessionId, { seat: AgentPresetSeatController; labels: AgentPresetSettingsController }>()
@@ -170,7 +180,7 @@ export function apply(ctx: ClientContext): void {
             ...(summary.agentPreset === undefined ? {} : { agentPreset: summary.agentPreset }) }
         }, (sessionId, preset) => {
           if (scope.sessions.binding(id) === binding) scope.sessions.noteAgentPreset(sessionId as SessionId, preset)
-        }, ctx.settingsScope.developerTools.enabled),
+        }),
         labels: new AgentPresetSettingsController(connection.forSession?.(id).api ?? api, remote, ctx.settingsScope.describe()),
       }
       panes.set(id, owned)
@@ -189,6 +199,7 @@ export function apply(ctx: ClientContext): void {
         },
         load: () => selected.load(),
         select: (preset: string) => selected.select(preset),
+        dismissRefusal: (error) => { selected.dismissRefusal(error) },
         introduced: () => { selected.introduced() },
       }
     }
@@ -200,12 +211,18 @@ export function apply(ctx: ClientContext): void {
 
     scope.effect(() => {
       // Turning Developer tools off clears every staged pick before any
-      // apply can compose it — `apply()` drops the stage itself.
+      // apply can compose it. The stage made afterwards still lands — the
+      // settings section's Creator entry and blank-session sync stay usable
+      // while the preference is off.
       const developerTools = ctx.settingsScope.developerTools.enabled
       const stopGate = developerTools.subscribe(() => {
         if (developerTools.getSnapshot()) return
+        seat.clearStage()
         void seat.apply()
-        for (const value of panes.values()) void value.seat.apply()
+        for (const value of panes.values()) {
+          value.seat.clearStage()
+          void value.seat.apply()
+        }
       })
       // Connecting a workspace either creates a blank session or reuses one,
       // and either way the chip's pick predates it — so the stage is applied
@@ -237,10 +254,19 @@ export function apply(ctx: ClientContext): void {
       // on: the chip's list-change applier composes the blank session the
       // workspace connect produces or reuses.
       creatorDraft = () => {
-        if (!section.store.getSnapshot().showPicker) return
+        // Each entry renders only after its own roster load proved the
+        // deployment offers preset selection; re-check both stores so a
+        // surface the user never opened cannot veto the other's launch.
+        const offered = section.store.getSnapshot().showPicker
+          || controller.store.getSnapshot().status === 'ready'
+        if (!offered) return
         // The introduce cue makes the chip announce the pick the user never
-        // made on this screen — the stage happened back in settings.
+        // made on this screen — the stage happened on another surface.
         seat.stage('cordis', true)
+        // The draft lands on the Conversation surface: a global main panel
+        // (the Plugins page this entry lives on) would otherwise stay mounted
+        // over it — the panel only yields when the session selection changes.
+        ctx.get('layout')?.selectPanel(null)
         scope.workspaces.startSession()
       }
       const chip = scope.slots.register({
@@ -267,6 +293,20 @@ export function apply(ctx: ClientContext): void {
         label()
       }
     }, 'ui-agent-preset: new-session chip and header label')
+
+    // The Plugins page's add menu offers the same Creator entry the settings
+    // section does: the item disposes with this scope, so its callback reads
+    // the current draft binding rather than capturing one.
+    scope.slots.inject('plugins.add.actions', () => scope.slots.register({
+      name: 'plugins.add.actions',
+      id: 'create-plugin',
+      locale: 'settings.agentPreset',
+      inject: (): CreatePluginMenuItemInjected => ({
+        hooks: { agentPresets: controller.store },
+        load: () => controller.load(),
+        startCreatorDraft: () => { creatorDraft?.() },
+      }),
+    }, CreatePluginMenuItem))
   })
 
   const sectionInjected = (): AgentPresetSectionInjected => ({

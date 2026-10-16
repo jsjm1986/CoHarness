@@ -3,14 +3,14 @@
 import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { mkdir } from 'node:fs/promises'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { UserDocDirectoryId, UserDocStore } from '@deepseek-ai/dsh-userdoc'
+import { UserDocStore } from '@deepseek-ai/dsh-userdoc'
 import type {
   BeginUserDocUpload,
   ResolveUserDocTarget,
   StoredUserDoc,
+  UserDocDirectoryId,
   UserDocDirectoryListing,
   UserDocDirectoryPage,
   UserDocDirectoryRef,
@@ -26,30 +26,7 @@ import type {
   UserDocTrashRef,
 } from '@deepseek-ai/dsh-userdoc'
 import { expandHomePath } from '@deepseek-ai/dsh-home-paths'
-import {
-  createDocDirectory,
-  listDocDirectories,
-  listDocDirectory,
-  listDocFiles,
-  moveDocFile,
-  openDocFile,
-  publishDocPartial,
-  readDocFile,
-  removeDocDirectory,
-  removeDocFile,
-  renameDocDirectory,
-  resolveDocTarget,
-  saveDocFile,
-  statDocFile,
-} from './store.ts'
-import {
-  listTrash,
-  purgeDocument,
-  purgeDueDocuments,
-  restoreDocument,
-  trashDocument,
-} from './trash.ts'
-import { migrateLegacyDocuments } from './migration.ts'
+import { LocalUserDocFs, SharedRead } from './local-fs.ts'
 import {
   DEFAULT_UPLOAD_CHUNK_BYTES,
   DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
@@ -58,7 +35,6 @@ import {
   DEFAULT_UPLOAD_MIN_FREE_BYTES,
   DEFAULT_UPLOAD_SESSION_TTL_MS,
   MAX_UPLOAD_TIMER_DELAY_MS,
-  LocalUploadManager,
 } from './upload.ts'
 
 export {
@@ -101,6 +77,8 @@ export {
   statDocFile,
 } from './store.ts'
 export { listTrash, purgeDocument, purgeDueDocuments, restoreDocument, trashDocument } from './trash.ts'
+export { LocalUserDocFs } from './local-fs.ts'
+export type { LocalUserDocFsOptions } from './local-fs.ts'
 
 /** Default document directory name below the runtime operating-system home. */
 export const DEFAULT_DOCUMENT_DIR_NAME = 'documents'
@@ -114,68 +92,6 @@ export const DEFAULT_MAX_FILES_PER_MESSAGE = 20
 export const DEFAULT_MAX_MESSAGE_BYTES = 200 * 1024 * 1024
 /** Default maximum bytes of a document inlined into a prompt as text. */
 export const DEFAULT_MAX_INLINE_TEXT_BYTES = 256 * 1024
-
-function abortError(signal: AbortSignal): Error {
-  return signal.reason instanceof Error
-    ? signal.reason
-    : new Error('Document listing was aborted.', { cause: signal.reason })
-}
-
-/** Share one filesystem scan while keeping cancellation local to each waiter. */
-class SharedRead<T> {
-  private settled = false
-  private waiters = 0
-  readonly controller = new AbortController()
-  readonly promise: Promise<T>
-
-  constructor(start: (signal: AbortSignal) => Promise<T>) {
-    this.promise = start(this.controller.signal).finally(() => {
-      this.settled = true
-    })
-  }
-
-  wait(signal?: AbortSignal): Promise<T> {
-    if (signal?.aborted) {
-      if (this.waiters === 0 && !this.settled) this.controller.abort()
-      signal.throwIfAborted()
-    }
-    this.waiters += 1
-    if (signal === undefined) return this.promise.finally(() => { this.release(false) })
-    let released = false
-    const release = (cancelled: boolean): void => {
-      if (released) return
-      released = true
-      this.release(cancelled)
-    }
-    return new Promise<T>((resolve, reject) => {
-      const onAbort = (): void => {
-        release(true)
-        reject(abortError(signal))
-      }
-      signal.addEventListener('abort', onAbort, { once: true })
-      if (signal.aborted) onAbort()
-      void this.promise.then((value) => {
-        signal.removeEventListener('abort', onAbort)
-        release(false)
-        resolve(value)
-      }, (error: unknown) => {
-        signal.removeEventListener('abort', onAbort)
-        release(false)
-        reject(error instanceof Error ? error : new Error(String(error), { cause: error }))
-      })
-    })
-  }
-
-  /** Cancel the shared scan when its cached result is no longer useful. */
-  cancel(reason = new Error('document scan invalidated')): void {
-    if (!this.settled) this.controller.abort(reason)
-  }
-
-  private release(cancelled: boolean): void {
-    this.waiters -= 1
-    if (cancelled && this.waiters === 0 && !this.settled) this.controller.abort()
-  }
-}
 
 /** Local document backend configuration. */
 export interface Config {
@@ -231,22 +147,11 @@ export class LocalUserDocStore extends UserDocStore {
     trashRetentionDays: z.number().step(1).min(1).default(30),
   })
 
-  /** Absolute document root. */
-  readonly root: string
-  readonly limits: UserDocLimits
-  private readonly uploads: LocalUploadManager
-  private readonly legacyRoot: string | undefined
-  private readonly trashRetentionMs: number
-  private readonly directoryReads = new Map<string, SharedRead<UserDocDirectoryListing>>()
+  private readonly engine: LocalUserDocFs
   private readonly pageReads = new Map<string, SharedRead<UserDocDirectoryPage>>()
-  private readonly trashReads = new Map<string, SharedRead<UserDocTrashRef[]>>()
   private readonly trashPageReads = new Map<string, SharedRead<UserDocTrashPage>>()
-  private readonly fullReads = new Map<string, SharedRead<UserDocRef[]>>()
   /** Includes scans removed from lookup maps by a mutation, so disposal can still join them. */
   private readonly activeReads = new Set<SharedRead<unknown>>()
-  private ready: Promise<void> | undefined
-  private disposed = false
-  private trashSweepTask: Promise<void> | undefined
 
   constructor(ctx: Context, config: Config) {
     super(ctx)
@@ -257,16 +162,15 @@ export class LocalUserDocStore extends UserDocStore {
     }
     const usesDefaultRoot = config.uploadRoot === undefined
     const configuredRoot = config.uploadRoot
-    this.root = resolve(configuredRoot === undefined
+    const root = resolve(configuredRoot === undefined
       ? join(homedir(), DEFAULT_DOCUMENT_DIR_NAME)
       : expandHomePath(configuredRoot))
-    this.legacyRoot = config.legacyUploadRoot === undefined
+    const legacyRoot = config.legacyUploadRoot === undefined
       ? usesDefaultRoot ? join(homedir(), LEGACY_UPLOAD_DIR_NAME) : undefined
       : resolve(expandHomePath(config.legacyUploadRoot))
-    this.trashRetentionMs = (config.trashRetentionDays ?? 30) * 86_400_000
-    registerManagedDataPath({ owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: this.root }, process.env.DSH_MANAGED_DATA_MANIFEST)
-    if (this.legacyRoot !== undefined) registerManagedDataPath({ owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: this.legacyRoot }, process.env.DSH_MANAGED_DATA_MANIFEST)
-    this.limits = Object.freeze({
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: root }, process.env.DSH_MANAGED_DATA_MANIFEST)
+    if (legacyRoot !== undefined) registerManagedDataPath({ owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: legacyRoot }, process.env.DSH_MANAGED_DATA_MANIFEST)
+    const limits = Object.freeze({
       maxFileBytes: config.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES,
       maxFilesPerMessage: config.maxFilesPerMessage ?? DEFAULT_MAX_FILES_PER_MESSAGE,
       maxMessageBytes: config.maxMessageBytes ?? DEFAULT_MAX_MESSAGE_BYTES,
@@ -278,73 +182,48 @@ export class LocalUserDocStore extends UserDocStore {
         resumable: true as const,
       }),
     })
-    this.uploads = new LocalUploadManager({
-      root: this.root,
-      limits: this.limits,
-      resolveTarget: input => this.resolveTarget(input),
-      publish: (target, partial, bytes, expectedSha256) => publishDocPartial(this.root, target, partial, bytes, expectedSha256),
-    }, {
-      chunkBytes: config.uploadChunkBytes ?? DEFAULT_UPLOAD_CHUNK_BYTES,
-      sessionTtlMs: config.uploadSessionTtlMs ?? DEFAULT_UPLOAD_SESSION_TTL_MS,
-      minFreeBytes: config.uploadMinFreeBytes ?? DEFAULT_UPLOAD_MIN_FREE_BYTES,
-      maxConcurrent: config.uploadMaxConcurrent ?? DEFAULT_UPLOAD_MAX_CONCURRENT,
-      cleanupIntervalMs: config.uploadCleanupIntervalMs ?? DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
-      manifestMaxBytes: config.uploadManifestMaxBytes ?? DEFAULT_UPLOAD_MANIFEST_MAX_BYTES,
+    this.engine = new LocalUserDocFs({
+      root,
+      ...(legacyRoot === undefined ? {} : { legacyRoot }),
+      limits,
+      upload: {
+        chunkBytes: config.uploadChunkBytes ?? DEFAULT_UPLOAD_CHUNK_BYTES,
+        sessionTtlMs: config.uploadSessionTtlMs ?? DEFAULT_UPLOAD_SESSION_TTL_MS,
+        minFreeBytes: config.uploadMinFreeBytes ?? DEFAULT_UPLOAD_MIN_FREE_BYTES,
+        maxConcurrent: config.uploadMaxConcurrent ?? DEFAULT_UPLOAD_MAX_CONCURRENT,
+        cleanupIntervalMs: config.uploadCleanupIntervalMs ?? DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
+        manifestMaxBytes: config.uploadManifestMaxBytes ?? DEFAULT_UPLOAD_MANIFEST_MAX_BYTES,
+      },
+      sweepIntervalMs: config.uploadCleanupIntervalMs ?? DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
+      trashRetentionMs: (config.trashRetentionDays ?? 30) * 86_400_000,
     })
     ctx.effect(() => {
-      const timer = setInterval(() => {
-        if (this.disposed || this.trashSweepTask !== undefined) return
-        const task = Promise.resolve().then(() => purgeDueDocuments(this.root)).catch(() => {
-          // A later sweep retries after a transient filesystem failure.
-        }).then(() => undefined).finally(() => {
-          if (this.trashSweepTask === task) this.trashSweepTask = undefined
-        })
-        this.trashSweepTask = task
-      }, config.uploadCleanupIntervalMs ?? DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS)
+      this.engine.attach()
       return () => {
-        this.disposed = true
-        clearInterval(timer)
-        const reads = this.readOperations()
-        const ready = this.ready
+        const reads = [...this.activeReads]
         for (const read of reads) read.cancel(new Error('document store disposed'))
-        return Promise.allSettled([
-          ...reads.map(read => read.promise),
-          ...(ready === undefined ? [] : [ready]),
-          ...(this.trashSweepTask === undefined ? [] : [this.trashSweepTask]),
-        ]).then(() => this.uploads.stop()).then(() => undefined)
+        return Promise.allSettled([...reads.map(read => read.promise), this.engine.dispose()])
+          .then(() => undefined)
       }
     }, 'userdoc-local: upload cleanup')
   }
 
-  private ensureReady(): Promise<void> {
-    if (this.disposed) return Promise.reject(new Error('document store is disposed'))
-    if (this.ready !== undefined) return this.ready
-    const operation = (async () => {
-      if (this.legacyRoot === undefined) await mkdir(this.root, { recursive: true, mode: 0o700 })
-      else await migrateLegacyDocuments(this.legacyRoot, this.root)
-      await this.uploads.cleanupExpired()
-      await this.uploads.resumePendingFinalizations()
-      if (!this.disposed) this.uploads.startCleanup()
-    })()
-    const ready = operation.catch((error: unknown) => {
-      // A prewarm can race a temporarily unavailable legacy root. Do not pin
-      // the rejected promise forever; the next request must be able to retry
-      // initialization after the filesystem recovers.
-      if (this.ready === ready) this.ready = undefined
-      throw error
-    })
-    this.ready = ready
-    return ready
+  /** Absolute document root. */
+  get root(): string {
+    return this.engine.root
+  }
+
+  get limits(): UserDocLimits {
+    return this.engine.limits
   }
 
   /** Pre-initialize storage and maintenance before the first browser request. */
   async warm(): Promise<void> {
-    await this.ensureReady()
+    await this.engine.warm()
   }
 
   async resolveTarget(input: ResolveUserDocTarget): Promise<UserDocTarget> {
-    await this.ensureReady()
-    return resolveDocTarget(this.root, input.directoryId ?? UserDocDirectoryId(''), input.name)
+    return this.engine.resolveTarget(input)
   }
 
   async save(
@@ -352,21 +231,17 @@ export class LocalUserDocStore extends UserDocStore {
     body: ReadableStream<Uint8Array>,
     signal?: AbortSignal,
   ): Promise<UserDocRef> {
-    await this.ensureReady()
-    const saved = await saveDocFile(this.root, target, body, this.limits, signal)
+    const saved = await this.engine.save(target, body, signal)
     this.invalidateReads()
     return saved
   }
 
   async beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession> {
-    await this.ensureReady()
-    return this.uploads.begin(input)
+    return this.engine.beginUpload(input)
   }
 
   async inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession> {
-    signal?.throwIfAborted()
-    await this.ensureReady()
-    return this.uploads.inspect(uploadId)
+    return this.engine.inspectUpload(uploadId, signal)
   }
 
   async writeUploadChunk(
@@ -374,54 +249,28 @@ export class LocalUserDocStore extends UserDocStore {
     chunk: UserDocUploadChunk,
     signal?: AbortSignal,
   ): Promise<UserDocUploadSession> {
-    await this.ensureReady()
-    return this.uploads.write(uploadId, chunk, signal)
+    return this.engine.writeUploadChunk(uploadId, chunk, signal)
   }
 
   async completeUpload(uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal): Promise<UserDocUploadSession> {
-    signal?.throwIfAborted()
-    await this.ensureReady()
-    const completed = await this.uploads.complete(uploadId, sha256)
+    const completed = await this.engine.completeUpload(uploadId, sha256, signal)
     if (completed.state === 'complete') this.invalidateReads()
     return completed
   }
 
   async cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void> {
-    signal?.throwIfAborted()
-    await this.ensureReady()
-    return this.uploads.cancel(uploadId)
+    return this.engine.cancelUpload(uploadId, signal)
   }
 
   async list(signal?: AbortSignal): Promise<UserDocRef[]> {
-    await this.ensureReady()
-    const existing = this.fullReads.get('root')
-    if (existing !== undefined) return existing.wait(signal)
-    const operation = new SharedRead<UserDocRef[]>(scanSignal => listDocFiles(this.root, scanSignal))
-    this.activeReads.add(operation)
-    this.fullReads.set('root', operation)
-    void operation.promise.finally(() => {
-      if (this.fullReads.get('root') === operation) this.fullReads.delete('root')
-      this.activeReads.delete(operation)
-    }).catch(() => {})
-    return operation.wait(signal)
+    return this.engine.list(signal)
   }
 
   async listDirectory(
     directoryId: UserDocDirectoryId,
     signal?: AbortSignal,
   ): Promise<UserDocDirectoryListing> {
-    await this.ensureReady()
-    const key = String(directoryId)
-    const existing = this.directoryReads.get(key)
-    if (existing !== undefined) return existing.wait(signal)
-    const operation = new SharedRead<UserDocDirectoryListing>(scanSignal => listDocDirectory(this.root, directoryId, scanSignal))
-    this.activeReads.add(operation)
-    this.directoryReads.set(key, operation)
-    void operation.promise.finally(() => {
-      if (this.directoryReads.get(key) === operation) this.directoryReads.delete(key)
-      this.activeReads.delete(operation)
-    }).catch(() => {})
-    return operation.wait(signal)
+    return this.engine.listDirectory(directoryId, signal)
   }
 
   override async listDirectoryPage(
@@ -429,8 +278,7 @@ export class LocalUserDocStore extends UserDocStore {
     query: UserDocListQuery = {},
     signal?: AbortSignal,
   ): Promise<UserDocDirectoryPage> {
-    await this.ensureReady()
-    const key = `${String(directoryId)}\u0000${JSON.stringify(query)}`
+    const key = `${String(directoryId)} ${JSON.stringify(query)}`
     const existing = this.pageReads.get(key)
     if (existing !== undefined) return existing.wait(signal)
     const operation = new SharedRead<UserDocDirectoryPage>(scanSignal => super.listDirectoryPage(directoryId, query, scanSignal))
@@ -443,43 +291,20 @@ export class LocalUserDocStore extends UserDocStore {
     return operation.wait(signal)
   }
 
-  async listDirectories(signal?: AbortSignal): Promise<UserDocDirectoryRef[]> {
-    await this.ensureReady()
-    return listDocDirectories(this.root, signal)
-  }
-
   private invalidateReads(): void {
-    // Existing callers keep their in-flight snapshot; only later requests must
-    // miss the result after a mutation.
-    this.directoryReads.clear()
     this.pageReads.clear()
-    this.trashReads.clear()
     this.trashPageReads.clear()
-    this.fullReads.clear()
   }
 
-  /** Snapshot every cached scan so invalidation and disposal can cancel it once. */
-  private readOperations(): SharedRead<unknown>[] {
-    return [...this.activeReads]
+  async listDirectories(signal?: AbortSignal): Promise<UserDocDirectoryRef[]> {
+    return this.engine.listDirectories(signal)
   }
 
   async listTrash(signal?: AbortSignal): Promise<UserDocTrashRef[]> {
-    signal?.throwIfAborted()
-    await this.ensureReady()
-    const existing = this.trashReads.get('root')
-    if (existing !== undefined) return existing.wait(signal)
-    const operation = new SharedRead<UserDocTrashRef[]>(scanSignal => listTrash(this.root, scanSignal))
-    this.activeReads.add(operation)
-    this.trashReads.set('root', operation)
-    void operation.promise.finally(() => {
-      if (this.trashReads.get('root') === operation) this.trashReads.delete('root')
-      this.activeReads.delete(operation)
-    }).catch(() => {})
-    return operation.wait(signal)
+    return this.engine.listTrash(signal)
   }
 
   override async listTrashPage(query: UserDocListQuery = {}, signal?: AbortSignal): Promise<UserDocTrashPage> {
-    await this.ensureReady()
     const key = JSON.stringify(query)
     const existing = this.trashPageReads.get(key)
     if (existing !== undefined) return existing.wait(signal)
@@ -494,73 +319,59 @@ export class LocalUserDocStore extends UserDocStore {
   }
 
   async trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef> {
-    signal?.throwIfAborted()
-    await this.ensureReady()
-    const trashed = await trashDocument(this.root, docId, this.trashRetentionMs)
+    const trashed = await this.engine.trash(docId, signal)
     this.invalidateReads()
     return trashed
   }
 
   async restore(docId: UserDocId, directoryId?: UserDocDirectoryId, name?: string, signal?: AbortSignal): Promise<UserDocRef> {
-    signal?.throwIfAborted()
-    await this.ensureReady()
-    const restored = await restoreDocument(this.root, docId, directoryId, name)
+    const restored = await this.engine.restore(docId, directoryId, name, signal)
     this.invalidateReads()
     return restored
   }
 
   async purge(docId: UserDocId, signal?: AbortSignal): Promise<void> {
-    signal?.throwIfAborted()
-    await this.ensureReady()
-    await purgeDocument(this.root, docId)
+    await this.engine.purge(docId, signal)
     this.invalidateReads()
   }
 
   async createDirectory(parentDirectoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef> {
-    await this.ensureReady()
-    const created = await createDocDirectory(this.root, parentDirectoryId, name)
+    const created = await this.engine.createDirectory(parentDirectoryId, name)
     this.invalidateReads()
     return created
   }
 
   async renameDirectory(directoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef> {
-    await this.ensureReady()
-    const renamed = await renameDocDirectory(this.root, directoryId, name)
+    const renamed = await this.engine.renameDirectory(directoryId, name)
     this.invalidateReads()
     return renamed
   }
 
   async removeDirectory(directoryId: UserDocDirectoryId): Promise<void> {
-    await this.ensureReady()
-    await removeDocDirectory(this.root, directoryId)
+    await this.engine.removeDirectory(directoryId)
     this.invalidateReads()
   }
 
   async move(docId: UserDocId, directoryId: UserDocDirectoryId): Promise<UserDocRef> {
-    await this.ensureReady()
-    const moved = await moveDocFile(this.root, docId, directoryId)
+    const moved = await this.engine.move(docId, directoryId)
     this.invalidateReads()
     return moved
   }
 
   async stat(docId: UserDocId, signal?: AbortSignal): Promise<UserDocRef> {
-    await this.ensureReady()
-    return statDocFile(this.root, docId, signal)
+    return this.engine.stat(docId, signal)
   }
 
   async read(docId: UserDocId, signal?: AbortSignal): Promise<StoredUserDoc> {
-    await this.ensureReady()
-    return readDocFile(this.root, docId, signal)
+    return this.engine.read(docId, signal)
   }
 
   async openRead(docId: UserDocId): Promise<{ ref: UserDocRef; body: ReadableStream<Uint8Array> }> {
-    await this.ensureReady()
-    return openDocFile(this.root, docId)
+    return this.engine.openRead(docId)
   }
 
   async remove(docId: UserDocId, signal?: AbortSignal): Promise<void> {
-    await this.ensureReady()
-    await removeDocFile(this.root, docId, signal)
+    await this.engine.remove(docId, signal)
     this.invalidateReads()
   }
 }

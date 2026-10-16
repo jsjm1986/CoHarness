@@ -456,7 +456,8 @@ currentSelection(): ModelSelection
 
 /**
  * Save the complete default model selection. A deployment without a settings
- * provider keeps its composition entry.
+ * provider keeps its composition entry. Saves commit in submission order; a
+ * failed save rejects its caller without blocking later saves.
  * @param next - resolved selection accepted by an entry point.
  * @returns fulfillment after the optional settings write settles.
  */

@@ -19,11 +19,11 @@ kind: "package-reference"
 
 `POST /api/documents/transfer/list` 接受一个已授权的源作用域，并为 composer 选择器返回安全文档元数据；不会返回路径或文件字节。
 
-在 Gateway 部署中，Gateway 还负责 `/api/documents/transfer/uploads` 及其可续传子路由。每个请求通过经过校验的 `scope` query 指定个人或项目目标，Gateway 会在把请求流式转发到目标运行时前重新检查写权限。Standalone composition 仍然只提供当前运行时上传路由。
+在 Gateway 部署中，Gateway 还负责 `/api/documents/transfer/uploads` 及其可续传子路由。每个请求通过经过校验的 `scope` query 指定个人或项目目标，Gateway 重新检查写权限后直接对目标作用域的文档根提供会话；仅在未配置本地文档 broker 时才转发到目标运行时。Standalone composition 仍然只提供当前运行时上传路由。
 
-在 Gateway 部署中，浏览器请求会先由 Gateway 文档 broker 接管，再进入运行时代理。Standalone composition 仍直接使用 Host Consumer；两条路径都不会在浏览器响应中暴露运行时回环地址。
+在 Gateway 部署中，面向作用域的路由由文档 broker 自己服务：`handleUserDocHttp` 连同 `UserDocHttpHost` 适配面一起导出，Gateway 借此在授权作用域的文档根上运行同一套路由而无需运行时进程，`UserDocRequest`/`UserDocResponse` 同时覆盖真实 socket 与 broker 的合成元数据调用。Standalone composition 仍直接使用 Host Consumer；两条路径都不会在浏览器响应中暴露运行时回环地址。
 
-`POST /api/documents/transfer/directories` 返回安全的目标文件夹元数据，`POST /api/documents/transfer/directories/create` 在检查目标 `rw` 后创建文件夹。`/api/documents/scope` 子树会对其他作用域的列表、内容、文件夹、移动、回收、恢复和永久清理请求应用相同授权。`GET /api/documents/overview` 返回用户可读的全部作用域元数据，`GET /api/documents/history` 返回当前作用域最近的审计操作。
+`POST /api/documents/transfer/directories` 返回安全的目标文件夹元数据，`POST /api/documents/transfer/directories/create` 在检查目标 `rw` 后创建文件夹。`/api/documents/scope` 子树会对其他作用域的列表、内容、文件夹、移动、回收、恢复和永久清理请求应用相同授权，Gateway 文档 broker 通过同一个处理器应答这些请求。`GET /api/documents/overview` 返回用户可读的全部作用域元数据，`GET /api/documents/history` 返回当前作用域最近的审计操作。
 
 Gateway 的 `document-admin` principal 只被回收、恢复和永久清理路由接受；普通文档读写仍要求运行时用户拥有对应作用域权限。
 

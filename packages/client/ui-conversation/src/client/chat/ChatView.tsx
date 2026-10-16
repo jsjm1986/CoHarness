@@ -17,7 +17,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import type {
   ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { Button, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, CoHarnessMascot, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ToolCallId } from '../contract/views.ts'
 import type { ChatViewSlotProps, RenderMessageImages } from '../contract/slots.ts'
 import type { ChatNode, TurnProcessChatData } from '../contract/chat-nodes.ts'
@@ -26,6 +27,7 @@ import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
+import a11yCss from './accessibility.module.css'
 
 const FOLLOW_THRESHOLD = 24
 /** Start the next older-page request before the reader reaches the exact head. */
@@ -157,26 +159,28 @@ function turnProcessAlwaysOpen(node: ChatNode | undefined): boolean {
   return location.turn.status === 'open' || reason === 'aborted' || reason === 'error'
 }
 
-/** Return submission ids already represented by durable nodes or queue rows. */
-function observedRpcIds(
+/** Return submission ids already represented by durable nodes, plus the last input's Turn. */
+function observedInputs(
   order: readonly string[],
-  nodes: { get(key: string): { readonly kind: string; readonly data: unknown } | undefined },
-  queue: readonly { readonly rpcId?: string }[],
-): ReadonlySet<string> {
+  nodes: { get(key: string): { readonly kind: string; readonly data: unknown; readonly location: ChatNode['location'] } | undefined },
+): { readonly rpcIds: ReadonlySet<string>; readonly lastInputTurn: number | undefined } {
   const observed = new Set<string>()
+  let lastInputTurn: number | undefined
   for (const key of order) {
     const node = nodes.get(key)
     if (node === undefined || (node.kind !== 'user' && node.kind !== 'steering')) continue
+    const turn = nodeTurn(node)
+    if (turn !== undefined) lastInputTurn = turn
     const source = (node.data as { readonly source?: unknown }).source as
       | { readonly kind?: unknown; readonly rpcId?: unknown }
       | undefined
     if (source?.kind === 'user' && typeof source.rpcId === 'string') observed.add(source.rpcId)
   }
-  for (const item of queue) {
-    if (item.rpcId !== undefined) observed.add(item.rpcId)
-  }
-  return observed
+  return { rpcIds: observed, lastInputTurn }
 }
+
+/** Brand wordmark spelled out letter-by-letter so the status pulse can stagger it. */
+const TURN_STATUS_WORD = 'COHARNESS'.split('')
 
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
 function TurnStatus({ startTime, t }: {
@@ -204,7 +208,14 @@ function TurnStatus({ startTime, t }: {
   const showClock = elapsedMs >= 15_000
   return (
     <div className={css.turnStatus} role="status" aria-live="polite">
-      {t('chat.deepDiving')}
+      <span className={a11yCss.visuallyHidden}>{t('chat.deepDiving')}</span>
+      <CoHarnessMascot size={20} busy />
+      <span className={css.turnStatusWord} aria-hidden>
+        {TURN_STATUS_WORD.map((letter, i) => (
+          <span key={i} style={{ animationDelay: `${i * 0.09}s` }}>{letter}</span>
+        ))}
+      </span>
+      <span className={css.turnStatusDots} aria-hidden><i /><i /><i /></span>
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
           {formatRunDuration(elapsedMs, t).map(part => part.text).join('')}
@@ -232,6 +243,13 @@ export function ChatView({
   const pendingSubmissions = useSession(s => s.pendingSubmissions ?? EMPTY_PENDING_SUBMISSIONS)
   // Workspace root off the session list row: path summaries display relative to it.
   const cwd = useSessions(s => s.byId[sessionId]?.cwd)
+  const fileImages = useMemo(() => ({
+    resolve: (path: string) => fileMediaUrl(document.baseURI, resolveWorkspacePath(cwd, path)),
+    labels: {
+      open: t('image.open'), loading: t('image.loading'), failed: t('image.failed'),
+      dialog: t('image.dialog'), close: t('image.close'),
+    },
+  }), [cwd, t])
   const running = useSession(s => s.running)
   const openState = useSession(s => s.openState)
   const openError = useSession(s => s.openError)
@@ -283,17 +301,26 @@ export function ChatView({
     setFileOpenBusy(false)
   }, [])
 
-  const pendingSteering = useMemo(
-    () => inbox.filter(item => item.placement === 'steering'),
-    [inbox],
-  )
-  // Keep the local echo hidden during the one-frame overlap in which its
-  // durable event or queue occurrence has landed but retirement is pending.
-  const visibleSubmissions = useMemo(() => {
-    if (pendingSubmissions.length === 0) return pendingSubmissions
-    const observed = observedRpcIds(order, nodeStore, inbox)
-    return pendingSubmissions.filter(item => !observed.has(item.requestId))
-  }, [inbox, nodeStore, order, pendingSubmissions])
+  const pendingSteering = useMemo(() => {
+    // Admitted local identities outlive their bubbles until retirement, so a
+    // stale steering row carrying the same rpcId must not reappear beside them.
+    const localIds = new Set(
+      pendingSubmissions.filter(submission => submission.placement !== 'queued')
+        .map(submission => submission.requestId as string),
+    )
+    return inbox.filter(item =>
+      item.placement === 'steering' && (item.rpcId === undefined || !localIds.has(item.rpcId)))
+  }, [inbox, pendingSubmissions])
+  // Keep the local echo hidden once its durable counterpart renders; the
+  // echo→durable swap stays atomic regardless of when retirement lands.
+  const [visibleSubmissions, lastInputTurn] = useMemo(() => {
+    if (pendingSubmissions.length === 0) return [pendingSubmissions, undefined] as const
+    const observed = observedInputs(order, nodeStore)
+    return [
+      pendingSubmissions.filter(item => item.placement !== 'queued' && !observed.rpcIds.has(item.requestId)),
+      observed.lastInputTurn,
+    ] as const
+  }, [nodeStore, order, pendingSubmissions])
   const transcriptSubmissions = useMemo(
     () => visibleSubmissions.filter(item => item.placement !== 'queued' && item.placement !== 'steering'),
     [visibleSubmissions],
@@ -308,6 +335,13 @@ export function ChatView({
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
   const runningTurn = useMemo(() => runningTurnOf(timeline), [timeline])
+  // An empty opening control follows the first local transcript echo, never steering.
+  const tailKey = order.at(-1)
+  const tailNode = tailKey === undefined ? undefined : nodeStore.get(tailKey)
+  const hoistFirstTranscript = running && tailNode?.kind === 'turn-process'
+    && tailNode.location.kind === 'turn'
+    && tailNode.location.turn.status === 'open'
+    && tailNode.location.turn.turn !== lastInputTurn
   /**
    * Merge the full-session index with loaded anchors. Index-only markers keep
    * their durable range and become clickable after `loadHistoryUntil` brings
@@ -730,7 +764,7 @@ export function ChatView({
   }, [chatScroll.save, loadHistoryUntil, navigation])
 
   return (
-    <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
+    <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile} fileImages={fileImages}>
       <div className={css.root}>
         <div ref={listRef} className={css.scroll}>
           <TurnNavigator items={navigationItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={navigateToTurn} t={t} />
@@ -797,6 +831,14 @@ export function ChatView({
                 double-render the same wait. */}
             {/* Turn-level loading signal: rides the whole running turn (first-token
                 wait, tool execution, streaming) so it never flickers per step. */}
+            {running && hoistFirstTranscript && transcriptSubmissions[0] !== undefined && (
+              <PendingSubmissionBubble
+                key={transcriptSubmissions[0].requestId}
+                submission={transcriptSubmissions[0]}
+                renderMessageImages={renderMessageImages}
+                t={t}
+              />
+            )}
             {running && <TurnStatus startTime={runningTurnStart} t={t} />}
             {pendingSteering.map(item => (
               <PendingSteeringBubble
@@ -814,7 +856,7 @@ export function ChatView({
                 t={t}
               />
             ))}
-            {transcriptSubmissions.map(submission => (
+            {transcriptSubmissions.slice(hoistFirstTranscript ? 1 : 0).map(submission => (
               <PendingSubmissionBubble
                 key={submission.requestId}
                 submission={submission}

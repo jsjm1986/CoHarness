@@ -14,6 +14,7 @@
  */
 import type { WebBlockProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolCallBlock } from './tool-call-model.ts'
+import { parsedToolCall } from './raw-tool-call.ts'
 
 /** Distributive `Omit` over a discriminated union. */
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never
@@ -77,4 +78,22 @@ export function webCardModel(block: ToolCallBlock): WebCardModelProps | null {
     }
   }
   return null
+}
+
+/**
+ * Read the openable URL of a web_fetch call from its arguments.
+ * @param block - running or settled Tool block.
+ * @returns the http(s) URL, or undefined for another tool, protocol, or unparsable argument.
+ */
+export function webFetchHref(block: ToolCallBlock): string | undefined {
+  const call = parsedToolCall(block)
+  if (call?.name !== 'web_fetch' || typeof call.args.url !== 'string') return undefined
+  const { url } = call.args
+  try {
+    const { protocol } = new URL(url)
+    return protocol === 'http:' || protocol === 'https:' ? url : undefined
+  } catch {
+    // An unparsable URL stays plain summary text.
+    return undefined
+  }
 }

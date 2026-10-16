@@ -12,6 +12,7 @@ import Lsp from '@deepseek-ai/dsh-lsp'
 import * as LspLocal from '@deepseek-ai/dsh-lsp-stdio'
 import * as TimeoutPolicy from '@deepseek-ai/dsh-tool-call-timeout-policy'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /**
  * Focused in-process integration of the model-facing tool, seam, local provider, and timeout policy.
@@ -48,6 +49,7 @@ function serverScript(hang: boolean): string {
 
 async function mount(hang: boolean, timeoutMs?: number): Promise<Context> {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(Lsp)

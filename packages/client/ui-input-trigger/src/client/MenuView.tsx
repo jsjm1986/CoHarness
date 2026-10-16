@@ -11,7 +11,7 @@ import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } fro
 import clsx from 'clsx'
 import {
   IconBrowseOutline16, IconChevronRightOutline14, IconFolderClose16, IconUserOutline16,
-  MobileSheetBackdrop, useAnchoredMaxHeight,
+  MenuSurface, MobileSheetBackdrop, useAnchoredMaxHeight,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { InputTriggerCandidate } from '../types.ts'
@@ -93,7 +93,7 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
   return (
     <>
       <MobileSheetBackdrop onClose={onDismiss} />
-      <div
+      <MenuSurface
         ref={listRef}
         className={css.menu}
         style={{ maxHeight }}
@@ -196,7 +196,7 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
               ))}
           </div>
         </div>
-      </div>
+      </MenuSurface>
     </>
   )
 }

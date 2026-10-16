@@ -23,6 +23,8 @@
   // cannot see both sides of the cordis Context merges).
   "exclude": [
     "tests/client-plugin-live.e2e.ts",
+    "tests/connection-recovery.e2e.ts",
+    "tests/server-restart.e2e.ts",
     "tests/default-product-isolation.e2e.ts",
     "tests/scaffold.ts",
     "tests/expected.ts",
@@ -43,6 +45,7 @@
     "tests/lifecycle-chrome.e2e.ts",
     "tests/details-session-lifecycle.e2e.ts",
     "tests/diff-context.e2e.ts",
+    "tests/code-card-layout.e2e.ts",
     "tests/plugin-config.e2e.ts",
     "tests/settings-chrome.e2e.ts",
     "tests/settings-compact.e2e.ts",
@@ -99,6 +102,7 @@
     "tests/startup-auto-selection.e2e.ts",
     "tests/produced-files.e2e.ts",
     "tests/produced-file-mentions.e2e.ts",
+    "tests/clickable-links-gallery.e2e.ts",
     "tests/goal-bar.e2e.ts",
     "tests/goal-command-presentation.e2e.ts",
     "tests/subagent-conversation.e2e.ts",
@@ -122,6 +126,8 @@
     "tests/chat-long-interactions.e2e.ts",
     "tests/chat-continuous-conversation.e2e.ts",
     "tests/composer-model-mobile.e2e.ts",
+    "tests/mobile-density.e2e.ts",
+    "tests/swipe-check.e2e.ts",
     "tests/composer-tab-geometry.e2e.ts",
     "tests/complex-history.perf.ts",
     "tests/pwsh-terminal.e2e.ts",

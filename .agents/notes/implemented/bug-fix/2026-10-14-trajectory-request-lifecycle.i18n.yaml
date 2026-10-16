@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-14-trajectory-request-lifecycle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-14-trajectory-request-lifecycle.md
+/agent-note-trajectory-request-lifecycle-is-settled-state-not-stream-presence:
+  en: 1c8df52b38ae50c9
+  zh: 76c7cf99d7bc63b7
+/agent-note-trajectory-request-lifecycle-is-settled-state-not-stream-presence/problem:
+  en: eb61dddb328dab32
+  zh: 38679162e4262a9b
+/agent-note-trajectory-request-lifecycle-is-settled-state-not-stream-presence/decision:
+  en: 15803fbfe771a6cd
+  zh: 64034861b479faff
+/agent-note-trajectory-request-lifecycle-is-settled-state-not-stream-presence/alternatives-considered:
+  en: ae069aa18e91ef48
+  zh: 0ce6c7edbb88cc83
+/agent-note-trajectory-request-lifecycle-is-settled-state-not-stream-presence/consequences:
+  en: 6f62afe359776da7
+  zh: c9a8f89f35ee4610
+/agent-note-trajectory-request-lifecycle-is-settled-state-not-stream-presence/verification:
+  en: ad944b4638bffada
+  zh: 9f51ab7e341711a4
+/agent-note-trajectory-request-lifecycle-is-settled-state-not-stream-presence/related:
+  en: e35d90a016837def
+  zh: ed54b8061d6da0ca

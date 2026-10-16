@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-12-durable-path-safety-fixes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-durable-path-safety-fixes.md
+/agent-note-durable-path-safety-fixes-spill-publish-attachment-carriers-v3-restart-repair:
+  en: cf0edb7456b1cb88
+  zh: 474ce49ba4766ff0
+/agent-note-durable-path-safety-fixes-spill-publish-attachment-carriers-v3-restart-repair/problem:
+  en: 773453e402cc5e3e
+  zh: 531284e27a7ffbf3
+/agent-note-durable-path-safety-fixes-spill-publish-attachment-carriers-v3-restart-repair/decision:
+  en: 61249bc24559042a
+  zh: 7442c481bb6e99f4
+/agent-note-durable-path-safety-fixes-spill-publish-attachment-carriers-v3-restart-repair/alternatives-considered:
+  en: a466288956de29a1
+  zh: f215a94889a34923
+/agent-note-durable-path-safety-fixes-spill-publish-attachment-carriers-v3-restart-repair/consequences:
+  en: e64c9998e37c95f7
+  zh: 8d5e7f56c9e275e0
+/agent-note-durable-path-safety-fixes-spill-publish-attachment-carriers-v3-restart-repair/verification:
+  en: 2252df23a929f326
+  zh: 86d18fc25526bcd9
+/agent-note-durable-path-safety-fixes-spill-publish-attachment-carriers-v3-restart-repair/related:
+  en: 6ec73e6b2ed7d263
+  zh: 973a235436ecfa72

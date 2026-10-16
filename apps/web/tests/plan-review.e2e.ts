@@ -7,16 +7,19 @@
 // Replay is deterministic: the plan content arrives from replayed chunks, the
 // review wait is real, and the approve click is the test's own gesture (the
 // turn cannot complete without it, in record and replay alike).
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { deriveReplayScript, parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
-  launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
+  launchWebScaffold, recordFixture, seedSession, waitForIdleSessionDot, watchConsole,
+  webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
@@ -109,6 +112,7 @@ describe('web e2e: plan review takeover round trip', () => {
     expect(await page.locator('[data-plan-review-key]').count()).toBe(0)
     expect(await selectedRow.locator('[data-state="warning"]').count()).toBe(0)
     await expect.poll(() => page.locator('textarea').first().isEnabled(), { timeout: 10_000 }).toBe(true)
+    await waitForIdleSessionDot(page)
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(APPROVED_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
@@ -265,54 +269,67 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Session 
   })
 })
 
-describe.skipIf(MODE === 'record')('web e2e: dismissed plan review', () => {
-  // Replay supplies the continuation after the dismissal; the real rejection
-  // result and the retained plan-mode state are the assertions.
-  it('rejects exit_plan_mode and keeps plan mode after Request changes', async () => {
-    const scaffold = await launchWebScaffold({ replayFixture: FIXTURE, paceMs: 15 })
+describe('web e2e: dismissed plan history', () => {
+  it.skipIf(MODE === 'record')('reopens the permanent plan card after dismissing its review', async () => {
+    // A dismissed review concludes the turn, so only the call presenting the plan replays.
+    const replayRoot = await mkdtemp(join(tmpdir(), 'dsh-plan-review-dismiss-replay-'))
+    const replayOverride = join(replayRoot, 'replay.override.json')
+    const script = deriveReplayScript(parseSessionLog(await readFile(FIXTURE, 'utf8')))
+    await writeFile(replayOverride, JSON.stringify(script.slice(0, 1)))
+    const scaffold = await launchWebScaffold({ replayFixture: FIXTURE, replayOverride, paceMs: 15 })
     let browser: Browser | undefined
     const events: SessionEvent[] = []
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
     try {
       browser = await chromium.launch()
       const page = await newEnglishPage(browser)
+      await page.setViewportSize({ width: 620, height: 900 })
       const tripwire = watchConsole(page)
       await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
       await connectFreshWorkspace(page, scaffold.workspaceCwd)
       const input = page.locator('textarea').first()
-      await input.waitFor({ timeout: 10_000 })
       const settled = scaffold.whenTurnSettled(30_000)
       await input.fill(LINE)
       await input.press('Enter')
       const review = page.locator('[data-plan-review-key]')
-      await review.waitFor({ state: 'visible', timeout: 30_000 })
+      await review.waitFor({ state: 'visible' })
+      await page.locator('[data-plan-preview]').waitFor({ state: 'visible' })
+      await page.locator('[data-sidebar-right-toggle]').click()
       await review.getByRole('button', { name: 'Request changes', exact: true }).click()
       await settled
-
       const call = events.find((event): event is SessionEvent<'tool/call'> =>
         event.type === 'tool/call' && event.data.name === 'exit_plan_mode')
       expect(call).toBeDefined()
-      const result = events.filter(event => event.type === 'tool/result')
-        .find(event => event.data.message.source.callId === call?.data.callId)
-      expect(result?.data.message).toMatchObject({ role: 'tool', toolCallId: call?.data.callId, isError: true })
+      const results = events.filter(event => event.type === 'tool/result')
+      const result = results.find(event => event.data.message.source.callId === call?.data.callId)
+      expect(result?.data.message).toMatchObject({ role: 'tool', toolCallId: call?.data.callId, isError: false })
       expect(JSON.stringify(result)).toContain('dismissed the plan review')
-      expect(events.filter(event => event.type === 'plan/mode'))
-        .toEqual([expect.objectContaining({ data: { active: true } })])
-      expect(await review.count()).toBe(0)
-      // The turn returns to the user at once: the composer is free again.
-      await expect.poll(() => page.locator('textarea').first().isEnabled(), { timeout: 10_000 }).toBe(true)
-      // The dismissal is durable: after a reload the settled review does not resurface.
+      expect(results.some(event => JSON.stringify(event).includes('Plan approved'))).toBe(false)
+      expect(events.filter(event => event.type === 'assistant/message')).toHaveLength(1)
+      const modes = events.filter(event => event.type === 'plan/mode')
+      expect(modes).toHaveLength(1)
+      expect(modes[0]).toMatchObject({ data: { active: true } })
+      await review.waitFor({ state: 'detached' })
+      const card = page.locator('[data-plan-card]')
+      await card.waitFor({ state: 'visible' })
+      await card.click()
+      await page.locator('[data-plan-preview]').waitFor({ state: 'visible' })
+      await page.locator('[data-sidebar-right-toggle]').click()
+      await card.click()
       await page.reload({ waitUntil: 'load' })
-      await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-      await page.locator('textarea').first().waitFor({ timeout: 15_000 })
-      expect(await page.locator('[data-plan-review-key]').count()).toBe(0)
-      expect(await page.locator('textarea').first().isEnabled()).toBe(true)
+      await page.locator('[data-plan-card]').waitFor({ state: 'visible' })
+      await page.locator('[data-plan-preview]').waitFor({ state: 'visible' })
+      expect(await page.locator('[data-plan-preview]').getByRole('heading', { level: 1 }).textContent()).toContain('--greeting')
+      await page.locator('[data-sidebar-right-toggle]').click()
+      await page.reload({ waitUntil: 'load' })
+      await page.locator('[data-plan-card]').waitFor({ state: 'visible' })
+      expect(await page.locator('[data-plan-preview]').isVisible()).toBe(false)
       expect(tripwire.pageErrors).toEqual([])
       expect(tripwire.warnings).toEqual([])
     } finally {
       await browser?.close()
       await scaffold.close()
+      await rm(replayRoot, { recursive: true, force: true })
     }
   }, 120_000)
 })

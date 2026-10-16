@@ -17,30 +17,44 @@
   - img
   - img
   - text: Thinking The user wants me to use the ask_user_question tool with specific parameters. Let me do exactly that.
-- button "Ask question 1/1 answered View answers":
-  - img
+- button "Ask question 1/1 answered View answers" [expanded]:
   - img
   - text: Ask question 1/1 answered
   - button "View answers":
     - img
     - text: View answers
-- region "Which color do you prefer?":
-  - text: Pick one
-  - heading "Which color do you prefer?" [level=2]
-  - text: Answered
-  - button "Collapse the question card" [expanded]:
+- term: Which color do you prefer?
+- definition: Green Answered after the timeout
+- button "Inspect":
+  - img
+  - text: Inspect
+- list:
+  - listitem:
+    - text: "{\"kind\":\"answer_to_pending_question\",\"tool\":\"ask_user_question\",\"callId\":\"call_00_Cijldc88LYmVPCXYUsRq1617\",\"questions\":[{\"id\":\"color\",\"question\":\"Which color do you prefer?\",\"header\":\"Pick one\",\"mult…"
+    - button "Edit queued message":
+      - img
+    - button "Remove queued message":
+      - img
+    - button "Steer queued message" [disabled]:
+      - img
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turns · 1 steps · {{throughput}} tok/s\"":
     - img
-  - button "Close the panel — reopen it from the tool call":
+    - text: "1 turns · 1 steps{{throughput}} tok/s"
+  - button "4.4K tok · Cache hit 97%":
     - img
-  - group:
-    - checkbox "Blue" [disabled]: Blue A cool recessive hue that reads as calm and trustworthy in long reading sessions and dense dashboards.
-    - checkbox "Green" [checked] [disabled]: Green A restful mid-spectrum hue with the highest perceived brightness, easiest on the eye over long sessions.
-    - textbox "Type your answer" [disabled]: Answered after the timeout
-  - button "Previous question" [disabled]:
-    - img
-  - text: 1 / 1
-  - button "Next question" [disabled]:
-    - img
-  - status
+    - text: 4.4K tokCache hit 97%
 - separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

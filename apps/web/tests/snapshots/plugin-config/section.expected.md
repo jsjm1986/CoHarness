@@ -3,9 +3,11 @@
 - button "插件说明":
   - img
 - button "刷新" [disabled]
-- button "添加插件" [disabled]:
-  - img
-  - text: 添加插件
+- group "添加插件":
+  - button "添加插件" [disabled]:
+    - img
+    - text: 添加插件
+  - button "选择添加插件方式" [disabled]
 - status: 本部署没有可管理的 profile，无法安装或启停插件。
 - heading "插件配置" [level=3]
 - text: "5"
@@ -17,11 +19,11 @@
     - button "查看 Agent 循环": Agent 循环
     - text: Agent 如何派发工具调用。
   - listitem:
-    - button "查看 Subagent": Subagent
-    - text: 设置 Subagent 的递归层级和并行数量。
+    - button "查看 子智能体": 子智能体
+    - text: 设置子智能体的递归层级和并行数量。
   - listitem:
     - button "查看 模型选择": 模型选择
-    - text: 允许 Agent 为 Subagent 选择模型
+    - text: 允许 Agent 为子智能体选择模型
   - listitem:
     - button "查看 网页搜索": 网页搜索
     - text: DeepSeek 搜索提供方。

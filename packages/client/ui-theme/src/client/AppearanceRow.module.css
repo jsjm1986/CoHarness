@@ -74,16 +74,37 @@
 }
 
 @media (max-width: 767px) {
+  .group {
+    padding: var(--dsw-space-3) 0;
+  }
+
+  /* One segmented control, not three bordered pills: the track carries the
+     quiet fill, the active segment reads as the raised chip inside it —
+     the same grammar the compact conversation tabs already use. */
   .cubeRow {
     flex-wrap: nowrap;
+    gap: 0;
+    padding: 3px;
+    border-radius: var(--dsw-radius-card);
+    background: var(--dsw-alias-interactive-bg-hover);
   }
 
   .themeCube {
     flex: 1 1 0;
     min-width: 0;
-    min-height: var(--dsw-touch-target);
-    padding: var(--dsw-space-3) var(--dsw-space-2);
-    font-size: 12px;
+    flex-direction: row;
+    min-height: 36px;
+    padding: 0 var(--dsw-space-2);
+    gap: var(--dsw-space-1);
+    border: 0;
+    border-radius: var(--dsw-radius-control);
+    font-size: 13px;
     line-height: 18px;
+  }
+
+  .selected {
+    background: var(--dsw-alias-bg-raised);
+    --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+    box-shadow: var(--dsw-elevation-control);
   }
 }

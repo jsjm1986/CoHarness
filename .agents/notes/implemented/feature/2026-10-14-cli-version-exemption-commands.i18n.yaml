@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-14-cli-version-exemption-commands.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-14-cli-version-exemption-commands.md
+/agent-note-cli-version-exemption-commands:
+  en: 58f9e3dbbdfa18f2
+  zh: 0ceb489c48997fde
+/agent-note-cli-version-exemption-commands/problem:
+  en: 3b32c94383bf18a9
+  zh: c990655db9ccd36d
+/agent-note-cli-version-exemption-commands/decision:
+  en: 4898d32e572ee810
+  zh: bab937141d7a4e8d
+/agent-note-cli-version-exemption-commands/alternatives-considered:
+  en: 8a8d7c121aa993dc
+  zh: 40d7aa3f2c35659b
+/agent-note-cli-version-exemption-commands/consequences:
+  en: 5378a2d0644bfe9f
+  zh: 841c2b74d77c09b1
+/agent-note-cli-version-exemption-commands/verification:
+  en: 5be40c29e4098408
+  zh: 5227872b42dcc1c3
+/agent-note-cli-version-exemption-commands/related:
+  en: 194b1a79b0d399de
+  zh: 6b7280d1e64e39b1

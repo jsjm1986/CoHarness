@@ -196,6 +196,7 @@ export function timingError(code: Extract<ScheduleUpdateResult, { code: string }
     case 'invalid_selector':
     case 'invalid_rule':
     case 'time_out_of_range': return 'timing.invalid'
+    case 'subagent_session': return 'timing.subagentSession'
     case 'internal_error': return 'timing.error'
   }
   /* v8 ignore next -- Exhaustiveness guard for the closed ScheduleUpdateResult error-code union. */

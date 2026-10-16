@@ -84,30 +84,6 @@
   white-space: nowrap;
 }
 
-/* ---- Inline edit form ---- */
-
-.objectiveInput {
-  flex: 1;
-  min-width: 0;
-  height: 26px;
-  padding: 0 var(--dsw-space-2);
-  border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-base);
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-primary);
-  outline: none;
-}
-
-.objectiveInput:focus {
-  border-color: var(--dsw-alias-state-business-primary);
-}
-
-.objectiveInput::placeholder {
-  color: var(--dsw-alias-label-caption);
-}
-
 /* ---- Icon actions ---- */
 
 .actions {

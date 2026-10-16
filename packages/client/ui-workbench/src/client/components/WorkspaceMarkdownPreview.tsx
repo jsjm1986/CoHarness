@@ -83,9 +83,15 @@ export function WorkspaceMarkdownPreview({ request, read, resource, markdownT, c
   const copyLabel = markdownT('code.copy')
   const copiedLabel = markdownT('code.copied')
   const footnotes = markdownT('footnotes')
+  const codeLabel = markdownT('codeBlock.title')
+  const wrapLabel = markdownT('codeBlock.wrap')
+  const unwrapLabel = markdownT('codeBlock.unwrap')
   const markdownLabels = useMemo<MarkdownLabels>(() => ({
-    code: { copyLabel, copiedLabel }, footnotes,
-  }), [copyLabel, copiedLabel, footnotes])
+    code: {
+      copyLabel, copiedLabel,
+      toolbarLabels: { codeLabel, wrapLabel, unwrapLabel },
+    }, footnotes,
+  }), [copyLabel, copiedLabel, footnotes, codeLabel, wrapLabel, unwrapLabel])
   const failure = error ?? metadata.error
   return <section aria-label={request.path} className={css.filePreview}>
     <div className={css.filePreviewActions}>

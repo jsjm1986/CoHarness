@@ -3,8 +3,11 @@
   - text: Edit
   - button "config.txt"
   - text: +1 -1
-- button "Copy"
-- text: config.txt - mode=DEBUG + mode=RELEASE level=info └ +1 -1 · 1 file
+- text: Code block
+- button "Wrap lines"
+- button "Copy":
+  - img
+- text: "{{cwd}}/workspace/config.txt - mode=DEBUG + mode=RELEASE level=info └ +1 -1 · 1 file"
 - button "Open details in sidebar"
 - button "Inspect":
   - img

@@ -36,12 +36,10 @@ export interface SdkRunSpec {
   patches: string[]
   /** Absolute isolated Harness home for the nested runtime. */
   dshHome: string
-  /**
-   * Absolute working directory for the child process AND the workspace cwd
-   * of its SDK session. The provider resolves it before this spec exists:
-   * config override, else the delegating parent session's workspace.
-   */
+  /** Absolute initial working directory selected by the delegating runtime. */
   cwd: string
+  /** Parent origin directory recorded independently of the child's effective directory. */
+  originCwd?: string | undefined
   /** Provider route the child runtime initializes with. */
   provider: string
   /** Model the child runtime initializes with. */
@@ -57,6 +55,8 @@ export interface SdkRunSpec {
    * current `DSH_*` fact survives while ambient namesakes never leak.
    */
   env: Record<string, string>
+  /** Bound (ms) on the protocol `initialize` handshake during start. */
+  initializeTimeoutMs: number
   /** Bound (ms) on the protocol `shutdown` exchange during dispose. */
   shutdownTimeoutMs: number
   /** Grace period (ms) for the child's EOF-driven quiesce on dispose. */
@@ -70,6 +70,9 @@ export interface SdkRunSpec {
    */
   onError?: (error: Error, stopReason: SubagentStopReason) => void
 }
+
+/** Default bound on the protocol `initialize` handshake during start. */
+export const DEFAULT_INITIALIZE_TIMEOUT_MS = 10_000
 
 /** EOF grace for child flush and nested-process teardown; wider than the signal grace below. */
 export const DEFAULT_DISPOSE_EOF_GRACE_MS = 6_000
@@ -243,10 +246,11 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
     dshHome: spec.dshHome,
     processCwd: spec.cwd,
     env: { ...scrubbedParentEnv(), ...spec.env },
+    initializeTimeoutMs: spec.initializeTimeoutMs,
     shutdownTimeoutMs: spec.shutdownTimeoutMs,
     disposeEofGraceMs: spec.disposeEofGraceMs,
     disposeGraceMs: spec.disposeGraceMs,
-    cwd: spec.cwd,
+    cwd: spec.originCwd ?? spec.cwd,
     provider: spec.provider,
     model: spec.model,
     ...spec.reasoningEffort === undefined ? {} : { reasoningEffort: spec.reasoningEffort },
@@ -319,6 +323,9 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
   const result: Promise<SubagentResult> = settleRunResult({
     attempt: async () => {
       try {
+        // The child session's origin is the parent's project root; move its
+        // effective directory to the delegation-selected cwd before the turn.
+        await harness.session(childSessionId).setWorkingDirectory(spec.cwd)
         const turn = await Promise.race([
           harness.session(childSessionId).run(request.prompt, { onNotification: observe }),
           cancelSettled.then(() => 'cancelled' as const),

@@ -8443,7 +8443,7 @@
         "packages/context/agent-instructions/tests/agent-instructions.e2e.ts",
         "packages/context/agent-instructions/tests/agent-instructions.spec.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/context/agent-instructions",
@@ -9323,7 +9323,7 @@
         "packages/experimental/browser-use-runtime/tests/mcp.spec.ts",
         "packages/experimental/browser-use-runtime/tests/shared-host-runtimes.spec.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/experimental/browser-use-runtime",
@@ -11467,7 +11467,7 @@
         "packages/plan/plan-mode/tests/integration.spec.ts",
         "packages/plan/plan-mode/tests/plan-mode.spec.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/plan/plan-mode",
@@ -14080,7 +14080,7 @@
         "packages/test-support/agent-loop-testkit/README.i18n.yaml",
         "packages/test-support/agent-loop-testkit/package.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/test-support/agent-loop-testkit",
@@ -14799,7 +14799,7 @@
     },
     {
       "area": "packages/util/timeout",
-      "status": "retain",
+      "status": "adapt",
       "localOwner": "packages/util/timeout",
       "commitScope": [
         "packages/util/timeout/"
@@ -14812,7 +14812,7 @@
         "packages/util/timeout/README.i18n.yaml",
         "packages/util/timeout/package.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/util/timeout",

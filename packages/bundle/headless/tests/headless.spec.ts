@@ -19,6 +19,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { Session, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import { SessionQueryError } from '@deepseek-ai/dsh-session-query'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { apply, Config } from '../src/index.ts'
 import { internals } from '../src/runner-internals.ts'
 
@@ -58,6 +59,8 @@ interface BenchOptions {
   preliveMeta?: { cwd?: string; origin?: 'subagent'; agentPreset?: string }
   /** Run when the runner awaits idle, e.g. to append to the attached log. */
   onWhenIdle?: (agent: Agent) => void
+  /** Release child cleanup after the observed parent activity ends. */
+  afterIdle?: () => void
 }
 
 const frameStates = new WeakMap<Agent, { attemptId: ReturnType<typeof LlmAttemptId>; revision: number; index: number }>()
@@ -144,25 +147,29 @@ async function bench(script: Script, options: BenchOptions = {}): Promise<{
   ): Promise<Agent> => {
     const inbox = createInboxStub()
     let idle = Promise.resolve()
+    let running = false
     const agent: Agent = {
       id: session.id,
       options: createOptions.agentOptions ?? {},
       session,
       inbox,
-      status: 'idle',
+      get status() { return running ? 'running' : 'idle' },
       ctx: ownerCtx,
       cancel: () => {},
       runMaintenance: () => Promise.reject(new Error('not used')),
       send: () => {},
       followup: (message: UserMessage) => {
         agent.inbox.append('next-turn', message)
-        idle = Promise.resolve().then(() => script.afterPrompt(session, message, agent))
+        running = true
+        idle = Promise.resolve().then(() => script.afterPrompt(session, message, agent)).finally(() => { running = false })
       },
       steer: () => {},
       inject: () => {},
-      whenIdle: () => {
+      whenIdle: async () => {
         options.onWhenIdle?.(agent)
-        return idle
+        let activity: Promise<void>
+        do { await (activity = idle) } while (activity !== idle)
+        options.afterIdle?.()
       },
     }
     await createOptions.setup?.(ownerCtx, agent)
@@ -234,6 +241,33 @@ describe('headless runner', () => {
     }, { filesystemCwd: cwd })
     try { expect(await test.run()).toMatchObject({ code: 0, out: 'remote answer\n' }) }
     finally { await test.ctx.fiber.dispose() }
+  })
+
+  it('waits for parent awakened between idle and child observation', async () => {
+    let turns = 0
+    const test = await bench({
+      async afterPrompt(session, message) {
+        turns += 1
+        appendTurn(session, turns, message, turns === 1 ? 'waiting for child' : 'child result incorporated', true)
+      },
+    })
+    let childObserved = true
+    test.ctx.provide('subagents', {
+      async waitForChildren(parent: Agent) {
+        if (!childObserved) return false
+        childObserved = false
+        // Settlement delivery wakes the parent while the join reports work.
+        parent.followup(createUserMessage({
+          content: [{ type: 'text', text: 'child settlement arrived' }],
+          source: { kind: 'user' },
+        }))
+        return true
+      },
+    } as never)
+    try {
+      expect(await test.run()).toMatchObject({ code: 0, out: 'child result incorporated\n' })
+      expect(turns).toBe(2)
+    } finally { await test.ctx.fiber.dispose() }
   })
 
   it('reports the provider cwd in its opening JSON event', async () => {

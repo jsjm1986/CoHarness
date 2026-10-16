@@ -121,6 +121,10 @@
     --danger-soft: #462727;
     --shadow-dialog: 0 24px 70px rgba(0, 0, 0, 0.5);
   }
+
+  .brandMark .lamp {
+    fill: #6b93ff;
+  }
 }
 
 * {
@@ -198,17 +202,26 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-lg);
-  background: var(--text);
-  color: var(--surface);
+  flex: none;
+  color: var(--text);
 }
 
 .brandMark svg {
-  width: 18px;
-  height: 18px;
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+
+.brandMark .lamp {
+  fill: #2563eb;
+}
+
+.brandMark .cut {
+  fill: var(--surface-subtle);
+}
+
+.mobileHeader .brandMark .cut {
+  fill: var(--bg);
 }
 
 .brandCopy {
@@ -222,6 +235,7 @@ a {
   overflow: hidden;
   font-size: 14px;
   font-weight: 650;
+  letter-spacing: .045em;
   white-space: nowrap;
   text-overflow: ellipsis;
 }

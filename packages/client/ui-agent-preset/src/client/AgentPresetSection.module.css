@@ -164,7 +164,7 @@
 }
 
 .cardMain:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -2px;
 }
 
@@ -285,7 +285,7 @@
 }
 
 .iconButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -1px;
 }
 
@@ -479,9 +479,37 @@
   .cards {
     grid-template-columns: minmax(0, 1fr);
     grid-auto-rows: auto;
+    gap: 0;
+  }
+
+  /* On a phone the option list is rows, not cards: the bounding box and the
+     20px corner are desktop chrome; a hairline carries the separation and the
+     selected row reads by fill alone. */
+  .card {
+    border: 0;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
+  }
+
+  .cardActive {
+    border-color: var(--dsw-alias-border-l2);
   }
 
   .cardMain {
     min-height: var(--dsw-touch-target);
+    padding: var(--dsw-space-3) 0;
+    gap: var(--dsw-space-1);
+  }
+
+  /* Three lines on a phone: the fourth line bought a taller card, not more
+     readable description. */
+  .cardDesc {
+    min-height: 0;
+    -webkit-line-clamp: 3;
+  }
+
+  .cardFoot {
+    padding: 2px 0;
+    border-top: 0;
   }
 }

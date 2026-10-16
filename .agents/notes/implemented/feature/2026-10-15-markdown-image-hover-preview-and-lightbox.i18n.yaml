@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-markdown-image-hover-preview-and-lightbox.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-markdown-image-hover-preview-and-lightbox.md
+/agent-note-markdown-images-gain-hover-previews-and-the-shared-lightbox:
+  en: 18b017d415a43c3b
+  zh: 58035140c185fbd9
+/agent-note-markdown-images-gain-hover-previews-and-the-shared-lightbox/problem:
+  en: 3c0b3365c3245482
+  zh: 225988d7011d2501
+/agent-note-markdown-images-gain-hover-previews-and-the-shared-lightbox/decision:
+  en: c1e5c427b114bfeb
+  zh: 3cd3b46845ca46e5
+/agent-note-markdown-images-gain-hover-previews-and-the-shared-lightbox/alternatives-considered:
+  en: e007f9661e1f5dc1
+  zh: 6080d8c64e980379
+/agent-note-markdown-images-gain-hover-previews-and-the-shared-lightbox/consequences:
+  en: 1ebb61d89100e388
+  zh: 82e1c675a9e662d7
+/agent-note-markdown-images-gain-hover-previews-and-the-shared-lightbox/verification:
+  en: 1928bcd1b09fab48
+  zh: 38d8daa00bf3120a
+/agent-note-markdown-images-gain-hover-previews-and-the-shared-lightbox/related:
+  en: 8523ae77db7b7bcb
+  zh: 3370d417da2015ef

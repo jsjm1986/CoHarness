@@ -108,3 +108,30 @@ export function steerHostSubagentPrompt(
     'steer',
   )
 }
+
+/**
+ * Process-stable symbol-keyed residency probe shared by this unbundled
+ * internal subpath and sibling in-process providers composing structured
+ * children.
+ * @internal
+ */
+export const subagentPendingDirectChildren = Symbol.for('dsh.subagent.pendingDirectChildren')
+
+/** Runtime face required by the pending-children probe. */
+export interface PendingDirectChildrenProbe {
+  [subagentPendingDirectChildren](parent: Agent): boolean
+}
+
+/**
+ * Report whether one live parent still owns unsettled direct continuable work:
+ * a resident child Activation naming it as parent, or an in-flight
+ * materialization whose recorded lineage contains it. A provider composing a
+ * structured child needs this synchronously; the public async
+ * `waitForChildren` cannot answer inside a tool boundary.
+ * @param runtime - subagent runtime owning continuation residency.
+ * @param parent - exact live Agent whose direct children are observed.
+ * @returns whether direct continuable work remains unsettled.
+ */
+export function hasPendingDirectChildren(runtime: SubagentRuntime, parent: Agent): boolean {
+  return (runtime as SubagentRuntime & PendingDirectChildrenProbe)[subagentPendingDirectChildren](parent)
+}

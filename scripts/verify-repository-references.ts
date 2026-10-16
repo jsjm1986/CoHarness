@@ -59,7 +59,11 @@ export function findRepositoryReferences(
     // identity here. Prose and other fields retain the ordinary reference rule.
     const selectionPin = file === 'scripts/fixtures/pr-scope-baseline/inputs.json'
       && /^\s*"sourceCommit": "[a-f0-9]{40}",?\s*$/.test(line)
-    if (!selectionPin && [...line.matchAll(commitCandidate)].some(match => commits.has(match[0].toLowerCase()))) {
+    // Agent Notes record upstream commit identifiers as their subject matter
+    // during alignment work, the same reason `upgrades/` is excluded; the
+    // organization-url check above still applies to them.
+    const notesCommitEvidence = file.startsWith('.agents/notes/')
+    if (!selectionPin && !notesCommitEvidence && [...line.matchAll(commitCandidate)].some(match => commits.has(match[0].toLowerCase()))) {
       references.push({ file, line: index + 1, kind: 'commit-hash' })
     }
   }

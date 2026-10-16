@@ -19,6 +19,9 @@
   config:
     cwd: !!js process.cwd()
 
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 - id: agent
   name: '@deepseek-ai/dsh-agent-spine-demo'
   config:

@@ -88,8 +88,10 @@ describe.skipIf(MODE === 'record').each(CASES)('web e2e: $name', (scenario) => {
       && event.data.message.source.callId === editCall.data.callId)
     if (result?.type !== 'tool/result') throw new Error('the real edit produced no durable result')
     expect(result.data.message.isError).toBe(false)
+    const editedPath = join(workspace, scenario.file)
     expect(result.data.meta).toEqual({
-      diffs: [{ path: scenario.file, oldText: scenario.before.slice(0, -1), newText: scenario.after.slice(0, -1) }],
+      path: editedPath,
+      diffs: [{ path: editedPath, oldText: scenario.before.slice(0, -1), newText: scenario.after.slice(0, -1) }],
     })
 
     await page.getByText('DONE', { exact: true }).waitFor()

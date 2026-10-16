@@ -290,6 +290,11 @@
   display: none;
 }
 
+/* Slot-contributed quick buttons join .rowActions' flex as if unwrapped. */
+.slotActions {
+  display: contents;
+}
+
 /* An open row menu pins the hover affordances (figma: the row keeps its
    hover fill while its dropdown is up). */
 .projectRow.menuOpen,
@@ -449,6 +454,10 @@
     display: none;
   }
 
+  .sessionRow .slotActions {
+    display: none;
+  }
+
   .iconButton {
     width: var(--dsw-touch-target);
     height: var(--dsw-touch-target);
@@ -460,12 +469,33 @@
   min-height: var(--dsw-touch-target);
 }
 
+/* Native press: an instant fill instead of the desktop scale nudge — a
+   full-width cell that squishes under the thumb reads as elastic, not
+   tappable. */
+:global([data-viewport='compact']) .projectRow:active,
+:global([data-viewport='compact']) .sessionRow:active,
+:global([data-viewport='compact']) .searchResultRow:active {
+  transform: none;
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
 :global([data-viewport='compact']) .projectRow .rowActions,
 :global([data-viewport='compact']) .sessionRow .rowActions {
   display: flex;
 }
 
 :global([data-viewport='compact']) .sessionRow .time {
+  /* The relative-time stamp is the row's scanning metadata, not chrome noise —
+     keep it at the caption tier so a list of single-line rows still carries
+     recency; the title flexes down and ellipsizes ahead of it. */
+  display: inline;
+  flex: none;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-caption);
+}
+
+:global([data-viewport='compact']) .sessionRow .slotActions {
   display: none;
 }
 
@@ -477,15 +507,15 @@
 /* Mobile Workspace cards keep the hierarchy visible: the Workspace row is a
    card header and Sessions are inset children rather than a flat desktop tree. */
 :global([data-viewport='compact']) .projectRow {
-  min-height: 48px;
+  min-height: 44px;
   height: auto;
   padding: 0 var(--dsw-space-2) 0 var(--dsw-space-3);
   border-radius: var(--dsw-radius-lg);
-  align-items: flex-start;
+  align-items: center;
 }
 
 :global([data-viewport='compact']) .projectRow .slot {
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 :global([data-viewport='compact']) .projectRow .title {
@@ -498,7 +528,8 @@
   min-height: 44px;
   height: auto;
   margin: 0;
-  padding: 0 var(--dsw-space-2) 0 var(--dsw-space-5);
+  padding: 0 var(--dsw-space-1) 0 var(--dsw-space-4);
+  gap: var(--dsw-space-2);
   border: 0;
   border-radius: var(--dsw-radius-md);
   background: transparent;
@@ -509,8 +540,18 @@
   line-height: 18px;
 }
 
+/* An idle row's leading status slot carries nothing but the slot's
+   display:contents host element: collapse the pair so the title lands near
+   the group label's inset instead of floating mid-row. */
+:global([data-viewport='compact']) .sessionRow .slot:has(> :only-child:empty) {
+  display: none;
+}
+
 :global([data-viewport='compact']) .sessionRow.selected {
-  background: var(--dsw-alias-interactive-bg-hover);
+  /* Flat active fill, not the desktop raised pill: in a full-width drawer a
+     lifted card reads as a button, not a selection marker. */
+  background: var(--dsw-alias-interactive-bg-active);
+  box-shadow: none;
 }
 
 :global([data-viewport='compact']) .flatSessionRowWithoutStatus,

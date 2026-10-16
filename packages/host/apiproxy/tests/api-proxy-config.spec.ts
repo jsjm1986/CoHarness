@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
-import SessionStore from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import { GoalId } from '@deepseek-ai/dsh-goal'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -37,6 +38,7 @@ import type { RpcRequest, RpcResponse } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
 import { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-agent-default-model'
 import { createApiProxy } from '../src/api-proxy.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const DEFAULTS = { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' }
 
@@ -572,6 +574,23 @@ describe('settings domain', () => {
     }])
   })
 
+  it('forwards a goal activation edge with the exact current ref', async () => {
+    const ctx = await harness()
+    const api = createApiProxy(ctx, DEFAULTS)
+    const payload = {
+      sessionId: SessionId('session-1'),
+      goal: { id: GoalId('goal-1'), revision: 1, activation: 'disarmed' as const },
+    }
+    const frames = await collectHost(api, ['host/remote-event'], 1, async () => {
+      ctx.emit('goal/activation-changed', payload)
+    })
+    expect(frames).toEqual([{
+      type: 'host/remote-event',
+      event: 'goal/activation-changed',
+      args: [payload],
+    }])
+  })
+
   it('broadcasts a permission change without invalidating the model catalog', async () => {
     const ctx = await harness()
     const permission = ctx.settings.register(settingsNamespace('permission'), z.object({
@@ -810,6 +829,7 @@ describe('settings domain', () => {
   it.each([false, true])('checks real subagent settings ownership and protected capacity: manager=%s', async (projectManager) => {
     const ctx = await harness({ projectScope: 'rw', projectManager })
     try {
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       const api = createApiProxy(ctx, DEFAULTS)
       const result = await api.settings.mutate(request({

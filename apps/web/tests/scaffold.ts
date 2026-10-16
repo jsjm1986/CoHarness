@@ -419,6 +419,12 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     ...mode === 'record' || options.deepSeekMissingCredential === true
       ? []
       : [{ id: 'agent-default-model', config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }],
+    // host.describe's canOpenPath asks the RUNNING host whether a native
+    // opener exists; on a headless runner it reports false and file-open
+    // gestures surface the "preview unavailable" refusal instead of reaching
+    // host.openPath. Pin the capability so every host replays the recorded
+    // desktop behavior; a scenario overlay can still win.
+    { id: 'api-gateway', config: { nativeOpen: true } },
     ...extraOverlayPatches,
     // The roster's `roots` is an assembly fact AppCLIEntry resolves and patches
     // in, exactly like `distIndex` on the webserver row — the shipped preset
@@ -1079,6 +1085,17 @@ export async function captureStableAria(page: Page, selector: string, workspaceC
     return stable
   }, { timeout: 10_000, message: 'aria snapshot did not stabilize' }).toBe(true)
   return previous
+}
+
+/**
+ * Wait until the session header's state dot unmounts. The sessions-list
+ * running bit travels as its own host frame, so it clears a frame after the
+ * turn barrier resolves; an end-state capture taken in between still draws
+ * the Running marker for a settled turn.
+ * @param page - the page under test.
+ */
+export async function waitForIdleSessionDot(page: Page): Promise<void> {
+  await page.locator('header [data-session-state]').waitFor({ state: 'detached' })
 }
 
 /**

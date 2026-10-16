@@ -16,7 +16,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, expectTooltipOnTop, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/queue-actions', import.meta.url))
 const FIXTURE = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
@@ -145,6 +145,13 @@ describe('web e2e: queue row actions', () => {
     await editRow.getByRole('button', { name: 'Edit queued message' }).click()
     const editor = page.getByRole('textbox', { name: 'Edit queued message' })
     await editor.fill(EDITED)
+    const save = page.getByRole('button', { name: 'Save queued message' })
+    await save.hover()
+    const saveTooltip = page.getByRole('tooltip', { name: 'Save queued message', exact: true })
+    await saveTooltip.waitFor()
+    // The dock tucks under the input card, which paints later; the bubble must
+    // escape the panel's stacking context instead of landing behind it.
+    await expectTooltipOnTop(saveTooltip)
     const editingSnapshot = await captureStableAria(page, '[data-queue-dock]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(EDITING_EXPECTED, editingSnapshot, MODE)
     await page.getByRole('button', { name: 'Save queued message' }).click()

@@ -3,9 +3,8 @@
   - button "Close":
     - img
   - paragraph: No per-file size limit, up to 20 per upload
-  - button "Personal documents Visible only to you":
+  - button "Personal documents":
     - strong: Personal documents
-    - text: Visible only to you
     - img
   - status:
     - text: Project scopes could not be refreshed; showing the last result
@@ -34,10 +33,6 @@
       - listitem:
         - checkbox "notes.txt"
         - text: notes.txt 30.0 KB · 2026-08-16
-        - button "Add notes.txt to conversation":
-          - img
-        - button "Preview notes.txt":
-          - img
         - 'button "More actions: notes.txt"':
           - img
     - group "Upload date 2026-08-14":
@@ -45,9 +40,5 @@
       - listitem:
         - checkbox "brief.txt"
         - text: brief.txt 21 B · 2026-08-14
-        - button "Add brief.txt to conversation":
-          - img
-        - button "Preview brief.txt":
-          - img
         - 'button "More actions: brief.txt"':
           - img

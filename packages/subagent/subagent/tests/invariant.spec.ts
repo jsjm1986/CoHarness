@@ -10,9 +10,11 @@ import type {
 } from '@deepseek-ai/dsh-subagent'
 import * as SubagentInvariant from '@deepseek-ai/dsh-subagent/invariant'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(InvariantRegistry)
   await ctx.plugin(SubagentInvariant)

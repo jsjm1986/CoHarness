@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-13-rightbar-resize-strip-occlusion.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-rightbar-resize-strip-occlusion.md
+/agent-note-details-resize-strip-rides-the-panel-border-above-dock-and-scrim-layers:
+  en: 8bbcccdb7ae11323
+  zh: 9ef2e8c36bf8145c
+/agent-note-details-resize-strip-rides-the-panel-border-above-dock-and-scrim-layers/problem:
+  en: 0a84852b7f212de0
+  zh: 0fedec5c3d555a34
+/agent-note-details-resize-strip-rides-the-panel-border-above-dock-and-scrim-layers/decision:
+  en: 704e7833c6398965
+  zh: 129e75a1923bfb0b
+/agent-note-details-resize-strip-rides-the-panel-border-above-dock-and-scrim-layers/verification:
+  en: 5464609384b8ea76
+  zh: 4fe0e39221eea56b
+/agent-note-details-resize-strip-rides-the-panel-border-above-dock-and-scrim-layers/alternatives-considered:
+  en: 76e79ca66ee43bbd
+  zh: 1ad5163012f404ea
+/agent-note-details-resize-strip-rides-the-panel-border-above-dock-and-scrim-layers/consequences:
+  en: f22a6fa654bddbd8
+  zh: f00f733b5c9d3405

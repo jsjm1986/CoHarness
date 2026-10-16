@@ -33,6 +33,8 @@ flowchart LR
   cfg --> plugin_acp_token_meter
   plugin_acp_compaction_basic["compaction-basic<br/>@deepseek-ai/dsh-compaction-basic"]
   cfg --> plugin_acp_compaction_basic
+  plugin_acp_working_directory["working-directory<br/>@deepseek-ai/dsh-working-directory"]
+  cfg --> plugin_acp_working_directory
   plugin_acp_session_projection["session-projection<br/>@deepseek-ai/dsh-session-projection"]
   cfg --> plugin_acp_session_projection
   plugin_acp_subagent["subagent<br/>@deepseek-ai/dsh-subagent"]
@@ -86,6 +88,7 @@ flowchart LR
 | `acp-agent` | `@deepseek-ai/dsh-acp-demo` |
 | `token-meter` | `@deepseek-ai/dsh-token-meter` |
 | `compaction-basic` | `@deepseek-ai/dsh-compaction-basic` |
+| `working-directory` | `@deepseek-ai/dsh-working-directory` |
 | `session-projection` | `@deepseek-ai/dsh-session-projection` |
 | `subagent` | `@deepseek-ai/dsh-subagent` |
 | `subagent-spawn-in-process` | `@deepseek-ai/dsh-subagent-spawn-in-process` |

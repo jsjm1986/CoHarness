@@ -1,0 +1,7 @@
+# The gallery asserts the native folder action and both link-opening branches
+# without launching them. Pin the capability so headless Linux CI and desktop
+# developer hosts expose the same UI branch; platform opener behavior belongs
+# to the Host unit tests.
+- id: api-gateway
+  config:
+    nativeOpen: true

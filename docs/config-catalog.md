@@ -110,7 +110,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-agent-instructions`
 
-- `inject`: `sessionProjections`
+- `inject`: `sessionProjections` · `workingDirectory`
 - `source`: [`packages/context/agent-instructions/src/config.ts:18`](../packages/context/agent-instructions/src/config.ts)
 
 ```ts config-catalog
@@ -118,7 +118,7 @@ export interface Config {
 export interface Config {
   /** Harness home containing the fixed user-global `AGENTS.md`; defaults to `$DSH_HOME` or `~/.dsh`. */
   dshHome?: string
-  /** Directory entries that identify the project root while walking upward from the session cwd. */
+  /** Directory entries that identify the project root while walking upward from the current working directory. */
   projectRootMarkers?: string[]
   /** UTF-8 byte cap for one rendered baseline or dynamic batch; non-positive or non-finite disables loading. */
   maxBytes: number
@@ -145,7 +145,7 @@ export interface Config {
 
 - `inject`: `agents` · `sessions` · `llm` · `tools` · `systemPrompt` · `sessionProjections`
 - `refs`: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md)
-- `source`: [`packages/core/agent-loop/src/index.ts:319`](../packages/core/agent-loop/src/index.ts)
+- `source`: [`packages/core/agent-loop/src/index.ts:330`](../packages/core/agent-loop/src/index.ts)
 
 ```ts config-catalog
 /** Agent-loop plugin configuration. */
@@ -350,8 +350,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-api-terminal-controller`
 
-- `inject`: `subprocess` · `sandboxPolicy` · `typert`
-- `source`: [`packages/api/terminal-controller/src/index.ts:30`](../packages/api/terminal-controller/src/index.ts)
+- `inject`: `subprocess` · `sandboxPolicy` · `typert` · `workingDirectory`
+- `source`: [`packages/api/terminal-controller/src/index.ts:31`](../packages/api/terminal-controller/src/index.ts)
 
 ```ts config-catalog
 /** Deployment limits and an optional shell profile. */
@@ -731,7 +731,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-credentials-local`
 
-- `source`: [`packages/credentials/credentials-local/src/index.ts:65`](../packages/credentials/credentials-local/src/index.ts)
+- `source`: [`packages/credentials/credentials-local/src/index.ts:66`](../packages/credentials/credentials-local/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: file location and hot-reload behavior. */
@@ -895,7 +895,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-experimental-ptc-runtime-python`
 
-- `source`: [`packages/experimental/ptc-runtime-python/src/index.ts:42`](../packages/experimental/ptc-runtime-python/src/index.ts)
+- `inject`: `sandbox` · `sandboxPolicy`
+- `source`: [`packages/experimental/ptc-runtime-python/src/index.ts:45`](../packages/experimental/ptc-runtime-python/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: every cap, changeable from `cordis.yml` (no hardcoded tunables). */
@@ -1060,8 +1061,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-file-reference-local`
 
-- `inject`: `agents`
-- `source`: [`packages/context/file-reference-local/src/index.ts:35`](../packages/context/file-reference-local/src/index.ts)
+- `inject`: `agents` · `workingDirectory`
+- `source`: [`packages/context/file-reference-local/src/index.ts:36`](../packages/context/file-reference-local/src/index.ts)
 
 ```ts config-catalog
 /** Local file-reference discovery configuration. */
@@ -1188,7 +1189,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-hmr`
 
 - `refs`: `ChokidarOptions` (`chokidar`)
-- `source`: [`packages/boot/hmr/src/index.ts:51`](../packages/boot/hmr/src/index.ts)
+- `source`: [`packages/boot/hmr/src/index.ts:56`](../packages/boot/hmr/src/index.ts)
 
 ```ts config-catalog
 /** Module roots and watcher timing, with Chokidar deployment options. */
@@ -1210,7 +1211,7 @@ export interface HmrConfig extends ChokidarOptions {
 
 ## `@deepseek-ai/dsh-hooks-claude-code`
 
-- `inject`: `shell`
+- `inject`: `shell` · `workingDirectory`
 - `source`: [`packages/hooks/hooks-claude-code/src/index.ts:54`](../packages/hooks/hooks-claude-code/src/index.ts)
 
 ```ts config-catalog
@@ -1231,7 +1232,7 @@ export interface Config {
   /**
    * Replaces `${CLAUDE_PROJECT_DIR}` in command strings AND is exported as the
    * `CLAUDE_PROJECT_DIR` env var for hook processes. When omitted, the env var
-   * defaults per-run to the agent's session workspace (`session.header.cwd`, the
+   * defaults per-run to the agent's current directory (the
    * same dir the hook runs in) — Claude Code always exports this var, and common
    * unmodified hooks reference `$CLAUDE_PROJECT_DIR` for project-relative paths.
    */
@@ -1256,7 +1257,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-hooks-codex`
 
-- `inject`: `shell`
+- `inject`: `shell` · `workingDirectory`
 - `source`: [`packages/hooks/hooks-codex/src/index.ts:53`](../packages/hooks/hooks-codex/src/index.ts)
 
 ```ts config-catalog
@@ -2403,7 +2404,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-schedule`
 
 - `inject`: `agents` · `sessions` · `tools` · `storageDomain` · `sessionController` · `sessionPersistence`
-- `source`: [`packages/schedule/schedule/src/index.ts:73`](../packages/schedule/schedule/src/index.ts)
+- `source`: [`packages/schedule/schedule/src/index.ts:74`](../packages/schedule/schedule/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the Host Schedule domain. */
@@ -2444,9 +2445,9 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-sdk-jsonrpc-server`
 
-- `inject`: `agents`
+- `inject`: `agents` · `workingDirectory`
 - `refs`: `Readable` (`node:stream`) · `Writable` (`node:stream`)
-- `source`: [`packages/sdk/server/src/index.ts:25`](../packages/sdk/server/src/index.ts)
+- `source`: [`packages/sdk/server/src/index.ts:26`](../packages/sdk/server/src/index.ts)
 
 ```ts config-catalog
 /** JSON-RPC deployment config plus runtime-only test hooks. */
@@ -2483,19 +2484,26 @@ export interface JsonRpcConfig {
 ## `@deepseek-ai/dsh-session-log-deepseek`
 
 - `inject`: `deepseekLlmApiExtensions` · `sessions`
-- `source`: [`packages/session/session-log-deepseek/src/index.ts:34`](../packages/session/session-log-deepseek/src/index.ts)
+- `refs`: `Volatile` (`@deepseek-ai/cordis`)
+- `source`: [`packages/session/session-log-deepseek/src/index.ts:35`](../packages/session/session-log-deepseek/src/index.ts)
 
 ```ts config-catalog
 /** Session-log request contribution configuration. */
 export interface Config {
   /** Contribute `dsh_session_log` to official DeepSeek requests. Defaults to `false`. */
-  enabled?: boolean
+  enabled: Volatile<boolean>
   /** Optional exact endpoint allowlist; an empty list preserves the adapter's configured endpoint. */
-  allowedEndpoints?: string[]
+  allowedEndpoints: string[]
   /** Environment key whose non-empty value disables new deliveries immediately. */
-  killSwitchEnv?: string
+  killSwitchEnv: string
   /** Emit metadata-only delivery audit records through the host logger. */
-  audit?: boolean
+  audit: boolean
+  /**
+   * Largest serialized `dsh_session_log` field, in UTF-8 bytes, that one request carries.
+   * A request uploads the longest pending event prefix that fits; later requests continue
+   * after its acceptance. Defaults to 8 MiB.
+   */
+  maxBytes: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-log-deepseek -->
@@ -2685,7 +2693,7 @@ export interface Config {
 
 - `inject`: `sessions`
 - `refs`: `BatchLogRecordProcessorOptions` (`@opentelemetry/sdk-logs`) · `OTLPExporterNodeConfigBase` (`@opentelemetry/otlp-exporter-base`)
-- `source`: [`packages/session/session-telemetry-otel/src/index.ts:100`](../packages/session/session-telemetry-otel/src/index.ts)
+- `source`: [`packages/session/session-telemetry-otel/src/index.ts:133`](../packages/session/session-telemetry-otel/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -2697,20 +2705,26 @@ export interface Config {
   /** Defaults to `FEEDBACK_ONLY`: capture session history only when feedback is explicitly submitted. */
   mode?: SessionTelemetryMode
   /**
-   * Passed verbatim to the SDK's OTLP/HTTP log exporter — the complete
+   * Passed verbatim to the SDK's OTLP/HTTP log exporter — the
    * `OTLPExporterNodeConfigBase` shape (`headers`, `timeoutMillis`,
-   * `compression`, `keepAlive`, …), owned and documented by the SDK. `url`
-   * is the one field this package requires and validates itself.
+   * `compression`, `keepAlive`, …) minus self-observability metering, which
+   * no owning MeterProvider exists to consume. `url` is the one field this
+   * package requires and validates itself.
    */
-  exporter?: OTLPExporterNodeConfigBase & {
+  exporter?: Omit<OTLPExporterNodeConfigBase, 'selfObsMeterProvider'> & {
     /** Full logs endpoint (e.g. `https://collector.example.com/v1/logs`). Required outside `DISABLED`; validated at load. */
     url?: string
   }
   /**
-   * Passed verbatim to `BatchLogRecordProcessor` (minus the exporter slot,
-   * which this plugin fills); the SDK owns and documents these knobs.
+   * Count, queue, cadence, and per-request watchdog settings for the
+   * byte-bounded processor (minus the exporter slot, which this plugin
+   * fills, and self-observability metering, which no owning MeterProvider
+   * exists to consume). A watchdog warning never releases an unsettled
+   * transport slot.
    */
-  processor?: Omit<BatchLogRecordProcessorOptions, 'exporter'>
+  processor?: TelemetryProcessorOptions
+  /** Uncompressed OTLP request byte limit, at most 4,000,000. */
+  maxRequestBytes?: number
   /** Maximum time spent awaiting the SDK provider's complete shutdown path. */
   shutdownTimeoutMillis?: number
 }
@@ -2720,6 +2734,14 @@ export enum SessionTelemetryMode {
   FEEDBACK_ONLY = 'FEEDBACK_ONLY',
   DISABLED = 'DISABLED',
 }
+
+/**
+ * Count, queue, cadence, and per-request watchdog knobs accepted by
+ * {@link ByteBoundedLogProcessor}. The exporter slot belongs to the owning
+ * pipeline, and `selfObsMeterProvider` is excluded because this processor
+ * implements no self-observability metering.
+ */
+export type TelemetryProcessorOptions = Omit<BatchLogRecordProcessorOptions, 'exporter' | 'selfObsMeterProvider'>
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-telemetry-otel -->
 
@@ -3071,7 +3093,8 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 ## `@deepseek-ai/dsh-subagent`
 
-- `source`: [`packages/subagent/subagent/src/index.ts:198`](../packages/subagent/subagent/src/index.ts)
+- `inject`: `workingDirectory`
+- `source`: [`packages/subagent/subagent/src/index.ts:205`](../packages/subagent/subagent/src/index.ts)
 
 ```ts config-catalog
 /** Host configuration for continuable subagent capacity. */
@@ -3105,14 +3128,6 @@ export interface Config {
   command: string
   /** Arguments passed to {@link command}. */
   args: string[]
-  /**
-   * Working directory override for the child process and its ACP session.
-   * Must be non-empty; a relative path resolves against the harness launch
-   * directory at load, and the result must be an existing directory. When
-   * omitted, each child inherits its delegating parent session's cwd — and
-   * starting one from a parent session that has no cwd fails.
-   */
-  cwd?: string
   /**
    * How to auto-answer the child's `session/request_permission` prompts:
    * `reject` (default — decline every prompt) or `allow` (approve via the first
@@ -3152,8 +3167,8 @@ export interface Config {
    */
   stateDir?: string
   /**
-   * Workspace override for persistent ACP members; defaults to {@link cwd},
-   * else the member Session working directory. Used only with {@link resume}.
+   * Workspace override for persistent ACP members; omitted uses the member
+   * Session's working directory. Used only with {@link resume}.
    */
   memberCwd?: string
 }
@@ -3264,7 +3279,7 @@ export type CodexPermissionMode =
 
 - `inject`: `subagents`
 - `refs`: [`ReasoningEffortId`](../packages/llm/llm/src/index.ts)
-- `source`: [`packages/subagent/subagent-dsh-sdk/src/index.ts:33`](../packages/subagent/subagent-dsh-sdk/src/index.ts)
+- `source`: [`packages/subagent/subagent-dsh-sdk/src/index.ts:34`](../packages/subagent/subagent-dsh-sdk/src/index.ts)
 
 ```ts config-catalog
 /** Config: how to spawn and drive the child SDK runtime process. */
@@ -3279,15 +3294,6 @@ export interface Config {
   patches: string[]
   /** Absolute isolated Harness home for every nested child process. */
   dshHome: string
-  /**
-   * Working directory override for the child process and its SDK session
-   * workspace. Must be non-empty; a relative path resolves against the
-   * harness launch directory at load, and the result must be an existing
-   * directory. When omitted, each child inherits its delegating parent
-   * session's cwd — and starting one from a parent session that has no cwd
-   * fails.
-   */
-  cwd?: string
   /** Provider route the child runtime initializes with (default `deepseek-official`). */
   provider: string
   /** Model the child runtime initializes with (default `deepseek-v4-flash`). */
@@ -3304,6 +3310,8 @@ export interface Config {
    * not leak implicitly.
    */
   env: Record<string, string>
+  /** Bound (ms) on the child's protocol `initialize` handshake during start. */
+  initializeTimeoutMs?: number
   /** Bound (ms) on the protocol `shutdown` exchange during dispose. */
   shutdownTimeoutMs?: number
   /**
@@ -3357,14 +3365,14 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:249`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:256`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */
 export interface Config {
   /** Include the fixed DeepSeek Harness identity before the deployment persona (default true). */
   includeHarnessIdentity?: boolean
-  /** Include dynamic runtime-context snapshots in model history (default true). */
+  /** Include optional runtime-context snapshots in model history (default true); required context remains. */
   includeRuntimeContext?: boolean
   /**
    * Deployment-wide persona prefix template before first-party guidance. A scoped section named
@@ -3391,7 +3399,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-terminal-bash`
 
-- `inject`: `terminals` · `sandboxPolicy` · `sessionProjections` · `subprocess`
+- `inject`: `terminals` · `sandboxPolicy` · `sessionProjections` · `subprocess` · `workingDirectory`
 - `source`: [`packages/terminal/terminal-bash/src/config.ts:10`](../packages/terminal/terminal-bash/src/config.ts)
 
 ```ts config-catalog
@@ -3519,7 +3527,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-bash`
 
-- `inject`: `tools` · `shell` · `systemPrompt` · `shellEnv`
+- `inject`: `tools` · `shell` · `systemPrompt` · `shellEnv` · `workingDirectory`
 - `source`: [`packages/shell/tool-bash/src/index.ts:38`](../packages/shell/tool-bash/src/index.ts)
 
 ```ts config-catalog
@@ -3549,8 +3557,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-bash-persistent`
 
-- `inject`: `tools` · `terminals`
-- `source`: [`packages/shell/tool-bash-persistent/src/index.ts:444`](../packages/shell/tool-bash-persistent/src/index.ts)
+- `inject`: `tools` · `terminals` · `workingDirectory`
+- `source`: [`packages/shell/tool-bash-persistent/src/index.ts:445`](../packages/shell/tool-bash-persistent/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the persistent Bash tool. */
@@ -3572,8 +3580,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-fs`
 
-- `inject`: `tools` · `fs` · `systemPrompt`
-- `source`: [`packages/fs/tool-fs/src/index.ts:25`](../packages/fs/tool-fs/src/index.ts)
+- `inject`: `tools` · `fs` · `systemPrompt` · `workingDirectory`
+- `source`: [`packages/fs/tool-fs/src/index.ts:26`](../packages/fs/tool-fs/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config (all optional — `Config` supplies the defaults). */
@@ -3595,8 +3603,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-fs-search`
 
-- `inject`: `tools` · `systemPrompt` · `subprocess`
-- `source`: [`packages/fs/tool-fs-search/src/index.ts:73`](../packages/fs/tool-fs-search/src/index.ts)
+- `inject`: `tools` · `systemPrompt` · `subprocess` · `workingDirectory`
+- `source`: [`packages/fs/tool-fs-search/src/index.ts:74`](../packages/fs/tool-fs-search/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config; over-cap glob sampling is an explicit deployment choice and the remaining fields have defaults. */
@@ -3662,10 +3670,11 @@ export interface Config {
   completionDelivery?: CompletionDelivery
   /**
    * Turns one owner may have opened by completion wakes before the next
-   * notice degrades to injection, reset by any user-authored input. Defaults
-   * to 10: the bound blocks the self-exciting chain where a woken turn starts
-   * the job whose completion wakes it again, at the cost of notices past the
-   * cap waiting silently for the next user input.
+   * notice degrades to injection, reset by any user-authored input. Absent by
+   * default: every idle completion wakes its owner. Set it to bound the
+   * self-exciting chain where a woken turn starts the job whose completion
+   * wakes it again, at the cost of notices past the cap waiting silently for
+   * the next user input.
    */
   maxConsecutiveWakes?: number
 }
@@ -3684,8 +3693,8 @@ export type CompletionDelivery = 'quiet' | 'wakeup'
 
 ## `@deepseek-ai/dsh-tool-lsp`
 
-- `inject`: `tools` · `lsp` · `systemPrompt`
-- `source`: [`packages/lsp/tool-lsp/src/index.ts:58`](../packages/lsp/tool-lsp/src/index.ts)
+- `inject`: `tools` · `lsp` · `systemPrompt` · `workingDirectory`
+- `source`: [`packages/lsp/tool-lsp/src/index.ts:57`](../packages/lsp/tool-lsp/src/index.ts)
 
 ```ts config-catalog
 /** Plugin configuration: result caps and the timeout budget. */
@@ -3705,8 +3714,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-present`
 
-- `inject`: `tools` · `fs` · `sessionProjections`
-- `source`: [`packages/deliverables/tool-present/src/index.ts:15`](../packages/deliverables/tool-present/src/index.ts)
+- `inject`: `tools` · `fs` · `sessionProjections` · `workingDirectory`
+- `source`: [`packages/deliverables/tool-present/src/index.ts:16`](../packages/deliverables/tool-present/src/index.ts)
 
 ```ts config-catalog
 /** Per-call delivery limit. */
@@ -3722,7 +3731,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-pwsh`
 
-- `inject`: `tools` · `shell` · `systemPrompt` · `shellEnv`
+- `inject`: `tools` · `shell` · `systemPrompt` · `shellEnv` · `workingDirectory`
 - `source`: [`packages/shell/tool-pwsh/src/index.ts:55`](../packages/shell/tool-pwsh/src/index.ts)
 
 ```ts config-catalog
@@ -3752,8 +3761,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-pwsh-persistent`
 
-- `inject`: `tools` · `terminals`
-- `source`: [`packages/shell/tool-pwsh-persistent/src/index.ts:457`](../packages/shell/tool-pwsh-persistent/src/index.ts)
+- `inject`: `tools` · `terminals` · `workingDirectory`
+- `source`: [`packages/shell/tool-pwsh-persistent/src/index.ts:458`](../packages/shell/tool-pwsh-persistent/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the persistent pwsh tool. */
@@ -3817,8 +3826,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-skill`
 
-- `inject`: `agents` · `tools` · `skills`
-- `source`: [`packages/skill/tool-skill/src/index.ts:61`](../packages/skill/tool-skill/src/index.ts)
+- `inject`: `agents` · `tools` · `skills` · `workingDirectory`
+- `source`: [`packages/skill/tool-skill/src/index.ts:62`](../packages/skill/tool-skill/src/index.ts)
 
 ```ts config-catalog
 /** Model-facing skill catalog configuration. */
@@ -3924,8 +3933,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-terminal`
 
-- `inject`: `terminals` · `tools` · `systemPrompt`
-- `source`: [`packages/terminal/tool-terminal/src/index.ts:36`](../packages/terminal/tool-terminal/src/index.ts)
+- `inject`: `terminals` · `tools` · `systemPrompt` · `workingDirectory`
+- `source`: [`packages/terminal/tool-terminal/src/index.ts:38`](../packages/terminal/tool-terminal/src/index.ts)
 
 ```ts config-catalog
 /** Model-facing terminal tool configuration. */
@@ -4071,7 +4080,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tools`
 
 - `inject`: `systemPrompt`
-- `source`: [`packages/core/tools/src/index.ts:676`](../packages/core/tools/src/index.ts)
+- `source`: [`packages/core/tools/src/index.ts:677`](../packages/core/tools/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: how the registered tools are presented to the model. */
@@ -4157,7 +4166,7 @@ export type ApprovalPolicy = 'ask' | 'never'
 
 ## `@deepseek-ai/dsh-userdoc-local`
 
-- `source`: [`packages/attachment/userdoc-local/src/index.ts:181`](../packages/attachment/userdoc-local/src/index.ts)
+- `source`: [`packages/attachment/userdoc-local/src/index.ts:97`](../packages/attachment/userdoc-local/src/index.ts)
 
 ```ts config-catalog
 /** Local document backend configuration. */
@@ -4387,8 +4396,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-workflow-ptc`
 
-- `inject`: `subagents` · `ptcRuntime` · `sandboxPolicy`
-- `source`: [`packages/workflow/workflow-ptc/src/index.ts:32`](../packages/workflow/workflow-ptc/src/index.ts)
+- `inject`: `subagents` · `ptcRuntime` · `sandboxPolicy` · `workingDirectory`
+- `source`: [`packages/workflow/workflow-ptc/src/index.ts:33`](../packages/workflow/workflow-ptc/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config (all optional — `static Config` supplies the defaults). */
@@ -4406,6 +4415,23 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workflow-ptc -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-working-directory -->
+<a id="deepseek-aidsh-working-directory"></a>
+
+## `@deepseek-ai/dsh-working-directory`
+
+- `inject`: `fs` · `sessionProjections` · `systemPrompt`
+- `source`: [`packages/session/working-directory/src/index.ts:57`](../packages/session/working-directory/src/index.ts)
+
+```ts config-catalog
+/** Deployment default for Sessions without an original project directory. */
+export interface Config {
+  /** Absolute execution-world fallback directory; omitted values use the launch directory. */
+  defaultDirectory?: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-working-directory -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
 <a id="deepseek-aidsh-workspace-changes"></a>
@@ -4526,7 +4552,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-computer-use` | — | [`packages/computer-use/computer-use/src/index.ts`](../packages/computer-use/computer-use/src/index.ts) |
 | `@deepseek-ai/dsh-cordis-client-runner` | — | [`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts) |
 | `@deepseek-ai/dsh-deepseek-llm-api-extensions` | — | [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../packages/llm/deepseek-llm-api-extensions/src/index.ts) |
-| `@deepseek-ai/dsh-experimental-auto-review` | `approval` · `llm` · `permissionPresets` · `sessions` · `tools` | [`packages/experimental/auto-review/src/index.ts`](../packages/experimental/auto-review/src/index.ts) |
+| `@deepseek-ai/dsh-experimental-auto-review` | `approval` · `llm` · `permissionPresets` · `sessions` · `tools` · `workingDirectory` | [`packages/experimental/auto-review/src/index.ts`](../packages/experimental/auto-review/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-client-ui-agent-team` | — | [`packages/experimental/client-ui-agent-team/src/index.ts`](../packages/experimental/client-ui-agent-team/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-client-ui-voice-input` | — | [`packages/experimental/client-ui-voice-input/src/index.ts`](../packages/experimental/client-ui-voice-input/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | `computerUse` · `tools` · `systemPrompt` | [`packages/experimental/computer-use-cua-driver-native/src/index.ts`](../packages/experimental/computer-use-cua-driver-native/src/index.ts) |
@@ -4555,6 +4581,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-tool-call-timeout-policy` | `tools` | [`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts) |
 | `@deepseek-ai/dsh-tool-cordis` | `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` | [`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts) |
 | `@deepseek-ai/dsh-tool-subagent-control` | `tools` · `subagents` | [`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts) |
+| `@deepseek-ai/dsh-tool-working-directory` | `tools` · `workingDirectory` | [`packages/session/tool-working-directory/src/index.ts`](../packages/session/tool-working-directory/src/index.ts) |
 | `@deepseek-ai/dsh-user-questions` | — | [`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts) |
 | `@deepseek-ai/dsh-userdoc-context` | `agents` · `sessions` | [`packages/context/userdoc-context/src/index.ts`](../packages/context/userdoc-context/src/index.ts) |
 | `@deepseek-ai/dsh-webhook` | `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` | [`packages/webhook/webhook/src/index.ts`](../packages/webhook/webhook/src/index.ts) |

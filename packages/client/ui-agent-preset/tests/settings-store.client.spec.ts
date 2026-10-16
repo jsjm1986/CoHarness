@@ -304,7 +304,6 @@ describe('the new-session chip controller', () => {
       failList?: string
       throwOn?: 'list' | 'select'
       modeSelection?: boolean
-      developerTools?: boolean
       list?: () => Promise<{
         ok: true
         value: { presets: unknown[]; authorable: boolean; modeSelectionEnabled: boolean }
@@ -333,11 +332,7 @@ describe('the new-session chip controller', () => {
         },
       },
     } as unknown as Pick<ClientRemote, 'agentPresets'>
-    const developerTools = options.developerTools ?? true
-    return new AgentPresetSeatController(remote, () => current as SeatSessionSummary | undefined, undefined, {
-      getSnapshot: () => developerTools,
-      subscribe: () => () => {},
-    })
+    return new AgentPresetSeatController(remote, () => current as SeatSessionSummary | undefined)
   }
 
   const ROSTER: { id: string; trust: 'system' | 'user'; isDefault: boolean }[] = [
@@ -449,16 +444,20 @@ describe('the new-session chip controller', () => {
     expect(writes).toEqual([])
   })
 
-  it('refuses to compose a pick while developer tools are disabled', async () => {
+  it('re-derives the reported choice after an external stage clear', async () => {
     const writes: Recorded[] = []
-    const controller = chip(
-      ROSTER, { id: 's1', blank: true, agentPreset: 'standard' }, { writes, developerTools: false })
+    const controller = chip(ROSTER, undefined, { writes })
     await controller.load()
     await controller.select('minimal')
+    expect(controller.store.getSnapshot().current).toBe('minimal')
 
-    // The picker is hidden under the same preference, so a stage reaching
-    // apply here came from a stale surface and must not land.
+    // The preference gate clears the stage itself; the next apply still
+    // reports what the next session would compose rather than the dead pick.
+    controller.clearStage()
+    await controller.apply()
+
     expect(writes).toEqual([])
+    expect(controller.store.getSnapshot().current).toBe('standard')
   })
 
   it('falls back to the default when the host refuses the switch', async () => {
@@ -470,7 +469,9 @@ describe('the new-session chip controller', () => {
 
     // Showing `minimal` after a refusal would claim a composition the session
     // never got.
-    expect(controller.store.getSnapshot()).toMatchObject({ current: 'standard', error: 'already started' })
+    expect(controller.store.getSnapshot()).toMatchObject({
+      current: 'standard', error: { preset: { id: 'minimal' }, reason: 'already started' },
+    })
   })
 
   it('uses a structured refusal reason when the host supplies one', async () => {
@@ -483,7 +484,9 @@ describe('the new-session chip controller', () => {
 
     await controller.select('minimal')
 
-    expect(controller.store.getSnapshot()).toMatchObject({ current: 'standard', error: 'already started' })
+    expect(controller.store.getSnapshot()).toMatchObject({
+      current: 'standard', error: { preset: { id: 'minimal' }, reason: 'already started' },
+    })
   })
 
   it('falls back to the default when the switch never reaches the host', async () => {
@@ -494,7 +497,7 @@ describe('the new-session chip controller', () => {
     await controller.select('minimal')
 
     expect(controller.store.getSnapshot())
-      .toMatchObject({ current: 'standard', busy: false, error: 'socket closed' })
+      .toMatchObject({ current: 'standard', busy: false, error: { reason: 'socket closed' } })
   })
 
   it('ignores a pick while a switch is in flight', async () => {

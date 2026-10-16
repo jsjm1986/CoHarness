@@ -8,6 +8,7 @@ import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
 import SubagentRuntime, { SUBAGENT_DESCRIPTOR_VERSION } from '@deepseek-ai/dsh-subagent'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { assertBuiltBenchmarkRuntime } from '../support/built-worker.ts'
 import { PARENT_ID, syntheticHistory, TIME_ZERO, WORKLOAD } from './workload.ts'
 
@@ -56,6 +57,7 @@ async function seed(ctx: Context): Promise<void> {
 async function run(root: string, mode: string): Promise<CatalogReport | { seeded: true }> {
   const ctx = new Context()
   try {
+    provideWorkingDirectoryFixture(ctx, '/bench')
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(JsonlSessionPersistence, { root, compression: 'zstd' })

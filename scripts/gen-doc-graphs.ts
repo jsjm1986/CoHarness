@@ -497,6 +497,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Durably checkpoints projection unit states per session (throttled + turn/end/detach mandatory points) and serves the cold-read ladder: cache row + persistence tail replay, so listings never load full logs.',
   },
   {
+    key: 'workingDirectory',
+    pkg: 'working-directory',
+    title: 'Session working directory',
+    mode: 'seam',
+    implementations: ['working-directory'],
+    consumers: ['tools', 'tool-fs', 'tool-fs-search', 'tool-lsp', 'tool-bash', 'tool-pwsh', 'tool-bash-persistent', 'tool-pwsh-persistent', 'terminal-bash', 'tool-terminal', 'api-terminal-controller', 'tool-skill', 'agent-instructions', 'file-reference-local', 'tool-present', 'hooks-claude-code', 'hooks-codex', 'workflow-ptc', 'tool-working-directory', 'subagent', 'sdk-jsonrpc-server', 'experimental-auto-review', 'experimental-browser-use-runtime', 'host-apiproxy'],
+    note: 'One Session projection owns the effective execution directory, contained under the original project tree; the Session-scoped filesystem validates changes and required runtime context reports them.',
+  },
+  {
     key: 'skills',
     pkg: 'skill',
     title: 'Skill provider registry',

@@ -8,7 +8,7 @@ import type { Duplex, Readable, Writable } from 'node:stream'
 import { finished, pipeline } from 'node:stream/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SubprocessHandle, SubprocessSpawnSpec, SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
-import { OutputCollector, prepareManagedProcessBinding } from '@deepseek-ai/dsh-subprocess-local/output'
+import { logSpillFailure, OutputCollector, prepareManagedProcessBinding, type SpillFailureReporter } from '@deepseek-ai/dsh-subprocess-local/output'
 import { doneSchema, outputSnapshotFrameLimit, spawnSchema, type SshProcessId, type SshStreamEndpoint } from './schemas.ts'
 import { z } from 'zod'
 import { SSH_STREAM_TLS_OPTIONS } from './stream-security.ts'
@@ -94,17 +94,14 @@ export class RemoteProcesses {
   private readonly cleanups = new Set<Promise<void>>()
   private closing = false
 
+  /** Spill failures reach the helper's logger; the remote caller then receives the tail without a spill path. */
+  private readonly reportSpillFailure: SpillFailureReporter
+
   constructor(
     private readonly ctx: Context, private readonly root: string,
     private readonly limit: number, private readonly preparationMs: number,
-  ) {}
-
-  /** Log one spill failure; the remote caller then receives the tail without a spill path. */
-  private readonly reportSpillFailure = (error: unknown, label: string): void => {
-    this.ctx.logger.error(
-      `ssh helper could not write the complete ${label} stream to its spill file; the remote result keeps only the in-memory tail and reports no full-output path.`,
-      error,
-    )
+  ) {
+    this.reportSpillFailure = logSpillFailure(ctx.logger, 'ssh helper')
   }
 
   /**

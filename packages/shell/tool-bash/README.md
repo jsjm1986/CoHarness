@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 The model-facing `bash` tool registered over the `ctx.shell` executor seam. Foreground execution stays behind that seam; a background process handle is registered with the generic `ctx.jobs` runtime and controlled through `job_output`, `job_list`, and `job_kill` from `@deepseek-ai/dsh-tool-jobs`.
 
-Requires a loaded executor Service Provider (e.g. `@deepseek-ai/dsh-bash-local`) and the [`@deepseek-ai/dsh-shell-env`](../shell-env/README.md) registry; the plugin stays pending until every injected service exists (`inject: ['tools', 'bash', 'systemPrompt', 'bashEnv']`). The tool contract is bash-dialect — mount a bash-parsing executor.
+Requires a loaded executor Service Provider (e.g. `@deepseek-ai/dsh-bash-local`), the [`@deepseek-ai/dsh-shell-env`](../shell-env/README.md) registry, and the [`@deepseek-ai/dsh-working-directory`](../../session/working-directory/README.md) service; the plugin stays pending until every injected service exists (`inject: ['tools', 'shell', 'systemPrompt', 'shellEnv', 'workingDirectory']`). The tool contract is bash-dialect — mount a bash-parsing executor.
 
 The package root exposes only the Cordis plugin contract (`name`, `inject`, `Config`, `apply`); result rendering and background-process adaptation remain package-internal.
 
@@ -17,7 +17,7 @@ The plugin also contributes the `tool:bash` prompt section (order 105): check th
 
 ## Summary
 
-`dsh-tool-bash` lets an agent run one-shot `bash` commands and receive stdout, stderr, and exit markers. Each call uses a fresh shell, so cwd, variables, and functions do not persist; `run_in_background` starts long-running work inspectable with `job_output` and stoppable with `job_kill`. The description requires verifying the resolved absolute path before any delete or move and guarding path variables with `${VAR:?}`. Commands receive the managed `DSH_*` environment; sandbox denials can be retried once with wider `sandbox_permissions`, a `justification`, and user approval. Non-zero exits arrive as results for the agent to answer. Use an executor such as `dsh-bash-local` and load `dsh-shell-env`.
+`dsh-tool-bash` lets an agent run one-shot `bash` commands and receive stdout, stderr, and exit markers. Each call uses a fresh shell — cwd, variables, and functions do not persist; `run_in_background` starts long-running work inspectable with `job_output` and stoppable with `job_kill`. Commands start in the Session's current working directory; relative `workdir` resolves against it. The description requires verifying resolved absolute paths before delete or move and guarding path variables with `${VAR:?}`. Commands receive the managed `DSH_*` environment; a denial may be retried once with wider `sandbox_permissions`, `justification`, and approval. Non-zero exits arrive as results.
 
 ## Table of Contents
 
@@ -43,12 +43,12 @@ The plugin also contributes the `tool:bash` prompt section (order 105): check th
 | `command` | string (required) | Run via `bash -c`. No state persists between calls — use `workdir`, not `cd`. |
 | `description` | string (required) | One-line, active-voice summary of the command (5-10 words), for UI/log display only — no effect on execution. |
 | `timeoutMs` | number | Timeout override in milliseconds. The executor applies its configured default and cap. |
-| `workdir` | string | Working directory for this call. Defaults to the filesystem identity of the calling agent's session cwd (`session.header.cwd`) so each session runs in its own workspace; a relative `workdir` is resolved against that same identity. |
+| `workdir` | string | Working directory for this call. Defaults to the Session's current working directory (`ctx.workingDirectory`) so each session runs in its own workspace; a relative `workdir` is resolved against that same directory. |
 | `run_in_background` | boolean | Return a job id immediately; no timeout applies. |
 | `sandbox_permissions` | string enum | ADVERTISED ONLY when the mounted executor sandboxes (`ctx.shell.sandboxMode` reports a confining default): the wider mode a denied command needs, from the closed target vocabulary `workspace-write`/`danger-full-access` (never cut down to the executor's default — the effective mode is per-session; a wider mode is checked and approved at execution, a repeated mode runs without approval, and a narrower request fails without prompting anyone). |
 | `justification` | string | Required together with `sandbox_permissions` (each without the other is a validation error): one sentence for the user explaining why this exact command needs the wider access. |
 
-`command`, `workdir`, and `timeoutMs` are resolved against the executor's config defaults via `ctx.shell.resolve()` before execution, so the Service Definition (`ShellExecSpec`) receives explicit `workdir`/`timeoutMs` values. The workdir default is applied in the tool layer from the calling agent's `session.header.cwd` BEFORE `resolve()` — the per-session cwd must come from `exec.agent`, since N sessions share one executor; only when no session cwd is available does the executor fall back to its own config / `process.cwd()`. When sandbox policy is present, the tool reuses its already-canonical `workspaceRoot` as the workdir base so confinement and process launch cannot resolve the same session spelling differently.
+`command`, `workdir`, and `timeoutMs` are resolved against the executor's config defaults via `ctx.shell.resolve()` before execution, so the Service Definition (`ShellExecSpec`) receives explicit `workdir`/`timeoutMs` values. The workdir default is applied in the tool layer BEFORE `resolve()` from the Session's current directory (`ctx.workingDirectory.ensure(exec.agent)`) — the per-session cwd must come from `exec.agent`, since N sessions share one executor; only when no agent is bound does the executor fall back to its own config / `process.cwd()`. The effective directory is independent of the sandbox permission root, which stays anchored on the Session's original project directory.
 
 ### Managed shell environment
 
@@ -56,7 +56,7 @@ Every foreground and background model bash call receives a freshly collected tru
 
 Result text contains stdout, an optional `[stderr]` section, then applicable sandbox-denial, timeout, signal, exit-code, and truncation markers. Timeout is reported independently of final exit status; nonzero exit remains a model-interpreted result rather than `isError`. Truncation links a safe complete spill file or reports it unavailable. Only infrastructure failures such as spawn errors and aborts produce `isError`.
 
-The canonical success is `{ kind: 'foreground', ...ShellRunResult }` for a completed foreground process or `{ kind: 'background', jobId }` for a published task. The Native renderer preserves the text above, including exactly `started background job <id>`; programmatic consumers use the typed fields without parsing those strings. Executor stream caps remain acquisition limits on `ShellRunResult` and carry their spill paths.
+The canonical success is `{ kind: 'foreground', cwd, ...ShellRunResult }` for a completed foreground process or `{ kind: 'background', jobId, cwd }` for a published task; `cwd` is the executor-resolved launch directory, and persisted presentation metadata carries the same value so settled cards retain the directory used by that call. The Native renderer preserves the text above, including exactly `started background job <id>`; programmatic consumers use the typed fields without parsing those strings. Executor stream caps remain acquisition limits on `ShellRunResult` and carry their spill paths.
 
 When `run_in_background` is true, this plugin preflights `ctx.jobs.start()` before spawning, registers the calling agent as owner, and adapts the returned `ShellProcess` handle into generic cancel/done/incremental-output hooks. The job runtime owns ids, cross-session isolation, completion notices, waiting, and disposal cleanup; this plugin only maps bash exit/sandbox facts into job output and outcome detail. `enableRunInBackground: false` removes the parameter and rejects a forced background call at execution time.
 

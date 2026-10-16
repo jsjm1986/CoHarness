@@ -14,9 +14,9 @@ import { createPortal } from 'react-dom'
 import type { PluginInstallFailureKind, Registry } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   Button, IconCheckOutline16, IconChevronDownOutline14, IconChevronLeftOutline14,
-  IconChevronRightOutline14, IconCloseOutline16,
+  IconChevronRightOutline14, IconCloseOutline16, IconDownloadOutline16,
   IconQuestionOutline14, IconPlusOutline16, IconRefreshOutline16, IconTrashOutline16,
-  IconWarningOutline16, Input, Modal, pointerModality,
+  IconWarningOutline16, Input, Menu, MenuItemButton, Modal, pointerModality,
   PluginArtworkDefault, PluginArtworkLoop, PluginArtworkSearch, PluginArtworkSubagent, PluginArtworkTerminal,
   StateDot, Switch, Tag, TerminalBlock, Toast, Tooltip, useAnchoredPosition, useDismissOnOutsidePointer,
   type IconProps, type StateDotState, type TerminalBlockLabels,
@@ -30,7 +30,7 @@ import {
   type InstallInputError, type InstallState, type InstallSubject, type PackageRow, type PackageView,
   type PluginManagerFace, type RegistryChoice,
 } from './manager-store.ts'
-import { managementText, noticeText, packageText, registryText, rowText, type Translate } from './presentation.ts'
+import { managementText, noticeText, packageText, registryText, restartText, rowText, type Translate } from './presentation.ts'
 import type { PluginPackageRef, PluginRowRef, PluginsSubject } from './slot-contract.ts'
 import type { ConfigPageForm } from './slot-contract.ts'
 import css from './PluginManagerPage.module.css'
@@ -41,6 +41,7 @@ export type PluginManagerPageProps =
   & PropsLocale<'pluginManager'>
   & PropsRenderSlots<
     | 'plugins.item' | 'plugins.bundle.config' | 'plugins.row.config' | 'plugins.bundle.activation'
+    | 'plugins.add.actions'
     | 'plugins.detail.actions' | 'plugins.detail.badge' | 'plugins.detail.section'
   >
   & InjectFace<PluginManagerFace>
@@ -51,6 +52,47 @@ type RenderConfig = PluginManagerPageProps['renderSlot']
 type ResolveText = PluginManagerFace['resolveText']
 
 type RowPhase = NonNullable<PackageRow['phase']>
+
+/** The primary action installs; the adjacent menu offers every add-plugin path. */
+function AddPluginMenu({ t, label, title, disabled, openInstall, renderSlot }: {
+  readonly t: Translate
+  readonly label: string
+  readonly title: string | undefined
+  readonly disabled: boolean
+  readonly openInstall: () => void
+  readonly renderSlot: RenderConfig
+}): ReactNode {
+  const [open, setOpen] = useState(false)
+  const onDismiss = (): void => { setOpen(false) }
+  return (
+    <span className={css.addGroup} role="group" aria-label={t('addPlugin')}>
+      <Button variant="primary" size="sm" className={css.addPrimary} icon={<IconPlusOutline16 size={13} />}
+        disabled={disabled} {...title === undefined ? {} : { title }} onClick={() => { onDismiss(); openInstall() }}>
+        {label}
+      </Button>
+      <Menu open={open} onClose={onDismiss} align="end" portal autoFocus listClassName={css.addMenu}
+        anchor={(
+          <Button variant="primary" size="sm" className={css.addMore}
+            disabled={disabled} {...title === undefined ? {} : { title }}
+            aria-label={t('chooseAddMethod')} aria-haspopup="menu" aria-expanded={open}
+            onClick={() => { setOpen(value => !value) }}
+            onKeyDown={(event) => {
+              if (!open && event.key === 'ArrowDown') { event.preventDefault(); setOpen(true) }
+            }}>
+            <IconChevronDownOutline14 size={12} aria-hidden="true" />
+          </Button>
+        )}>
+        <MenuItemButton icon={<IconDownloadOutline16 size={14} />} onSelect={() => { onDismiss(); openInstall() }}>
+          <span className={css.addMenuItem}>
+            <span>{t('installExisting')}</span>
+            <span className={css.addMenuDescription}>{t('installExistingDescription')}</span>
+          </span>
+        </MenuItemButton>
+        {renderSlot('plugins.add.actions', { onDismiss })}
+      </Menu>
+    </span>
+  )
+}
 
 /** How long the list marks a package an install just enabled. */
 const HIGHLIGHT_MS = 2_400
@@ -1167,7 +1209,7 @@ function InstallDialog({
             ? <p className={css.result} role="status">{t('installDoneNothing')}</p>
             : null}
           {phase === 'done' && install.restartRequired
-            ? <p className={css.resultWarn} role="status">{t('installDoneRestart')}</p>
+            ? <p className={css.resultWarn} role="status">{restartText('installDoneRestart', install.restartReason, t)}</p>
             : null}
           {phase === 'done' && install.approvedBuilds.length > 0
             ? <p className={css.result} role="status">{t('installDoneApproved', { names: install.approvedBuilds.join(', ') })}</p>
@@ -1397,10 +1439,10 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
                   </span>
                 </button>
               </Tooltip>
-              <Button variant="primary" size="sm" className={css.addButton} icon={<IconPlusOutline16 size={13} />}
-                disabled={!loaded || !canManage} {...!canManage ? { title: t('managementDenied') } : {}} onClick={props.openInstall}>
-                {t(state.install.requestId === undefined ? 'addPlugin' : 'installViewTask')}
-              </Button>
+              <AddPluginMenu t={t} renderSlot={renderSlot} openInstall={props.openInstall}
+                label={t(state.install.requestId === undefined ? 'addPlugin' : 'installViewTask')}
+                title={!canManage ? t('managementDenied') : undefined}
+                disabled={!loaded || !canManage} />
             </div>
           </header>
         )

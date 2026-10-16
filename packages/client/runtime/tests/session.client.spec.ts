@@ -191,12 +191,14 @@ function histResponse(
   events: SessionEvent[],
   hasMore = false,
   omittedSpans?: readonly { startSeq: number; endSeq: number }[],
+  projections?: { asOfSeq: number; values: Record<string, unknown> },
 ) {
   // history returns HistoryEntry[] ({event, view?}); these tests are view-less.
   return Promise.resolve(ok({
     events: entries(events) as never[],
     hasMore,
     ...omittedSpans === undefined ? {} : { omittedSpans },
+    ...projections === undefined ? {} : { projections },
   }))
 }
 
@@ -489,11 +491,16 @@ describe('live event path', () => {
     feed(ev.assistant(6, 1, '累计完成'))
     feedStream(session, streamEnd('att-1', 3, { kind: 'committed', eventType: 'assistant/message', seq: 6 }))
     await Promise.resolve()
+    // The durable message publishes at stream end; its chunks stay visible
+    // until the owning Step's boundary event retires them.
     expect(published).toHaveLength(2)
-    expect(published[1]).toEqual([0, 1, 2, 3, 4, 5, 6])
+    expect(published[1]).toHaveLength(10)
+    feed(ev.stepEnd(7, 1, 0))
+    await Promise.resolve()
+    expect(published[2]).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
 
     frames.shift()!(0)
-    expect(published).toHaveLength(2)
+    expect(published).toHaveLength(3)
   })
 
   it('publishes session/queue frames on the animation-frame channel', async () => {
@@ -1055,8 +1062,9 @@ describe('pending submission echoes', () => {
       height: 2,
       name: 'submission.png',
     }
+    session.handleRunning(true)
     const handle = session.beginSubmission({
-      placement: 'queued',
+      mode: 'queue',
       text: '带图消息',
       images: [{ previewUrl: 'blob:submission', name: 'submission.png' }],
       onRetire: retired,
@@ -1141,7 +1149,7 @@ describe('pending submission echoes', () => {
       const { api, session } = makeSession()
       testCase.setup(api)
       const retired = vi.fn()
-      const handle = session.beginSubmission({ placement: 'transcript', text: testCase.label, images: [], onRetire: retired })
+      const handle = session.beginSubmission({ mode: 'queue', text: testCase.label, images: [], onRetire: retired })
       const controller = new AbortController()
       const result = await session.prompt(
         [{ type: 'text', text: testCase.label }],
@@ -1160,12 +1168,190 @@ describe('pending submission echoes', () => {
   it('disposes an unresolved echo once and leaves no pending submission', () => {
     const { session } = makeSession()
     const retired = vi.fn()
-    session.beginSubmission({ placement: 'transcript', text: '待处理', images: [], onRetire: retired })
+    session.beginSubmission({ mode: 'queue', text: '待处理', images: [], onRetire: retired })
     session.dispose()
     session.dispose()
     expect(session.getSnapshot().pendingSubmissions).toEqual([])
     expect(retired).toHaveBeenCalledOnce()
     expect(retired).toHaveBeenCalledWith({ reason: 'failed' })
+  })
+
+  const queueFrame = (items: readonly { rpcId?: string }[]) => ({
+    type: 'session/queue' as const,
+    sessionId: SID,
+    items: items.map((item, index) => ({
+      id: `queue-${index}` as never,
+      rpcId: item.rpcId as never,
+      placement: 'queued' as const,
+      message: createUserMessage({ content: [{ type: 'text', text: '队' }] as never, source: { kind: 'user' } as never }),
+    })),
+  })
+
+  const durableUser = (seq: number, rpcId: string): SessionEvent => ({
+    seq: SessionSeq(seq),
+    time: 1_700_000_000_000 + seq,
+    type: 'user/message',
+    surfaceOp: 'append',
+    data: createUserMessage({
+      content: [{ type: 'text', text: '到' }] as never,
+      source: { kind: 'user', rpcId } as never,
+    }),
+  })
+
+  const spliceEvent = (seq: number, outcome?: 'canceled'): SessionEvent => ({
+    seq: SessionSeq(seq),
+    time: 1_700_000_000_000 + seq,
+    type: 'agent/inbox/spliced',
+    data: {
+      target: 'next-turn', start: 0, removedCount: 1, inserted: [],
+      ...(outcome === undefined ? {} : { outcome }),
+    },
+  })
+
+  it('fails a departed transcript echo only after the log moves past its queue removal', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([])
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '先丢', images: [], onRetire: retired })
+    session.handleMuxEnvelope('q1' as never, queueFrame([{ rpcId: handle.requestId }]))
+    session.handleMuxEnvelope('q2' as never, queueFrame([]))
+    // Removal alone is not proof: the durable admission may still be in flight.
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    expect(retired).not.toHaveBeenCalled()
+    session.handleMuxEnvelope('e1' as never, { type: 'session/event', sessionId: SID, event: ev.turnEnd(9, 1) })
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledWith({ reason: 'failed' })
+  })
+
+  it('fails a departed transcript echo immediately on a canceled splice', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([])
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '被取消', images: [], onRetire: retired })
+    session.handleMuxEnvelope('q1' as never, queueFrame([{ rpcId: handle.requestId }]))
+    session.handleMuxEnvelope('q2' as never, queueFrame([]))
+    session.handleMuxEnvelope('e1' as never, { type: 'session/event', sessionId: SID, event: spliceEvent(4, 'canceled') })
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledWith({ reason: 'failed' })
+  })
+
+  it('settles a transcript echo observed when admission follows the queue removal', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([])
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '迟到录取', images: [], onRetire: retired })
+    session.handleMuxEnvelope('q1' as never, queueFrame([{ rpcId: handle.requestId }]))
+    session.handleMuxEnvelope('q2' as never, queueFrame([]))
+    session.handleMuxEnvelope('e1' as never, { type: 'session/event', sessionId: SID, event: durableUser(7, handle.requestId) })
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+  })
+
+  it('keeps an admitted echo until the queue publication drops its row', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([])
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '入队', images: [], onRetire: retired })
+    session.handleMuxEnvelope('q1' as never, queueFrame([{ rpcId: handle.requestId }]))
+    session.handleMuxEnvelope('e1' as never, { type: 'session/event', sessionId: SID, event: durableUser(5, handle.requestId) })
+    // Admitted while the queue still carries it: hold until the publication removes the row.
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    expect(retired).not.toHaveBeenCalled()
+    session.handleMuxEnvelope('q2' as never, queueFrame([]))
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+  })
+
+  it('keeps a steering echo until durable admission rather than queue presence', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([])
+    await session.open()
+    const retired = vi.fn()
+    session.handleRunning(true)
+    const handle = session.beginSubmission({ mode: 'steer', text: '插队', images: [], onRetire: retired })
+    session.handleMuxEnvelope('q1' as never, {
+      type: 'session/queue', sessionId: SID,
+      items: [{
+        id: 'queue-steer' as never, rpcId: handle.requestId, placement: 'steering' as const,
+        message: createUserMessage({ content: [{ type: 'text', text: '插队' }] as never, source: { kind: 'user' } as never }),
+      }],
+    })
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    expect(retired).not.toHaveBeenCalled()
+    session.handleMuxEnvelope('q2' as never, queueFrame([]))
+    session.handleMuxEnvelope('e1' as never, { type: 'session/event', sessionId: SID, event: durableUser(8, handle.requestId) })
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+  })
+
+  it('keeps an echo whose queue row moves inside one splice', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([])
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '移位', images: [], onRetire: retired })
+    session.handleMuxEnvelope('q1' as never, queueFrame([{ rpcId: handle.requestId }]))
+    session.handleMuxEnvelope('e1' as never, { type: 'session/event', sessionId: SID, event: {
+      seq: SessionSeq(4), time: 1_700_000_000_004,
+      type: 'agent/inbox/spliced',
+      data: {
+        target: 'next-turn', start: 0, removedCount: 1,
+        inserted: [createUserMessage({
+          content: [{ type: 'text', text: '移位' }] as never,
+          source: { kind: 'user', rpcId: handle.requestId } as never,
+        })],
+      },
+    } as SessionEvent })
+    session.handleMuxEnvelope('e2' as never, { type: 'session/event', sessionId: SID, event: ev.turnEnd(5, 1) })
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    expect(retired).not.toHaveBeenCalled()
+  })
+
+  it('disposes an admitted echo as observed rather than failed', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([])
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '已收', images: [], onRetire: retired })
+    session.handleMuxEnvelope('e1' as never, { type: 'session/event', sessionId: SID, event: durableUser(3, handle.requestId) })
+    session.dispose()
+    await flushSubmissionFrame()
+    expect(retired).toHaveBeenCalledOnce()
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+  })
+
+  it('accepts queue-confirmed identities as observed when a follow baseline installs', async () => {
+    const { api, session } = makeSession()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '重连存活', images: [], onRetire: retired })
+    api.onHistory = () => histResponse([], false, undefined, {
+      asOfSeq: 9,
+      values: {
+        queuedInbox: [{
+          id: 'q-baseline' as never,
+          rpcId: handle.requestId,
+          placement: 'queued' as const,
+          message: createUserMessage({ content: [{ type: 'text', text: '重连存活' }] as never, source: { kind: 'user' } as never }),
+        }],
+      },
+    })
+    await session.open()
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledOnce()
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
   })
 })
 
@@ -1359,6 +1545,28 @@ describe('remaining branches', () => {
       await vi.waitFor(() => { expect(errorSpy).toHaveBeenCalled() })
       // Window unchanged; a later successful repull still lands the buffered frames.
       expect(session.getSnapshot().nodes).toHaveLength(2)
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('a gap repair in flight at dispose settles quietly instead of logging teardown noise', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))
+    await session.open()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    api.onHistory = () => gate.promise
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      session.handleMuxEnvelope('r1' as never, { type: 'session/event', sessionId: SID, event: ev.user(9, '洞一') })
+      session.dispose()
+      // The real transport rejects the read with the abort reason once dispose
+      // tears down; the fake settles the parked call with that same reason.
+      gate.reject(api.lastHistorySignal?.reason ?? new Error('session disposed'))
+      // The rejection propagates through the repair loop entirely in
+      // microtasks; a macrotask boundary drains it before the assertion.
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(errorSpy).not.toHaveBeenCalled()
     } finally {
       errorSpy.mockRestore()
     }
@@ -1670,8 +1878,14 @@ describe('assistant stream', () => {
     feed(session, ev.assistant(6, 1, '你好'))
     expect(chatSeqs(session.getSnapshot())).toEqual(liveSeqs)
 
+    // The committed end publishes the message alongside its retained chunks;
+    // the chunks retire only when the owning Step's boundary event lands.
     feedStream(session, streamEnd('att-1', 2, { kind: 'committed', eventType: 'assistant/message', seq: 6 }))
-    expect(chatSeqs(session.getSnapshot())).toEqual([0, 1, 2, 3, 4, 5, 6])
+    const retained = chatSeqs(session.getSnapshot())
+    expect(retained.slice(0, 6)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(retained[8]).toBe(6)
+    feed(session, ev.stepEnd(7, 1, 0))
+    expect(chatSeqs(session.getSnapshot())).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
   })
 
   it('drops transients on abandonment without publishing a settlement', async () => {

@@ -6,6 +6,9 @@
   --dsh-boot-label-tertiary: #81858c;
   --dsh-boot-border: rgb(0 0 0 / 10%);
   --dsh-boot-brand: #0f1115;
+  --dsh-boot-ink: #2a2d31;
+  --dsh-boot-tile: #fff;
+  --dsh-boot-accent: #2563eb;
 
   height: 100%;
   display: grid;
@@ -19,6 +22,9 @@
   --dsh-boot-label-tertiary: #adb2b8;
   --dsh-boot-border: rgb(255 255 255 / 12%);
   --dsh-boot-brand: #f9fafb;
+  --dsh-boot-ink: #eef0f3;
+  --dsh-boot-tile: #232324;
+  --dsh-boot-accent: #6b93ff;
 }
 
 .card {
@@ -28,11 +34,17 @@
   gap: 16px;
 }
 
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .wordmark {
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 17px;
+  line-height: 26px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   color: var(--dsw-alias-label-primary, var(--dsh-boot-label-primary));
 }
 

@@ -5,7 +5,8 @@
  * @module @deepseek-ai/dsh-session-log-deepseek
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import { Buffer } from 'node:buffer'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import { isSurfaceEvent, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
@@ -33,21 +34,28 @@ export const inject = ['deepseekLlmApiExtensions', 'sessions']
 /** Session-log request contribution configuration. */
 export interface Config {
   /** Contribute `dsh_session_log` to official DeepSeek requests. Defaults to `false`. */
-  enabled?: boolean
+  enabled: Volatile<boolean>
   /** Optional exact endpoint allowlist; an empty list preserves the adapter's configured endpoint. */
-  allowedEndpoints?: string[]
+  allowedEndpoints: string[]
   /** Environment key whose non-empty value disables new deliveries immediately. */
-  killSwitchEnv?: string
+  killSwitchEnv: string
   /** Emit metadata-only delivery audit records through the host logger. */
-  audit?: boolean
+  audit: boolean
+  /**
+   * Largest serialized `dsh_session_log` field, in UTF-8 bytes, that one request carries.
+   * A request uploads the longest pending event prefix that fits; later requests continue
+   * after its acceptance. Defaults to 8 MiB.
+   */
+  maxBytes: number
 }
 
 /** Validated Session-log request contribution configuration. */
-export const Config: z<Config> = z.object({
-  enabled: z.boolean().default(false),
+export const Config = z.object({
+  enabled: z.boolean().default(false).volatile(),
   allowedEndpoints: z.array(z.string()).default([]),
   killSwitchEnv: z.string().default('COHARNESS_DISABLE_SESSION_LOG_UPLOAD'),
   audit: z.boolean().default(true),
+  maxBytes: z.number().step(1).min(1).default(8 * 1024 * 1024),
 })
 
 interface AcceptanceFold {
@@ -56,6 +64,23 @@ interface AcceptanceFold {
 }
 
 const acceptanceFolds = new WeakMap<Session, AcceptanceFold>()
+/** Per-session sequence of the first pending event that did not fit; warns once each time the boundary moves. */
+const blockedWarnings = new WeakMap<Session, number>()
+
+/**
+ * UTF-8 length of one value's JSON text as the request body encodes it.
+ * @returns `Infinity` when the value fails to serialize, which counts as exceeding every limit.
+ */
+function jsonBytes(value: DeepSeekSessionLogExtension | DeepSeekSessionLogWireEvent): number {
+  let text: string
+  try {
+    text = JSON.stringify(value)
+  } catch (_unserializable) {
+    // No request can carry a value that fails to serialize.
+    return Number.POSITIVE_INFINITY
+  }
+  return Buffer.byteLength(text)
+}
 
 /** Translate logical Session metadata back to the stable version-0 wire header. */
 function wireHeader(session: Session): DeepSeekSessionLogWireHeader {
@@ -111,6 +136,13 @@ export function acceptedThrough(session: Session): SessionSeqCursor {
       throw new Error(`session-log-deepseek: missing event ${String(index)} below captured length ${String(length)}`)
     }
     if (event.type !== 'session-log-deepseek/delivery-accepted') continue
+    const acceptedFormatVersion = event.data.sessionFormatVersion ?? 0
+    if (!Number.isSafeInteger(acceptedFormatVersion)
+      || acceptedFormatVersion < 0
+      || Object.is(acceptedFormatVersion, -0)) {
+      throw new Error(`session-log-deepseek: malformed acceptance format version at seq ${event.seq}`)
+    }
+    if (acceptedFormatVersion !== session.header.version) continue
     let acceptedSeq: SessionSeqType
     try {
       acceptedSeq = SessionSeq(event.data.throughSeq)
@@ -134,15 +166,14 @@ export function acceptedThrough(session: Session): SessionSeqCursor {
  * @param config - validated opt-in configuration.
  */
 export function apply(ctx: Context, config: Config): void {
-  if (config.enabled !== true) return
-  const endpoints = (config.allowedEndpoints ?? []).map(endpoint => normalizeEndpoint(endpoint))
+  const endpoints = config.allowedEndpoints.map(endpoint => normalizeEndpoint(endpoint))
   if (endpoints.some(endpoint => endpoint === undefined)) {
     throw new Error('session-log-deepseek: allowedEndpoints must contain absolute http(s) URLs')
   }
-  const killSwitchEnv = config.killSwitchEnv ?? 'COHARNESS_DISABLE_SESSION_LOG_UPLOAD'
-  const audit = config.audit !== false
+  const { killSwitchEnv, audit, maxBytes } = config
   ctx.deepseekLlmApiExtensions.register('dsh_session_log', {
     prepare: (request) => {
+      if (!config.enabled.get()) return undefined
       const killSwitchValue = killSwitchEnv.length > 0 ? process.env[killSwitchEnv] : undefined
       if (killSwitchValue !== undefined && killSwitchValue.length > 0) {
         if (audit) ctx.logger.warn('session-log-deepseek: delivery suppressed by kill switch')
@@ -164,18 +195,43 @@ export function apply(ctx: Context, config: Config): void {
 
       const afterSeq = acceptedThrough(session)
       // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-      const snapshot = session.snapshotEvents()
-      const throughSeq = snapshot.at(-1)?.seq
-      if (throughSeq === undefined) return undefined
-      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-      const suffix = session.snapshotEvents(SessionLogOffset(afterSeq + 1))
-      const value: DeepSeekSessionLogExtension = {
+      const pending = session.snapshotEvents(SessionLogOffset(afterSeq + 1))
+      const envelope = {
         version: 1,
+        sessionFormatVersion: session.header.version,
         session: wireHeader(session),
         afterSeq: Number(afterSeq),
-        throughSeq: Number(throughSeq),
-        events: suffix.map(wireEvent),
+      } as const
+      // Field bytes without events or throughSeq digits; each candidate prefix adds its own.
+      let bytes = jsonBytes({ ...envelope, throughSeq: 0, events: [] }) - 1
+      const events: DeepSeekSessionLogWireEvent[] = []
+      // Field bytes with the last examined event; when none fits, the first event's own field size.
+      let candidateBytes = 0
+      for (const event of pending) {
+        const wire = wireEvent(event)
+        const next = bytes + (events.length === 0 ? 0 : 1) + jsonBytes(wire)
+        candidateBytes = next + String(event.seq).length
+        if (candidateBytes > maxBytes) break
+        bytes = next
+        events.push(wire)
       }
+      const last = events.length === 0 ? undefined : pending[events.length - 1]
+      if (last === undefined) {
+        const first = pending[0]
+        if (first !== undefined && blockedWarnings.get(session) !== first.seq) {
+          blockedWarnings.set(session, first.seq)
+          const seq = String(first.seq)
+          ctx.logger.warn(Number.isFinite(candidateBytes)
+            ? `session-log-deepseek: event ${seq} of session "${session.id}" needs a ${String(candidateBytes)}-byte`
+              + ` dsh_session_log field, above maxBytes ${String(maxBytes)}; this session's upload stays at event ${seq}`
+              + ' until maxBytes admits it'
+            : `session-log-deepseek: event ${seq} of session "${session.id}" is too large to serialize into a dsh_session_log field;`
+              + ` this session's upload stays at event ${seq}`)
+        }
+        return undefined
+      }
+      const throughSeq = last.seq
+      const value: DeepSeekSessionLogExtension = { ...envelope, throughSeq: Number(throughSeq), events }
       return {
         value,
         accept: () => {

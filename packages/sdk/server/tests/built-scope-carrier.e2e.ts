@@ -31,6 +31,7 @@ const [
   { default: JsonlSessionPersistence },
   { HarnessSdkJsonRpcServer },
   { SessionId },
+  { provideWorkingDirectoryFixture },
 ] = await Promise.all([
   load("vendor/cordis/lib/index.js"),
   load("packages/examples/agent-spine-demo/lib/index.js"),
@@ -38,12 +39,14 @@ const [
   load("packages/session/session-persistence-jsonl/lib/index.js"),
   load("packages/sdk/server/lib/index.js"),
   load("packages/core/session/lib/index.js"),
+  load("packages/test-support/agent-loop-testkit/lib/index.js"),
 ]);
 
 const storageRoot = await mkdtemp(join(tmpdir(), "jsonrpc-built-scope-"));
 const ctx = new Context();
 try {
   await ctx.plugin(agentCore, { workspaceContext: false });
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime);
   await ctx.plugin(JsonlSessionPersistence, { root: storageRoot });
   await new Promise((ready) => setTimeout(ready, 50));

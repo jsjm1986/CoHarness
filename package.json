@@ -162,6 +162,7 @@
     "verify-client-packages": "tsx scripts/verify-client-packages.ts",
     "verify-client-route-resolution": "tsx scripts/verify-client-route-resolution.ts",
     "verify-client-ui-i18n": "tsx scripts/verify-client-ui-i18n.ts",
+    "verify-menu-surface-backdrop": "tsx scripts/verify-menu-surface-backdrop.ts",
     "verify-concrete-terms": "tsx scripts/verify-concrete-terms.ts",
     "verify-config-catalog": "tsx scripts/gen-config-catalog.ts --check",
     "verify-config-source-ownership": "tsx scripts/verify-config-source-ownership.ts",

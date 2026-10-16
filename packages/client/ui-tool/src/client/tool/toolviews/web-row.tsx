@@ -13,7 +13,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { IconBrowseOutline16, IconGlobeOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
-import { webCardModel } from '../models/web-card-model.ts'
+import { webCardModel, webFetchHref } from '../models/web-card-model.ts'
 import { toolRowModel } from '../models/tool-call-model.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
@@ -48,6 +48,7 @@ export function WebRow({ useDisclosure, toolName, block, inspect, openDetails, t
         ? WEB_TITLE_KEYS.web_search
         : toolName === 'web_fetch' ? WEB_TITLE_KEYS.web_fetch : model.titleKey)}
       summary={model.summary}
+      href={webFetchHref(block)}
       bodyRaw={null}
       output={model.output}
       errorSummary={model.errorSummary}

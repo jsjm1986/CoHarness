@@ -31,6 +31,7 @@ import {
   type AcpMemberConfig,
 } from '../src/member.ts'
 import type { PermissionPolicy } from '../src/run.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /**
  * Keyless member tests for persistent ACP children: the scripted mock agent
@@ -271,6 +272,7 @@ describe('ACP member plugin composition', () => {
   it('loads one-shot only when resume is off, and needs no llm service', async () => {
     const ctx = new Context()
     contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     await expect(ctx.plugin(acp, {
@@ -285,6 +287,7 @@ describe('ACP member plugin composition', () => {
   it('fails loud when resume is on without the llm service', async () => {
     const ctx = new Context()
     contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     await expect(ctx.plugin(acp, {
@@ -302,6 +305,7 @@ describe('ACP member plugin composition', () => {
     const transcript = join(dir, 'transcript.jsonl')
     const ctx = new Context()
     contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const target = remote ? new Context() : ctx
@@ -357,6 +361,7 @@ describe('ACP member plugin composition', () => {
     contexts.push(ctx)
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(AgentLoop, { agents: [] })
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     await ctx.plugin(acp, {
@@ -389,6 +394,7 @@ describe('ACP member plugin composition', () => {
     const persistedRoot = join(dir, 'sessions')
     await ctx.plugin(JsonlSessionPersistence, { root: persistedRoot })
     await ctx.plugin(AgentLoop, { agents: [] })
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     // A no-op adapter for the parent agent's own route.
@@ -659,10 +665,11 @@ describe('AcpMemberAdapter', () => {
 })
 
 describe('ACP member plugin defaults', () => {
-  it('derives member workspace from the configured cwd when memberCwd is omitted', async () => {
+  it('derives member workspace from the member Session working directory when memberCwd is omitted', async () => {
     const dir = root()
     const ctx = new Context()
     contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const { LlmRuntime } = await import('@deepseek-ai/dsh-llm')
@@ -672,7 +679,6 @@ describe('ACP member plugin defaults', () => {
       command: process.execPath,
       args: [mockServer],
       resume: true,
-      cwd: dir,
       permission: 'reject',
       stateDir: join(dir, 'state'),
       env: {},
@@ -683,6 +689,7 @@ describe('ACP member plugin defaults', () => {
   it('registers the default store without capturing a workspace at plugin load', async () => {
     const ctx = new Context()
     contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const { LlmRuntime } = await import('@deepseek-ai/dsh-llm')

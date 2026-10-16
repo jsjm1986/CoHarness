@@ -40,9 +40,14 @@ function styleInjectionModule(
   css: string,
   classMap?: Readonly<Record<string, string>>,
 ): string {
+  // Sibling directories can carry same-named stylesheets (tool/ToolDetails.module.css
+  // next to tool/components/ToolDetails.module.css); the src-relative path keeps
+  // their dedup keys distinct so neither file's rules are skipped.
+  const boundary = fileId.lastIndexOf(SOURCE_MARKER)
+  const name = boundary < 0 ? basename(fileId) : fileId.slice(boundary + SOURCE_MARKER.length)
   const source = [
     `const css = ${JSON.stringify(css)};`,
-    `const tagId = ${JSON.stringify(`${id}/${basename(fileId)}`)};`,
+    `const tagId = ${JSON.stringify(`${id}/${name}`)};`,
     'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
     '  const tag = document.createElement(\'style\');',
     `  tag.dataset.plugin = ${JSON.stringify(id)};`,
@@ -61,7 +66,7 @@ function styleInjectionModule(
  * Everything else under @deepseek-ai/* is either a module-table entry
  * (external) or a leak the purity gate rejects.
  */
-export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:host-apiproxy|file-reference|session|llm|tools|brand|client-userdoc-upload|output-retention|typert-protocol|util-crypto|util-values)(?:\/|$)|@deepseek-ai\/dsh-session-format\/surface$|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-host-open-in-app\/shared$|@deepseek-ai\/dsh-plugin-manager\/registry$|@deepseek-ai\/dsh-agent-presets\/display$|@deepseek-ai\/dsh-spill-policy\/notice$)/
+export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:host-apiproxy|file-reference|session|llm|tools|brand|client-userdoc-upload|output-retention|typert-protocol|util-crypto|util-values|util-workspace-path)(?:\/|$)|@deepseek-ai\/dsh-session-format\/surface$|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-host-open-in-app\/shared$|@deepseek-ai\/dsh-plugin-manager\/registry$|@deepseek-ai\/dsh-agent-presets\/display$|@deepseek-ai\/dsh-spill-policy\/notice$)/
 
 /**
  * Vendored framework libraries: rescoped into @deepseek-ai, so the gate below

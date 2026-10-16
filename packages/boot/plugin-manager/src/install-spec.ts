@@ -4,18 +4,9 @@
  * @module @deepseek-ai/dsh-plugin-manager/install-spec
  */
 
-import { isAbsolute } from 'node:path'
-
-/**
- * One spec read into its form and the parts an inspection needs. A git spec
- * and a tarball URL carry the `host` pnpm fetches them from, which no registry
- * stands in for; only their dependencies come from the registry.
- */
-export type ParsedInstallSpec =
-  | { readonly kind: 'registry'; readonly spec: string; readonly name: string; readonly range?: string }
-  | { readonly kind: 'path'; readonly spec: string; readonly path: string }
-  | { readonly kind: 'tarball'; readonly spec: string; readonly path?: string; readonly host?: string }
-  | { readonly kind: 'git'; readonly spec: string; readonly host: string }
+import { homedir } from 'node:os'
+import { isAbsolute, resolve } from 'node:path'
+import type { ParsedInstallSpec } from './types.ts'
 
 /** The forms pnpm resolves through a git host: a host shorthand, a git URL, or a hosted repository URL. */
 const GIT_SHORTHAND = /^(?:github|gitlab|bitbucket|gist):/i
@@ -30,6 +21,14 @@ const TARBALL_SPEC = /\.(?:tgz|tar\.gz)(?:#.*)?$/i
 /** An npm package name: lowercase URL-safe segments, an optional scope, no leading dot or underscore. */
 const PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/
 const PACKAGE_NAME_MAX_LENGTH = 214
+
+/**
+ * A recorded dependency value that is not a registry range: an explicit protocol pnpm does not fetch from the
+ * registry, or a `name@spec` alias whose spec carries one.
+ */
+const NON_REGISTRY_VALUE = /^(?!(?:npm|jsr|workspace|catalog):)[a-z][a-z0-9+.-]*:|^[^@/:\s]+@[^:/\s]+:/i
+/** Credentials a git-over-HTTP dependency URL carries, stripped before the spec is shown or compared. */
+const HTTP_USER_INFO = /^((?:git\+)?https?:\/\/)[^/]*@/i
 
 /** A spec neither pnpm nor the registry would take; `reason` is what the person reads. */
 export class InvalidInstallSpecError extends Error {
@@ -88,4 +87,27 @@ export function parseInstallSpec(raw: string): ParsedInstallSpec {
   }
   if (range === '') throw invalid(spec, 'a version after @ must not be empty')
   return range === undefined ? { kind: 'registry', spec, name } : { kind: 'registry', spec, name, range }
+}
+
+/**
+ * The installable spec a dependency entry records, as pnpm would spell it on the command line: the `name@range` pair
+ * for a registry version, the resolved `file:`/`link:` path for a local directory, or the recorded value itself.
+ * @param name - the dependency name.
+ * @param recorded - the value the profile manifest records for it.
+ * @param profileDir - the profile directory a relative local path is resolved against.
+ * @param packageName - the name the installed package's manifest declares, when it could be read.
+ * @returns the installable spec.
+ */
+export function dependencySpec(name: string, recorded: string, profileDir: string, packageName = name): string {
+  const local = /^(file|link):(.*)$/s.exec(recorded)
+  let spec: string
+  if (local !== null) {
+    const path = (local[2] as string).replace(/^~(?=$|[\\/])/, () => homedir())
+    spec = `${local[1]}:${resolve(profileDir, path)}`
+  } else if (NON_REGISTRY_VALUE.test(recorded)) {
+    spec = recorded.replace(HTTP_USER_INFO, '$1')
+  } else {
+    return `${name}@${recorded}`
+  }
+  return packageName === name ? spec : `${name}@${spec}`
 }

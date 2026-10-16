@@ -12,6 +12,7 @@ import {
 } from '@deepseek-ai/dsh-userdoc'
 import {
   handleUserDocHttp,
+  userDocHttpHost,
   USERDOC_HTTP_PATH,
   USERDOC_UPLOADS_PATH,
   USERDOC_TRASH_PATH,
@@ -27,7 +28,7 @@ beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-http-'))
   context = new Context()
   await context.plugin(LocalUserDocStore, { uploadRoot: root, maxFileBytes: 8, uploadChunkBytes: 64 * 1024, uploadMinFreeBytes: 0 })
-  server = createServer((req, res) => { void handleUserDocHttp(context, req, res) })
+  server = createServer((req, res) => { void handleUserDocHttp(userDocHttpHost(context), req, res) })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   origin = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`
 })

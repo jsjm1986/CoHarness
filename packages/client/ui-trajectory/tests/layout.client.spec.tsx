@@ -15,7 +15,7 @@ import {
   appendTrajectoryPartialLayout as appendTrajectoryPartialLayoutWithLocale,
   deriveTrajectoryLayout as deriveTrajectoryLayoutWithLocale,
 } from '../src/client/layout.ts'
-import { t } from './locale.client.ts'
+import { t, tZh } from './locale.client.ts'
 
 const deriveTrajectoryLayout = (
   input: Parameters<typeof deriveTrajectoryLayoutWithLocale>[0],
@@ -71,6 +71,20 @@ describe('TrajectoryTurn', () => {
 })
 
 describe('deriveTrajectoryLayout', () => {
+  it('marks an interrupted assistant as failed while retaining its output', () => {
+    const turns = deriveTrajectoryLayout({
+      nodes: [{
+        kind: 'assistant', seq: 3, time: 3_000, turn: 1, step: 1,
+        blocks: [{ kind: 'text', text: 'cut short' }], interrupted: true,
+      }] as never as ConversationSnapshot['nodes'],
+      partial: null,
+      runningCalls: [],
+    })
+    expect(turns[0]?.groups[0]?.cells).toMatchObject([{
+      kind: 'message', isError: true, outputDetail: 'cut short',
+    }])
+  })
+
   it('expands assistant blocks, hangs usage on Message, and folds call+result into Tool', () => {
     const nodes = [
       { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'hello' }], source: null },
@@ -88,7 +102,7 @@ describe('deriveTrajectoryLayout', () => {
         call: { name: 'bash', argsRaw: '{"command":"ls"}' }, callTime: 6_200,
         content: [{ type: 'text', text: 'a.txt' }], isError: false, callView: null, resultView: null,
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     expect(turns).toHaveLength(1)
     expect(turns[0]?.turn).toBe(1)
@@ -128,16 +142,17 @@ describe('deriveTrajectoryLayout', () => {
     const nodes = [{
       kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1,
       blocks: [{ kind: 'text', text: 'finalized' }],
-    }] as unknown as ConversationSnapshot['nodes']
+    }] as never as ConversationSnapshot['nodes']
     const partial = {
       turn: 2,
       step: 1,
       blocks: [{ kind: 'reasoning' as const, text: 'streaming' }],
+      timing: { stepStartTime: 3_000, firstTokenTime: 3_200 },
     }
     const request = {
       purpose: 'assistant', startSeq: 3, turn: 2, step: 1,
       startedAt: 3_000, completedAt: null, status: 'running',
-    } as unknown as RequestView
+    } as never as RequestView
     const base = deriveTrajectoryLayout({
       nodes,
       partial: { ...partial, blocks: [] },
@@ -156,6 +171,13 @@ describe('deriveTrajectoryLayout', () => {
       text: '',
       previewMarkdown: 'streaming',
       timeSeconds: null,
+      startedAt: 3_000,
+      assistantMetrics: {
+        timingRecorded: true,
+        stepStartTime: 3_000,
+        firstTokenTime: 3_200,
+        completedTime: null,
+      },
     }])
     expect(streamed[1]?.groups[0]?.cells[0]?.requestOnly).toBeUndefined()
   })
@@ -198,7 +220,7 @@ describe('deriveTrajectoryLayout', () => {
         ],
         usage: { inputTokens: 1, outputTokens: 2, reasoningTokens: 3 },
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     const cells = turns[0]?.groups.flatMap(g => g.cells) ?? []
     expect(cells.find(c => c.kind === 'message')?.timeSeconds).toBeNull()
@@ -224,7 +246,7 @@ describe('deriveTrajectoryLayout', () => {
         call: { name: 'bash', argsRaw: '{}' }, callTime: 2_600,
         content: [], isError: false, callView: null, resultView: null,
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     expect(turns[0]?.groups[0]?.description).toBe('3,000 ms bash×2')
   })
@@ -241,7 +263,7 @@ describe('deriveTrajectoryLayout', () => {
         kind: 'assistant', seq: 4, time: 4_000, turn: 2, step: 0,
         blocks: [{ kind: 'text', text: 'ok2' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     expect(turns.map(t => t.turn)).toEqual([1, 2])
     expect(turns[0]?.groups.flatMap(g => g.cells.map(c => c.previewMarkdown))).toEqual([
@@ -269,7 +291,7 @@ describe('deriveTrajectoryLayout', () => {
         kind: 'assistant', seq: 4, time: 4_000, turn: 1, step: 2,
         blocks: [{ kind: 'text', text: 'second step' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const step = {
       turn: 1, step: 2, start: undefined, end: undefined, status: 'open' as const,
       data: EMPTY_LOCATION_DATA,
@@ -304,7 +326,7 @@ describe('deriveTrajectoryLayout', () => {
     const nodes = [{
       kind: 'steering', messageId: 'steer-1', seq: 3, time: 3_000,
       content: [{ type: 'text', text: 'change direction' }], source: null,
-    }] as unknown as ConversationSnapshot['nodes']
+    }] as never as ConversationSnapshot['nodes']
     const step = {
       turn: 1, step: 2, start: undefined, end: undefined, status: 'open' as const,
       data: EMPTY_LOCATION_DATA,
@@ -350,7 +372,7 @@ describe('deriveTrajectoryLayout', () => {
         kind: 'assistant', seq: 4, time: 4_000, turn: 2, step: 3,
         blocks: [{ kind: 'text', text: 'continued' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
 
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
 
@@ -378,7 +400,7 @@ describe('deriveTrajectoryLayout', () => {
         kind: 'assistant', seq: 6, time: 6_000, turn: 2, step: 1,
         blocks: [{ kind: 'text', text: 'after compaction' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const compaction: RequestView = {
       purpose: 'compaction',
       startSeq: 3,
@@ -416,7 +438,7 @@ describe('deriveTrajectoryLayout', () => {
         blocks: [{ kind: 'reasoning', text: '…' }],
         usage: { inputTokens: 11, outputTokens: 22, reasoningTokens: 3 },
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     const message = turns[0]?.groups.flatMap(g => g.cells).find(c => c.kind === 'message')
     expect(message).toMatchObject({
@@ -429,7 +451,7 @@ describe('deriveTrajectoryLayout', () => {
     const nodes = [{
       kind: 'assistant', seq: 1, time: 5_000, turn: 1, step: 0,
       blocks: [{ kind: 'reasoning', text: thinking }],
-    }] as unknown as ConversationSnapshot['nodes']
+    }] as never as ConversationSnapshot['nodes']
 
     const turns = deriveTrajectoryLayout({
       nodes, partial: null, runningCalls: [],
@@ -468,7 +490,7 @@ describe('deriveTrajectoryLayout', () => {
         kind: 'assistant', seq: 6, time: 10_000, turn: 1, step: 0,
         blocks: [{ kind: 'text', text: 'done' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     const cells = turns[0]?.groups.flatMap(g => g.cells) ?? []
     const message = cells.find(c => c.kind === 'message' && c.previewMarkdown === 'done')
@@ -486,13 +508,40 @@ describe('deriveTrajectoryLayout', () => {
         blocks: [{ kind: 'text', text: 'done' }],
         timing: { stepStartTime: 3_000, firstTokenTime: 3_500, completedTime: 4_000 },
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const turns = deriveTrajectoryLayout({
       nodes, partial: null, runningCalls: [],
     })
     const message = turns[0]?.groups.flatMap(group => group.cells)
       .find(cell => cell.kind === 'message')
     expect(message).toMatchObject({ startedAt: 3_000, timeSeconds: 1 })
+  })
+
+  it.each(['tool-addition', 'tool-removal'] as const)('names a single %s without detail content', (type) => {
+    const nodes = [{
+      kind: 'context', seq: 1, time: 1_000,
+      content: [{ type, toolName: 'search' }], source: 'tool-registry',
+      producer: { role: 'inject', label: 'tool-registry' }, form: null,
+    }] as never as ConversationSnapshot['nodes']
+    const cells = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
+      .flatMap(turn => turn.groups.flatMap(group => group.cells))
+    expect(cells[0]?.text).toBe(type === 'tool-addition' ? 'Tool added: search' : 'Tool removed: search')
+    expect(cells[0]?.inputDetail).toBeUndefined()
+  })
+
+  it.each([
+    [t, 'Tools updated · 2 added, 1 removed', 'Added: search, read_file\nRemoved: old_search'],
+    [tZh, '工具已更新 · 新增 2 个，移除 1 个', '新增：search, read_file\n移除：old_search'],
+  ] as const)('keeps tool update details on two literal lines', (translate, text, inputDetail) => {
+    const nodes = [{
+      kind: 'context', seq: 1, time: 1_000,
+      content: [{ type: 'tool-addition', toolName: 'search' }, { type: 'tool-addition', toolName: 'read_file' }, { type: 'tool-removal', toolName: 'old_search' }],
+      source: 'tool-registry', producer: { role: 'inject', label: 'tool-registry' }, form: null,
+    }] as never as ConversationSnapshot['nodes']
+    const turns = deriveTrajectoryLayoutWithLocale({ nodes, partial: null, runningCalls: [] }, translate)
+    const cells = turns.flatMap(turn => turn.groups.flatMap(group => group.cells))
+    expect(cells).toMatchObject([{ text, inputDetail }])
+    expect(cells[0]?.sourceBlocks).toHaveLength(3)
   })
 })
 
@@ -510,7 +559,7 @@ describe('run_code sub-dispatch cells', () => {
       content: [{ type: 'text', text: 'done' }], isError: false, callView: null, resultView: null,
       subCalls: [],
     },
-  ] as unknown as ConversationSnapshot['nodes']
+  ] as never as ConversationSnapshot['nodes']
 
   const settledSub = (n: number, name: string, start: number, end: number) => ({
     kind: 'tool-result' as const, seq: 100 + n, time: end,

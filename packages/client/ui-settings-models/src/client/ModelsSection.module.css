@@ -905,6 +905,52 @@ select.input {
   .modelRow {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* The dashed "add" boxes read as desktop placeholder cards; on the phone
+     they join the plain hairline row grammar — each takes its own full-width
+     row (basis 100% wraps the pair) instead of splitting one row in half. */
+  .addActions {
+    gap: 0;
+  }
+
+  .addButton {
+    /* `width` covers the single-button block container (`addActionsSingle`);
+       `flex-basis` wraps the pair onto separate rows in the flex container. */
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: flex-start;
+    min-width: 0;
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
+    background: transparent;
+    /* Row labels align at the section's leading edge like every other
+       settings row; the button's own 14px insets belong to the pill form. */
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Provider entries and the editor cards they open into are rows too: the
+     bounding box + 14px insets are desktop chrome, the hairline carries the
+     separation. The expanded editor keeps its internal gaps. */
+  .list {
+    gap: 0;
+  }
+
+  .rowCard {
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
+    padding: var(--dsw-space-2) 0;
+    gap: var(--dsw-space-2);
+  }
+
+  .addCard,
+  .setupCard {
+    border-radius: 0;
+    background: transparent;
+    padding: var(--dsw-space-2) 0 var(--dsw-space-3);
+  }
 }
 
 @media (pointer: coarse) {

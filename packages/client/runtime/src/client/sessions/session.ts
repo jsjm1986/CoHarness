@@ -1,6 +1,7 @@
 // Sessions remain resident after creation so they continue consuming mux frames
 // off-screen; their browser history window is staged and released separately.
 
+import type { InboxTarget } from '@deepseek-ai/dsh-agent/types'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
@@ -194,6 +195,17 @@ export class Session implements SessionFace {
   private pendingSubmissions: readonly PendingSubmission[] = []
   /** Settlement latches prevent queue and durable observations retiring one echo twice. */
   private readonly submissionSettlements = new Map<RpcId, {
+    readonly placement: PendingSubmission['placement']
+    /** Inbox list carrying this identity at last observation. */
+    queueTarget?: InboxTarget
+    /** Position in that queue at the last carrying observation; null once removed pre-admission. */
+    queueIndex?: number | null
+    /** Position held into a removal, so a late canceled splice can still fail it. */
+    removedIndex?: number
+    /** Seq of the observation that set the position; replayed splices at or below it are ignored. */
+    queueSeq?: number
+    /** Durable admission may precede the queue publication noticing its claim. */
+    admitted?: readonly ImageAttachmentRef[]
     readonly onRetire?: ((retirement: PendingSubmissionRetirement) => void) | undefined
     retiring: boolean
   }>()
@@ -255,7 +267,7 @@ export class Session implements SessionFace {
       const inbox = this.projections.values().queuedInbox
       if (inbox !== undefined) {
         this.queueMirror.replace(inbox)
-        this.observeSubmissionQueue(inbox)
+        this.observeSubmissionQueue(inbox, this.projections.seqOf('queuedInbox') ?? (this.windowTailSeq() ?? 0))
         this.notifier.markDirty()
       }
     })
@@ -344,14 +356,15 @@ export class Session implements SessionFace {
    */
   beginSubmission(input: BeginSubmissionInput): SubmissionHandle {
     const requestId = randomUUID() as RpcId
+    const placement = this.running ? input.mode === 'steer' ? 'steering' : 'queued' : 'transcript'
     this.pendingSubmissions = [...this.pendingSubmissions, {
       requestId,
-      placement: input.placement,
+      placement,
       time: Date.now(),
       text: input.text,
       images: input.images,
     }]
-    this.submissionSettlements.set(requestId, { onRetire: input.onRetire, retiring: false })
+    this.submissionSettlements.set(requestId, { placement, onRetire: input.onRetire, retiring: false })
     this.promptAttempted = true
     this.notifier.markDirty()
     return {
@@ -733,7 +746,7 @@ export class Session implements SessionFace {
       }
       case 'session/queue': {
         this.queueMirror.replace(frame.items)
-        this.observeSubmissionQueue(frame.items)
+        this.observeSubmissionQueue(frame.items, this.windowTailSeq() ?? 0)
         // Queue baselines ride the stream's per-turn cadence; publish on the
         // frame channel like other hot producers instead of per-envelope
         // microtask flushes.
@@ -870,8 +883,9 @@ export class Session implements SessionFace {
     this.historyExpansionPromise = null
     this.openPromise = null
     this.fillPromise = null
-    for (const requestId of [...this.submissionSettlements.keys()]) {
-      this.retireFailedSubmission(requestId)
+    for (const [requestId, settlement] of [...this.submissionSettlements]) {
+      if (settlement.admitted !== undefined) this.scheduleObservedRetirement(requestId, settlement.admitted)
+      else this.retireFailedSubmission(requestId)
     }
   }
 
@@ -1102,7 +1116,23 @@ export class Session implements SessionFace {
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
     for (const event of this.events) this.observeSubmissionEvent(event)
     this.conversation.replaceWindow(this.rebuildWindowInputs(), hasMore)
-    if (projections !== undefined) this.projections.seed(projections)
+    if (projections !== undefined) {
+      this.projections.seed(projections)
+      // A new follow baseline replaces confirmed optimistic inputs with
+      // Host-owned rows: identities the Host queue observed at or before the
+      // baseline are accepted, not failed, even if their history sits outside
+      // this window.
+      const inbox = this.projections.values().queuedInbox
+      if (inbox !== undefined) {
+        this.observeSubmissionQueue(inbox, projections.asOfSeq)
+        for (const [requestId, settlement] of this.submissionSettlements) {
+          if (settlement.queueIndex !== undefined
+            && (settlement.queueSeq ?? 0) <= projections.asOfSeq) {
+            this.scheduleObservedRetirement(requestId, settlement.admitted ?? [])
+          }
+        }
+      }
+    }
     const buffered = this.liveBuffer
     this.liveBuffer = []
     for (const item of buffered) this.stitchBuffered(item)
@@ -1153,8 +1183,16 @@ export class Session implements SessionFace {
         this.rebaselineAssistantStream()
         publication = 'none'
         break
-      default:
+      default: {
         publication = this.conversation.append({ event, view })
+        if (folded?.type === 'publish' && folded.retireAttemptId !== undefined) {
+          // A successful message published at stream end keeps its transient
+          // rows until the Step boundary; this publication is that boundary.
+          const retired = this.conversation.settleAssistant(folded.retireAttemptId)
+          if (retired === 'immediate') publication = 'immediate'
+        }
+        break
+      }
     }
     return queueChanged ? 'immediate' : publication
   }
@@ -1176,6 +1214,12 @@ export class Session implements SessionFace {
       case 'transient':
         this.scheduleConversation(this.conversation.append({ event: result.entry.event, view: undefined }))
         return
+      case 'publish': {
+        const view = this.stagedViews.get(result.entry.event.seq)
+        this.stagedViews.delete(result.entry.event.seq)
+        this.scheduleConversation(this.conversation.append({ event: result.entry.event, view }))
+        return
+      }
       case 'settlement': {
         const view = this.stagedViews.get(result.entry.event.seq)
         this.stagedViews.delete(result.entry.event.seq)
@@ -1205,23 +1249,127 @@ export class Session implements SessionFace {
     void this.repairGap()
   }
 
-  /** Observe a durable user message carrying a browser submission identity. */
+  /** Observe durable events carrying a browser submission identity or settling a removed one. */
   private observeSubmissionEvent(event: SessionEvent): void {
-    if (event.type !== 'user/message' || this.submissionSettlements.size === 0) return
-    const source = event.data.source
-    if (source.kind !== 'user' || !('rpcId' in source) || typeof source.rpcId !== 'string') return
-    this.scheduleObservedRetirement(source.rpcId, imageRefsIn(event.data.content))
+    if (this.submissionSettlements.size === 0) return
+    if (event.type === 'agent/inbox/spliced') {
+      this.observeSubmissionSplice(event)
+      return
+    }
+    if (event.type === 'request/context' || event.type === 'turn/end') {
+      // A removed-before-admission echo fails once the log moves past its
+      // disappearance: the removal was observed earlier, and no durable
+      // admission arrived to claim it.
+      for (const [requestId, settlement] of this.submissionSettlements) {
+        if (settlement.queueIndex === null && settlement.admitted === undefined
+          && (settlement.queueSeq ?? 0) < event.seq) {
+          this.retireFailedSubmission(requestId)
+        }
+      }
+      return
+    }
+    if (event.type === 'user/message') {
+      const source = event.data.source
+      if (source.kind !== 'user' || !('rpcId' in source) || typeof source.rpcId !== 'string') return
+      const settlement = this.submissionSettlements.get(source.rpcId)
+      if (settlement === undefined || settlement.retiring) return
+      settlement.admitted = imageRefsIn(event.data.content)
+      this.retireAdmittedSubmission(source.rpcId)
+    }
   }
 
-  /** Observe queue occurrences that carry a browser submission identity. */
-  private observeSubmissionQueue(items: readonly {
-    readonly rpcId?: RpcId
-    readonly message: { readonly content: unknown }
-  }[]): void {
-    if (this.submissionSettlements.size === 0) return
-    for (const item of items) {
-      if (item.rpcId !== undefined) this.scheduleObservedRetirement(item.rpcId, imageRefsIn(item.message.content))
+  /** Apply one inbox splice's position deltas to the tracked submission identities. */
+  private observeSubmissionSplice(event: SessionEvent<'agent/inbox/spliced'>): void {
+    const { target, start, removedCount = 0, inserted, outcome } = event.data
+    for (const [requestId, settlement] of this.submissionSettlements) {
+      if (settlement.queueTarget !== target
+        || (settlement.queueSeq !== undefined && event.seq <= settlement.queueSeq)) continue
+      settlement.queueSeq = event.seq
+      const index = settlement.queueIndex ?? null
+      if (index !== null) {
+        const removed = index >= start && index < start + removedCount
+        if (removed) {
+          settlement.removedIndex = index
+          settlement.queueIndex = null
+          if (outcome === 'canceled') {
+            this.retireFailedSubmission(requestId)
+            continue
+          }
+        } else if (index >= start) {
+          settlement.queueIndex = index + inserted.length - removedCount
+        }
+      } else if (settlement.removedIndex !== undefined
+        && settlement.removedIndex >= start && settlement.removedIndex < start + removedCount) {
+        // A queue publication can report the removal before its splice lands;
+        // the splice still owns the removal's outcome.
+        delete settlement.removedIndex
+        if (outcome === 'canceled') {
+          this.retireFailedSubmission(requestId)
+          continue
+        }
+      }
     }
+    for (const [index, message] of inserted.entries()) {
+      const source = message.source
+      if (source.kind !== 'user' || !('rpcId' in source)) continue
+      const settlement = this.submissionSettlements.get(source.rpcId)
+      if (settlement === undefined || settlement.retiring
+        || (settlement.queueSeq !== undefined && event.seq < settlement.queueSeq)) continue
+      settlement.queueTarget = target
+      settlement.queueIndex = start + index
+      settlement.queueSeq = event.seq
+      delete settlement.removedIndex
+      if (settlement.placement === 'queued' && settlement.admitted === undefined) {
+        this.scheduleObservedRetirement(source.rpcId, imageRefsIn(message.content))
+      }
+    }
+  }
+
+  /** Observe queue publications that carry or drop a browser submission identity. */
+  private observeSubmissionQueue(
+    items: readonly {
+      readonly rpcId?: RpcId
+      readonly placement: 'queued' | 'steering' | 'context'
+      readonly message: { readonly content: unknown }
+    }[],
+    seq: number,
+  ): void {
+    if (this.submissionSettlements.size === 0) return
+    const positions = new Map<RpcId, { target: InboxTarget; index: number; item: (typeof items)[number] }>()
+    const counts: Record<InboxTarget, number> = { 'next-turn': 0, 'next-step': 0 }
+    for (const item of items) {
+      const target = item.placement === 'queued' ? 'next-turn' : 'next-step'
+      if (item.rpcId !== undefined) positions.set(item.rpcId, { target, index: counts[target], item })
+      counts[target] += 1
+    }
+    for (const [requestId, settlement] of this.submissionSettlements) {
+      const found = positions.get(requestId)
+      if (found === undefined) {
+        if (settlement.queueIndex !== undefined && settlement.queueIndex !== null) {
+          settlement.removedIndex = settlement.queueIndex
+          settlement.queueIndex = null
+          settlement.queueSeq = seq
+        }
+        continue
+      }
+      settlement.queueTarget = found.target
+      settlement.queueIndex = found.index
+      settlement.queueSeq = seq
+      delete settlement.removedIndex
+      // A queue placement echo retires once the Dock row renders its identity.
+      if (settlement.placement === 'queued' && settlement.admitted === undefined) {
+        this.scheduleObservedRetirement(requestId, imageRefsIn(found.item.message.content))
+      }
+    }
+    for (const requestId of this.submissionSettlements.keys()) this.retireAdmittedSubmission(requestId)
+  }
+
+  /** Retire an admitted echo once no queue publication can still surface its row. */
+  private retireAdmittedSubmission(requestId: RpcId): void {
+    const settlement = this.submissionSettlements.get(requestId)
+    if (settlement?.admitted === undefined) return
+    if (settlement.queueIndex !== undefined && settlement.queueIndex !== null) return
+    this.scheduleObservedRetirement(requestId, settlement.admitted)
   }
 
   /** Latch an observed settlement and retire one frame later. */
@@ -1235,7 +1383,7 @@ export class Session implements SessionFace {
   /** Retire one local echo immediately after a failed prompt or pre-admission abort. */
   private retireFailedSubmission(requestId: RpcId): void {
     const settlement = this.submissionSettlements.get(requestId)
-    if (settlement === undefined || settlement.retiring) return
+    if (settlement === undefined || settlement.retiring || settlement.admitted !== undefined) return
     settlement.retiring = true
     this.finishSubmission(requestId, { reason: 'failed' })
   }
@@ -1513,7 +1661,9 @@ export class Session implements SessionFace {
         // oxlint-disable-next-line typescript/no-unnecessary-condition -- a resync or baseline can request another read mid-await.
       } while (this.repairRequested)
     } catch (error) {
-      console.error('[web-runtime] gap repair failed:', error)
+      // A repair in flight when the scope disposes rejects with the lifetime
+      // abort reason — teardown, not a repair failure.
+      if (!this.lifetime.signal.aborted) console.error('[web-runtime] gap repair failed:', error)
     } finally {
       this.repairRequested = false
       this.stitching = false

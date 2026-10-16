@@ -26,10 +26,12 @@ agent 可以在会话期间发现并加载 skill。在首次请求前，如果�
 
 -----
 
+技能发现、目录更新与显式技能调用均使用 Session 的当前工作目录。
+
 <a id="catalog-lifecycle"></a>
 ## 目录生命周期
 
-每次符合条件的 `agent/pre-step`，该插件都会使用调用会话的 cwd 调用 `ctx.skills.snapshot()`，将 pre-step 中止信号转发到发现流程，应用 `skill` 工具的精确可见性，并按顺序渲染 `name` 和 `description` 条目。如果先前不存在目录且该视图非空，插件会向下游 `enter` 决策添加初始的持久用户角色 `<system-reminder>`。目录消息只包含这些摘要；skill 正文、路径、来源、提供方和 `whenToUse` 提示仍位于目录之外。
+每次符合条件的 `agent/pre-step`，该插件都会使用 Session 的当前工作目录调用 `ctx.skills.snapshot()`，将 pre-step 中止信号转发到发现流程，应用 `skill` 工具的精确可见性，并按顺序渲染 `name` 和 `description` 条目。如果先前不存在目录且该视图非空，插件会向下游 `enter` 决策添加初始的持久用户角色 `<system-reminder>`。目录消息只包含这些摘要；skill 正文、路径、来源、提供方和 `whenToUse` 提示仍位于目录之外。
 
 每条目录消息都携带 `skill-catalog` 来源，也就是 `catalog` 形态的上下文。它的 `entries` 精确记录本次发布的 `name` 与 `description` 对，替换目录另带 `update`。digest 覆盖这些持久条目，而不是渲染后的正文，因此 `<system-reminder>` 包装不会影响是否需要重新发布，消费方也不需要重新解析 `<available_skills>` 块。插件从后向前扫描持久会话事件且不复制，并以最新一条仍可见且可读的 `skill-catalog` 消息作为比较基线；不可读和外来的记录都会跳过。digest 变化时，下游 `enter` 决策会收到一条包含完整替换目录的持久用户角色消息；空替换会显式停用较早的名称。如果已无目录可见，但历史中存在可识别目录，则说明压缩（compaction）已将其遮蔽，下一次完整观察会重新建立当前目录。提供方快照不完整时，插件不会发送任何内容，并会保留最后一次完整的模型视图，在下一次 pre-step 重试。若不存在先前目录且当前视图为空，则不需要 tombstone。
 

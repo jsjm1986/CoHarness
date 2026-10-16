@@ -11,7 +11,7 @@
  * @module @deepseek-ai/dsh-loader-smoke
  */
 
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execa } from 'execa'
@@ -216,7 +216,9 @@ export async function runLoaderSmoke(options: LoaderSmokeOptions): Promise<Loade
   const providedCwd = hasProvidedCwd(options)
   const cwd = providedCwd
     ? options.cwd
-    : await mkdtemp(join(options.tempDirParent ?? tmpdir(), options.tempDirPrefix))
+    // tmpdir() keeps the symlinked /var spelling on macOS; the recorded
+    // session header must carry the canonical path a real process.cwd() sees.
+    : await realpath(await mkdtemp(join(options.tempDirParent ?? tmpdir(), options.tempDirPrefix)))
   const processTimeoutMs = options.processTimeoutMs ?? DEFAULT_PROCESS_TIMEOUT_MS
   try {
     await options.prepare?.(cwd)

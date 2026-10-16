@@ -20,11 +20,20 @@
   height: 44px;
   border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-primary);
 }
 
-.spinner {
-  animation: scope-switch-spin 0.8s linear infinite;
+.mascot {
+  animation: scope-switch-pulse 1.6s ease-in-out infinite;
+}
+
+.wordmark {
+  margin: 0 0 2px;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 16px;
 }
 
 .copy {
@@ -89,8 +98,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-@keyframes scope-switch-spin {
-  to { transform: rotate(360deg); }
+@keyframes scope-switch-pulse {
+  50% { transform: scale(0.92); opacity: 0.8; }
 }
 
 @keyframes scope-switch-progress {
@@ -105,7 +114,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spinner,
+  .mascot,
   .progressIndicator {
     animation-duration: 2.4s;
   }

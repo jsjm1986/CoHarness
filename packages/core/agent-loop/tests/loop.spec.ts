@@ -260,7 +260,7 @@ describe('agent loop', () => {
     expect(agent.inbox.nextTurn.length + agent.inbox.nextStep.length).toBe(0)
   })
 
-  it('appends the complete entered-message batch before dispatching message-entered effects', async () => {
+  it('commits claimed input before its message-entered dispatch and the refreshed context before its own', async () => {
     const adapter = new MockAdapter([textResponse('done')])
     const ctx = await harness(adapter)
     ctx.systemPrompt.context({ name: 'policy', order: 0, text: 'Mode: read-only.' })
@@ -274,7 +274,7 @@ describe('agent loop', () => {
     send(agent, 'inspect the complete batch')
     await waitForIdle(ctx, agent)
 
-    expect(visibleCounts).toEqual([2, 2])
+    expect(visibleCounts).toEqual([1, 2])
   })
 
   it('round-trips tool calls: model requests tool → executes → result in next request', async () => {

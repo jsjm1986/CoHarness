@@ -45,6 +45,9 @@
       "path": "../../storage/storage-domain"
     },
     {
+      "path": "../../subagent/subagent"
+    },
+    {
       "path": "../../typert/protocol"
     },
     {

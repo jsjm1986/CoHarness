@@ -21,6 +21,12 @@
       "path": "../ui-conversation"
     },
     {
+      "path": "../ui-layout"
+    },
+    {
+      "path": "../ui-plugin-manager/tsconfig.client.json"
+    },
+    {
       "path": "../ui-primitives"
     },
     {

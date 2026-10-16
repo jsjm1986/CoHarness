@@ -4,7 +4,10 @@ import { useCallback, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { structuredPatch } from 'diff'
 import { writeClipboard } from './clipboard.ts'
+import { CodeToolbar, type CodeToolbarLabels } from './CodeToolbar.tsx'
+import { languageForPath } from './code-highlighting.ts'
 import { ExpandButton } from './ExpandButton.tsx'
+import cardCss from './CodeCard.module.css'
 import css from './DiffBlock.module.css'
 
 /**
@@ -29,7 +32,7 @@ export interface DiffHunk {
 }
 
 /** Localized display copy for a diff block. */
-export interface DiffBlockLabels {
+export interface DiffBlockLabels extends CodeToolbarLabels {
   /** Copy-button idle label. */
   copy: string
   /** Copy-button label after a successful copy. */
@@ -187,6 +190,9 @@ export function DiffBlock({ diffs, maxLines = DEFAULT_DIFF_MAX_LINES, className,
   const { rows, added, removed, files } = useMemo(() => buildRows(diffs), [diffs])
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [wrapped, setWrapped] = useState(false)
+  const firstLanguage = diffs[0] === undefined ? undefined : languageForPath(diffs[0].path)
+  const language = diffs.every(diff => languageForPath(diff.path) === firstLanguage) ? firstLanguage : undefined
 
   const onCopy = useCallback(() => {
     if (copied) return
@@ -211,10 +217,9 @@ export function DiffBlock({ diffs, maxLines = DEFAULT_DIFF_MAX_LINES, className,
   const tail = capped ? rows.slice(rows.length - tailLines) : []
 
   return (
-    <div className={clsx(css.block, className)} data-diff="">
-      <button type="button" className={css.copyButton} onClick={onCopy}>
-        {copied ? copy.copied : copy.copy}
-      </button>
+    <div className={clsx(cardCss.card, css.block, className)} data-diff="" data-code-wrap={wrapped}>
+      <CodeToolbar lang={language} labels={copy} copyLabel={copy.copy} copiedLabel={copy.copied}
+        copied={copied} wrapped={wrapped} onCopy={onCopy} onWrap={() => { setWrapped(value => !value) }} />
       <div className={css.body}>
         {head.map((row, index) => (
           <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>

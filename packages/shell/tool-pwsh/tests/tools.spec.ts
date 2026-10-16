@@ -35,6 +35,7 @@ import * as ToolPwsh from '@deepseek-ai/dsh-tool-pwsh'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
 import { processOutcome } from '../src/background.ts'
 import { renderPwshJobRead, renderPwshResult } from '../src/render.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /** Empty offset readers for fakes that never produce output. */
 const silentReader = { readFrom: (fromByte: number) => ({ text: '', nextOffset: fromByte, lossy: false }) }
@@ -141,6 +142,7 @@ function killableProcess(): ShellProcess {
 
 async function setup(toolConfig: Partial<ToolPwsh.Config> = {}, dshHome?: string) {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
@@ -154,6 +156,7 @@ async function setup(toolConfig: Partial<ToolPwsh.Config> = {}, dshHome?: string
 /** Full harness: the generic job runtime + its controller, then the pwsh tool. */
 async function setupWithJobs(toolConfig: Partial<ToolPwsh.Config> = {}, dshHome?: string) {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
@@ -214,6 +217,7 @@ class ConfiningFakeBash extends ShellExecutor {
 /** Sandboxed composition: the shared policy service + a confining executor + the pwsh tool (+ optional approval). */
 async function setupSandboxed(withApproval = false) {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
@@ -372,6 +376,7 @@ describe('registration', () => {
 
   it('stays pending until ctx.shell exists (inject)', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(ToolPwsh)
@@ -380,6 +385,7 @@ describe('registration', () => {
 
   it('unregisters everything on fiber disposal (HMR safety)', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(BashEnvPlugin)
@@ -475,6 +481,7 @@ describe('execution through the bash seam', () => {
     if (result.isError) throw new Error('expected pwsh success')
     expect(result.value).toEqual({
       kind: 'foreground',
+      cwd: process.cwd(),
       exitCode: 2,
       signal: null,
       timedOut: false,
@@ -585,6 +592,7 @@ describe('per-call sandbox policy resolution', () => {
 
   it('fails load when a confining executor has no shared sandbox-policy resolver', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
@@ -779,7 +787,7 @@ describe('background execution through the job runtime', () => {
     const started = await call(ctx, 'pwsh', { command: 'Write-Output bg-ok', description: 'test command', run_in_background: true })
     expect(started.isError).toBe(false)
     if (started.isError) throw new Error('expected background pwsh success')
-    expect(started.value).toEqual({ kind: 'background', jobId: 'pwsh-1' })
+    expect(started.value).toEqual({ kind: 'background', jobId: 'pwsh-1', cwd: process.cwd() })
     expect(text(started)).toBe('started background job pwsh-1')
 
     const read = await callUntilText(ctx, 'job_output', { job_id: 'pwsh-1' }, 'bg-ok')
@@ -845,6 +853,7 @@ describe('background execution through the job runtime', () => {
   it('never spawns the process when tasks.start preflight throws (no orphan, by construction)', async () => {
     // With no job controller, preflight fails before the executor can spawn.
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(LocalJobRegistry)
@@ -879,6 +888,7 @@ describe('background execution through the job runtime', () => {
     // Bypasses the schemastery defaults on purpose: apply() must stand on its
     // own `?? true` fallback when embedded programmatically without the schema.
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
@@ -897,6 +907,7 @@ describe('background execution through the job runtime', () => {
 describe('the background surface follows the job registry', () => {
   async function bare() {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)

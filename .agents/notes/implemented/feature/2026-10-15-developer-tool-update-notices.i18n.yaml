@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-developer-tool-update-notices.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-developer-tool-update-notices.md
+/agent-note-developer-tool-updates-present-as-compact-context-notices:
+  en: 36fe52fd4d60abbf
+  zh: 5e3ea8419db86540
+/agent-note-developer-tool-updates-present-as-compact-context-notices/problem:
+  en: 4ba74fd8f46d7902
+  zh: 00b35ae81ee80cc3
+/agent-note-developer-tool-updates-present-as-compact-context-notices/decision:
+  en: 23dc641fb9dfa986
+  zh: d70dcd8b8488da9b
+/agent-note-developer-tool-updates-present-as-compact-context-notices/alternatives-considered:
+  en: 17f5f8e8cec6c57a
+  zh: ab68c0038513ea5c
+/agent-note-developer-tool-updates-present-as-compact-context-notices/consequences:
+  en: 6cd6efe02dd853f7
+  zh: 502d3eba659856bb
+/agent-note-developer-tool-updates-present-as-compact-context-notices/verification:
+  en: a6887bff331db865
+  zh: b979ff3e1a6e0ac8
+/agent-note-developer-tool-updates-present-as-compact-context-notices/related:
+  en: dd07d4deae4dad5d
+  zh: 20aec3453c27db1b

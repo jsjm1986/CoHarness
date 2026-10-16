@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-submitted-plan-cards-and-previews.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-submitted-plan-cards-and-previews.md
+/agent-note-submitted-plan-cards-and-session-backed-sidebar-previews:
+  en: 940388f620d92056
+  zh: f3c7fd401332cbdc
+/agent-note-submitted-plan-cards-and-session-backed-sidebar-previews/problem:
+  en: 9d96b496705003b0
+  zh: 257c08b75076f1f8
+/agent-note-submitted-plan-cards-and-session-backed-sidebar-previews/decision:
+  en: be2abe98bf8eb5cf
+  zh: 5da831427e4de63a
+/agent-note-submitted-plan-cards-and-session-backed-sidebar-previews/alternatives-considered:
+  en: fc6cd95393009e47
+  zh: e60cf46b96d194e1
+/agent-note-submitted-plan-cards-and-session-backed-sidebar-previews/consequences:
+  en: 9d6520d09033e118
+  zh: ba869c3b9ae1ca8c
+/agent-note-submitted-plan-cards-and-session-backed-sidebar-previews/verification:
+  en: 21e859af1c60b5ea
+  zh: 12da04ca0ce7a04d
+/agent-note-submitted-plan-cards-and-session-backed-sidebar-previews/related:
+  en: 5c0a96e317c75d00
+  zh: 17c18d26c3d4cd88

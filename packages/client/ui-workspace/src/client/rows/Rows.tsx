@@ -405,7 +405,9 @@ function sessionStatuses(
 function SessionStatusDots({ statuses }: { statuses: readonly [SessionStatus, ...SessionStatus[]] }) {
   return (
     <>
-      <StateDot state={statuses[0].state} />
+      {/* The ongoing C-mark chase reads at 12px inside the 16px slot;
+          solid dots keep their 10px spec. */}
+      <StateDot state={statuses[0].state} size={statuses[0].state === 'ongoing' ? 12 : undefined} />
       {statuses.map(status => (
         <span className={css.visuallyHidden} key={status.label}>{status.label}</span>
       ))}
@@ -689,7 +691,13 @@ export function SessionNodeItem({
               { hookContext: menuOpenState },
             )}
           </Menu>
-          {renderSlot('sidebar.workspaces.session.row.action', { sessionId: node.id, displayTitle: row.title })}
+          {/* Every row.action contributor also publishes the same verb as a
+              menu.item inside the ellipsis menu, so on coarse/compact — where
+              the strip is permanently visible — only the menu trigger stays;
+              the extra buttons would crowd the title for a duplicate path. */}
+          <span className={css.slotActions}>
+            {renderSlot('sidebar.workspaces.session.row.action', { sessionId: node.id, displayTitle: row.title })}
+          </span>
         </span>
       )}
     </div>

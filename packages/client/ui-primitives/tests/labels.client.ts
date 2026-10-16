@@ -14,6 +14,7 @@ export const markdownLabels: MarkdownLabels = {
 }
 
 export const diffBlockLabels: DiffBlockLabels = {
+  codeLabel: '代码块', wrapLabel: '自动换行', unwrapLabel: '取消自动换行',
   copy: '复制', copied: '复制成功', collapseAria: '收起差异',
   expandAria: hidden => `展开其余 ${hidden} 行差异`,
   collapse: '收起', expand: hidden => `… 其余 ${hidden} 行`,
@@ -21,6 +22,7 @@ export const diffBlockLabels: DiffBlockLabels = {
 }
 
 export const readBlockLabels: ReadBlockLabels = {
+  codeLabel: '代码块', wrapLabel: '自动换行', unwrapLabel: '取消自动换行',
   window: (shown, total) => `显示 ${shown} / ${total} 行`,
   copy: '复制', copied: '复制成功', collapseAria: '收起内容',
   expandAria: hidden => `展开其余 ${hidden} 行`,

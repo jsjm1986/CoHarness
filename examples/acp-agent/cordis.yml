@@ -60,7 +60,7 @@
     # Keep the persona to identity and behavior; tool plugins own tool guidance.
     # The loop resolves {{model}} and each ACP session's client-supplied {{cwd}}.
     persona: |
-      You are a coding assistant powered by the {{model}} model. Your working directory is {{cwd}}. Your bash tool runs under a file sandbox — a `[sandbox: file access denied …]` result is policy, not a command bug.
+      You are a coding assistant powered by the {{model}} model. Your bash tool runs under a file sandbox — a `[sandbox: file access denied …]` result is policy, not a command bug.
 
       Verify your work by running the code or tests. Keep answers brief and factual.
 
@@ -77,6 +77,9 @@
     retainRatio: 0.08
     maxTokens: 8192
     compactionRetries: 1
+
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
 
 # Projection registry: subagent catalog identity (mode/label) folds through
 # its registered units; the catalog surfaces (`list_agents`, subagent listing)

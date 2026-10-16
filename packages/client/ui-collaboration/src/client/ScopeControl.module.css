@@ -19,32 +19,9 @@
   overflow: hidden;
 }
 
-/* Scope is context, not another command: a quiet surface keeps the current
-   workspace legible while the other footer rows remain flat. */
-.context {
-  background: var(--dsw-alias-bg-layer-2);
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
-}
-
 .trigger:hover:not(:disabled),
 .trigger[aria-expanded='true'] {
   background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.context:hover:not(:disabled),
-.context[aria-expanded='true'] {
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-brand-primary);
-}
-
-/* The steward space is a caution surface: warn-family amber marks the
-   trigger while maintenance scope is active. */
-.contextSteward {
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-warn-secondary);
-}
-
-.contextSteward:hover:not(:disabled),
-.contextSteward[aria-expanded='true'] {
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-warn-primary);
 }
 
 .trigger:disabled {
@@ -53,7 +30,7 @@
 }
 
 .trigger:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
 }
 
@@ -76,38 +53,98 @@
   white-space: nowrap;
 }
 
-.mode {
+/* Mode flag on the trigger: a status dot + text for non-default scopes
+   (read-only/steward), matching the pushed page's flat row grammar. The
+   dot inherits the flag's colour — muted for read-only, warn amber for
+   maintenance. */
+.modeFlag {
+  display: inline-flex;
   flex: none;
-  padding: 0 var(--dsw-space-1);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-layer-2);
+  align-items: center;
+  gap: var(--dsw-space-1);
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 18px;
 }
 
-/* Steward mode pill: warn-family amber marks maintenance scope as a caution
-   surface, matching the banner in conversation.input.dock. */
-.modeSteward {
-  composes: mode;
-  background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-label);
+.modeFlag::before,
+.scopeFlagMark::before,
+.scopeFlagWarn::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  corner-shape: round;
+  background: currentcolor;
+  content: '';
+}
+
+.modeFlagWarn {
+  composes: modeFlag;
+  color: var(--dsw-alias-state-warn-primary);
   font-weight: 600;
 }
 
 .chevron {
   flex: none;
   color: var(--dsw-alias-label-caption);
+  transition: rotate var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
-/* Keep a large project roster from pushing the menu across the whole frame;
-   Menu's scrolling viewport leaves the management actions pinned below it. */
+/* Keep a large project roster from pushing the rail menu across the whole
+   frame; Menu's scrolling viewport leaves the management actions pinned
+   below it. */
 .scopeMenu {
   --dsh-menu-max-height: min(480px, calc(100vh - 24px));
 }
 
+/* Identity tiles: the letter of the project on a deterministic solid tint.
+   Selection stays on the trailing check; the tile carries identity only. */
+.tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--dsw-radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tileRound {
+  border-radius: 50%;
+  corner-shape: round;
+}
+
+.tileBlue { background: var(--dsw-static-blue-100); color: var(--dsw-static-blue-600); }
+.tileGreen { background: var(--dsw-static-green-100); color: var(--dsw-static-green-900); }
+.tileAmber { background: var(--dsw-static-amber-100); color: var(--dsw-static-amber-600); }
+.tileRed { background: var(--dsw-static-red-100); color: var(--dsw-static-red-600); }
+.tileDeep { background: var(--dsw-static-deepseek-100); color: var(--dsw-static-deepseek-600); }
+.tileWarn {
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+}
+
+/* 28px variant for the hub's current-space card. Shape classes (tileRound)
+   keep owning the radius so the personal tile stays circular at any size. */
+.tileLg {
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+}
+
+.sheetHead {
+  display: flex;
+  align-items: center;
+}
+
 /* Panel-style header above the search field. */
 .menuHeader {
+  flex: 1;
+  min-width: 0;
   padding: 0 var(--dsw-space-1) var(--dsw-space-1);
   color: var(--dsw-alias-label-caption);
   font-size: 12px;
@@ -129,8 +166,8 @@
 }
 
 .menuSearch:focus-within {
-  border-color: var(--dsw-alias-brand-primary);
-  box-shadow: 0 0 0 1px var(--dsw-alias-brand-primary);
+  border-color: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 1px var(--dsw-alias-state-business-primary);
 }
 
 .menuSearchIcon {
@@ -250,51 +287,26 @@
   white-space: nowrap;
 }
 
-.scopeMode {
+/* Roster mode flag: restricted scopes carry a muted dot (read-only) or a
+   warn dot (steward); the default read-write state stays plain text. */
+.scopeFlag {
+  display: inline-flex;
   flex: none;
-  padding: 0 var(--dsw-space-1);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-layer-2);
+  align-items: center;
+  gap: var(--dsw-space-1);
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 18px;
 }
 
-.scopeModeSteward {
-  composes: scopeMode;
-  background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-label);
+.scopeFlagMark {
+  composes: scopeFlag;
+}
+
+.scopeFlagWarn {
+  composes: scopeFlag;
+  color: var(--dsw-alias-state-warn-primary);
   font-weight: 600;
-}
-
-.scopeDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin: 0 5px;
-  border-radius: 50%;
-  corner-shape: round;
-  background: var(--dsw-alias-label-tertiary);
-}
-
-.scopeDotOn {
-  composes: scopeDot;
-  background: var(--dsw-alias-brand-primary);
-}
-
-/* Steward rows carry the maintenance glyph instead of a selection dot: the
-   reserved space is an identity, not a state. Shares the amber warn family
-   with the trigger chrome and the dock notice. */
-.scopeIconSteward {
-  display: inline-flex;
-  flex: none;
-  color: var(--dsw-alias-state-warn-primary);
-}
-
-/* The active steward trigger carries the same glyph in warn amber. */
-.stewardGlyph {
-  flex: none;
-  color: var(--dsw-alias-state-warn-primary);
 }
 
 .badge {
@@ -305,7 +317,7 @@
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--dsw-alias-brand-primary, #0066cc);
+  background: var(--dsw-alias-state-business-primary);
   color: #fff;
   font-size: 11px;
   line-height: 18px;
@@ -322,4 +334,324 @@
 :global([data-viewport='compact']) .trigger:not(.rail) {
   height: auto;
   min-height: var(--dsw-touch-target);
+}
+
+/* Push page: on compact it covers the whole drawer; on wider layouts the
+   media query below shrinks it to the published browsing-region box so the
+   column's brand, controls, and foot stay in view. The fill matches the
+   column's own surface so the page reads as the column, not a card;
+   entering slides in from the trailing edge so the push reads as
+   navigation, not a popup. */
+.scopePage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--dsw-safe-top, 0px);
+  background: var(--dsw-specific-sidebar-fill);
+  color: var(--dsw-alias-label-primary);
+  animation: scope-page-in var(--ds-transition-duration) var(--ds-ease-in-out);
+}
+
+/* Wider layouts keep the column's chrome in view: the page aligns to the
+   browsing region whose box the sidebar publishes as custom properties, so
+   the brand, controls, and foot stay visible around it. Below 768px the
+   drawer itself is the surface and the page keeps covering it edge to edge. */
+@media (min-width: 768px) {
+  .scopePage {
+    top: var(--dsh-sidebar-region-top, 0);
+    bottom: auto;
+    height: var(--dsh-sidebar-region-height, 100%);
+  }
+}
+
+@keyframes scope-page-in {
+  from {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+}
+
+/* Level transitions reuse the same grammar at a shorter travel; the class
+   is re-applied per view because the scroll container remounts on change. */
+.pagePush {
+  animation: scope-view-in 160ms var(--ds-ease-in-out);
+}
+
+.pagePop {
+  animation: scope-view-out 160ms var(--ds-ease-in-out);
+}
+
+@keyframes scope-view-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+@keyframes scope-view-out {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scopePage,
+  .pagePush,
+  .pagePop {
+    animation: none;
+  }
+}
+
+/* Navigation bar: back chevron on the leading edge, the title optically
+   centered by reserving the button's footprint on the trailing edge. */
+.pageNav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 46px;
+  padding: 0 var(--dsw-space-2);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.pageBack {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-state-business-primary);
+  cursor: pointer;
+}
+
+.pageBack:hover,
+.pageBack:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.pageTitle {
+  flex: 1;
+  min-width: 0;
+  padding-right: 32px;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The hero carries the current scope's identity — tile, name, and mode —
+   plus the management shortcut when a writable project is active. */
+.pageHero {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+  padding: var(--dsw-space-3) var(--dsw-space-3);
+}
+
+.pageHeroBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pageHeroName {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageHeroMeta {
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageManage {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding: var(--dsw-space-1) var(--dsw-space-2);
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pageManage:hover,
+.pageManage:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Section labels divide the page's two jobs: managing the current space,
+   then switching to another. */
+.pageGroup {
+  padding: var(--dsw-space-3) var(--dsw-space-3) var(--dsw-space-1);
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.pageLabel {
+  padding: var(--dsw-space-2) var(--dsw-space-3) var(--dsw-space-1);
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Page rows are the leaf grammar: flat full-bleed buttons with hairlines
+   between neighbours — no cards inside the page. */
+.pageRow {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px var(--dsw-space-3);
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pageRow + .pageRow {
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.pageRow:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.pageRow:active:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.pageRow:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -1px;
+}
+
+.pageRow:disabled {
+  color: var(--dsw-alias-label-caption);
+  cursor: wait;
+}
+
+@media (pointer: coarse) {
+  .pageRow {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+/* The current scope is the one primary row: a brand-blue tint plus blue
+   label among otherwise neutral rows. */
+.pageRowCurrent,
+.pageRowCurrent:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);
+  color: var(--dsw-alias-state-business-primary);
+  font-weight: 600;
+}
+
+.pageRowName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two-line variant for the visibility options: name over a caption. */
+.pageRowText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pageRowMeta {
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Row-end affordances: mode text appears only for non-default scopes
+   (read-only/steward); selection stays on the trailing check. */
+.pageValue {
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.pageValueWarn {
+  composes: pageValue;
+  color: var(--dsw-alias-state-warn-primary);
+  font-weight: 600;
+}
+
+.pageCheck {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.pageIcon {
+  display: inline-flex;
+  flex: none;
+  width: 20px;
+  justify-content: center;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.pageDisclose {
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+}
+
+/* Creation stays the one accent row; plain rows keep the badge and the
+   disclosure chevron as their only trailing marks. */
+.pageCreate,
+.pageCreate .pageIcon {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.pageSearch {
+  padding: var(--dsw-space-1) var(--dsw-space-3);
 }

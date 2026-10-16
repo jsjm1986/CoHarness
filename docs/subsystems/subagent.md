@@ -48,14 +48,19 @@ The tool layer builds this request from the model input and its own config; the 
  * {@link SubagentProvider.start}.
  */
 interface SubagentStartRequest {
+  /**
+   * Initial child directory; relative paths resolve against the parent's
+   * current directory. Omitted inherits that directory at start. Every
+   * explicit path must land inside the parent's original project directory.
+   */
+  readonly cwd?: string
   /** Optional short display label persisted with a session-backed child. */
   readonly label?: string
   /** Content delivered as the child's user message. */
   readonly prompt: ContentBlock[]
   /**
-   * The spawning agent. In-process providers derive workspace, lineage, and
-   * delegation depth from its durable session state. ACP reads only its cwd,
-   * and only when no deployment `cwd` override is configured.
+   * The spawning agent. Its effective directory supplies the default cwd;
+   * in-process children retain its origin, lineage, and delegation depth.
    */
   readonly parent: Agent
   /**
@@ -116,6 +121,8 @@ The caller-facing request does not carry catalog format details or continuation 
  * the durable child descriptor.
  */
 interface ResolvedSubagentStartRequest extends SubagentStartRequest {
+  /** Absolute directory selected once before provider startup. */
+  readonly cwd: string
   /** Detached descriptor a session-backed provider persists in the child log. */
   readonly descriptor: SubagentDescriptorData
 }
@@ -199,7 +206,7 @@ interface ContinuableStart {
 }
 ```
 
-When a resident Activation settles, the manager delivers one notice to the child's durable direct parent describing how that epoch ended and carrying its final assistant content. That delivery is unconditional for every child whose id a caller received, happens before the ownership release that would let the parent be judged settled, and reaches a resident parent through the same waking-admission accounting as an Agent message. A parent whose own lineage is already tearing down receives it without a wake, because waking a quiescent Agent starts a turn rather than queueing work. Its source kind is distinct so a transcript never presents a runtime account as something the child wrote.
+When a resident Activation settles, the manager delivers one notice to the child's durable direct parent describing how that epoch ended and carrying its final assistant content, the committed structured value when the epoch's `outputSchema` captured one as `Structured result: <JSON>`, and any provider diagnostic as its own text block. A completed structured epoch with no committed capture settles as `error`. That delivery is unconditional for every child whose id a caller received, happens before the ownership release that would let the parent be judged settled, and reaches a resident parent through the same waking-admission accounting as an Agent message. A parent whose own lineage is already tearing down receives it without a wake, because waking a quiescent Agent starts a turn rather than queueing work. Its source kind is distinct so a transcript never presents a runtime account as something the child wrote.
 
 ```ts type-equiv
 /**
@@ -233,6 +240,8 @@ The provider participates only in preparing the initial creation spec, where `sp
  * history.
  */
 interface ContinuableCreateRequest {
+  /** Absolute initial directory captured before provider preparation. */
+  readonly cwd: string
   /** The reserved durable child session id, for provider diagnostics. */
   readonly sessionId: SessionId
   /** The delegating parent agent whose history a seeding provider reads. */
@@ -557,6 +566,14 @@ interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): vo
  * @throws an aggregate error after all branches settle when any failed.
  */
 async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>
+
+/**
+ * Join progressing descendants without cancelling them. Idle descendants whose
+ * inboxes require a later wake stay resident and do not delay host completion.
+ * @param parent - the exact parent whose descendant work is observed.
+ * @returns whether work was joined; hosts recheck parent idle after true.
+ */
+async waitForChildren(parent: Agent): Promise<boolean>
 
 /**
  * Release selected resident continuable direct children of one exact live

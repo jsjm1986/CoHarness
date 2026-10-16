@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { computeHunkDiffs, diffsFromMeta, DIFF_CONTEXT } from '../src/diff.ts'
+import { computeHunkDiffs, diffsFromMeta, pathFromMeta, DIFF_CONTEXT } from '../src/diff.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 
 const lines = (n: number): string => Array.from({ length: n }, (_, i) => `line${i + 1}`).join('\n') + '\n'
@@ -109,5 +109,26 @@ describe('diffsFromMeta (defensive narrowing)', () => {
     expect(diffsFromMeta(m({ diffs: [null] }))).toBeUndefined()
     expect(diffsFromMeta(m({ diffs: ['x'] }))).toBeUndefined()
     expect(diffsFromMeta(m({ diffs: [[]] }))).toBeUndefined()
+  })
+})
+
+describe('pathFromMeta (defensive narrowing)', () => {
+  const m = (value: unknown): JsonValue | undefined => value as JsonValue | undefined
+
+  it('reads the recorded path from a well-formed payload', () => {
+    expect(pathFromMeta(m({ path: 'f.txt', diffs: [] }))).toBe('f.txt')
+  })
+
+  it('rejects undefined / non-object / array meta', () => {
+    expect(pathFromMeta(undefined)).toBeUndefined()
+    expect(pathFromMeta(null)).toBeUndefined()
+    expect(pathFromMeta(m('nope'))).toBeUndefined()
+    expect(pathFromMeta(m([]))).toBeUndefined()
+  })
+
+  it('rejects a missing / empty / non-string path field', () => {
+    expect(pathFromMeta(m({}))).toBeUndefined()
+    expect(pathFromMeta(m({ path: '' }))).toBeUndefined()
+    expect(pathFromMeta(m({ path: 7 }))).toBeUndefined()
   })
 })

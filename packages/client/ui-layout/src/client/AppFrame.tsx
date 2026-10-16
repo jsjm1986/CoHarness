@@ -51,9 +51,11 @@ function DetailsColumn(props: { children?: ReactNode }) {
 }
 
 /**
- * One 8px resize strip centered on a column border. Pointer capture keeps the
- * gesture on the strip; moves are rAF-batched into a single width write per
- * frame; `side` keys the hover-reveal CSS to the owning column.
+ * One 8px resize strip centered on a column border. `left` is the track edge;
+ * for details the stylesheet shifts the strip the column inset's width onto
+ * the floating panel's left border. Pointer capture keeps the gesture on the
+ * strip; moves are rAF-batched into a single width write per frame; `side`
+ * keys the hover-reveal CSS to the owning column.
  */
 function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart: () => void; onDrag: (dx: number) => void; onEnd: () => void }) {
   const [dragging, setDragging] = useState(false)
@@ -251,6 +253,136 @@ export function AppFrame({
     drawerWasOpen.current = drawerOpen
   }, [drawerOpen])
 
+  // Phone drawers are swipe-driven surfaces: a rightward edge-swipe opens
+  // and a leftward drag on the open drawer closes, both finger-tracking.
+  // The listeners are native — React binds touch handlers passive, and the
+  // gesture needs preventDefault to win against the drawer's own vertical
+  // scroll once horizontal intent shows.
+  const drawerEl = useRef<HTMLDivElement | null>(null)
+  const scrimEl = useRef<HTMLDivElement | null>(null)
+  const edgeEl = useRef<HTMLDivElement | null>(null)
+  const actionsRef = useRef(actions)
+  actionsRef.current = actions
+  useEffect(() => {
+    if (mode !== 'compact') return
+    const drawer = drawerEl.current
+    const scrim = scrimEl.current
+    const edge = edgeEl.current
+    if (drawer === null || scrim === null) return
+    interface Swipe {
+      kind: 'open' | 'close'
+      x0: number
+      y0: number
+      t0: number
+      lastDx: number
+      engaged: boolean
+      width: number
+    }
+    let swipe: Swipe | null = null
+    const clearInline = () => {
+      drawer.style.transform = ''
+      drawer.style.visibility = ''
+      drawer.style.transition = ''
+      scrim.style.opacity = ''
+      scrim.style.transition = ''
+    }
+    /* End the gesture on the stylesheet transition rather than snapping:
+       inline overrides carry the panel from its dragged spot to the target,
+       then clear so the [data-open] rules own the steady state. */
+    const settle = (opened: boolean, width: number) => {
+      drawer.style.transition = ''
+      scrim.style.transition = ''
+      let finished = false
+      const done = () => {
+        if (finished) return
+        finished = true
+        drawer.removeEventListener('transitionend', done)
+        clearInline()
+      }
+      drawer.addEventListener('transitionend', done)
+      window.setTimeout(done, 400)
+      if (opened) {
+        drawer.style.visibility = 'visible'
+        drawer.style.transform = 'translateX(0)'
+        scrim.style.opacity = '1'
+      } else {
+        drawer.style.transform = `translateX(${-width}px)`
+        drawer.style.visibility = ''
+        scrim.style.opacity = '0'
+      }
+    }
+    const start = (kind: Swipe['kind']) => (event: TouchEvent) => {
+      const t = event.touches[0]
+      if (t === undefined) return
+      swipe = { kind, x0: t.clientX, y0: t.clientY, t0: performance.now(), lastDx: 0, engaged: false, width: drawer.offsetWidth || 300 }
+    }
+    const move = (event: TouchEvent) => {
+      const s = swipe
+      const t = event.touches[0]
+      if (s === null || t === undefined) return
+      const dx = t.clientX - s.x0
+      const dy = t.clientY - s.y0
+      if (!s.engaged) {
+        const horizontal = s.kind === 'open'
+          ? dx > 12 && dx > Math.abs(dy)
+          : dx < -12 && -dx > Math.abs(dy)
+        if (!horizontal) {
+          if (Math.abs(dy) > 12) swipe = null
+          return
+        }
+        s.engaged = true
+        drawer.style.transition = 'none'
+        scrim.style.transition = 'none'
+      }
+      s.lastDx = dx
+      event.preventDefault()
+      if (s.kind === 'open') {
+        const slid = Math.min(dx, s.width)
+        drawer.style.visibility = 'visible'
+        drawer.style.transform = `translateX(${slid - s.width}px)`
+        scrim.style.opacity = String(Math.max(0, slid / s.width))
+      } else {
+        const slid = Math.min(0, dx)
+        drawer.style.transform = `translateX(${slid}px)`
+        scrim.style.opacity = String(Math.max(0, 1 + slid / s.width))
+      }
+    }
+    const finish = () => {
+      const s = swipe
+      swipe = null
+      if (s === null || !s.engaged) return
+      const velocity = s.lastDx / Math.max(1, performance.now() - s.t0)
+      const passed = s.kind === 'open'
+        ? s.lastDx > s.width * 0.3 || velocity > 0.35
+        : s.lastDx < -s.width * 0.3 || velocity < -0.35
+      const opened = s.kind === 'open' ? passed : !passed
+      settle(opened, s.width)
+      if (opened && s.kind === 'open') actionsRef.current.toggleSidebar()
+      if (!opened && s.kind === 'close') actionsRef.current.collapseNarrow()
+    }
+    const openStart = start('open')
+    const closeStart = start('close')
+    edge?.addEventListener('touchstart', openStart, { passive: true })
+    edge?.addEventListener('touchmove', move, { passive: false })
+    edge?.addEventListener('touchend', finish)
+    edge?.addEventListener('touchcancel', finish)
+    drawer.addEventListener('touchstart', closeStart, { passive: true })
+    drawer.addEventListener('touchmove', move, { passive: false })
+    drawer.addEventListener('touchend', finish)
+    drawer.addEventListener('touchcancel', finish)
+    return () => {
+      edge?.removeEventListener('touchstart', openStart)
+      edge?.removeEventListener('touchmove', move)
+      edge?.removeEventListener('touchend', finish)
+      edge?.removeEventListener('touchcancel', finish)
+      drawer.removeEventListener('touchstart', closeStart)
+      drawer.removeEventListener('touchmove', move)
+      drawer.removeEventListener('touchend', finish)
+      drawer.removeEventListener('touchcancel', finish)
+      swipe = null
+    }
+  }, [mode, drawerOpen])
+
   // The drag base is the rendered width captured at drag start (grabbing a
   // concession-clamped or overlay-rendered panel must not jump back to the
   // stored preference); it stays frozen for the whole gesture so dx deltas
@@ -323,10 +455,26 @@ export function AppFrame({
             {/* Drawer pair: the scrim owns pointer dismissal (keyboard users
                   close through the topbar toggle); the drawer keeps the sidebar
                   slot mounted across open/close and slides by transform. */}
-            <div className={css.scrim} data-open={drawerOpen || undefined} aria-hidden onClick={() => { actions.collapseNarrow() }} />
-            <div className={css.drawer} data-open={drawerOpen || undefined}>
-              {renderSlot('sidebar', { collapsed: false, width: SIDEBAR_DEFAULT })}
+            <div
+              ref={scrimEl}
+              className={css.scrim}
+              data-open={drawerOpen || undefined}
+              aria-hidden
+              onClick={() => { actions.collapseNarrow() }}
+            />
+            <div ref={drawerEl} className={css.drawer} data-open={drawerOpen || undefined}>
+              {/* The drawer's CSS width is min(82%, 300px) of the frame;
+                  the sidebar's frozen inline width must match exactly —
+                  SIDEBAR_DEFAULT would leave a dead strip on ≥366px phones. */}
+              {renderSlot('sidebar', {
+                collapsed: false,
+                width: viewport > 0 ? Math.min(Math.round(viewport * 0.82), 300) : SIDEBAR_DEFAULT,
+              })}
             </div>
+            {/* Left-edge swipe target for opening the drawer — the platform
+                back-gesture strip. Taps pass through (no click handling);
+                only a horizontal-dominant drag engages. */}
+            {!drawerOpen && <div ref={edgeEl} className={css.edgeZone} aria-hidden />}
           </>
         )
         : (

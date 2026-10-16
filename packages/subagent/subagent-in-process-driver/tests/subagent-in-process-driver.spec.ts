@@ -14,6 +14,7 @@ import SubagentRuntime, { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-su
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import { maxTokensResponse, MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import { startInProcessRun } from '../src/index.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -35,6 +36,7 @@ async function setup(script: Script, parentOptions: Partial<AgentOptions> = {}) 
   await mountAgentLoopTestDependencies(ctx)
   await mountInvariants(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   const adapter = new MockAdapter(script)
   ctx.llm.registerAdapter(['mock'], adapter)
@@ -47,6 +49,9 @@ function request(parent: Agent, signal = new AbortController().signal) {
     label: 'child task',
     prompt: [{ type: 'text' as const, text: 'child task' }],
     parent,
+    // start() resolves the selected directory before provider startup; direct
+    // driver calls supply the already-resolved value.
+    cwd: parent.session.header.cwd ?? process.cwd(),
     signal,
     descriptor: snapshotSubagentDescriptor({
       mode: 'one-shot',
@@ -94,6 +99,18 @@ describe('startInProcessRun', () => {
     await run.dispose()
     await run.dispose()
     expect(ctx.agents.get(run.id)).toBeUndefined()
+  })
+
+  it('fails the start when the child context lacks the working-directory service', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await mountInvariants(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('unused')]))
+    const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    await expect(startInProcessRun(request(parent), {}))
+      .rejects.toThrow('in-process subagents require the working-directory service')
+    await ctx.fiber.dispose()
   })
 
   it('marks the child as provider-owned before publication announces it', async () => {

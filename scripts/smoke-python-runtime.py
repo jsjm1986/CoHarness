@@ -265,7 +265,7 @@ def write_advanced_profile_patch(root: Path, name: str, sessions: Path) -> Path:
         {
             "id": "system-prompt",
             "config": {
-                "persona": "You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.",
+                "persona": "You are a coding agent powered by the {{model}} model.",
             },
         },
         {"id": "session-log-deepseek", "config": {"enabled": True}},
@@ -626,11 +626,14 @@ def minimal_tool_followup(
             raise AssertionError("persistent editor smoke request has no messages")
         editor_path = next(
             (
-                text.split(MINIMAL_EDITOR_PATH_PREFIX, 1)[1].strip()
+                # The wire may merge a runtime-context snapshot into the prompt's user
+                # message as a trailing text block; read the prefixed block's own line.
+                block["text"].split(MINIMAL_EDITOR_PATH_PREFIX, 1)[1].splitlines()[0].strip()
                 for message in messages
                 if isinstance(message, dict) and message.get("role") == "user"
-                for text in [message_text(message.get("content"))]
-                if MINIMAL_EDITOR_PATH_PREFIX in text
+                for block in message.get("content", [])
+                if isinstance(block, dict) and block.get("type") == "text"
+                and isinstance(block.get("text"), str) and MINIMAL_EDITOR_PATH_PREFIX in block["text"]
             ),
             None,
         )
@@ -1779,7 +1782,10 @@ def smoke_sdk_scheduler_recovery(base_url: str, executable: Path, update_snapsho
             raise AssertionError(f"scheduler recovery duplicated or lost tool outcomes: {tool_results}")
         if sum(record.get("type") == "todo/write" for record in records) != 1:
             raise AssertionError("scheduler recovery executed an unstarted todo update")
-        replacements = [(str(root), "{{cwd}}"), (RECOVERY_SESSION_ID, "{{parent}}")]
+        replacements = [
+            *snapshot_directory_replacements(root, "{{cwd}}"),
+            (RECOVERY_SESSION_ID, "{{parent}}"),
+        ]
         result_value = [{
             "session_id": result.session_id,
             "final_response": result.final_response,
@@ -2293,7 +2299,7 @@ def build_dynamic_tools_snapshot_files(
                 if block.get("type") in ("tool_addition", "tool_removal")] for request in requests]
     assert changes == [[], [{"type": "tool_addition", "tool": {"type": "tool_reference", "name": "snapshot_ping"}}], []], changes
     assert requests[1]["messages"][:len(requests[0]["messages"])] == requests[0]["messages"], "tool addition changed earlier messages"
-    replacements = [(str(cwd), "{{cwd}}"), (result.session_id, "{{session}}")]
+    replacements = snapshot_directory_replacements(cwd, "{{cwd}}") + [(result.session_id, "{{session}}")]
     evidence = {
         "finalResponse": result.final_response,
         "declarations": declarations,
@@ -2387,13 +2393,35 @@ def minimal_snapshot_message(message: object, cwd: Path) -> dict[str, object]:
     results = latest_tool_result(message)
     if results is not None:
         return {"role": "tool", "toolCallId": results.get("tool_use_id"), "text": "{{tool-result}}"}
-    return {"role": role, "text": minimal_snapshot_text(message_text(message.get("content")), cwd)}
+    content = message.get("content")
+    if isinstance(content, list):
+        # The wire layer can fold the dynamic runtime-context snapshot into the
+        # preceding user message as an extra text block; drop it per block so the
+        # same expected output replays whether the platform emits it or not.
+        content = [
+            block for block in content
+            if not (
+                isinstance(block, dict)
+                and block.get("type") == "text"
+                and isinstance(block.get("text"), str)
+                and block["text"].startswith(RUNTIME_CONTEXT_PREFIX)
+            )
+        ]
+    return {"role": role, "text": minimal_snapshot_text(message_text(content), cwd)}
+
+
+def snapshot_directory_replacements(directory: Path, token: str) -> list[tuple[str, str]]:
+    """Pin the allocated fixture path in plain fields and JSON-quoted context text."""
+    path = str(directory)
+    return [(json.dumps(path, ensure_ascii=False)[1:-1], token), (path, token)]
 
 
 def minimal_snapshot_text(value: object, cwd: Path) -> object:
     """Replace the scenario's temporary working directory everywhere it appears."""
     if isinstance(value, str):
-        return value.replace(str(cwd), "{{cwd}}")
+        for actual, token in snapshot_directory_replacements(cwd, "{{cwd}}"):
+            value = value.replace(actual, token)
+        return value
     if isinstance(value, list):
         return [minimal_snapshot_text(item, cwd) for item in value]
     if isinstance(value, dict):
@@ -2408,7 +2436,7 @@ def build_snapshot_files(
     cwd: Path,
 ) -> dict[str, str]:
     """Render the SDK result and three persisted logs into stable expected outputs."""
-    replacements = [(str(cwd), "{{cwd}}"), (SNAPSHOT_SESSION_ID, "{{parent}}")]
+    replacements = snapshot_directory_replacements(cwd, "{{cwd}}") + [(SNAPSHOT_SESSION_ID, "{{parent}}")]
     replacements.append((snapshot_workflow_run_id(result), "{{workflow-run}}"))
     for index, child_id in enumerate(child_ids, start=1):
         replacements.append((child_id, f"{{{{child-{index}}}}}"))
@@ -2480,8 +2508,8 @@ def build_restart_snapshot_files(
 ) -> dict[str, str]:
     """Render two SDK processes, isolated model histories, and durable logs."""
     replacements = [
-        (str(sessions), "{{sessions}}"),
-        (str(cwd), "{{cwd}}"),
+        *snapshot_directory_replacements(sessions, "{{sessions}}"),
+        *snapshot_directory_replacements(cwd, "{{cwd}}"),
         (RESTART_FIRST_SESSION_ID, "{{session-1}}"),
         (RESTART_SECOND_SESSION_ID, "{{session-2}}"),
     ]
@@ -2702,6 +2730,7 @@ def normalize_snapshot_value(
                     item["updatedAt"] = 0
         scrub_snapshot_header(result)
         scrub_snapshot_system_message(result)
+        sort_snapshot_tool_manifests(result)
         return result
 
     return normalize(value)
@@ -2736,6 +2765,53 @@ def scrub_snapshot_system_message(value: dict[object, object]) -> None:
     for block in content:
         if isinstance(block, dict) and block.get("type") == "text":
             block["text"] = "{{system}}"
+
+
+def sort_snapshot_tool_manifests(value: dict[object, object]) -> None:
+    """Sort embedded `listTools` payloads so registry iteration order is not pinned.
+
+    Plugin fibers activate in inject-dependency order, so the Tool registry emits
+    schema entries in a different order across processes. The pinned contract is
+    the advertised tool set — the same order-insensitive treatment the smoke
+    applies to `requests.json` `toolNames` — while every other field stays exact.
+    """
+    data = value.get("data")
+    if not isinstance(data, dict):
+        return
+    content: object = None
+    if value.get("type") == "tool/ptc-dispatch":
+        content = data.get("content")
+    elif value.get("type") == "tool/result":
+        message = data.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, list):
+        return
+    for block in content:
+        text = block.get("text") if isinstance(block, dict) else None
+        if not isinstance(text, str) or '"tools"' not in text:
+            continue
+        try:
+            payload = json.loads(text)
+        except ValueError:
+            continue
+        if isinstance(payload, dict) and sort_snapshot_tools_field(payload):
+            block["text"] = json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def sort_snapshot_tools_field(payload: dict[object, object]) -> bool:
+    """Sort one Inspect payload's `data.tools` schema list or `tools` name list."""
+    data = payload.get("data")
+    manifest = data.get("tools") if isinstance(data, dict) else None
+    if isinstance(manifest, list) and all(
+        isinstance(tool, dict) and isinstance(tool.get("name"), str) for tool in manifest
+    ):
+        manifest.sort(key=lambda tool: tool["name"])
+        return True
+    names = payload.get("tools")
+    if isinstance(names, list) and all(isinstance(name, str) for name in names):
+        names.sort()
+        return True
+    return False
 
 
 def render_jsonl(records: list[object]) -> str:
@@ -2878,6 +2954,7 @@ def normalize_session_format_comparison(
         normalized.pop("time", None)
     if source_session_version == 1 and normalized.get("type") == "assistant/message":
         normalized.pop("sourceEventSeqs", None)
+    sort_snapshot_tool_manifests(normalized)
     return normalized
 
 

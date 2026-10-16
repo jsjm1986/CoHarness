@@ -45,9 +45,15 @@
     - img
   - text: 显示代码工作视图 开启后，显示轨迹、本轮代码差异，可选择完整的 Agent 预设切换
   - switch "显示代码工作视图" [checked]
+  - text: 链接打开方式 选择对话中 http(s) 链接的打开位置
+  - button "内置浏览器":
+    - text: 内置浏览器
+    - img
   - text: 快捷键
   - paragraph: 查看和编辑当前可用的快捷键和输入操作
-  - button "编辑快捷键"
+  - button "编辑快捷键":
+    - text: 编辑快捷键
+    - img
   - text: 繁忙时的发送行为 智能体运行时 Enter 键和发送按钮的行为；Cmd/Ctrl+Enter 使用另一行为
   - button "排队发送":
     - text: 排队发送

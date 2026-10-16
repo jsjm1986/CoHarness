@@ -73,7 +73,7 @@ export async function runWithDeadline(upstream: AbortSignal | undefined, timeout
 
 将你自己的 `code` 传给 `timeoutOf`，使分类可在嵌套场景中正确组合。当 `upstream` 本身是 deadline 信号时，如果该 timer 先触发，`AbortSignal.any` 会保留它的 `TimeoutReason`。将匹配范围限定为你的 code，会把外部超时视为普通的 upstream 取消，而不会声称本地 timer 已到期。
 
-对于流式传输，创建一个 `idleWatchdog`，将其稳定的 `signal` 传给传输层，并为提供方的每次读取调用 `watchdog.next(iterator)`。当传输活动不产生迭代器值时，调用 `watchdog.pulse()`。间隔必须为正有限数，且不得超过 `MAX_TIMER_DELAY_MS`；否则 Node 会将其限制为 1 毫秒。它只对尚未完成的读取请求计时，因此当下游代码进行渲染或在请求下一个分片前以其他方式等待时，timer 不会运行。该原语仍然只会通知，因此传输层必须观察稳定信号；DeepSeek 和 pi-ai 适配器证明，超时会关闭它们的真实响应正文或 SDK 请求。
+对于流式传输，创建一个 `idleWatchdog`，将其稳定的 `signal` 传给传输层，并为提供方的每次读取调用 `watchdog.next(iterator)`。当传输活动不产生迭代器值时，调用 `watchdog.pulse()`。间隔必须为正有限数，且不得超过 `MAX_TIMER_DELAY_MS`；否则 Node 会将其限制为 1 毫秒。它只对尚未完成的读取请求计时，因此当下游代码进行渲染或在请求下一个分片前以其他方式等待时，timer 不会运行。与 `deadline()` 不同，空闲 watchdog 会按自己的截止时间结算尚未完成的读取请求：传输层在 abort 之后仍挂起的读取会让 `next()` 以该 watchdog 的 `TimeoutReason` reject，因此完全不观察信号的传输层也无法把等待拖过空闲间隔。信号仍用于让传输层释放自身资源——DeepSeek 和 pi-ai 适配器证明，超时会关闭它们的真实响应正文或 SDK 请求。
 
 <a id="what-does-not-get-a-timeout"></a>
 ## 哪些操作不设置超时

@@ -11,8 +11,8 @@ it('ships install metadata with the built web application', async () => {
 
   const manifest: unknown = JSON.parse(await readFile(join(DIST_ROOT, 'manifest.webmanifest'), 'utf8'))
   const official = index.includes('<title>DeepSeek Harness</title>')
-  const expectedName = official ? 'DeepSeek Harness' : 'CoHarness'
-  const expectedShortName = official ? 'DSH' : 'CoHarness'
+  const expectedName = official ? 'DeepSeek Harness' : 'COHARNESS'
+  const expectedShortName = official ? 'DSH' : 'COHARNESS'
   expect(manifest).toEqual({
     id: '/',
     name: expectedName,
@@ -31,10 +31,9 @@ it('ships install metadata with the built web application', async () => {
 
 it('ships a favicon that switches to a light mark under dark color scheme', async () => {
   const favicon = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
-  if (favicon.includes('coharness-arc')) {
-    expect(favicon).toContain('coharness-node')
-    expect(favicon).toContain('#0f766e')
-    expect(favicon).toContain('#5eead4')
+  if (favicon.includes('class="arc"')) {
+    expect(favicon).toContain('#2563eb')
+    expect(favicon).toContain('#6b93ff')
     expect(favicon).toMatch(/@media \(prefers-color-scheme: dark\)/)
     return
   }

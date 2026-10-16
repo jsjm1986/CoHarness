@@ -184,7 +184,11 @@ interface UserQuestionProjectionView {
 }
 ```
 
-问题开放期间唯一的回答路径是 waterfall。变为 `continued` 之后，`answer` Remote 方法向所属 agent steer 一条用户消息并叫醒空闲的 agent；其 source 为带 `outcome: 'answered'` 的 `user-question-reply`，正文是 `answer_to_pending_question` 载荷。该方法拒绝开放中的问题，并以 `BAD_ANSWER` 拒绝没有恰好各命名该调用每个问题一次的批次。没有任何 Remote 方法会放弃问题：Client 收起提问界面时不发送任何内容，因此未被回答的问题只能通过超时结束。`user-question-reply` 来源也接受 `outcome: 'dismissed'`，projection 与 Client 对话节点仍会为记录过它的会话读取；当前没有调用方产生它。Session 在 Host 重启后被重开时，Remote 层先恢复根 agent，回复作为新一轮进入。
+开放中的问题只能通过 waterfall 回答。问题变为 `continued` 后，`answer` Remote 方法向所属 agent 排入一条用户消息，并在其空闲时唤醒它。消息的 source 为 `user-question-reply`，outcome 为 `answered`，正文是 `answer_to_pending_question` 载荷。开放或未知调用返回 `false`；回复仍在排队时的第二次提交以 `REPLY_QUEUED` 拒绝，Host 重启后也一样；遗漏或重复问题的回答批次以 `BAD_ANSWER` 拒绝。`user-question-reply` 来源也接受 `outcome: 'dismissed'`，projection 与 Client 对话节点仍会为记录过它的会话读取；当前没有调用方产生它。
+
+收起 Client 面板不会发送内容。前台超时只结束工具等待。已继续的问题没有期限；在回复进入会话前，问题仍可回答。
+
+Host 重启后，Session 重开时 Remote 层会恢复根 agent。之后的迟到回复会作为新一轮进入。
 
 ## 错误
 
@@ -222,9 +226,11 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
  * @param agent - Live root agent for the owning Session.
  * @param callId - Continued question identity.
  * @param answer - Complete structured answer batch, one item per question of the call.
- * @returns Whether the question was continued and accepted the answer.
+ * @returns Whether the question is still continued; an accepted reply stays
+ *   queued until the agent admits its user message.
  * @throws {UserQuestionError} `BAD_ANSWER` when the batch does not name each
- *   question of the call exactly once.
+ *   question of the call exactly once, or `REPLY_QUEUED` when a reply is
+ *   already waiting for admission.
  */
 @Remote answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean
 

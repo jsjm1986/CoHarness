@@ -1,9 +1,9 @@
 /**
  * Provider-side vocabulary for OUT-OF-PROCESS subagent backends — the pieces
  * that enforce this seam's own contracts around a child in another process:
- * the no-capabilities advertisement, timing-bound validation, child
- * working-directory resolution (config override, else the delegating parent
- * session's workspace), the never-reject result settlement, and the standard
+ * the no-capabilities advertisement, timing-bound validation, child execution
+ * resolution (explicit workspace override, else the owning Session's effective
+ * working directory), the never-reject result settlement, and the standard
  * run-handle publication. Backends compose these with their own wire drivers;
  * the process machinery itself (spawn, env scrub, tree-scoped teardown)
  * belongs to the `dsh-subprocess` seam.
@@ -12,12 +12,13 @@
  */
 
 import { accessSync, constants, realpathSync, statSync } from 'node:fs'
-import { isAbsolute, resolve } from 'node:path'
+import { isAbsolute } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-fs'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SubagentCapabilities, SubagentResult, SubagentRun, SubagentStopReason } from './types.ts'
 
@@ -111,45 +112,6 @@ export function assertUsableCwd(prefix: string, label: string, cwd: string): str
   return cwd
 }
 
-/**
- * Validate a configured `cwd` override ONCE, at plugin load: reject the empty
- * string (`path.resolve('')` is the process cwd — it would silently
- * reintroduce the launch-directory fallback this resolution removes),
- * interpret a relative path against the harness launch directory, and require
- * an enterable directory.
- * @param prefix - the consuming plugin's diagnostic prefix.
- * @param cwd - the configured override, or `undefined` when the config omits it.
- * @returns the validated absolute override, or `undefined` when omitted.
- */
-export function validateConfiguredCwd(prefix: string, cwd: string | undefined): string | undefined {
-  if (cwd === undefined) return undefined
-  if (cwd === '') {
-    throw new Error(`${prefix}: config cwd must not be empty — omit the key to inherit the parent session cwd`)
-  }
-  return assertUsableCwd(prefix, 'config cwd', resolve(cwd))
-}
-
-/**
- * Resolve the child's working directory at start: the deployment override
- * when configured (already validated at load), else the parent session's
- * workspace cwd (validated here, its earliest resolvable point). Fails loud
- * when neither exists — falling back to the harness process cwd would
- * silently bind the child to the server's launch directory instead of the
- * delegating session's workspace (one server process serves many sessions,
- * each with its own cwd).
- * @param prefix - the consuming plugin's diagnostic prefix.
- * @param configured - the load-validated override, or `undefined`.
- * @param parentCwd - the delegating parent session's workspace cwd, if any.
- * @returns the absolute child working directory.
- */
-export function resolveChildCwd(prefix: string, configured: string | undefined, parentCwd: string | undefined): string {
-  if (configured !== undefined) return configured
-  if (parentCwd === undefined) {
-    throw new Error(`${prefix}: no working directory for the child — configure \`cwd\` or delegate from a parent session that has one`)
-  }
-  return assertUsableCwd(prefix, 'parent session cwd', parentCwd)
-}
-
 /** Workspace and subprocess provider resolved in the Session's fixed execution target. */
 export interface ChildExecution {
   readonly cwd: string
@@ -173,9 +135,14 @@ export function externalMemberAgent(ctx: Context, id: SessionId): Agent {
 /**
  * Resolve a child process in the delegating or member Agent's workspace and execution world.
  * Local execution needs no preset composition; SSH requires its standing realm.
- * @param ctx - provider context used to locate an SSH standing realm.
- * @param agent - the actual owner; its immutable header selects the execution target.
- * @param configured - explicit workspace override, otherwise the Session working directory.
+ * @param ctx - provider context used to locate an SSH standing realm and the
+ *   working-directory service.
+ * @param agent - the actual owner; its immutable header selects the execution
+ *   target, and its Session's effective directory supplies the workspace when
+ *   {@link configured} is omitted.
+ * @param configured - explicit workspace override, otherwise the Session's
+ *   effective working directory (falling back to the header origin only when
+ *   no working-directory service is mounted).
  * @param signal - admission cancellation, before any external prompt is sent.
  * @returns canonical workspace and its matching subprocess provider.
  */
@@ -187,10 +154,13 @@ export async function resolveChildExecution(
   const environmentForAgent = remote ? (await import('@deepseek-ai/dsh-agent-presets')).environmentForAgent : undefined
   const subprocess = environmentForAgent === undefined ? agent.ctx.get('subprocess') : environmentForAgent(ctx, agent, 'subprocess')
   if (subprocess === undefined) throw new Error('External member execution target has no subprocess provider')
-  const candidate = configured ?? agent.session.header.cwd
+  const workingDirectory = ctx.get('workingDirectory')
+  const candidate = configured ?? (workingDirectory === undefined
+    ? agent.session.header.cwd
+    : await workingDirectory.ensure(agent, signal))
   if (candidate === undefined) throw new Error('External member requires a Session working directory or an explicit workspace')
   if (environmentForAgent === undefined) {
-    return { cwd: realpathSync(resolveChildCwd('external member', undefined, candidate)), target: 'local', remote, subprocess }
+    return { cwd: realpathSync(assertUsableCwd('external member', 'Session working directory', candidate)), target: 'local', remote, subprocess }
   }
   const fs = environmentForAgent(ctx, agent, 'fs')
   if (fs === undefined) throw new Error('External member SSH execution target has no filesystem provider')

@@ -9,7 +9,7 @@
  */
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { createElement, type ComponentProps, type FC, type ReactNode } from 'react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
@@ -77,7 +77,7 @@ const NODES = [
     kind: 'assistant', seq: 4, time: 4_000, turn: 2, step: 1, blocks: [],
     timing: { stepStartTime: 3_500, firstTokenTime: 3_700, completedTime: 4_000 },
   },
-] as unknown as ConversationSnapshot['nodes']
+] as never as ConversationSnapshot['nodes']
 
 function historySnapshot(
   nodes: ConversationSnapshot['nodes'],
@@ -181,7 +181,7 @@ function standaloneProps(
     useProjection: (() => undefined) as never,
     // The locale seat the outlet would inject for the declared namespace.
     t: tZh,
-  } as unknown as ConvViewProps & { t: (key: LocaleKeysOf<'trajectory'>) => string }
+  } as never as ConvViewProps & { t: (key: LocaleKeysOf<'trajectory'>) => string }
 }
 
 /** Real-stack bench: root Context + real SlotRegistry ring + the plugin fiber. */
@@ -274,11 +274,11 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
     return (
       <View
         {...injectedProps}
-        {...({ sessionId: SID, useSession, useSessions: emptySessions(), useWorkspaces: emptyWorkspaces() } as unknown as ConvViewProps)}
+        {...({ sessionId: SID, useSession, useSessions: emptySessions(), useWorkspaces: emptyWorkspaces() } as never as ConvViewProps)}
         key={key}
       />
     )
-  }) as unknown as ConversationSessionProps['renderSlot']
+  }) as never as ConversationSessionProps['renderSlot']
   return render(
     <>
       <ConversationSessionHeader
@@ -347,7 +347,7 @@ describe('plugin registration', () => {
     const entry = b.slots.entries('conversation.view')
       .find(candidate => candidate.options.id === 'trajectory')
     expect(entry).toBeDefined()
-    const injectEntry = entry!.inject as unknown as (
+    const injectEntry = entry!.inject as never as (
       sessionId: SessionId,
     ) => TrajectoryViewInjected
     const first = injectEntry(SID)
@@ -365,7 +365,7 @@ describe('plugin registration', () => {
     const entry = b.slots.entries('conversation.view')
       .find(candidate => candidate.options.id === 'trajectory')
     expect(entry).toBeDefined()
-    const injectEntry = entry!.inject as unknown as (
+    const injectEntry = entry!.inject as never as (
       sessionId: SessionId,
     ) => TrajectoryViewInjected
     const first = injectEntry(SID)
@@ -382,7 +382,7 @@ describe('plugin registration', () => {
     const b = await bench()
     const entry = b.slots.entries('conversation.view')
       .find(candidate => candidate.options.id === 'trajectory')
-    const injectEntry = entry!.inject as unknown as (
+    const injectEntry = entry!.inject as never as (
       sessionId: SessionId,
     ) => TrajectoryViewInjected
     const injected = injectEntry(SID)
@@ -475,7 +475,7 @@ describe('tab switching in ConversationRoot', () => {
         kind: 'assistant', seq: 6, time: 6_000, turn: 2, step: 1,
         blocks: [{ kind: 'text', text: 'after' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const compaction: RequestView = {
       purpose: 'compaction',
       startSeq: 3,
@@ -515,7 +515,7 @@ describe('tab switching in ConversationRoot', () => {
         kind: 'assistant', seq: 10, time: 10_000, turn: 3, step: 1,
         blocks: [{ kind: 'text', text: 'after second compaction' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const compactions: RequestView[] = [
       {
         purpose: 'compaction',
@@ -1192,6 +1192,28 @@ describe('timeline projection', () => {
 })
 
 describe('TrajectoryView state', () => {
+  it.each([
+    { interrupted: true, status: '失败' },
+    { interrupted: false, status: '已完成' },
+  ])('uses the settled response status when the Step start is unloaded: $status', ({ interrupted, status }) => {
+    const nodes: ConversationSnapshot['nodes'] = [{
+      kind: 'assistant', seq: 10, time: 10_000, turn: 2, step: 3,
+      blocks: [{ kind: 'text', text: 'loaded response' }],
+      ...(interrupted ? { interrupted: true } : {}),
+    }] as never as ConversationSnapshot['nodes']
+    render(<TrajectoryView
+      {...standaloneProps(nodes)}
+      {...standaloneHistory(historySnapshot(nodes))}
+      {...standalonePreferences()}
+    />)
+    fireEvent.click(screen.getByRole('row', { name: /loaded response/ }))
+    expect(within(screen.getByRole('tabpanel')).getByText(status)).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: '请求 #1' }))
+    expect(within(screen.getByRole('tabpanel')).getByText(status)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '助手消息' }))
+    expect(within(screen.getByRole('tabpanel')).getByText(status)).toBeTruthy()
+  })
+
   it('persists the duration preference through the runtime snapshot-store seam', () => {
     const firstDuration = createTrajectoryDurationStore()
     const commonProps = {
@@ -1231,11 +1253,11 @@ describe('TrajectoryView state', () => {
     const older = {
       kind: 'user', seq: 1, time: 1_000,
       content: [{ type: 'text', text: 'older prompt' }], source: null,
-    } as unknown as ConversationSnapshot['nodes'][number]
+    } as never as ConversationSnapshot['nodes'][number]
     const current = {
       kind: 'assistant', seq: 100, time: 5_000, turn: 2, step: 1,
       blocks: [{ kind: 'text', text: 'selected current response' }],
-    } as unknown as ConversationSnapshot['nodes'][number]
+    } as never as ConversationSnapshot['nodes'][number]
     const store = createSnapshotStore(historySnapshot([current]))
     const view = render(
       <TrajectoryView

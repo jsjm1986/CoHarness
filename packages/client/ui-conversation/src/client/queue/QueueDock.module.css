@@ -137,16 +137,12 @@
   box-shadow: inset 0 1px 0 var(--dsw-alias-border-l1);
 }
 
-.preview,
-.editor {
+.preview {
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
   font: var(--dsw-font-xs-13);
   font-family: Inter, var(--dsw-font-family);
-}
-
-.preview {
-  overflow: hidden;
   color: var(--dsw-alias-label-primary-dimmed);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -174,21 +170,6 @@
   border-radius: 4px;
   background: var(--dsw-alias-bg-base);
   object-fit: cover;
-}
-
-.editor {
-  box-sizing: border-box;
-  height: 28px;
-  padding: 0 var(--dsw-space-2);
-  border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: var(--dsw-radius-sm);
-  outline: none;
-  background: var(--dsw-alias-bg-base);
-  color: var(--dsw-alias-label-primary);
-}
-
-.editor:focus {
-  border-color: var(--dsw-alias-state-business-primary);
 }
 
 .actions {

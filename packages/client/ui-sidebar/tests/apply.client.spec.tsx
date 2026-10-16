@@ -47,10 +47,14 @@ describe('ui-sidebar apply', () => {
     expect(b.slots.entries('sidebar')[0]!.locale).toBe('sidebar')
     const injected = (b.slots.entries('sidebar')[0]!.inject as () => SidebarRootInjected)()
     expect(Object.keys(injected)).toEqual(['hooks', 'exitWorkbench', 'startSession', 'toggleSidebar', 'selectPanel'])
-    // Both arms delegate to the runtime's shared New Session action.
+    // Both arms return the center to the Conversation before delegating to
+    // the runtime's shared New Session action — a clear or same-session
+    // reuse emits no selection change for the panel to ride.
     injected.startSession('workspace' as never)
+    expect(b.layout.selectPanel).toHaveBeenLastCalledWith(null)
     expect(b.workspaces.startSession).toHaveBeenCalledWith('workspace')
     injected.startSession()
+    expect(b.layout.selectPanel).toHaveBeenLastCalledWith(null)
     expect(b.workspaces.startSession).toHaveBeenLastCalledWith(undefined)
     injected.toggleSidebar()
     expect(b.layout.toggleSidebar).toHaveBeenCalledOnce()

@@ -147,7 +147,7 @@ export type MuxFrame =
     lastSeq: number
     assistantStream?: SessionAssistantStreamBaseline
   }
-  | { type: 'approval/requested'; sessionId: SessionId; approvalId: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string }
+  | { type: 'approval/requested'; sessionId: SessionId; approvalId: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; displayReason?: { readonly en: string; readonly [locale: string]: string } }
   | { type: 'approval/resolved'; sessionId: SessionId; approvalId: ApprovalRequestId; outcome: ApprovalOutcome }
   | { type: 'question/requested'; sessionId: SessionId; questions: AskUserQuestionItem[]; wait?: { callId: ToolCallId; timed?: boolean } }
   | { type: 'question/resolved'; sessionId: SessionId; questionRpcId: RpcId; outcome: 'answered' | 'cancelled' | 'pending' }

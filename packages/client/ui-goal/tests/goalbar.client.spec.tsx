@@ -162,6 +162,21 @@ describe('GoalBar', () => {
     expect(screen.queryByText('进行中的目标')).toBeNull()
   })
 
+  it('portals an action tooltip out of the strip, where the input card cannot cover it', () => {
+    vi.useFakeTimers()
+    try {
+      const actions = makeActions()
+      render(<GoalBar goal={makeGoal()} {...actions} t={t} />)
+      fireEvent.mouseEnter(screen.getByRole('button', { name: '暂停目标' }))
+      act(() => { vi.advanceTimersByTime(500) })
+      const tooltip = screen.getByRole('tooltip')
+      expect(tooltip.textContent).toBe('暂停目标')
+      expect(tooltip.parentElement).toBe(document.body)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('blocked goal: "受阻的目标" with the block reason as the strip tooltip', () => {
     const actions = makeActions()
     const goal = makeGoal({ phase: 'blocked', blockedReason: { code: 'stalled', message: 'No progress in 3 rounds' } })

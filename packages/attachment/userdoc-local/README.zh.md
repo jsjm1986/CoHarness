@@ -15,6 +15,8 @@ kind: "package-reference"
 
 相同的在途列表请求会共享一次文件系统扫描；单个调用方的取消只影响自己，只有最后一个等待方离开时才会停止底层扫描。
 
+导出的 `LocalUserDocFs` 引擎承载同一套文件系统操作但不依赖 Cordis `Context`，使非运行时宿主——Gateway 的本地文档 broker——能对授权作用域根提供完全相同的行为。
+
 `mediaType` 由存储文件的扩展名推导。文本、Markdown、CSV、JSON、YAML、XML、常见源代码、图片、PDF 和 Office 扩展名会得到对应的展示类型；无法识别的扩展名记为 `application/octet-stream`。它只是展示用的元数据：这里既不解析内容，也不拒绝未知格式。
 
 ## 概述

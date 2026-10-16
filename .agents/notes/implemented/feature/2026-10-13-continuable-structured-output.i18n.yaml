@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-continuable-structured-output.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-continuable-structured-output.md
+/agent-note-continuable-children-accept-an-outputschema-with-scoped-capture:
+  en: 6bdebd352f581a91
+  zh: df770821f551c1d9
+/agent-note-continuable-children-accept-an-outputschema-with-scoped-capture/problem:
+  en: 2f4cb638d5de6442
+  zh: 1710a22617efdb55
+/agent-note-continuable-children-accept-an-outputschema-with-scoped-capture/decision:
+  en: 236f02bb7b576512
+  zh: 59657f150293daed
+/agent-note-continuable-children-accept-an-outputschema-with-scoped-capture/alternatives-considered:
+  en: 868f277869297680
+  zh: f331765076cdd37d
+/agent-note-continuable-children-accept-an-outputschema-with-scoped-capture/consequences:
+  en: 145ac69af1df880c
+  zh: ad53d6da75a819a2
+/agent-note-continuable-children-accept-an-outputschema-with-scoped-capture/verification:
+  en: cab6227bf55dd3a4
+  zh: 118de50c3198b4af
+/agent-note-continuable-children-accept-an-outputschema-with-scoped-capture/related:
+  en: 61a04cc3f6a5e617
+  zh: 256de855f1a326b6

@@ -48,14 +48,19 @@ interface SubagentCapabilities {
  * {@link SubagentProvider.start}.
  */
 interface SubagentStartRequest {
+  /**
+   * Initial child directory; relative paths resolve against the parent's
+   * current directory. Omitted inherits that directory at start. Every
+   * explicit path must land inside the parent's original project directory.
+   */
+  readonly cwd?: string
   /** Optional short display label persisted with a session-backed child. */
   readonly label?: string
   /** Content delivered as the child's user message. */
   readonly prompt: ContentBlock[]
   /**
-   * The spawning agent. In-process providers derive workspace, lineage, and
-   * delegation depth from its durable session state. ACP reads only its cwd,
-   * and only when no deployment `cwd` override is configured.
+   * The spawning agent. Its effective directory supplies the default cwd;
+   * in-process children retain its origin, lineage, and delegation depth.
    */
   readonly parent: Agent
   /**
@@ -116,6 +121,8 @@ interface SubagentStartRequest {
  * the durable child descriptor.
  */
 interface ResolvedSubagentStartRequest extends SubagentStartRequest {
+  /** Absolute directory selected once before provider startup. */
+  readonly cwd: string
   /** Detached descriptor a session-backed provider persists in the child log. */
   readonly descriptor: SubagentDescriptorData
 }
@@ -199,7 +206,7 @@ interface ContinuableStart {
 }
 ```
 
-当驻留 Activation 结算时，管理器会向该 child 持久化的直接 parent 投递一条通知，说明该 epoch 如何结束，并携带其最终 assistant 内容。对每个调用方拿到过 id 的 child，这条投递都是无条件的；它发生在会让 parent 被判定为已结算的所有权释放之前，并通过与 Agent 消息相同的唤醒准入记账到达驻留 parent。若 parent 自身所在的谱系已在拆卸中，这条通知会以不唤醒的方式送达，因为唤醒一个静息 Agent 是开启一个轮次，而不是排队等待工作。其来源 kind 是独立的，因此 transcript（文本记录）绝不会把运行时的记账呈现为 child 自己写下的内容。
+当驻留 Activation 结算时，管理器会向该 child 持久化的直接 parent 投递一条通知，说明该 epoch 如何结束，并携带其最终 assistant 内容；当该 epoch 的 `outputSchema` 捕获到已提交的结构化值时，以 `Structured result: <JSON>` 一并送达，提供方诊断如有也作为独立文本块携带。没有已提交捕获的 `completed` 结构化 epoch 按 `error` 结算。对每个调用方拿到过 id 的 child，这条投递都是无条件的；它发生在会让 parent 被判定为已结算的所有权释放之前，并通过与 Agent 消息相同的唤醒准入记账到达驻留 parent。若 parent 自身所在的谱系已在拆卸中，这条通知会以不唤醒的方式送达，因为唤醒一个静息 Agent 是开启一个轮次，而不是排队等待工作。其来源 kind 是独立的，因此 transcript（文本记录）绝不会把运行时的记账呈现为 child 自己写下的内容。
 
 ```ts type-equiv
 /**
@@ -233,6 +240,8 @@ interface SubagentSettledMessageSource {
  * history.
  */
 interface ContinuableCreateRequest {
+  /** Absolute initial directory captured before provider preparation. */
+  readonly cwd: string
   /** The reserved durable child session id, for provider diagnostics. */
   readonly sessionId: SessionId
   /** The delegating parent agent whose history a seeding provider reads. */
@@ -561,6 +570,14 @@ interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): vo
  * @throws an aggregate error after all branches settle when any failed.
  */
 async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>
+
+/**
+ * Join progressing descendants without cancelling them. Idle descendants whose
+ * inboxes require a later wake stay resident and do not delay host completion.
+ * @param parent - the exact parent whose descendant work is observed.
+ * @returns whether work was joined; hosts recheck parent idle after true.
+ */
+async waitForChildren(parent: Agent): Promise<boolean>
 
 /**
  * Release selected resident continuable direct children of one exact live

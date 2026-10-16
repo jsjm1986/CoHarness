@@ -32,7 +32,7 @@ import type { ImageCardModel } from '../models/image-card-model.ts'
 import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-model.ts'
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
-import { diffBlockLabels, readBlockLabels, searchBlockLabels, webBlockLabels } from '../models/primitive-labels.ts'
+import { codeToolbarLabels, diffBlockLabels, readBlockLabels, searchBlockLabels, webBlockLabels } from '../models/primitive-labels.ts'
 import type { WebCardModelProps } from '../models/web-card-model.ts'
 import { formatToolBody, type ToolRowState, type ToolRowVariant } from '../models/tool-call-model.ts'
 import { ToolDetails, type ToolDetailsModel } from './ToolDetails.tsx'
@@ -62,6 +62,8 @@ export interface ToolRowProps {
   summarySuffix?: string | null | undefined
   /** Original argument payload; formatting is deferred until expansion. */
   bodyRaw?: string | null | undefined
+  /** Safe http(s) URL from tool args; when set, the summary renders as a link that opens it in a new tab. */
+  href?: string | undefined
   /** Flattened result text for the expanded Output section; null/absent = no output section. */
   output?: string | null | undefined
   /** Ask-user transcript card; replaces generic input/output sections. */
@@ -157,6 +159,11 @@ function stateStatus(state: ToolRowState, t: TranslateNS<'conversation'>): strin
   }
 }
 
+/** Keep a summary link click from toggling the row; the browser still follows the link. */
+function stopLinkClick(event: MouseEvent<HTMLAnchorElement>): void {
+  event.stopPropagation()
+}
+
 export function ToolRow({
   useDisclosure,
   openDetails,
@@ -168,6 +175,7 @@ export function ToolRow({
   summary,
   summarySuffix,
   bodyRaw,
+  href,
   output,
   askQuestion,
   errorSummary,
@@ -227,17 +235,18 @@ export function ToolRow({
   const suffix = failureLine === null ? summarySuffix ?? diffStat : null
   // The failure line is error prose, not the path: no open-file affordance.
   const fileLink = filePath !== undefined && onOpenFile !== undefined && failureLine === null
+  const linkHref = failureLine !== null || state === 'stopped' ? undefined : href
   const openFile = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()
     if (filePath === undefined) return
     if (filePathLine === undefined) onOpenFile?.(filePath)
     else onOpenFile?.(filePath, { line: filePathLine })
   }
-  // Keep Enter/Space on the focused path link from bubbling to the row's
+  // Keep Enter/Space on the focused path or URL link from bubbling to the row's
   // keydown handler, which would preventDefault() the key and toggle expand
-  // instead of activating the link — the keyboard analogue of openFile's
-  // stopPropagation. The native button still fires its own onClick from the key.
-  const fileLinkKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+  // instead of activating the link — the keyboard analogue of the click
+  // handlers' stopPropagation. The native element still activates from the key.
+  const fileLinkKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
   }
   // The code variant's program renders through CodeBlock (shiki), so only its
@@ -275,6 +284,17 @@ export function ToolRow({
               >
                 {summaryText}
               </button>
+            ) : linkHref !== undefined ? (
+              <a
+                className={css.fileLink}
+                href={linkHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={stopLinkClick}
+                onKeyDown={fileLinkKeyDown}
+              >
+                {summaryText}
+              </a>
             ) : (
               <span
                 className={clsx(css.summary, failureLine !== null && css.errorSummary)}
@@ -345,7 +365,8 @@ export function ToolRow({
                             <>
                               {variant === 'code' && bodyText !== null && (
                                 <div className={css.bodyScroll}>
-                                  <CodeBlock code={bodyText} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')} className={css.codeBody} />
+                                  <CodeBlock code={bodyText} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')}
+                                    toolbarLabels={codeToolbarLabels(t)} className={css.codeBody} />
                                 </div>
                               )}
                               {(cardBody !== null || outputText !== null) && (

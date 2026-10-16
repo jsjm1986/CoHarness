@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { IconLoadingOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CoHarnessMascot, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollaborationScopeTarget } from './collaboration-client.ts'
 import type { CollaborationKey } from './locales.ts'
 import css from './ScopeSwitchStatus.module.css'
@@ -56,9 +56,10 @@ export function ScopeSwitchStatus({ target, t }: { target: CollaborationScopeTar
     >
       <div className={css.content} role="status" aria-live="polite" aria-busy="true">
         <div className={css.iconFrame} aria-hidden="true">
-          <IconLoadingOutline16 className={css.spinner} size={22} />
+          <CoHarnessMascot className={css.mascot} size={30} />
         </div>
         <div className={css.copy}>
+          <p className={css.wordmark} aria-hidden="true">{t('brand.product')}</p>
           <h2 className={css.title}>{t('scope.switching')}</h2>
           <p className={css.target}>{t('scope.switchingTarget', { name: targetName })}</p>
           <p className={css.stage}>{stageText}</p>

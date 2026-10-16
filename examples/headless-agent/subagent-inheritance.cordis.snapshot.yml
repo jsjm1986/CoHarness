@@ -34,6 +34,9 @@
 - id: tool-fs
   name: '@deepseek-ai/dsh-tool-fs'
 
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 # This scenario probes filesystem confinement only, so the bash stack is absent:
 # without it the bundle's `toolBash: false` is required, because `tool-bash` would
 # otherwise wait forever for a `bash` executor this tree never mounts.

@@ -16,7 +16,7 @@
  * @module @deepseek-ai/dsh-session-snapshot/harness
  */
 
-import { cp, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises'
 import { existsSync, realpathSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
@@ -239,8 +239,11 @@ export function snapshotSpillRoot(
  * @returns The captured stdout/stderr, session id, generated cwd, and harvested logs.
  */
 export async function runScenario(input: InputScript, opts: RunOptions): Promise<RunResult> {
-  const cwd = await mkdtemp(join(opts.workspaceParent ?? tmpdir(), 'acp-snap-cwd-'))
-  const cwdAliases = [...new Set([realpathSync(cwd), realpathSync.native(cwd)])]
+  // mkdtemp keeps tmpdir()'s spelling; a symlinked temporary root (macOS /var)
+  // would materialize fixture cwd differently from the canonical path a real
+  // process records, so replay diverges between platforms.
+  const cwd = await realpath(await mkdtemp(join(opts.workspaceParent ?? tmpdir(), 'acp-snap-cwd-')))
+  const cwdAliases = [...new Set([cwd, realpathSync(cwd), realpathSync.native(cwd)])]
   const sessionsRoot = await mkdtemp(join(tmpdir(), 'acp-snap-sessions-'))
   let spillRoot: string | undefined
   // Everything past the temp-dir creation is followed by failure-safe cleanup,

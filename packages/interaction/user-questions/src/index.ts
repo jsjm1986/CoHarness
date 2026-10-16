@@ -9,7 +9,8 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
-import { createUserMessage, HarnessError, type ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, HarnessError, type MessageId, type ToolCallId, type UserMessage } from '@deepseek-ai/dsh-llm'
+import type { Session } from '@deepseek-ai/dsh-session'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -72,10 +73,13 @@ function restoreUserQuestionError(reason: unknown): unknown {
   return reason
 }
 
+type QueuedReply = { messageId: MessageId; claimedTurn?: number }
+
 /** `ctx.userQuestions`: validation plus the scoped answerer waterfall. */
 export class UserQuestionService extends TypertRemoteService {
   static Config = z.object({})
   private readonly waits = new Map<Agent, Map<ToolCallId, TimedQuestionWait>>()
+  private readonly queuedReplies = new WeakMap<Session, Map<ToolCallId, QueuedReply>>()
 
   constructor(ctx: Context) {
     super(ctx, 'userQuestions')
@@ -88,6 +92,40 @@ export class UserQuestionService extends TypertRemoteService {
       }
       this.waits.clear()
     }, 'userQuestions: foreground waits')
+    ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
+      const source = message.source
+      if (source.kind !== 'user-question-reply') return
+      const calls = this.queuedReplies.get(agent.session) ?? new Map<ToolCallId, QueuedReply>()
+      const reply = calls.get(source.callId)
+      if (reply === undefined) {
+        calls.set(source.callId, { messageId: message.id, claimedTurn: turn })
+        this.queuedReplies.set(agent.session, calls)
+      } else if (reply.messageId === message.id) {
+        reply.claimedTurn = turn
+      }
+    }, { global: true })
+    ctx.on('agent/inbox/discarded', ({ agent, message }) => {
+      const source = message.source
+      if (source.kind === 'user-question-reply') this.releaseReply(agent.session, source.callId, message.id)
+    }, { global: true })
+    ctx.on('session/event', (session, event) => {
+      if (event.type === 'user/message') {
+        const source = event.data.source
+        if (source.kind === 'user-question-reply') this.releaseReply(session, source.callId, event.data.id)
+      } else if (event.type === 'turn/end') {
+        const calls = this.queuedReplies.get(session)
+        if (calls === undefined) return
+        for (const [callId, reply] of calls) {
+          if (reply.claimedTurn === event.data.turn) calls.delete(callId)
+        }
+      }
+    }, { global: true })
+  }
+
+  private releaseReply(session: Session, callId: ToolCallId, messageId: MessageId): void {
+    const calls = this.queuedReplies.get(session)
+    if (calls?.get(callId)?.messageId !== messageId) return
+    calls.delete(callId)
   }
 
   private assertLiveRoot(agent: Agent): void {
@@ -117,15 +155,23 @@ export class UserQuestionService extends TypertRemoteService {
    * @param agent - Live root agent for the owning Session.
    * @param callId - Continued question identity.
    * @param answer - Complete structured answer batch, one item per question of the call.
-   * @returns Whether the question was continued and accepted the answer.
+   * @returns Whether the question is still continued; an accepted reply stays
+   *   queued until the agent admits its user message.
    * @throws {UserQuestionError} `BAD_ANSWER` when the batch does not name each
-   *   question of the call exactly once.
+   *   question of the call exactly once, or `REPLY_QUEUED` when a reply is
+   *   already waiting for admission.
    */
   @Remote
   answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean {
     this.assertLiveRoot(agent)
     const question = this.continued(agent).find(item => item.callId === callId)
     if (question === undefined) return false
+    const queued = this.queuedReplies.get(agent.session)
+    const matches = (message: UserMessage): boolean =>
+      message.source.kind === 'user-question-reply' && message.source.callId === callId
+    if (queued?.has(callId) || agent.inbox.nextTurn.some(matches) || agent.inbox.nextStep.some(matches)) {
+      throw new UserQuestionError('a reply is already queued for this question', 'REPLY_QUEUED')
+    }
     // The gateway validated the batch's shape from the type; the model-facing
     // contract also promises one item per question, which only this owner of
     // the asked questions can check before the batch reaches the model.
@@ -137,7 +183,7 @@ export class UserQuestionService extends TypertRemoteService {
         `the answer batch for ${callId} must name each of its ${String(question.questions.length)} questions exactly once`,
         'BAD_ANSWER')
     }
-    agent.steer(createUserMessage({
+    const message = createUserMessage({
       source: { kind: 'user-question-reply', callId, outcome: 'answered' },
       content: [{
         type: 'text',
@@ -146,7 +192,16 @@ export class UserQuestionService extends TypertRemoteService {
           questions: question.questions, answers: answer.answers,
         }),
       }],
-    }))
+    })
+    const calls = queued ?? new Map<ToolCallId, QueuedReply>()
+    calls.set(callId, { messageId: message.id })
+    this.queuedReplies.set(agent.session, calls)
+    try {
+      agent.steer(message)
+    } catch (error: unknown) {
+      this.releaseReply(agent.session, callId, message.id)
+      throw error
+    }
     return true
   }
 

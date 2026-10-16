@@ -1,6 +1,15 @@
+import { Buffer } from 'node:buffer'
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { Session, SessionId, SessionLogOffset, SessionSeq, type CreateSessionOptions, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { Context, LoggerLevel } from '@deepseek-ai/cordis'
+import SessionStore, {
+  SESSION_FORMAT_VERSION,
+  Session,
+  SessionId,
+  SessionLogOffset,
+  SessionSeq,
+  type CreateSessionOptions,
+  type SessionEvent,
+} from '@deepseek-ai/dsh-session'
 import DeepSeekLlmApiExtensionRegistry from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
@@ -40,8 +49,56 @@ function body(text = 'x'.repeat(300)) {
   return { messages: [{ role: 'user', content: text }] }
 }
 
+function userMessages(texts: readonly string[]): SessionEvent[] {
+  return texts.map((text, index): SessionEvent => ({
+    type: 'user/message',
+    seq: SessionSeq(index),
+    time: index + 1,
+    data: createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }),
+    surfaceOp: 'append',
+  }))
+}
+
+function bytes(value: DeepSeekSessionLogExtension): number {
+  return Buffer.byteLength(JSON.stringify(value))
+}
+
+/** The field value carrying only the first `count` events of `value`. */
+function prefix(value: DeepSeekSessionLogExtension, count: number): DeepSeekSessionLogExtension {
+  return { ...value, throughSeq: value.events[count - 1]!.seq, events: value.events.slice(0, count) }
+}
+
+async function prepareField(ctx: Context, session: Session): Promise<DeepSeekSessionLogExtension | undefined> {
+  return (await ctx.deepseekLlmApiExtensions.prepare({ body: body(), signal: SIGNAL, sessionId: session.id })).fields.dsh_session_log
+}
+
+/** Mount the contribution with one byte limit around `run`. */
+async function withMaxBytes<T>(ctx: Context, maxBytes: number, run: () => Promise<T>): Promise<T> {
+  const upload = ctx.plugin(SessionLogDeepSeek, { enabled: true, maxBytes })
+  await upload
+  try {
+    return await run()
+  } finally {
+    await upload.dispose()
+  }
+}
+
+/** Capture every pending event under the default limit, which these small logs stay below. */
+async function unbounded(id: string, texts: readonly string[]): Promise<{
+  ctx: Context
+  session: Session
+  full: DeepSeekSessionLogExtension
+}> {
+  const { ctx, session, disposeUpload } = await harness(id, userMessages(texts))
+  const full = await prepareField(ctx, session)
+  if (full === undefined) throw new Error('expected a session-log field')
+  await disposeUpload()
+  return { ctx, session, full }
+}
+
 describe('incremental DeepSeek session-log upload', () => {
   it('publishes raw numeric sequence fields on its external wire DTO', () => {
+    expectTypeOf<DeepSeekSessionLogExtension['sessionFormatVersion']>().toEqualTypeOf<number>()
     expectTypeOf<DeepSeekSessionLogExtension['afterSeq']>().toEqualTypeOf<number>()
     expectTypeOf<DeepSeekSessionLogExtension['throughSeq']>().toEqualTypeOf<number>()
     expectTypeOf<DeepSeekSessionLogExtension['events'][number]['seq']>().toEqualTypeOf<number>()
@@ -129,6 +186,73 @@ describe('incremental DeepSeek session-log upload', () => {
     })).rejects.toThrow(/allowedEndpoints must contain absolute http\(s\) URLs/)
   })
 
+  it('applies the 8 MiB default when the composition sets no limit', async () => {
+    const { ctx, session } = await harness('bounded-default', userMessages(['a', 'b', 'c'].map(letter => letter.repeat(3 * 1024 * 1024))))
+    const value = await prepareField(ctx, session)
+    expect(value?.events.map(event => event.seq)).toEqual([0, 1])
+    expect(bytes(value!)).toBeLessThanOrEqual(8 * 1024 * 1024)
+  })
+
+  it('fills a request up to exactly maxBytes and leaves the next event for a later request', async () => {
+    const { ctx, session, full } = await unbounded('bounded-exact', ['a'.repeat(200), 'b'.repeat(200), 'c'.repeat(200)])
+    const limit = bytes(prefix(full, 2))
+    const atLimit = await withMaxBytes(ctx, limit, () => prepareField(ctx, session))
+    expect(atLimit).toEqual(prefix(full, 2))
+    expect(bytes(atLimit!)).toBe(limit)
+    expect(await withMaxBytes(ctx, limit - 1, () => prepareField(ctx, session))).toEqual(prefix(full, 1))
+  })
+
+  it('measures maxBytes in UTF-8 bytes', async () => {
+    const { ctx, session, full } = await unbounded('bounded-utf8', ['界'.repeat(100), '界'.repeat(100)])
+    const one = bytes(prefix(full, 1))
+    const two = bytes(prefix(full, 2))
+    expect(await withMaxBytes(ctx, two, () => prepareField(ctx, session))).toEqual(prefix(full, 2))
+    expect(await withMaxBytes(ctx, two - 1, () => prepareField(ctx, session))).toEqual(prefix(full, 1))
+    expect(await withMaxBytes(ctx, one - 1, () => prepareField(ctx, session))).toBeUndefined()
+  })
+
+  it('drains a backlog larger than maxBytes through consecutive accepted requests', async () => {
+    const { ctx, session, full } = await unbounded('bounded-drain', Array.from({ length: 6 }, (_, index) => String(index).repeat(200)))
+    const maxBytes = bytes(prefix(full, 2))
+    const batches = await withMaxBytes(ctx, maxBytes, async () => {
+      const values: DeepSeekSessionLogExtension[] = []
+      for (let request = 0; request < 10 && SessionLogDeepSeek.acceptedThrough(session) < full.throughSeq; request++) {
+        const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: body(), signal: SIGNAL, sessionId: session.id })
+        values.push(prepared.fields.dsh_session_log!)
+        await prepared.accept()
+      }
+      return values
+    })
+    expect(SessionLogDeepSeek.acceptedThrough(session)).toBeGreaterThanOrEqual(full.throughSeq)
+    expect(batches[0]).toEqual(prefix(full, 2))
+    expect(batches.length).toBeGreaterThan(2)
+    for (const value of batches) {
+      expect(bytes(value)).toBeLessThanOrEqual(maxBytes)
+      expect(value.events.map(event => event.seq))
+        .toEqual(Array.from({ length: value.throughSeq - value.afterSeq }, (_, index) => value.afterSeq + 1 + index))
+    }
+    expect(batches.map(value => value.afterSeq)).toEqual([-1, ...batches.slice(0, -1).map(value => value.throughSeq)])
+    expect(batches.flatMap(value => value.events).filter(event => event.type !== 'session-log-deepseek/delivery-accepted'))
+      .toEqual(full.events)
+  })
+
+  it('omits the field and keeps the watermark while the next pending event alone exceeds maxBytes', async () => {
+    const { ctx, session, full } = await unbounded('bounded-oversized', ['x'.repeat(1000)])
+    const warnings: unknown[][] = []
+    ctx.logger.exporter({ levels: { default: LoggerLevel.WARN }, export: (message) => { if (message.type === 'warn') warnings.push(message.args) } })
+    const limit = bytes(prefix(full, 1)) - 1
+    await withMaxBytes(ctx, limit, async () => {
+      const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: body(), signal: SIGNAL, sessionId: session.id })
+      expect(prepared.fields).not.toHaveProperty('dsh_session_log')
+      await prepared.accept()
+      session.append('turn/start', { turn: 1 })
+      expect(await prepareField(ctx, session)).toBeUndefined()
+    })
+    expect(SessionLogDeepSeek.acceptedThrough(session)).toBe(-1)
+    const warning = `session-log-deepseek: event 0 of session "bounded-oversized" needs a ${String(limit + 1)}-byte dsh_session_log field,`
+    expect(warnings).toEqual([[expect.stringContaining(warning)]])
+  })
+
   it('uploads the full first prefix, records acceptance, then sends only the appended suffix', async () => {
     const { ctx, session } = await harness('incremental')
     session.append('turn/start', { turn: 1 })
@@ -194,18 +318,19 @@ describe('incremental DeepSeek session-log upload', () => {
         type: 'session-log-deepseek/delivery-accepted',
         seq: SessionSeq(1),
         time: 2,
-        data: { sessionId: id, throughSeq: SessionSeq(0) },
+        data: { sessionId: id, throughSeq: SessionSeq(0), sessionFormatVersion: SESSION_FORMAT_VERSION },
       },
     ]
     let reads = 0
     const session = {
       id,
+      header: { version: SESSION_FORMAT_VERSION },
       get seq() { return events.length },
       eventAt(seq: number) {
         reads++
         return events[seq]
       },
-    } as unknown as Session
+    } as Partial<Session> as Session
 
     expect(SessionLogDeepSeek.acceptedThrough(session)).toBe(0)
     expect(reads).toBe(2)
@@ -219,7 +344,7 @@ describe('incremental DeepSeek session-log upload', () => {
         type: 'session-log-deepseek/delivery-accepted',
         seq: SessionSeq(3),
         time: 4,
-        data: { sessionId: id, throughSeq: SessionSeq(2) },
+        data: { sessionId: id, throughSeq: SessionSeq(2), sessionFormatVersion: SESSION_FORMAT_VERSION },
       },
     )
     expect(SessionLogDeepSeek.acceptedThrough(session)).toBe(2)
@@ -231,7 +356,7 @@ describe('incremental DeepSeek session-log upload', () => {
       id: SessionId('missing-event'),
       seq: 1,
       eventAt: () => undefined,
-    } as unknown as Session
+    } as never as Session
 
     expect(() => SessionLogDeepSeek.acceptedThrough(session))
       .toThrow('session-log-deepseek: missing event 0 below captured length 1')
@@ -340,11 +465,29 @@ describe('incremental DeepSeek session-log upload', () => {
         type: 'session-log-deepseek/delivery-accepted',
         seq: 0,
         time: 1,
-        data: { sessionId: `malformed-${id}`, throughSeq },
-      }] as unknown as SessionEvent[]
+        data: { sessionId: `malformed-${id}`, throughSeq, sessionFormatVersion: SESSION_FORMAT_VERSION },
+      }] as Partial<SessionEvent>[] as SessionEvent[]
       const session = Session.create(SessionId(`malformed-${id}`), malformed)
       expect(() => SessionLogDeepSeek.acceptedThrough(session)).toThrow(/malformed acceptance watermark/)
     }
+  })
+
+  it.each([-1, -0, 0.5])('rejects a malformed acceptance format version %s', (sessionFormatVersion) => {
+    const id = SessionId(`malformed-format-${sessionFormatVersion}`)
+    const events = [{
+      type: 'session-log-deepseek/delivery-accepted',
+      seq: SessionSeq(0),
+      time: 1,
+      data: { sessionId: id, throughSeq: SessionSeq(0), sessionFormatVersion },
+    }] as Partial<SessionEvent>[] as SessionEvent[]
+    const session = {
+      id,
+      header: { version: SESSION_FORMAT_VERSION },
+      get seq() { return SessionLogOffset(events.length) },
+      eventAt: (seq: ReturnType<typeof SessionSeq>) => events[seq],
+    } as Partial<Session> as Session
+
+    expect(() => SessionLogDeepSeek.acceptedThrough(session)).toThrow(/malformed acceptance format version/)
   })
 
   it('withdraws its request field when the contributing plugin reloads', async () => {

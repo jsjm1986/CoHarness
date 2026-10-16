@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SandboxBashExecutor } from '@deepseek-ai/dsh-bash-sandbox'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as FsPolicy from '@deepseek-ai/dsh-fs-observation-policy'
@@ -56,6 +57,7 @@ beforeEach(async () => {
   await ctx.plugin(LocalSubprocessRuntime)
   await ctx.plugin(SandboxBashExecutor, { cwd: fallbackRoot, timeoutMs: 30_000 })
   await ctx.plugin(SandboxedFileSystem, { cwd: fallbackRoot })
+  provideWorkingDirectoryFixture(ctx, fallbackRoot)
   await ctx.plugin(agentSpine, {
     workspaceContext: false,
     skills: { enabled: false },

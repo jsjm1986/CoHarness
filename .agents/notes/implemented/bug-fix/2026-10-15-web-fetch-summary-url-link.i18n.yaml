@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-web-fetch-summary-url-link.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-web-fetch-summary-url-link.md
+/agent-note-collapsed-web-fetch-row-links-its-url:
+  en: a93308fd0228ac6b
+  zh: d43a41f10aa59f3f
+/agent-note-collapsed-web-fetch-row-links-its-url/problem:
+  en: e6497426a672df97
+  zh: 407ef762ae79bcc1
+/agent-note-collapsed-web-fetch-row-links-its-url/decision:
+  en: 08b145a3def39f7e
+  zh: d56879bd5216a333
+/agent-note-collapsed-web-fetch-row-links-its-url/alternatives-considered:
+  en: 9ef30e755215500c
+  zh: b8dc427e4c1e5f89
+/agent-note-collapsed-web-fetch-row-links-its-url/consequences:
+  en: b05e9d56d213259d
+  zh: 02ee6e0888711cf6
+/agent-note-collapsed-web-fetch-row-links-its-url/verification:
+  en: 014352ea036007fa
+  zh: 31a1f8670b40c34e
+/agent-note-collapsed-web-fetch-row-links-its-url/related:
+  en: 95f16c119882d781
+  zh: ab6926179e855feb

@@ -61,14 +61,33 @@
   pointer-events: none;
 }
 
-/* Blank hero/settling: keep the strict Session header mounted without taking
-   column space; the root-owned scrollport and composer remain below it. */
-.headerHidden {
+/* Blank Sessions retain the corner seat's navigation occupant without
+   conversation title, tabs, or utilities; an empty corner drops the row. */
+.headerBlank {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.headerBlank::after {
+  display: none;
+}
+
+.headerBlank .headerCorner {
+  align-self: flex-end;
+}
+
+.headerBlank:not(:has(.headerCorner > :first-child)) {
   display: none;
 }
 
 .titleRow {
   order: 0;
+  /* Anonymous inline-size container (CSS modules hash container-names per
+     module, so occupants match the nearest container): header occupants such
+     as the preset label shed their text at row-width breakpoints. The row is
+     a stretch item of the column header, so inline-size containment cannot
+     collapse it. */
+  container-type: inline-size;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -207,6 +226,27 @@
   flex: none;
   align-items: center;
   gap: var(--dsw-space-1);
+}
+
+/* The far-right corner seat reaches into the header's trailing padding; it
+   lays out only while its occupant renders something. */
+.headerCorner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: var(--dsw-space-1);
+  margin-right: -16px;
+}
+
+.headerCorner:empty {
+  display: none;
+}
+
+/* The compact header's trailing padding is space-3, not the desktop's 16px;
+   re-anchoring the negative margin keeps the corner flush to the viewport
+   edge instead of overhanging it. */
+:global([data-viewport='compact']) .headerCorner {
+  margin-right: calc(-1 * var(--dsw-space-3));
 }
 
 /* Segmented tabs (transitions `16-tabs-sliding`, MIT): the equal-column grid
@@ -375,6 +415,11 @@
      gutter moves the input card sideways by the bar's width whenever the two
      differ ([decision](../../../../../../.agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.md)). */
   scrollbar-gutter: stable;
+}
+
+:global([data-viewport='compact']) .scrollBody {
+  /* End-of-transcript momentum must not chain into the page behind it. */
+  overscroll-behavior: contain;
 }
 
 /* Two 40px hit strips flank the content column, each inner edge 24px
@@ -634,8 +679,10 @@
   flex-direction: row;
   align-items: stretch;
   box-sizing: border-box;
-  min-height: var(--dsw-mobile-tab-height);
-  padding: 0 var(--dsw-mobile-page-inset);
+  /* 36px chrome row under the 44px app topbar: the desktop 52px header
+     recipe compressed to a phone strip, not a second page title. */
+  min-height: 36px;
+  padding: 0 var(--dsw-space-3);
 }
 
 :global([data-viewport-short]) .header {
@@ -650,15 +697,15 @@
   align-self: center;
   overflow-x: auto;
   overflow-y: hidden;
-  min-height: var(--dsw-mobile-tab-height);
+  min-height: 34px;
 }
 
 :global([data-viewport='compact']) .tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(var(--dsw-mobile-tab-height) - 12px);
-  padding: var(--dsw-space-1) var(--dsw-space-3);
+  min-height: 28px;
+  padding: 3px var(--dsw-space-2);
   font: var(--dsw-mobile-font-secondary);
 }
 
@@ -704,8 +751,8 @@
 
 :global([data-viewport='compact']) .headerActions button,
 :global([data-viewport='compact']) .headerActions [role='button'] {
-  min-width: var(--dsw-touch-target);
-  min-height: var(--dsw-mobile-tab-height);
+  min-width: 40px;
+  min-height: 36px;
   flex: none;
 }
 

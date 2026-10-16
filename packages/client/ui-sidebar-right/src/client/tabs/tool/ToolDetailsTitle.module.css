@@ -1,6 +1,9 @@
-/* The chip title's tool glyph, beside the name the strip lays out; the glyph
-   draws on currentColor, so this ink is the chip rendering's own. */
+/* The chip title's tool glyph, beside the name the strip lays out: 14px so the
+   leading glyph shares the close button's optical weight inside a 24px chip;
+   the glyph draws on currentColor, so this ink is the chip rendering's own. */
 .titleIcon {
   flex: none;
+  width: 14px;
+  height: 14px;
   color: var(--dsw-alias-label-tertiary);
 }

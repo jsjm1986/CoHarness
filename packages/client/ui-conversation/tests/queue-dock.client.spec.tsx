@@ -154,6 +154,23 @@ describe('QueueDock', () => {
     expect(container.innerHTML).toBe('')
   })
 
+  it('leaves a queued transcript echo to Chat and suppresses its inbox row', () => {
+    const requestId = 'request-transcript-echo' as never
+    const snap = {
+      ...snapshotWith([{ ...row('t-1', '从对话发出'), rpcId: requestId }]),
+      pendingSubmissions: [{
+        requestId,
+        placement: 'transcript' as const,
+        time: 1,
+        text: '从对话发出',
+        images: [],
+      }],
+    }
+    const source = liveSession(snap)
+    const { container } = render(<QueueDock {...kitFor(snap)} useSession={source.useSession} />)
+    expect(container.innerHTML).toBe('')
+  })
+
   it('renders one row directly and defaults multiple rows to a collapsible count header', () => {
     const single = snapshotWith([row('i-1', 'one')])
     const source = liveSession(single)
@@ -204,6 +221,22 @@ describe('QueueDock', () => {
     expect(header).toHaveProperty('disabled', false)
     expect(header.getAttribute('aria-expanded')).toBe('false')
     expect(view.queryByText('second')).toBeNull()
+  })
+
+  it('portals a row action tooltip out of the panel, where the input card cannot cover it', () => {
+    vi.useFakeTimers()
+    try {
+      const single = snapshotWith([row('i-tip', 'queued draft')])
+      const source = liveSession(single)
+      const view = render(<QueueDock {...kitFor(single)} useSession={source.useSession} />)
+      fireEvent.mouseEnter(view.getByLabelText('删除排队消息'))
+      act(() => { vi.advanceTimersByTime(500) })
+      const tooltip = view.getByRole('tooltip')
+      expect(tooltip.textContent).toBe('删除排队消息')
+      expect(tooltip.parentElement).toBe(document.body)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps an in-flight row action visible when another item arrives', async () => {

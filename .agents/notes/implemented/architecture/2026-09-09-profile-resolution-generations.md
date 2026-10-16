@@ -8,11 +8,11 @@ English | [中文](2026-09-09-profile-resolution-generations.zh.md)
 
 A profile loads plugin rows from its own package project, while Harness packages and packages carried by selected bundles can live outside that project's ordinary dependency tree. Bridging the trees through shared symlinks, profile-owned links, or packaged-executable proxy packages persists package selections across processes and installations. Those files require reconciliation and locking, expose generated proxy manifests to metadata readers, and cannot represent a process-local change atomically.
 
-The runtime design keeps installation-first, ordered-bundle, and local-before-fallback precedence. It covers imports performed by plugin modules as well as Loader row imports and works in the main thread and Harness-owned Workers. Generation replacement preserves existing package mappings and local package names, permits linked-root membership changes, and never mutates a live table entry by entry.
+The runtime design keeps installation-first, ordered-bundle, and local-before-fallback precedence. It covers imports performed by plugin modules as well as Loader row imports and works in the main thread and Harness-owned Workers. Generation replacement keeps retained mappings and installation anchors fixed, permits linked-root membership changes and removal of profile-scoped entries and local names after their plugins stop, and never mutates a live table entry by entry.
 
 ## Decision
 
-Profile startup computes one immutable `RuntimeResolution` and installs it into Node's ESM and CommonJS resolvers. Runtime is the only resolution backend; there is no mode selector or disk materializer. `PluginPackages.replace()` publishes a complete successor with one reference replacement.
+Profile startup computes one immutable `RuntimeResolution` and installs it into Node's ESM and CommonJS resolvers. Runtime is the default backend; plain-Node callers of `runProfile` may select link mode to materialize the table as symlinks or dual mode to materialize and verify it. `PluginPackages.replace()` publishes a complete successor with one reference replacement.
 
 ### One selection algorithm
 
@@ -107,7 +107,7 @@ New Workers inherit the latest published generation. Existing Workers keep the g
 
 A caller adding a package completes its pnpm transaction before constructing a successor generation. Replacement rejects any generation that changes the directory or version of an existing package. The caller publishes an additive successor before mounting the new Loader row; this implementation does not provide that package transaction. A mount failure may leave the package installed but inactive.
 
-Changing or removing an existing runtime package mapping, or removing a recorded profile-local package name, requires process restart because Node's ESM Module Map, CommonJS cache, existing object references, and running Workers can retain the old module identity. These restrictions do not prohibit removing a linked root from the interception scope. Generation replacement does not claim to unload modules.
+Changing a retained mapping's normalized directory or scope, changing an installation mapping's version or removing it, or overriding an existing mapping with a new local name requires process restart because Node's ESM Module Map, CommonJS cache, existing object references, and running Workers can retain the old module identity. A successor may remove `scope: profile` mappings and profile-local names once their plugins stop, a retained profile mapping may change its declaring anchor and, for a package upgraded in place, its version, and a linked root may point to another target once no profile mapping names it — Node's cached real paths of the previous target are relocated ([replacement Note](2026-10-16-replace-changed-package-modules-on-recomposition.md)); the [refresh Note](2026-10-13-profile-package-refresh-and-manifest-invalidation.md) owns the publication points. Generation replacement does not claim to unload modules.
 
 ### Filesystem and runtime carriers
 

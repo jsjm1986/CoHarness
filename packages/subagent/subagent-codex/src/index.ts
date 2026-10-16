@@ -108,7 +108,7 @@ class CodexProvider implements SubagentProvider {
         model: config.model ?? CODEX_MEMBER_MODEL,
       }
       this.prepareContinuable = async (request: ContinuableCreateRequest) => {
-        const execution = await resolveChildExecution(ctx, request.parent, config.memberCwd, request.signal)
+        const execution = await resolveChildExecution(ctx, request.parent, config.memberCwd ?? request.cwd, request.signal)
         if (execution.remote) await execution.subprocess.resolveExecutable(config.remoteCommand, config.env, request.signal)
         return {}
       }
@@ -120,12 +120,9 @@ class CodexProvider implements SubagentProvider {
   ) => Promise<ContinuableCreateSpec>
 
   async start(request: ResolvedSubagentStartRequest) {
-    if (request.parent.session.header.cwd === undefined) {
-      throw new Error('subagent-codex: no working directory for the child — delegate from a parent session that has one')
-    }
     let execution: ChildExecution
     try {
-      execution = await resolveChildExecution(this.ctx, request.parent, undefined, request.signal)
+      execution = await resolveChildExecution(this.ctx, request.parent, request.cwd, request.signal)
     } catch (error: unknown) {
       if (request.signal.aborted) {
         throw new Error(

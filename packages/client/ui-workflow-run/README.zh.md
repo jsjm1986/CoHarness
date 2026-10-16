@@ -28,7 +28,7 @@ kind: "package-reference"
 <a id="durable-state-and-replay"></a>
 ## 持久状态与回放
 
-`tool-workflow/run-start` 以 `runId` 创建唯一 Context；成员开始、成员结束和运行结束事件按日志顺序更新该 Context。只有 update 的历史尾页会保持 pending，直到更早页面补入唯一 start；此后 prepend、完整回放和实时 append 得到相同状态。若所属 Turn 或 Step 已关闭但终点事件缺失，界面把相应运行或成员显示为已中断，而不改写工具结果。
+`tool-workflow/run-start` 以 `runId` 创建唯一 Context；成员开始、成员结束和运行结束事件按日志顺序更新该 Context。只有 update 的历史尾页会保持 pending，直到更早页面补入唯一 start；此后 prepend、完整回放和实时 append 得到相同状态。缺少终点事件的运行或成员在所属 Turn 或 Step 正常结束后仍显示为运行中，因为后台运行的生命周期长于其工具 Step；只有当所属 Turn 在崩溃后或于分叉边界被关闭时，界面才把它们显示为已中断，且不改写工具结果。
 
 阶段组只来自真正开始过的成员。完全相同的阶段字符串归入同一组，字段缺省与空字符串保持不同身份；成员结算只改变状态，不删除或重排成员。
 
@@ -63,6 +63,7 @@ kind: "package-reference"
 ## 已知限制与暂缓事项
 
 - 只有经 `dsh-tool-workflow` 发起的顶层调用会生成这些记录；嵌套 PTC mode 调用和直接 `WorkflowEngine` 消费方不会生成。
+- 在正常结束的轮次中未写终点事件就丢失的运行保持运行中：例如进程在之后的轮次中崩溃的后台运行，或追加失败后停止记录的运行；会话日志中没有标记其已停止的事实。
 - 导航刻意只面向实时运行。终态成员继续保留供复盘，但本节点永不为其提供冷 Session 入口。
 - 节点只显示运行、阶段、成员身份与状态；脚本、输出、错误、日志、用量、静态拓扑和控制操作都不属于本界面。
 

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-15-plugins-page-creator-entry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-plugins-page-creator-entry.md
+/agent-note-the-plugins-page-add-menu-carries-the-creator-entry:
+  en: 3f369275cee95cf7
+  zh: f144846ff9f145f9
+/agent-note-the-plugins-page-add-menu-carries-the-creator-entry/problem:
+  en: d789c1c6c38470cd
+  zh: b12328253adcbedf
+/agent-note-the-plugins-page-add-menu-carries-the-creator-entry/decision:
+  en: b76711460f6f68ad
+  zh: 87e3e77c47a35cf8
+/agent-note-the-plugins-page-add-menu-carries-the-creator-entry/alternatives-considered:
+  en: 26c49bc7e88298f3
+  zh: 41ce0ef00f389dfc
+/agent-note-the-plugins-page-add-menu-carries-the-creator-entry/consequences:
+  en: 29c7ddb8aaa7f6dd
+  zh: 5b57f1907e974ba1
+/agent-note-the-plugins-page-add-menu-carries-the-creator-entry/testing:
+  en: 49b769fdb3107e04
+  zh: 87524117ff2821e6

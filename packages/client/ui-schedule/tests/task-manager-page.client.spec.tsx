@@ -2947,6 +2947,21 @@ describe('Task detail rule header and run-time card', () => {
     expect(screen.getByRole('alert').textContent).toBe(en['rule.error.conflict'])
   })
 
+  it('explains a subagent-owned Session through the ordinary update result', async () => {
+    const h = mount({ records: [cron] })
+    fireEvent.click(screen.getByRole('button', { name: cron.prompt }))
+    h.updateTiming.mockResolvedValue({ ok: true, value: { code: 'subagent_session', message: 'delegated child Session' } })
+    chooseCronShape(en['rule.cronLabel'])
+    fireEvent.change(screen.getByLabelText<HTMLInputElement>(en['rule.cronLabel']), {
+      target: { value: '*/15 * * * *' },
+    })
+    clickSave()
+    await act(async () => { await h.updateTiming.mock.results[0]!.value })
+    // The refusal arrives as an ordinary non-mutating result, so the editor
+    // names the reason instead of falling back to `rule.error.unknown`.
+    expect(screen.getByRole('alert').textContent).toBe(en['timing.subagentSession'])
+  })
+
   it.each([en, zh])('renders a catalog cron rule with its shape rows, preview, zone, and next run', (dictionary) => {
     mount({ records: [cron] }, dictionary)
     fireEvent.click(screen.getByRole('button', { name: cron.prompt }))

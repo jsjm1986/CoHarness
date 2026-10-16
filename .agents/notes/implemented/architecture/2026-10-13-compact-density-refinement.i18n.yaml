@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-compact-density-refinement.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-13-compact-density-refinement.md
+/agent-note-compact-density-refinement-for-phone-viewports:
+  en: 0dc0c42f6e1a7f91
+  zh: 8c5376f518cc0db9
+/agent-note-compact-density-refinement-for-phone-viewports/problem:
+  en: 9ad3fde2e4e07c0f
+  zh: 5f1aaca491edcc79
+/agent-note-compact-density-refinement-for-phone-viewports/decision:
+  en: 66a51c525070fa6b
+  zh: 4243f840d5ea8281
+/agent-note-compact-density-refinement-for-phone-viewports/alternatives-considered:
+  en: 2b7223a61887ff90
+  zh: f4e64e47be586bf7
+/agent-note-compact-density-refinement-for-phone-viewports/consequences:
+  en: 3ddc549a6912ed84
+  zh: 0da9ed3433c37904
+/agent-note-compact-density-refinement-for-phone-viewports/verification:
+  en: c4a691a9eac7dfb2
+  zh: 5bdb4fc96c42d919
+/agent-note-compact-density-refinement-for-phone-viewports/related:
+  en: f2fe779dfdc5207f
+  zh: 5fdd3f06189475c4

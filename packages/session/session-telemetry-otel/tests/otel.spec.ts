@@ -6,7 +6,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { createServer, type Server } from 'node:http'
+import { Agent, createServer, type Server } from 'node:http'
 import { once } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -26,6 +26,8 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import OpenTelemetrySessionBackend, { Config, DEFAULT_TELEMETRY_MODE, SessionTelemetryMode } from '../src/index.ts'
 
 interface Capture {
+  /** Uncompressed request size the byte bound applies to. */
+  bytes: number
   headers: import('node:http').IncomingHttpHeaders
   body: OtlpLogsRequest
 }
@@ -75,9 +77,10 @@ afterEach(async () => {
 
 async function mockCollector(
   beforeRespond?: (requestIndex: number) => Promise<void> | void,
-): Promise<{ url: string; captures: Capture[] }> {
+): Promise<{ url: string; captures: Capture[]; openConnections: () => number }> {
   const captures: Capture[] = []
   let requestIndex = 0
+  let open = 0
   const server = createServer((request, response) => {
     const chunks: Buffer[] = []
     request.on('data', chunk => chunks.push(chunk as Buffer))
@@ -88,6 +91,7 @@ async function mockCollector(
         const raw = Buffer.concat(chunks)
         const body = request.headers['content-encoding'] === 'gzip' ? gunzipSync(raw) : raw
         captures.push({
+          bytes: body.length,
           headers: request.headers,
           body: JSON.parse(body.toString()) as OtlpLogsRequest,
         })
@@ -95,12 +99,16 @@ async function mockCollector(
       })()
     })
   })
+  server.on('connection', (socket) => {
+    open++
+    socket.on('close', () => { open-- })
+  })
   servers.push(server)
   server.listen(0, '127.0.0.1')
   await once(server, 'listening')
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('no port')
-  return { url: `http://127.0.0.1:${address.port}/v1/logs`, captures }
+  return { url: `http://127.0.0.1:${address.port}/v1/logs`, captures, openConnections: () => open }
 }
 
 async function boot(url: string) {
@@ -247,6 +255,41 @@ describe('OpenTelemetrySessionBackend wire', () => {
     expect(ops).toHaveLength(0)
   })
 
+  it('bounds every OTLP request under maxRequestBytes and drops oversized records', async () => {
+    const { url, captures } = await mockCollector()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    const fiber = await ctx.plugin(OpenTelemetrySessionBackend, {
+      mode: SessionTelemetryMode.FEEDBACK_ONLY,
+      exporter: { url },
+      maxRequestBytes: 2_048,
+      processor: { scheduledDelayMillis: 5 },
+    })
+    const session = ctx.sessions.create(SessionId('byte-bound'), { meta: {} })
+    session.append('request/header', { header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
+    for (let turn = 1; turn <= 6; turn++) session.append('turn/start', { turn })
+    session.append('assistant/message', {
+      turn: 6,
+      step: 1,
+      message: createAssistantMessage({
+        content: [{ type: 'text', text: 'oversized'.repeat(2_000) }],
+        source: { provider: 'mock', model: 'mock' },
+      }),
+      stream: [],
+    }, { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 6, reason: { kind: 'completed' } })
+    recordFeedback(session, { text: 'report' })
+    await fiber.dispose()
+
+    expect(captures.length).toBeGreaterThan(1)
+    expect(captures.every(capture => capture.bytes <= 2_048)).toBe(true)
+    const types = eventTypes(captures)
+    expect(types).not.toContain('assistant/message')
+    expect(types).toContain('turn/end')
+    expect(warn).toHaveBeenCalledWith('Session telemetry record rejected; content was not truncated', expect.any(Error))
+  })
+
   it('drains records enqueued after a timer export began: dispose during an in-flight batch', async () => {
     // Hold the first authorized batch while a second submission queues its suffix.
     const gate = Promise.withResolvers<boolean>()
@@ -283,10 +326,10 @@ describe('OpenTelemetrySessionBackend wire', () => {
     expect(allRecords(captures).some(r => r.scope.endsWith('/ops'))).toBe(false)
   })
 
-  it('bounds the SDK forceFlush wait when an in-flight transport never settles', async () => {
+  it('bounds the SDK forceFlush wait and destroys the hung transport at the deadline', async () => {
     const gate = Promise.withResolvers<boolean>()
     const arrived = Promise.withResolvers<boolean>()
-    const { url, captures } = await mockCollector(async (index) => {
+    const { url, captures, openConnections } = await mockCollector(async (index) => {
       if (index === 0) {
         arrived.resolve(true)
         await gate.promise
@@ -312,11 +355,37 @@ describe('OpenTelemetrySessionBackend wire', () => {
     expect(performance.now() - started).toBeLessThan(1_000)
     expect(captures).toHaveLength(0)
 
-    // The outer deadline cannot cancel the SDK transport. Let it finish so
-    // the real provider promise remains clean after the test has proved the
-    // Cordis disposer no longer waits for it.
+    // The deadline destroyed the tracked agent's sockets, so the hung request
+    // failed client-side and the server side no longer holds a connection —
+    // nothing keeps the transport alive past shutdown.
+    await expect.poll(openConnections).toBe(0)
+
+    // The server-side handler of the already-received first request still
+    // completes once the gate opens; the aborted export never returns.
     gate.resolve(true)
-    await expect.poll(() => captures.length).toBeGreaterThanOrEqual(2)
+    await expect.poll(() => captures.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('releases the keepAlive transport socket after a clean shutdown', async () => {
+    const { url, captures, openConnections } = await mockCollector()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(OpenTelemetrySessionBackend, {
+      mode: SessionTelemetryMode.FEEDBACK_ONLY,
+      exporter: { url },
+      processor: { scheduledDelayMillis: 10 },
+    })
+    const session = ctx.sessions.create(SessionId('socket-release'), { meta: {} })
+    session.append('request/header', { header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
+    session.append('turn/start', { turn: 1 })
+    recordFeedback(session, { text: 'report' })
+    await expect.poll(() => captures.length).toBeGreaterThanOrEqual(1)
+    expect(openConnections()).toBe(1)
+
+    await fiber.dispose()
+    // The SDK's transport shutdown is a no-op; without teardown the keepAlive
+    // agent would hold this socket (and the event loop) past disposal.
+    await expect.poll(openConnections).toBe(0)
   })
 
   it('passes exporter options beyond url and headers through to the SDK exporter', async () => {
@@ -341,6 +410,36 @@ describe('OpenTelemetrySessionBackend wire', () => {
     const types = allRecords(captures).flatMap(({ record }) =>
       record.attributes?.flatMap(a => a.key === 'event.type' ? [a.value.stringValue] : []) ?? [])
     expect(types).toContain('turn/start')
+  })
+
+  it('tracks transport agents across every exporter agent-option form', async () => {
+    const { url, captures } = await mockCollector()
+    const factoryAgent = new Agent({ keepAlive: false })
+    const functionFactory = vi.fn((_protocol: string) => factoryAgent)
+    const variants = [
+      // Options object alone: handed to the SDK's options factory verbatim.
+      { httpAgentOptions: { keepAlive: false } },
+      // keepAlive merges under an options object: the object's own fields win.
+      { keepAlive: false, httpAgentOptions: { keepAlive: true } },
+      // A function factory stays verbatim even beside a keepAlive setting.
+      { keepAlive: false, httpAgentOptions: functionFactory },
+    ]
+    for (const [index, extra] of variants.entries()) {
+      const ctx = new Context()
+      await ctx.plugin(SessionStore)
+      const fiber = await ctx.plugin(OpenTelemetrySessionBackend, {
+        mode: SessionTelemetryMode.FEEDBACK_ONLY,
+        exporter: { url, ...extra },
+        processor: { scheduledDelayMillis: 10 },
+      })
+      const session = ctx.sessions.create(SessionId(`agents-${index}`), { meta: {} })
+      session.append('request/header', { header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
+      session.append('turn/start', { turn: 1 })
+      recordFeedback(session, { text: `report ${index}` })
+      await fiber.dispose()
+    }
+    expect(functionFactory).toHaveBeenCalledWith('http:')
+    expect(captures.length).toBeGreaterThanOrEqual(3)
   })
 
   it('maps warn severity from record policy and leaves the seam flush hint unimplemented', async () => {
@@ -633,10 +732,14 @@ describe('OpenTelemetrySessionBackend config fails loud', () => {
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'ftp://collector' } }, /must be http\(s\)/],
     [{ mode: 'INVALID' }, /INVALID/],
     [{ mode: 'FULL' }, /FULL/],
-    // The SDK accepts a non-positive batch size but its shutdown drain then
-    // splices empty batches forever — dispose would hang, so reject at load.
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxExportBatchSize: 0 } }, /maxExportBatchSize/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxExportBatchSize: 0.5 } }, /maxExportBatchSize/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxQueueSize: 0 } }, /maxQueueSize/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxQueueSize: 1, maxExportBatchSize: 2 } }, /must not exceed/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { exportTimeoutMillis: 0 } }, /exportTimeoutMillis/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, maxRequestBytes: 0 }, /maxRequestBytes/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, maxRequestBytes: 4_000_001 }, /maxRequestBytes/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, maxRequestBytes: 1.5 }, /maxRequestBytes/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, shutdownTimeoutMillis: 0 }, /shutdownTimeoutMillis/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, shutdownTimeoutMillis: Number.POSITIVE_INFINITY }, /shutdownTimeoutMillis/],
   ])('rejects %j at plugin load', async (config, message) => {

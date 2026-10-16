@@ -8,6 +8,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type { SubagentPromptRequest } from './control-types.ts'
 import { SubagentError } from './error.ts'
+import type { StructuredAttachment } from './structured.ts'
 
 /** One Agent inbox destination, as the wire request selects it. */
 export type SubagentDelivery = SubagentPromptRequest['delivery']
@@ -19,8 +20,13 @@ export class SubagentInbox {
   /**
    * Wrap one live continuable Agent.
    * @param agent - the Agent whose inbox receives accepted deliveries.
+   * @param structured - this epoch's structured attachment, whose staged or
+   *   committed capture closes child-bound input until its result resolves.
    */
-  constructor(private readonly agent: Agent) {}
+  constructor(
+    private readonly agent: Agent,
+    private readonly structured?: StructuredAttachment,
+  ) {}
 
   /**
    * Read the Activation's close transaction.
@@ -49,6 +55,9 @@ export class SubagentInbox {
         `subagent "${this.agent.id}" activation is being disposed; the message was not accepted`,
         'ACTIVATION_CLOSING',
       )
+    }
+    if (this.structured?.acceptsInput() === false) {
+      throw new SubagentError('subagent is submitting or has submitted its structured result; the message was not accepted', 'INPUT_CLOSED')
     }
     if (delivery === 'steer') this.agent.steer(message)
     else this.agent.followup(message)

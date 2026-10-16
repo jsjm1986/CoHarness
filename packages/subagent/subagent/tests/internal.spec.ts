@@ -6,10 +6,12 @@ import type { SubagentRuntime } from '@deepseek-ai/dsh-subagent'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import {
   deliverSubagentPrompt,
+  hasPendingDirectChildren,
   isAdjacentAgentSendMessageTool,
   markAdjacentAgentSendMessageTool,
   queueHostSubagentPrompt,
   steerHostSubagentPrompt,
+  subagentPendingDirectChildren,
 } from '../src/internal.ts'
 
 /**
@@ -20,7 +22,7 @@ describe('host prompt adapters', () => {
   it.each(['queue', 'steer'] as const)('forwards the %s delivery mode through the runtime symbol', async (delivery) => {
     const accepted = MessageId('m-1')
     const deliver = vi.fn(async () => accepted)
-    const runtime = { [deliverSubagentPrompt]: deliver } as unknown as SubagentRuntime
+    const runtime = { [deliverSubagentPrompt]: deliver } as never as SubagentRuntime
     const parent = {} as Agent
     const childId = SessionId('child')
     const content = [{ type: 'text' as const, text: 'follow up' }]
@@ -31,6 +33,18 @@ describe('host prompt adapters', () => {
     await expect(call(runtime, parent, childId, content, source, signal)).resolves.toBe(accepted)
     expect(deliver).toHaveBeenCalledWith(parent, childId, content, source, signal, delivery)
     expect(deliver).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('pending direct children probe', () => {
+  it('forwards the exact live parent through the runtime symbol', () => {
+    const parent = {} as Agent
+    const probe = vi.fn((agent: Agent) => agent === parent)
+    const runtime = { [subagentPendingDirectChildren]: probe } as never
+
+    expect(hasPendingDirectChildren(runtime, parent)).toBe(true)
+    expect(probe).toHaveBeenCalledWith(parent)
+    expect(hasPendingDirectChildren(runtime, {} as Agent)).toBe(false)
   })
 })
 

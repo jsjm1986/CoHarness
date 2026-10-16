@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-15-menu-surface-backdrop-pairing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-menu-surface-backdrop-pairing.md
+/agent-note-elevated-menu-surfaces-pair-fill-with-backdrop-filter:
+  en: 5cd19ad75e87c3a1
+  zh: 78d0db9ccd7e5bf6
+/agent-note-elevated-menu-surfaces-pair-fill-with-backdrop-filter/problem:
+  en: cc1c86ecbba3a9fc
+  zh: b18f4b6a032c4c87
+/agent-note-elevated-menu-surfaces-pair-fill-with-backdrop-filter/decision:
+  en: a3b7e500d8d4b957
+  zh: f2b6dad3f55510d2
+/agent-note-elevated-menu-surfaces-pair-fill-with-backdrop-filter/alternatives-considered:
+  en: ca7ba33c487d5847
+  zh: dc12abe3b9058802
+/agent-note-elevated-menu-surfaces-pair-fill-with-backdrop-filter/consequences:
+  en: 35677450dd90ee79
+  zh: 022e8559f526e8a2
+/agent-note-elevated-menu-surfaces-pair-fill-with-backdrop-filter/testing:
+  en: 5e12a1faafbb199b
+  zh: 04fb61b501c4851a

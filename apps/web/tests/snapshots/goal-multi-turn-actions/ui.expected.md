@@ -31,9 +31,15 @@
   - text: — 随机选中的包：
   - code: packages/context/session-reference
   - text: 📦
-- button "Copy"
+- text: Code block
+- button "Wrap lines" [pressed]
+- button "Copy":
+  - img
 - code: session-reference ├── README.md ├── package.json ├── src │ ├── index.ts │ └── uri.ts └── tests └── session-reference.spec.ts
-- button "Copy"
+- text: Code block
+- button "Wrap lines" [pressed]
+- button "Copy":
+  - img
 - code: "session-reference/ ├── README.md # 包说明文档 ├── package.json # 包元数据与依赖声明 ├── src/ │ ├── index.ts # 入口，导出公共 API │ └── uri.ts # 会话引用 URI 相关实现 └── tests/ └── session-reference.spec.ts # 单元测试"
 - paragraph: 这是一个很典型的轻量 TypeScript 包结构：入口 + 实现 + 测试。这一轮到此结束，等系统开启下一个 turn。
 - button "Copy":
@@ -60,15 +66,19 @@
     - strong: Turn 1
     - text: — 随机选中
     - code: packages/context/session-reference
-    - text: ，输出了文件结构：
-    - button "Copy"
+    - text: ，输出了文件结构： Code block
+    - button "Wrap lines" [pressed]
+    - button "Copy":
+      - img
     - code: session-reference/ ├── README.md ├── package.json ├── src/ │ ├── index.ts │ └── uri.ts └── tests/ └── session-reference.spec.ts
   - listitem:
     - strong: Turn 2
     - text: — 随机选中
     - code: packages/llm/token-meter
-    - text: ，输出了文件结构：
-    - button "Copy"
+    - text: ，输出了文件结构： Code block
+    - button "Wrap lines" [pressed]
+    - button "Copy":
+      - img
     - code: token-meter/ ├── README.md ├── package.json ├── src/ │ └── index.ts └── tests/ └── token-meter.spec.ts
 - paragraph:
   - strong: 验证方式：
@@ -125,7 +135,7 @@
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
-- button "9% of context used"
+- button "9% of context used": 9%
 - button "Send message" [disabled]
 - group "Session statistics":
   - "button \"2 turns · 12 steps · {{throughput}} tok/s\"":

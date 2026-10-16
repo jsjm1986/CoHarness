@@ -92,7 +92,7 @@ async function stack(
 ) {
   const ctx = new Context()
   contexts.add(ctx)
-  await mountAgentLoopTestDependencies(ctx)
+  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
   await backend.mount(ctx, root)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(SubagentService)

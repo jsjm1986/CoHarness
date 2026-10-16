@@ -5,6 +5,7 @@ export const NS = 'collaboration'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'brand.product': 'COHARNESS',
   'logout.label': '退出登录',
   'logout.short': '退出',
   'scope.aria': '切换个人或项目空间',
@@ -17,7 +18,13 @@ export const zh = {
   'scope.searchEmpty': '没有匹配的项目空间',
   'scope.readOnly': '只读',
   'scope.readWrite': '可编辑',
+  'scope.admin': '管理员',
+  'scope.personalFlag': '个人',
   'scope.steward': '维护',
+  'scope.manage': '管理',
+  'scope.settingsGroup': '空间设置',
+  'scope.allSpaces': '所有空间',
+  'steward.chip.label': '维护通道',
   'steward.banner.lead': '常驻维护通道',
   'steward.banner.rest': '全部操作留痕审计 · 写语句需当场批准',
   'scope.switching': '正在切换空间',
@@ -135,6 +142,7 @@ export const zh = {
 
 /** English dictionary, key-identical to the Chinese source of truth. */
 export const en: Record<CollaborationKey, string> = {
+  'brand.product': 'COHARNESS',
   'logout.label': 'Sign out',
   'logout.short': 'Sign out',
   'scope.aria': 'Switch personal or project scope',
@@ -147,7 +155,13 @@ export const en: Record<CollaborationKey, string> = {
   'scope.searchEmpty': 'No project spaces match this search',
   'scope.readOnly': 'Read only',
   'scope.readWrite': 'Can edit',
+  'scope.admin': 'Admin',
+  'scope.personalFlag': 'Personal',
   'scope.steward': 'Maintenance',
+  'scope.manage': 'Manage',
+  'scope.settingsGroup': 'Space settings',
+  'scope.allSpaces': 'All spaces',
+  'steward.chip.label': 'Maintenance',
   'steward.banner.lead': 'Resident maintenance channel',
   'steward.banner.rest': 'every action is audited · writes need in-session approval',
   'scope.switching': 'Switching scope',

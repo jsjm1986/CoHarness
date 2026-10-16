@@ -6,6 +6,7 @@ import { guideEn, guideZh, type PresetGuideKey } from './guide-locales.ts'
 export type AgentPresetSettingsKey =
   | PresetGuideKey
   | 'title' | 'description' | 'managedByProject' | 'managedByAccount' | 'managedByOrganization' | 'managedByDeployment' | 'loading' | 'error' | 'userTrust' | 'seatHint' | 'headerHint'
+  | 'switchRefused'
   | 'nav' | 'sectionIntro' | 'projectFilesystem' | 'builtIn' | 'setDefault' | 'view'
   | 'presetStandardName' | 'presetStandardDescription'
   | 'presetPtcName' | 'presetPtcDescription'
@@ -17,6 +18,7 @@ export type AgentPresetSettingsKey =
   | 'brokenBadge' | 'brokenNoCopy'
   | 'composition' | 'cancel' | 'close' | 'retry'
   | 'copyTitle' | 'copyIntro' | 'create' | 'creating' | 'creatorDraft'
+  | 'createPlugin' | 'createPluginDescription' | 'createPluginChecking' | 'createPluginUnavailable' | 'createPluginMissing'
   | 'openLocation' | 'showLocation' | 'revealedPathLabel'
   | 'idRequired' | 'idInvalid' | 'idTaken'
   | 'deleteTitle' | 'deleteDescription' | 'deleteConfirm' | 'deleting'
@@ -37,6 +39,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   userTrust: 'Custom',
   seatHint: 'Agent preset for the session you are about to start',
   headerHint: 'The agent preset this session runs, fixed when it started',
+  switchRefused: 'Could not switch to {name}: {reason}',
   nav: 'Agent presets',
   sectionIntro:
     'A preset is the plugin composition one session\'s agent runs — its tools, prompt, and capabilities. '
@@ -82,6 +85,11 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   create: 'Create',
   creating: 'Creating…',
   creatorDraft: 'Draft a custom preset with Creator mode',
+  createPlugin: 'Let the agent create a plugin',
+  createPluginDescription: 'Enter Creator mode and make your own DSH plugin',
+  createPluginChecking: 'Checking whether Creator mode is available',
+  createPluginUnavailable: 'Temporarily unavailable. Reopen this menu to retry',
+  createPluginMissing: 'Creator mode is not included in this configuration',
   openLocation: 'Open folder',
   showLocation: 'Show location',
   revealedPathLabel: 'Preset files:',
@@ -121,6 +129,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   userTrust: '自定义',
   seatHint: '即将开始的这个会话所用的 Agent 预设',
   headerHint: '本会话运行的 Agent 预设，开始时即固定',
+  switchRefused: '无法切换到「{name}」：{reason}',
   nav: 'Agent 预设',
   sectionIntro: '预设即一个会话的 Agent 所运行的插件组装 —— 它的工具、提示词与能力。复制一份既有预设改成自己的，或用「创造模式」让 Agent 帮你创建。',
   projectFilesystem: '项目目录和服务器文件由管理端负责。',
@@ -128,7 +137,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   setDefault: '设为默认',
   view: '查看',
   presetStandardName: '标准模式',
-  presetStandardDescription: '功能完整的编码 Agent，支持文件编辑、Shell、文件与网页检索、Skills、计划、目标、子代理和工作流。',
+  presetStandardDescription: '功能完整的编码 Agent，支持文件编辑、Shell、文件与网页检索、Skills、计划、目标、子智能体和工作流。',
   presetPtcName: 'PTC 模式',
   presetPtcDescription: '功能完整的编码 Agent，但默认不提供 workflow 工具；其他工具通过 PTC 模式 SDK 呈现，让模型用一个 TypeScript 程序组合多步操作。',
   presetMinimalName: '极简模式',
@@ -158,6 +167,11 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   create: '创建',
   creating: '正在创建…',
   creatorDraft: '用「创造模式」创作自定义预设',
+  createPlugin: '让 Agent 创建插件',
+  createPluginDescription: '进入创造模式，制作属于你的 DSH 插件',
+  createPluginChecking: '正在确认创造模式是否可用',
+  createPluginUnavailable: '暂时不可用，请重新打开菜单重试',
+  createPluginMissing: '当前配置未提供创造模式',
   openLocation: '打开目录',
   showLocation: '查看路径',
   revealedPathLabel: '预设文件：',

@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-`ui-settings-models` 声明两个增量子 slot：按提供方 settings namespace keyed 的 `settings.models.provider-card`，提供脱敏的提供方条目以及 configured/keyConfigured 事实；以及有序的 `settings.models.footer`，不携带可变页面状态。Models 分区会在 setup、已配置和新增提供方卡片中，以及添加控件之后渲染这些 slot。分区仍是提供方身份、授权和 settings／凭据写入的唯一所有者；slot owner 只接收数据型 props，并通过正常 slot effect 注册。
+`ui-settings-models` 声明两个增量子 slot：按提供方 settings namespace keyed 的 `settings.models.provider-card`，提供脱敏的提供方条目以及 configured/keyConfigured 事实——`keyConfigured` 报告页面会为该行使用的凭据引用（profile 的 `apiKeyEnv`，或 profile 未指名时页面自身的派生引用，与编辑器同一套派生规则）；以及有序的 `settings.models.footer`，不携带可变页面状态。Models 分区会在 setup、已配置和新增提供方卡片中，以及添加控件之后渲染这些 slot。分区仍是提供方身份、授权和 settings／凭据写入的唯一所有者；slot owner 只接收数据型 props，并通过正常 slot effect 注册。
 
 ## 考虑过的替代方案
 

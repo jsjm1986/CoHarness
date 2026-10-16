@@ -19,6 +19,8 @@ import { AgentPresetRow } from '../src/client/AgentPresetRow.tsx'
 import type { AgentPresetRowInjected } from '../src/client/AgentPresetRow.tsx'
 import { AgentPresetSection } from '../src/client/AgentPresetSection.tsx'
 import type { AgentPresetSectionInjected } from '../src/client/AgentPresetSection.tsx'
+import { CreatePluginMenuItem } from '../src/client/CreatePluginMenuItem.tsx'
+import type { CreatePluginMenuItemInjected } from '../src/client/CreatePluginMenuItem.tsx'
 import { AgentPresetSeat } from '../src/client/AgentPresetSeat.tsx'
 import type { AgentPresetSeatInjected } from '../src/client/AgentPresetSeat.tsx'
 import { AgentPresetSeatController } from '../src/client/seat-store.ts'
@@ -189,6 +191,7 @@ function declareRoot(slots: SlotRegistry): () => void {
     children: {
       'settings.general.item': { kind: 'list', scope: 'root' },
       'settings.section': { kind: 'list', scope: 'root' },
+      main: { kind: 'list', scope: 'root' },
       conversation: { kind: 'single', scope: 'root' },
     },
   } as never, () => null)
@@ -639,6 +642,42 @@ describe('ui-agent-preset apply', () => {
     conversation()
   })
 
+  it('offers the Plugins page add menu a Creator entry bound to the shared draft', async () => {
+    const { ctx, slots } = await bench()
+    declareRoot(slots)
+    const conversation = declareConversation(slots)
+    // The Plugins page declares the add-menu slot its entries fill; the
+    // contribution defers until that declaration exists, like every other.
+    const page = slots.register({
+      name: 'main',
+      id: 'plugin-manager',
+      children: { 'plugins.add.actions': { kind: 'list', scope: 'root' } },
+    } as never, () => null)
+    ctx.provide('conversation', {} as never)
+    const workspaces = workspacesDouble()
+    ctx.provide('workspaces', workspaces as never)
+    ctx.provide('sessions', sessionsDouble({ byId: {} }) as never)
+    const selectPanel = vi.fn()
+    ctx.provide('layout', { selectPanel } as never)
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+
+    const entry = slots.entries('plugins.add.actions')[0]!
+    expect(entry.component).toBe(CreatePluginMenuItem)
+    expect(entry.options).toMatchObject({ id: 'create-plugin' })
+    const face = callInject(entry) as CreatePluginMenuItemInjected
+    await face.load()
+    face.startCreatorDraft()
+    // The menu shares the section's launch: its own fresh roster read alone
+    // proves the deployment offers preset selection, so the draft stages and
+    // the session flow begins without Settings ever having been opened.
+    // Launching from a main panel first returns the center to the
+    // Conversation — the draft composes there.
+    expect(selectPanel).toHaveBeenCalledWith(null)
+    expect(workspaces.starts).toHaveLength(1)
+    conversation()
+    page()
+  })
+
   it('keeps the applied composition when the roster load lands late', async () => {
     const { ctx, slots, calls } = await bench()
     declareRoot(slots)
@@ -865,7 +904,6 @@ describe('ui-agent-preset apply', () => {
 
 describe('AgentPresetSeatController reconciliation', () => {
   /** Accepted developer-tools preference: selection gates need it on. */
-  const devToolsOn = { getSnapshot: () => true, subscribe: () => () => {} }
 
   it('does not capture a non-blank session', () => {
     const controller = new AgentPresetSeatController(
@@ -885,7 +923,6 @@ describe('AgentPresetSeatController reconciliation', () => {
       { agentPresets: { select } } as never,
       () => current,
       undefined,
-      devToolsOn,
     )
     const captured = controller.blankSessionId()
     if (captured === undefined) throw new Error('expected a blank session')
@@ -914,7 +951,6 @@ describe('AgentPresetSeatController reconciliation', () => {
       } as never,
       () => ({ id: 's1' as never, blank: true }),
       undefined,
-      devToolsOn,
     )
     controller.stage('minimal')
 

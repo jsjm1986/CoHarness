@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile, realpath } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { renderPrompt, TOOL_ORDER_REST } from '@deepseek-ai/dsh-system-prompt'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import * as agentCore from '../src/index.ts'
 import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -70,6 +71,7 @@ async function mount(config: agentCore.Config, withBash = false): Promise<Contex
   process.env.DSH_HOME = await mkdtemp(join(tmpdir(), 'dsh-agent-spine-demo-home-'))
   process.env.DSH_AGENTS_HOME = await mkdtemp(join(tmpdir(), 'dsh-agent-spine-demo-agents-'))
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   if (withBash) {
     ctx.provide('shell', {
       sandboxMode: undefined,
@@ -448,6 +450,9 @@ describe('dsh-agent-spine-demo bundle', () => {
 
   it('snapshots a created project skill through catalog refresh and progressive loading', { timeout: 15_000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-agent-spine-demo-skill-refresh-'))
+    // Tool results carry the canonical path: on macOS the tmpdir symlink
+    // resolves /var → /private/var, so normalize the real path before the raw one.
+    const canonicalRoot = await realpath(root)
     const home = await mkdtemp(join(tmpdir(), 'dsh-agent-spine-demo-skill-refresh-home-'))
     try {
       await mkdir(join(root, '.git'), { recursive: true })
@@ -530,6 +535,7 @@ describe('dsh-agent-spine-demo bundle', () => {
             callId: result.source.callId,
             isError: result.isError,
             text: result.content.map(block => block.type === 'text' ? block.text : '').join('\n')
+              .replaceAll(canonicalRoot, '{{cwd}}')
               .replaceAll(root, '{{cwd}}')
               .replaceAll(sep, '/'),
           }]

@@ -24,7 +24,7 @@ Web 客户端忽略了它。write/edit 调用落到 `GenericToolCard`，其行�
 - **行终止符。** 每一侧的内容按 `TerminalBlock` 与 TUI 共用的终止符规则在 `\n` 上切分：空文本是零行（整文件删除的 `newText`、新建缺失的 `oldText` 侧），单个结尾换行终止其最后一行而非新增一条幻影空行，内部空行保留。
 - **页脚与复制。** 暗色 `└ +A -R · N file(s)` 页脚统计比较结果中的增删行和去重路径，不受高度上限影响。复制写入完整的带前缀 diff，包含路径头、中性上下文、变更行与间隔标记，使折叠或多文件复制保持可辨别归属。
 
-几何、圆角、字体镜像 `CodeBlock`/`TerminalBlock`，使 diff 卡片、terminal 卡片、代码块读起来是一家；`white-space: pre` 加横向滚动是刻意的分歧。复制控件浮在卡片右上角，而非占据自己的 banner 行，因为只放一个复制按钮的 banner 会在第一行 diff 上方画出一条空带 —— TUI 的 diff 卡片也没有 banner，只有页脚。
+几何、圆角、字体镜像 `CodeBlock`/`TerminalBlock`，使 diff 卡片、terminal 卡片、代码块读起来是一家；`white-space: pre` 加横向滚动是刻意的默认，共享工具栏的换行开关可把正文切为 `pre-wrap` 而不改变复制的文本。卡片表面与标题栏来自共享的 `CodeCard.module.css`/`CodeToolbar` 组合：标题栏承载语言标签（diff 各路径语言不一致时取本地化代码块标题）、换行开关与复制控件——只放一个复制按钮的横幅行已不存在。
 
 chat 行把 diff 常驻渲染在路径链接摘要之下，上限 `CHAT_DIFF_MAX_LINES`（8），对应面板的 16 —— 与 [terminal 卡片](2026-07-28-web-terminal-card.zh.md#inline-output-in-the-chat-row-reverses-a-stated-convention)记录的内联输出决策、以及流内表面与阅读表面的同一划分一致。write/edit 行是单文件的，所以它的摘要既是可打开的路径链接，其 diff 卡片又展开；两者共存，因为卡片不是路径的参数体。
 

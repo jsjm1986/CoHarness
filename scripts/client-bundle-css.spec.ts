@@ -2,7 +2,7 @@
  * Stylesheets enter client bundles through virtual modules, so the loader must
  * register their physical files as watch dependencies.
  */
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -45,6 +45,32 @@ describe('client bundle CSS Modules', () => {
 
       expect(watched).toEqual([stylesheet])
       expect(output).toContain('data-plugin-css')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keys the injector dedup tag by src-relative path so same-named files stay distinct', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-client-css-tagid-'))
+    try {
+      const plugin = cssPlugin('dsh-css-modules-inline')
+      const tagIds: string[] = []
+      for (const dir of ['a', 'b']) {
+        const dirPath = join(root, 'src', dir)
+        await mkdir(dirPath, { recursive: true })
+        const stylesheet = join(dirPath, 'Fixture.module.css')
+        await writeFile(stylesheet, `.root { color: ${dir === 'a' ? 'red' : 'blue'}; }\n`)
+        const importer = join(dirPath, 'index.ts')
+        const virtualId = plugin.resolveId?.('./Fixture.module.css', importer)
+        if (typeof virtualId !== 'string' || plugin.load === undefined) {
+          throw new Error('CSS Modules plugin hooks are incomplete')
+        }
+        const output = await plugin.load.call({ addWatchFile: () => {} }, virtualId)
+        tagIds.push(output?.match(/const tagId = "([^"]+)"/)?.[1] ?? '')
+      }
+
+      expect(tagIds[0]).not.toBe('')
+      expect(tagIds[0]).not.toBe(tagIds[1])
     } finally {
       await rm(root, { recursive: true, force: true })
     }

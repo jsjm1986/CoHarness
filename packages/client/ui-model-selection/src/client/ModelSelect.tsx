@@ -28,7 +28,7 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconBrainOutline16, IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconChevronLeftOutline14, IconCloseFill14, Input, MenuGroup,
+  IconChevronLeftOutline14, IconCloseFill14, Input, MenuGroup, MenuSurface,
   MobileSheetBackdrop, IconWarningOutline16, observeStickyMenuGroups, rankByName, StateDot, Toast, useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -623,7 +623,7 @@ export function ModelSelect(
   }
 
   const menu = (
-    <div
+    <MenuSurface
       ref={menuRef}
       id={`${id}-menu`}
       className={css.menu}
@@ -674,7 +674,7 @@ export function ModelSelect(
           {effortOptions}
         </>
       )}
-    </div>
+    </MenuSurface>
   )
 
   return (

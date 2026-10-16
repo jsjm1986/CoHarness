@@ -63,6 +63,7 @@
 | [slots.md](slots.zh.md) | Web Client 的类型化 React 组合系统：`ctx.slots.register()`、无 React 依赖的注册表与类型代数、渲染器的可观测源绑定 |
 | [conversation.md](conversation.zh.md) | Client Session 事件窗口与浏览器视图之间的目标中立装配层：按 binding 的注册表、Turn/Step 位置与增量 Context 组装 |
 | [session-projection.md](session-projection.zh.md) | 投影 seam：`SessionProjectionMap`、纯函数 `ProjectionDefinition` 单元、`ProjectionSnapshot` 的一致切面、变更馈送 |
+| [working-directory.md](working-directory.zh.md) | Session 的有效目录：`working-directory/change` 记录、`ctx.workingDirectory` 的 get/ensure/resolve/set、项目边界约束、执行世界文件系统校验 |
 | [session-telemetry.md](session-telemetry.zh.md) | 对外会话上报能力 seam：`SessionTelemetryRecord`/`SessionTelemetrySeverity`、`SessionTelemetrySink` 约定和 `session-telemetry/record` 脱敏 waterfall |
 | [boot.md](boot.zh.md) | 当前 profile 插件管理与 launcher 重载协调 |
 | [mcp.md](mcp.zh.md) | 外部 MCP 连接、作用域工具与资源、服务器指令、协议结果与配置归属 |

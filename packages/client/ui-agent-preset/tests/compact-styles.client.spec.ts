@@ -38,10 +38,20 @@ describe('agent-preset compact styles', () => {
     expect(compact).toContain('grid-template-columns: minmax(0, 1fr)')
   })
 
-  it('stacks the general-settings preset row under 768px', () => {
+  it('lists presets as continuous hairline rows, not cards, under 768px', () => {
+    const compact = mediaBody(section, '(max-width: 767px)')
+    expect(compact).toMatch(/\.card\s*\{[^}]*border:\s*0[^}]*border-bottom:\s*0\.5px solid var\(--dsw-alias-border-l2\)/)
+    expect(compact).toMatch(/\.card\s*\{[^}]*border-radius:\s*0/)
+    // Selection reads by fill alone on the flat list, not by a second box.
+    expect(compact).toMatch(/\.cardActive\s*\{[^}]*border-color:\s*var\(--dsw-alias-border-l2\)/)
+    expect(compact).toMatch(/\.cardFoot\s*\{[^}]*border-top:\s*0/)
+  })
+
+  it('keeps the general-settings preset row on one line under 768px', () => {
     const compact = mediaBody(row, '(max-width: 767px)')
-    expect(compact).toContain('flex-direction: column')
-    expect(compact).toContain('var(--dsw-touch-target)')
+    expect(compact).not.toContain('flex-direction: column')
+    expect(compact).toContain('align-self: center')
+    expect(compact).toContain('min-height: var(--dsw-touch-target)')
   })
 
   it('gives the hero preset chip the touch target on compact viewports', () => {

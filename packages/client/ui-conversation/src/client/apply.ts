@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
 import type { ViewTab } from './contract/views.ts'
 import type {
-  ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
+  ApprovalInjected, ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
   ComposerChainProps, ConversationInjected,
   ConversationViewportInjected, ConversationSessionHeaderInjected, ConversationSessionInjected, MessageImageLoader,
   DetailsInjected, WorkspaceSelectionOptions,
@@ -227,27 +227,27 @@ export function apply(ctx: Context): void {
     }),
   }, TranscriptViewRow))
 
-  // The destination choice only exists while a built-in Browser tab type is
-  // registered; assemblies without one keep the external default. The registry
-  // comes through the reflect layer: ui-sidebar-right's own project reference
-  // points back here, so a typed Context merge would close a reference cycle.
-  const sidebarRightTabs = ctx.reflect.get('sidebarRightTabs') as BrowserTabsRegistry | undefined
-  const browserAvailable: ObservableSnapshot<boolean> = sidebarRightTabs === undefined
-    ? { getSnapshot: () => false, subscribe: () => () => {} }
-    : {
-      getSnapshot: () => sidebarRightTabs.get('browser') !== undefined,
-      subscribe: listener => sidebarRightTabs.subscribe(listener),
+  // The destination choice only exists once ui-sidebar-right provides its
+  // tab-type registry; assemblies without one keep the external default and no
+  // row. The registry type stays structural: ui-sidebar-right's own project
+  // reference points back here, so a typed Context merge would close a cycle.
+  ctx.inject(['sidebarRightTabs'], (scope) => {
+    const tabs = scope.reflect.get('sidebarRightTabs') as BrowserTabsRegistry
+    const browserAvailable: ObservableSnapshot<boolean> = {
+      getSnapshot: () => tabs.get('browser') !== undefined,
+      subscribe: listener => tabs.subscribe(listener),
     }
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
-    id: 'link-opening',
-    order: 17,
-    locale: NS,
-    inject: (): LinkOpeningRowInjected => ({
-      hooks: { linkOpening: linkOpening.destination, browserAvailable, settings: linkOpening.settings },
-      setLinkOpening: (destination) => { linkOpening.setDestination(destination) },
-    }),
-  }, LinkOpeningRow))
+    scope.slots.inject('settings.general.item', () => scope.slots.register({
+      name: 'settings.general.item',
+      id: 'link-opening',
+      order: 17,
+      locale: NS,
+      inject: (): LinkOpeningRowInjected => ({
+        hooks: { linkOpening: linkOpening.destination, browserAvailable, settings: linkOpening.settings },
+        setLinkOpening: (destination) => { linkOpening.setDestination(destination) },
+      }),
+    }, LinkOpeningRow))
+  })
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -639,7 +639,15 @@ export function apply(ctx: Context): void {
   // pending — a question is a conversation the model is waiting on, while an
   // approval only blocks one tool call; answering the question first cannot
   // strand the approval (it re-elects the moment the question resolves).
-  slots.register({ name: 'conversation.composer', select: selectApproval, priority: 1, locale: NS }, ApprovalPanel)
+  slots.register({
+    name: 'conversation.composer',
+    select: selectApproval,
+    priority: 1,
+    locale: NS,
+    inject: (): ApprovalInjected => ({
+      resolveReason: reason => ctx.locale.resolveText(reason),
+    }),
+  }, ApprovalPanel)
 
   // The chat view: first entry of the ring this package just declared.
   // ChatView owns only the stable ordered Node list. Business renderers are

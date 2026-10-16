@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { RUN_CODE_NAME, defineContentToolFixture } from '@deepseek-ai/dsh-tools'
@@ -164,7 +165,7 @@ function expectPlanPtcSdkBindings(sdk: string): void {
   expect(sdk).toContain('read: Record<string, JsonValue>;')
   expect(sdk).toContain('write: Record<string, JsonValue>;')
   expect(sdk).toContain('interface ToolOutputMap {')
-  expect(sdk).toContain('exit_plan_mode: {\n    approved: true;\n  };')
+  expect(sdk).toContain('exit_plan_mode: {\n    approved: boolean;\n  };')
   expect(sdk).toContain('[K in ToolName]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]>;')
 }
 
@@ -946,6 +947,7 @@ describe('exit_plan_mode', () => {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime, { mode: 'ptc' })
     await ctx.plugin(ExitRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await mountProjectionSeam(ctx)
     await ctx.plugin(PlanModeController, PLAN_CONFIG)
     await ctx.plugin(AgentRegistry)
@@ -1080,7 +1082,7 @@ describe('exit_plan_mode', () => {
     expect(question?.options?.map(option => option.label)).toContain(question?.intent?.approve)
   })
 
-  it('reads a dismissed review as the user taking the turn back, not as a failure', async () => {
+  it('reads a dismissed review as the user taking the turn back: a turn-concluding success, not a failure', async () => {
     const { ctx, agent } = await setupWithReview()
     registerQuestionAnswerer(ctx, {
       ask: () => Promise.reject(Object.assign(
@@ -1089,8 +1091,9 @@ describe('exit_plan_mode', () => {
       )),
     })
     const result = await callExit(ctx, agent)
-    expect(result.isError).toBe(true)
-    expect(result.content).toEqual([{ type: 'text', text: 'Error: The user dismissed the plan review to speak instead; stay in plan mode, stop here, and wait for their message.' }])
+    expect(result.isError).toBe(false)
+    expect(result.concludesTurn).toBe(true)
+    expect(result.content).toEqual([{ type: 'text', text: 'The user dismissed the plan review to reply in their own words; plan mode remains active.' }])
     expect(foldPlanMode(agent.session.snapshotEvents())).toBe(true)
   })
 

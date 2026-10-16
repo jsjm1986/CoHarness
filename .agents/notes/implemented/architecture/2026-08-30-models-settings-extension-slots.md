@@ -10,7 +10,7 @@ Provider-specific sign-in or status controls had to edit the Models section or d
 
 ## Decision
 
-`ui-settings-models` declares two additive child slots: keyed `settings.models.provider-card`, keyed by the provider settings namespace and supplied with the redacted provider entry plus configured/keyConfigured facts, and ordered `settings.models.footer`, which carries no mutable page state. The Models section renders these slots for setup, configured, and add-provider cards and after the add controls. The section remains the sole owner of provider identity, authorization, and settings/credential writes; slot owners receive data-only props and register through normal slot effects.
+`ui-settings-models` declares two additive child slots: keyed `settings.models.provider-card`, keyed by the provider settings namespace and supplied with the redacted provider entry plus configured/keyConfigured facts — `keyConfigured` reports the credential reference this page would use for the row (the profile's `apiKeyEnv`, or the page's derived reference while the profile names none, matching the editor's own derivation) — and ordered `settings.models.footer`, which carries no mutable page state. The Models section renders these slots for setup, configured, and add-provider cards and after the add controls. The section remains the sole owner of provider identity, authorization, and settings/credential writes; slot owners receive data-only props and register through normal slot effects.
 
 ## Alternatives considered
 

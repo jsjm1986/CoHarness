@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-14-preset-stage-outlives-tools-toggle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-14-preset-stage-outlives-tools-toggle.md
+/agent-note-the-tools-preference-clears-preset-stages-on-its-off-transition-only:
+  en: dfab6134bdb3e23e
+  zh: 3db6738140022a6a
+/agent-note-the-tools-preference-clears-preset-stages-on-its-off-transition-only/problem:
+  en: 1c1ac65b9a48b291
+  zh: 35fcd003ad448887
+/agent-note-the-tools-preference-clears-preset-stages-on-its-off-transition-only/decision:
+  en: e8d98654b0edcc87
+  zh: cd7eefdf7e0bf57c
+/agent-note-the-tools-preference-clears-preset-stages-on-its-off-transition-only/alternatives-considered:
+  en: 846020ee05aa83be
+  zh: 8f272878f6799cf4
+/agent-note-the-tools-preference-clears-preset-stages-on-its-off-transition-only/consequences:
+  en: a2fbcc4ee6204902
+  zh: 4e69b75017e0d600
+/agent-note-the-tools-preference-clears-preset-stages-on-its-off-transition-only/verification:
+  en: 1076c1914f7a06b4
+  zh: 67b7a85b2ae65a3e

@@ -1,4 +1,5 @@
 /** The Node compatibility matrix runs this complete source-entry smoke. */
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
@@ -11,6 +12,7 @@ import { fakeParent, mountPtcRuntime } from './setup.ts'
 async function setup(mode: SandboxMode) {
   const ctx = new Context()
   const files = await mountPtcRuntime(ctx, mode)
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   ctx.subagents.registerProvider({
     name: 'spawn',

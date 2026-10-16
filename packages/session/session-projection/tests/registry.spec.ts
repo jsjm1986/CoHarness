@@ -7,7 +7,7 @@
  * removal of registrations and change listeners (HMR safety).
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import SessionStore, {
@@ -277,6 +277,22 @@ describe('SessionProjectionRegistry drive', () => {
     mark(session, ['after-dispose'])
     expect(notifications).toEqual(['test/marks'])
     expect(ctx.sessionProjections.snapshot(session).values).toEqual({})
+  })
+
+  it('keeps a yielded registration live until the composite finishes using it', async () => {
+    const { ctx, session } = await harness()
+    onTestFinished(async () => { await ctx.fiber.dispose() })
+    let observed: MarksState | undefined
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      inner.effect(function* () {
+        yield inner.sessionProjections.register(marksUnit())
+        yield () => { observed = inner.sessionProjections.stateOf(session, 'test/marks') }
+      })
+    }, { inject: ['sessionProjections'] }))
+    mark(session, ['live'])
+    await fiber.dispose()
+    expect(observed).toEqual({ marks: ['live'] })
+    expect(ctx.sessionProjections.stateOf(session, 'test/marks')).toBeUndefined()
   })
 
   it('snapshot serves client views and excludes host-only state', async () => {

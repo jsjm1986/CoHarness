@@ -24,6 +24,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../session/working-directory"
+    },
+    {
       "path": "../terminal"
     },
     {

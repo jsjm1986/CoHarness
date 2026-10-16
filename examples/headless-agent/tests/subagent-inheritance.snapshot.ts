@@ -105,9 +105,11 @@ describe('parent-only override inheritance snapshot', () => {
         const childRecords = child.trimEnd().split('\n').map(
           line => JSON.parse(line) as Record<string, unknown>,
         )
-        expect(childRecords[1]).toMatchObject({
+        // The working-directory/change event lands first; the delegation
+        // sandbox override follows it rather than owning a fixed index.
+        const sandboxMode = childRecords.find(record => record.type === 'sandbox/mode')
+        expect(sandboxMode).toMatchObject({
           type: 'sandbox/mode',
-          seq: 0,
           data: { mode: 'read-only', source: 'delegation' },
         })
 

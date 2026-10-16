@@ -1,6 +1,9 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -24,6 +27,9 @@ async function harness(): Promise<Context> {
   await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(ToolRegistry)
   await ctx.plugin(AgentRegistry)
+  await ctx.plugin(LocalFileSystem)
+  await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(WorkingDirectory)
   return ctx
 }
 
@@ -95,6 +101,25 @@ describe('LocalFileReferenceService', () => {
     expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain(FILE_REFERENCE_PROMPT)
   })
 
+  it('rebuilds completion from the current directory after a Session directory change', async () => {
+    const ctx = await harness()
+    try {
+      const { agent } = await stubAgent(ctx)
+      await ctx.plugin(LocalFileReferenceService)
+      const signal = new AbortController().signal
+      expect(await ctx.fileReferences.list(agent, '', signal)).toEqual([{ path: 'README.md', kind: 'file' }])
+      const nextRoot = join(agent.session.header.cwd!, 'nested')
+      await mkdir(nextRoot)
+      await writeFile(join(nextRoot, 'NEXT.md'), 'next')
+      const original = agent.session.header.cwd
+      await ctx.workingDirectory.set(agent, nextRoot, signal)
+      expect(await ctx.fileReferences.list(agent, '', signal)).toEqual([{ path: 'NEXT.md', kind: 'file' }])
+      expect(agent.session.header.cwd).toBe(original)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('invalidates cached searches after tool results and disposes them with the agent', async () => {
     const ctx = await harness()
     const { agent, dispose } = await stubAgent(ctx)
@@ -103,12 +128,12 @@ describe('LocalFileReferenceService', () => {
     await ctx.plugin(LocalFileReferenceService)
     await ctx.fileReferences.list(agent, 'README', new AbortController().signal)
 
-    ctx.emit('session/event', agent.session, { type: 'tool/result' } as never)
+    ctx.emit('session/event', agent.session, { type: 'tool/result', seq: 0, data: {} } as never)
     expect(invalidate).toHaveBeenCalledOnce()
-    ctx.emit('session/event', agent.session, { type: 'assistant/message' } as never)
+    ctx.emit('session/event', agent.session, { type: 'assistant/message', seq: 0, data: {} } as never)
     expect(invalidate).toHaveBeenCalledOnce()
     const orphan = ctx.sessions.create(SessionId('file-reference-orphan'))
-    ctx.emit('session/event', orphan, { type: 'tool/result' } as never)
+    ctx.emit('session/event', orphan, { type: 'tool/result', seq: 0, data: {} } as never)
     expect(invalidate).toHaveBeenCalledOnce()
 
     await dispose()

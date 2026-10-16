@@ -1,29 +1,22 @@
-- menu:
-  - text: Switch space
-  - searchbox "Search project spaces"
-  - text: Personal
-  - menuitem "Personal"
-  - separator
-  - text: Projects
-  - menuitem "Payments migration Can edit":
-    - text: Payments migration Can edit
+- group "Switch personal or project scope":
+  - button "Close":
     - img
-  - menuitem "Audit platform Read only"
-  - separator
-  - text: New conversation visibility
-  - menuitem "Shared with project Project members can view and participate":
+  - text: Switch space Payments migration Can edit
+  - button "Manage":
+    - text: Manage
     - img
-    - text: Shared with project Project members can view and participate
+  - text: Space settings
+  - button "New conversation visibility Shared with project":
+    - text: New conversation visibility Shared with project
     - img
-  - menuitem "Only me Only the creator can view it":
-    - img
-    - text: Only me Only the creator can view it
-  - menuitem "New project space":
-    - img
-    - text: New project space
-  - menuitem "Invitations and tasks":
-    - img
+  - button "Invitations and tasks":
     - text: Invitations and tasks
-  - menuitem "Project settings":
     - img
+  - button "Project settings":
     - text: Project settings
+    - img
+  - text: All spaces · 3
+  - button "Personal Personal"
+  - button "Payments migration"
+  - button "Audit platform Read only"
+  - button "New project space"

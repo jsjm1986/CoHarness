@@ -100,7 +100,7 @@ describe('client build environment', { timeout: 15_000 }, () => {
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7), DSH_CLIENT_VERSION: '1.2.3', DSH_CLIENT_EXTRA: 'inherited',
     }
     expect(resolveClientBuildEnvironment(environment, 'coharness')).toEqual({
-      DSH_CLIENT_BUILD_PROFILE: 'coharness', DSH_CLIENT_TITLE: 'CoHarness',
+      DSH_CLIENT_BUILD_PROFILE: 'coharness', DSH_CLIENT_TITLE: 'COHARNESS',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7), DSH_CLIENT_VERSION: '1.2.3',
     })
     expect(() => { resolveClientBuildEnvironment(environment, 'sdk') }).toThrow('unknown client build profile')

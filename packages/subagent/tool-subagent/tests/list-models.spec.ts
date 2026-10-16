@@ -18,6 +18,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as tool from '../src/index.ts'
 import { registerListSubagentModels } from '../src/list-models.ts'
 import { testToolSignal, text } from './harness.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 class CatalogAdapter extends LlmAdapter {
   constructor(private readonly empty = false) {
@@ -105,6 +106,7 @@ describe('list_subagent_models', () => {
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(tool, { provider: 'unused' })
     expect(ctx.tools.get('list_subagent_models')).toBeUndefined()
@@ -114,6 +116,7 @@ describe('list_subagent_models', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     registerListSubagentModels(ctx, { routes: [{ provider: 'alpha', model: 'fast' }] })
     const result = await call(ctx, {})

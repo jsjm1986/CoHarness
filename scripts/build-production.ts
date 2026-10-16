@@ -55,6 +55,12 @@ const GATEWAY_RUNTIME_PACKAGES: readonly { directory: string; entry: string }[] 
   { directory: 'packages/llm/llm', entry: 'lib/types/discovery.js' },
   { directory: 'packages/session/session-format', entry: 'lib/index.js' },
   { directory: 'packages/session/session-format-catalog', entry: 'lib/index.js' },
+  { directory: 'packages/util/home-paths', entry: 'lib/index.js' },
+  { directory: 'packages/attachment/userdoc', entry: 'lib/index.js' },
+  { directory: 'packages/attachment/userdoc-local', entry: 'lib/index.js' },
+  { directory: 'packages/host/userdoc-http', entry: 'lib/index.js' },
+  { directory: 'vendor/cordis', entry: 'lib/index.js' },
+  { directory: 'vendor/schemastery', entry: 'lib/index.mjs' },
 ]
 
 /**

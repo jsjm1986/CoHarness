@@ -123,6 +123,21 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.card :where(pre) {
+  padding: 6px 18px 16px;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.card[data-code-wrap='false'] {
+  --dsl-code-block-line-white-space: pre;
+}
+
+.card[data-code-wrap='false'] :where(pre) {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
 /* Consumers may turn the stable content node into a viewport without changing
    the default CodeBlock layout. */
 .content {
@@ -155,20 +170,22 @@
 }
 
 @media (max-width: 767px) {
-  /* Keep the 44px copy target without adding the desktop banner padding on
-     top of it. The banner is one compact toolbar row on a phone. */
+  /* Phone block: 10px radius reads as a content inset rather than a floating
+     card, and the banner is one 40px toolbar row instead of the desktop's
+     padded 40px-plus chrome. */
   .block {
-    margin: var(--dsw-space-3) 0;
+    --dsl-code-block-border-radius: var(--dsw-radius-card);
+    margin: var(--dsw-space-2) 0;
   }
 
   .banner {
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
     padding: 0 10px;
   }
 
   .copyButton {
-    min-width: var(--dsw-touch-target);
-    min-height: var(--dsw-touch-target);
+    min-width: 40px;
+    min-height: 40px;
   }
 
   .block :where(pre) {

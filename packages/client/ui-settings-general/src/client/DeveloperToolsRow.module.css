@@ -18,3 +18,10 @@
   font-size: 12px;
   line-height: 18px;
 }
+
+@media (max-width: 767px) {
+  .row {
+    gap: var(--dsw-space-3);
+    padding: var(--dsw-space-3) 0;
+  }
+}

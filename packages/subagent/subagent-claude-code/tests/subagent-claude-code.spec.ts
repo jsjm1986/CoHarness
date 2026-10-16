@@ -26,7 +26,7 @@ import {
 import { AgentRegistry, type Agent } from '@deepseek-ai/dsh-agent'
 import LlmRuntime, { createUserMessage, type ContentBlock, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
+import SubagentRuntime, { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import type {
   SubprocessHandle,
   SubprocessOutcome,
@@ -52,6 +52,7 @@ import {
   textTask,
   type ClaudeCodeRunSpec,
 } from '../src/run.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 type QueryFactory = (params: {
   prompt: string
@@ -345,6 +346,7 @@ describe('named persistent member routes', () => {
   it('keeps default and named routes independent through registration and disposal', async () => {
     const ctx = new Context()
     try {
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(LocalSubprocessRuntime)
       await ctx.plugin(LlmRuntime)
@@ -367,11 +369,66 @@ describe('named persistent member routes', () => {
     }
   })
 
+  it('prepareContinuable resolves the request cwd when memberCwd is unset', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-claude-plugin-'))
+    const ctx = new Context()
+    try {
+      provideWorkingDirectoryFixture(ctx)
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(claudeCode, { stateDir: dir })
+      const provider = ctx.subagents.getProvider('claude-code')!
+      const resolution = vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution')
+        .mockResolvedValue({ cwd: dir, target: 'local', remote: false, subprocess: ctx.subprocess })
+      const signal = new AbortController().signal
+      await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
+        cwd: dir,
+        sessionId: SessionId('continuable-child'),
+        parent: fakeParent,
+        signal,
+      }))).resolves.toEqual({})
+      expect(resolution.mock.calls[0]![2]).toBe(dir)
+      expect(resolution.mock.calls[0]![3]).toBe(signal)
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('start reports an abort observed while resolving the child execution', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-claude-plugin-'))
+    const ctx = new Context()
+    try {
+      provideWorkingDirectoryFixture(ctx)
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(claudeCode, { stateDir: dir })
+      const provider = ctx.subagents.getProvider('claude-code')!
+      const controller = new AbortController()
+      vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution')
+        .mockImplementation(async () => {
+          controller.abort()
+          throw new Error('resolver unreachable')
+        })
+      await expect(provider.start(withExecutionContext(ctx, {
+        ...request(undefined, controller.signal),
+        cwd: dir,
+        descriptor: snapshotSubagentDescriptor({ mode: 'one-shot', provider: 'claude-code' }),
+      }))).rejects.toThrow('aborted before SDK startup')
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it.each([false, true])('routes member and one-shot SDK processes to their selected world (remote=%s)', async (remote) => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-claude-plugin-'))
     const ctx = new Context()
     const target = remote ? new Context() : ctx
     try {
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(LocalSubprocessRuntime)
       await ctx.plugin(LlmRuntime)
@@ -389,6 +446,7 @@ describe('named persistent member routes', () => {
 
       const provider = ctx.subagents.getProvider('claude-code')!
       await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
+        cwd: process.cwd(),
         sessionId: SessionId('continuable-child'),
         parent: fakeParent,
         signal: new AbortController().signal,
@@ -527,6 +585,7 @@ describe('task admission and package contracts', () => {
 
   it('registers the default descriptor, validates config, and unregisters on HMR', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const fiber = await ctx.plugin(claudeCode, {})
@@ -558,6 +617,7 @@ describe('task admission and package contracts', () => {
 
   it('keeps named instances, runs, and HMR ownership isolated', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const safeChild = fakeChild()
@@ -655,6 +715,7 @@ describe('task admission and package contracts', () => {
 
   it('rejects duplicate provider names without replacing the first instance', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const firstFiber = await ctx.plugin(claudeCode, {
@@ -692,6 +753,7 @@ describe('task admission and package contracts', () => {
 
   it('resolves the safe permission default when apply is called directly', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
@@ -715,6 +777,7 @@ describe('task admission and package contracts', () => {
 
   it('starts through the registered provider with its resolved config and diagnostics', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
@@ -735,16 +798,20 @@ describe('task admission and package contracts', () => {
       disposeGraceMs: 29,
     })
 
-    await expect(ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
+    // A parent without a Session directory inherits the runtime default;
+    // the child still launches there instead of rejecting.
+    const inherited = await ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
       ...request(),
       parent: {
         id: 'parent-without-cwd',
         session: { header: {} },
       } as unknown as Agent,
-    }))).rejects.toThrow(
-      'subagent-claude-code: no working directory for the child — delegate from a parent session that has one',
-    )
-    expect(queryMock).not.toHaveBeenCalled()
+    }))
+    expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ cwd: process.cwd() }))
+    await inherited.dispose()
+    queryMock.mockClear()
+    spawn.mockClear()
+    warn.mockClear()
 
     const invalidCwdParent = {
       id: 'parent-with-invalid-cwd',
@@ -766,10 +833,11 @@ describe('task admission and package contracts', () => {
 
     const invalidCwdAbort = new AbortController()
     invalidCwdAbort.abort(new Error('cancel invalid cwd startup'))
+    // The service's pre-start abort check rethrows the signal's own reason.
     await expect(ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
       ...request(undefined, invalidCwdAbort.signal),
       parent: invalidCwdParent,
-    }))).rejects.toThrow('aborted before SDK startup')
+    }))).rejects.toThrow('cancel invalid cwd startup')
     expect(queryMock).not.toHaveBeenCalled()
     warn.mockClear()
 
@@ -793,9 +861,13 @@ describe('task admission and package contracts', () => {
       .toContain('Native CLI binary for fixture-platform not found')
     expect(resolveExecutable).not.toHaveBeenCalled()
 
+    // A dedicated child: the earlier inherited-directory run already consumed
+    // the first fixture's one-shot process outcome.
+    const runChild = fakeChild()
+    spawn.mockReturnValueOnce(runChild.handle)
     const run = await ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, request()))
-    child.settle({ exitCode: 9, signal: null })
-    child.stdout.end()
+    runChild.settle({ exitCode: 9, signal: null })
+    runChild.stdout.end()
     await expect(run.result).resolves.toEqual({
       output: [],
       diagnostic: expectedFailureDiagnostic('query-run', 'invalid-result'),

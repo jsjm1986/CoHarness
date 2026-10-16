@@ -1,4 +1,4 @@
-/* Active plan status follows Figma's warn-state pill. */
+/* Active plan status follows the business-state pill of the sibling mode controls. */
 
 .wrap {
   display: inline-flex;
@@ -10,13 +10,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--dsw-space-1);
+  height: 28px;
   min-width: 34px;
-  padding: 2px var(--dsw-space-2);
+  padding: 0 var(--dsw-space-2);
   border: none;
-  border-radius: 999px;
-  corner-shape: round;
-  background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-label);
+  border-radius: var(--dsw-radius-full);
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-state-business-primary);
   font-size: 13px;
   font-weight: 500;
   line-height: 20px;
@@ -29,11 +29,15 @@
 }
 
 .chip:hover:not(:disabled) {
-  color: var(--dsw-alias-state-warn-primary);
+  background: color-mix(
+    in srgb,
+    var(--dsw-alias-state-business-tertiary),
+    var(--dsw-alias-state-business-primary) 6%
+  );
 }
 
 .chip:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-warn-label);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
 

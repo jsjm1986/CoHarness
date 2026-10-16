@@ -103,7 +103,7 @@ interface InstanceOwner {
 }
 
 /** Re-check a persisted project path immediately before it becomes a runtime cwd. */
-function validateProjectRuntimePath(cfg: GatewayConfig, path: string): string {
+export function validateProjectRuntimePath(cfg: GatewayConfig, path: string): string {
   let canonical: string
   try {
     canonical = realpathSync(path)

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-schedule-subagent-ownership.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-schedule-subagent-ownership.md
+/agent-note-schedule-subagent-ownership-target-refusal-and-delegated-caller-refusal:
+  en: 8904434fd49b5c75
+  zh: 493be21e7b0c5297
+/agent-note-schedule-subagent-ownership-target-refusal-and-delegated-caller-refusal/problem:
+  en: f1a6b71ef9251a1d
+  zh: 788ec2367599b09c
+/agent-note-schedule-subagent-ownership-target-refusal-and-delegated-caller-refusal/decision:
+  en: e6be251772fa35f4
+  zh: ef304769284f239b
+/agent-note-schedule-subagent-ownership-target-refusal-and-delegated-caller-refusal/alternatives-considered:
+  en: 765681034a54d41b
+  zh: ed70d9543708408f
+/agent-note-schedule-subagent-ownership-target-refusal-and-delegated-caller-refusal/consequences:
+  en: 82d30b3c1fcae79a
+  zh: b8f81035a3d285ed
+/agent-note-schedule-subagent-ownership-target-refusal-and-delegated-caller-refusal/verification:
+  en: 817c604b900a6a45
+  zh: 4606cbe7594a16ba
+/agent-note-schedule-subagent-ownership-target-refusal-and-delegated-caller-refusal/related:
+  en: ae71aabc25a402aa
+  zh: dec20778ec5f5a80

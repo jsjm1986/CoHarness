@@ -52,8 +52,15 @@ function renderRow(state: Partial<AgentPresetSettingsState> = {}) {
     ...actions,
     useAgentPreset: bindSnapshotSelector(store),
     t: (key: keyof typeof en) => en[key],
-  } as unknown as AgentPresetRowProps)} />)
+  } as never as AgentPresetRowProps)} />)
   return actions
+}
+
+const t: AgentPresetSeatProps['t'] = (key, params) => {
+  const template = en[key as keyof typeof en] ?? key
+  return params === undefined
+    ? template
+    : template.replace(/\{(\w+)\}/g, (match, name: string) => name in params ? String(params[name]) : match)
 }
 
 function renderSeat(state: Partial<AgentPresetSeatState> = {}, developerTools = true) {
@@ -62,14 +69,15 @@ function renderSeat(state: Partial<AgentPresetSeatState> = {}, developerTools = 
   const actions = {
     load: vi.fn(() => Promise.resolve()),
     select: vi.fn(() => Promise.resolve()),
+    dismissRefusal: vi.fn(),
     introduced: vi.fn(),
   }
   render(<AgentPresetSeat {...({
     ...actions,
     useAgentPresetSeat: bindSnapshotSelector(store),
     useDeveloperTools: bindSnapshotSelector(devTools),
-    t: (key: keyof typeof en) => en[key],
-  } as unknown as AgentPresetSeatProps)} />)
+    t,
+  } as Partial<AgentPresetSeatProps> as AgentPresetSeatProps)} />)
   return { ...actions, store, devTools }
 }
 
@@ -89,7 +97,7 @@ function renderLabel(
     useSessions: bindSnapshotSelector(sessions),
     useAgentPresets: bindSnapshotSelector(store),
     t: (key: keyof typeof en) => en[key],
-  } as unknown as AgentPresetLabelProps)} />)
+  } as never as AgentPresetLabelProps)} />)
   return { load, view }
 }
 
@@ -181,7 +189,7 @@ describe('the General-settings row', () => {
       useAgentPreset: bindSnapshotSelector(
         createSnapshotStore<AgentPresetSettingsState>({ ...ROW_READY, status: 'unavailable', options: [] })),
       t: (key: keyof typeof en) => en[key],
-    } as unknown as AgentPresetRowProps)} />)
+    } as never as AgentPresetRowProps)} />)
 
     expect(container.firstChild).toBeNull()
   })
@@ -193,7 +201,7 @@ describe('the General-settings row', () => {
       select: vi.fn(() => Promise.resolve()),
       useAgentPreset: bindSnapshotSelector(store),
       t: (key: keyof typeof en) => en[key],
-    } as unknown as AgentPresetRowProps)} />)
+    } as never as AgentPresetRowProps)} />)
     fireEvent.click(screen.getByRole('button'))
 
     act(() => { store.set({ ...ROW_READY, writable: false }) })
@@ -258,6 +266,45 @@ describe('the new-session chip', () => {
     renderSeat({ error: 'session has already started' })
 
     expect(screen.getByRole('button').getAttribute('title')).toBe('session has already started')
+  })
+
+  it('announces a refused switch in a banner naming the preset', () => {
+    renderSeat({ error: { preset: { id: 'mine', trust: 'user', name: 'My preset' }, reason: 'no adapter' } })
+
+    const alert = screen.getByRole('alert')
+    expect(alert.textContent).toBe('Could not switch to My preset: no adapter')
+    // The reason also stays on the trigger while the banner plays.
+    expect(screen.getByRole('button').getAttribute('title')).toBe('no adapter')
+  })
+
+  it('keeps a refusal banner when the chip itself is hidden', () => {
+    renderSeat({ error: { preset: { id: 'mine', trust: 'user' }, reason: 'failed to mount' } }, false)
+
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.getByRole('alert').textContent).toBe('Could not switch to mine: failed to mount')
+  })
+
+  it('dismisses the banner through the controller once it finishes', () => {
+    vi.useFakeTimers()
+    const refusal = { preset: { id: 'mine', trust: 'user' as const }, reason: 'failed to mount' }
+    const actions = renderSeat({ error: refusal })
+
+    act(() => { vi.advanceTimersByTime(60_000) })
+
+    expect(actions.dismissRefusal).toHaveBeenCalledWith(refusal)
+    vi.useRealTimers()
+  })
+
+  it('replays the banner when the same preset is refused again', () => {
+    const { store } = renderSeat({ error: { preset: { id: 'mine', trust: 'user' }, reason: 'first' } })
+    const first = screen.getByRole('alert').textContent
+
+    act(() => {
+      store.set({ ...SEAT_READY, error: { preset: { id: 'mine', trust: 'user' }, reason: 'second' } })
+    })
+
+    expect(screen.getByRole('alert').textContent).not.toBe(first)
+    expect(screen.getByRole('alert').textContent).toContain('second')
   })
 
   it('renders nothing before the roster arrives or when there is none', () => {

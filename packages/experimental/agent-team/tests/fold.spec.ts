@@ -332,6 +332,18 @@ describe('Agent Teams fold', () => {
     expect(pending(state)[0]?.content).toEqual([extension])
   })
 
+  it('preserves opaque JSON fields including own __proto__ keys through fold', () => {
+    const extension = JSON.parse('{"type":"plugin/custom","__proto__":{"saved":true},"constructor":{"saved":false},"content":[{"__proto__":{"nested":true},"opaque":true}]}') as never
+    const queued = event('team/message/queued', {
+      version: 1, teamId: TEAM, message: message({ content: [extension] }),
+    }, 0)
+    const state = foldTeam(ROOT, [queued])
+    const block = pending(state)[0]!.content[0]!
+    expect(block).toEqual(extension)
+    expect(Object.hasOwn(block, '__proto__')).toBe(true)
+    expect(Object.getPrototypeOf(block)).toBe(Object.prototype)
+  })
+
   it('rejects unsupported event versions without mutating an empty state', () => {
     const state = emptyTeamFoldState(ROOT)
     const invalid = event('team/task', {

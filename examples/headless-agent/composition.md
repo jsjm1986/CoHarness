@@ -28,6 +28,8 @@ flowchart LR
   cfg --> plugin_headless_token_meter
   plugin_headless_compaction_basic["compaction-basic<br/>@deepseek-ai/dsh-compaction-basic"]
   cfg --> plugin_headless_compaction_basic
+  plugin_headless_working_directory["working-directory<br/>@deepseek-ai/dsh-working-directory"]
+  cfg --> plugin_headless_working_directory
   plugin_headless_session_projection["session-projection<br/>@deepseek-ai/dsh-session-projection"]
   cfg --> plugin_headless_session_projection
   plugin_headless_subagent["subagent<br/>@deepseek-ai/dsh-subagent"]
@@ -76,6 +78,7 @@ flowchart LR
 | `checkpoint-policy` | `@deepseek-ai/dsh-session-checkpoint-policy` |
 | `token-meter` | `@deepseek-ai/dsh-token-meter` |
 | `compaction-basic` | `@deepseek-ai/dsh-compaction-basic` |
+| `working-directory` | `@deepseek-ai/dsh-working-directory` |
 | `session-projection` | `@deepseek-ai/dsh-session-projection` |
 | `subagent` | `@deepseek-ai/dsh-subagent` |
 | `subagent-spawn-in-process` | `@deepseek-ai/dsh-subagent-spawn-in-process` |

@@ -47,7 +47,7 @@
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
-- button "7% of context used"
+- button "7% of context used": 7%
 - button "Send message" [disabled]
 - group "Session statistics":
   - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":

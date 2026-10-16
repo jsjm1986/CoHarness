@@ -1,0 +1,99 @@
+.card {
+  position: relative;
+  margin: 16px 0;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-markdown-code-block);
+  border-radius: 12px;
+  font: var(--dsw-font-markdown-code-block);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px 4px;
+  background: var(--dsw-alias-markdown-code-block-banner);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  color: var(--dsw-alias-label-secondary);
+  font: 11px/18px var(--dsw-font-family);
+}
+
+.heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.language {
+  flex: none;
+  font-family: var(--ds-font-family-code);
+}
+
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.status {
+  margin-right: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.action:focus-visible {
+  outline: 1px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.body {
+  padding: 6px 18px 16px;
+  font: var(--dsw-font-markdown-code-block);
+  overflow-x: auto;
+}
+
+@media (max-width: 767px) {
+  /* Keep the 44px action targets without adding the desktop header padding on
+     top of it. The header is one compact toolbar row on a phone. */
+  .card {
+    margin: var(--dsw-space-3) 0;
+  }
+
+  .header {
+    min-height: var(--dsw-touch-target);
+    padding: 0 10px;
+  }
+
+  .action {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+}

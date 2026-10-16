@@ -30,10 +30,18 @@ function mediaBody(query: string): string {
 }
 
 describe('AppearanceRow.module.css compact', () => {
-  it('keeps the three theme cubes on one row under 768px', () => {
+  it('keeps the three theme options as one segmented row under 768px', () => {
     const compact = mediaBody('(max-width: 767px)')
     expect(compact).toMatch(/\.cubeRow\s*\{[^}]*flex-wrap:\s*nowrap/)
     expect(compact).toContain('flex: 1 1 0')
-    expect(compact).toContain('min-height: var(--dsw-touch-target)')
+  })
+
+  it('reads as one segmented control, not three bordered pills, under 768px', () => {
+    const compact = mediaBody('(max-width: 767px)')
+    // The track carries the quiet fill; each option drops its own box, and the
+    // selected segment is the raised chip inside the track.
+    expect(compact).toMatch(/\.cubeRow\s*\{[^}]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/)
+    expect(compact).toMatch(/\.themeCube\s*\{[^}]*border:\s*0/)
+    expect(compact).toMatch(/\.selected\s*\{[^}]*background:\s*var\(--dsw-alias-bg-raised\)/)
   })
 })

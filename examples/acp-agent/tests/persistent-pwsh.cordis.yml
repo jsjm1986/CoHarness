@@ -23,6 +23,12 @@
     shellDialect: pwsh
     timeoutMs: 30000
 
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 - id: acp-agent
   name: '@deepseek-ai/dsh-acp-demo'
   config:

@@ -33,6 +33,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import { assertObjectJsonSchema } from '@deepseek-ai/dsh-tools'
@@ -83,7 +84,7 @@ import type { SubagentDescendantListEntry, SubagentListEntry } from './list-chil
 import { snapshotSubagentDescriptor } from './descriptor.ts'
 import { establishCatalogChild, subagentCatalogProjectionDefinition } from './catalog.ts'
 import { subagentIdentityProjectionDefinition, subagentTimingProjectionDefinition } from './projection.ts'
-import { deliverSubagentPrompt } from './internal.ts'
+import { deliverSubagentPrompt, subagentPendingDirectChildren } from './internal.ts'
 
 export * from './out-of-process.ts'
 export { AssistantOutputFold, finalAssistantOutput } from './assistant-output.ts'
@@ -140,6 +141,12 @@ export type {} from './catalog.ts'
 export type * from './control-types.ts'
 export type { SubagentRunEndInfo, SubagentRunInfo } from './types.ts'
 export type { SubagentIdentityProjection, SubagentTimingProjection } from './projection-types.ts'
+export {
+  attachStructuredRuntime,
+  STRUCTURED_OUTPUT_INSTRUCTION,
+  STRUCTURED_OUTPUT_TOOL,
+} from './structured.ts'
+export type { StructuredAttachment } from './structured.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -246,6 +253,7 @@ export class SubagentRuntime extends TypertRemoteService {
     maxContinuableActivationsPerParent: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER)
       .default(DEFAULT_MAX_CONTINUABLE_ACTIVATIONS_PER_PARENT),
   })
+  static inject = ['workingDirectory']
 
   private settingsSource: () => Config
 
@@ -331,7 +339,22 @@ export class SubagentRuntime extends TypertRemoteService {
    * @throws when continuation services are unavailable or materialization fails.
    */
   async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart> {
-    return this.withPendingParent(spec.request.parent, () => this.requireContinuations().startContinuable(spec))
+    const continuations = this.requireContinuations()
+    this.assertCapabilities(this.expectProvider(spec.provider), spec.request)
+    if (spec.request.outputSchema !== undefined) assertObjectJsonSchema(spec.request.outputSchema)
+    return this.withPendingParent(spec.request.parent, () => continuations.startContinuable(spec))
+  }
+
+  /**
+   * Report unsettled direct continuable work for one live parent. Symbol-keyed
+   * because sibling in-process providers need the synchronous probe for
+   * structured-completion admission without another public Service operation.
+   * @param parent - exact live Agent whose direct children are observed.
+   * @returns whether direct continuable work remains unsettled.
+   * @internal
+   */
+  [subagentPendingDirectChildren](parent: Agent): boolean {
+    return this.continuations?.hasPendingDirectChildren(parent) ?? false
   }
 
   /**
@@ -417,6 +440,16 @@ export class SubagentRuntime extends TypertRemoteService {
     // Absent continuation services means nothing was ever materialized.
     if (manager === undefined) return
     await manager.drainDescendants(parents)
+  }
+
+  /**
+   * Join progressing descendants without cancelling them. Idle descendants whose
+   * inboxes require a later wake stay resident and do not delay host completion.
+   * @param parent - the exact parent whose descendant work is observed.
+   * @returns whether work was joined; hosts recheck parent idle after true.
+   */
+  async waitForChildren(parent: Agent): Promise<boolean> {
+    return this.continuations?.waitForChildren(parent) ?? false
   }
 
   /**
@@ -746,7 +779,11 @@ export class SubagentRuntime extends TypertRemoteService {
         provider: name,
         ...request.label !== undefined ? { label: request.label } : {},
       })
-      const resolved: ResolvedSubagentStartRequest = { ...request, descriptor }
+      const cwd = request.cwd === undefined
+        ? await this.ctx.workingDirectory.ensure(request.parent, request.signal)
+        : await this.ctx.workingDirectory.resolve(request.parent, request.cwd, request.signal)
+      request.signal.throwIfAborted()
+      const resolved: ResolvedSubagentStartRequest = { ...request, cwd, descriptor }
       const run = await provider.start(resolved)
       const owned = this.leasedRuns.get(request.parent) ?? new Set<SubagentRun>()
       this.leasedRuns.set(request.parent, owned)
@@ -840,7 +877,10 @@ export class SubagentRuntime extends TypertRemoteService {
   }
 
   /** Reject the first requested capability that the provider lacks. */
-  private assertCapabilities(provider: SubagentProvider, request: SubagentStartRequest): void {
+  private assertCapabilities(
+    provider: SubagentProvider,
+    request: Pick<SubagentStartRequest, 'agentOptions' | 'outputSchema' | 'maxDepth' | 'toolFilter' | 'persona'>,
+  ): void {
     const needs: { when: boolean; cap: keyof SubagentCapabilities }[] = [
       { when: request.agentOptions !== undefined, cap: 'agentOptions' },
       { when: request.outputSchema !== undefined, cap: 'outputSchema' },

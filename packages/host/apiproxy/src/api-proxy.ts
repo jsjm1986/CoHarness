@@ -156,6 +156,10 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 import type {} from '@deepseek-ai/dsh-user-approval'
 // Type-only: resolves the `schedule/changed` forward event and `ctx.get('schedule')`.
 import type {} from '@deepseek-ai/dsh-schedule/client'
+// Type-only: resolves the `goal/activation-changed` forward event.
+import type {} from '@deepseek-ai/dsh-goal'
+// Type-only: resolves `ctx.get('workingDirectory')` — optional in host compositions.
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { inboxProjectionDefinition } from './inbox-projection.ts'
 import { modelSelectionProjectionDefinition } from './model-selection-projection.ts'
@@ -470,46 +474,63 @@ async function durablePromptContent(
   }
 }
 
-/** Search durable content for an image reference, including nested tool results. */
+/** Search one declared content array for a direct image block. */
 function imageBlockIn(content: unknown, match: (ref: ImageAttachmentRef) => boolean): ImageAttachmentRef | undefined {
   if (!Array.isArray(content)) return undefined
   for (const value of content) {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
-    const block = value as { type?: unknown; attachment?: unknown; content?: unknown }
+    const block = value as { type?: unknown; attachment?: unknown }
     if (block.type === 'image' && typeof block.attachment === 'object' && block.attachment !== null) {
       const ref = block.attachment as ImageAttachmentRef
       if (match(ref)) return ref
-    }
-    if (block.type === 'tool-result') {
-      const nested = imageBlockIn(block.content, match)
-      if (nested !== undefined) return nested
     }
   }
   return undefined
 }
 
-/** Search every durable event carrier that can own model-visible content. */
+/** Read only first-party declared content fields; unknown event payloads stay opaque. */
 function imageInEvent(event: SessionEvent, match: (ref: ImageAttachmentRef) => boolean): ImageAttachmentRef | undefined {
   const data = event.data as {
     content?: unknown
     message?: { content?: unknown }
-    inserted?: Array<{ content?: unknown }>
-    stream?: readonly AssistantStreamRecord[]
+    inserted?: unknown
+    summary?: unknown
+    rawOutput?: unknown
   }
-  const direct = imageBlockIn(data.content, match)
-  if (direct !== undefined) return direct
-  if (data.message !== undefined) {
-    const wrapped = imageBlockIn(data.message.content, match)
-    if (wrapped !== undefined) return wrapped
-  }
-  if (data.inserted !== undefined) {
-    for (const message of data.inserted) {
-      const inserted = imageBlockIn(message.content, match)
-      if (inserted !== undefined) return inserted
+  // First-party event payloads can be present without their producer plugin mounted.
+  const type: string = event.type
+  switch (type) {
+    case 'user/message':
+    case 'tool/ptc-dispatch':
+      return imageBlockIn(data.content, match)
+    case 'system/message':
+    case 'developer/message':
+    case 'tool/result':
+    case 'team/message/queued':
+      return imageBlockIn(data.message?.content, match)
+    case 'agent/inbox/spliced': {
+      const messages = data.inserted
+      if (!Array.isArray(messages)) return undefined
+      for (const message of messages as readonly unknown[]) {
+        if (typeof message !== 'object' || message === null || Array.isArray(message)) continue
+        const found = imageBlockIn((message as { readonly content?: unknown }).content, match)
+        if (found !== undefined) return found
+      }
+      return undefined
     }
+    case 'compaction/summary':
+      return imageBlockIn(data.summary, match) ?? imageBlockIn(data.rawOutput, match)
+    case 'assistant/message': {
+      const found = imageBlockIn(data.message?.content, match)
+      if (found !== undefined) return found
+      break
+    }
+    case 'assistant/attempt': break
+    default: return undefined
   }
-  if (data.stream !== undefined) {
-    for (const timed of expandAssistantStream(data.stream)) {
+  const stream = (event.data as { stream?: readonly AssistantStreamRecord[] }).stream
+  if (stream !== undefined) {
+    for (const timed of expandAssistantStream(stream)) {
       if (timed.chunk.type === 'block-end') {
         const found = imageBlockIn([timed.chunk.block], match)
         if (found !== undefined) return found
@@ -1289,6 +1310,7 @@ interface PendingApproval {
   toolName: string
   callId?: ToolCallId
   reason?: string
+  displayReason?: { readonly en: string; readonly [locale: string]: string }
   resolve(outcome: ApprovalOutcome): void
 }
 
@@ -1308,6 +1330,7 @@ function requestedFrame(pending: PendingApproval): RpcRequest<MuxFrame> {
       toolName: pending.toolName,
       ...pending.callId === undefined ? {} : { callId: pending.callId },
       ...pending.reason === undefined ? {} : { reason: pending.reason },
+      ...pending.displayReason === undefined ? {} : { displayReason: pending.displayReason },
     },
   }
 }
@@ -2789,6 +2812,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           toolName: req.toolName,
           ...req.callId === undefined ? {} : { callId: req.callId },
           ...req.reason === undefined ? {} : { reason: req.reason },
+          ...req.displayReason === undefined ? {} : { displayReason: req.displayReason },
           resolve: settle,
         }
         pendingApprovals.set(pending.rpcId, pending)
@@ -3540,6 +3564,44 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   /** Missing-service report shared by the settings domain (skills-domain stance). */
   function settingsAbsent(): RpcError {
     return { code: 'internal', message: 'settings service is absent: this deployment does not mount a settings provider (e.g. @deepseek-ai/dsh-settings-file) in its composition', details: {} }
+  }
+
+  /**
+   * Prove one client-supplied path round-trips through the composed filesystem
+   * back to the identical Host path before a native handoff accepts it. A
+   * deployment without an `fs` capability has no filesystem authority to verify
+   * against, so its injected opener keeps its own trust.
+   * @returns the resolved Host path, or the refusal error.
+   */
+  async function verifyDesktopPath(
+    path: string, signal: AbortSignal,
+  ): Promise<{ verified: string } | { error: RpcError }> {
+    if (path.length === 0) {
+      return { error: { code: 'bad-request', message: 'a non-empty file path is required', details: { issues: [] } } }
+    }
+    const hostPath = resolve(path)
+    const fs = ctx.get('fs')
+    if (fs === undefined) return { verified: hostPath }
+    const mapped = fs.processPathFromHostPath(hostPath)
+    if (mapped !== undefined) {
+      try {
+        if (fs.processPath(await fs.resolve(mapped, { signal })) === hostPath) {
+          return { verified: hostPath }
+        }
+      } catch (error: unknown) {
+        if (isAborted(signal)) {
+          return { error: { code: 'cancelled', message: 'path open was aborted', details: {} } }
+        }
+        return {
+          error: {
+            code: 'internal',
+            message: `path verification failed: ${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          },
+        }
+      }
+    }
+    return { error: { code: 'bad-request', message: 'path has no verified Host mapping through the filesystem', details: { issues: [] } } }
   }
 
   /** Open one Host-resolved target and map native failures onto the wire vocabulary. */
@@ -4526,13 +4588,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
             selectForNextRequest(found.agent, selected)
             if (authorized.authority?.participant.scope.kind !== 'project') {
-              try {
-                await defaults.saveDefaultModelSelection?.(selected)
-              } catch (error: unknown) {
+              void defaults.saveDefaultModelSelection?.(selected).catch((error: unknown) => {
                 ctx.logger.warn(
                   `api-proxy: the model switch applies to this session but was not saved as the default: ${String(error)}`,
                 )
-              }
+              })
             }
             return ok(request, { selected: { ...selected } })
           } catch (error: unknown) {
@@ -5549,7 +5609,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       async openPath(request, signal) {
         const authorized = authorizePersonalConfiguration()
         if (authorized.error !== undefined) return err(request, authorized.error)
-        return openPath(request, request.payload.path, signal, request.payload.action, request.payload.application)
+        const verified = await verifyDesktopPath(request.payload.path, signal)
+        if ('error' in verified) return err(request, verified.error)
+        return openPath(request, verified.verified, signal, request.payload.action, request.payload.application)
       },
 
       async fileApplications(request, signal) {
@@ -5557,9 +5619,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (authorized.error !== undefined) return err(request, authorized.error)
         try {
           if (!canOpenPaths()) return ok(request, { applications: [] })
+          const verified = await verifyDesktopPath(request.payload.path, signal)
+          if ('error' in verified) return err(request, verified.error)
           const applications = defaults.fileApplications !== undefined
-            ? await defaults.fileApplications(request.payload.path, signal)
-            : await nativeFileApplications(request.payload.path, signal)
+            ? await defaults.fileApplications(verified.verified, signal)
+            : await nativeFileApplications(verified.verified, signal)
           return ok(request, { applications: [...applications] })
         } catch (error: unknown) {
           if (signal.aborted) {
@@ -5611,8 +5675,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
     skills: {
       // Skill lookup never creates or resumes an agent: the session address
-      // resolves to a canonical cwd from the host-resident session header, and
-      // the view scope is the live agent or the preset's standing key.
+      // resolves to its recorded working directory, and the view scope is
+      // the live agent or the preset's standing key.
       async list(request) {
         const { sessionId } = request.payload
         const authorized = await authorizeSession(sessionId, 'read')
@@ -5625,12 +5689,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { sessionId },
           })
         }
-        if (session.header.cwd === undefined) {
+        // The recorded working directory is the catalog's directory; a
+        // composition without the service can only ever have produced the
+        // original project directory, so the header read is the exact
+        // fallback, and `ctx.get` keeps the handler independent of this
+        // plugin's inject list (the service is optional in API
+        // compositions).
+        const workingDirectory = ctx.get('workingDirectory')
+        const cwd = workingDirectory === undefined ? session.header.cwd : workingDirectory.get(session)
+        if (cwd === undefined) {
           // Every served session records its project at create time; a
           // cwd-less header is a pre-project legacy log (not served).
           return err(request, { code: 'internal', message: `session "${sessionId}" has no project cwd`, details: {} })
         }
-        const cwd = session.header.cwd
         // The host registry is layered per scope and serves every session. A
         // composition may still realm-mount its own registry instead; that
         // instance is invisible to host contexts, so address it through the

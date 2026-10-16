@@ -12,6 +12,8 @@
 - text: read
 - button "Close details"
 - text: Input json
-- button "Copy"
+- button "Wrap lines" [pressed]
+- button "Copy":
+  - img
 - code: "{ \"file_path\": \"a.txt\" }"
 - text: "Output <path>{{cwd}}/a.txt</path> <type>file</type> <content> 1: alpha (End of file - total 1 lines) </content>"

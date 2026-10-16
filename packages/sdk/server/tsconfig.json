@@ -33,6 +33,9 @@
       "path": "../protocol"
     },
     {
+      "path": "../../session/working-directory"
+    },
+    {
       "path": "../../subagent/subagent"
     },
     {

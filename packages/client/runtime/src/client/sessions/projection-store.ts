@@ -103,6 +103,16 @@ export class ProjectionValueStore {
   }
 
   /**
+   * The watermark the row's value is consistent with, for callers that must
+   * order a projection fact against durable seqs.
+   * @param key - projection key.
+   * @returns the applied seq, or `undefined` when the key carries no row.
+   */
+  seqOf(key: string): number | undefined {
+    return this.rows.get(key)?.seq
+  }
+
+  /**
    * Read every current projection value as one reference-stable snapshot.
    * @returns The same frozen value map until a row changes.
    */

@@ -319,6 +319,78 @@ describe('v3-to-v4 reference remapping', () => {
   })
 })
 
+describe('v3-to-v4 interrupted turns', () => {
+  const splice = () => ({ type: 'agent/inbox/spliced', time: 1, data: { target: 'next-turn', inserted: [{ id: 'u', role: 'user', content: [] }] } })
+  const start = (turn: number) => ({ type: 'turn/start', time: turn, data: { turn } })
+  const end = (turn: number, reason: unknown = 'done') => ({ type: 'turn/end', time: turn, data: { turn, reason } })
+
+  it('closes an interrupted turn when the restart opens the next turn', () => {
+    const { events } = run([
+      start(1),
+      { type: 'step/start', time: 2, data: { turn: 1, step: 1 } },
+      { type: 'step/end', time: 3, data: { turn: 1, step: 1 } },
+      splice(),
+      start(2),
+      end(2),
+    ])
+    expect(events.map(event => event.type)).toEqual([
+      'turn/start', 'step/start', 'step/end', 'agent/inbox/spliced', 'turn/end', 'turn/start', 'turn/end',
+    ])
+    expect(events[4]).toMatchObject({ seq: 4, data: { turn: 1, reason: { kind: 'interrupted' } } })
+    expect(events.map(event => event.seq)).toEqual([0, 1, 2, 3, 4, 5, 6])
+  })
+
+  it('repairs each independently evidenced restart', () => {
+    const { events } = run([start(1), splice(), start(2), splice(), start(3), end(3)])
+    expect(events.filter(event => event.type === 'turn/end').map(event => event.data)).toEqual([
+      { turn: 1, reason: { kind: 'interrupted' } },
+      { turn: 2, reason: { kind: 'interrupted' } },
+      { turn: 3, reason: 'done' },
+    ])
+  })
+
+  it.each([
+    ['a balanced turn boundary', [start(1), end(1), splice(), start(2), end(2)]],
+    ['an empty next-turn splice', [start(1), { type: 'agent/inbox/spliced', time: 2, data: { target: 'next-turn', inserted: [] } }, start(2)]],
+    ['a next-step splice', [start(1), { type: 'agent/inbox/spliced', time: 2, data: { target: 'next-step', inserted: [{ id: 'u' }] } }, start(2)]],
+    ['a nonadjacent splice', [start(1), splice(), { type: 'feedback/record', time: 3, data: {} }, start(2)]],
+    ['an open step', [start(1), { type: 'step/start', time: 2, data: { turn: 1, step: 1 } }, splice(), start(2)]],
+    ['a repeated turn number', [start(1), splice(), start(1)]],
+  ])('synthesizes no interrupted end for %s', (_name, rows) => {
+    const { events } = run(rows as never)
+    expect(events.filter(event => event.type === 'turn/end')
+      .filter(event => (event.data as { reason?: unknown }).reason !== 'done')).toEqual([])
+  })
+
+  it('remaps references across the synthesized boundary', () => {
+    const { events } = run([
+      start(1),
+      splice(),
+      start(2),
+      { type: 'session/title', time: 4, data: { title: 't', messageSeqs: [0, 2] } },
+      { type: 'image/offload', time: 5, data: { targets: [{ attachmentId: 'a', seq: 0 }] } },
+    ])
+    // The inserted turn/end shifts every later event by one; references follow.
+    expect(events.at(-2)).toMatchObject({ data: { messageSeqs: [0, 3] } })
+    expect(events.at(-1)).toMatchObject({ data: { targets: [{ attachmentId: 'a', seq: 0 }] } })
+  })
+
+  it('rejects malformed image/offload targets', () => {
+    expect(() => run([
+      start(1),
+      { type: 'image/offload', time: 2, data: { targets: 'x' } },
+    ])).toThrow('v3 image/offload targets must be an array')
+    expect(() => run([
+      start(1),
+      { type: 'image/offload', time: 2, data: { targets: [7] } },
+    ])).toThrow('v3 image/offload target must be an object')
+    expect(() => run([
+      start(1),
+      { type: 'image/offload', time: 2, data: { targets: [{ attachmentId: 'a', seq: 9 }] } },
+    ])).toThrow('does not name an earlier event')
+  })
+})
+
 describe('v4 codec and validation', () => {
   const physicalHeader = { type: 'session', ...header, version: 4 }
   const turn = { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }

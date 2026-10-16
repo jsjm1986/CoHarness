@@ -18,8 +18,8 @@
   en: 84ddef3e30b22560
   zh: 324d4a65ec82c114
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/public-api:
-  en: 01d2756821246165
-  zh: 8895a2cc4ba47164
+  en: 6713c5dd6f6ea66f
+  zh: 598dbb76ea19d903
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/injected-services:
   en: 174543e4b0f52e85
   zh: d0c1371fbc538db0
@@ -30,8 +30,8 @@
   en: c757ba891d021ae0
   zh: 6adb6753afe1f6d1
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/internal-concrete-driver:
-  en: 9285fb4b6d055d0e
-  zh: 1a3708ab53d1e17c
+  en: 0378d519bc91e176
+  zh: ff3aed78cdfd385a
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/loop-lifecycle-agent-ts:
   en: b27bbabb34a140ac
   zh: f91ef8e2ef970750
@@ -45,8 +45,8 @@
   en: 5507d83eb979c737
   zh: 0ffde85d627b3933
 /dsh-agent-loop/model-experience/complete-conversation-request/what-the-model-sees:
-  en: 6a60e889b0f19e33
-  zh: f45bd9b2b843ca7a
+  en: f5da4e729c4db412
+  zh: 4a3f13f075b89b6d
 /dsh-agent-loop/model-experience/complete-conversation-request/token-effect:
   en: ad93d8d61968a25d
   zh: 268ff858b0fa96e8
@@ -78,8 +78,8 @@
   en: 1750eea3cc5bf2d8
   zh: cd3dfe31be5dedec
 /dsh-agent-loop/known-limitations-and-deferred-work:
-  en: f22f810de2ed5afb
-  zh: 7ac5dffc1d3bb165
+  en: dd90cc276137032e
+  zh: e5d76cc7554e072f
 /dsh-agent-loop/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

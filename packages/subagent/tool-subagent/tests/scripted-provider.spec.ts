@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { type Agent } from '@deepseek-ai/dsh-agent'
-import SubagentRuntime, { type SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
+import SubagentRuntime, { snapshotSubagentDescriptor, type ResolvedSubagentStartRequest, type SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import * as scripted from './scripted-provider.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /** A minimal parent; the scripted provider only reads its id. */
 function fakeParent(id = 'parent-1'): Agent {
@@ -21,6 +22,7 @@ function baseRequest(over: Partial<SubagentStartRequest> = {}): SubagentStartReq
 
 async function mount(config: Partial<scripted.Config> = {}): Promise<Context> {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await scripted.mountScriptedProvider(ctx, { name: 'mock', ...config })
   return ctx
@@ -78,17 +80,31 @@ describe('scripted subagent provider fixture', () => {
     const ctx = await mount()
     const alreadyAborted = new AbortController()
     alreadyAborted.abort()
+    // The service's pre-start abort check rejects before provider startup.
     await expect(ctx.subagents.start('mock', baseRequest({ signal: alreadyAborted.signal })))
-      .rejects.toThrow('scripted subagent start aborted before publication')
+      .rejects.toThrow('This operation was aborted')
 
     const handoff = new AbortController()
     const pending = ctx.subagents.start('mock', baseRequest({ signal: handoff.signal }))
     handoff.abort()
-    await expect(pending).rejects.toThrow('scripted subagent start aborted before publication')
+    await expect(pending).rejects.toThrow('This operation was aborted')
+
+    // Inside provider startup the abort check is the provider's own: a direct
+    // `provider.start` with a pre-aborted signal keeps its typed rejection.
+    const providerAbort = new AbortController()
+    providerAbort.abort()
+    const resolved: ResolvedSubagentStartRequest = {
+      ...baseRequest({ signal: providerAbort.signal }),
+      cwd: process.cwd(),
+      descriptor: snapshotSubagentDescriptor({ mode: 'one-shot', provider: 'mock' }),
+    }
+    await expect(ctx.subagents.getProvider('mock')!.start(resolved))
+      .rejects.toThrow('scripted subagent start aborted before publication')
   })
 
   it('unregisters with its owning fixture fiber', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     const fiber = await scripted.mountScriptedProvider(ctx, { name: 'mock' })
     expect(ctx.subagents.list()).toEqual(['mock'])

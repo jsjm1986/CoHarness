@@ -1,3 +1,4 @@
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { Context } from '@deepseek-ai/cordis'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
@@ -32,6 +33,7 @@ async function setup(execute?: (bindings: HostBindings, spec: PtcRunSpec) => Pro
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjections)
   await ctx.plugin(SandboxPolicy, { mode: 'read-only' })
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   ctx.subagents.registerProvider({
     name: 'stub',
@@ -57,6 +59,38 @@ async function setup(execute?: (bindings: HostBindings, spec: PtcRunSpec) => Pro
 }
 
 describe('workflow host callback validation', () => {
+  it('retains its selected directory for the process when the parent moves', async () => {
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    let launched: PtcRunSpec | undefined
+    const { ctx, start, parent } = await setup(async (bindings, spec) => {
+      launched = spec
+      entered.resolve(undefined)
+      await release.promise
+      await bindings.startChild!({ prompt: 'child' })
+      return completed
+    })
+    const initial = `${process.cwd()}/selected`
+    const ensureDirectory = vi.spyOn(ctx.workingDirectory, 'ensure').mockResolvedValue(initial)
+    const childStart = vi.spyOn(ctx.subagents, 'start')
+    const run = start()
+    try {
+      await entered.promise
+      ensureDirectory.mockResolvedValue(`${process.cwd()}/later`)
+      release.resolve(undefined)
+      expect((await run.result).stopReason).toBe('completed')
+      expect(launched?.cwd).toBe(initial)
+      expect(launched?.sandboxPolicy?.workspaceRoot).toBe(parent.session.header.cwd)
+      expect(childStart).toHaveBeenCalledOnce()
+      // The engine resolves once at launch; startChild resolves again so the
+      // child inherits the parent's directory as moved after launch.
+      expect(ensureDirectory).toHaveBeenCalledTimes(2)
+    } finally {
+      release.resolve(undefined)
+      await run.dispose()
+    }
+  })
+
   it('binds delayed worker child requests to the workflow initiator', async () => {
     const entered = Promise.withResolvers<undefined>(), resume = Promise.withResolvers<undefined>()
     const f = await setup(async (bindings) => {

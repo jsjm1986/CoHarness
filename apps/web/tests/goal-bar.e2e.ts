@@ -12,7 +12,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { expectTooltipOnTop, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/goal-bar', import.meta.url))
 const ACTIVE_EXPECTED = join(SNAPSHOT_DIR, 'active.expected.md')
@@ -57,6 +57,14 @@ describe('web e2e: goal bar clear convergence', () => {
     await bar.waitFor({ timeout: 10_000 })
     const snapshot = await captureStableAria(page, '[data-goal-bar]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(ACTIVE_EXPECTED, snapshot, MODE)
+
+    const pause = bar.getByRole('button', { name: 'Pause goal' })
+    await pause.hover()
+    const pauseTooltip = page.getByRole('tooltip', { name: 'Pause goal', exact: true })
+    await pauseTooltip.waitFor()
+    // The strip rides directly above the input card, which paints later; the
+    // bubble must escape the strip's stacking context instead of landing under it.
+    await expectTooltipOnTop(pauseTooltip)
 
     const clear = bar.getByRole('button', { name: 'Clear goal' })
     await clear.evaluate((button) => {

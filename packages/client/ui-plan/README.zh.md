@@ -15,6 +15,8 @@ chip 携带无障碍描述 "Plan mode on, press to turn off"。准入失败（`m
 
 模型通过稳定的 `exit_plan_mode` 工具退出 plan mode；其 plan 评审走已组合的 Web question 通道。
 
+已提交计划以隐藏的 `submitted-plan` Chat 节点持久化，按退出工具调用标识——原生 `tool/call` id 与 PTC `tool/ptc-dispatch` 的 `subCallId` 一致——因此每个已完成回合的末尾在 `conversation.chat.turnTail` 下按调用渲染一张卡片。卡片把 `dsh-resource://plan/<session>/<callId>`（直属子代理则是 `dsh-resource://plan/subagent/<parent>/<child>/<mode>/<callId>`）打开进可见 Session 的右侧边栏；`plan` 侧栏类型同时认领瞬态 `dsh-resource://plan-review/...` 地址，后者经导航参数携带未提交评审的 Markdown。持久文档经 `Session.readCallHistory` 恢复：解析所属 Session 或子代理，并经同一套 conversation 定义重组该调用的完整回合；`resourceSession` 从地址读出归属，使子代理计划在其父 Session 侧栏下仍通过归属校验。`conversation.plan-review.actions` 下的评审操作在 Session 挂载后自动打开一次评审——已关闭的评审不会重开——并保留手动入口；`sidebar.right.pane.tab` 及其标题座位渲染正文与恢复的标题。
+
 ## 概述
 
 计划模式让你在实施前审阅计划。通过 `/plan` 进入，通过编辑器中的状态按钮退出。提交的计划自动在右侧边栏打开供审阅；批准、拒绝或关闭审批后，仍可通过已完成回合末尾的产物卡片查看。重新打开同一计划会聚焦已有标签页，刷新浏览器后会从会话历史恢复正文。

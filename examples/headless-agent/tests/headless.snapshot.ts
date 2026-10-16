@@ -1,4 +1,5 @@
 import { copyFile, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { delimiter, dirname, join } from 'node:path'
@@ -78,6 +79,17 @@ const refreshing = process.env.DSH_SNAPSHOT === 'refresh'
 
 interface JsonObject {
   [key: string]: unknown
+}
+
+/** Keep the cwd text priced by compaction independent of the platform's temporary-root length. */
+async function compactionWorkspaceOptions(): Promise<{ tempDirParent: string; tempDirPrefix: string }> {
+  const tempDirParent = await realpath(tmpdir())
+  const prefix = 'headless-snapshot-compaction-recovery-'
+  // mkdtemp appends six characters; JSON quoting is part of the runtime-context text.
+  const unpaddedLength = JSON.stringify(join(tempDirParent, `${prefix}XXXXXX`)).length
+  const paddingLength = 192 - unpaddedLength
+  if (paddingLength < 0) throw new Error('compaction snapshot temporary root exceeds its fixed cwd text length')
+  return { tempDirParent, tempDirPrefix: prefix + '-'.repeat(paddingLength) }
 }
 
 interface PersistedLog {
@@ -588,7 +600,7 @@ describe('headless stream-json snapshots', () => {
     let runCwd = ''
     const result = await runLoaderSmoke({
       label: 'compaction recovery headless stream-json snapshot',
-      tempDirPrefix: 'headless-snapshot-compaction-recovery-',
+      ...(await compactionWorkspaceOptions()),
       binScript,
       libBinScript: binScript,
       configPath: compactionConfigPath,

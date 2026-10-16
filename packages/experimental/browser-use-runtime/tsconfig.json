@@ -27,6 +27,9 @@
       "path": "../../mcp/mcp-client"
     },
     {
+      "path": "../../session/working-directory"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {

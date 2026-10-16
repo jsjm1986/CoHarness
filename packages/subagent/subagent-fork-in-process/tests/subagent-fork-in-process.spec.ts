@@ -15,6 +15,7 @@ import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import * as fork from '../src/index.ts'
 import { STRUCTURED_OUTPUT_TOOL } from '@deepseek-ai/dsh-subagent-in-process-driver'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
@@ -44,6 +45,7 @@ async function setup(script: Script) {
   await mountAgentLoopTestDependencies(ctx)
   await mountInvariants(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(fork, { providerName: 'fork' })
   ctx.llm.registerAdapter(['mock'], new MockAdapter(script))
@@ -203,6 +205,7 @@ describe('dsh-subagent-fork-in-process', () => {
 
   it('unregisters the provider when its fiber is disposed (HMR safety)', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(AgentRegistry)
     const fiber = await ctx.plugin(fork, { providerName: 'fork' })
@@ -219,6 +222,7 @@ describe('dsh-subagent-fork-in-process', () => {
     // Before any completed parent turn there is nothing to inherit, so the
     // child starts fresh rather than carrying an empty seed.
     const fresh = await provider.prepareContinuable!({
+      cwd: process.cwd(),
       sessionId: SessionId('continuable-fresh'),
       parent,
       signal,
@@ -229,6 +233,7 @@ describe('dsh-subagent-fork-in-process', () => {
     parent.followup(createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }))
     await parent.whenIdle()
     const seeded = await provider.prepareContinuable!({
+      cwd: process.cwd(),
       sessionId: SessionId('continuable-seeded'),
       parent,
       signal,

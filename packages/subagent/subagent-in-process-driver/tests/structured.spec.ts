@@ -3,7 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, ToolCallId, type ContentBlock, type GenerateOptions } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { mountAgentLoopTestDependencies, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import * as SessionInvariant from '@deepseek-ai/dsh-session/invariant'
@@ -20,7 +20,7 @@ import { startInProcessRun } from '../src/index.ts'
 import {
   STRUCTURED_OUTPUT_INSTRUCTION,
   STRUCTURED_OUTPUT_TOOL,
-} from '../src/structured.ts'
+} from '../src/index.ts'
 
 const testToolSignal = new AbortController().signal
 
@@ -59,6 +59,7 @@ async function setup(script: Script, options: SetupOptions = {}) {
   await mountAgentLoopTestDependencies(ctx, {
     tools: { mode: options.toolMode ?? 'native' },
   })
+  provideWorkingDirectoryFixture(ctx)
   if (options.toolMode === 'ptc' || options.toolMode === 'both') {
     ctx.provide('ptcRuntime', {
       language: 'typescript',

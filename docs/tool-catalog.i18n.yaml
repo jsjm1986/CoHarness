@@ -9,14 +9,14 @@
   en: ddbe8316ec6b1363
   zh: b2d705c03641df84
 /tool-schema-catalog/tool-package-map:
-  en: 266f6d3a211089c7
-  zh: ad274fe5a7e24c7a
+  en: 294dc378ef51e5dc
+  zh: 54ad646627dafc99
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager/plugin-manager:
-  en: ab4d1e7f7aa435b5
-  zh: 70af9245b9b98039
+  en: 55b6f02a3ef555cf
+  zh: 0be88dc758ae752f
 /tool-schema-catalog/deepseek-ai-dsh-mcp-resources:
   en: dd78bd55ec83a539
   zh: dd78bd55ec83a539
@@ -300,8 +300,14 @@
   en: dea62d26fb18ff68
   zh: dea62d26fb18ff68
 /tool-schema-catalog/deepseek-ai-dsh-tool-todo/todo-write:
-  en: 8c64fe5f2e58a890
-  zh: e3c780fc842aeb43
+  en: f252137b940b38d1
+  zh: 25bd9c6b1ce783d8
+/tool-schema-catalog/deepseek-ai-dsh-tool-working-directory:
+  en: 1bdc4627ca4fff29
+  zh: 1bdc4627ca4fff29
+/tool-schema-catalog/deepseek-ai-dsh-tool-working-directory/working-directory:
+  en: e612e5787a00b958
+  zh: 82dd5ad2824e335e
 /tool-schema-catalog/deepseek-ai-dsh-tool-workflow:
   en: bb38a9d29f46563c
   zh: bb38a9d29f46563c

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-13-coharness-brand-identity.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-coharness-brand-identity.md
+/agent-note-coharness-brand-identity-in-the-web-client:
+  en: 50a03b60de66130f
+  zh: 97aafd4123ad729b
+/agent-note-coharness-brand-identity-in-the-web-client/problem:
+  en: c3948da3159757d4
+  zh: f317334158b17ea0
+/agent-note-coharness-brand-identity-in-the-web-client/decision:
+  en: 91716160886cb391
+  zh: e185f8d2ddab275c
+/agent-note-coharness-brand-identity-in-the-web-client/alternatives-considered:
+  en: ea2d442d0029b42c
+  zh: 93190afe5c55c382
+/agent-note-coharness-brand-identity-in-the-web-client/consequences:
+  en: 342d69ed30075a0f
+  zh: 5fd2bdf03af9cc2b
+/agent-note-coharness-brand-identity-in-the-web-client/verification:
+  en: 9d3bcd28a490dc81
+  zh: a2f69d53f1691c8f

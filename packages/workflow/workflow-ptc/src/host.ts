@@ -2,6 +2,7 @@
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import type { PtcBindingFunction, PtcJsonValue, PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -122,6 +123,7 @@ export class PtcWorkflowRun implements WorkflowRun {
   private cancelReason: string | undefined
   private disposed: Promise<void> | undefined
   private readonly externalAbort: () => void
+  private readonly cwd: Promise<string>
 
   constructor(
     private readonly ctx: Context,
@@ -140,6 +142,7 @@ export class PtcWorkflowRun implements WorkflowRun {
     this.externalAbort = () => { this.cancel('workflow signal aborted') }
     if (signal?.aborted) this.externalAbort()
     else signal?.addEventListener('abort', this.externalAbort, { once: true })
+    this.cwd = ctx.workingDirectory.ensure(parent, this.controller.signal)
     // Consumers attach durable run recording after start() returns.
     this.result = Promise.resolve().then(() => this.drive())
   }
@@ -279,10 +282,12 @@ export class PtcWorkflowRun implements WorkflowRun {
   private async drive(): Promise<WorkflowResult> {
     let result: WorkflowResult
     try {
+      const cwd = await this.cwd
+      this.requireActive()
       const outcome = await this.runtime.run(this.runtime.resolve({
         program: PROGRAM,
         bindings: [{ global: 'workflowHost', functions: this.bindings() }],
-        cwd: this.policy.workspaceRoot,
+        cwd,
         sandboxPolicy: this.policy,
         timeoutMs: null,
         signal: this.controller.signal,

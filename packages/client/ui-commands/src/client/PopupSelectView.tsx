@@ -10,7 +10,7 @@
  * null; the overlay slot stays mounted. The card height clamps to the space
  * above the composer.
  */
-import { MenuGroup, observeStickyMenuGroups } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MenuGroup, MenuSurface, observeStickyMenuGroups } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Fragment, useEffect, useMemo, useRef } from 'react'
 import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
@@ -47,6 +47,22 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
+  // The card can open under a resting cursor: a row mounting beneath it fires
+  // mouseenter without any real hover, stealing the highlight parked on the
+  // session's current value — a blind accept would then confirm the wrong row.
+  // Wait for an actual pointer move after the options render.
+  const hoverArmed = useRef(false)
+  useEffect(() => {
+    if (!state.open || state.status !== 'ready') return
+    hoverArmed.current = false
+    const arm = (): void => {
+      hoverArmed.current = true
+    }
+    document.addEventListener('pointermove', arm, { once: true, capture: true })
+    return () => {
+      document.removeEventListener('pointermove', arm, { capture: true })
+    }
+  }, [state.open, state.status])
   const rows = useMemo(() => filterOptions(state.options, state.search, state.searchMode),
     [state.options, state.search, state.searchMode])
   const groups = useMemo(() => groupOptions(rows), [rows])
@@ -146,7 +162,7 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
       // owns focus anyway, so a plain click (inside the card → no
       // dismiss) works.
       onClick={() => { void popup.select(index) }}
-      onMouseEnter={() => { popup.highlight(index) }}
+      onMouseEnter={() => { if (hoverArmed.current) popup.highlight(index) }}
     >
       <span className={css.label}>
         <span className={css.labelText}>{option.label}</span>
@@ -163,7 +179,7 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
       {state.confirming === null && (
         <>
           <MobileSheetBackdrop onClose={() => { popup.dismiss() }} />
-          <div
+          <MenuSurface
             ref={cardRef}
             className={css.card}
             style={{ maxHeight }}
@@ -202,7 +218,7 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
                   ))}
               </div>
             )}
-          </div>
+          </MenuSurface>
         </>
       )}
       {confirmation !== undefined && (

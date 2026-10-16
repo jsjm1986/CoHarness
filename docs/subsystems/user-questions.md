@@ -184,7 +184,11 @@ interface UserQuestionProjectionView {
 }
 ```
 
-While a question is open, the only answer path is the waterfall. Once it is `continued`, the `answer` Remote method steers a user message into the owning agent, waking an idle one; its source is `user-question-reply` with `outcome: 'answered'` and its text is the `answer_to_pending_question` payload. That method refuses an open question, and rejects with `BAD_ANSWER` a batch that does not name each question of the call exactly once. No Remote method abandons a question: a Client that puts its question surface away sends nothing, so a question left unanswered ends only through its timeout. The `user-question-reply` source also admits `outcome: 'dismissed'`, which the projection and the Client conversation node still read for Sessions that recorded one; no current caller produces it. When the Session was reopened after a Host restart, the Remote layer resumes the root agent first, and the reply enters as a new turn.
+An open question accepts answers only through the waterfall. Once it is `continued`, the `answer` Remote method queues a user message for the owning agent and wakes it if idle. The message has source `user-question-reply`, outcome `answered`, and an `answer_to_pending_question` payload. The method returns `false` for an open or unknown call, rejects a second queued reply with `REPLY_QUEUED` even after a Host restart, and rejects incomplete or duplicate answer batches with `BAD_ANSWER`. The `user-question-reply` source also admits `outcome: 'dismissed'`, which the projection and the Client conversation node still read for Sessions that recorded one; no current caller produces it.
+
+Closing the Client panel sends nothing. A foreground timeout ends only the tool wait. Continued questions have no deadline; they stay answerable until a reply is admitted.
+
+After a Host restart, the Remote layer resumes the root agent when the Session reopens. A late reply then enters a new turn.
 
 ## Errors
 
@@ -222,9 +226,11 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
  * @param agent - Live root agent for the owning Session.
  * @param callId - Continued question identity.
  * @param answer - Complete structured answer batch, one item per question of the call.
- * @returns Whether the question was continued and accepted the answer.
+ * @returns Whether the question is still continued; an accepted reply stays
+ *   queued until the agent admits its user message.
  * @throws {UserQuestionError} `BAD_ANSWER` when the batch does not name each
- *   question of the call exactly once.
+ *   question of the call exactly once, or `REPLY_QUEUED` when a reply is
+ *   already waiting for admission.
  */
 @Remote answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean
 

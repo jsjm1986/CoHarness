@@ -11,6 +11,7 @@ import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandb
 import { SubprocessExecutableNotFoundError, type SubprocessRuntime, type SubprocessTerminalEnvironment, type SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { TerminalController, type Config } from '../src/index.ts'
 import { resolveShell } from '../src/shells.ts'
 import type { TerminalAttachmentId, WebTerminalId } from '../src/types.ts'
@@ -29,6 +30,7 @@ function owner(ctx: Context, id = 'session', cwd?: string): Agent {
 function fixture(overrides: Partial<Config> = {}) {
   const ctx = new Context()
   roots.push(ctx)
+  provideWorkingDirectoryFixture(ctx, '/workspace')
   const effects = vi.spyOn(ctx.fiber, 'effect')
   const sandboxPolicy = { defaultMode: 'danger-full-access', workspaceRoot: '/workspace', resolve: vi.fn((): SandboxExecutionPolicy => ({ mode: 'danger-full-access', workspaceRoot: '/workspace' })) }
   ctx.provide('sandboxPolicy', sandboxPolicy as never)
@@ -549,8 +551,10 @@ it.skipIf(process.platform === 'win32')('runs a real interactive shell with comp
 
 it('discovers installed shells once per path, preserves default arguments, and refuses unlisted paths', async () => {
   const h = fixture({ shellCandidates: ['bash', 'zsh', 'missing'] })
+  const missing = Object.assign(new Error('absent'), { name: 'SubprocessExecutableNotFoundError' })
+  expect(missing).not.toBeInstanceOf(SubprocessExecutableNotFoundError)
   h.subprocess.resolveExecutable.mockImplementation(async (path) => {
-    if (path === 'missing') throw new SubprocessExecutableNotFoundError('absent')
+    if (path === 'missing') throw missing
     return path.startsWith('/') ? path : `/bin/${path}`
   })
   const shells = await h.controller.shells(h.agent, signal())

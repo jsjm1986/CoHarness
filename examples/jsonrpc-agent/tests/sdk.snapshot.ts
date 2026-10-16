@@ -10,7 +10,7 @@
  */
 
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -117,7 +117,7 @@ const SCENARIOS: SdkScenario[] = [
     expectedTools: { bash: ['command'], str_replace_editor: ['command', 'path'] },
     expectedSystem: MINIMAL_SYSTEM_PROMPT,
     expectedToolDescriptions: { bash: MINIMAL_BASH_DESCRIPTION },
-    runtimeContext: false,
+    runtimeContext: { includes: ['Current working directory:'], excludes: ['Current DSH file policy'] },
   },
 ]
 
@@ -282,7 +282,10 @@ async function runScenario(scenario: SdkScenario): Promise<{
   observedFiles: Record<string, string | MissingFile>
   cwd: string
 }> {
-  const cwd = await mkdtemp(join(tmpdir(), `sdk-snapshot-${scenario.name}-`))
+  // mkdtemp keeps tmpdir()'s spelling; a symlinked temporary root (macOS /var)
+  // would materialize fixture cwd differently from the canonical path a real
+  // process records, so replay diverges between platforms.
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), `sdk-snapshot-${scenario.name}-`)))
   const sessionsRoot = join(cwd, '.sessions')
   const replayFixtures = recording ? [] : await hydrateReplayFixtures(scenario, cwd)
   const launch = resolveExampleLaunch({

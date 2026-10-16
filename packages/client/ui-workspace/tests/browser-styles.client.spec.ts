@@ -126,5 +126,8 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(rowsCss).toContain('min-height: 44px')
     expect(css).toContain('box-shadow: none')
     expect(rowsCss).toContain('background: transparent')
+    // Compact rows keep the relative-time stamp at the caption tier — single-line
+    // rows still carry recency; only the slot-action strip hides.
+    expect(rowsCss).toMatch(/\[data-viewport='compact'\]\)\s*\.sessionRow\s+\.time\s*\{[^}]*display:\s*inline/u)
   })
 })

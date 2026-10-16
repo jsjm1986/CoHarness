@@ -27,19 +27,25 @@ kind: "package-reference"
 
 | 配置键 | 默认值 | 含义 |
 |---|---:|---|
-| `enabled` | `false` | 注册 `dsh_session_log` 贡献。将其设为 `true` 可选择启用会话日志上传。 |
+| `enabled` | `false` | 发送 `dsh_session_log` 贡献。改动对下一次请求生效；设为 `true` 可选择启用会话日志上传。 |
+| `allowedEndpoints` | `[]` | 精确的 `http(s)` 端点白名单；空列表保留适配器配置的端点。 |
+| `killSwitchEnv` | `COHARNESS_DISABLE_SESSION_LOG_UPLOAD` | 非空值立即抑制新交付的环境变量名。 |
+| `audit` | `true` | 通过宿主 logger 输出仅含元数据的交付审计记录。 |
+| `maxBytes` | 8 MiB | 单个请求可携带的 `dsh_session_log` 字段序列化 UTF-8 字节数上限。 |
 
-随附 profile 会挂载该插件，让 overlay 可以启用它；默认配置不会注册请求字段，也不会追加接受水位。
+随附 profile 会挂载该插件，让 overlay 可以启用它；默认配置不提供请求字段，也不追加接受水位。重新启用后会续传未被接受的后缀，包括停用期间记录的事件。
 
 <a id="request-field"></a>
 ## 请求字段
 
-对于携带存活 `sessionId` 的请求，插件会折叠该确切会话身份的最大已接受水位，通过 `snapshotEvents()` 对会话日志取快照，并发送水位之后的连续后缀。进程内 fold 会让每条事件只被扫描一次并增量消费后续追加；重启与 HMR 会从持久日志重建它。版本 1 字段包含兼容 v0 的原始会话 header（仅 seeded Session 携带 `seedLength`）、数值型 `afterSeq` 与 `throughSeq`，以及把完整权威事件翻译为原始数值 envelope 字段后的数组元素。每个水位都会记录已接受请求发送的会话 id，因此 fork 会话会忽略从父会话继承的水位。
+对于携带存活 `sessionId` 的请求，插件会折叠该确切会话格式代际的最大已接受水位，通过 `snapshotEvents()` 对会话日志取快照，并发送水位之后能装进 `maxBytes` 的最长连续前缀。进程内 fold 会让每条事件只被扫描一次并增量消费后续追加；重启与 HMR 会从持久日志重建它。版本 1 字段包含 `sessionFormatVersion`、兼容 v0 的原始会话 header（仅 seeded Session 携带 `seedLength`）、数值型 `afterSeq` 与 `throughSeq`，以及把完整权威事件翻译为原始数值 envelope 字段后的数组元素。水位同时记录已接受请求发送的会话 id 与格式代际，两者都匹配才生效，因此 fork 会话会忽略从父会话继承的水位。
+
+`maxBytes` 约束完整序列化字段的 UTF-8 字节数，包含 header 与数值 envelope 字段。超过上限的积压会跨连续的已接受请求排空，每次从前一个 `throughSeq` 继续。当第一条待传事件单独就超过上限时，请求会省略 `dsh_session_log`，插件对每个阻塞事件记录一条警告，水位停留在该事件之前，直到 `maxBytes` 容纳它。完全无法序列化的事件按同样方式处理，且任何 `maxBytes` 值都无法容纳它。
 
 <a id="acceptance-and-retry"></a>
 ## 接受与重试
 
-DeepSeek 适配器会在 HTTP 2xx 后、消费 SSE（Server-Sent Events）正文前调用已准备贡献的 `accept()`。接受操作会追加 `session-log-deepseek/delivery-accepted` 及已上传的 `throughSeq`；下一次请求再把该事件作为新后缀的一部分上传。传输失败与非 2xx 失败不会追加接受记录，因此后续请求会重发不确定范围。并发交付可能乱序得到接受；折叠匹配记录中最大的 `throughSeq` 可以防止游标回退。
+DeepSeek 适配器会在 HTTP 2xx 后、消费 SSE（Server-Sent Events）正文前调用已准备贡献的 `accept()`。接受操作会追加 `session-log-deepseek/delivery-accepted` 及已上传的 `throughSeq` 与 `sessionFormatVersion`；省略格式字段的记录表示 v0。下一次请求再把该事件作为新后缀的一部分上传。传输失败与非 2xx 失败不会追加接受记录，因此后续请求会重发不确定范围。并发交付可能乱序得到接受；折叠匹配记录中最大的 `throughSeq` 可以防止游标回退。
 
 服务端接受后、持久化水位前发生崩溃，可能让恢复后的进程重放已经接受的范围。这是至少一次交付的失败方向：不确定性会制造重复，绝不会跳过序列。普通会话检查点策略会在下一个语义检查点持久化水位；本插件不执行独立 I/O。
 
@@ -70,7 +76,7 @@ DeepSeek 适配器会在 HTTP 2xx 后、消费 SSE（Server-Sent Events）正文
 
 - **崩溃窗口重复**——2xx 后、接受水位持久化前进程丢失，会在恢复时触发保守重放。
 - **缺少存活会话就没有字段**——直接调用或陈旧会话调用没有可供快照的权威日志；显式缺失语义仍暂缓处理。
-- **没有独立请求大小上限**——完整交付会快速失败；提供方拒绝会保持游标不变，而非截断日志。
+- **超大单事件阻塞后缀**——大于 `maxBytes` 的事件会拦住水位，直到上限容纳它；调大 `maxBytes` 可以排空。
 
 <a id="dev-note"></a>
 ### 开发备注

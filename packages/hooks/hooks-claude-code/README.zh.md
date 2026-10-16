@@ -35,7 +35,7 @@ import type { Config } from '@deepseek-ai/dsh-hooks-claude-code'
 const config: Config = {
   configPath: '/path/to/hooks.json', // required: a hooks.json or a settings file with a `hooks` key
   pluginRoot: '/path/to/plugin',     // optional: replaces ${CLAUDE_PLUGIN_ROOT} in command strings
-  projectDir: '/path/to/project',    // optional: replaces ${CLAUDE_PROJECT_DIR} AND sets the hook env var; defaults to the session cwd when omitted
+  projectDir: '/path/to/project',    // optional: replaces ${CLAUDE_PROJECT_DIR} AND sets the hook env var; defaults to the Session's current directory when omitted
   defaultTimeoutMs: 600_000,         // optional: per-hook timeout when a hook sets none (CC default)
   stderrSummaryMaxChars: 500,        // optional: char cap on the hook/result event's persisted stderr summary
   modelFeedbackMaxChars: 2_000,      // optional: char cap on one hook-authored text bound for model context
@@ -53,7 +53,7 @@ const config: Config = {
 
 配置只在加载时解析**一次**。`configPath` 是**进程级**配置：相对路径在加载时根据进程启动 cwd 解析，因此一份配置应用于整个进程。尚未进行每会话（`session/new.cwd`）配置发现（`TODO(per-session-hook-config)`）。读取／解析失败会被隔离处理，其中包括实际消费 matcher 的事件所带的无效 matcher 正则（会报告其 pattern 与事件）：桥接记录警告且不注册任何内容，而不是使启动崩溃（路径拼写错误不应使 agent（智能体）停止）。只运行 shell 形式 `type: 'command'` hook；`http`／`mcp_tool`／`prompt`／`agent` hook 会被解析并跳过，同时记录警告。没有每 hook `timeout` 的 hook 会使用协议参考默认值 `DEFAULT_HOOK_TIMEOUT_MS`（来自 `dsh-hook-protocol`，10 分钟，即 CC 默认值）。
 
-hook **本身**会在 agent 的会话工作区中运行：对 agent scope 点，桥接会将会话 `cwd`（`session/new.cwd`）作为 hook 进程工作目录，因此 hook 的 `pwd`／相对路径／marker 作用于用户项目树，而非服务器启动目录。
+hook **本身**会在 Agent 的 Session 当前目录中运行：对 agent scope 点，桥接解析 `ctx.workingDirectory.ensure(agent)` 并将结果同时作为 hook 进程工作目录和 payload `cwd`，因此 `pwd`、`cwd` 与相对路径保持一致。没有匹配 command 的 hook 点会完全跳过目录解析。
 
 <a id="hook-points--typed-decisions"></a>
 ## Hook 点 → 类型化 Decision

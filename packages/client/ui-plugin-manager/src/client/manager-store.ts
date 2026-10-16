@@ -23,6 +23,7 @@ import type {
   PluginSpecInspection,
   ReadOnlyReason,
   Registry,
+  RestartReason,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import { normalizeRegistry, NPMMIRROR_REGISTRY, OFFICIAL_NPM_REGISTRY, REGISTRY_URL } from '@deepseek-ai/dsh-plugin-manager/registry'
 import { createSnapshotStore, type ProjectUiPolicySnapshot, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
@@ -38,7 +39,7 @@ export type FailedAction = 'enable' | 'disable' | 'uninstall' | 'rowEnable' | 'r
 
 /** What the last action left to say, shown as a toast; `seq` tells one showing from the next. */
 export type ManagerNotice =
-  | { readonly kind: 'restart'; readonly packageName: string; readonly seq: number }
+  | { readonly kind: 'restart'; readonly packageName: string; readonly reason: RestartReason | undefined; readonly seq: number }
   | { readonly kind: 'overridden'; readonly packageName: string; readonly seq: number }
   | { readonly kind: 'cancelled'; readonly seq: number }
   | { readonly kind: 'refresh-failed'; readonly seq: number }
@@ -205,6 +206,8 @@ export interface InstallState {
   readonly installed: string | null
   /** Whether the finished run's bundle waits for the next start to load. */
   readonly restartRequired: boolean
+  /** Why it waits, when the Host says. */
+  readonly restartReason?: RestartReason
   /**
    * The run's failure, once one settled the dialog: the Host's refusal
    * `code` with its diagnostic as `reason`, or the transport's words alone;
@@ -1004,6 +1007,7 @@ export class PluginManagerController {
         phase: 'done', runs: settledRuns(runs, 0), failure: null,
         installed: result.bundle ?? null,
         restartRequired: result.application === 'restart-required',
+        ...result.restartReason === undefined ? {} : { restartReason: result.restartReason },
         approvedBuilds: result.approvedBuilds ?? [],
         ...asked,
       })
@@ -1165,7 +1169,7 @@ export class PluginManagerController {
         this.patch({ notice: { kind: 'cancelled', seq: ++this.noticeSeq } })
         return
       case 'restart-required':
-        this.patch({ notice: { kind: 'restart', packageName, seq: ++this.noticeSeq } })
+        this.patch({ notice: { kind: 'restart', packageName, reason: result.restartReason, seq: ++this.noticeSeq } })
         return
       case 'overridden':
         this.patch({ notice: { kind: 'overridden', packageName, seq: ++this.noticeSeq } })

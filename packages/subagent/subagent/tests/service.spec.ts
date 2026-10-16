@@ -19,6 +19,7 @@ import SubagentRuntime, {
   type SubagentStartRequest,
 } from '@deepseek-ai/dsh-subagent'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 function fakeParent(id = 'parent-1'): Agent {
   return { id: SessionId(id) } as unknown as Agent
@@ -64,6 +65,7 @@ class StubProvider implements SubagentProvider {
 
 async function service(): Promise<{ ctx: Context; subagents: SubagentRuntime }> {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   return { ctx, subagents: ctx.subagents }
 }
@@ -74,7 +76,9 @@ describe('SubagentRuntime', () => {
     { maxContinuableActivationsPerParent: 1.5 },
     { maxContinuableActivations: Number.MAX_SAFE_INTEGER + 1 },
   ])('rejects invalid Activation limits at plugin load', async (config) => {
-    await expect(new Context().plugin(SubagentRuntime, config)).rejects.toThrow()
+    const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
+    await expect(ctx.plugin(SubagentRuntime, config)).rejects.toThrow()
   })
 
   it('registers, lists, looks up, starts, and removes providers', async () => {
@@ -123,6 +127,9 @@ describe('SubagentRuntime', () => {
 
     expect(provider.lastRequest).toEqual({
       ...request,
+      // The runtime resolves the parent's effective directory before startup;
+      // the stub parent has no Session, so the fixture's default applies.
+      cwd: process.cwd(),
       descriptor: {
         version: SUBAGENT_DESCRIPTOR_VERSION,
         mode: 'one-shot',

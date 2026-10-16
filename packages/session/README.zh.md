@@ -33,6 +33,8 @@ session 组让对话持久保存，恢复已发布的日志格式，并使已提
 | 包 | 职责 | ctx 键 |
 |---|---|---|
 | [`session-projection/`](session-projection/README.zh.md) | 定义并驱动会话投影单元 | `ctx.sessionProjections` |
+| [`working-directory/`](working-directory/README.zh.md) | 拥有每个 Session 的有效执行目录与用户上下文变更 | `ctx.workingDirectory` |
+| [`tool-working-directory/`](tool-working-directory/README.zh.md) | 通过单一工具读取或更改活动目录 | `working_directory` |
 | [`session-projection-cache/`](session-projection-cache/README.zh.md) | 持久化并恢复投影检查点 | `ctx.sessionProjectionCache` |
 | [`session-stats/`](session-stats/README.zh.md) | 提供全日志会话计数与墙钟时间（`sessionStats` 单元） | 注册到 `ctx.sessionProjections` |
 
@@ -58,4 +60,4 @@ session 组让对话持久保存，恢复已发布的日志格式，并使已提
 | [`session-telemetry/`](session-telemetry/README.zh.md) | 定义捕获、脱敏、投影，以及实时或按需后端投递。 |
 | [`session-telemetry-otel/`](session-telemetry-otel/README.zh.md) | 通过 OpenTelemetry 日志以 `FULL`、`FEEDBACK_ONLY` 或 `DISABLED` 模式投递遥测。 |
 
-子系统参考：[persistence.md](../../docs/subsystems/persistence.zh.md)、[session-projection.md](../../docs/subsystems/session-projection.zh.md)、[session-title.md](../../docs/subsystems/session-title.zh.md) 与 [session-telemetry.md](../../docs/subsystems/session-telemetry.zh.md)。同一时间只允许一个标题提供方注册；demo 主干挂载回退服务，两个模型提供方都留在默认组合之外。
+子系统参考：[persistence.md](../../docs/subsystems/persistence.zh.md)、[working-directory.md](../../docs/subsystems/working-directory.zh.md)、[session-projection.md](../../docs/subsystems/session-projection.zh.md)、[session-title.md](../../docs/subsystems/session-title.zh.md) 与 [session-telemetry.md](../../docs/subsystems/session-telemetry.zh.md)。同一时间只允许一个标题提供方注册；demo 主干挂载回退服务，两个模型提供方都留在默认组合之外。

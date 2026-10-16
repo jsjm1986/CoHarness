@@ -9,6 +9,7 @@
  * @module @deepseek-ai/dsh-agent-instructions
  */
 
+import type {} from '@deepseek-ai/dsh-working-directory'
 import type { Context } from '@deepseek-ai/cordis'
 import { isDeepStrictEqual } from 'node:util'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
@@ -27,11 +28,12 @@ import {
   type InstructionVersionCache,
   type AgentInstructionSource,
 } from './state.ts'
-import type { AgentInstructionChange } from './render.ts'
+import { trimmedInstructionDigest } from './digest.ts'
+import { instructionScopeKey, scopeForDisplayPath, type AgentInstructionChange } from './render.ts'
 
 export { Config, name }
 /** Services required by workspace instruction projection. */
-export const inject = ['sessionProjections']
+export const inject = ['sessionProjections', 'workingDirectory']
 export {
   discoverBaselineInstructionFiles,
   loadBaselineInstructions,
@@ -118,15 +120,15 @@ export function apply(ctx: Context, config: Config): void {
     }
     const fileSystem = ctx.get('fs')
     if (fileSystem === undefined) return undefined
-    if (touchedPaths.length === 0 && pending.length > 0) return pending[0]
     const content: UserMessage['content'][number][] = []
     const changes: AgentInstructionChange[] = []
     let desiredBaseline = false
     const authorityMessages = [...claimed]
-    /* v8 ignore next -- normal agents carry an absolute session cwd. */
-    const cwd = agent.session.header.cwd ?? process.cwd()
+    const cwd = await ctx.workingDirectory.ensure(agent, signal)
     const projectRoot = await findProjectRoot(cwd, resolved.projectRootMarkers, fileSystem, signal)
     const identity = workspaceBaselineIdentity(resolved, cwd, projectRoot)
+    if (touchedPaths.length === 0 && pending.length > 0
+      && baselinePreparations.get(agent.session)?.identity === identity) return pending[0]
     const visibleBaseline = visibleBaselineSource(agent, authorityMessages)
     const baselinePresent = visibleBaseline !== undefined
     const keepVisibleBaseline = visibleBaseline?.baselineIdentity === identity
@@ -151,8 +153,22 @@ export function apply(ctx: Context, config: Config): void {
       }, fileSystem)
       const baseline = baselineInstructionState(instructions?.included ?? [])
       const observedBaseline = baselineInstructionState(instructions?.observed ?? [])
+      const includedDigestsByDir = new Map<string, Set<string>>()
+      for (const file of instructions?.included ?? []) {
+        const directory = scopeForDisplayPath(file.displayPath)
+        const digests = includedDigestsByDir.get(directory) ?? new Set<string>()
+        digests.add(trimmedInstructionDigest(file.content))
+        includedDigestsByDir.set(directory, digests)
+      }
+      // A duplicate inherits its winner's budget omission. Only duplicates of
+      // retained content remain eligible for promotion during reconciliation.
       const excludedScopes = new Set(observedBaseline.changes.keys())
       for (const scope of baseline.changes.keys()) excludedScopes.delete(scope)
+      for (const file of instructions?.deduped ?? []) {
+        if (includedDigestsByDir.get(scopeForDisplayPath(file.displayPath))?.has(trimmedInstructionDigest(file.content))) {
+          excludedScopes.delete(instructionScopeKey(file.displayPath))
+        }
+      }
       excludedBaselineScopes = excludedScopes
       nextPreparation = { identity, excludedScopes }
       let versionStates = instructionVersions.get(agent.session)
@@ -193,6 +209,7 @@ export function apply(ctx: Context, config: Config): void {
       instructionVersions,
       fileSystem,
       {
+        cwd,
         authorityMessages,
         scopeMessages: pending,
         includeBaselineScopes: keepVisibleBaseline,

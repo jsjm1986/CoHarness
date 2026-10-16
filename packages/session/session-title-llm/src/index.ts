@@ -170,7 +170,15 @@ export function registerSessionTitleLlmProvider(
     id: titleProvider,
     automatic,
     async generate(request) {
-      return generateSessionTitleWithLlm(ctx, resolved, request, selectMessages(request.messages), titleProvider)
+      const current = automatic === 'all-prompts' ? ctx.sessionTitle.get(request.session) : undefined
+      return generateSessionTitleWithLlm(
+        ctx,
+        resolved,
+        request,
+        selectMessages(request.messages),
+        titleProvider,
+        current?.source.kind === 'provider' ? current.title : undefined,
+      )
     },
   })
 }
@@ -190,17 +198,27 @@ function resolveRoute(
 }
 
 /** Stable language-aware system instruction shared by both provider plugins. */
-function systemPrompt(config: ResolvedSessionTitleLlmConfig): string {
+function systemPrompt(config: ResolvedSessionTitleLlmConfig, hasCurrentTitle: boolean): string {
   return [
     'Create a concise title for an AI coding-assistant session from the supplied human messages.',
     'Return only the title on one line, **in plain text of natural language**, with no quotes, prefix, explanation, Markdown, XML, or terminal control codes. No code is allowed.',
     'Use the language of the messages.',
     `Aim for about ${config.targetWords} words in non-CJK languages or ${config.targetCjkCharacters} CJK characters.`,
+    'If the messages give little to name, still return a short best-effort title, such as Greeting, instead of explaining.',
+    ...hasCurrentTitle ? [
+      'An existing title is supplied as currentTitle. If it still accurately describes the main topic or task, return it exactly unchanged.',
+      'Follow-up questions, additional details within the same topic, acknowledgements such as "thanks", and requests to continue do not by themselves justify a title change.',
+      'Do not reword, polish, shorten, or replace synonyms in an adequate title. Keeping its exact wording takes priority over the target length.',
+      'Change the title only when the messages materially change or expand the main topic or task so that the existing title is no longer accurate.',
+    ] : [],
   ].join('\n')
 }
 
 /** Frame exact messages as JSON so user text cannot break structural delimiters. */
-function frameMessages(messages: readonly SessionTitleUserMessage[]): string {
+function frameMessages(messages: readonly SessionTitleUserMessage[], currentTitle?: string): string {
+  if (currentTitle !== undefined) {
+    return `Update the session title from this JSON object:\n${JSON.stringify({ currentTitle, messages })}`
+  }
   return `Generate the session title from this JSON array of human messages:\n${JSON.stringify(messages)}`
 }
 
@@ -231,6 +249,7 @@ function finishError(finish: FinishReason): Error | undefined {
  * @param request - service-owned session, route, message snapshot, and cancellation.
  * @param selectedMessages - exact provider-selected subset to frame and attribute.
  * @param titleProvider - registered title-provider identity recorded with the request.
+ * @param currentTitle - existing model-generated title to preserve while it still describes the main topic.
  * @returns normalized non-empty title, exact source seqs, and used model route.
  */
 export async function generateSessionTitleWithLlm(
@@ -239,12 +258,13 @@ export async function generateSessionTitleWithLlm(
   request: SessionTitleProviderRequest,
   selectedMessages: readonly SessionTitleUserMessage[],
   titleProvider: SessionTitleProviderId,
+  currentTitle?: string,
 ): Promise<SessionTitleProviderResult> {
   request.signal.throwIfAborted()
   if (selectedMessages.length === 0) {
     throw new Error('session-title-llm: at least one source message is required')
   }
-  const framedInput = frameMessages(selectedMessages)
+  const framedInput = frameMessages(selectedMessages, currentTitle)
   const inputBytes = Buffer.byteLength(framedInput, 'utf8')
   if (inputBytes > config.maxInputBytes) {
     throw new Error(`session-title-llm: input is ${inputBytes} bytes, exceeding maxInputBytes ${config.maxInputBytes}`)
@@ -254,7 +274,7 @@ export async function generateSessionTitleWithLlm(
     content: [{ type: 'text', text: framedInput }],
     source: { kind: 'dsh-session-title-llm' },
   })]
-  const system = systemPrompt(config)
+  const system = systemPrompt(config, currentTitle !== undefined)
   using callDeadline = deadline(request.signal, config.timeoutMs, SESSION_TITLE_TIMEOUT_CODE)
   const options: GenerateOptions = deepFreeze({
     provider: route.provider,

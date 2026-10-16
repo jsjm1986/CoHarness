@@ -76,3 +76,5 @@ None; this package neither assembles nor sends a provider request.
 None.
 
 </details>
+
+History rows without a stored title use the localized unnamed label (未命名 / untitled), rather than a directory name. The current blank row remains New Session; other blank rows remain hidden.

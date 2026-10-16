@@ -14,6 +14,7 @@
  * - `FAKE_ECHO_ENV`: comma-separated env names to echo as `name=value` lines in the assistant text.
  * - `FAKE_MALFORMED`: `initialize` returns `{}` (no serverInfo); `prompt` returns `{}` (no messageId).
  * - `FAKE_MALFORMED_PROMPT`: `initialize` is normal; only `prompt` returns `{}` (no messageId).
+ * - `FAKE_MALFORMED_DIRECTORY`: `session/working-directory/*` replies `{cwd: 17}` (non-string cwd probe).
  * - `FAKE_INIT_ERROR`: `initialize` answers a JSON-RPC error response with code 7.
  * - `FAKE_INIT_ERROR_ONCE_FILE`: fail `initialize` (code 7) only when this
  *   marker file does NOT exist yet, creating it — so the first runtime
@@ -47,6 +48,7 @@
  */
 
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import process from 'node:process'
 import { createInterface } from 'node:readline'
 
@@ -79,6 +81,8 @@ function notify(method: string, params: object): void {
 }
 
 let seq = 0
+let originCwd = process.cwd()
+const workingDirectories = new Map<string, string>()
 function event(sessionId: string, type: string, data: object): void {
   notify('session.event', { sessionId, event: { type, seq: seq++, time: 0, data } })
 }
@@ -225,6 +229,7 @@ reader.on('line', (line) => {
   const respond = (result: object): void => { write({ jsonrpc: '2.0', id: frame.id, result }) }
   switch (frame.method) {
     case 'initialize':
+      if (typeof frame.params?.cwd === 'string') originCwd = frame.params.cwd
       if (env.FAKE_RECORD_INIT !== undefined) appendFileSync(env.FAKE_RECORD_INIT, `${JSON.stringify(frame.params)}\n`)
       if (env.FAKE_HANG_INIT !== undefined) return
       if (env.FAKE_INIT_READY !== undefined && env.FAKE_INIT_GO !== undefined) {
@@ -257,6 +262,21 @@ reader.on('line', (line) => {
       }
       respond({ serverInfo: { name: 'deepseek-harness-sdk-runtime', version: '0.0.1' } })
       return
+    case 'session/working-directory/get':
+    case 'session/working-directory/set': {
+      if (env.FAKE_MALFORMED_DIRECTORY !== undefined) {
+        respond({ cwd: 17 })
+        return
+      }
+      const sessionId = sessionIdOf(frame.params)
+      const previous = workingDirectories.get(sessionId) ?? originCwd
+      const cwd = frame.method === 'session/working-directory/set'
+        ? resolve(previous, String(frame.params?.path))
+        : previous
+      workingDirectories.set(sessionId, cwd)
+      respond({ cwd })
+      return
+    }
     case 'session/prompt': {
       const sessionId = sessionIdOf(frame.params)
       const messageId = `fake-user-${seq}`

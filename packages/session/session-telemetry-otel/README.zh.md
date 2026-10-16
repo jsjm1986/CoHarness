@@ -7,11 +7,11 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-[遥测（telemetry）seam](../session-telemetry/) 的 OpenTelemetry 后端，也是部署方唯一要加载的条目。其 `mode` 决定 seam 是实时跟随会话事件、仅在记录反馈时回放权威日志，还是将遥测留在本地。上传模式会原样组合 OTel JS SDK（`LoggerProvider` → `BatchLogRecordProcessor` → OTLP/HTTP 日志导出器），把每条已交接记录映射到 `logger.emit()`，并使用两个插桩作用域（instrumentation scope）：ledger 记录挂在 `@deepseek-ai/dsh-session-sessionTelemetry-otel` 下，运维记录挂在 `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops` 下。资源身份包含 `service.name`/`service.version`（来自 `dsh-llm` 的 `APP_IDENTITY`），以及本包的匿名 `user.id`（`$DSH_HOME/.anonymous-user-id`；首次使用时创建的随机 UUID，删除该文件可重置）；这些身份随每个导出批次携带一次，而非逐条记录携带。
+[遥测（telemetry）seam](../session-telemetry/) 的 OpenTelemetry 后端，也是部署方唯一要加载的条目。其 `mode` 决定 seam 是实时跟随会话事件、仅在记录反馈时回放权威日志，还是将遥测留在本地。上传模式组合一个 `LoggerProvider`、本包的字节/条数有界处理器与 OTLP/HTTP 日志导出器，把每条已交接记录映射到 `logger.emit()`，并使用两个插桩作用域（instrumentation scope）：ledger 记录挂在 `@deepseek-ai/dsh-session-sessionTelemetry-otel` 下，运维记录挂在 `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops` 下。资源身份包含 `service.name`/`service.version`（来自 `dsh-llm` 的 `APP_IDENTITY`），以及本包的匿名 `user.id`（`$DSH_HOME/.anonymous-user-id`；首次使用时创建的随机 UUID，删除该文件可重置）；这些身份随每个导出批次携带一次，而非逐条记录携带。
 
 ## 概述
 
-`dsh-session-telemetry-otel` 仅在新的显式反馈后通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。`FEEDBACK_ONLY` 释放截至该反馈的权威日志前缀，包含上下文；后续记录等待下一次显式反馈。`DISABLED` 不构造传输。SDK 批处理可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
+`dsh-session-telemetry-otel` 仅在新的显式反馈后通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。`FEEDBACK_ONLY` 释放截至该反馈的权威日志前缀，包含上下文；后续记录等待下一次显式反馈。`DISABLED` 不构造传输。有界队列可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
 
 ## 目录
 
@@ -38,7 +38,8 @@ kind: "package-reference"
       url: https://collector.example.com/v1/logs
       headers:
         authorization: !!js `Bearer ${process.env.OTLP_TOKEN}`
-    processor: {}            # optional; passed verbatim to BatchLogRecordProcessor
+    maxRequestBytes: 4000000 # optional; uncompressed request ceiling, never above 4,000,000
+    processor: {}            # optional; count/queue/cadence/watchdog knobs of the bounded processor
 ```
 
 | `mode` | 行为 |
@@ -53,7 +54,7 @@ kind: "package-reference"
 
 已挂载的服务通过 seam 的 [`SessionTelemetrySharingStatus`](../session-telemetry/README.zh.md#the-sharing-disclosure) `sharing` 属性披露解析后的模式（`full` / `feedback-only` / `disabled`），因此 `/feedback` 的确认文本可以报告会话是否以及如何被共享。该披露在构造函数中设置，与采集相互独立：即使 `DISABLED` 也会披露 `disabled`。
 
-`exporter.url` 在 `FULL` 与 `FEEDBACK_ONLY` 中必填，无默认值，且必须能解析为 `http(s)`；在 `DISABLED` 中可省略且不使用。在上传模式中，`shutdownTimeoutMillis` 是由 DSH 管理的有限正数外层截止时间，默认值为 3000 ms；`processor.maxExportBatchSize` 不是正整数时也会在插件加载时失败，因为 SDK 会接受该值，随后却在关闭时挂起。两个 SDK 配置块都整体透传（passthrough）：`OTLPExporterNodeConfigBase` 的每个字段（`headers`、`timeoutMillis`、`compression`、`keepAlive` 等）都会到达导出器；批处理、导出节奏（`scheduledDelayMillis`）、重试、队列上限，以及持续失败下的丢失策略，都是通过 `processor` 调节的 SDK 行为。该后端不实现 `flush()`：常规 flush 由批处理器负责。关闭期间，OTel 会先等待 `exporter.forceFlush()`，再等待受处理器 `exportTimeoutMillis` 限制的完成 promise；如果该传输 promise 始终不结算，本包会在 `shutdownTimeoutMillis` 到期时放弃等待，通过协调器记录已隔离的关闭失败，并让应用继续拆卸。该截止时间无法取消 SDK 传输，因此届时仍待处理的记录可能在进程退出时丢失。
+`exporter.url` 在 `FULL` 与 `FEEDBACK_ONLY` 中必填，无默认值，且必须能解析为 `http(s)`；在 `DISABLED` 中可省略且不使用。在上传模式中，`shutdownTimeoutMillis` 是由 DSH 管理的有限正数外层截止时间，默认值为 3000 ms。`maxRequestBytes` 以未压缩 UTF-8 字节数约束每个 OTLP 请求（含 envelope），只能调低、不得超过采集端上限 4,000,000；`processor` 的每个旋钮（`maxQueueSize`、`maxExportBatchSize`、`scheduledDelayMillis`、`exportTimeoutMillis`）必须是不大于 2,147,483,647 的正整数，且 `maxExportBatchSize` 不得超过 `maxQueueSize`——以上违规均在插件加载时失败。处理器用 SDK 自身的请求序列化器对每条记录只测量一次，并按字节与条数上限贪心打包；单条超限记录经 `ctx.logger.warn` 诊断一次后丢弃（不截断），绝不阻塞后续记录，队列满时同样拒绝新记录。一个 HTTP 请求占有传输槽直至结算：`processor.exportTimeoutMillis` 是看门狗告警而非中止。两个 SDK 配置块整体透传（passthrough），例外是自观测量（`selfObsMeterProvider`，没有归属的 MeterProvider 消费）与 `exporter.httpAgentOptions`（本包对其包装以跟踪每个 transport agent 供关闭时清理）；`OTLPExporterNodeConfigBase` 的其余每个字段（`headers`、`timeoutMillis`、`compression`、`keepAlive` 等）都会到达导出器；持续失败下的传输重试与 socket 行为仍归 SDK 导出器。该后端不实现 `flush()`：常规 flush 由处理器负责。关闭期间，provider 先等待队列排干与 `exporter.forceFlush()`，传输始终拿不到 socket 时该等待可保持未决；若到 `shutdownTimeoutMillis` 仍未结算，排队记录被丢弃，已隔离的关闭失败经协调器记录，应用继续拆卸。无论到期还是正常完成，随后都会销毁每个被跟踪的 transport agent：挂起的在途请求因此失败而不是滞留，SDK 空实现的 transport shutdown 留下的空闲 keepAlive socket 也不会把进程拖住。
 
 <a id="what-leaves-the-machine"></a>
 ## 哪些数据会离开本机
@@ -68,7 +69,7 @@ seam 记录 → SDK 日志记录：`time` → `timestamp`/`observedTimestamp`；
 <a id="invariants"></a>
 ## 不变量
 
-**运行时不变量：** 未发布配套入口。记录交给供应商 SDK 自身的批处理与导出流水线；后端不拥有可供比较的排队或重试状态。
+**运行时不变量：** 未发布配套入口。有界队列原样持有已发出的记录；不存在第二份投影可供比较。
 
 
 <a id="model-experience"></a>

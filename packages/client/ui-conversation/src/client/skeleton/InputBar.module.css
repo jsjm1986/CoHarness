@@ -708,6 +708,12 @@
   flex-wrap: wrap;
 }
 
+/* Compact docked card: shave the desktop 16/12 padding to a phone rhythm;
+   the bottom sits above the stats strip, which needs no extra card gap. */
+:global([data-viewport='compact']) .root {
+  padding-bottom: var(--dsw-space-1);
+}
+
 :global([data-viewport='compact']) .row {
   /* The compact toolbar holds one icon line at every width; extension items
      scroll inside their own lane instead of pushing the row taller. */
@@ -785,8 +791,8 @@
    before it ever yields a second row. */
 @media (max-width: 767px) {
   :global([data-viewport='compact']) .card {
-    gap: var(--dsw-space-2);
-    padding-top: 8px;
+    gap: 6px;
+    padding: 6px var(--dsw-space-3) var(--dsw-space-2);
     border-radius: var(--dsw-mobile-card-radius);
   }
 
@@ -801,7 +807,7 @@
     grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
     gap: var(--dsw-space-1);
-    padding: 0 var(--dsw-space-2) 6px;
+    padding: 0 0 4px;
   }
 
   :global([data-viewport='compact']) .tools {

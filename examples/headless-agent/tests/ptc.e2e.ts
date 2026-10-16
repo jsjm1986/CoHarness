@@ -3,15 +3,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import LlmRuntime, { createUserMessage, ToolCallId, HarnessError  } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId, HarnessError } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { RUN_CODE_NAME, defineTool } from '@deepseek-ai/dsh-tools'
+import { RUN_CODE_NAME, defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
-import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { LocalBashExecutor } from '@deepseek-ai/dsh-bash-local'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
@@ -55,12 +55,11 @@ afterEach(async () => {
 
 async function codeModeHarness(cwd: string): Promise<Context> {
   const harness = new Context()
-  await harness.plugin(LlmRuntime)
-  await harness.plugin(SessionStore)
-  await harness.plugin(SystemPrompt, { personaPrefix: PERSONA })
-  await harness.plugin(ToolRuntime, { mode: 'ptc' })
-  await harness.plugin(AgentRegistry)
-  await harness.plugin(SessionProjectionRegistry)
+  await mountAgentLoopTestDependencies(harness, {
+    workingDirectory: true,
+    systemPrompt: { personaPrefix: PERSONA },
+    tools: { mode: 'ptc' },
+  })
   await harness.plugin(AgentLoop, { agents: [] })
   await harness.plugin(LlmDeepSeek)
   await harness.plugin(LocalSubprocessRuntime)
@@ -73,15 +72,14 @@ async function codeModeHarness(cwd: string): Promise<Context> {
 
 async function workspacePtcHarness(): Promise<Context> {
   const harness = new Context()
-  await harness.plugin(LlmRuntime)
-  await harness.plugin(SessionStore)
-  await harness.plugin(SystemPrompt, { personaPrefix: PERSONA })
-  await harness.plugin(ToolRuntime, { mode: 'ptc' })
-  await harness.plugin(AgentRegistry)
   await harness.plugin(LocalFileSystem, { cwd: '/' })
+  await mountAgentLoopTestDependencies(harness, {
+    workingDirectory: true,
+    systemPrompt: { personaPrefix: PERSONA },
+    tools: { mode: 'ptc' },
+  })
   await harness.plugin(ToolFs)
   await harness.plugin(WorkspaceContext, { maxBytes: 65536 })
-  await harness.plugin(SessionProjectionRegistry)
   await harness.plugin(AgentLoop, { agents: [] })
   await harness.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-flash' }] })
   await mountRuntime(harness)
@@ -131,8 +129,7 @@ async function mountRuntime(harness: Context): Promise<void> {
 /** Keyless real-worker harness for direct typed-binding acceptance tests. */
 async function typedPtcHarness(): Promise<Context> {
   const harness = new Context()
-  await harness.plugin(SystemPrompt)
-  await harness.plugin(ToolRuntime, { mode: 'ptc' })
+  await mountAgentLoopTestDependencies(harness, { workingDirectory: true, tools: { mode: 'ptc' } })
   await mountRuntime(harness)
   return harness
 }
@@ -291,7 +288,8 @@ describe('PTC mode typed values: keyless real-worker contracts', () => {
     const agent = {
       id: SessionId('ptc-cordis'),
       session: ctx.sessions.create(SessionId('ptc-cordis'), { meta: { cwd: process.cwd() } }),
-    } as unknown as Agent
+      ctx,
+    } as Agent
 
     const value = completion(await runCode(ctx, `
       const listed = await tools.cordis_inspect_list({});
@@ -334,7 +332,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC mode: real model writes a pr
   it('collapses the wire tool list to [run_code], bridges sub-calls, and returns curated output', async () => {
     workdir = await mkdtemp(join(tmpdir(), 'dsh-ptc-e2e-'))
     ctx = await codeModeHarness(workdir)
-    const agent = await ctx.agentLoop.create(SessionId('e2e-ptc'), { provider: 'deepseek-official', model: 'deepseek-flash' })
+    const agent = await ctx.agentLoop.create(SessionId('e2e-ptc'), { provider: 'deepseek-official', model: 'deepseek-flash' }, { cwd: workdir })
 
     agent.followup(createUserMessage({
       content: [{

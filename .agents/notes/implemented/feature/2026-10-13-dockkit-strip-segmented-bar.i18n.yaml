@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-13-dockkit-strip-segmented-bar.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-dockkit-strip-segmented-bar.md
+/agent-note-dock-strip-adopts-the-segmented-bar-language-and-the-panel-clips-its-own-corners:
+  en: e359358f4b9130ce
+  zh: 05937b6116bba286
+/agent-note-dock-strip-adopts-the-segmented-bar-language-and-the-panel-clips-its-own-corners/problem:
+  en: d8c6b67c1f6b4f19
+  zh: 4dd2118928c471cd
+/agent-note-dock-strip-adopts-the-segmented-bar-language-and-the-panel-clips-its-own-corners/decision:
+  en: ea69ff3c8b14c2be
+  zh: 39aeec4cf61ea269
+/agent-note-dock-strip-adopts-the-segmented-bar-language-and-the-panel-clips-its-own-corners/alternatives-considered:
+  en: 1c5589bd1f1cf4de
+  zh: 96ea44a221d20d97
+/agent-note-dock-strip-adopts-the-segmented-bar-language-and-the-panel-clips-its-own-corners/verification:
+  en: fe6cc960b9925632
+  zh: 07faa5004419264a
+/agent-note-dock-strip-adopts-the-segmented-bar-language-and-the-panel-clips-its-own-corners/consequences:
+  en: bb8430866e05150f
+  zh: 1a6cd856b8fef5b9

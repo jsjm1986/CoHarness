@@ -19,3 +19,12 @@
   cursor: default;
   user-select: none;
 }
+
+/* First sacrifice when the title row (the enclosing inline-size container)
+   runs out of width: the preset is passive chrome, so it yields before any
+   interactive header action loses its label. */
+@container (max-width: 540px) {
+  .label {
+    display: none;
+  }
+}

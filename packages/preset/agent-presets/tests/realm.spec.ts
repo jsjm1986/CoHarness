@@ -19,6 +19,7 @@ import ToolRuntime from '@deepseek-ai/dsh-tools'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import TerminalController from '@deepseek-ai/dsh-api-terminal-controller'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -43,6 +44,7 @@ declare global {
 /** Boot the composition harness with a host `fs` a realm can shadow. */
 async function harness(roster: Config = { default: 'probe', roots: ROOTS, includeUserRoot: false }): Promise<Context> {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   ctx.baseUrl = pathToFileURL(FIXTURES).href + '/'
   await ctx.plugin(Loader)
   await ctx.plugin(PluginPackages)

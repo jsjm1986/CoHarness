@@ -879,6 +879,43 @@ describe('step boundary publication order', () => {
   })
 })
 
+describe('request admission ordering', () => {
+  it('dispatches agent/message-entered for claimed input before the agent/request waterfall, and for the refreshed runtime-context snapshot after it', async () => {
+    const adapter = new MockAdapter([textResponse('done')])
+    const ctx = await harness(adapter)
+    const agent = await ctx.agentLoop.create(SessionId('a-admission-order'), { provider: 'mock', model: 'mock' })
+
+    ctx.systemPrompt.context({
+      name: 'test-context',
+      order: 100,
+      text: 'test context line',
+      interpolate: false,
+      required: true,
+    })
+
+    const order: string[] = []
+    let contextCommittedAtRequest = true
+    ctx.on('agent/message-entered', ({ event }) => {
+      if (event.type === 'user/message') order.push(`entered:${event.data.source.kind}`)
+    })
+    ctx.on('agent/request', async (_payload, next) => {
+      order.push('request')
+      contextCommittedAtRequest = agent.session.snapshotEvents()
+        .some(event => event.type === 'user/message' && event.data.source.kind === 'runtime-context')
+      return next()
+    })
+
+    send(agent, 'go')
+    await waitForIdle(ctx, agent)
+
+    expect(order).toEqual(['entered:user', 'request', 'entered:runtime-context'])
+    expect(contextCommittedAtRequest).toBe(false)
+    const committed = agent.session.snapshotEvents()
+      .filter(event => event.type === 'user/message' && event.data.source.kind === 'runtime-context')
+    expect(committed).toHaveLength(1)
+  })
+})
+
 describe('turn and step boundary recovery', () => {
   // The session invariant companion makes an unbalanced log fail the test.
   async function balancedHarness(adapter: MockAdapter) {

@@ -10,7 +10,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import type { PendingSubmission, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronUpOutline14, IconCloseOutline16,
-  IconEditOutline16, IconQueueOutline14, IconSendOutline14, IconTrashOutline16, Tooltip,
+  IconEditOutline16, IconQueueOutline14, IconSendOutline14, IconTrashOutline16, InlineEditor, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageImageLoader } from '../contract/slots.ts'
 import type { QueueAction, QueueItemId, QueueRow } from '../contract/queue.ts'
@@ -70,8 +70,17 @@ export type QueueDockProps = PropsRuntime<'conversation.input.dock'> & QueueDock
  */
 export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: QueueDockProps) {
   const inbox = useSession(s => s.queue)
-  const queue = useMemo(() => inbox.filter(row => row.placement === 'queued'), [inbox])
   const pendingSubmissions = useSession(s => s.pendingSubmissions ?? EMPTY_PENDING_SUBMISSIONS)
+  const queue = useMemo(() => {
+    const rows = inbox.filter(row => row.placement === 'queued')
+    // A transcript submission stays in Chat even after the Host queues its
+    // message; its Inbox row must not also surface in the Dock.
+    const inChat = new Set(
+      pendingSubmissions.filter(item => item.placement === 'transcript')
+        .map(item => item.requestId as string),
+    )
+    return inChat.size === 0 ? rows : rows.filter(row => row.rpcId === undefined || !inChat.has(row.rpcId))
+  }, [inbox, pendingSubmissions])
   const pendingQueue = useMemo(() => {
     const admitted = new Set(queue.flatMap(row => row.rpcId === undefined ? [] : [row.rpcId]))
     return pendingSubmissions.filter(submission => (
@@ -151,22 +160,12 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                 {rowCount === 1 && <span className={css.lead} aria-hidden><IconQueueOutline14 /></span>}
                 {editing?.id === row.id
                   ? (
-                    <input
-                      autoFocus
-                      className={css.editor}
-                      aria-label={t('queue.edit')}
+                    <InlineEditor
                       value={editing.text}
-                      onChange={(event) => { setEditing({ id: row.id, text: event.currentTarget.value }) }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') {
-                          setEditing(null)
-                          return
-                        }
-                        if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                          event.preventDefault()
-                          void saveEdit()
-                        }
-                      }}
+                      label={t('queue.edit')}
+                      onChange={(text) => { setEditing({ id: row.id, text }) }}
+                      onSave={() => { void saveEdit() }}
+                      onCancel={() => { setEditing(null) }}
                     />
                   )
                   : (
@@ -190,7 +189,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                   {editing?.id === row.id
                     ? (
                       <>
-                        <Tooltip label={t('queue.save')} side="bottom" delayMs={500}>
+                        <Tooltip portal label={t('queue.save')} side="bottom" delayMs={500}>
                           <button
                             type="button"
                             className={css.action}
@@ -201,7 +200,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                             <IconCheckOutline16 size={14} />
                           </button>
                         </Tooltip>
-                        <Tooltip label={t('queue.cancelEdit')} side="bottom" delayMs={500}>
+                        <Tooltip portal label={t('queue.cancelEdit')} side="bottom" delayMs={500}>
                           <button
                             type="button"
                             className={css.action}
@@ -216,7 +215,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                     )
                     : (
                       <>
-                        <Tooltip label={t('queue.edit')} side="bottom" delayMs={500} disabled={row.text === null}>
+                        <Tooltip portal label={t('queue.edit')} side="bottom" delayMs={500} disabled={row.text === null}>
                           <button
                             type="button"
                             className={css.action}
@@ -232,7 +231,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                             <IconEditOutline16 size={14} />
                           </button>
                         </Tooltip>
-                        <Tooltip label={t('queue.remove')} side="bottom" delayMs={500}>
+                        <Tooltip portal label={t('queue.remove')} side="bottom" delayMs={500}>
                           <button
                             type="button"
                             className={css.action}
@@ -249,7 +248,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                             <IconTrashOutline16 size={14} />
                           </button>
                         </Tooltip>
-                        <Tooltip label={t('queue.steer')} side="bottom" delayMs={500} disabled={!running}>
+                        <Tooltip portal label={t('queue.steer')} side="bottom" delayMs={500} disabled={!running}>
                           <button
                             type="button"
                             className={css.action}

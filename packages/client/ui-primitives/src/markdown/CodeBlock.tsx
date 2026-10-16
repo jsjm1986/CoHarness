@@ -8,6 +8,7 @@ import { Fragment, useCallback, useMemo, useRef, useState, useSyncExternalStore 
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import clsx from 'clsx'
 import { writeClipboard } from '../clipboard.ts'
+import { CodeToolbar, type CodeToolbarLabels } from '../CodeToolbar.tsx'
 import {
   StreamingHighlightSession, grammarLoadCount, highlightToHtml, subscribeGrammarLoaded,
 } from './highlight.ts'
@@ -34,6 +35,10 @@ export interface CodeBlockProps {
   copyLabel: string
   /** Copy-button label during the post-copy confirmation window. */
   copiedLabel: string
+  /** Enable the shared card toolbar and spacing; omit for owner-styled source or compact views. */
+  toolbarLabels?: CodeToolbarLabels | undefined
+  /** With toolbarLabels, use the owner's wrapping preference and omit the toolbar's local wrap action. */
+  wrap?: boolean | undefined
 }
 
 /** Shiki attributes mirrored by the retained streaming tree. */
@@ -58,7 +63,7 @@ function renderLine(line: readonly HighlightSpan[], index: number): ReactNode {
 }
 
 export function CodeBlock({
-  code, lang, streaming = false, className, contentRef, lineNumbers = false, showHeader = true, copyLabel, copiedLabel,
+  code, lang, streaming = false, className, contentRef, lineNumbers = false, showHeader = true, copyLabel, copiedLabel, toolbarLabels, wrap,
 }: CodeBlockProps) {
   const trimmed = code.endsWith('\n') ? code.slice(0, -1) : code
   const sourceLines = lineNumbers ? trimmed.split('\n') : undefined
@@ -137,6 +142,8 @@ export function CodeBlock({
     [highlighting, streaming, streamedBody, trimmed, lang, loaded],
   )
   const [copied, setCopied] = useState(false)
+  const [localWrapped, setWrapped] = useState(true)
+  const wrapped = wrap ?? localWrapped
 
   const onCopy = useCallback(() => {
     if (copied) return
@@ -168,23 +175,31 @@ export function CodeBlock({
   return (
     <div
       ref={rootRef}
-      className={clsx(css.block, 'md-code-block', lineNumbers && css.numbered, className)}
+      className={clsx(css.block, 'md-code-block', lineNumbers && css.numbered, toolbarLabels !== undefined && css.card, className)}
       data-empty={trimmed === '' ? '' : undefined}
       data-line-numbers={lineNumbers || undefined}
+      data-code-wrap={toolbarLabels === undefined ? undefined : wrapped}
       style={sourceLines === undefined ? undefined : {
         '--dsl-code-block-line-number-width': `${Math.max(2, String(sourceLines.length).length)}ch`,
       } as CSSProperties}
     >
+      {/* These paired attributes are stable semantic hooks for owner styling and DOM tests. */}
       {showHeader && (
         <div className={css.bannerWrap}>
-          <div className={css.banner} data-code-block-banner>
-            <div className={css.infostring}>{lang ?? ''}</div>
-            <div className={css.action}>
-              <button type="button" className={css.copyButton} onClick={onCopy}>
-                {copied ? copiedLabel : copyLabel}
-              </button>
+          {toolbarLabels !== undefined ? <CodeToolbar
+            lang={lang} labels={toolbarLabels} copyLabel={copyLabel} copiedLabel={copiedLabel}
+            copied={copied} wrapped={wrapped} onCopy={onCopy}
+            onWrap={wrap === undefined ? () => { setWrapped(value => !value) } : undefined}
+          /> : (
+            <div className={css.banner} data-code-block-banner>
+              <div className={css.infostring}>{lang ?? ''}</div>
+              <div className={css.action}>
+                <button type="button" className={css.copyButton} onClick={onCopy}>
+                  {copied ? copiedLabel : copyLabel}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
       <div ref={contentRef} className={css.content} data-code-block-content>{body}</div>

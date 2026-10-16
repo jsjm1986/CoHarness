@@ -1,5 +1,5 @@
 ---
-description: "Plan-mode composer control: the conversation.input.plan seat over the plan projection and the /plan command channel"
+description: "Plan-mode composer chip, persistent submitted-plan cards, and Session-backed right-sidebar plan and review previews"
 kind: "package-reference"
 ---
 
@@ -14,6 +14,8 @@ Plan mode is entered through the `/plan` command path: users can choose Plan fro
 The chip carries the accessible description "Plan mode on, press to turn off". Admission failures (`matched: false`, business errors, transport faults) surface as an inline error and the chip stays until the projection confirms the exit.
 
 The model exits plan mode through the stable `exit_plan_mode` tool; its plan review uses the composed Web question channel.
+
+Submitted plans persist as hidden `submitted-plan` Chat nodes keyed by the exit-tool invocation — native `tool/call` ids and PTC `tool/ptc-dispatch` `subCallId`s alike — so every completed Turn's tail renders one card per invocation under `conversation.chat.turnTail`. A card opens `dsh-resource://plan/<session>/<callId>` (or `dsh-resource://plan/subagent/<parent>/<child>/<mode>/<callId>` for a direct-child subagent) into the visible Session's right sidebar, and the `plan` Sidebar type also owns transient `dsh-resource://plan-review/...` addresses that carry an uncommitted review's Markdown in navigation params. Durable documents are recovered through `Session.readCallHistory`, which resolves the owning Session or child subagent and reassembles the call's complete Turn through the same conversation definitions; `resourceSession` reads the owner out of the address so a subagent plan still passes Sidebar ownership validation from its parent. Review actions under `conversation.plan-review.actions` open the review automatically once a Session is mounted — a dismissed review stays closed — and keep a manual opener; `sidebar.right.pane.tab` and its title seat render the Markdown and recovered heading.
 
 ## Summary
 

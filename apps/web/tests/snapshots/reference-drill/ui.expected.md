@@ -3,4 +3,4 @@
   - button "src" [disabled]
 - listbox "Trigger suggestions":
   - text: Files & folders
-  - option "File · nested.txt src/nested.txt" [selected]
+  - option "nested.txt" [selected]

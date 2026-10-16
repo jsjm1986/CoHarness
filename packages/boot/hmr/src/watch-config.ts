@@ -71,14 +71,26 @@ export async function watchConfig(
   watcher.on('add', onChange)
   watcher.on('change', onChange)
   watcher.on('unlink', onChange)
-  const ready = Promise.withResolvers<undefined>()
+  const ready = Promise.withResolvers<void>()
   let pending = true
-  watcher.once('ready', () => { pending = false; ready.resolve(undefined) })
-  watcher.on('error', (error) => {
+  let disposed = false
+  watcher.once('ready', () => { pending = false; ready.resolve() })
+  const onError = (error: unknown): void => {
+    // A watcher error after disposal is not actionable: this registration's
+    // path is gone and no refresh will run.
+    if (disposed) return
     if (pending) { pending = false; ready.reject(error) } else { ctx.logger.warn(error) }
-  })
+  }
+  watcher.on('error', onError)
   const dispose = async () => {
-    await watcher.close()
+    disposed = true
+    // `close()` drops every listener but leaves a scheduled write-settle poll;
+    // its straggler stats a file this teardown is deleting, which Windows
+    // reports as EPERM, and an 'error' emission with no listener is rethrown
+    // as an uncaught exception. Re-attach across the close.
+    const closing = watcher.close()
+    watcher.on('error', onError)
+    await closing
     paths.delete(target.filename)
     if (!inTransaction()) await running
   }

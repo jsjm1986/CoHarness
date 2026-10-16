@@ -130,7 +130,9 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 <a id="pending-queue-projection"></a>
 ## 待处理队列投影
 
-`ConversationSnapshot.queue` 是 Host 提供的 `agent.inbox.nextTurn` 权威瞬态快照；待处理的 next-step steering（中途引导）不进入此投影。每行携带其 `MessageId`、所有内容块均为文本时的完整可编辑文本，以及扁平化预览；图片块会从预览中省略，因为对话 dock 会单独渲染其持久化缩略图。本地提交会记录预期的 transcript、queued 或 steering 位置，直到观察到携带匹配 `rpcId` 的 Host 状态。Host 根据持久 `agent/inbox/spliced` 变更派生完整 `session/queue` 快照，并在重连时发送基线；面向单条消息的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知不用于重建该投影。`Session.updateQueue()` 经 Host 侧 `Inbox.splice()` 发送编辑／移除操作，客户端不做乐观变更，因此下一份 Host 快照是唯一可见的提交结果，claim 竞态则可能呈现 `queue-item-not-found`。
+`ConversationSnapshot.queue` 是 Host 提供的 `agent.inbox.nextTurn` 权威瞬态快照；待处理的 next-step steering（中途引导）不进入此投影。每行携带其 `MessageId`、所有内容块均为文本时的完整可编辑文本，以及扁平化预览；图片块会从预览中省略，因为对话 dock 会单独渲染其持久化缩略图。Host 根据持久 `agent/inbox/spliced` 变更派生完整 `session/queue` 快照，并在重连时发送基线；面向单条消息的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知不用于重建该投影。`Session.updateQueue()` 经 Host 侧 `Inbox.splice()` 发送编辑／移除操作，客户端不做乐观变更，因此下一份 Host 快照是唯一可见的提交结果，claim 竞态则可能呈现 `queue-item-not-found`。
+
+`session.beginSubmission` 在调用方开始序列化和发送之前，同步地把一条本地回显写入 `SessionSnapshot.pendingSubmissions`，使会话界面能在提交点击的同一帧渲染该消息。Session 依据自身实时 running 状态与请求 mode 固定 `transcript`、`queued` 或 `steering` 位置；prompt 的 `requestId` 即关联身份，Host 会把它回显为持久 user source 的 `rpcId`。每个身份都会跟踪其队列与 splice 位置：queued 位置的回显在被队列接受后延迟一个动画帧退役；transcript 与 steering 回显等待持久录取——已录取回显会一直登记到携带它的队列发布移除其行为止。仅从队列移除并不构成失败证据：`canceled` splice 会立即使被移除的回显失败，而已离开队列且未录取的回显会在移除之后记录的下一条 `request/context` 或 `turn/end` 边界处失败。新的 follow 基线会把所有在 `asOfSeq` 及之前已被队列观察到的身份按已观察接受，即使其持久录取不在已加载窗口内。已识别的 prompt 失败与 `abandon()` 会立即使未录取回显退役；销毁则按已观察处理已录取回显、按失败处理其余未决回显。每次退役恰好触发一次 `onRetire`；已观察的退役携带按内容顺序排列的持久图片引用，以便 composer 释放成功的草稿。回显只存在于 Client 内存中；重新加载与重连后，会话仅从持久事件重建。
 
 <a id="conversation-assembly"></a>
 ## Conversation 组装
@@ -145,7 +147,7 @@ Definition 作者只根据当前事件完成匹配，为每条关联事件提供
 
 `ui-conversation` 注册内建 Chat Definition 与 keyed Chat snapshot builder。append 来源的 user、assistant 和 Tool result 构成人类可见记录；仅供模型使用的 replacement 副本不进入 Chat，compaction 检查点除外，它会成为独立标记，并在更早分页补齐 summary 溯源后更新。持久 inbox splice Context 能把 next-step 用户消息判定为 steering，无须让 inbox 状态成为 Session 特例。上下文消息保留生产者记录与 form。StatsLine 读取 `ConversationSnapshot.chat.legacy.nodes`；Session 则把该 legacy slice 镜像到顶层 `nodes`、`partial` 和 `runningCalls` 公共兼容字段，无须运行第二套业务 fold。`ui-trajectory` 在同一个 Session 窗口上注册独立 Definition 与 target builder；它保留现有的 stage-oriented view model，既不消费 Chat 兼容字段，也不运行另一套 history fold。
 
-Chat builder 为每个 Session 保留一个 mutable keyed store。内容更新只通知受影响的 node key；结构变化才重建顺序和 Location 成员关系；prepend 只增加行，不替换既有 keyed value。每个 Assistant chunk 都会更新 Definition State，但最多每个 animation frame 请求一次物化；final message 与 Turn/Step 关闭会立即发布。参见 [Client Tool 展示所有权决策](../../../.agents/notes/implemented/architecture/2026-08-08-client-tool-presentation-ownership.zh.md)。
+Chat builder 为每个 Session 保留一个 mutable keyed store。内容更新只通知受影响的 node key；结构变化才重建顺序和 Location 成员关系；prepend 只增加行，不替换既有 keyed value。每个 Assistant chunk 都会更新 Definition State，但最多每个 animation frame 请求一次物化；final message 与 Turn/Step 关闭会立即发布。成功的 `assistant/message` 结算在其流结束时即发布，而该尝试的瞬态行会一直显示到匹配的 `step/end`；被中断的 message 与 attempt 仍在流结束时结算。当已有保留结算在等待其 step 边界时，新到达的流尝试会请求 rebaseline。参见 [Client Tool 展示所有权决策](../../../.agents/notes/implemented/architecture/2026-08-08-client-tool-presentation-ownership.zh.md)。
 
 <a id="trajectory-request-data"></a>
 ## Trajectory 请求数据

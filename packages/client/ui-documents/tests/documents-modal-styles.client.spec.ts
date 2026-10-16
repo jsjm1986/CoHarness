@@ -44,13 +44,17 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/\.selectionDelete\s*\{[\s\S]*color:\s*var\(--dsw-alias-label-primary-foreground\)/)
   })
 
-  it('gives compact upload and More controls one full toolbar track', () => {
+  it('shares the compact toolbar row between search and the action pair', () => {
     expect(modal).toMatch(/\.actionGroup\.mobileActionGroup\s*\{[\s\S]*display:\s*flex/)
     expect(modal).toMatch(/\.mobileActionGroup \.upload\s*\{[\s\S]*flex:\s*1 1 auto/)
+    const compactBlocks = modal.match(/@media \(max-width: 767px\) \{[\s\S]*?\n\}/g) ?? []
+    const compact = compactBlocks.join('\n')
+    expect(compact).toMatch(/\.filterGroup\s*\{[\s\S]*flex-basis:\s*0/)
+    expect(compact).toMatch(/\.search\s*\{[\s\S]*flex:\s*1 1 0/)
   })
 
   it('keeps compact navigation and operations in touch-safe sheets', () => {
-    expect(modal).toMatch(/\.scopeTrigger\s*\{[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
+    expect(modal).toMatch(/\.scopeTrigger\s*\{[\s\S]*min-height:\s*36px[\s\S]*padding:\s*var\(--dsw-space-1\) 0/)
     expect(modal).toMatch(/\.rowMore\s*\{[\s\S]*min-width:\s*var\(--dsw-touch-target\)[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
     expect(modal).toMatch(/\.mobileSelectionBar\s*\{[\s\S]*var\(--dsw-safe-bottom\)/)
     expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.scopeRail\s*\{[\s\S]*display:\s*none/)
@@ -81,6 +85,17 @@ describe('DocumentsModal.module.css', () => {
       '\\.row,[\\s\\S]*\\.overviewRow,[\\s\\S]*\\.trashRow\\s*\\{',
       '[\\s\\S]*content-visibility:\\s*auto[\\s\\S]*contain-intrinsic-block-size:\\s*auto 50px',
     ].join('')))
+  })
+
+  it('flattens overview and trash rows into the hairline list grammar under 768px', () => {
+    const compactBlocks = modal.match(/@media \(max-width: 767px\) \{[\s\S]*?\n\}/g) ?? []
+    const compact = compactBlocks.join('\n')
+    for (const sel of ['overviewRow', 'trashRow']) {
+      expect(compact).toMatch(new RegExp(
+        `\\.${sel}\\s*\\{[^}]*border:\\s*none[^}]*border-bottom:\\s*0\\.5px solid var\\(--dsw-alias-border-l2\\)[^}]*border-radius:\\s*0`,
+      ))
+    }
+    expect(compact).toMatch(/\.overviewRow\s*\{[^}]*background:\s*transparent/)
   })
 
   it('keeps overview source metadata and transfer actions in one desktop row surface', () => {

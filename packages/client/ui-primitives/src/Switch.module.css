@@ -33,7 +33,7 @@
 }
 
 .switch:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
 
@@ -49,6 +49,10 @@
   background: var(--dsw-alias-label-primary-foreground);
   transition: transform var(--dsw-motion-duration-medium, 0.35s)
     var(--dsw-motion-ease-bounce, var(--ds-ease-in-out));
+}
+
+.switch[aria-checked='false'] .thumb {
+  background: var(--dsw-alias-switch-thumb);
 }
 
 .switch[aria-checked='true'] .thumb {

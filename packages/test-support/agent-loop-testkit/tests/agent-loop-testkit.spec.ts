@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import FsLocal from '@deepseek-ai/dsh-fs-local'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
@@ -32,6 +33,17 @@ describe('dsh-agent-loop-testkit', () => {
 
     expect(renderPrompt(await ctx.systemPrompt.assemble())).toContain('Test persona.')
     await expect(mountAgentLoopTestHarness(ctx)).resolves.toBeDefined()
+
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps a pre-mounted filesystem when the working-directory spine is requested', async () => {
+    const ctx = new Context()
+    await ctx.plugin(FsLocal)
+    await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
+
+    expect(typeof ctx.get('workingDirectory')?.get).toBe('function')
+    expect(typeof ctx.get('fs')?.resolve).toBe('function')
 
     await ctx.fiber.dispose()
   })

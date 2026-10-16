@@ -101,9 +101,9 @@ turn/end
 
 输入通过同一个 inbox 到达驱动器。有些消息会立即唤醒它；注入的上下文会留在 inbox 中，直到另一条消息将其唤醒。
 
-`agent/pre-step` 决定模型看到什么。监听器可以改写已领取的消息，也可以直接拒绝它们；首次领取被拒绝或被改写为空时，仍会关闭一个不含步骤的持久轮次，因此日志会记录这次尝试。每个步骤读取插件注册的提示词片段和工具 schema。
+`agent/pre-step` 决定模型看到什么。监听器可以改写已领取的消息，也可以直接拒绝它们；首次领取被拒绝或被改写为空时，仍会关闭一个不含步骤的持久轮次，因此日志会记录这次尝试。每个步骤读取插件注册的提示词片段和工具 schema，且每次请求准入尝试都会刷新已注册的运行时上下文——已接纳组装的片段、schema 与变量保持绑定，而 provider 提供的上下文文本会被重新求值并作为新快照提交。
 
-详情见[时序图](agent-lifecycle.zh.md)、[工具流水线](tool-execution-pipeline.zh.md)和[取消与错误恢复](subsystems/core.zh.md#the-agent-handle)。AgentLoop 发布操作在回滚处理范围内等待串行 `agent/created` 初始化完成；它是唯一的启动初始化事件，setup 与发布通过维护任务暂存唤醒输入，成功后才放行。
+详情见[时序图](agent-lifecycle.zh.md)、[工具流水线](tool-execution-pipeline.zh.md)和[取消与错误恢复](subsystems/core.zh.md#the-agent-handle)。AgentLoop 发布操作在回滚处理范围内等待串行 `agent/created` 初始化完成；它是唯一的启动初始化事件，setup 与发布通过维护任务暂存唤醒输入，成功后才放行。卸载在 Agent teardown 期间保留所需资源；[agent-loop](../packages/core/agent-loop/README.zh.md#understand-the-implementation)定义顺序。
 
 永久清理 Session 时保留生命周期所有权：预留阻止新工作，插件可因持有资源而拒绝，确认空闲释放后才进行持久删除。普通取消行为不变。[空闲清理决定](../.agents/notes/implemented/architecture/2026-09-27-idle-session-purge.zh.md)规定执行顺序与失败处理。
 
@@ -112,6 +112,8 @@ turn/end
 会话日志是模型所见上下文的来源。`deriveMessages()` 从中投影出模型历史，原始 `assistant/chunk` 事件则保证回放和 UI 保真。fork、恢复、transcript（文本记录）、遥测和持久化都派生自该事件流。
 
 **模型可见即已记录。** 抵达模型请求的一切都必须能从日志重建，并由一项运行时不变量断言这一点。因此，新增一项模型可见输入就需要新增一个会话事件：扩展 `SessionEventMap` 并从日志渲染。
+
+[工作目录](subsystems/working-directory.zh.md) 提供用户上下文与执行路径，且不改变原始项目身份、沙箱可写根目录或既有进程目录。
 
 ## 能力 seam
 

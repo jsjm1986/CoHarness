@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-12-deepseek-request-extension-resilience.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md
+/agent-note-deepseek-request-extensions-tolerate-per-field-failure-and-bound-their-size:
+  en: c5645060700fbc1a
+  zh: bc880449336f167e
+/agent-note-deepseek-request-extensions-tolerate-per-field-failure-and-bound-their-size/problem:
+  en: 62e8509e11a5cbad
+  zh: 049b37ea390f643c
+/agent-note-deepseek-request-extensions-tolerate-per-field-failure-and-bound-their-size/decision:
+  en: 47a394f7e43dfb98
+  zh: 81d59e63ec55071c
+/agent-note-deepseek-request-extensions-tolerate-per-field-failure-and-bound-their-size/alternatives-considered:
+  en: 71539ea03c471083
+  zh: b7431a9934f2eb9a
+/agent-note-deepseek-request-extensions-tolerate-per-field-failure-and-bound-their-size/consequences:
+  en: b5b24c5bd903e991
+  zh: 4384295d46d8813a
+/agent-note-deepseek-request-extensions-tolerate-per-field-failure-and-bound-their-size/verification:
+  en: cd849b5484525b1f
+  zh: 1501fe4b79e9882b
+/agent-note-deepseek-request-extensions-tolerate-per-field-failure-and-bound-their-size/related:
+  en: 6e320aa584bbf8eb
+  zh: e2b6887bd73c6b8c

@@ -57,7 +57,7 @@
   text-align: left;
   background: var(--dsw-alias-bg-layer-1);
   border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: 24px;
+  border-radius: var(--dsw-radius-full);
   cursor: pointer;
 }
 
@@ -111,11 +111,69 @@
   text-overflow: ellipsis;
 }
 
-/* The chip title's compass, beside the label the strip lays out; the glyph
-   draws on currentColor, so this ink is the chip rendering's own. */
+/* The chip title's compass, beside the label the strip lays out: 14px so the
+   leading glyph shares the close button's optical weight inside a 24px chip;
+   the glyph draws on currentColor, so this ink is the chip rendering's own. */
 .titleIcon {
   flex: none;
+  width: 14px;
+  height: 14px;
   color: var(--dsw-alias-label-tertiary);
 }
 
 .entryCell { width: 380px; max-width: 100%; }
+
+/* Phone: the entries are the pushed screen's whole content, so they take the
+   flat-list grammar — top-anchored full-width rows split by hairlines — rather
+   than capsules floating in a centred column. The compass hero shrinks and
+   anchors the top instead of lifting the stack off the middle. */
+@media (max-width: 767px) {
+  .guide {
+    gap: 0;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: var(--dsw-space-2) 0 0;
+  }
+
+  .guide::after {
+    display: none;
+  }
+
+  .hero {
+    margin: var(--dsw-space-4) auto var(--dsw-space-6);
+  }
+
+  .hero svg {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* The hairline lives on the cell wrapper, not the entry: slot-provided
+     entries (the terminal's own row, for one) draw their own element inside
+     the cell, and a rule keyed on `.entry` could not reach them. */
+  .entryCell {
+    width: 100%;
+  }
+
+  .entryCell:not(:last-child) {
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+  }
+
+  .entry {
+    width: 100%;
+    min-height: 56px;
+    padding: var(--dsw-space-3) var(--dsw-space-4);
+    gap: var(--dsw-space-3);
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+
+  .entry:active {
+    background: var(--dsw-alias-interactive-bg-active);
+  }
+
+  .entryTitle {
+    font-size: 15px;
+  }
+}

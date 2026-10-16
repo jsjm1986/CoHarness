@@ -32,7 +32,7 @@ Status: implemented
 
 **开关做成 config 字段而非 env patch。** 不可行：cordis 行没有 config 层的 disable 语义，且 `exporter.url` 校验在插件构造期 fail-loud，开关必须在 Loader 之前生效——AppCLIEntry patch 层是唯一落点。
 
-**退出时 `Promise.race` 兜底超时。** 最初暂缓，是因为 SDK 参数看似已经将后端排空耗时限制在约 1.5-3s（通常 <100ms），实测 SIGINT 到退出耗时 110ms-1.1s。后来在 Linux 沙箱中复现并证明，`BatchLogRecordProcessor.shutdown()` 可能在 `exporter.forceFlush()` 中永久等待，无法进入受 `exportTimeoutMillis` 限制的完成 Promise。因此，[CLI 关闭修复](../bug-fix/2026-08-03-cli-signal-shutdown-escalation.zh.md) 既为这一特定缺口增加 3 秒后端上限，也为整棵插件树增加 5 秒进程级上限和重复信号退出途径。
+**退出时 `Promise.race` 兜底超时。** 最初暂缓，是因为 SDK 参数看似已经将后端排空耗时限制在约 1.5-3s（通常 <100ms），实测 SIGINT 到退出耗时 110ms-1.1s。后来在 Linux 沙箱中复现并证明，provider 关闭可能在 `exporter.forceFlush()` 上永久等待——处理器的导出看门狗只告警、绝不放弃传输槽，传输始终拿不到 socket 时该等待不会结算。因此，[CLI 关闭修复](../bug-fix/2026-08-03-cli-signal-shutdown-escalation.zh.md) 既为这一特定缺口增加 3 秒后端上限，也为整棵插件树增加 5 秒进程级上限和重复信号退出途径。
 
 ## 后果
 

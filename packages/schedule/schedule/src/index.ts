@@ -5,6 +5,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-api-remotes/session-controller'
+import { delegationDepthOf } from '@deepseek-ai/dsh-subagent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace'
 import { ScheduleRuntime } from './runtime.ts'
@@ -20,7 +21,7 @@ import {
 import type {
   DeliveryRetentionBounds, ScheduleCatalogEntry, ScheduleCreateRequest, ScheduleDeleteRequest, ScheduleDeleteResult,
   ScheduleDeliveryHistoryRequest, ScheduleDeliveryHistoryResult, ScheduleListRequest, ScheduleRecord,
-  ScheduleUpdateRequest, ScheduleUpdateResult,
+  ScheduleUpdateRequest, ScheduleUpdateResult, SubagentSessionError,
 } from './types.ts'
 
 export type * from './types.ts'
@@ -238,6 +239,8 @@ export class ScheduleService extends TypertRemoteService {
    *
    * The request must supply a title; a missing, blank-after-trim, or over-long
    * title rejects with `invalid_prompt` instead of deriving one from the prompt.
+   * A Session a delegated child owns rejects with `subagent_session`, because delivery
+   * can never reach it.
    * The record is built from the clock reading taken before the request joins the
    * serialized queue, so a create that waits behind a longer operation keeps its
    * request-time anchor and may already be due when the queue reaches it.
@@ -270,6 +273,8 @@ export class ScheduleService extends TypertRemoteService {
     else if (request.cron !== undefined) record = createCronScheduleRecord(id, request.prompt, request.cron, now, title)
     else throw new ScheduleInputError('invalid_selector', 'Exactly one reminder selector is required.')
     return this.serialize(async () => {
+      const refusal = this.reminderTargetRefusal(sessionId)
+      if (refusal !== undefined) throw new ScheduleInputError('subagent_session', refusal.message)
       const domain = await this.getDomain()
       signal?.throwIfAborted()
       await domain.table('tasks').put(id, {
@@ -360,15 +365,20 @@ export class ScheduleService extends TypertRemoteService {
    * binding without activating the Session or changing saved deliveries.
    *
    * Each supplied field replaces its stored value; an omitted field keeps it. A name or
-   * instruction change alone does not reset the committed target.
+   * instruction change alone does not reset the committed target. A Session a delegated
+   * child owns returns the non-mutating `subagent_session` result, so an edit cannot
+   * re-arm a task bound to a Session delivery can never reach, and management views can
+   * explain the refusal through the ordinary result they already render.
    * @param request - Task binding, complete observed record, and any combination of timing, name, and instruction.
    * @param signal - Cancellation checked after domain readiness and FIFO waits, before persistence begins.
-   * @returns The committed record, unchanged record for a no-op, or a non-mutating input/lookup/conflict result.
+   * @returns The committed record, unchanged record for a no-op, or a non-mutating input/lookup/conflict/refusal result.
    * Storage and lifecycle failures reject; cancellation after a write starts does not roll it back.
    */
   @Remote('update')
   async update(request: ScheduleUpdateRequest, signal?: AbortSignal): Promise<ScheduleUpdateResult> {
     return this.serialize<ScheduleUpdateResult>(async () => {
+      const refusal = this.reminderTargetRefusal(request.sessionId)
+      if (refusal !== undefined) return refusal
       const tasks = (await this.getDomain()).table('tasks')
       signal?.throwIfAborted()
       const current = tasks.get(request.id)
@@ -383,6 +393,27 @@ export class ScheduleService extends TypertRemoteService {
       this.runtime?.requestDrive()
       return result
     })
+  }
+
+  /**
+   * Refuse a Session no delivery can reach because a delegated child owns it.
+   *
+   * Delivery resolves the bound Session through `ctx.sessionController.resolveAgent`,
+   * which rejects the live Agent of a delegated child; a stored task for such a Session
+   * would stay permanently overdue and retry on every drive. Both operations that can
+   * arm a delivery read that same fact here instead of restating it: a delegated child
+   * is one whose {@link delegationDepthOf} is above zero, the accounting the delegation
+   * cap itself enforces, which survives a cold resume through the persisted header.
+   * @param sessionId - Session the task would be bound to.
+   * @returns The stable refusal for a delegated child's Session, or undefined when the Session is eligible.
+   */
+  private reminderTargetRefusal(sessionId: SessionId): SubagentSessionError | undefined {
+    const agent = this.ctx.agents.get(sessionId)
+    if (agent === undefined || delegationDepthOf(agent) === 0) return undefined
+    return {
+      code: 'subagent_session',
+      message: 'This Session belongs to subagent routing, which never receives reminder delivery.',
+    }
   }
 
   /**

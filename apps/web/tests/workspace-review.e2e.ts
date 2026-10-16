@@ -55,7 +55,7 @@ describe('web e2e: delivered files and historical review', () => {
     })
     expect(delivery.isError).toBe(false)
     expect(session.snapshotEvents().find(event => event.type === 'deliverables/presented'))
-      .toMatchObject({ data: { files: [{ path: 'review.txt', description: 'Reviewed text file' }] } })
+      .toMatchObject({ data: { files: [{ path: join(workspaceCwd, 'review.txt'), description: 'Reviewed text file' }] } })
     session.append('assistant/message', { turn: 1, step: 1, stream: [], message: createAssistantMessage({
       content: [{ type: 'text', text: 'The review file is ready.' }], source: { provider: 'fixture', model: 'fixture' },
     }) }, { surfaceOp: 'append' })

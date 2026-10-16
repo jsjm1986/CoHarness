@@ -33,6 +33,8 @@ Serves current, log-derived per-session state to client carriers.
 | Package | Role | ctx key |
 |---|---|---|
 | [`session-projection/`](session-projection/README.md) | Defines and drives session projection units | `ctx.sessionProjections` |
+| [`working-directory/`](working-directory/README.md) | Owns each Session's effective execution directory and user-context changes | `ctx.workingDirectory` |
+| [`tool-working-directory/`](tool-working-directory/README.md) | Reads or changes the active directory through one tool | `working_directory` |
 | [`session-projection-cache/`](session-projection-cache/README.md) | Persists and restores projection checkpoints | `ctx.sessionProjectionCache` |
 | [`session-stats/`](session-stats/README.md) | Serves whole-log conversation counts and wall times (`sessionStats` unit) | registers on `ctx.sessionProjections` |
 
@@ -58,4 +60,4 @@ Projects session activity into outbound telemetry and delegates delivery to a co
 | [`session-telemetry/`](session-telemetry/README.md) | Defines capture, redaction, projection, and live or on-demand backend delivery. |
 | [`session-telemetry-otel/`](session-telemetry-otel/README.md) | Delivers telemetry through OpenTelemetry logs in `FULL`, `FEEDBACK_ONLY`, or `DISABLED` mode. |
 
-The subsystem references: [persistence.md](../../docs/subsystems/persistence.md), [session-projection.md](../../docs/subsystems/session-projection.md), [session-title.md](../../docs/subsystems/session-title.md), and [session-telemetry.md](../../docs/subsystems/session-telemetry.md). Only one title provider may register at a time; the demo spine mounts the fallback service and leaves both model providers out of default composition.
+The subsystem references: [persistence.md](../../docs/subsystems/persistence.md), [working-directory.md](../../docs/subsystems/working-directory.md), [session-projection.md](../../docs/subsystems/session-projection.md), [session-title.md](../../docs/subsystems/session-title.md), and [session-telemetry.md](../../docs/subsystems/session-telemetry.md). Only one title provider may register at a time; the demo spine mounts the fallback service and leaves both model providers out of default composition.

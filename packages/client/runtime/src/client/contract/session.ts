@@ -14,19 +14,25 @@ import type {
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { ChatSnapshot, ConversationSnapshot } from '../sessions/conversation.ts'
-import type { PendingSubmissionImage, PendingSubmissionPlacement } from '../sessions/conversation.ts'
+import type { PendingSubmissionImage } from '../sessions/conversation.ts'
 import type { SessionPublishedInteraction } from '../sessions/pending.ts'
 import type { ObservableSnapshot } from './store.ts'
 
-/** Why a local submission echo retired from the session snapshot. */
+/**
+ * Why a local submission echo retired from the session snapshot. Chat echoes
+ * persist until durable admission — transcript and steering identities also
+ * wait out the queue publication that carried them — while queued echoes
+ * retire on queue acceptance. Identified failures retire submissions that
+ * have not already reached durable admission.
+ */
 export type PendingSubmissionRetirement =
   | { readonly reason: 'observed'; readonly attachments: readonly ImageAttachmentRef[] }
   | { readonly reason: 'failed' }
 
 /** Input used to register one optimistic local submission echo. */
 export interface BeginSubmissionInput {
-  /** Expected surface selected from the submission mode and running state. */
-  readonly placement: PendingSubmissionPlacement
+  /** Prompt mode; the Session fixes the echo's surface from its live running state. */
+  readonly mode: 'queue' | 'steer'
   /** Prompt text exactly as the upcoming request will send it. */
   readonly text: string
   /** Ordered browser previews matching the upcoming image parts. */
@@ -69,7 +75,16 @@ export interface ISession {
   readonly sessionId: SessionId
   /** Host-computed projection values by key (the useProjection seat). */
   readonly projections: ProjectionsFace
-  /** Local submission echoes currently awaiting durable admission. */
+  /**
+   * Register one local submission echo in `snapshot.pendingSubmissions`,
+   * synchronously, before the caller serializes and sends the prompt. Chat
+   * echoes persist until durable admission; transcript identities also wait
+   * for the queue-claim watermark so stale queue rows stay suppressed.
+   * Queued echoes retire on queue acceptance. Identified failures retire
+   * submissions that have not already reached durable admission.
+   * @param input - echo content and the optional settlement callback.
+   * @returns the minted identity for {@link prompt} plus the pre-prompt abandon path.
+   */
   readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle
   /** Read the complete turn owning a call without changing the visible history window.
    * @param callId - durable root or nested Tool call identity.

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-16-long-session-input-probe.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-16-long-session-input-probe.md
+/agent-note-long-session-input-probe-drops-per-keypress-driver-roundtrips:
+  en: 621f81ceabfb19cf
+  zh: 7d776ab1a85e5685
+/agent-note-long-session-input-probe-drops-per-keypress-driver-roundtrips/problem:
+  en: 94de3c6a3378696a
+  zh: 364ec75c519c6561
+/agent-note-long-session-input-probe-drops-per-keypress-driver-roundtrips/decision:
+  en: d7f79247e4aabd86
+  zh: 690d5c55b70bc6fb
+/agent-note-long-session-input-probe-drops-per-keypress-driver-roundtrips/alternatives-considered:
+  en: 03074ef8797735ee
+  zh: bc04127da4fb5451
+/agent-note-long-session-input-probe-drops-per-keypress-driver-roundtrips/consequences:
+  en: 48f1b4cc36fdd35b
+  zh: 029cd933a27c9815

@@ -11,6 +11,7 @@
 
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import type {
   Agent,
   AgentHandle,
@@ -25,7 +26,9 @@ import type {
   SessionLogOffset as SessionLogOffsetType,
   UserMessage,
 } from '@deepseek-ai/dsh-session'
-import type { ToolRestriction } from '@deepseek-ai/dsh-tools'
+import type { ObjectJsonSchema, ToolRestriction } from '@deepseek-ai/dsh-tools'
+import { attachStructuredRuntime } from './structured.ts'
+import type { StructuredAttachment } from './structured.ts'
 import {
   appendDelegatedPolicyOverrides,
   applyChildComposition,
@@ -97,6 +100,13 @@ export interface Activation {
   /** The lifecycle observer that emits this epoch's start and terminal edges. */
   readonly observer: ActivationObserver
   /**
+   * Scoped structured-output attachment when this epoch's child carried an
+   * `outputSchema`; its committed value joins the terminal the observer
+   * captures, and its admission state closes child-bound input once a result
+   * stages.
+   */
+  readonly structured: StructuredAttachment | undefined
+  /**
    * Whether any delivery to this child was ever accepted. A materialization
    * rolled back before its first acceptance is a child the caller was told does
    * not exist, so its teardown owes the parent no settlement account.
@@ -117,6 +127,8 @@ export interface MaterializeInputs {
    * so a resume never re-captures the parent's policy.
    */
   create?: {
+    /** Absolute directory captured from the initial request. */
+    cwd: string
     seed: readonly SessionEvent[] | undefined
     meta: NonNullable<CreateAgentOptions['meta']>
     /** Exact parent-log prefix length inside {@link seed}. */
@@ -128,6 +140,12 @@ export interface MaterializeInputs {
   }
   agentOptions: AgentOptions
   composition: { persona?: string | undefined; toolFilter?: ToolRestriction | undefined }
+  /**
+   * Per-activation structured-output schema a fresh creation attaches to the
+   * child; cold resume restores none — the descriptor keeps it out of durable
+   * composition because it budgets one activation's result contract.
+   */
+  outputSchema?: ObjectJsonSchema
   signal: AbortSignal
 }
 
@@ -428,6 +446,65 @@ export class ContinuableActivationRegistry {
   }
 
   /**
+   * Join progressing descendant work without cancelling it. Idle descendants
+   * whose inboxes require a later wake stay resident and do not delay host
+   * completion.
+   * @param parent - exact live parent whose descendants are observed.
+   * @returns whether work was joined and the host must recheck parent completion.
+   */
+  async waitForChildren(parent: Agent): Promise<boolean> {
+    let observed = false
+    while (true) {
+      const pending = [...this.materializations].filter(item => item.lineage.includes(parent))
+      const children = [...this.resident.values()].filter(item => item.handle.agent !== parent && item.ancestry.has(parent))
+      observed ||= children.some(item => item.handle.agent.status !== 'idle')
+      await Promise.all(children.map(item => item.handle.agent.whenIdle()))
+      const waits: Promise<unknown>[] = pending.map(item => item.settled)
+      for (const item of children) {
+        if (item.inbox.closing !== undefined) {
+          waits.push(item.inbox.closing.catch(() => undefined))
+          continue
+        }
+        if (item.handle.agent.status !== 'idle') {
+          waits.push(item.handle.agent.whenIdle())
+          continue
+        }
+        if (item.ownedChildren.size > 0) {
+          // Published descendants are observed separately; preparation holds
+          // keep the owner pending until publication or rollback wakes it.
+          if ([...item.ownedChildren].some(id => !this.resident.has(id))) waits.push(item.poke.promise)
+          continue
+        }
+        if (item.inbox.hasPending) continue
+        waits.push(item.poke.promise)
+      }
+      if (waits.length > 0) {
+        observed = true
+        await Promise.all(waits)
+        continue
+      }
+      // A descendant can be published while whenIdle follows another child.
+      if ([...this.materializations].some(item => item.lineage.includes(parent) && !pending.includes(item))
+        || [...this.resident.values()].some(item => item.handle.agent !== parent
+          && item.ancestry.has(parent) && !children.includes(item))) continue
+      return observed
+    }
+  }
+
+  /**
+   * Report whether one live parent still owns unsettled direct work: a resident
+   * child Activation naming it as parent, or an in-flight materialization whose
+   * recorded lineage contains it. The structured-completion admission needs the
+   * synchronous answer `waitForChildren` cannot give inside a tool boundary.
+   * @param parent - exact live Agent whose direct children are observed.
+   * @returns whether direct continuable work remains unsettled.
+   */
+  hasPendingDirectChildren(parent: Agent): boolean {
+    return [...this.materializations].some(item => item.lineage.includes(parent))
+      || [...this.resident.values()].some(item => item.parentSession === parent.id)
+  }
+
+  /**
    * Release selected resident direct children of one exact live parent.
    * @param parent - exact live direct parent authorizing the selected release.
    * @param childIds - durable direct-child ids to release when resident.
@@ -701,14 +778,27 @@ export class ContinuableActivationRegistry {
   ): Promise<Activation> {
     const { childId, provider, parent, create } = inputs
     inputs.signal.throwIfAborted()
-    const setup = (childCtx: Context, child: Agent): void => {
+    let structured: StructuredAttachment | undefined
+    const setup = async (childCtx: Context, child: Agent): Promise<void> => {
       // Only fresh creation appends the descriptor and delegated policy after
       // the inherited marker; a cold resume replays those persisted events.
       if (create !== undefined) {
         child.session.append('subagent/descriptor', create.descriptor)
         appendDelegatedPolicyOverrides(childCtx, child.session, create.delegatedPolicies)
+        const workingDirectory = childCtx.get('workingDirectory')
+        if (workingDirectory === undefined) {
+          throw new Error('continuable subagents require the working-directory service')
+        }
+        await workingDirectory.set(child, create.cwd, inputs.signal)
       }
       applyChildComposition(childCtx, parent, inputs.composition)
+      if (inputs.outputSchema !== undefined) {
+        structured = attachStructuredRuntime(childCtx, inputs.outputSchema, () =>
+          this.resident.get(childId)?.ownedChildren.size === 0
+          && child.inbox.nextStep.length === 0
+          && child.inbox.nextTurn.length === 0,
+        )
+      }
     }
     const observer = this.observeActivation(provider, childId, parent)
     const handle: AgentHandle = create === undefined
@@ -737,10 +827,11 @@ export class ContinuableActivationRegistry {
       parentSession: parent.id,
       provider,
       handle,
-      inbox: new SubagentInbox(handle.agent),
+      inbox: new SubagentInbox(handle.agent, structured),
       ancestry: new WeakSet([handle.agent, ...parentLineage]),
       ownedChildren: new Set(),
       observer,
+      structured,
       announced: false,
       poke: Promise.withResolvers<undefined>(),
     }
@@ -890,7 +981,7 @@ export class ContinuableActivationRegistry {
     const failures: SubagentError[] = []
     if (finalStateFlushed) {
       try {
-        activation.observer.capture(activation.handle.agent)
+        activation.observer.capture(activation.handle.agent, activation.structured)
       } catch (error: unknown) {
         failures.push(new SubagentError(
           `subagent "${childId}" activation teardown failed: ${errorChain(error)}`,
@@ -923,7 +1014,7 @@ export class ContinuableActivationRegistry {
         }
         await idle
         await this.flushFinalState(activation)
-        activation.observer.capture(activation.handle.agent)
+        activation.observer.capture(activation.handle.agent, activation.structured)
       } catch (error: unknown) {
         failures.push(new SubagentError(
           `subagent "${childId}" activation teardown failed: ${errorChain(error)}`,

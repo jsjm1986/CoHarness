@@ -15,6 +15,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId, contentHasImage, createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -146,8 +147,12 @@ export class SubagentContinuationManager {
     // but the service is also callable outside a turn.
     const releaseHold = this.activations.holdOwnership(parent, childId)
     try {
+      const cwd = request.cwd === undefined
+        ? await this.ctx.workingDirectory.ensure(parent, spec.signal)
+        : await this.ctx.workingDirectory.resolve(parent, request.cwd, spec.signal)
       const prepared = await this.host.prepareContinuable(spec.provider, {
         sessionId: childId,
+        cwd,
         parent,
         signal: spec.signal,
       })
@@ -174,6 +179,7 @@ export class SubagentContinuationManager {
           provider: spec.provider,
           parent,
           create: {
+            cwd,
             seed,
             meta: childSessionMeta(parent, childDepth, prepared.seed !== undefined),
             inheritedEventCount,
@@ -182,6 +188,7 @@ export class SubagentContinuationManager {
           },
           agentOptions,
           composition: { persona: request.persona, toolFilter: request.toolFilter },
+          ...request.outputSchema === undefined ? {} : { outputSchema: request.outputSchema },
           signal: spec.signal,
         })
         const childHeader = activation.handle.agent.session.header
@@ -395,6 +402,29 @@ export class SubagentContinuationManager {
   /** Close manager-wide admission and release every live Activation. */
   async drain(): Promise<void> {
     await this.activations.drain()
+  }
+
+  /**
+   * Join progressing descendant work without cancelling it. Idle descendants
+   * whose inboxes require a later wake stay resident and do not delay host
+   * completion.
+   * @param parent - exact live parent whose descendants are observed.
+   * @returns whether work was joined and the host must recheck parent completion.
+   */
+  async waitForChildren(parent: Agent): Promise<boolean> {
+    return this.activations.waitForChildren(parent)
+  }
+
+  /**
+   * Report unsettled direct continuable work for one live parent without
+   * awaiting, so a child-bound model tool execution can decide whether its
+   * final structured result is acceptable.
+   * @param parent - exact live parent whose direct continuable work is probed.
+   * @returns whether a materialization lineage or resident Activation still
+   *   claims that parent.
+   */
+  hasPendingDirectChildren(parent: Agent): boolean {
+    return this.activations.hasPendingDirectChildren(parent)
   }
 
   /**

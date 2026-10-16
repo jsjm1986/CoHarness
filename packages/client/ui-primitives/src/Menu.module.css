@@ -3,8 +3,8 @@
   display: inline-flex;
 }
 
-/* Dropdown card (figma MenuDropdown 122:9481 / 419:16920): menu surface,
- * r12, elevation-prominent (hairline stroke in shadow), 4px inset padding. */
+/* Compact translucent dropdown card shared by feature menus: MenuSurface
+ * paints the material and outer radius; this block keeps the layout. */
 .list,
 .submenu {
   /* min-widths below are the design's outer card widths — include the pad. */
@@ -14,8 +14,6 @@
   flex-direction: column;
   gap: 0;
   border: 0;
-  border-radius: var(--dsw-radius-card);
-  background: var(--dsw-specific-menu);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-raised);
   /* Entrance: brief fade + slight settle from the anchor edge. The origin
@@ -150,6 +148,14 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Arrow navigation moves real focus, so the row the keyboard is on carries the
+   same fill the pointer gets: the fill is the row's focus indication, and the
+   browser's default ring would double it. */
+.item:focus-visible:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  outline: none;
+}
+
 .item:active:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-active);
   transition-duration: 0s;
@@ -211,6 +217,11 @@
   .compactList .item {
     min-height: 40px;
   }
+
+  /* Touch-primary devices carry no keyboard; accelerator hints are noise. */
+  .shortcut {
+    display: none;
+  }
 }
 
 .itemIcon {
@@ -253,6 +264,11 @@
   background: transparent;
 }
 
+/* Fill-mode selection: the row holds the hover fill instead of a check. */
+.selectedFill {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 /* Destructive row: error text/icon, danger hover fill. */
 .danger {
   color: var(--dsw-alias-state-error-primary);
@@ -264,6 +280,11 @@
 
 .danger:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.danger:focus-visible:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  outline: none;
 }
 
 /* Heading row: non-interactive small grey text, padding aligned with items. */
@@ -279,6 +300,14 @@
   height: 0.5px;
   margin: var(--dsw-space-1) 2px;
   background: var(--dsw-alias-border-l1);
+}
+
+/* A data separator directly followed by a row that starts a group draws one
+ * line, not two; a group start on the list's first row draws none. */
+.separator + .separator,
+.separator + .itemWrap > .separator:first-child,
+.itemWrap:first-child > .separator:first-child {
+  display: none;
 }
 
 /* Nested card to the right of the parent row (figma 419:16920).
@@ -377,7 +406,7 @@
     height: auto;
   }
 
-  .submenu {
+  .list .submenu {
     position: static;
     min-width: 0;
     margin: var(--dsw-space-1) 0 var(--dsw-space-1) var(--dsw-space-6);
@@ -387,6 +416,10 @@
     border-radius: 0;
     background: transparent;
     box-shadow: none;
+  }
+
+  .submenu > [data-menu-material-fill] {
+    display: none;
   }
 
   .submenu::before {

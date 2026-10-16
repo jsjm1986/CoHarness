@@ -14,17 +14,17 @@ describe('StateDot', () => {
     expect(dot.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('solid states are spans; ongoing is an svg pixel matrix', () => {
+  it('solid states are spans; ongoing is an svg C-letterform pixel chase', () => {
     const { container, rerender } = render(<StateDot state="done" />)
     expect(container.firstElementChild?.tagName).toBe('SPAN')
     rerender(<StateDot state="ongoing" />)
-    const matrix = container.firstElementChild as SVGSVGElement
-    expect(matrix.tagName).toBe('svg')
-    const cells = matrix.querySelectorAll('rect')
-    expect(cells).toHaveLength(8)
-    // Chase phase: every cell carries its own negative animation delay.
-    const delays = [...cells].map(cell => (cell).style.animationDelay)
-    expect(new Set(delays).size).toBe(8)
+    const mark = container.firstElementChild as SVGSVGElement
+    expect(mark.tagName).toBe('svg')
+    const pixels = mark.querySelectorAll('rect')
+    expect(pixels).toHaveLength(11)
+    // Each cell chases the C arc in stroke order, so every delay differs.
+    const delays = new Set([...pixels].map(pixel => pixel.style.animationDelay))
+    expect(delays.size).toBe(pixels.length)
   })
 
   it('sizes via the size prop in both shapes', () => {

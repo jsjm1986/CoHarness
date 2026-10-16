@@ -3,9 +3,11 @@
  * rides currentColor and takes {size, className}; stroke weight follows the
  * drawn size (2 at ≥16px, 2.2 at 14px, 2.4 at ≤12px). `aria-hidden` stays
  * absent: the a11y tree lists bare svg glyphs as `img`, which the web golden
- * snapshots depend on. Two glyphs stay custom — IconCloseFill14 (heavy
- * filled X, no Lucide analogue) and IconTreeCorner8x10 (structural
- * tree-line connector, not an icon metaphor).
+ * snapshots depend on. A few glyphs stay custom — IconCloseFill14 (heavy
+ * filled X, no Lucide analogue), IconTreeCorner8x10 (structural tree-line
+ * connector, not an icon metaphor), IconShieldOutline16 (figma shield
+ * contour shared with SHIELD_OUTLINE_PATH consumers), and the code-toolbar
+ * wrap/nowrap fills (no Lucide analogue).
  */
 import type { LucideIcon, LucideProps } from 'lucide-react'
 import {
@@ -33,6 +35,7 @@ import {
   ClipboardList,
   Clock,
   CodeXml,
+  Columns2,
   Copy,
   Cpu,
   Database,
@@ -78,7 +81,6 @@ import {
   Share,
   Info,
   Minimize2,
-  Shield,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -140,6 +142,8 @@ export const IconSettingsOutline14 = glyph(Settings, 14)
 export const IconSettingsOutline16 = glyph(Settings, 16)
 /** ic_ds_panel_left_outline_16 */
 export const IconPanelLeftOutline16 = glyph(PanelLeft, 16)
+/** ic_ds_split_panes_outline_16 */
+export const IconSplitPanesOutline16 = glyph(Columns2, 16)
 /** ic_ds_ellipsis_outline_16 */
 export const IconEllipsisOutline16 = glyph(Ellipsis, 16)
 /** ic_ds_plus_outline_16 */
@@ -314,7 +318,18 @@ export const IconPlanOutline14 = glyph(ClipboardList, 14)
 /** ic_ds_compact_outline_16 */
 export const IconCompactOutline16 = glyph(FoldVertical, 16)
 /** ic_ds_shield_outline_16 */
-export const IconShieldOutline16 = glyph(Shield, 16)
+/** Permission row glyph of the composer menu: the shield contour without a mode mark. */
+export const SHIELD_OUTLINE_PATH = 'M8.20554 0.899994L14.7901 3.36857V7.01026C14.7901 12 11.0466 14.2103 8.20554 15.3C5.36446 14.2103 1.62012 12 1.62012 7.01026V3.36857L8.20554 0.899994Z'
+
+/** Stroke width of {@link SHIELD_OUTLINE_PATH}. */
+export const SHIELD_OUTLINE_STROKE = '1.31831'
+
+/** Permission row glyph of the composer menu: the shield contour alone. */
+export const IconShieldOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d={SHIELD_OUTLINE_PATH} stroke="currentColor" strokeWidth={SHIELD_OUTLINE_STROKE} strokeLinejoin="round" />
+  </svg>
+)
 /** ic_ds_brain_outline_16 */
 export const IconBrainOutline16 = glyph(Brain, 16)
 
@@ -359,3 +374,21 @@ export const IconCircleDashedOutline16 = glyph(CircleDashed, 16)
 export const IconWrenchOutline16 = glyph(Wrench, 16)
 /** ic_ds_app_window_outline_16 */
 export const IconAppWindowOutline16 = glyph(AppWindow, 16)
+
+/** Wrap-enabled state glyph for the code-card toolbar. */
+export const IconWrapFill16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M10.9999 8C10.9999 6.89543 10.1046 6 9 6H4.5V5H9C10.6568 5 11.9999 6.34315 11.9999 8C11.9999 9.65685 10.6568 11 9 11H6.20703L6.85351 11.6465L6.14648 12.3535L4.64652 10.8536C4.45126 10.6583 4.45126 10.3417 4.64652 10.1464L6.14648 8.64648L6.85351 9.35352L6.20703 10H9C10.1046 10 10.9999 9.10457 10.9999 8Z" fill="currentColor" />
+    <path d="M2 15H1V1H2V15Z" fill="currentColor" />
+    <path d="M15 15H14V1H15V15Z" fill="currentColor" />
+  </svg>
+)
+
+/** Wrap-disabled state glyph for the code-card toolbar. */
+export const IconNowrapFill16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M2 15H1V1H2V15Z" fill="currentColor" />
+    <path d="M12.3535 7.64645C12.5487 7.84171 12.5487 8.15829 12.3535 8.35355L9.85352 10.8535L9.14648 10.1465L10.793 8.5H3.5V7.5H10.793L9.14648 5.85352L9.85352 5.14648L12.3535 7.64645Z" fill="currentColor" />
+    <path d="M15 15H14V1H15V15Z" fill="currentColor" />
+  </svg>
+)

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-15-menu-material-surface-and-keyboard-guards.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-menu-material-surface-and-keyboard-guards.md
+/agent-note-menu-material-surface-and-keyboard-guards:
+  en: 1686cdd3d15edce0
+  zh: b66ed0dce13c750c
+/agent-note-menu-material-surface-and-keyboard-guards/problem:
+  en: eb74ae5783b7f19c
+  zh: 1f193b92e45d87ed
+/agent-note-menu-material-surface-and-keyboard-guards/decision:
+  en: 5a0e04356a4f748b
+  zh: 02ed0ccf5ffac76a
+/agent-note-menu-material-surface-and-keyboard-guards/alternatives-considered:
+  en: 17e1dca069fa23cf
+  zh: 3897ae10b6b8e581
+/agent-note-menu-material-surface-and-keyboard-guards/consequences:
+  en: c25d54239ec5fb47
+  zh: 7207397add856cbb
+/agent-note-menu-material-surface-and-keyboard-guards/verification:
+  en: f13113e75f64d07d
+  zh: 9dc35aed382aed0f

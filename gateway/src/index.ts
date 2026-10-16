@@ -75,6 +75,7 @@ import {
   createDocumentTransferHandler,
 } from './document-transfer.ts'
 import { createDocumentCatalogHandlers } from './document-catalog.ts'
+import { LocalDocumentBroker } from './documents-local.ts'
 import { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, type GatewayDeps } from './server.ts'
@@ -464,6 +465,18 @@ try {
 
 const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
 await accessMonitor.synchronize()
+// Browser document operations run against each scope's filesystem root so a
+// panel read never starts a runtime; chat/agent work still launches one.
+const localDocuments = new LocalDocumentBroker({
+  cfg,
+  instances: deps.instances,
+  users,
+  projects,
+  collaboration,
+  principals: principalKeys.signer,
+  organizationId: context.organizationId,
+  catalog: documentCatalogHandlers,
+})
 const documentAdmin = createGatewayDocumentAdminHandler({
   instances: deps.instances,
   users,
@@ -472,6 +485,7 @@ const documentAdmin = createGatewayDocumentAdminHandler({
   principals: principalKeys.signer,
   audit,
   maxResponseBytes: cfg.upstreamResponseLimitBytes,
+  local: localDocuments,
 })
 const server = createGatewayServer(deps, {
   ...proxyHandlers,
@@ -505,6 +519,7 @@ const server = createGatewayServer(deps, {
     principals: principalKeys.signer,
     audit,
     maxResponseBytes: cfg.upstreamResponseLimitBytes,
+    local: localDocuments,
   }),
   documentTransferUpload: createGatewayDocumentTransferUploadHandler({
     instances: deps.instances,
@@ -514,6 +529,7 @@ const server = createGatewayServer(deps, {
     principals: principalKeys.signer,
     audit,
     maxResponseBytes: cfg.upstreamResponseLimitBytes,
+    local: localDocuments,
   }),
   documentScope: createGatewayDocumentScopeHandler({
     instances: deps.instances,
@@ -524,6 +540,7 @@ const server = createGatewayServer(deps, {
     audit,
     maxResponseBytes: cfg.upstreamResponseLimitBytes,
     upstreamTimeoutMs: cfg.upstreamTimeoutMs,
+    local: localDocuments,
   }),
   admin: createAdminApiHandler(deps, documentAdmin, proxyHandlers.invalidateAccess),
   runtime: createRuntimeApiHandler({
@@ -588,6 +605,7 @@ const server = createGatewayServer(deps, {
       principals: principalKeys.signer,
       audit,
       maxResponseBytes: cfg.upstreamResponseLimitBytes,
+      local: localDocuments,
     }),
     documentTransferDirectories: createDocumentTransferDirectoriesHandler({
       instances: deps.instances,
@@ -754,6 +772,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
       desktopSweepTask.wait(),
     ])
     proxyHandlers.close()
+    await localDocuments.dispose()
     await accessMonitor.close()
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])
     await waitForWriters()

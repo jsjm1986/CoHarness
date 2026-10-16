@@ -22,6 +22,7 @@ import {
   startDeepSeekResponsesBridge,
   type DeepSeekResponsesBridge,
 } from './deepseek-responses-bridge.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const execFileAsync = promisify(execFile)
 const codexPackageJson = createRequire(import.meta.url).resolve('@openai/codex/package.json')
@@ -96,6 +97,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
       }
       const ctx = new Context()
       contexts.push(ctx)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(LocalSubprocessRuntime)
       const handles: SubprocessHandle[] = []

@@ -93,7 +93,7 @@ describe('ui-settings-plugins apply', () => {
     expect(entries.map(entry => entry.options.id))
       .toEqual(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
     expect(entries.map(entry => resolveSlotLabel(entry.options.label)))
-      .toEqual(['终端', 'Agent 循环', 'Subagent', '模型选择', '网页搜索'])
+      .toEqual(['终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索'])
   })
 
   it('injects one business face per card', async () => {

@@ -18,8 +18,17 @@ describe('conversation compact chrome', () => {
     expect(root).toContain('.crumb')
     expect(root).toContain('max-width: 100%')
     expect(root).toContain('display: contents')
-    expect(root).toContain('var(--dsw-mobile-tab-height)')
+    // The compact header collapses the desktop 52px recipe to a 36px chrome
+    // strip with 28px tab pills inside a 34px track.
+    expect(root).toMatch(/\.header\s*\{[^}]*min-height:\s*36px/u)
+    expect(root).toMatch(/\.tabs\s*\{[^}]*min-height:\s*34px/u)
+    expect(root).toMatch(/\.tab\s*\{[^}]*min-height:\s*28px/u)
     expect(root).toContain('.headerUtilities')
+    // The corner seat's edge reach re-anchors to the compact header's space-3
+    // trailing padding; the desktop -16px would push its button 4px off-screen.
+    expect(root).toMatch(
+      /\[data-viewport='compact'\]\)\s*\.headerCorner\s*\{[^}]*margin-right:\s*calc\(-1 \* var\(--dsw-space-3\)\)/u,
+    )
   })
 
   it('shrinks the hero headline and grows the workspace chip on compact', () => {
@@ -60,7 +69,14 @@ describe('conversation compact chrome', () => {
     expect(contextMeter).toContain('var(--dsw-mobile-sheet-radius)')
     const actions = readFileSync(fileURLToPath(new URL('../src/client/chat/MessageIconActions.module.css', import.meta.url)), 'utf8')
     expect(actions).toContain('flex-wrap: wrap')
-    expect(actions).toContain('min-width: var(--dsw-touch-target)')
+    // Compact drops to 40px targets (the composer's compromise): the full
+    // 44px touch target stays on coarse pointers that are not compact.
+    expect(actions).toMatch(/@media\s*\(pointer:\s*coarse\)[^{]*\{[^@]*width:\s*var\(--dsw-touch-target\)/u)
+    expect(actions).toMatch(/\[data-viewport='compact'\]\s*\)\s*\.action\s*\{[^}]*min-width:\s*40px/u)
+    // Phone keeps the primary figure per stats pill; speed and cache-hit
+    // segments hide instead of ellipsizing mid-number (dialogs keep them).
+    const pills = readFileSync(fileURLToPath(new URL('../src/client/chat/StatsPills.module.css', import.meta.url)), 'utf8')
+    expect(pills).toMatch(/\[data-viewport='compact'\]\)\s*\.detail\s*\{[^}]*display:\s*none/u)
   })
 
   it('raises a trajectory details takeover above the absolute composer seat', () => {

@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-模型设置与产品引导插件。同一个 client Cordis 插件会注册 Models 页面和按条件显示的 DeepSeek 官方凭据弹窗。该步骤使用共用弹窗组件，并继续由 `settings.onboarding` 排序。Models 平面把三个协议领域汇聚为一个共享快照：`llm.providers`（可配置提供方目录，含每条路由的存活／休眠状态）、`settings.describe`（序列化 schema、分层脱敏值、secret slot）与 `credentials.describe`（不含值的 configured/source/writable 徽标）；页面据此渲染提供方行，一次只展开一张编辑卡片，且不把路由存活状态呈现为提供方状态。
+模型设置与产品引导插件。同一个 client Cordis 插件会注册 Models 页面和按条件显示的 DeepSeek 官方凭据弹窗。该步骤使用共用弹窗组件，并继续由 `settings.onboarding` 排序。Models 平面把三个协议领域汇聚为一个共享快照：`llm.providers`（可配置提供方目录，含每条路由的存活／休眠状态）、`settings.describe`（序列化 schema、分层脱敏值、secret slot）与 `credentials.describe`（不含值的 configured/source/writable 徽标，覆盖 profile 指名的引用以及页面为未指名行自行派生的引用）；页面据此渲染提供方行，一次只展开一张编辑卡片，且不把路由存活状态呈现为提供方状态。
 
 进入项目作用域后，页面使用 Gateway 所有的 transport，而不是共用的个人 settings 文档。`ProjectModelsBridge` 把项目 Provider 配置、不含值的凭据状态、端点发现和带 revision 校验的 mutation 适配为与个人设置相同的 `ModelsSettingsStore`、`ProviderEditor` 和 `ModelListEditor`。项目密钥加密保存并限定在单个项目；普通成员只能读取元数据，项目 owner 与组织管理员可以写入。项目 transport 不可用时，页面会明确说明，不会回退到个人设置。
 

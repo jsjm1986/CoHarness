@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-12-session-reliability-fixes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-session-reliability-fixes.md
+/agent-note-session-reliability-fixes-wake-cap-executable-errors-opaque-team-content-goal-withdrawal-plan-dismissal:
+  en: 174161af7091592d
+  zh: ac220c5a91d15388
+/agent-note-session-reliability-fixes-wake-cap-executable-errors-opaque-team-content-goal-withdrawal-plan-dismissal/problem:
+  en: cd45872f2c8eb3ea
+  zh: e1faa2687e31da96
+/agent-note-session-reliability-fixes-wake-cap-executable-errors-opaque-team-content-goal-withdrawal-plan-dismissal/decision:
+  en: 2fa3b1fa076201b3
+  zh: e817aa49c2074810
+/agent-note-session-reliability-fixes-wake-cap-executable-errors-opaque-team-content-goal-withdrawal-plan-dismissal/alternatives-considered:
+  en: 9ffc9aad175eb330
+  zh: 3a4da474890c58aa
+/agent-note-session-reliability-fixes-wake-cap-executable-errors-opaque-team-content-goal-withdrawal-plan-dismissal/consequences:
+  en: 7b9728c661da5ef6
+  zh: a48d2cd3910389f7
+/agent-note-session-reliability-fixes-wake-cap-executable-errors-opaque-team-content-goal-withdrawal-plan-dismissal/verification:
+  en: 48a48c25834fe684
+  zh: 5084508a56bc5f6d
+/agent-note-session-reliability-fixes-wake-cap-executable-errors-opaque-team-content-goal-withdrawal-plan-dismissal/related:
+  en: f1f4f4e171926c5f
+  zh: d4998cc9ae6c5b23

@@ -67,6 +67,12 @@ export interface RenderedInstructionSet {
   rendered: RenderedAgentInstructions
   /** Successfully read candidates before content deduplication and byte budgeting. */
   observed: LoadedInstructionFile[]
+  /**
+   * Candidates dropped as content duplicates of an earlier candidate in their
+   * directory. Duplicates of retained content remain eligible for probing,
+   * because deleting or changing the retained candidate can make them visible.
+   */
+  deduped: LoadedInstructionFile[]
   /** Candidates retained by content deduplication and byte budgeting. */
   included: LoadedInstructionFile[]
 }
@@ -218,7 +224,7 @@ export function ancestorChain(root: string, cwd: string): string[] {
 
 /**
  * Find descendant directories crossed between a cwd and a touched file.
- * @param root - session cwd that bounds nested discovery.
+ * @param root - current working directory that bounds nested discovery.
  * @param touchedPath - absolute path or path relative to `root`.
  * @returns descendant directories from shallowest through the touched file's parent.
  */
@@ -441,9 +447,11 @@ export async function loadBaselineInstructionSet(
     return {
       rendered,
       observed: [],
+      deduped: [],
       included,
     }
   }
+  const keptPaths = new Set(deduped.map(file => file.absolutePath))
   const { rendered, included } = renderAgentInstructionSet(deduped, {
     maxBytes: config.maxBytes,
     ...options.replacePreviousBaseline === undefined
@@ -453,7 +461,32 @@ export async function loadBaselineInstructionSet(
   return {
     rendered,
     observed: loaded,
+    deduped: loaded.filter(file => !keptPaths.has(file.absolutePath)),
     included,
+  }
+}
+
+/**
+ * Resolve the file and display paths for one logical instruction candidate.
+ * @param scope - candidate scope key containing its directory and file name.
+ * @param projectRoot - root used for project-relative candidates.
+ * @param resolved - normalized discovery configuration.
+ * @returns the absolute and model-facing paths for the candidate.
+ * @internal
+ */
+export function scopeInstructionFile(
+  scope: string,
+  projectRoot: string,
+  resolved: ResolvedConfig,
+): { absolutePath: string; displayPath: string } {
+  const { directory, candidateName } = decodeScopeKey(scope)
+  const dir = directory === USER_GLOBAL_DIRECTORY
+    ? resolved.dshHome
+    : directory === '.' ? projectRoot : join(projectRoot, directory)
+  const absolutePath = join(dir, candidateName)
+  return {
+    absolutePath,
+    displayPath: directory === USER_GLOBAL_DIRECTORY ? userGlobalDisplayPath(resolved.dshHome) : relativeDisplay(projectRoot, absolutePath),
   }
 }
 
@@ -473,11 +506,8 @@ export async function probeScopeInstruction(
   fileSystem: FileSystem,
   signal?: AbortSignal,
 ): Promise<ScopeInstructionProbe> {
-  const { directory, candidateName } = decodeScopeKey(scope)
-  const dir = directory === USER_GLOBAL_DIRECTORY
-    ? resolved.dshHome
-    : directory === '.' ? projectRoot : join(projectRoot, directory)
-  const absolutePath = join(dir, candidateName)
+  const candidate = scopeInstructionFile(scope, projectRoot, resolved)
+  const absolutePath = candidate.absolutePath
   // resolve() follows a final-component symlink; stat then classifies the target.
   // A non-file target (missing, or a link to a directory) is a confirmed absence;
   // only a provider exception is reported as unavailable.
@@ -492,8 +522,7 @@ export async function probeScopeInstruction(
   }
   if (info?.type !== 'file') return { kind: 'absent' }
   const file: ProbedInstructionFile = {
-    absolutePath,
-    displayPath: directory === USER_GLOBAL_DIRECTORY ? userGlobalDisplayPath(resolved.dshHome) : relativeDisplay(projectRoot, absolutePath),
+    ...candidate,
     target,
     version: info.version,
     ...info.size === undefined ? {} : { size: info.size },

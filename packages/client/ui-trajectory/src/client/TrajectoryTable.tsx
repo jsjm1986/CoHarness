@@ -258,7 +258,10 @@ function jsonTreeLabels(t: TrajectoryTranslate): JsonTreeLabels {
 
 function markdownLabels(t: TrajectoryTranslate): MarkdownLabels {
   return {
-    code: { copyLabel: t('copy'), copiedLabel: t('copied') },
+    code: {
+      copyLabel: t('copy'), copiedLabel: t('copied'),
+      toolbarLabels: { codeLabel: t('codeBlock.title'), wrapLabel: t('codeBlock.wrap'), unwrapLabel: t('codeBlock.unwrap') },
+    },
     footnotes: t('markdown.footnotes'),
   }
 }
@@ -1469,6 +1472,10 @@ function MarkdownRecordContent({
   onOpenCall: (callId: string) => void
   t: TrajectoryTranslate
 }) {
+  if (record.cell.sourceBlocks?.length && record.cell.sourceBlocks.every(block =>
+    block.type === 'tool-addition' || block.type === 'tool-removal')) {
+    return <pre className={`${css.payload} ${css.toolUpdatePayload}`}>{record.cell.inputDetail}</pre>
+  }
   if (!rendered && record.cell.sourceBlocks && record.cell.sourceBlocks.length > 0) {
     return <SourceBlocks blocks={record.cell.sourceBlocks} onOpenCall={onOpenCall} t={t} />
   }
@@ -2191,7 +2198,7 @@ export function TrajectoryTable({
     ), [allRecords, selectedRequest])
   const selectedRequestRecords = selectedRequestRecordTemplates.map(currentRecord)
   const selectedRequestAssistant = selectedRequestRecords.find(
-    record => record.cell.kind === 'message',
+    record => record.cell.kind === 'message' && record.cell.requestOnly !== true,
   )
   const selectedRequestAnchor = selectedRequestAssistant ?? selectedRequestRecords[0]
   const selectedRequestNumber = selectedRequest === null
@@ -2662,6 +2669,9 @@ export function TrajectoryTable({
                   {({ displayText, listDisplayText, resultText, toolCallOnly, toolCallText }) => {
                     const isCollapsedSummary = record.collapsedSummary !== undefined
                     const isRequestOnly = record.cell.requestOnly === true
+                    const singleToolNotice = record.cell.kind === 'context'
+                      && record.cell.sourceBlocks?.length === 1
+                      && record.cell.sourceBlocks.every(block => block.type === 'tool-addition' || block.type === 'tool-removal')
                     const isInitialSystem = record.cell.kind === 'system'
                 && record.cell.index === allRecords[0]?.cell.index
                     const key = requestKey(record.turn, record.group)
@@ -2692,7 +2702,7 @@ export function TrajectoryTable({
                       : activeTurn === record.turn
                     return (
                       <tr
-                        tabIndex={isRequestOnly ? -1 : 0}
+                        tabIndex={isRequestOnly || singleToolNotice ? -1 : 0}
                         aria-rowindex={position + 1 + historyRowOffset}
                         aria-label={isCollapsedSummary
                           ? t('request.collapsedSummary', {
@@ -2727,7 +2737,7 @@ export function TrajectoryTable({
                         data-timeline-focus={isCollapsedSummary || timelineFocusIndexes === null
                           ? undefined
                           : timelineFocusIndexes.has(record.cell.index) ? 'inside' : 'outside'}
-                        onClick={isRequestOnly
+                        onClick={isRequestOnly || singleToolNotice
                           ? undefined
                           : isCollapsedSummary
                             ? () => {
@@ -2737,7 +2747,7 @@ export function TrajectoryTable({
                             }
                             : () => { selectRecord(record.cell.index) }}
                         onDoubleClick={(event) => {
-                          if (isCollapsedSummary || isRequestOnly) return
+                          if (isCollapsedSummary || isRequestOnly || singleToolNotice) return
                           if (record.turn !== null && collapsedTurns.has(record.turn)) {
                             event.preventDefault()
                             onToggleTurn(record.turn)
@@ -2761,7 +2771,7 @@ export function TrajectoryTable({
                           onToggleTurn(record.turn)
                         }}
                         onKeyDown={(event) => {
-                          if (isRequestOnly) return
+                          if (isRequestOnly || singleToolNotice) return
                           if (event.key !== 'Enter' && event.key !== ' ') return
                           event.preventDefault()
                           if (isCollapsedSummary) {
@@ -3156,8 +3166,10 @@ export function TrajectoryTable({
                     )}
                     {selectedRequestInfo?.error !== undefined && (
                       <div>
-                        <dt>{t('details.error')}</dt>
-                        <dd className={css.error}>
+                        <dt>{t(selectedRequestState !== 'error' && selectedRequestInfo.retry !== undefined
+                          ? 'details.lastAttemptError'
+                          : 'details.error')}</dt>
+                        <dd className={selectedRequestState === 'error' ? css.error : undefined}>
                           {selectedRequestInfo.error === COMPACTION_INTERRUPTED_ERROR
                             ? t('layout.compactionInterrupted')
                             : selectedRequestInfo.error}
@@ -3168,7 +3180,7 @@ export function TrajectoryTable({
                       <div>
                         <dt>{t('details.retry')}</dt>
                         <dd>
-                          {t('details.scheduled')} {selectedRequestInfo.maxRetries === undefined
+                          {selectedRequestInfo.maxRetries === undefined
                             ? selectedRequestInfo.retry
                             : t('request.retryProgress', {
                               retry: selectedRequestInfo.retry,

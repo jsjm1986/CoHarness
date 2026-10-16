@@ -78,19 +78,54 @@ describe('ClientAssistantStream', () => {
     }
   })
 
-  it('stages a matching durable settlement and releases it on the committed end', () => {
+  it('publishes a committed message at stream end and retires its chunks at its Step end', () => {
     const fold = new ClientAssistantStream()
     fold.replace([ev.turnEnd(5, 0)])
-    fold.acceptFrame(start('att-1', 5))
+    fold.acceptFrame(start('att-1', 5, 1, 1))
     fold.acceptFrame(chunk('att-1', 0, '你'))
     fold.acceptFrame(chunk('att-1', 1, '好'))
-    const message = ev.assistant(6, 1, '你好')
+    const message = ev.assistant(6, 1, '你好', 1)
     expect(fold.acceptDurable(message)).toBeUndefined()
-    const released = fold.acceptFrame(endCommitted('att-1', 2, 6))
-    expect(released?.type).toBe('settlement')
-    if (released?.type === 'settlement') {
-      expect(released.attemptId).toBe(ATTEMPT)
-      expect(released.entry.event).toBe(message)
+    expect(fold.acceptFrame(endCommitted('att-1', 2, 6))).toEqual({ type: 'publish', entry: { event: message } })
+    for (const [turn, step] of [[2, 1], [1, 2]] as const) {
+      expect(fold.acceptDurable(ev.stepEnd(7, turn, step))).toEqual({ type: 'publish', entry: { event: ev.stepEnd(7, turn, step) } })
+    }
+    const closed = ev.stepEnd(8, 1, 1)
+    expect(fold.acceptDurable(closed)).toEqual({ type: 'publish', entry: { event: closed }, retireAttemptId: ATTEMPT })
+    const followUp = ev.user(9, '续')
+    expect(fold.acceptDurable(followUp)).toEqual({ type: 'publish', entry: { event: followUp } })
+    expect(fold.acceptFrame(start('att-2', 8))).toBeUndefined()
+  })
+
+  it('clears retained chunks on window install and refuses a new attempt before Step completion', () => {
+    const fold = new ClientAssistantStream()
+    fold.replace([ev.turnEnd(5, 0)])
+    fold.acceptFrame(start('att-1', 5, 1, 1))
+    const staged = ev.assistant(6, 1, '半', 1)
+    fold.acceptDurable(staged)
+    expect(fold.acceptFrame(endCommitted('att-1', 0, 6))).toEqual({ type: 'publish', entry: { event: staged } })
+    expect(fold.acceptFrame(start('att-2', 6))).toEqual({ type: 'rebaseline' })
+    const installed = [ev.turnEnd(5, 0), ev.assistant(6, 1, '整', 1)]
+    expect(fold.replace(installed)).toEqual(installed.map(event => ({ event })))
+    const closed = ev.stepEnd(7, 1, 1)
+    expect(fold.acceptDurable(closed)).toEqual({ type: 'publish', entry: { event: closed } })
+    expect(fold.acceptFrame(start('att-2', 7))).toBeUndefined()
+  })
+
+  it('retires interrupted messages and attempts at stream end', () => {
+    const message = ev.assistant(6, 1, '断', 1)
+    if (message.type !== 'assistant/message') throw new Error('expected assistant message')
+    const interrupted = { ...message, data: { ...message.data, interrupted: true as const } }
+    for (const durable of [ev.attempt(6, 1, 1), interrupted]) {
+      const fold = new ClientAssistantStream()
+      fold.replace([ev.turnEnd(5, 0)])
+      fold.acceptFrame(start('att-1', 5, 1, 1))
+      fold.acceptFrame(chunk('att-1', 0, '半'))
+      expect(fold.acceptDurable(durable)).toBeUndefined()
+      const released = fold.acceptFrame(endCommitted('att-1', 1, 6,
+        durable.type === 'assistant/message' ? 'assistant/message' : 'assistant/attempt'))
+      expect(released?.type).toBe('settlement')
+      if (released?.type === 'settlement') expect(released.attemptId).toBe(ATTEMPT)
     }
   })
 

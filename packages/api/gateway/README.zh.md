@@ -20,6 +20,7 @@ Client 调用根据已声明的 Session 地址或调用方 Agent Context 选择�
 ## 目录
 
 - [Host 服务：`TypertGatewayService`（ctx key：`typertGateway`）](#host-service-typertgatewayservice-ctx-key-typertgateway)
+- [媒体引用](#media-references)
 - [Client 服务：`ClientRemote`（ctx key：`remote`）](#client-service-clientremote-ctx-key-remote)
 - [不变量](#invariants)
 - [模型体验](#model-experience)
@@ -38,6 +39,11 @@ Client 调用根据已声明的 Session 地址或调用方 Agent Context 选择�
 Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandler 上注册 trusted-host interceptor。Connection 把这个复合 handler 交给 HTTP bridge；handler 将已认领 endpoint 分发给 Gateway，未认领 endpoint 则交给 API Proxy。直接调用 `invoke()` 会保留业务错误；`TypertGatewayError` 可区分分发、绑定、提供方、查找、Context、参数和编解码器各自负责的故障。resolver 可以用 `TypertLookupFailure` 携带既有 RPC error，使冷恢复失败或 ownership fence 等策略拒绝保持原错误码。
 
 支持取消的 Remote 方法会把 `signal: AbortSignal` 声明为最后一个 Host 参数。signal 是 descriptor 元数据，而不是 wire 参数：Connection 将它提供给 Gateway，Gateway 则在已解码的业务参数之后注入它。SRC 识别这个保留的末位参数名，严格生成还要求它具有全局 `AbortSignal` 类型。
+
+<a id="media-references"></a>
+## 媒体引用
+
+当组合了 `connection`、`fs` 与 `attachments` 时，Host 入口还通过 `connection.http.handlePrefix`（trusted-host 权威）挂载 `GET|HEAD /api/file?path=<绝对路径>`。它经 `ctx.fs` 读取普通文件，包括已注册工作区之外的临时路径与远程 provider 中的文件。目录归属与 MIME 类别均不限制访问；`mime-types` 按解析出的显示路径提供响应类型，未知扩展回退 `application/octet-stream`。GET 复用 `readBytes` 承担预检与读取中的字节上限；HEAD 只读元数据。所有文件使用 `ctx.attachments.imageLimits.maxImageBytes`；超限返回 413。响应包含完整文件、忽略 Range，并携带 `private, no-store`、`nosniff` 与 `sandbox; default-src 'none'` CSP，使被直接打开的 HTML/SVG 无法在 API 源下执行。客户端 socket 关闭会中止进行中的读取；非 `FsError` 的 provider 失败向 Connection 层传播。Markdown 改写位于 `ui-conversation`（`AssistantMarkdown`）；音视频响应可用，Markdown 音视频播放节点属于另行排期的工作。
 
 <a id="client-service-clientremote-ctx-key-remote"></a>
 ## Client 服务：`ClientRemote`（ctx key：`remote`）

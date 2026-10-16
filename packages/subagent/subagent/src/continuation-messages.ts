@@ -158,6 +158,10 @@ export function createSettlementMessage(
       ...closingText.length === 0
         ? [{ type: 'text' as const, text: 'It left no closing message.' }]
         : [{ type: 'text' as const, text: 'Its closing message:' }, ...closingText],
+      ...terminal.structured !== undefined
+        ? [{ type: 'text' as const, text: `Structured result: ${JSON.stringify(terminal.structured)}` }] : [],
+      ...terminal.diagnostic !== undefined
+        ? [{ type: 'text' as const, text: terminal.diagnostic }] : [],
     ],
     source: {
       kind: 'subagent-settled' as const,

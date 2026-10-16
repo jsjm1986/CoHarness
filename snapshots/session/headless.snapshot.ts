@@ -1,7 +1,7 @@
 /** Recorded-session replay through the shipped headless `dsh` profile. */
 
 import { startHttpMcpFixture } from '../../packages/mcp/mcp-client/tests/http-fixture.ts'
-import { cp, copyFile, mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
+import { cp, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, utimes, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -97,6 +97,17 @@ interface HeadlessScenario {
 interface SessionLog {
   readonly content: string
   readonly header: JsonObject
+}
+
+/** Keep the cwd text priced by compaction independent of the platform's temporary-root length. */
+async function compactionWorkspaceOptions(): Promise<{ tempDirParent: string; tempDirPrefix: string }> {
+  const tempDirParent = await realpath(tmpdir())
+  const prefix = 'dsh-log-snap-'
+  // mkdtemp appends six characters; JSON quoting is part of the runtime-context text.
+  const unpaddedLength = JSON.stringify(join(tempDirParent, `${prefix}XXXXXX`)).length
+  const paddingLength = 192 - unpaddedLength
+  if (paddingLength < 0) throw new Error('compaction snapshot temporary root exceeds its fixed cwd text length')
+  return { tempDirParent, tempDirPrefix: prefix + '-'.repeat(paddingLength) }
 }
 
 function propertyName(node: ts.PropertyName): string | undefined {
@@ -651,6 +662,30 @@ async function verifyBackgroundConfinementFailure(log: string, cwd: string): Pro
   expect(JSON.parse(await readFile(join(cwd, 'confinement-audit.json'), 'utf8'))).toEqual({ confineCalls: 1, spawnCalls: 0 })
 }
 
+function verifyWorkingDirectory(log: string, cwd: string): void {
+  const events = records(log)
+  const directories = events.filter(event => event.type === 'working-directory/change')
+    .map(event => (event.data as JsonObject).cwd)
+  expect(directories).toEqual([join(cwd, 'selected'), join(cwd, 'second'), cwd])
+  expect(events.filter(event => event.type === 'system/message')).toHaveLength(1)
+  const users = events.filter(event => event.type === 'user/message').map(event => event.data as JsonObject)
+  const contexts = users.flatMap(message => {
+    const source = message.source as JsonObject
+    if (source.kind !== 'runtime-context') return []
+    return (source.sections as JsonObject[]).filter(section => section.name === 'working-directory:current')
+      .map(section => section.text)
+  })
+  expect(contexts).toEqual([cwd, join(cwd, 'selected'), join(cwd, 'second'), cwd]
+    .map(directory => `Current working directory: ${JSON.stringify(directory)}.`))
+  const notices = users.filter(message => (message.source as JsonObject).kind === 'working-directory')
+    .map(message => (message.content as JsonObject[]).map(block => block.text).join(''))
+  expect(notices).toEqual([
+    `The working directory changed from ${JSON.stringify(cwd)} to ${JSON.stringify(join(cwd, 'selected'))}.`,
+    `The working directory changed from ${JSON.stringify(join(cwd, 'selected'))} to ${JSON.stringify(join(cwd, 'second'))}.`,
+    `The working directory ${JSON.stringify(join(cwd, 'second'))} is unavailable. The working directory is now ${JSON.stringify(cwd)}.`,
+  ])
+}
+
 /** Exercise provider-cwd adoption through the shipped launcher without normalizing away the observation. */
 async function verifyProviderCwdResume(
   scenario: HeadlessScenario,
@@ -1080,6 +1115,7 @@ describe('headless recorded-session snapshots', () => {
         result = await runLoaderSmoke({
           label: `${scenario.name} headless snapshot`,
           tempDirPrefix: 'dsh-log-snap-',
+          ...(scenario.name === 'compaction-recovery' ? await compactionWorkspaceOptions() : {}),
           ...(scenario.manifest.workspace?.parent === 'outside-temp' ? { tempDirParent: outsideTempWorkspaceParent() } : {}),
           binScript: dshBin,
           sourceImport: 'tsx/esm',
@@ -1165,6 +1201,9 @@ describe('headless recorded-session snapshots', () => {
             }
             if (scenario.name === 'background-confinement-failure') {
               await verifyBackgroundConfinementFailure(actualLogs[0]!.content, cwd)
+            }
+            if (scenario.name === 'working-directory') {
+              verifyWorkingDirectory(actualLogs[0]!.content, await realpath(cwd))
             }
             finalWorkspace = await captureWorkspaceSnapshot(cwd, {
               ignoredRootEntries: RUNTIME_WORKSPACE_ENTRIES,

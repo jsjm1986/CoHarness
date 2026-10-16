@@ -7,7 +7,7 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-Unified Web `@file` and `@session` source. The browser starts the `fileReferences/list` and `sessionReferenceResolver/candidates` Remote calls together for an unquoted token, deterministically orders files before sessions with locale-registered folder/file/session labels, and renders the rows under non-selectable file and session section headings without a redundant raw `reference` source title. Either failed candidate domain degrades independently. An open `@"…` token searches files only.
+Unified Web `@file` and `@session` source. Each candidate request retains the browsing Client Session through completion and waits for its initial history open before starting the `fileReferences/list` and `sessionReferenceResolver/candidates` Remote calls, which then run together for an unquoted token; a session that is not already bound fails the query rather than reopening it, and either failed candidate domain degrades independently. Rows order files before sessions and the browsing session's direct subagents above ordinary sessions, rendered under non-selectable section headings without a redundant raw `reference` source title. A row carries only what distinguishes it: a file names its parent directory unless a drilled listing's breadcrumb already does, and a session names its workspace only when it is not the current one. Session rows carry the session list's relative activity age, falling back to the candidate's creation time when the list does not carry that session. An open `@"…` token searches files only.
 
 File picks preserve the natural text defined by the shared `@path` grammar as their hidden serialized and clipboard form. A file closes completion as an atomic inline reference displayed with a file glyph, business-color filename, and no capsule. A directory settles as an atomic folder reference on an ordinary pick; its explicit drill action (Tab, the row chevron, or a breadcrumb) instead replaces the token with editable path text and keeps the menu active at its trailing slash. Drilled listings publish a reversible workspace breadcrumb. Paths containing whitespace use `@"path with spaces"`, and a quote the user opened explicitly remains quoted.
 
@@ -17,7 +17,7 @@ The `/client` export is the plugin body (`apply`/`inject`) only; candidate encod
 
 ## Summary
 
-Use `dsh-client-ui-reference` when Web users need to mention files, folders, or sessions from one `@` completion menu. It lists files before sessions and keeps either group available when the other cannot load. Picking a file, folder, or session inserts an atomic reference with a stable clipboard form; folder rows also let users descend without closing completion. File rows omit redundant root locations, and session rows show a workspace only when it differs from the current one. Session mentions are validated before model context is captured, while browsing candidates has no model effect.
+Use `dsh-client-ui-reference` when Web users need to mention files, folders, or sessions from one `@` completion menu. Each request retains the browsing session through its initial history open rather than reopening released sessions. The menu lists files, then the session's direct subagents, then other sessions, keeping either group available when the other cannot load. Rows carry distinguishing detail — parent directory, foreign workspace, relative activity age. A pick inserts an atomic reference with a stable clipboard form; folder rows also let users descend without closing completion. Session mentions are validated before model context is captured; browsing has no model effect.
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@ Use `dsh-client-ui-reference` when Web users need to mention files, folders, or 
 <a id="invariants"></a>
 ## Invariants
 
-**Runtime invariant:** No companion is published. Candidates are fetched per token through the `fileReferences/list` and `sessionReferenceResolver/candidates` remotes; the source keeps no candidate state between requests.
+**Runtime invariant:** No companion is published. Candidates are fetched per token through the `fileReferences/list` and `sessionReferenceResolver/candidates` remotes under a short-lived `referenceCandidates` Session reference; the source keeps no candidate state between requests.
 
 <a id="model-experience"></a>
 ## Model Experience

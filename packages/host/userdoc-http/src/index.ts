@@ -1,6 +1,6 @@
 /** Streaming HTTP consumer for user-uploaded documents. @module @deepseek-ai/dsh-host-userdoc-http */
 
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { IncomingMessage, OutgoingHttpHeader, OutgoingHttpHeaders } from 'node:http'
 import { Readable } from 'node:stream'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-collaboration'
@@ -48,7 +48,6 @@ import {
   type UserDocDirectoryPage,
   type UserDocListSort,
   type UserDocListType,
-  type UserDocListQuery,
   type UserDocStore,
 } from '@deepseek-ai/dsh-userdoc'
 import type {} from '@deepseek-ai/dsh-client-connection'
@@ -84,6 +83,82 @@ export const USERDOC_PURGE_PATH = `${USERDOC_HTTP_PATH}/purge`
 
 export const name = 'host-userdoc-http'
 export const inject = ['connection', 'userDocs']
+
+/**
+ * Document-store method surface the HTTP handlers call. `UserDocStore`
+ * satisfies it; a filesystem engine without a service context may too.
+ */
+export type UserDocStoreApi = Pick<UserDocStore,
+  'limits' | 'resolveTarget' | 'save'
+  | 'beginUpload' | 'inspectUpload' | 'writeUploadChunk' | 'completeUpload' | 'cancelUpload'
+  | 'list' | 'listDirectory' | 'listDirectories'
+  | 'listTrash' | 'trash' | 'restore' | 'purge'
+  | 'createDirectory' | 'renameDirectory' | 'removeDirectory' | 'move'
+  | 'stat' | 'read' | 'openRead' | 'remove'
+> & {
+  /** Optional provider paging; absent stores fall back to in-process paging. */
+  listDirectoryPage?: UserDocStore['listDirectoryPage']
+  listTrashPage?: UserDocStore['listTrashPage']
+  warm?: () => Promise<void>
+}
+
+/**
+ * Request surface the document handlers read. `IncomingMessage` satisfies it;
+ * the Gateway broker supplies a synthetic request for metadata routes whose
+ * entire input is the URL.
+ */
+export interface UserDocRequest {
+  method?: string | undefined
+  url?: string | undefined
+  readonly headers: IncomingMessage['headers']
+  once(event: string | symbol, listener: (...args: unknown[]) => void): unknown
+  removeListener(event: string | symbol, listener: (...args: unknown[]) => void): unknown
+  resume(): unknown
+  [Symbol.asyncIterator](): AsyncIterator<unknown>
+}
+
+/**
+ * Response surface the document handlers write to. `ServerResponse` satisfies
+ * it; the Gateway broker supplies an in-memory capture for JSON operations and
+ * the live socket response for streamed downloads.
+ */
+export interface UserDocResponse {
+  writeHead(statusCode: number, headers?: OutgoingHttpHeaders | OutgoingHttpHeader[]): unknown
+  write(chunk: unknown): unknown
+  end(chunkOrCallback?: unknown, encodingOrCallback?: BufferEncoding | (() => void), callback?: () => void): unknown
+  once(event: string | symbol, listener: (...args: unknown[]) => void): unknown
+  removeListener(event: string | symbol, listener: (...args: unknown[]) => void): unknown
+  readonly writableEnded: boolean
+  readonly destroyed: boolean
+  destroy(error?: Error): unknown
+}
+
+/**
+ * Minimal host surface the document HTTP handlers need beyond the store.
+ * A Cordis Context satisfies it through `ctx.userDocs` and `ctx.get`; the
+ * Gateway broker supplies the same surface around a filesystem engine so
+ * document requests stay resident while the scope runtime is stopped.
+ * `get` resolves optional services by name (`gatewayRuntime`, `collaboration`).
+ */
+export interface UserDocHttpHost {
+  readonly userDocs: UserDocStoreApi
+  readonly get?: (name: string) => unknown
+}
+
+/**
+ * Adapt a Cordis context to the host surface the handlers consume.
+ * @param ctx - composition context exposing `userDocs` and optional `get`.
+ * @returns one stable host object; reuse it so catalog queues serialize on it.
+ */
+export function userDocHttpHost(ctx: Context): UserDocHttpHost {
+  return {
+    userDocs: ctx.userDocs,
+    get: (name) => {
+      const service: unknown = ctx.get(name)
+      return service
+    },
+  }
+}
 
 type DocumentAction = 'read' | 'write'
 
@@ -126,17 +201,17 @@ class DocumentCatalogAuthorizationError extends Error {
 }
 
 /** Enforce project document access without changing standalone/local mode. */
-function authorizeDocumentAction(ctx: Context, action: DocumentAction, allowDocumentAdmin = false): void {
-  if (isDocumentAdminRequest(ctx)) {
+function authorizeDocumentAction(host: UserDocHttpHost, action: DocumentAction, allowDocumentAdmin = false): void {
+  if (isDocumentAdminRequest(host)) {
     if (allowDocumentAdmin) return
     throw new DocumentAuthorizationError(action)
   }
   // Handler unit tests and lightweight local compositions may provide only the
   // document store; an actual Cordis Context always exposes `get`.
-  const get = (ctx as unknown as { get?: (name: string) => unknown }).get
+  const get = host.get
   if (typeof get !== 'function') return
-  const runtime = get.call(ctx, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined
-  const collaboration = get.call(ctx, 'collaboration') as Context['collaboration'] | undefined
+  const runtime = get.call(host, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined
+  const collaboration = get.call(host, 'collaboration') as Context['collaboration'] | undefined
   if (runtime?.identity.kind === 'project' && collaboration === undefined) {
     throw new DocumentAuthorizationUnavailableError()
   }
@@ -154,13 +229,13 @@ function authorizeDocumentAction(ctx: Context, action: DocumentAction, allowDocu
   }
 }
 
-function runtimeForCatalog(ctx: Context): Context['gatewayRuntime'] | undefined {
-  const get = (ctx as unknown as { get?: (name: string) => unknown }).get
-  return typeof get === 'function' ? get.call(ctx, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined : undefined
+function runtimeForCatalog(host: UserDocHttpHost): Context['gatewayRuntime'] | undefined {
+  const get = host.get
+  return typeof get === 'function' ? get.call(host, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined : undefined
 }
 
-function isDocumentAdminRequest(ctx: Context): boolean {
-  const runtime = runtimeForCatalog(ctx)
+function isDocumentAdminRequest(host: UserDocHttpHost): boolean {
+  const runtime = runtimeForCatalog(host)
   // Lightweight Host compositions may expose only the runtime identity (for
   // example while a request handler is unit-tested).  A production
   // `GatewayRuntime` always provides `current`, but the optional check keeps
@@ -174,13 +249,13 @@ function isDocumentAdminRequest(ctx: Context): boolean {
 }
 
 async function syncCatalog(
-  ctx: Context,
+  host: UserDocHttpHost,
   documents: readonly UserDocRef[],
   replace: boolean,
   source: 'upload' | 'transfer' | 'legacy' | 'admin' = 'legacy',
   removed: readonly string[] = [],
 ): Promise<void> {
-  const runtime = runtimeForCatalog(ctx)
+  const runtime = runtimeForCatalog(host)
   if (runtime === undefined) return
   try {
     await runtime.request('/internal/runtime/documents/catalog/sync', {
@@ -211,36 +286,36 @@ async function syncCatalog(
 const catalogQueues = new WeakMap<object, Promise<void>>()
 
 function queueCatalogSync(
-  ctx: Context,
+  host: UserDocHttpHost,
   documents: readonly UserDocRef[],
   replace: boolean,
   source: 'upload' | 'transfer' | 'legacy' | 'admin' = 'legacy',
   removed: readonly string[] = [],
 ): void {
-  const previous = catalogQueues.get(ctx) ?? Promise.resolve()
+  const previous = catalogQueues.get(host) ?? Promise.resolve()
   const next = previous
     .catch(() => {})
-    .then(() => syncCatalog(ctx, documents, replace, source, removed))
+    .then(() => syncCatalog(host, documents, replace, source, removed))
     .catch(() => {})
     .finally(() => {
-      if (catalogQueues.get(ctx) === next) catalogQueues.delete(ctx)
+      if (catalogQueues.get(host) === next) catalogQueues.delete(host)
     })
-  catalogQueues.set(ctx, next)
+  catalogQueues.set(host, next)
 }
 
 /** Reconcile one mutation target before the ownership check can observe a cold catalog. */
-async function reconcileCatalogTarget(ctx: Context, docId: UserDocId): Promise<void> {
+async function reconcileCatalogTarget(host: UserDocHttpHost, docId: UserDocId): Promise<void> {
   try {
-    const ref = await ctx.userDocs.stat(docId)
-    await syncCatalog(ctx, [ref], false, 'legacy')
+    const ref = await host.userDocs.stat(docId)
+    await syncCatalog(host, [ref], false, 'legacy')
   } catch {
     // The following authorization call reports the authoritative retryable error.
   }
 }
 
-async function authorizeCatalogMutation(ctx: Context, action: 'delete' | 'move' | 'ownership' | 'restore' | 'purge', docIds: readonly string[]): Promise<void> {
-  if (isDocumentAdminRequest(ctx)) return
-  const runtime = runtimeForCatalog(ctx)
+async function authorizeCatalogMutation(host: UserDocHttpHost, action: 'delete' | 'move' | 'ownership' | 'restore' | 'purge', docIds: readonly string[]): Promise<void> {
+  if (isDocumentAdminRequest(host)) return
+  const runtime = runtimeForCatalog(host)
   if (runtime === undefined) return
   if (runtime.identity.kind !== 'project') return
   let response: Response
@@ -264,22 +339,22 @@ async function authorizeCatalogMutation(ctx: Context, action: 'delete' | 'move' 
 }
 
 /** Authorize a trash request while preserving idempotence for an existing entry. */
-async function authorizeTrashRequest(ctx: Context, docId: UserDocId): Promise<UserDocTrashRef | undefined> {
+async function authorizeTrashRequest(host: UserDocHttpHost, docId: UserDocId): Promise<UserDocTrashRef | undefined> {
   try {
-    await authorizeCatalogMutation(ctx, 'delete', [docId])
+    await authorizeCatalogMutation(host, 'delete', [docId])
     return undefined
   } catch (error) {
     if (!(error instanceof DocumentCatalogAuthorizationError)) throw error
     let existing: UserDocTrashRef | undefined
     try {
-      existing = (await ctx.userDocs.listTrash()).find(item => item.docId === docId)
+      existing = (await host.userDocs.listTrash()).find(item => item.docId === docId)
     } catch {
       throw error
     }
     if (existing === undefined) throw error
     // A trash-state ownership check is the safe idempotent equivalent of the
     // active-state delete check; it still rejects another user's entry.
-    await authorizeCatalogMutation(ctx, 'restore', [docId])
+    await authorizeCatalogMutation(host, 'restore', [docId])
     return existing
   }
 }
@@ -296,7 +371,7 @@ const DOCUMENT_PAGE_MAX = 100
 /** Keep untrusted offset cursors from forcing pathological in-memory slices. */
 const DOCUMENT_PAGE_MAX_OFFSET = 1_000_000
 
-function json(res: ServerResponse, status: number, value: unknown): void {
+function json(res: UserDocResponse, status: number, value: unknown): void {
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
@@ -327,7 +402,7 @@ function errorStatus(code: UserDocErrorCode): number {
   return 500
 }
 
-function failure(res: ServerResponse, error: unknown): void {
+function failure(res: UserDocResponse, error: unknown): void {
   if (error instanceof DocumentCatalogAuthorizationError) {
     json(res, error.status, { error: { code: error.code, message: error.message } } satisfies ErrorBody)
     return
@@ -405,7 +480,7 @@ async function responseJson(response: Response): Promise<unknown> {
   }
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJsonBody(req: UserDocRequest): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
   let bytes = 0
   try {
@@ -480,7 +555,7 @@ function singleHeader(value: string | string[] | undefined): string | undefined 
   return typeof value === 'string' ? value : undefined
 }
 
-function uploadStatus(res: ServerResponse, session: UserDocUploadSession): void {
+function uploadStatus(res: UserDocResponse, session: UserDocUploadSession): void {
   const safe = session.ref === undefined ? session : { ...session, ref: publicRef(session.ref) }
   json(res, session.state === 'complete' ? 200 : session.state === 'verifying' ? 202 : 200, safe)
 }
@@ -874,7 +949,7 @@ function safeCatalogHistory(value: unknown): Record<string, unknown> {
 }
 
 /* jscpd:ignore-start -- each HTTP phase validates a distinct wire response and owns its abort semantics. */
-async function readTransferPayload(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readTransferPayload(req: UserDocRequest): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
   let bytes = 0
   try {
@@ -935,7 +1010,7 @@ async function readTransferPayload(req: IncomingMessage): Promise<Record<string,
   }
 }
 
-async function readTransferPayloadForScope(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readTransferPayloadForScope(req: UserDocRequest): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
   let bytes = 0
   try {
@@ -1001,7 +1076,7 @@ async function readTransferPayloadForScope(req: IncomingMessage): Promise<Record
   }
 }
 
-async function readTransferDirectoryCreatePayload(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readTransferDirectoryCreatePayload(req: UserDocRequest): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
   let bytes = 0
   try {
@@ -1031,13 +1106,13 @@ async function readTransferDirectoryCreatePayload(req: IncomingMessage): Promise
 }
 
 async function transferDocuments(
-  ctx: Context,
-  req: IncomingMessage,
-  res: ServerResponse,
+  host: UserDocHttpHost,
+  req: UserDocRequest,
+  res: UserDocResponse,
 ): Promise<void> {
-  const get = (ctx as unknown as { get?: (name: string) => unknown }).get
+  const get = host.get
   const runtime = typeof get === 'function'
-    ? get.call(ctx, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined
+    ? get.call(host, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined
     : undefined
   if (runtime === undefined) {
     throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
@@ -1076,8 +1151,8 @@ async function transferDocuments(
   }
 }
 
-async function transferPhase(ctx: Context, req: IncomingMessage, res: ServerResponse, path: string, plan: boolean): Promise<void> {
-  const runtime = runtimeForCatalog(ctx)
+async function transferPhase(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse, path: string, plan: boolean): Promise<void> {
+  const runtime = runtimeForCatalog(host)
   if (runtime === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
   const payload = await readTransferPayload(req)
   const abort = abortFor(req, res)
@@ -1103,10 +1178,10 @@ async function transferPhase(ctx: Context, req: IncomingMessage, res: ServerResp
   }
 }
 
-async function transferCapabilities(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const get = (ctx as unknown as { get?: (name: string) => unknown }).get
+async function transferCapabilities(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
+  const get = host.get
   const runtime = typeof get === 'function'
-    ? get.call(ctx, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined
+    ? get.call(host, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined
     : undefined
   if (runtime === undefined) {
     throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
@@ -1142,10 +1217,10 @@ async function transferCapabilities(ctx: Context, req: IncomingMessage, res: Ser
   }
 }
 
-async function transferList(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const get = (ctx as unknown as { get?: (name: string) => unknown }).get
+async function transferList(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
+  const get = host.get
   const runtime = typeof get === 'function'
-    ? get.call(ctx, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined
+    ? get.call(host, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined
     : undefined
   if (runtime === undefined) {
     throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
@@ -1184,8 +1259,8 @@ async function transferList(ctx: Context, req: IncomingMessage, res: ServerRespo
   }
 }
 
-async function transferDirectories(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const runtime = runtimeForCatalog(ctx)
+async function transferDirectories(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
+  const runtime = runtimeForCatalog(host)
   if (runtime === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document directories are unavailable.')
   const payload = await readTransferPayloadForScope(req)
   const abort = abortFor(req, res)
@@ -1211,8 +1286,8 @@ async function transferDirectories(ctx: Context, req: IncomingMessage, res: Serv
   }
 }
 
-async function transferDirectoryCreate(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const runtime = runtimeForCatalog(ctx)
+async function transferDirectoryCreate(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
+  const runtime = runtimeForCatalog(host)
   if (runtime === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope folder creation is unavailable.')
   const payload = await readTransferDirectoryCreatePayload(req)
   const abort = abortFor(req, res)
@@ -1248,8 +1323,8 @@ async function transferDirectoryCreate(ctx: Context, req: IncomingMessage, res: 
   }
 }
 
-async function catalogOverview(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const runtime = runtimeForCatalog(ctx)
+async function catalogOverview(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
+  const runtime = runtimeForCatalog(host)
   if (runtime === undefined) {
     throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document metadata overview is unavailable.')
   }
@@ -1286,8 +1361,8 @@ async function catalogOverview(ctx: Context, req: IncomingMessage, res: ServerRe
   }
 }
 
-async function catalogHistory(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const runtime = runtimeForCatalog(ctx)
+async function catalogHistory(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
+  const runtime = runtimeForCatalog(host)
   if (runtime === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document history is unavailable.')
   const abort = abortFor(req, res)
   try {
@@ -1309,7 +1384,7 @@ async function catalogHistory(ctx: Context, req: IncomingMessage, res: ServerRes
 }
 /* jscpd:ignore-end */
 
-function query(req: IncomingMessage): URL {
+function query(req: UserDocRequest): URL {
   return new URL(req.url ?? USERDOC_HTTP_PATH, 'http://dsh.internal')
 }
 
@@ -1508,7 +1583,7 @@ interface RequestAbort {
   dispose(): void
 }
 
-function abortFor(req: IncomingMessage, res: ServerResponse): RequestAbort {
+function abortFor(req: UserDocRequest, res: UserDocResponse): RequestAbort {
   const controller = new AbortController()
   let disposed = false
   const dispose = (): void => {
@@ -1534,7 +1609,7 @@ function abortFor(req: IncomingMessage, res: ServerResponse): RequestAbort {
  * wait; sharing one would add a package dependency edge for a small socket
  * utility (client-connection's http-bridge carries the same loop). */
 /** Wait for a backpressured response to drain or close without retaining the losing listener. */
-async function waitForResponseWritable(res: ServerResponse): Promise<'drain' | 'close'> {
+async function waitForResponseWritable(res: UserDocResponse): Promise<'drain' | 'close'> {
   if (res.destroyed || res.writableEnded) return 'close'
   return new Promise<'drain' | 'close'>((resolve) => {
     let settled = false
@@ -1565,30 +1640,30 @@ function publicDirectoryRef(ref: UserDocDirectoryRef): UserDocDirectoryRef {
   return { ...ref, path: '' }
 }
 
-async function beginUpload(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
+async function beginUpload(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
+  authorizeDocumentAction(host, 'write')
   const input = parseUploadBegin(await readJsonBody(req))
-  uploadStatus(res, await ctx.userDocs.beginUpload(input))
+  uploadStatus(res, await host.userDocs.beginUpload(input))
 }
 
-async function inspectUpload(ctx: Context, res: ServerResponse, rawId: string): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
-  const session = await ctx.userDocs.inspectUpload(uploadIdFrom(rawId))
-  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(ctx, [session.ref], false, 'upload')
+async function inspectUpload(host: UserDocHttpHost, res: UserDocResponse, rawId: string): Promise<void> {
+  authorizeDocumentAction(host, 'write')
+  const session = await host.userDocs.inspectUpload(uploadIdFrom(rawId))
+  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(host, [session.ref], false, 'upload')
   uploadStatus(res, session)
 }
 
 async function writeUploadChunk(
-  ctx: Context,
-  req: IncomingMessage,
-  res: ServerResponse,
+  host: UserDocHttpHost,
+  req: UserDocRequest,
+  res: UserDocResponse,
   rawId: string,
   rawIndex: string,
 ): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
+  authorizeDocumentAction(host, 'write')
   const uploadId = uploadIdFrom(rawId)
   const index = parseUploadIndex(rawIndex)
-  const session = await ctx.userDocs.inspectUpload(uploadId)
+  const session = await host.userDocs.inspectUpload(uploadId)
   if (session.state !== 'uploading') {
     req.resume()
     uploadStatus(res, session)
@@ -1610,13 +1685,13 @@ async function writeUploadChunk(
   }
   const abort = abortFor(req, res)
   try {
-    const updated = await ctx.userDocs.writeUploadChunk(uploadId, {
+    const updated = await host.userDocs.writeUploadChunk(uploadId, {
       index,
       start: range.start,
       end: range.end,
       total: range.total,
       sha256: sha256.toLowerCase(),
-      body: Readable.toWeb(req) as ReadableStream<Uint8Array>,
+      body: Readable.toWeb(Readable.from(req)) as ReadableStream<Uint8Array>,
     } satisfies UserDocUploadChunk, abort.signal)
     if (!abort.signal.aborted) uploadStatus(res, updated)
   } catch (error) {
@@ -1627,25 +1702,25 @@ async function writeUploadChunk(
   }
 }
 
-async function completeUpload(ctx: Context, req: IncomingMessage, res: ServerResponse, rawId: string): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
+async function completeUpload(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse, rawId: string): Promise<void> {
+  authorizeDocumentAction(host, 'write')
   const value = await readJsonBody(req)
   if (value.version !== 1 || typeof value.sha256 !== 'string') {
     throw new UserDocError('Final upload metadata is invalid.', DOCUMENT_UPLOAD_HASH_CODE)
   }
-  const session = await ctx.userDocs.completeUpload(uploadIdFrom(rawId), value.sha256.toLowerCase())
-  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(ctx, [session.ref], false, 'upload')
+  const session = await host.userDocs.completeUpload(uploadIdFrom(rawId), value.sha256.toLowerCase())
+  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(host, [session.ref], false, 'upload')
   uploadStatus(res, session)
 }
 
-async function cancelUpload(ctx: Context, res: ServerResponse, rawId: string): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
-  await ctx.userDocs.cancelUpload(uploadIdFrom(rawId))
+async function cancelUpload(host: UserDocHttpHost, res: UserDocResponse, rawId: string): Promise<void> {
+  authorizeDocumentAction(host, 'write')
+  await host.userDocs.cancelUpload(uploadIdFrom(rawId))
   res.writeHead(204, { 'cache-control': 'no-store' })
   res.end()
 }
 
-function removedOneShotUpload(req: IncomingMessage, res: ServerResponse): void {
+function removedOneShotUpload(req: UserDocRequest, res: UserDocResponse): void {
   req.resume()
   json(res, 426, {
     error: {
@@ -1655,46 +1730,46 @@ function removedOneShotUpload(req: IncomingMessage, res: ServerResponse): void {
   } satisfies ErrorBody)
 }
 
-async function createFolder(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
-  const created = await ctx.userDocs.createDirectory(directoryQuery(url), requiredQuery(url, 'name'))
+async function createFolder(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
+  authorizeDocumentAction(host, 'write')
+  const created = await host.userDocs.createDirectory(directoryQuery(url), requiredQuery(url, 'name'))
   json(res, 201, publicDirectoryRef(created))
 }
 
-async function renameFolder(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
-  const renamed = await ctx.userDocs.renameDirectory(
+async function renameFolder(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
+  authorizeDocumentAction(host, 'write')
+  const renamed = await host.userDocs.renameDirectory(
     requiredDirectoryQuery(url, 'id'),
     requiredQuery(url, 'name'),
   )
-  await syncCatalog(ctx, await ctx.userDocs.list(), true, 'legacy')
+  await syncCatalog(host, await host.userDocs.list(), true, 'legacy')
   json(res, 200, publicDirectoryRef(renamed))
 }
 
-async function deleteFolder(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
+async function deleteFolder(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
+  authorizeDocumentAction(host, 'write')
   const directoryId = requiredDirectoryQuery(url, 'id')
-  const listing = await ctx.userDocs.listDirectory(directoryId)
+  const listing = await host.userDocs.listDirectory(directoryId)
   if (listing.documents.length > 0) {
-    await authorizeCatalogMutation(ctx, 'delete', listing.documents.map(document => document.docId))
+    await authorizeCatalogMutation(host, 'delete', listing.documents.map(document => document.docId))
   }
-  await ctx.userDocs.removeDirectory(directoryId)
+  await host.userDocs.removeDirectory(directoryId)
   res.writeHead(204, { 'cache-control': 'no-store' })
   res.end()
 }
 
-async function moveDocument(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
-  authorizeDocumentAction(ctx, 'write')
+async function moveDocument(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
+  authorizeDocumentAction(host, 'write')
   const docId = UserDocId(requiredQuery(url, 'id'))
-  await reconcileCatalogTarget(ctx, docId)
-  await authorizeCatalogMutation(ctx, 'move', [docId])
-  const moved = await ctx.userDocs.move(docId, directoryQuery(url))
-  await syncCatalog(ctx, [moved], false, 'legacy')
+  await reconcileCatalogTarget(host, docId)
+  await authorizeCatalogMutation(host, 'move', [docId])
+  const moved = await host.userDocs.move(docId, directoryQuery(url))
+  await syncCatalog(host, [moved], false, 'legacy')
   json(res, 200, publicRef(moved))
 }
 
-async function download(ctx: Context, req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
-  authorizeDocumentAction(ctx, 'read')
+async function download(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse, url: URL): Promise<void> {
+  authorizeDocumentAction(host, 'read')
   const docId = UserDocId(requiredQuery(url, 'id'))
   const controller = new AbortController()
   const requestState: { disconnected: unknown } = { disconnected: false }
@@ -1709,7 +1784,7 @@ async function download(ctx: Context, req: IncomingMessage, res: ServerResponse,
   req.once('aborted', abort)
   res.once('close', onResponseClose)
   try {
-    opened = await ctx.userDocs.openRead(docId)
+    opened = await host.userDocs.openRead(docId)
     if (requestState.disconnected === true) return
     const inline = url.searchParams.get('inline') === '1' && inlinePreviewMedia(opened.ref.mediaType)
     const headers = {
@@ -1746,26 +1821,22 @@ async function download(ctx: Context, req: IncomingMessage, res: ServerResponse,
   }
 }
 
-async function listTrashDocuments(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  authorizeDocumentAction(ctx, 'read')
+async function listTrashDocuments(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
+  authorizeDocumentAction(host, 'read')
   const abort = abortFor(req, res)
   try {
     const paged = req.url !== undefined && new URL(req.url, 'http://dsh.internal').searchParams.toString() !== ''
     if (!paged) {
-      const documents = await ctx.userDocs.listTrash(abort.signal)
+      const documents = await host.userDocs.listTrash(abort.signal)
       if (!abort.signal.aborted) json(res, 200, { version: 1, documents })
       return
     }
     const url = query(req)
     const options = parseListQuery(url, 'trash')
-    const listPage = (ctx.userDocs as unknown as { listTrashPage?: unknown }).listTrashPage
+    const listPage = host.userDocs.listTrashPage
     let page: UserDocTrashPage
     if (typeof listPage === 'function') {
-      const providerPage = await (listPage as (
-        this: UserDocStore,
-        query: UserDocListQuery,
-        signal?: AbortSignal,
-      ) => Promise<UserDocTrashPage>).call(ctx.userDocs, {
+      const providerPage = await listPage.call(host.userDocs, {
         ...(options.providerCursor === undefined ? {} : { cursor: options.providerCursor }),
         limit: options.limit,
         query: options.query,
@@ -1775,7 +1846,7 @@ async function listTrashDocuments(ctx: Context, req: IncomingMessage, res: Serve
       }, abort.signal)
       page = wrapProviderCursor(providerPage, options)
     } else {
-      const documents = await ctx.userDocs.listTrash(abort.signal)
+      const documents = await host.userDocs.listTrash(abort.signal)
       page = pageTrashListing(documents, options)
     }
     if (!abort.signal.aborted) json(res, 200, { version: 1, ...page })
@@ -1784,49 +1855,49 @@ async function listTrashDocuments(ctx: Context, req: IncomingMessage, res: Serve
   }
 }
 
-async function trashDocument(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
-  authorizeDocumentAction(ctx, 'write', true)
+async function trashDocument(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
+  authorizeDocumentAction(host, 'write', true)
   const docId = UserDocId(requiredQuery(url, 'id'))
-  await reconcileCatalogTarget(ctx, docId)
-  const alreadyTrashed = await authorizeTrashRequest(ctx, docId)
+  await reconcileCatalogTarget(host, docId)
+  const alreadyTrashed = await authorizeTrashRequest(host, docId)
   if (alreadyTrashed !== undefined) {
     json(res, 200, { version: 1, document: alreadyTrashed })
     return
   }
   let trashed: UserDocTrashRef
   try {
-    trashed = await ctx.userDocs.trash(docId)
+    trashed = await host.userDocs.trash(docId)
   } catch (error) {
     if (!(error instanceof UserDocError) || error.code !== DOCUMENT_TRASHED_CODE) throw error
-    const existing = (await ctx.userDocs.listTrash()).find(item => item.docId === docId)
+    const existing = (await host.userDocs.listTrash()).find(item => item.docId === docId)
     if (existing === undefined) throw error
     trashed = existing
   }
-  queueCatalogSync(ctx, [], false, 'legacy', [docId])
+  queueCatalogSync(host, [], false, 'legacy', [docId])
   json(res, 200, { version: 1, document: trashed })
 }
 
-async function restoreDocument(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
-  authorizeDocumentAction(ctx, 'write', true)
+async function restoreDocument(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
+  authorizeDocumentAction(host, 'write', true)
   const docId = UserDocId(requiredQuery(url, 'id'))
-  await authorizeCatalogMutation(ctx, 'restore', [docId])
+  await authorizeCatalogMutation(host, 'restore', [docId])
   const directory = url.searchParams.get('directory') ?? undefined
   const name = url.searchParams.get('name') ?? undefined
-  const restored = await ctx.userDocs.restore(
+  const restored = await host.userDocs.restore(
     docId,
     directory === undefined ? undefined : UserDocDirectoryId(directory),
     name,
   )
-  queueCatalogSync(ctx, [restored], false, 'legacy')
+  queueCatalogSync(host, [restored], false, 'legacy')
   json(res, 200, { version: 1, document: publicRef(restored) })
 }
 
-async function purgeDocument(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
-  authorizeDocumentAction(ctx, 'write', true)
+async function purgeDocument(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
+  authorizeDocumentAction(host, 'write', true)
   const docId = UserDocId(requiredQuery(url, 'id'))
-  await authorizeCatalogMutation(ctx, 'purge', [docId])
-  await ctx.userDocs.purge(docId)
-  const runtime = runtimeForCatalog(ctx)
+  await authorizeCatalogMutation(host, 'purge', [docId])
+  await host.userDocs.purge(docId)
+  const runtime = runtimeForCatalog(host)
   if (runtime?.request !== undefined) {
     try {
       await runtime.request('/internal/runtime/documents/catalog/purge', {
@@ -1839,7 +1910,7 @@ async function purgeDocument(ctx: Context, res: ServerResponse, url: URL): Promi
       // A later full reconciliation keeps the catalog from blocking the file purge.
     }
   } else {
-    queueCatalogSync(ctx, [], false, 'legacy', [docId])
+    queueCatalogSync(host, [], false, 'legacy', [docId])
   }
   res.writeHead(204, { 'cache-control': 'no-store' })
   res.end()
@@ -1847,54 +1918,54 @@ async function purgeDocument(ctx: Context, res: ServerResponse, url: URL): Promi
 
 /**
  * Handle the document subtree after Connection has admitted the request authority.
- * @param ctx - Host context containing Connection and the document store.
- * @param req - incoming HTTP request.
- * @param res - response that the route owns.
+ * @param host - document store plus catalog/attachment hooks the route reports through.
+ * @param req - incoming HTTP request; a minimal `{ method, url, headers, body }` face is accepted.
+ * @param res - response that the route owns; a minimal `{ writeHead, end, ... }` face is accepted.
  */
-export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function handleUserDocHttp(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
   const url = query(req)
   try {
     if (url.pathname === USERDOC_UPLOADS_PATH && req.method === 'POST') {
-      await beginUpload(ctx, req, res)
+      await beginUpload(host, req, res)
       return
     }
     const uploadChunk = new RegExp(`^${USERDOC_UPLOADS_PATH}/([^/]+)/chunks/([^/]+)$`, 'u').exec(url.pathname)
     if (uploadChunk !== null && req.method === 'PUT') {
-      await writeUploadChunk(ctx, req, res, uploadChunk[1] ?? '', uploadChunk[2] ?? '')
+      await writeUploadChunk(host, req, res, uploadChunk[1] ?? '', uploadChunk[2] ?? '')
       return
     }
     const uploadComplete = new RegExp(`^${USERDOC_UPLOADS_PATH}/([^/]+)/complete$`, 'u').exec(url.pathname)
     if (uploadComplete !== null && req.method === 'POST') {
-      await completeUpload(ctx, req, res, uploadComplete[1] ?? '')
+      await completeUpload(host, req, res, uploadComplete[1] ?? '')
       return
     }
     const uploadSession = new RegExp(`^${USERDOC_UPLOADS_PATH}/([^/]+)$`, 'u').exec(url.pathname)
     if (uploadSession !== null && req.method === 'GET') {
-      await inspectUpload(ctx, res, uploadSession[1] ?? '')
+      await inspectUpload(host, res, uploadSession[1] ?? '')
       return
     }
     if (uploadSession !== null && req.method === 'DELETE') {
-      await cancelUpload(ctx, res, uploadSession[1] ?? '')
+      await cancelUpload(host, res, uploadSession[1] ?? '')
       return
     }
     if (url.pathname === USERDOC_TRASH_PATH && req.method === 'GET') {
-      await listTrashDocuments(ctx, req, res)
+      await listTrashDocuments(host, req, res)
       return
     }
     if (url.pathname === USERDOC_TRASH_PATH && req.method === 'POST') {
-      await trashDocument(ctx, res, url)
+      await trashDocument(host, res, url)
       return
     }
     if (url.pathname === USERDOC_RESTORE_PATH && req.method === 'POST') {
-      await restoreDocument(ctx, res, url)
+      await restoreDocument(host, res, url)
       return
     }
     if (url.pathname === USERDOC_PURGE_PATH && req.method === 'DELETE') {
-      await purgeDocument(ctx, res, url)
+      await purgeDocument(host, res, url)
       return
     }
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'GET') {
-      authorizeDocumentAction(ctx, 'read')
+      authorizeDocumentAction(host, 'read')
       const abort = abortFor(req, res)
       try {
         const paged = url.searchParams.has('cursor') || url.searchParams.has('limit')
@@ -1903,17 +1974,12 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
         const listOptions = paged ? parseListQuery(url, 'active') : undefined
         if (url.searchParams.has('directory')) {
           const directoryId = directoryQuery(url)
-          const pageMethod = (ctx.userDocs as unknown as { listDirectoryPage?: unknown }).listDirectoryPage
+          const pageMethod = host.userDocs.listDirectoryPage
           const usesProviderPage = listOptions !== undefined && typeof pageMethod === 'function'
           const providerListing = listOptions === undefined
-            ? await ctx.userDocs.listDirectory(directoryId, abort.signal)
+            ? await host.userDocs.listDirectory(directoryId, abort.signal)
             : typeof pageMethod === 'function'
-              ? await (pageMethod as (
-                this: UserDocStore,
-                id: UserDocDirectoryId,
-                query: UserDocListQuery,
-                signal?: AbortSignal,
-              ) => Promise<UserDocDirectoryPage>).call(ctx.userDocs, directoryId, {
+              ? await pageMethod.call(host.userDocs, directoryId, {
                 ...(listOptions.providerCursor === undefined ? {} : { cursor: listOptions.providerCursor }),
                 limit: listOptions.limit,
                 query: listOptions.query,
@@ -1921,7 +1987,7 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
                 sort: listOptions.sort,
                 state: 'active',
               }, abort.signal)
-              : pageListing(await ctx.userDocs.listDirectory(directoryId, abort.signal), listOptions)
+              : pageListing(await host.userDocs.listDirectory(directoryId, abort.signal), listOptions)
           const listing = listOptions === undefined || !usesProviderPage
             ? providerListing
             : wrapProviderCursor(providerListing as UserDocDirectoryPage, listOptions)
@@ -1931,7 +1997,7 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
               totalDocuments: listing.documents.length,
             } : listing
             json(res, 200, {
-              limits: ctx.userDocs.limits,
+              limits: host.userDocs.limits,
               ...response,
               ...(listOptions !== undefined && 'nextCursor' in response && response.nextCursor !== undefined
                 ? { nextCursor: response.nextCursor }
@@ -1941,18 +2007,18 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
             })
             // Catalog reconciliation is metadata maintenance and must not delay
             // the document page that the user is waiting to see.
-            queueCatalogSync(ctx, providerListing.documents, false)
+            queueCatalogSync(host, providerListing.documents, false)
           }
         } else {
-          const documents = listOptions === undefined ? await ctx.userDocs.list(abort.signal) : undefined
+          const documents = listOptions === undefined ? await host.userDocs.list(abort.signal) : undefined
           if (!abort.signal.aborted) {
             const response = listOptions === undefined
               ? {
                 documents: documents ?? [],
                 totalDocuments: documents?.length ?? 0,
               }
-              : await (typeof (ctx.userDocs as unknown as { listDirectoryPage?: unknown }).listDirectoryPage === 'function'
-                ? ctx.userDocs.listDirectoryPage(UserDocDirectoryId(''), {
+              : await (typeof host.userDocs.listDirectoryPage === 'function'
+                ? host.userDocs.listDirectoryPage(UserDocDirectoryId(''), {
                   ...(listOptions.providerCursor === undefined ? {} : { cursor: listOptions.providerCursor }),
                   limit: listOptions.limit,
                   query: listOptions.query,
@@ -1961,12 +2027,12 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
                   state: 'active',
                 }, abort.signal).then(page => wrapProviderCursor(page, listOptions))
                 : pageListing({
-                  directoryId: UserDocDirectoryId(''), directories: [], documents: await ctx.userDocs.list(abort.signal),
+                  directoryId: UserDocDirectoryId(''), directories: [], documents: await host.userDocs.list(abort.signal),
                 }, listOptions))
-            json(res, 200, { limits: ctx.userDocs.limits, ...response, documents: response.documents.map(publicRef) })
+            json(res, 200, { limits: host.userDocs.limits, ...response, documents: response.documents.map(publicRef) })
             // A full reconciliation runs after the response; mutation
             // authorization remains synchronous on its dedicated path.
-            queueCatalogSync(ctx, documents ?? response.documents, listOptions === undefined)
+            queueCatalogSync(host, documents ?? response.documents, listOptions === undefined)
           }
         }
       } finally {
@@ -1975,10 +2041,10 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
       return
     }
     if (url.pathname === `${USERDOC_HTTP_PATH}/directories` && req.method === 'GET') {
-      authorizeDocumentAction(ctx, 'read')
+      authorizeDocumentAction(host, 'read')
       const abort = abortFor(req, res)
       try {
-        const directories = await ctx.userDocs.listDirectories(abort.signal)
+        const directories = await host.userDocs.listDirectories(abort.signal)
         if (!abort.signal.aborted) json(res, 200, { directories: directories.map(publicDirectoryRef) })
       } finally {
         abort.dispose()
@@ -1986,78 +2052,75 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
       return
     }
     if (url.pathname === USERDOC_TRANSFER_PATH && req.method === 'POST') {
-      await transferDocuments(ctx, req, res)
+      await transferDocuments(host, req, res)
       return
     }
     if (url.pathname === USERDOC_TRANSFER_PLAN_PATH && req.method === 'POST') {
-      await transferPhase(ctx, req, res, '/internal/runtime/documents/transfer/plan', true)
+      await transferPhase(host, req, res, '/internal/runtime/documents/transfer/plan', true)
       return
     }
     if (url.pathname === USERDOC_TRANSFER_COMMIT_PATH && req.method === 'POST') {
-      await transferPhase(ctx, req, res, '/internal/runtime/documents/transfer/commit', false)
+      await transferPhase(host, req, res, '/internal/runtime/documents/transfer/commit', false)
       return
     }
     if (url.pathname === USERDOC_TRANSFER_RETRY_PATH && req.method === 'POST') {
-      await transferPhase(ctx, req, res, '/internal/runtime/documents/transfer/retry', false)
+      await transferPhase(host, req, res, '/internal/runtime/documents/transfer/retry', false)
       return
     }
     if (url.pathname === USERDOC_TRANSFER_LIST_PATH && req.method === 'POST') {
-      await transferList(ctx, req, res)
+      await transferList(host, req, res)
       return
     }
     if (url.pathname === USERDOC_TRANSFER_DIRECTORIES_PATH && req.method === 'POST') {
-      await transferDirectories(ctx, req, res)
+      await transferDirectories(host, req, res)
       return
     }
     if (url.pathname === USERDOC_TRANSFER_DIRECTORY_CREATE_PATH && req.method === 'POST') {
-      await transferDirectoryCreate(ctx, req, res)
+      await transferDirectoryCreate(host, req, res)
       return
     }
     if (url.pathname === USERDOC_CATALOG_OVERVIEW_PATH && req.method === 'GET') {
-      authorizeDocumentAction(ctx, 'read')
-      await catalogOverview(ctx, req, res)
+      authorizeDocumentAction(host, 'read')
+      await catalogOverview(host, req, res)
       return
     }
     if (url.pathname === USERDOC_CATALOG_HISTORY_PATH && req.method === 'GET') {
-      authorizeDocumentAction(ctx, 'read')
-      await catalogHistory(ctx, req, res)
+      authorizeDocumentAction(host, 'read')
+      await catalogHistory(host, req, res)
       return
     }
     if (url.pathname === `${USERDOC_TRANSFER_PATH}/capabilities` && req.method === 'GET') {
-      await transferCapabilities(ctx, req, res)
+      await transferCapabilities(host, req, res)
       return
     }
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'POST') {
-      authorizeDocumentAction(ctx, 'write')
+      authorizeDocumentAction(host, 'write')
       removedOneShotUpload(req, res)
       return
     }
     if (url.pathname === `${USERDOC_HTTP_PATH}/content` && (req.method === 'GET' || req.method === 'HEAD')) {
-      await download(ctx, req, res, url)
+      await download(host, req, res, url)
       return
     }
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'DELETE') {
-      authorizeDocumentAction(ctx, 'write')
+      authorizeDocumentAction(host, 'write')
       const docId = UserDocId(requiredQuery(url, 'id'))
-      await reconcileCatalogTarget(ctx, docId)
-      const alreadyTrashed = await authorizeTrashRequest(ctx, docId)
+      await reconcileCatalogTarget(host, docId)
+      const alreadyTrashed = await authorizeTrashRequest(host, docId)
       if (alreadyTrashed !== undefined) {
         res.writeHead(204, { 'cache-control': 'no-store' })
         res.end()
         return
       }
-      const trash = (ctx.userDocs as unknown as { trash?: (id: UserDocId) => Promise<unknown> }).trash
-      if (typeof trash === 'function') {
-        try {
-          await trash.call(ctx.userDocs, docId)
-        } catch (error) {
-          if (!(error instanceof UserDocError)
-            || (error.code !== DOCUMENT_NOT_FOUND_CODE && error.code !== DOCUMENT_TRASHED_CODE
-              && error.code !== DOCUMENT_UPLOAD_PROTOCOL_CODE)) throw error
-          if (error.code === DOCUMENT_UPLOAD_PROTOCOL_CODE) await ctx.userDocs.remove(docId)
-        }
-      } else await ctx.userDocs.remove(docId)
-      const runtime = runtimeForCatalog(ctx)
+      try {
+        await host.userDocs.trash(docId)
+      } catch (error) {
+        if (!(error instanceof UserDocError)
+          || (error.code !== DOCUMENT_NOT_FOUND_CODE && error.code !== DOCUMENT_TRASHED_CODE
+            && error.code !== DOCUMENT_UPLOAD_PROTOCOL_CODE)) throw error
+        if (error.code === DOCUMENT_UPLOAD_PROTOCOL_CODE) await host.userDocs.remove(docId)
+      }
+      const runtime = runtimeForCatalog(host)
       if (runtime !== undefined) {
         try {
           const response = await runtime.request('/internal/runtime/documents/catalog/sync', {
@@ -2072,19 +2135,19 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
       return
     }
     if (url.pathname === `${USERDOC_HTTP_PATH}/folders` && req.method === 'POST') {
-      await createFolder(ctx, res, url)
+      await createFolder(host, res, url)
       return
     }
     if (url.pathname === `${USERDOC_HTTP_PATH}/folders` && req.method === 'PATCH') {
-      await renameFolder(ctx, res, url)
+      await renameFolder(host, res, url)
       return
     }
     if (url.pathname === `${USERDOC_HTTP_PATH}/folders` && req.method === 'DELETE') {
-      await deleteFolder(ctx, res, url)
+      await deleteFolder(host, res, url)
       return
     }
     if (url.pathname === `${USERDOC_HTTP_PATH}/move` && req.method === 'POST') {
-      await moveDocument(ctx, res, url)
+      await moveDocument(host, res, url)
       return
     }
     res.writeHead(404)
@@ -2096,10 +2159,12 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
 
 /** Register the streaming document subtree in the current Connection transport. */
 export function apply(ctx: Context): void {
-  const warm = (ctx.userDocs as unknown as { warm?: () => Promise<void> }).warm
+  // One host object per composition so catalog sync queues serialize on it.
+  const host = userDocHttpHost(ctx)
+  const warm = host.userDocs.warm
   if (typeof warm === 'function') {
     ctx.effect(() => {
-      void warm.call(ctx.userDocs).catch(() => {
+      void warm.call(host.userDocs).catch(() => {
         // The first request will surface the authoritative runtime error and
         // the next boot/request retries initialization.
       })
@@ -2108,7 +2173,7 @@ export function apply(ctx: Context): void {
   }
   ctx.connection.http.handlePrefix(
     USERDOC_HTTP_PATH,
-    (req, res) => handleUserDocHttp(ctx, req, res),
+    (req, res) => handleUserDocHttp(host, req, res),
     { authority: 'trusted-host' },
   )
 }

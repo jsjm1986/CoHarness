@@ -38,6 +38,25 @@ async function executeBody(test: Awaited<ReturnType<typeof setup>>, name: string
 }
 
 describe('Schedule model tools', () => {
+  it('refuses every tool for a delegated child caller', async () => {
+    const test = await setup()
+    const parent = agentFor(test.ctx, 'delegating-parent')
+    test.ctx.agents.enter(parent, undefined)
+    const child = agentFor(test.ctx, 'delegated-child', { delegationDepth: 1 })
+    test.ctx.agents.enter(child, parent)
+    const cases = [
+      ['schedule_create', { prompt: 'Check', after_seconds: 60, title: 'Check' }],
+      ['schedule_list', {}],
+      ['schedule_delete', { id: 'task-1' }],
+      ['schedule_update', { id: 'task-1', title: 'Check' }],
+    ] as const
+    for (const [name, args] of cases) {
+      const result = await execute(test, name, args, child)
+      expect(result.isError).toBe(false)
+      expect(result.value).toEqual({ code: 'subagent_session', message: 'A delegated subagent cannot use reminders.' })
+    }
+  })
+
   it('creates and lists a lossless daily JSON rule rather than a one-shot', async () => {
     const test = await setup()
     const created = await execute(test, 'schedule_create', {

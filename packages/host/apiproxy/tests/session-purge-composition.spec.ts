@@ -19,6 +19,7 @@ import TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import GoalService from '@deepseek-ai/dsh-goal'
 import * as GoalRoundDriver from '@deepseek-ai/dsh-goal-round-driver'
 import { afterEach, expect, it, vi } from 'vitest'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { hostSessionLifecycle } from '../src/session-lifecycle.ts'
 
 const cleanup: Array<() => Promise<void>> = []
@@ -30,6 +31,7 @@ async function fixture(goals = false) {
   const ctx = new Context()
   cleanup.push(() => ctx.fiber.dispose())
   ctx.baseUrl = pathToFileURL(directory).href + '/'
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([

@@ -28,6 +28,7 @@ import {
   recoverCodexThread,
   type CodexMemberConfig,
 } from '../src/member.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /**
  * Member tests for persistent Codex children: the app-server speaks over an
@@ -559,6 +560,7 @@ describe('codex member plugin', () => {
     const dir = root()
     const ctx = new Context()
     contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     await ctx.plugin(LlmRuntime)
@@ -578,6 +580,7 @@ describe('codex member plugin', () => {
 
     const provider = ctx.subagents.getProvider('codex')!
     await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
+      cwd: dir,
       sessionId: SessionId('continuable-child'),
       parent: { session: { header: { cwd: dir } } } as unknown as Agent,
       signal,
@@ -610,6 +613,32 @@ describe('codex member plugin', () => {
       expect(spawn).toHaveBeenCalledTimes(2)
       expect(hostSpawn).not.toHaveBeenCalled()
     }
+  })
+
+  it('prepareContinuable resolves the request cwd when memberCwd is unset', async () => {
+    const dir = root()
+    const ctx = new Context()
+    contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(codex, { stateDir: dir })
+    const provider = ctx.subagents.getProvider('codex')!
+    const resolution = vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution')
+      .mockResolvedValue({ cwd: dir, target: 'local', remote: false, subprocess: ctx.subprocess })
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    const parentSession = ctx.sessions.create(SessionId('continuable-parent'), { meta: { cwd: dir } })
+    const parent = { id: parentSession.id, session: parentSession, ctx, status: 'idle' } as Agent
+    await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
+      cwd: dir,
+      sessionId: SessionId('continuable-child'),
+      parent,
+      signal,
+    }))).resolves.toEqual({})
+    expect(resolution.mock.calls[0]![2]).toBe(dir)
+    expect(resolution.mock.calls[0]![3]).toBe(signal)
   })
 })
 

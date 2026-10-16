@@ -1168,8 +1168,10 @@
   align-items: center;
   gap: var(--dsw-space-2);
   width: 100%;
-  min-height: 56px;
-  padding: var(--dsw-space-2) var(--dsw-space-3);
+  /* Content-box: 32px + the padding edges lands single-line options at 44px
+     and two-line copy at 52px. */
+  min-height: 32px;
+  padding: var(--dsw-space-1) var(--dsw-space-3);
   border: 1px solid transparent;
   border-radius: var(--dsw-radius-md);
   background: transparent;
@@ -1392,19 +1394,19 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--dsw-space-2);
-    padding: 0 var(--dsw-space-1);
+    padding: var(--dsw-space-1) 0;
     color: var(--dsw-alias-label-caption);
     font: var(--dsw-mobile-font-caption);
   }
 
   .scopeStaleMobile button {
-    min-height: var(--dsw-touch-target);
+    min-height: 36px;
   }
 
   .workbenchContent {
     min-height: 0;
     gap: var(--dsw-space-2);
-    padding: var(--dsw-space-3);
+    padding: var(--dsw-space-2) var(--dsw-space-3);
   }
 
   .scopeTrigger {
@@ -1413,11 +1415,16 @@
     gap: var(--dsw-space-2);
     width: 100%;
     min-width: 0;
-    min-height: var(--dsw-touch-target);
-    padding: var(--dsw-space-2) var(--dsw-space-3);
-    border: 0.5px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
-    background: var(--dsw-alias-bg-layer-1);
+    /* UA border-box on <button>: the 4px edges fold into the 44px total, so
+       the trigger lands as one list row beside the 40px toolbar controls. */
+    min-height: 44px;
+    padding: var(--dsw-space-1) 0;
+    /* A scope picker is a list row on a phone, not a bordered card — the
+       hairline under it carries the separation. */
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
+    background: transparent;
     color: var(--dsw-alias-label-primary);
     text-align: left;
     cursor: pointer;
@@ -1457,9 +1464,10 @@
     font: var(--dsw-mobile-font-secondary);
   }
 
+  /* The visibility line duplicates the caption row directly underneath
+     (scope filter + count), so the trigger stays a single-line picker. */
   .scopeTriggerCopy small {
-    color: var(--dsw-alias-label-caption);
-    font: var(--dsw-mobile-font-caption);
+    display: none;
   }
 
   .scopeTriggerChevron {
@@ -1468,7 +1476,7 @@
   }
 
   .breadcrumbs {
-    min-height: var(--dsw-touch-target);
+    min-height: 36px;
     overflow: hidden;
   }
 
@@ -1488,7 +1496,7 @@
 
   .breadcrumbs .crumb {
     max-width: 100%;
-    min-height: var(--dsw-touch-target);
+    min-height: 36px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -1524,8 +1532,11 @@
     justify-content: space-between;
   }
 
+  /* Full-width stacked actions read as app buttons in a rounded rect, not
+     the desktop capsule. */
   .overviewActions > * {
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
+    border-radius: var(--dsw-radius-lg);
   }
 
   .trashHeader {
@@ -1541,9 +1552,10 @@
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
     align-items: start;
-    padding: var(--dsw-space-2);
-    border: 0.5px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
+    padding: var(--dsw-space-2) 0;
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
   }
 
   .trashActions {
@@ -1557,9 +1569,11 @@
     min-height: var(--dsw-touch-target);
   }
 
+  /* Search field and the action pair share one toolbar row on a phone. */
   .filterGroup {
     display: flex;
-    width: 100%;
+    flex: 1 1 auto;
+    width: auto;
   }
 
   .filterGroup .select {
@@ -1573,30 +1587,39 @@
 
   .actionGroup.mobileActionGroup {
     display: flex;
-    width: 100%;
+    flex: 0 0 auto;
+    width: auto;
     gap: var(--dsw-space-2);
     margin-left: 0;
   }
 
+  /* Toolbar controls match the shared input's 40px coarse-pointer floor so
+     the row keeps one height. */
   .mobileActionGroup .upload {
     min-width: 0;
     flex: 1 1 auto;
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
     white-space: nowrap;
   }
 
   .mobileActionGroup .mobileMore {
     display: inline-flex;
     flex: 0 0 auto;
-    min-width: var(--dsw-touch-target);
-    min-height: var(--dsw-touch-target);
+    min-width: 40px;
+    min-height: 40px;
     padding-inline: var(--dsw-space-2);
     white-space: nowrap;
   }
 
+  /* The toolbar's pills sit beside a rounded-rect input — match that corner
+     so the row reads as one control family. */
+  .mobileActionGroup > * {
+    border-radius: var(--dsw-radius-md);
+  }
+
   .limits {
-    margin-inline: var(--dsw-space-3);
-    padding: var(--dsw-space-1) var(--dsw-space-2);
+    margin-inline: 0;
+    padding: 0 0 var(--dsw-space-1);
   }
 
   .scopeNotice {
@@ -1610,8 +1633,8 @@
 
   .caption {
     gap: var(--dsw-space-1);
-    min-height: 24px;
-    padding-bottom: var(--dsw-space-2);
+    min-height: 0;
+    padding-bottom: var(--dsw-space-1);
   }
 
   .desktopSelectionBar {
@@ -1619,19 +1642,43 @@
   }
 
   .list {
-    gap: var(--dsw-space-1);
+    gap: 0;
     overscroll-behavior: contain;
   }
 
+  /* Continuous rows with an inset hairline — the same list grammar as the
+     session drawer — instead of a bordered card per document. min-height is
+     content-box, so 44px + 8px edges lands the row on the feed rhythm. */
   .row {
+    position: relative;
     display: grid;
-    grid-template-columns: var(--dsw-touch-target) 24px minmax(0, 1fr) auto var(--dsw-touch-target);
+    grid-template-columns: var(--dsw-touch-target) 24px minmax(0, 1fr) var(--dsw-touch-target);
     align-items: center;
-    min-height: 56px;
+    min-height: 44px;
     padding: var(--dsw-space-1) 0;
-    border: 0.5px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
-    background: var(--dsw-alias-bg-layer-1);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .row::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: calc(var(--dsw-touch-target) + 24px + var(--dsw-space-2));
+    height: 0.5px;
+    background: var(--dsw-alias-border-l2);
+    pointer-events: none;
+  }
+
+  .group .row:last-of-type::after,
+  .list > .row:last-of-type::after {
+    display: none;
+  }
+
+  .row:active {
+    background: var(--dsw-alias-interactive-bg-active);
   }
 
   .row:not(.folderRow) .actions {
@@ -1705,27 +1752,14 @@
     height: var(--dsw-touch-target);
     min-height: var(--dsw-touch-target);
     padding: 0;
-    grid-column: 5;
-    border-radius: var(--dsw-radius-md);
-  }
-
-  .mobileCoreActions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
     grid-column: 4;
+    border-radius: var(--dsw-radius-md);
   }
 
-  .mobileCoreAction {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--dsw-touch-target);
-    min-width: var(--dsw-touch-target);
-    height: var(--dsw-touch-target);
-    min-height: var(--dsw-touch-target);
-    padding: 0;
-    border-radius: var(--dsw-radius-md);
+  /* The row's trailing cluster is the ⋯ affordance alone; every action lives
+     in its sheet, so the duplicated icon pair stays out of the row. */
+  .mobileCoreActions {
+    display: none;
   }
 
   .mobileCoreLabel {
@@ -1734,7 +1768,7 @@
 
   .readOnlyBadge {
     display: inline-flex;
-    grid-column: 5;
+    grid-column: 4;
     align-items: center;
     justify-content: center;
     min-width: 0;
@@ -1773,17 +1807,19 @@
 
   .emptyActions > * {
     width: 100%;
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
+    border-radius: var(--dsw-radius-lg);
   }
 
   .overviewRow {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) var(--dsw-touch-target);
-    min-height: 56px;
-    padding: var(--dsw-space-1);
-    border: 0.5px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
-    background: var(--dsw-alias-bg-layer-1);
+    min-height: 52px;
+    padding: 6px 0;
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
+    background: transparent;
   }
 
   .overviewRow .size {
@@ -1816,7 +1852,8 @@
   .formActions > *,
   .inlineForm > * {
     width: 100%;
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
+    border-radius: var(--dsw-radius-lg);
   }
 
   .historyList li,
@@ -2034,29 +2071,139 @@
 }
 
 @media (max-width: 767px) {
+  /* The empty state is centered placeholder content, not a drop zone card —
+     the dashed bounding box is desktop chrome. */
+  .emptyState {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+}
+
+@media (max-width: 767px) {
   .dialog {
     border: 0;
     border-radius: var(--dsw-mobile-sheet-radius) var(--dsw-mobile-sheet-radius) 0 0;
     box-shadow: none;
   }
 
+  /* The catalog heading is a section label on a phone, not a page title. */
+  .overviewHeader h2,
+  .trashHeader h2 {
+    color: var(--dsw-alias-label-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+
+  .overviewHeader {
+    padding-bottom: var(--dsw-space-1);
+  }
+
   .limits {
-    margin: 8px 12px 0;
+    margin: 0;
   }
 
   .workbenchContent {
-    padding: 12px;
+    padding: var(--dsw-space-2) var(--dsw-space-3);
   }
 
+  /* The sheet is already the surface; the inner panel is not a second card
+     nested inside it. */
   .panel {
-    padding: 12px;
-    border-radius: 12px;
+    gap: var(--dsw-space-2);
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
     box-shadow: none;
   }
 
+  .overview,
+  .trash {
+    gap: var(--dsw-space-2);
+  }
+
   .emptyState {
-    min-height: 200px;
-    padding: 16px;
+    min-height: 0;
+    padding: var(--dsw-space-6) 0;
+  }
+
+  /* The empty-state hero is a bare glyph on a phone — the bordered tile was
+     desktop card chrome. */
+  .emptyIcon {
+    width: auto;
+    height: auto;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  /* These rules sit after the shared 60px card grammar above so the phone
+     list keeps the continuous inset-separator form instead. */
+  .row {
+    min-height: 44px;
+    padding: var(--dsw-space-1) 0;
+    border-bottom: 0;
+    border-radius: 0;
+  }
+
+  /* The unconditional catalog-card metrics above (60px, 10px 12px) also
+     reach the flattened overview and trash rows; re-assert the row metrics
+     here so all three lists share the same compact rhythm. These rows are
+     border-box, so 44px min-height lands each at exactly 44px. */
+  .overviewRow {
+    min-height: 44px;
+    padding: var(--dsw-space-1) 0;
+  }
+
+  .trashRow {
+    min-height: 44px;
+    padding: var(--dsw-space-1) 0;
+  }
+
+  /* Hairline rows leave no room for a per-group gap or a fat date band. */
+  .group {
+    gap: 0;
+  }
+
+  .groupDate {
+    padding: var(--dsw-space-3) 0 var(--dsw-space-1);
+  }
+
+  /* Skeleton placeholders keep the same continuous-row form as real rows. */
+  .loadingState {
+    gap: 0;
+    padding-top: 0;
+  }
+
+  .loadingRow {
+    height: 52px;
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
+  }
+
+  /* The desktop toolbar's 460px search basis wraps the action pair onto a
+     second row; a zero basis keeps both in one row on the phone. */
+  .filterGroup {
+    flex-basis: 0;
+    min-width: 0;
+  }
+
+  /* The shared input floors at 40px/16px text on coarse pointers (below that
+     iOS Safari zooms on focus); the toolbar row matches it. */
+  .search {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 40px;
+  }
+
+  /* The dialog's own title row — 48px content + 20px edges was the desktop
+     density; the pushed sheet keeps one 44px nav row. */
+  .shell > :first-child {
+    min-height: 40px;
+    padding: var(--dsw-space-2) var(--dsw-space-4) var(--dsw-space-1);
   }
 }
 

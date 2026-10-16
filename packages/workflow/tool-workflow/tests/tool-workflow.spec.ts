@@ -5,7 +5,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult, ToolExecutionToken } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { unsupportedInbox, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { WorkflowRunId, WorkflowEngine } from '@deepseek-ai/dsh-workflow'
 import type {
   WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowResult, WorkflowRun,
@@ -618,6 +618,7 @@ describe('dsh-tool-workflow', () => {
       onTestFinished(async () => { await ctx.fiber.dispose() })
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SessionProjectionRegistry)
       await ctx.plugin(SubagentRuntime)
       ctx.subagents.registerProvider({
@@ -653,6 +654,7 @@ describe('dsh-tool-workflow', () => {
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(LocalJobRegistry)
       await ctx.plugin(ToolTasks)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SessionProjectionRegistry)
       await ctx.plugin(SubagentRuntime)
       ctx.subagents.registerProvider({

@@ -779,6 +779,42 @@ describe('ChatView', () => {
     expect(view.container.querySelectorAll('[data-pending-steering]')).toHaveLength(1)
   })
 
+  it('keeps a transcript echo mounted while the Host queue still holds its row', () => {
+    const requestId = RpcId('queued-transcript')
+    const h = makeHarness({
+      queue: [{
+        id: 'occ-q' as never, messageId: 'msg-q' as never,
+        placement: 'queued' as const, rpcId: requestId,
+        content: [{ type: 'text' as const, text: '排在队列里' }],
+        preview: '排在队列里', text: '排在队列里',
+      }],
+      pendingSubmissions: [{
+        requestId, placement: 'transcript', time: 1, text: '排在队列里', images: [],
+      }],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getAllByText('排在队列里')).toHaveLength(1)
+  })
+
+  it('suppresses a Host steering row while the local echo for its rpcId still renders', () => {
+    const requestId = RpcId('steer-echo-held')
+    const h = makeHarness({
+      queue: [{
+        id: 'occ-s' as never, messageId: 'msg-s' as never,
+        placement: 'steering' as const, rpcId: requestId,
+        content: [{ type: 'text' as const, text: '插队一句' }],
+        preview: '插队一句', text: '插队一句',
+      }],
+      pendingSubmissions: [{
+        requestId, placement: 'steering', time: 1, text: '插队一句', images: [],
+      }],
+      running: true,
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getAllByText('插队一句')).toHaveLength(1)
+    expect(view.container.querySelectorAll('[data-pending-steering]')).toHaveLength(1)
+  })
+
   it('animates only the latest unresolved model retry', () => {
     const retryNode = retry(2)
     const nextRetry = { ...retry(3), turn: 2, retry: 2 }
@@ -1204,7 +1240,10 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     expect(view.getByTestId('tool-seat-r1')).toBeTruthy()
     expect(h.toolOwners[0]?.block).toMatchObject({ callId: 'r1', argsRaw: '{"command":"cmd-r1"}' })
-    expect(view.getByRole('status').textContent).toBe('深度求索中...')
+    const status = view.getByRole('status')
+    expect(status.textContent).toContain('深度求索中...')
+    expect(status.querySelector('svg[data-brand="coharness-mascot"]')).not.toBeNull()
+    expect(status.textContent).toContain('COHARNESS')
   })
 
   it('keeps the Tool renderer mounted when a running call settles into log order', () => {
@@ -1264,7 +1303,8 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     // Freshly mounted (as after a reload) yet already past the 15s gate.
     const status = view.getByRole('status')
-    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分\d秒$/)
+    expect(status.textContent).toContain('深度求索中...')
+    expect(status.textContent).toMatch(/2分\d秒$/)
     expect(status.querySelector('[aria-hidden="true"]')).not.toBeNull()
     act(() => {
       h.set({ queue: [{
@@ -1276,7 +1316,7 @@ describe('ChatView', () => {
         text: 'also',
       }] })
     })
-    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分\d秒$/)
+    expect(status.textContent).toMatch(/2分\d秒$/)
   })
 
   it('hands each ordered root call to the keyed business-node slot', () => {

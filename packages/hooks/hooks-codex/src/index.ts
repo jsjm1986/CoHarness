@@ -12,6 +12,7 @@
 // Each dialect bridge keeps its complete dependency list visible at the entry
 // point; a cross-package facade for imports alone would add indirection.
 /* jscpd:ignore-start */
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { readFileSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -36,18 +37,17 @@ import {
   DEFAULT_HOOK_TIMEOUT_MS,
   DEFAULT_MODEL_FEEDBACK_MAX_CHARS,
   DEFAULT_STDERR_SUMMARY_MAX_CHARS,
-  matchesMatcher,
   mergeHookOutputs,
   runHook,
+  selectHookGroups,
   type HookOutput,
-  type MatcherGroup,
   type MergedHookOutcome,
 } from '@deepseek-ai/dsh-hook-protocol'
 import { parseCodexConfig, type CodexHookConfig } from './config.ts'
 /* jscpd:ignore-end */
 
 export const name = 'hooks-codex'
-export const inject = ['shell']
+export const inject = ['shell', 'workingDirectory']
 
 /** Plugin config: where the Codex hooks.json lives + the model name for payloads. */
 export interface Config {
@@ -132,7 +132,7 @@ export function apply(ctx: Context, config: Config): void {
   async function runPoint(
     point: string,
     matchQuery: string,
-    payload: unknown,
+    payload: Record<string, unknown>,
     opts: {
       agent?: Agent
       turn?: number
@@ -140,14 +140,13 @@ export function apply(ctx: Context, config: Config): void {
       plainStdoutAsContext?: boolean
     },
   ): Promise<MergedHookOutcome> {
-    const groups: MatcherGroup[] = parsed[point] ?? []
+    const groups = selectHookGroups(parsed[point], matchQuery, 'codex')
+    if (groups.length === 0) return mergeHookOutputs([])
     const outputs: HookOutput[] = []
-    // Run hooks in the agent's session workspace so relative paths address the
-    // user's project rather than the server launch directory.
-    const workdir = opts.agent?.session.header.cwd
+    // Run hooks in the agent's current directory so relative paths address the
+    // session's workspace rather than the server launch directory.
+    const workdir = opts.agent === undefined ? undefined : await ctx.workingDirectory.ensure(opts.agent, opts.signal)
     for (const group of groups) {
-      // Codex always interprets matchers as regexes; it has no literal fast path.
-      if (!matchesMatcher(group.matcher, matchQuery, 'codex')) continue
       for (const hook of group.hooks) {
         const handlerId = nextHandlerId(point)
         const session = opts.agent?.session
@@ -158,7 +157,7 @@ export function apply(ctx: Context, config: Config): void {
           })
         }
         const { output, durationMs } = await runHook(ctx.shell, hook, {
-          payload,
+          payload: { ...payload, cwd: workdir ?? process.cwd() },
           defaultTimeoutMs,
           ...workdir !== undefined ? { cwd: workdir } : {},
           signal: opts.signal,
@@ -316,7 +315,6 @@ function base(ctx: Context, agent: Agent | undefined, event: string, model: stri
     transcript_path: agent === undefined
       ? null
       : ctx.get('sessionPersistence')?.locate(agent.session.header)?.path ?? null,
-    cwd: agent?.session.header.cwd ?? process.cwd(),
     hook_event_name: event,
     model,
     permission_mode: 'default',

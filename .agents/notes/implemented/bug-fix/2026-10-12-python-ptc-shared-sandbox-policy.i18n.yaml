@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-12-python-ptc-shared-sandbox-policy.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-python-ptc-shared-sandbox-policy.md
+/agent-note-python-ptc-runs-under-the-shared-file-sandbox-policy:
+  en: 47ceed98b9969362
+  zh: 585d6133fd77702c
+/agent-note-python-ptc-runs-under-the-shared-file-sandbox-policy/problem:
+  en: f99133904c0a2140
+  zh: 8e0a7ee81ec12842
+/agent-note-python-ptc-runs-under-the-shared-file-sandbox-policy/decision:
+  en: bcf683c0d458370e
+  zh: c4f84351c6dc7460
+/agent-note-python-ptc-runs-under-the-shared-file-sandbox-policy/alternatives-considered:
+  en: 308c1c09c7c1aabe
+  zh: de250941c9d1e8bf
+/agent-note-python-ptc-runs-under-the-shared-file-sandbox-policy/consequences:
+  en: 173173a7355ab01d
+  zh: 1571e959083f0c71
+/agent-note-python-ptc-runs-under-the-shared-file-sandbox-policy/verification:
+  en: c20457af2e8cca58
+  zh: e4489bf2146bebf8
+/agent-note-python-ptc-runs-under-the-shared-file-sandbox-policy/related:
+  en: 21d7afc61d03a477
+  zh: c3e4cf755a6868ac

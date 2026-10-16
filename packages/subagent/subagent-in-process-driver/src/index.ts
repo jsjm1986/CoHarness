@@ -13,6 +13,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { foldConsumedWork } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
@@ -20,10 +21,12 @@ import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionId, SessionLogOffset as SessionLogOffsetType, TurnEndReason } from '@deepseek-ai/dsh-session'
 import { createUserMessage, MessageId, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
+import { hasPendingDirectChildren } from '@deepseek-ai/dsh-subagent/internal'
 import {
   appendDelegatedPolicyOverrides,
   applyChildComposition,
   assertSubagentMaxDepth,
+  attachStructuredRuntime,
   captureDelegatedPolicyOverrides,
   childSessionMeta,
   finalAssistantOutput,
@@ -32,20 +35,17 @@ import {
 } from '@deepseek-ai/dsh-subagent'
 import type {
   ResolvedSubagentStartRequest,
+  StructuredAttachment,
   SubagentDescriptorData,
   SubagentResult,
   SubagentRun,
   SubagentStopReason,
 } from '@deepseek-ai/dsh-subagent'
-import {
-  attachStructuredRuntime,
-  type StructuredAttachment,
-} from './structured.ts'
 
 export {
   STRUCTURED_OUTPUT_TOOL,
   STRUCTURED_OUTPUT_INSTRUCTION,
-} from './structured.ts'
+} from '@deepseek-ai/dsh-subagent'
 
 /** Map a session turn outcome to the subagent seam's terminal vocabulary. */
 function toStopReason(reason: TurnEndReason | undefined): SubagentStopReason {
@@ -120,14 +120,26 @@ export async function startInProcessRun(
   const inherited = captureDelegatedPolicyOverrides(parent)
 
   let structured: StructuredAttachment | undefined
-  const setup = (childCtx: Context, child: Agent): void => {
+  const setup = async (childCtx: Context, child: Agent): Promise<void> => {
+    const workingDirectory = childCtx.get('workingDirectory')
+    if (workingDirectory === undefined) {
+      throw new Error('in-process subagents require the working-directory service')
+    }
+    // The service resolved `request.cwd` before provider startup; commit it
+    // durably on the child before composition and publication.
+    await workingDirectory.set(child, request.cwd, request.signal)
     appendDelegatedPolicyOverrides(childCtx, child.session, inherited)
     applyChildComposition(childCtx, parent, {
       persona: request.persona,
       toolFilter: request.toolFilter,
     })
     if (request.outputSchema !== undefined) {
-      structured = attachStructuredRuntime(childCtx, request.outputSchema)
+      const runtime = childCtx.get('subagents')
+      structured = attachStructuredRuntime(childCtx, request.outputSchema, () =>
+        child.inbox.nextStep.length === 0
+        && child.inbox.nextTurn.length === 0
+        && (runtime === undefined || !hasPendingDirectChildren(runtime, child)),
+      )
     }
     attachDescriptorAppend(childCtx, request.descriptor)
   }

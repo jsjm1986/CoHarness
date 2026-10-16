@@ -282,6 +282,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-deliverables ProducedFiles id \'@deepseek-ai/dsh-client-ui-deliverables/produced-files\'',
       'client-ui-deliverables DeliverablesTail id \'@deepseek-ai/dsh-client-ui-deliverables\'',
+      'client-ui-plan PlanCards',
       'client-ui-schedule ScheduleTurnCard id \'schedule-created\'',
     ],
     replaceRisk: 'none',
@@ -685,7 +686,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.pane\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-collaboration StewardDock id \'collaboration-steward-notice\'',
       'client-ui-conversation QueueDock id \'queue\'',
       'client-ui-conversation TodoDock id \'todo\'',
       'client-ui-goal GoalDock id \'goal\'',
@@ -742,7 +742,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.pane\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-sidebar-right BlankExpandButton id \'auxiliary-sidebar\'',
+      'client-ui-collaboration StewardChip id \'collaboration-steward-notice\'',
       'client-ui-sidebar-terminal TerminalRecovery',
     ],
     replaceRisk: 'none',
@@ -1030,7 +1030,9 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     hookContext: '',
     slotInject: '',
     declaredBy: 'an entry in \'conversation.composer\' (client-ui-user-questions), so it exists while that entry is mounted',
-    occupants: [],
+    occupants: [
+      'client-ui-plan PlanReviewOpen',
+    ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.plan-review.actions\', () => ctx.slots.register(\n      { name: \'conversation.plan-review.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-user-questions/src/client/contract/slots.ts:14',
@@ -1578,6 +1580,52 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     source: 'packages/client/ui-layout/src/client/index.ts:83',
   },
   {
+    key: 'plugins.add.actions',
+    kind: 'list',
+    scope: 'root',
+    summary: 'Additional MenuItemButton rows after installation: 72px high, with a title and a description capped at two lines.',
+    doc: 'Additional MenuItemButton rows after installation: 72px high, with a title and a description capped at two lines.',
+    registerOptions: [
+      {
+        name: 'id',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
+      },
+    ],
+    ownerProps: [
+      '/** Add-plugin menu actions, independent of any selected bundle or Session. */\nexport interface PluginAddActionsProps {\n  /** Close the add-plugin menu before starting the contributed action. */\n  readonly onDismiss: () => void\n}',
+    ],
+    ownerPropsReferences: [],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'main\' (client-ui-plugin-manager), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-agent-preset CreatePluginMenuItem id \'create-plugin\'',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'plugins.add.actions\', () => ctx.slots.register(\n      { name: \'plugins.add.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:86',
+  },
+  {
     key: 'plugins.bundle.activation',
     kind: 'keyed',
     scope: 'root',
@@ -1607,7 +1655,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'plugins.bundle.activation\', () => ctx.slots.register(\n      { name: \'plugins.bundle.activation\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:79',
+    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:88',
   },
   {
     key: 'plugins.bundle.config',
@@ -1641,7 +1689,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'plugins.bundle.config\', () => ctx.slots.register(\n      { name: \'plugins.bundle.config\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:97',
+    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:106',
   },
   {
     key: 'plugins.detail.actions',
@@ -1687,7 +1735,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'plugins.detail.actions\', () => ctx.slots.register(\n      { name: \'plugins.detail.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:111',
+    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:120',
   },
   {
     key: 'plugins.detail.badge',
@@ -1733,7 +1781,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'plugins.detail.badge\', () => ctx.slots.register(\n      { name: \'plugins.detail.badge\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:116',
+    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:125',
   },
   {
     key: 'plugins.detail.section',
@@ -1779,7 +1827,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'plugins.detail.section\', () => ctx.slots.register(\n      { name: \'plugins.detail.section\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:123',
+    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:132',
   },
   {
     key: 'plugins.item',
@@ -1832,7 +1880,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'plugins.item\', () => ctx.slots.register(\n      { name: \'plugins.item\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:91',
+    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:100',
   },
   {
     key: 'plugins.row.config',
@@ -1866,7 +1914,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'plugins.row.config\', () => ctx.slots.register(\n      { name: \'plugins.row.config\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:105',
+    source: 'packages/client/ui-plugin-manager/src/client/slot-contract.ts:114',
   },
   {
     key: 'rightbar',
@@ -2175,7 +2223,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/** Owner share of one provider-card extension occurrence. */\nexport interface ProviderCardExtrasOwnerProps {\n  /** Provider directory entry shown by the card. */\n  provider: ConfigurableProviderView\n  /** Whether any layer configures this provider. */\n  configured: boolean\n  /** Whether the joined API-key credential is configured. */\n  keyConfigured: boolean\n}',
+      '/** Owner share of one provider-card extension occurrence. */\nexport interface ProviderCardExtrasOwnerProps {\n  /** Provider directory entry shown by the card. */\n  provider: ConfigurableProviderView\n  /** Whether any layer configures this provider. */\n  configured: boolean\n  /**\n   * Whether the credential this page would use is configured: the profile\'s\n   * `apiKeyEnv`, or the page\'s derived reference while the profile names\n   * none — the same reference the row\'s own editor resolves.\n   */\n  keyConfigured: boolean\n}',
     ],
     ownerPropsReferences: [
       'ConfigurableProviderView',
@@ -2363,7 +2411,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'root\' (client-ui-layout), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-sidebar-right ExpandButton id \'auxiliary-sidebar\'',
       'session-log-export SessionLogDownloadMobileHeaderAction id \'session-log-download\'',
     ],
     replaceRisk: 'none',
@@ -2629,6 +2676,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'rightbar.session\' (client-ui-sidebar-right), so it exists while that entry is mounted',
     occupants: [
       'client-ui-deliverables ReviewTab',
+      'client-ui-plan PlanPreview',
       'client-ui-schedule ScheduleTaskTab',
       'client-ui-sidebar-browser BrowserBody',
       'client-ui-sidebar-right ToolBody key \'tool-details\'',
@@ -2672,6 +2720,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'rightbar.session\' (client-ui-sidebar-right), so it exists while that entry is mounted',
     occupants: [
       'client-ui-deliverables ReviewTabTitle',
+      'client-ui-plan PlanTitle',
       'client-ui-schedule ScheduleTaskTabTitle',
       'client-ui-sidebar-browser BrowserTitle',
       'client-ui-sidebar-right ToolDetailsTitle key \'tool-details\'',

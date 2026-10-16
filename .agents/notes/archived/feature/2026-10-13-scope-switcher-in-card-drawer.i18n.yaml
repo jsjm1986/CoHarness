@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write
+2026-10-13-scope-switcher-in-card-drawer.md: bc018aeebe416051e109aeb5241e17da0b9d7dc5
+2026-10-13-scope-switcher-in-card-drawer.zh.md: e47ad5aa21108f9855168847903e235c3f8b3ac5

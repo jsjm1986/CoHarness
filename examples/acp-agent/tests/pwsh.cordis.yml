@@ -14,6 +14,12 @@
 - id: shell-env
   name: '@deepseek-ai/dsh-shell-env'
 
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 - id: acp-agent
   name: '@deepseek-ai/dsh-acp-demo'
   config:
