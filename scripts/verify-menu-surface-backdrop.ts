@@ -53,7 +53,7 @@ export async function menuSurfaceBackdropViolations(root: string): Promise<strin
       if (BACKDROP.test(body)) continue
       const selector = (match[1] ?? '').trim().split('\n').pop()?.trim() ?? '?'
       violations.push(
-        `${relative(root, file).replaceAll('\\\\', '/')}: \`${selector}\` pairs the translucent menu fill with an elevation shadow but no backdrop-filter`,
+        `${relative(root, file).replaceAll('\\', '/')}: \`${selector}\` pairs the translucent menu fill with an elevation shadow but no backdrop-filter`,
       )
     }
   }
