@@ -1,16 +1,20 @@
 /**
  * Pure types of the goal domain: the ONE home of the `goal` projection-key
- * declaration plus the durable payload vocabulary it carries, free of this
- * package's host-side imports (cordis events, dsh-agent, dsh-llm, the
- * service). Two namespace projections serve it — `./types` for host
- * consumers, `./client` (the browser half-entry's re-export) for client
- * aggregates — with zero content duplication. Host-coupled domain
- * vocabulary (message sources, events, fold shapes) lives in ./domain.ts.
+ * declaration plus the durable and wire payload vocabulary it carries, free
+ * of this package's host-side imports (dsh-agent, dsh-llm, the service).
+ * The client-forwarded `goal/activation-changed` cordis event is declared
+ * here because remote consumers subscribe through client aggregates; the
+ * agent-scoped `goal/changed` event stays in ./domain.ts with the rest of
+ * the host-coupled domain vocabulary (message sources, fold shapes). Two
+ * namespace projections serve this file — `./types` for host consumers,
+ * `./client` (the browser half-entry's re-export) for client aggregates —
+ * with zero content duplication.
  *
  * @module @deepseek-ai/dsh-goal/types
  */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** Identifies one goal across its durable revisions. */
 export type GoalId = Branded<'GoalId'>
@@ -82,6 +86,21 @@ export interface GoalView extends GoalSnapshot {
   readonly activation: GoalActivation
 }
 
+/** Live process-local activation update forwarded to UI clients. */
+export interface GoalActivationChanged {
+  /** Session whose live goal activation changed. */
+  readonly sessionId: SessionId
+  /** Current exact activation, absent when no goal is current. */
+  readonly goal?: {
+    /** Exact current goal identity. */
+    readonly id: GoalId
+    /** Exact current goal revision. */
+    readonly revision: number
+    /** Current process-local continuation state. */
+    readonly activation: GoalActivation
+  }
+}
+
 /**
  * The `goal` projection value: the current durable goal with its replay
  * counters, exactly as the latest `goal/change` event carried them.
@@ -121,5 +140,16 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
      * advance `roundsStarted`.
      */
     goal: GoalProjection | null
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Process-local goal activation changed for one session.
+     * @mode emit
+     * @param payload - session id and the exact current goal activation, or no goal after a clear.
+     */
+    'goal/activation-changed'(payload: GoalActivationChanged): void
   }
 }
