@@ -172,7 +172,7 @@ describe('Team identity and provisioning', () => {
 
     expect(service.listMembers(lead)).toEqual([expect.objectContaining({
       name: 'lead',
-      status: 'idle',
+      status: 'inactive',
       diagnostics: [],
     })])
     const provisioning = {
@@ -296,7 +296,7 @@ describe('Team identity and provisioning', () => {
     expect(freshInspection.meta.isSeeded).toBe(false)
     expect(freshInspection.inheritedEventCount).toBe(0)
     expect(ctx.agentTeams.listMembers(lead).map(row => [row.name, row.context, row.status])).toEqual([
-      ['lead', undefined, 'idle'],
+      ['lead', undefined, 'inactive'],
       ['fork-worker', 'fork', 'inactive'],
       ['fresh-worker', 'fresh', 'inactive'],
     ])

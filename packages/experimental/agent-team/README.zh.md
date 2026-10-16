@@ -54,7 +54,7 @@ kind: "package-reference"
 
 fresh child 不带 parent 历史 seed。fork child 只捕获一次 Lead 的已完成 turn 前缀，不包含正在执行 delegation 的 turn。继承的 Team 记录带有旧 Root 的 `TeamId`，普通 fork 成为独立运行时 Root 后会忽略这些记录。roster 之外、由 provider 管理的 subagent 不会被误认为嵌套 Team Lead。
 
-roster 同时报告持久 provisioning／failed phase 与实时 `running`／`idle` 状态。active 但不驻留的 teammate 显示为 `inactive`；后续 wakeup 投递会经 continuation owner 冷恢复它。成员恢复在各自 `agent/created` 初始化时启动并在后台运行：创建不会等待冷恢复的邮箱队列——邮箱投递可能已持有该成员的串行队列，从创建侧等待会互相等待而无法完成。
+roster 同时报告持久 provisioning／failed phase 与 `running`／`inactive` 轮次可用状态——`inactive` 同时涵盖已加载轮次间隙与仅存于存储的成员，不描述任务结果；后续 wakeup 投递会经 continuation owner 冷恢复存储成员。成员恢复在各自 `agent/created` 初始化时启动并在后台运行：创建不会等待冷恢复的邮箱队列——邮箱投递可能已持有该成员的串行队列，从创建侧等待会互相等待而无法完成。
 
 <a id="durable-mailbox"></a>
 ## 持久 mailbox
@@ -102,7 +102,7 @@ Peer 消息追加在 target 可复用历史前缀之后。冷恢复会先复用�
 - **单进程、共享 checkout**：所有成员共享 cwd，修改立即可见；本包不提供 worktree、远端成员、自动 merge 或文件锁。
 - **write scope 仅作提示**：Bash、formatter、codegen 和直接外部写入可以绕过文件版本检查；Lead 必须协调 owner 并检查最终 diff。
 - **扁平且不可变的 roster**：只有 Lead 可以创建直接 teammate；不支持嵌套 Team、重命名、删除或名字复用。
-- **不会自动释放 owner**：idle、interrupt、进程退出与工作失败都不会释放任务 owner。
+- **不会自动释放 owner**：inactivity、interrupt、进程退出与工作失败都不会释放任务 owner。
 - **mailbox 不保证跨进程 exactly-once**：不支持多个 harness 进程并发操作同一 Team。
 
 <a id="dev-note"></a>

@@ -33,7 +33,7 @@ const task: TeamTask = {
 }
 const view: TeamView = {
   members: [
-    { id: SESSION, name: 'lead', role: 'lead', status: 'idle', model: 'model-a', diagnostics: [] },
+    { id: SESSION, name: 'lead', role: 'lead', status: 'inactive', model: 'model-a', diagnostics: [] },
     {
       id: 'worker-id' as SessionId,
       name: 'worker',
@@ -72,7 +72,7 @@ describe('TeamAction', () => {
     const firstLoad = Promise.withResolvers<{ ok: true; value: TeamView }>()
     const nextView: TeamView = {
       ...view,
-      members: [{ id: nextSession, name: 'lead', role: 'lead', status: 'idle', diagnostics: [] }],
+      members: [{ id: nextSession, name: 'lead', role: 'lead', status: 'inactive', diagnostics: [] }],
       tasks: [{ ...task, id: 'task-next' as TeamTaskId, subject: 'Next session task' }],
     }
     const load = vi.fn((sessionId: SessionId) => sessionId === SESSION

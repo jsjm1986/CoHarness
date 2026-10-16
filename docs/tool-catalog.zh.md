@@ -2222,7 +2222,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `list_agents`
 
-列出你启动的 subagent 及其 id、标签和状态。running 表示正在工作；inactive 表示当前未在工作。subagent 完成时你会收到通知，无需反复查看状态。使用 send_message 继续对话。
+按持久 id 和标签列出你启动的可继续后台 subagent。用于回忆你启动了哪些，而非轮询完成状态——完成时你会收到通知。状态来自在线注册表：running 表示正在执行轮次；inactive 表示没有轮次在执行，无论该 child 已加载还是需恢复，且不描述任务完成、成功、失败或等待其它 agent。
 
 ```json
 {
@@ -2244,7 +2244,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `send_message`
 
-向某个 agent 发送消息。工作中的 agent 会在下一个 step 收到消息；空闲的 agent 会以该消息开始新一轮。返回投递确认，而不是该 agent 的答案。
+向某个 agent 发送消息。仍在工作的目标会在最近的 step 边界收到消息；inactive 目标会开启或恢复一个轮次。返回投递确认，而不是该 agent 的答案——失败表示消息未送达。
 
 ```json
 {
@@ -2357,7 +2357,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
   "properties": {
     "target": {
       "type": "string",
-      "description": "Team member name, or lead."
+      "description": "Member target returned by spawn_teammate or list_agents, including lead."
     },
     "message": {
       "type": "string",
@@ -2383,7 +2383,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
   "properties": {
     "target": {
       "type": "string",
-      "description": "Teammate name."
+      "description": "Teammate target returned by spawn_teammate or list_agents."
     }
   },
   "required": [
@@ -2417,7 +2417,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
   "properties": {
     "target": {
       "type": "string",
-      "description": "Team member name, or lead."
+      "description": "Member target returned by spawn_teammate or list_agents, including lead."
     },
     "message": {
       "type": "string",
@@ -2552,7 +2552,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "owner": {
       "type": "string",
-      "description": "Optional member-name filter; use unowned for tasks without an owner."
+      "description": "Optional member target from spawn_teammate or list_agents, matching ownerName; use unowned for tasks without an owner."
     },
     "ready": {
       "type": "boolean",
@@ -2626,7 +2626,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "owner": {
       "type": "string",
-      "description": "Member name for Lead-only reassign; omit to unassign."
+      "description": "Member target from spawn_teammate or list_agents for Lead-only reassign; omit to unassign."
     }
   },
   "required": [

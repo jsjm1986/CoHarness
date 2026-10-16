@@ -85,16 +85,11 @@ function text(result: Awaited<ReturnType<typeof execute>>): string {
   return result.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')
 }
 
-function spawnedChildId(result: Awaited<ReturnType<typeof execute>>): SessionId {
-  const parsed: unknown = JSON.parse(text(result))
-  if (typeof parsed !== 'object' || parsed === null || !('member' in parsed)) {
-    throw new Error('spawn_teammate result has no member')
-  }
-  const member = parsed.member
-  if (typeof member !== 'object' || member === null || !('id' in member) || typeof member.id !== 'string') {
-    throw new Error('spawn_teammate result has no member id')
-  }
-  return SessionId(member.id)
+function spawnedChildId(ctx: Context, lead: Agent, result: Awaited<ReturnType<typeof execute>>): SessionId {
+  const parsed = JSON.parse(text(result)) as { member: { target: string } }
+  const member = ctx.agentTeams.listMembers(lead).find(member => member.name === parsed.member.target)
+  if (member === undefined) throw new Error('spawn_teammate target has no roster member')
+  return member.id
 }
 
 async function assembly(ctx: Context, agent: Agent) {
@@ -116,6 +111,81 @@ async function waitNoAgent(ctx: Context, id: SessionId): Promise<void> {
 }
 
 describe('dsh-tool-team', () => {
+  it.each(['running', 'inactive', 'provisioning', 'failed'] as const)(
+    'projects %s members consistently in creation, listing, and schemas', async (status) => {
+      const { ctx, lead } = await setup([])
+      const member = {
+        id: SessionId('private-member-session'), name: 'reviewer', role: 'teammate' as const,
+        status, description: 'review changes', diagnostics: [],
+      }
+      vi.spyOn(ctx.agentTeams, 'spawnTeammate').mockResolvedValue({ member })
+      vi.spyOn(ctx.agentTeams, 'listMembers').mockReturnValue([member])
+      const expected = {
+        target: 'reviewer', role: 'teammate', status,
+        description: 'review changes', diagnostics: [],
+      }
+      const spawned = await execute(ctx, lead, 'spawn_teammate', {
+        name: 'reviewer', description: 'review changes', prompt: 'review',
+      })
+      const listed = await execute(ctx, lead, 'list_agents', {})
+      expect(spawned.isError).toBe(false)
+      expect(listed.isError).toBe(false)
+      expect(JSON.parse(text(spawned))).toEqual({ member: expected })
+      expect(JSON.parse(text(listed))).toEqual([expected])
+      const scope = scopeOf(lead.ctx)
+      const spawnSchema = ctx.tools.get('spawn_teammate', scope)?.output.schema.properties?.member
+      const listSchema = ctx.tools.get('list_agents', scope)?.output.schema.items
+      for (const schema of [spawnSchema, listSchema]) {
+        expect(schema?.properties).toHaveProperty('target')
+        expect(schema?.properties).not.toHaveProperty('id')
+        expect(schema?.properties).not.toHaveProperty('name')
+        expect(schema?.properties?.status?.enum).toEqual(['running', 'inactive', 'provisioning', 'failed'])
+      }
+      expect(ctx.agentTeams.listMembers(lead)).toEqual([member])
+    },
+  )
+
+  it.each(['running', 'inactive'] as const)('returns interrupted %s status', async (previousStatus) => {
+    const { ctx, lead } = await setup([])
+    const interrupt = vi.spyOn(ctx.agentTeams, 'interrupt').mockReturnValue({ previousStatus })
+    const result = await execute(ctx, lead, 'interrupt_agent', { target: 'reviewer' })
+    expect(JSON.parse(text(result))).toEqual({ previousStatus })
+    expect(interrupt).toHaveBeenCalledWith(lead, 'reviewer')
+  })
+
+  it('uses returned targets for messages, interruption, and task assignment', async () => {
+    const { ctx, lead } = await setup(['hang', 'hang'])
+    const spawned = await execute(ctx, lead, 'spawn_teammate', {
+      name: 'reviewer', description: 'review changes', prompt: 'wait for work',
+    })
+    const { member } = JSON.parse(text(spawned)) as { member: { target: string } }
+    const childId = spawnedChildId(ctx, lead, spawned)
+    const child = await waitRunning(ctx, childId)
+    expect(member).not.toHaveProperty('id')
+    expect(member).not.toHaveProperty('name')
+    const listed = JSON.parse(text(await execute(ctx, lead, 'list_agents', {}))) as Array<{ target: string }>
+    expect(listed.map(row => row.target)).toEqual(['lead', member.target])
+    const created = await execute(ctx, lead, 'team_task_create', { subject: 'review', description: 'review changes' })
+    const task = JSON.parse(text(created)) as { id: string; revision: number }
+    const assigned = await execute(ctx, lead, 'team_task_update', {
+      task_id: task.id, expected_revision: task.revision, action: 'reassign', owner: member.target,
+    })
+    expect(assigned.isError).toBe(false)
+    expect(JSON.parse(text(assigned))).toMatchObject({ ownerName: member.target })
+    const tasks = await execute(ctx, lead, 'team_task_list', { owner: listed[1]!.target })
+    expect(JSON.parse(text(tasks))).toMatchObject({ tasks: [{ id: task.id, ownerName: member.target }] })
+    const sent = await execute(ctx, lead, 'send_message', { target: member.target, message: 'review the diff' })
+    expect(sent.isError).toBe(false)
+    const interrupted = await execute(ctx, lead, 'interrupt_agent', { target: listed[1]!.target })
+    expect(interrupted.isError).toBe(false)
+    await child.whenIdle()
+    expect(child.status).toBe('idle')
+    expect(ctx.agentTeams.interrupt(lead, member.target)).toEqual({ previousStatus: 'inactive' })
+    const stored = await execute(ctx, lead, 'list_agents', {})
+    expect(JSON.parse(text(stored))).toContainEqual(expect.objectContaining({ target: member.target, status: 'inactive' }))
+    expect(ctx.agentTeams.listMembers(lead)[1]).toMatchObject({ id: childId, name: member.target, status: 'inactive' })
+  })
+
   it('installs the complete scoped schema and shared-checkout policy for roots and teammates', async () => {
     const { ctx, lead } = await setup(['hang'])
     const leadAssembly = await assembly(ctx, lead)
@@ -135,7 +205,7 @@ describe('dsh-tool-team', () => {
       prompt: 'stay available',
     })
     expect(spawned.isError).toBe(false)
-    const childId = spawnedChildId(spawned)
+    const childId = spawnedChildId(ctx, lead, spawned)
     const child = await waitRunning(ctx, childId)
     const childAssembly = await assembly(ctx, child)
     expect(childAssembly.tools.map(schema => schema.name).filter(name => TOOL_NAMES.includes(name)).sort())
@@ -156,7 +226,7 @@ describe('dsh-tool-team', () => {
     const inactiveSpawn = await execute(inactiveSetup.ctx, inactiveSetup.lead, 'spawn_teammate', {
       name: 'inactive-worker', description: 'finish immediately', prompt: 'finish',
     })
-    const inactiveId = spawnedChildId(inactiveSpawn)
+    const inactiveId = spawnedChildId(inactiveSetup.ctx, inactiveSetup.lead, inactiveSpawn)
     await waitNoAgent(inactiveSetup.ctx, inactiveId)
     const noProgress = await execute(inactiveSetup.ctx, inactiveSetup.lead, 'wait_agent', { timeout_ms: 3_600_000 })
     expect(noProgress.isError).toBe(false)
@@ -177,7 +247,7 @@ describe('dsh-tool-team', () => {
     const activeSpawn = await execute(activeSetup.ctx, activeSetup.lead, 'spawn_teammate', {
       name: 'active-worker', description: 'stay active', prompt: 'wait',
     })
-    const activeId = spawnedChildId(activeSpawn)
+    const activeId = spawnedChildId(activeSetup.ctx, activeSetup.lead, activeSpawn)
     await waitRunning(activeSetup.ctx, activeId)
     const controller = new AbortController()
     const waiting = execute(activeSetup.ctx, activeSetup.lead, 'wait_agent', { timeout_ms: 10_000 }, controller.signal)
@@ -195,13 +265,13 @@ describe('dsh-tool-team', () => {
     const spawned = await execute(ctx, lead, 'spawn_teammate', {
       name: 'json-worker', description: 'json worker', prompt: 'wait', context: 'fresh',
     })
-    const childId = spawnedChildId(spawned)
+    const childId = spawnedChildId(ctx, lead, spawned)
     const child = await waitRunning(ctx, childId)
 
     const roster = await execute(ctx, child, 'list_agents', {})
     expect(JSON.parse(text(roster))).toMatchObject([
-      { name: 'lead', role: 'lead' },
-      { name: 'json-worker', role: 'teammate' },
+      { target: 'lead', role: 'lead' },
+      { target: 'json-worker', role: 'teammate' },
     ])
     // Every Team result reaches the model as compact JSON: indentation would
     // spend tokens on every roster, task, and receipt without adding meaning.
@@ -263,7 +333,7 @@ describe('dsh-tool-team', () => {
     const spawned = await execute(ctx, lead, 'spawn_teammate', {
       name: 'fork-worker', description: 'fork worker', prompt: 'stay active', context: 'fork',
     })
-    const childId = spawnedChildId(spawned)
+    const childId = spawnedChildId(ctx, lead, spawned)
     await waitRunning(ctx, childId)
 
     const firstResult = await execute(ctx, lead, 'team_task_create', {
@@ -338,7 +408,7 @@ describe('dsh-tool-team', () => {
     const spawned = await execute(ctx, lead, 'spawn_teammate', {
       name: 'hmr-worker', description: 'hmr worker', prompt: 'wait',
     })
-    const childId = spawnedChildId(spawned)
+    const childId = spawnedChildId(ctx, lead, spawned)
     const child = await waitRunning(ctx, childId)
 
     await fiber.dispose()
@@ -431,7 +501,7 @@ describe('dsh-tool-team', () => {
     const spawned = await execute(ctx, lead, 'spawn_teammate', {
       name: 'cold-worker', description: 'cold worker', prompt: 'finish once',
     })
-    const childId = spawnedChildId(spawned)
+    const childId = spawnedChildId(ctx, lead, spawned)
     await vi.waitFor(() => { expect(ctx.agents.get(childId)).toBeUndefined() }, { timeout: 5_000 })
     await vi.waitFor(() => { expect(adapter.requests.length).toBe(2) }, { timeout: 5_000 })
 
@@ -468,7 +538,7 @@ describe('dsh-tool-team', () => {
       name: 'custom-provider', description: 'custom provider', prompt: 'go',
     })
     expect(result.isError).toBe(false)
-    const childId = spawnedChildId(result)
+    const childId = spawnedChildId(ctx, lead, result)
     await vi.waitFor(() => { expect(ctx.agents.get(childId)).toBeUndefined() }, { timeout: 5_000 })
     expect(ctx.agentTeams.listMembers(lead)[1]).toMatchObject({ provider: 'team-fresh' })
   })

@@ -252,11 +252,11 @@
   en: 3eb5ac28342e354f
   zh: 06735f086cea84f1
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent-control/list-agents:
-  en: 61ca10e524490510
-  zh: 4943a5c5980fc2d3
+  en: 95b9a1b5b2ac7ab0
+  zh: 9e32cdd9d7c8194d
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent-control/send-message:
-  en: e1b3002e60d9a657
-  zh: 7e3cff35fedc6a32
+  en: b4d8ffa51c3c9cce
+  zh: 77587e69e83bc427
 /tool-schema-catalog/deepseek-ai-dsh-tool-jobs:
   en: 9be673b1604d0114
   zh: 9be673b1604d0114
@@ -279,10 +279,10 @@
   en: c3c7af05ceb9f8c9
   zh: ec379e0b42110c6a
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/list-agents:
-  en: a8dd8ced34d10a47
+  en: f9457f033f75f00a
   zh: a2d60ec44118c34c
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/send-message:
-  en: 455e78a918b34d95
+  en: 0a2d0146981a639e
   zh: a8f88ec35cfe38b8
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-agent-team/spawn-teammate:
   en: 02d6cc746e234b99

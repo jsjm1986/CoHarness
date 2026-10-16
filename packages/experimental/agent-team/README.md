@@ -54,7 +54,7 @@ Every ordinary runtime root is the implicit Lead of a Team whose `TeamId` equals
 
 Fresh children have no parent-history seed. Fork children capture the Lead's completed-turn prefix once; the in-flight delegation turn is excluded. Inherited Team records carry the old root's `TeamId` and are ignored when an ordinary fork becomes an independent runtime root. Provider-owned subagents outside the roster do not become nested Team Leads.
 
-The roster reports durable provisioning/failed phases and live `running`/`idle` status. An active but non-resident teammate is `inactive`; later waking delivery cold-resumes it through the continuation owner. Member recovery starts on each member's `agent/created` initialization and runs in the background: creation does not wait for a cold-resumed mailbox queue, because mailbox delivery can already hold that member's serial queue and awaiting it from creation would deadlock.
+The roster reports durable provisioning/failed phases and `running`/`inactive` turn availability — `inactive` covers loaded-between-turns and stored members alike and says nothing about task outcome; later waking delivery cold-resumes a stored member through the continuation owner. Member recovery starts on each member's `agent/created` initialization and runs in the background: creation does not wait for a cold-resumed mailbox queue, because mailbox delivery can already hold that member's serial queue and awaiting it from creation would deadlock.
 
 <a id="durable-mailbox"></a>
 ## Durable mailbox
@@ -100,7 +100,7 @@ Peer messages append after the target's reusable history prefix. Cold resume reu
 - **One process and one shared checkout** — members share cwd and observe edits immediately; this package provides no worktree, remote member, merge, or filesystem lock.
 - **Advisory write scopes** — Bash, formatters, code generators, and direct external writers can bypass filesystem version checks; Leads must coordinate ownership and review the final diff.
 - **Flat immutable roster** — only the Lead creates direct teammates; there is no nested Team, rename, deletion, or name reuse.
-- **No automatic ownership release** — idle, interruption, process exit, and failed work do not release a task owner.
+- **No automatic ownership release** — inactivity, interruption, process exit, and failed work do not release a task owner.
 - **Mailbox is not cross-process exactly-once** — concurrent harness processes over one Team are unsupported.
 
 <a id="dev-note"></a>
