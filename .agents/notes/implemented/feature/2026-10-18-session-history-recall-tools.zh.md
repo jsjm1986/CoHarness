@@ -16,6 +16,12 @@ Status: implemented
 
 `dsh-tool-session-query` 的授权在工作区相等之上叠加项目可读性。新增的 `readableSet` 助手仅在 `collaboration` 服务挂载时调用 `collaboration.capture().readableSessionIds()`，与 session-reference 惯例一致；服务缺位时（个人工作区）`cwd` 规则即完整规则，行为不变。`authorizeTarget` 拒绝不可读目标，`authorizeSessionIds` 将请求的父 id 与可读集合求交，会话搜索按页批量过滤命中项，跟踪投影为全部祖先与后代记录预取一次集合，使不可读节点沿用既有的无 id 边界/子树标记。读取后复核仍校验观测记录是否为已授权目标。
 
+## Consequences
+
+- `standard` 预设挂载五个只读会话工具：每次模型请求增加五个 schema 与固定召回指引。
+- 每份索引文档与查询为每对汉字相邻字符多付一个 `U+200B`；snippet 归一化会剥离该字符，呈现文本不含它。
+- `session_handoff` 在后续变更中加入；本 note 只覆盖五个搜索、血缘与读取工具。
+
 ## Alternatives considered
 
 **汉字 bigram 索引（ZCode 方案）。** 将汉字区段展开为 bigram 只能回答两字查询，覆盖不了三字及以上的子串和汉英混写区段。按字符拆分加短语匹配可统一覆盖任意长度。

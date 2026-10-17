@@ -16,6 +16,12 @@ Mount `tool-session-query` in the `standard` preset; the `sessionQuery` service 
 
 Authorization in `dsh-tool-session-query` layers project readability over workspace equality. A new `readableSet` helper calls `collaboration.capture().readableSessionIds()` only when the `collaboration` service is mounted, mirroring the session-reference convention; when absent (personal workspace) the `cwd` rule is the complete rule and nothing changes. `authorizeTarget` rejects unreadable targets, `authorizeSessionIds` intersects requested parent ids with the readable set, session-search pages filter hits through a per-page batch call, and trace projection prefetches one set for all ancestor and descendant records so unreadable nodes keep the existing no-id boundary/subtree markers. Post-read revalidation keeps checking that the observed record is the authorized target.
 
+## Consequences
+
+- The `standard` preset mounts five read-only session tools: every model request grows by five schemas plus fixed recall guidance.
+- Every indexed document and query pays one extra `U+200B` per Han-adjacent pair; the join never reaches presented text because snippet normalization strips it.
+- `session_handoff` arrived in a follow-up change; this note covers only the five search, trace, and read tools.
+
 ## Alternatives considered
 
 **Han bigram indexing (ZCode's approach).** Expanding Han runs to bigrams answers two-character queries but not three-or-more-character substrings or mixed Han/Latin runs. Per-character splitting with phrase matching covers all lengths uniformly.
