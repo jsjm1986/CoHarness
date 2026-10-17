@@ -161,6 +161,8 @@
       "@deepseek-ai/dsh-client-ui-schedule/client": ["./packages/client/ui-schedule/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-memory/client": ["./packages/client/ui-memory/src/client/index.ts"],
       "@deepseek-ai/dsh-schedule/client": ["./packages/schedule/schedule/src/client.ts"],
+      "@deepseek-ai/dsh-collaboration/types": ["./packages/context/collaboration/src/types.ts"],
+      "@deepseek-ai/dsh-memory/client": ["./packages/memory/memory/src/client.ts"],
       "@deepseek-ai/dsh-experimental-auto-review": ["./packages/experimental/auto-review/src"],
       "@deepseek-ai/dsh-session-log-export/client": ["./packages/session-query/session-log-export/src/client"],
       "@deepseek-ai/node-addon-system/landlock-run": ["./native/system/packages/entry/src/index.ts"],
