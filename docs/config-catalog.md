@@ -2059,7 +2059,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-memory-curation`
 
 - `inject`: `memory`
-- `source`: [`packages/memory/memory-curation/src/index.ts:47`](../packages/memory/memory-curation/src/index.ts)
+- `source`: [`packages/memory/memory-curation/src/index.ts:54`](../packages/memory/memory-curation/src/index.ts)
 
 ```ts config-catalog
 /** Curation scheduling and write budgets. Feature switches live in the `memory` settings namespace. */

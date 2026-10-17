@@ -23,6 +23,10 @@ Port all four, adapted to the typed memory service:
 - Every auxiliary request — the recall selector and both curation loops — resolves the model's lowest advertised reasoning effort via `llm.resolveModelInfo` and caps output at `AUXILIARY_MAX_TOKENS` (5,000). A failed metadata lookup only drops the effort hint.
 - `renderRecallEntry` prefixes entries updated more than a day ago with the same "N days old" point-in-time caution ZCode's content renderer emits.
 
+## Alternatives considered
+
+Keep the harness-local thresholds — any human turn qualifies extraction, any non-empty recall query reaches the selector, auxiliary calls inherit full model options. Rejected: ZCode's gates were tuned against production traffic and dropping them buys nothing but simpler code at a real recall/extraction cost. A CJK tokenizer for the word proxy was also rejected: per-ideograph counting preserves the same admission bar without a dependency.
+
 ## Consequences
 
 Single-word turns and acknowledgements no longer spend selector calls. An agent that already read a memory does not get its summary re-injected. Auxiliary calls cost the cheapest tier the route advertises. ZCode's remaining unported behaviors — a sticky selector conversation and dream-time transcript harvesting — stay deliberately absent: durable key folding already prevents re-selection across compaction, and per-turn extraction already harvests new signal, so consolidation only needs to merge.
