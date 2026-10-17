@@ -2,6 +2,7 @@
 import { expect, it } from 'vitest'
 import type { MemoryScope } from '../src/index.ts'
 import { memoryHarness, agentFor } from './harness.ts'
+import { searchTerms } from '../src/search.ts'
 
 const PERSONAL: MemoryScope = { kind: 'personal' }
 
@@ -87,4 +88,27 @@ it('caps results at searchMaxResults', async () => {
   }
   const hits = await test.service.search([PERSONAL], 'term')
   if (Array.isArray(hits)) expect(hits.length).toBe(2)
+})
+
+it('skips entries outside the searched scopes', async () => {
+  const test = await memoryHarness()
+  const agent = agentFor(test.ctx, 's1', { cwd: '/tmp/w' })
+  await test.service.save(
+    { scope: PERSONAL, kind: 'guidance', summary: 'shared term', content: 'x', key: 'p1' },
+    { kind: 'agent', agent },
+  )
+  await test.service.save(
+    { scope: { kind: 'workspace', directory: '/tmp/w' }, kind: 'guidance', summary: 'shared term', content: 'x', key: 'w1' },
+    { kind: 'agent', agent },
+  )
+  const hits = await test.service.search([PERSONAL], 'shared term')
+  if (Array.isArray(hits)) expect(hits.map(h => h.entry.key)).toEqual(['p1'])
+})
+
+it('drops sub-2-character, duplicate, and lone-CJK terms', () => {
+  expect(searchTerms('fix fix a 中')).toEqual(['fix'])
+})
+
+it('emits bigrams alongside the whole run for 3+ character CJK runs', () => {
+  expect(searchTerms('发布会')).toEqual(['发布会', '发布', '布会'])
 })

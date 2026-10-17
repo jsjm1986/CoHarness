@@ -1,7 +1,7 @@
 /** Memory service: validation bounds, write rules, scope admission, authorization, concurrency. */
 import { expect, it } from 'vitest'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { MemoryRevision, type MemoryScope } from '../src/index.ts'
+import { MemoryKey, MemoryRevision, type MemoryScope } from '../src/index.ts'
 import { agentFor, fakeAuthority, memoryHarness } from './harness.ts'
 
 const PERSONAL: MemoryScope = { kind: 'personal' }
@@ -161,4 +161,38 @@ it('serializes concurrent creates so exactly one wins', async () => {
   const results = [a, b]
   expect(results.filter(r => r.ok).length).toBe(1)
   expect(results.filter(r => !r.ok && r.code === 'memory_exists').length).toBe(1)
+})
+
+// ── direct readers and scope edges ────────────────────────────────────────────
+
+it('brands only pattern-valid keys and resolves malformed reads to undefined', async () => {
+  expect(() => MemoryKey('BAD KEY')).toThrow(TypeError)
+  expect(() => MemoryKey('a'.repeat(65))).toThrow(TypeError)
+  const test = await boot()
+  expect(await test.service.read(PERSONAL, 'BAD KEY')).toBeUndefined()
+  expect(await test.service.read(PERSONAL, 'a'.repeat(65))).toBeUndefined()
+  await test.save({ key: 'ok' })
+  expect((await test.service.read(PERSONAL, 'ok'))?.key).toBe('ok')
+})
+
+it('offers only the shared project scope in project space', async () => {
+  const test = await memoryHarness({ config: { space: 'project' } })
+  const agent = agentFor(test.ctx, 'pc', { cwd: '/x' })
+  expect(test.service.scopesFor(agent)).toEqual([{ kind: 'project' }])
+})
+
+it('carries sshTarget onto the workspace scope', async () => {
+  const test = await boot(undefined, { cwd: '/srv/ws', sshTarget: 3 })
+  expect(test.service.scopesFor(test.agent)).toEqual([
+    { kind: 'personal' },
+    { kind: 'workspace', directory: '/srv/ws', sshTarget: 3 },
+  ])
+})
+
+it('refuses deletes for malformed keys and unavailable scopes', async () => {
+  const test = await boot()
+  expect(await test.service.delete({ scope: PERSONAL, key: 'BAD KEY' }, test.writer))
+    .toMatchObject({ ok: false, code: 'memory_invalid', reason: 'key' })
+  expect(await test.service.delete({ scope: { kind: 'project' }, key: 'x' }, test.writer))
+    .toMatchObject({ ok: false, code: 'memory_invalid', reason: 'scope-unavailable' })
 })

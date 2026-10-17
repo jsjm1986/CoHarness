@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -244,6 +244,200 @@ describe('memory-context', () => {
     expect(decision.kind).toBe('enter')
     if (decision.kind === 'enter') {
       expect(decision.messages.find(m => m.id === pending.id)).toBeUndefined()
+    }
+    await h.ctx.fiber.dispose()
+  })
+
+  it('warns once per session when no frame fits the budget', async () => {
+    const h = await memoryHarness()
+    await h.ctx.plugin(AgentRegistry)
+    await h.ctx.plugin(SystemPrompt)
+    await h.ctx.plugin(ToolRuntime)
+    const warn = vi.spyOn(h.ctx.logger, 'warn')
+    // apply() is the contract the plugin loader invokes; a config below the
+    // schema floor drives the defensive publish-nothing path.
+    MemoryContext.apply(h.ctx, { catalogMaxBytes: 50, delegatedSessions: false })
+    const agent = agentFor(h.ctx, 'ctx-agent', { cwd: '/repo' })
+    const created = await save(h, agent, 'release-freeze')
+    const first = await step(h.ctx, agent)
+    expect(first.catalog).toBeUndefined()
+    expect(warn).toHaveBeenCalledTimes(1)
+
+    const durable = createUserMessage({
+      content: [{ type: 'text', text: 'catalog' }],
+      source: { kind: 'memory-catalog', form: 'catalog', entries: [{ name: 'release-freeze', description: 's', scope: 'personal', memoryKind: 'background', updated: '2026-01-01' }] },
+    })
+    publish(h.ctx, agent, durable)
+    await h.service.delete({ scope: { kind: 'personal' }, key: 'release-freeze', ...(created.ok ? { expectedRevision: created.entry.revision } : {}) }, writer(agent))
+    const second = await step(h.ctx, agent)
+    expect(second.catalog).toBeUndefined()
+    expect(warn).toHaveBeenCalledTimes(1)
+    await h.ctx.fiber.dispose()
+  })
+
+  it('drops a pending catalog proposal when the durable digest still matches', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'ctx-agent', { cwd: '/repo' })
+    await save(h, agent, 'release-freeze')
+    const first = await step(h.ctx, agent)
+    publish(h.ctx, agent, first.catalog!)
+
+    const pending = createUserMessage({
+      content: [{ type: 'text', text: 'stale' }],
+      source: { kind: 'memory-catalog', form: 'catalog', entries: [{ name: 'old', description: 'old', scope: 'personal', memoryKind: 'background', updated: '2026-01-01' }] },
+    })
+    const other = createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } })
+    const decision = await agentEvents(h.ctx, agent).waterfall(
+      'agent/pre-step',
+      { messages: [pending, other], turn: 1, step: 1, signal },
+      () => Promise.resolve({ kind: 'enter' as const, messages: [pending, other] }),
+    )
+    expect(decision.kind).toBe('enter')
+    if (decision.kind === 'enter') {
+      expect(decision.messages.map(m => m.id)).toEqual([other.id])
+    }
+    await h.ctx.fiber.dispose()
+  })
+
+  it('keeps a pending catalog proposal whose digest already matches the store', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'ctx-agent', { cwd: '/repo' })
+    await save(h, agent, 'release-freeze')
+    const listed = await h.service.list({ kind: 'personal' })
+    const entry = listed.find(e => e.key === 'release-freeze')!
+    const pending = createUserMessage({
+      content: [{ type: 'text', text: 'catalog' }],
+      source: {
+        kind: 'memory-catalog',
+        form: 'catalog',
+        entries: [{ name: entry.key, description: entry.summary, scope: 'personal', memoryKind: entry.kind, updated: entry.updated.at.slice(0, 10) }],
+      },
+    })
+    const decision = await agentEvents(h.ctx, agent).waterfall(
+      'agent/pre-step',
+      { messages: [pending], turn: 1, step: 1, signal },
+      () => Promise.resolve({ kind: 'enter' as const, messages: [pending] }),
+    )
+    expect(decision.kind).toBe('enter')
+    if (decision.kind === 'enter') {
+      expect(decision.messages.map(m => m.id)).toEqual([pending.id])
+    }
+    await h.ctx.fiber.dispose()
+  })
+
+  it('replaces a stale pending proposal with the current catalog', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'ctx-agent', { cwd: '/repo' })
+    await save(h, agent, 'release-freeze')
+    const pending = createUserMessage({
+      content: [{ type: 'text', text: 'stale' }],
+      source: { kind: 'memory-catalog', form: 'catalog', entries: [{ name: 'old', description: 'old', scope: 'personal', memoryKind: 'background', updated: '2026-01-01' }] },
+    })
+    const other = createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } })
+    const decision = await agentEvents(h.ctx, agent).waterfall(
+      'agent/pre-step',
+      { messages: [pending, other], turn: 1, step: 1, signal },
+      () => Promise.resolve({ kind: 'enter' as const, messages: [pending, other] }),
+    )
+    expect(decision.kind).toBe('enter')
+    if (decision.kind === 'enter') {
+      expect(decision.messages.map(m => m.id)).toHaveLength(2)
+      expect(decision.messages.find(m => m.id === pending.id)).toBeUndefined()
+      expect(decision.messages.find(m => m.source.kind === 'memory-catalog')?.id).not.toBe(pending.id)
+      expect(decision.messages.find(m => m.id === other.id)).toBeDefined()
+    }
+    await h.ctx.fiber.dispose()
+  })
+
+  it('renders a scope-less block in a single-scope space', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'ctx-agent')
+    await save(h, agent, 'release-freeze')
+    const { text } = await step(h.ctx, agent)
+    expect(text).toContain('<saved_memories>')
+    expect(text).not.toContain('<saved_memories scope=')
+    await h.ctx.fiber.dispose()
+  })
+
+  it('omits tail rows on an update that overruns the budget', async () => {
+    const h = await harness({ catalogMaxBytes: 1024 })
+    const agent = agentFor(h.ctx, 'ctx-agent', { cwd: '/repo' })
+    await save(h, agent, 'release-freeze')
+    const first = await step(h.ctx, agent)
+    publish(h.ctx, agent, first.catalog!)
+    for (let index = 0; index < 8; index += 1) {
+      await save(h, agent, `fact-${index}`, `a fairly long summary line for fact ${index} to consume catalog budget`)
+    }
+    const second = await step(h.ctx, agent)
+    expect(second.catalog).toBeDefined()
+    expect(second.source?.update).toBe(true)
+    expect(second.source?.omitted).toBeGreaterThan(0)
+    await h.ctx.fiber.dispose()
+  })
+
+  it('walks past shadowed, malformed, and foreign-source durable records', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'ctx-agent', { cwd: '/repo' })
+    await save(h, agent, 'release-freeze')
+    const first = await step(h.ctx, agent)
+    const event = agent.session.append('user/message', first.catalog!, { surfaceOp: 'append' })
+    h.ctx.emit('session/event', agent.session, event)
+
+    // A malformed catalog record, a plain user message, and a non-catalog
+    // replacement that shadows the durable catalog all precede it in the log.
+    const malformed = agent.session.append('user/message',
+      createUserMessage({ content: [{ type: 'text', text: 'x' }], source: { kind: 'memory-catalog', form: 'catalog', entries: JSON.parse('"nope"') } }),
+      { surfaceOp: 'append' })
+    h.ctx.emit('session/event', agent.session, malformed)
+    const plain = agent.session.append('user/message',
+      createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } }),
+      { surfaceOp: 'append' })
+    h.ctx.emit('session/event', agent.session, plain)
+    const shadow = agent.session.append('user/message',
+      createUserMessage({ content: [{ type: 'text', text: 'shadow' }], source: { kind: 'user' } }),
+      { surfaceOp: { op: 'replace', startSeq: event.seq, endSeq: event.seq }, sourceEventSeqs: [event.seq] })
+    h.ctx.emit('session/event', agent.session, shadow)
+
+    const second = await step(h.ctx, agent)
+    expect(second.catalog).toBeDefined()
+    expect(second.source?.update).toBe(true)
+    await h.ctx.fiber.dispose()
+  })
+
+  it('ignores pending records whose catalog source fails validation', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'ctx-agent', { cwd: '/repo' })
+    const pendingOf = (source: object) => createUserMessage({
+      content: [{ type: 'text', text: 'x' }],
+      source: source as MemoryCatalogSource,
+    })
+    const validEntry = { name: 'a', description: 'd', scope: 'personal', memoryKind: 'background', updated: 'd' }
+    const malformed = [
+      { kind: 'memory-catalog' },
+      { kind: 'memory-catalog', entries: 'x' },
+      { kind: 'memory-catalog', entries: [], omitted: -1 },
+      { kind: 'memory-catalog', entries: [], omitted: 1.5 },
+      { kind: 'memory-catalog', entries: [42] },
+      { kind: 'memory-catalog', entries: [null] },
+      { kind: 'memory-catalog', entries: [{ ...validEntry, name: 5 }] },
+      { kind: 'memory-catalog', entries: [{ ...validEntry, name: '' }] },
+      { kind: 'memory-catalog', entries: [{ ...validEntry, description: 5 }] },
+      { kind: 'memory-catalog', entries: [{ ...validEntry, scope: 'x' }] },
+      { kind: 'memory-catalog', entries: [{ ...validEntry, memoryKind: 'x' }] },
+      { kind: 'memory-catalog', entries: [{ ...validEntry, updated: 5 }] },
+    ]
+    const messages = [
+      createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } }),
+      ...malformed.map(pendingOf),
+    ]
+    const decision = await agentEvents(h.ctx, agent).waterfall(
+      'agent/pre-step',
+      { messages, turn: 1, step: 1, signal },
+      () => Promise.resolve({ kind: 'enter' as const, messages }),
+    )
+    expect(decision.kind).toBe('enter')
+    if (decision.kind === 'enter') {
+      expect(decision.messages).toHaveLength(messages.length)
     }
     await h.ctx.fiber.dispose()
   })

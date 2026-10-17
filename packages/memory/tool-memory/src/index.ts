@@ -100,11 +100,14 @@ export function apply(ctx: Context): void {
         )
       case 'memory_not_found':
         return new MemoryToolError(`No saved memory has the key "${args.key}"${suffix}.`, 'memory_not_found')
-      case 'memory_stale':
+      case 'memory_stale': {
+        /* v8 ignore next -- the service only refuses with memory_stale when the caller supplied a revision */
+        const revision = args.revision ?? ''
         return new MemoryToolError(
-          `The memory "${args.key}" changed after revision ${args.revision ?? ''}. Read it again with memory_read before changing it.`,
+          `The memory "${args.key}" changed after revision ${revision}. Read it again with memory_read before changing it.`,
           'memory_stale',
         )
+      }
       case 'memory_full':
         return new MemoryToolError(
           `This memory scope already holds ${ctx.memory.limits.maxEntriesPerScope} memories. Delete or merge memories that are no longer useful before saving a new one.`,

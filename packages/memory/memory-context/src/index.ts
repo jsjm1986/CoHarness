@@ -13,7 +13,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { SessionSeq, type UserMessage } from '@deepseek-ai/dsh-session'
+import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type { MemoryEntrySummary, MemoryKind, MemoryScope, MemoryScopeKind } from '@deepseek-ai/dsh-memory'
 import { delegationDepthOf } from '@deepseek-ai/dsh-subagent'
 
@@ -331,18 +331,12 @@ function escapeText(value: string): string {
 function catalogHistory(agent: Agent): { visibleDigest?: string; published: boolean } {
   const visible = new Set(agent.session.surface.nodes)
   let published = false
-  for (let index = agent.session.seq - 1; index >= 0; index -= 1) {
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-    const event = agent.session.eventAt(SessionSeq(index))
-    if (event === undefined) {
-      throw new Error(`memory catalog cannot read seq ${String(index)} below the current Session length`)
-    }
+  for (const event of agent.session.snapshotEvents().toReversed()) {
     if (event.type !== 'user/message' || event.data.source.kind !== 'memory-catalog') continue
     const parsed = readCatalog(event.data.source)
     if (parsed === undefined) continue
-    const digest = digestCatalog(parsed.entries, parsed.omitted)
     published = true
-    if (visible.has(event.seq)) return { visibleDigest: digest, published }
+    if (visible.has(event.seq)) return { visibleDigest: digestCatalog(parsed.entries, parsed.omitted), published }
   }
   return { published }
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { Context } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
+import SessionStore from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -170,5 +172,170 @@ describe('dsh-tool-memory', () => {
     const assembly = await h.ctx.systemPrompt.assemble()
     expect(assembly.sections.find(s => s.name === 'tool:memory')).toBeUndefined()
     await h.ctx.fiber.dispose()
+  })
+  it('throws the fixed wiring error when no agent stands behind a call', async () => {
+    const h = await harness()
+    const result = await h.ctx.tools.execute({
+      signal,
+      callId: ToolCallId(`call-${++callCounter}`),
+      name: 'memory_read',
+      arguments: { scope: 'personal', key: 'k' },
+    })
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toBe('Error: memory tools require a calling agent')
+    await h.ctx.fiber.dispose()
+  })
+
+  it('writes into the session workspace scope and refuses foreign mismatches upstream', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'tool-agent', { cwd: '/repo' })
+    const saved = await call(h.ctx, 'memory_save', { ...saveArgs, scope: 'workspace', key: 'ws-fact' }, agent)
+    expect(saved.isError).toBe(false)
+    expect(textOf(saved)).toMatch(/^Created memory "ws-fact" in the workspace scope \(revision .+\)\.$/)
+    expect(await h.service.read({ kind: 'workspace', directory: '/repo' }, 'ws-fact')).toBeDefined()
+    await h.ctx.fiber.dispose()
+  })
+
+  it('renders memory_not_found, summary, and content refusals verbatim', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'tool-agent', { cwd: '/repo' })
+    const missing = await call(h.ctx, 'memory_save', { ...saveArgs, revision: 'rev-x' }, agent)
+    expect(textOf(missing)).toBe('Error: No saved memory has the key "release-freeze" in the personal scope.')
+    const summary = await call(h.ctx, 'memory_save', { ...saveArgs, summary: 'a\nb' }, agent)
+    expect(textOf(summary)).toBe(`Error: The summary must be one line of 1 to ${h.service.limits.summaryMaxChars} characters.`)
+    const content = await call(h.ctx, 'memory_save', { ...saveArgs, content: '  ' }, agent)
+    expect(textOf(content)).toBe('Error: The content must not be empty and must fit in 8192 bytes of UTF-8.')
+    const gone = await call(h.ctx, 'memory_delete', { scope: 'personal', key: 'absent' }, agent)
+    expect(textOf(gone)).toBe('Error: No saved memory has the key "absent" in the personal scope.')
+    await h.ctx.fiber.dispose()
+  })
+
+  it('searches every offered scope when the scope argument is omitted and refuses empty queries', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'tool-agent', { cwd: '/repo' })
+    await h.service.save({ scope: { kind: 'workspace', directory: '/repo' }, key: 'ws-fact', kind: 'guidance', summary: 'workspace needle', content: 'x' }, { kind: 'agent', agent })
+    const search = await call(h.ctx, 'memory_search', { query: 'needle' }, agent)
+    expect(textOf(search)).toContain('- `ws-fact` (workspace) [guidance,')
+    const empty = await call(h.ctx, 'memory_search', { query: '   ' }, agent)
+    expect(empty.isError).toBe(true)
+    expect(textOf(empty)).toBe('Error: The query must contain at least one word.')
+    await h.ctx.fiber.dispose()
+  })
+
+  it('rethrows non-forbidden failures without rewriting the message', async () => {
+    const h = await harness({
+      space: 'project',
+      authority: fakeAuthority(new Error('service down')),
+    })
+    const agent = agentFor(h.ctx, 'tool-agent', { cwd: '/repo' })
+    const result = await call(h.ctx, 'memory_save', { key: 'team-fact', kind: 'background', summary: 's', content: 'c' }, agent)
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toBe('Error: service down')
+    await h.ctx.fiber.dispose()
+  })
+
+  it('renders updates, diffs, and the scope-free project variants', async () => {
+    const h = await harness({ space: 'project', authority: fakeAuthority({ primaryActorUserId: 3 }) })
+    const agent = agentFor(h.ctx, 'tool-agent', { cwd: '/repo' })
+    const created = await call(h.ctx, 'memory_save', { key: 'team-fact', kind: 'guidance', summary: 'team rule', content: 'v1 body' }, agent)
+    expect(textOf(created)).toMatch(/^Created memory "team-fact" \(revision .+\)\.$/)
+
+    const read = await call(h.ctx, 'memory_read', { key: 'team-fact' }, agent)
+    const readText = textOf(read)
+    expect(readText).toMatch(/^<memory key="team-fact" kind="guidance" /)
+    const revision = /revision="([^"]+)"/.exec(readText)![1]
+
+    const updated = await call(h.ctx, 'memory_save', { key: 'team-fact', kind: 'guidance', summary: 'team rule', content: 'v2 body', revision }, agent)
+    expect(textOf(updated)).toMatch(/^Updated memory "team-fact" \(revision .+\)\.$/)
+
+    const search = await call(h.ctx, 'memory_search', { query: 'team' }, agent)
+    expect(textOf(search)).toContain('- `team-fact` [guidance,')
+    expect(textOf(search)).not.toContain('(project)')
+
+    const reread = textOf(await call(h.ctx, 'memory_read', { key: 'team-fact' }, agent))
+    const current = /revision="([^"]+)"/.exec(reread)![1]
+    const deleted = await call(h.ctx, 'memory_delete', { key: 'team-fact', revision: current }, agent)
+    expect(textOf(deleted)).toBe('Deleted memory "team-fact".')
+    await h.ctx.fiber.dispose()
+  })
+
+  it('presents the save card and result diff through the tool definition', async () => {
+    const h = await harness()
+    const args = { scope: 'personal', key: 'k', kind: 'guidance', summary: 's', content: 'new body' }
+    const save = h.ctx.tools.get('memory_save')!
+    expect(save.presentCall?.(args)).toMatchObject({
+      card: 'diff',
+      title: 'Save memory k',
+      diffs: [{ path: 'memory/personal/k', oldText: null, newText: 'new body' }],
+    })
+    const presentResult = save.presentResult as ((a: unknown, r: unknown) => unknown) | undefined
+    expect(presentResult?.(args, { isError: true })).toBeUndefined()
+    expect(presentResult?.(args, {
+      isError: false,
+      meta: { path: 'memory/personal/k', oldText: 'old', newText: 'new' },
+    })).toMatchObject({ diffs: [{ path: 'memory/personal/k', oldText: 'old', newText: 'new' }] })
+    await h.ctx.fiber.dispose()
+
+    const project = await harness({ space: 'project', authority: fakeAuthority({ primaryActorUserId: 1 }) })
+    const projectSave = project.ctx.tools.get('memory_save')!
+    const projectArgs = { key: 'k', kind: 'guidance', summary: 's', content: 'fallback' }
+    expect(projectSave.presentCall?.(projectArgs))
+      .toMatchObject({ diffs: [{ path: 'memory/project/k', oldText: null, newText: 'fallback' }] })
+    const projectResult = projectSave.presentResult as ((a: unknown, r: unknown) => unknown) | undefined
+    expect(projectResult?.(projectArgs, { isError: false }))
+      .toMatchObject({ diffs: [{ path: 'memory/project/k', oldText: null, newText: 'fallback' }] })
+    await project.ctx.fiber.dispose()
+  })
+
+  it('declares search and read concurrency-safe and hides the guidance when memory_save is restricted', async () => {
+    const h = await harness()
+    const agent = agentFor(h.ctx, 'tool-agent', { cwd: '/repo' })
+    expect(h.ctx.tools.get('memory_search')?.isConcurrencySafe?.({ query: 'q' })).toBe(true)
+    expect(h.ctx.tools.get('memory_read')?.isConcurrencySafe?.({ scope: 'personal', key: 'k' })).toBe(true)
+
+    // A scoped restriction resolves to no memory_save, so the section renders ''.
+    let scope!: Scope
+    await h.ctx.plugin(Object.assign((inner: Context) => { scope = createScope(inner, agent) },
+      { inject: ['tools', 'systemPrompt', 'memory'] }))
+    scope.ctx.tools.restrict({ deny: ['memory_save'] })
+    const assembly = await h.ctx.systemPrompt.assemble({ scope: agent })
+    const section = assembly.sections.find(s => s.name === 'tool:memory')
+    expect(section?.text ?? '').toBe('')
+    await h.ctx.fiber.dispose()
+  })
+
+  it('maps service-side scope refusals and the fallback arm onto tool text', async () => {
+    // resolveScope already filters scopes the tools may name, so the
+    // remaining memory_invalid reasons are exercised through a stub service.
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    const base = {
+      space: 'personal' as const,
+      limits: { entryMaxBytes: 100, summaryMaxChars: 20, maxEntriesPerScope: 10, searchMaxResults: 5 },
+      scopesFor: () => [{ kind: 'personal' as const }],
+      save: async () => ({ ok: false as const, code: 'memory_invalid' as const, reason: 'scope-unavailable' as const }),
+      delete: async () => ({ ok: false as const, code: 'memory_invalid' as const, reason: 'workspace-mismatch' as const }),
+    }
+    let refusal: { ok: false; code: 'memory_invalid'; reason: 'scope-unavailable' | 'workspace-mismatch' | 'query' } =
+      { ok: false, code: 'memory_invalid', reason: 'scope-unavailable' }
+    ctx.provide('memory', { ...base, save: async () => refusal, delete: async () => refusal })
+    const fiber = await ctx.plugin(ToolMemory)
+    const agent = agentFor(ctx, 'tool-agent', { cwd: '/repo' })
+
+    const unavailable = await call(ctx, 'memory_save', saveArgs, agent)
+    expect(textOf(unavailable)).toBe('Error: This conversation has no working directory, so the workspace scope is unavailable.')
+
+    refusal = { ok: false, code: 'memory_invalid', reason: 'workspace-mismatch' }
+    const mismatch = await call(ctx, 'memory_delete', { scope: 'personal', key: 'k' }, agent)
+    expect(textOf(mismatch)).toBe('Error: This conversation can change only the workspace memory of its own working directory.')
+
+    refusal = { ok: false, code: 'memory_invalid', reason: 'query' }
+    const fallback = await call(ctx, 'memory_save', saveArgs, agent)
+    expect(textOf(fallback)).toBe('Error: The memory request was invalid.')
+
+    await fiber.dispose()
+    await ctx.fiber.dispose()
   })
 })
