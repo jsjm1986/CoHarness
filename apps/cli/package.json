@@ -70,6 +70,7 @@
     "@deepseek-ai/dsh-jobs-local": "workspace:*",
     "@deepseek-ai/dsh-launch-environment": "workspace:*",
     "@deepseek-ai/dsh-memory-context": "workspace:*",
+    "@deepseek-ai/dsh-memory-curation": "workspace:*",
     "@deepseek-ai/dsh-mcp-client": "workspace:*",
     "@deepseek-ai/dsh-persona": "workspace:*",
     "@deepseek-ai/dsh-plan-mode": "workspace:*",

@@ -1,0 +1,67 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/memory/memory-curation/README.md
+/:
+  en: f2e21c3ec8ebec76
+  zh: 610ff2190e64272c
+/deepseek-ai-dsh-memory-curation:
+  en: 3bac634ebdf627ba
+  zh: bb7b971db50382c0
+/deepseek-ai-dsh-memory-curation/summary:
+  en: fea7996be56ae322
+  zh: ada89d1a4f7850e5
+/deepseek-ai-dsh-memory-curation/table-of-contents:
+  en: 5db39835773628c9
+  zh: 51054db9dd5a5348
+/deepseek-ai-dsh-memory-curation/configuration:
+  en: 542dc7f319d20e80
+  zh: 6095182146e8bdb7
+/deepseek-ai-dsh-memory-curation/extraction:
+  en: 058d20343afa271c
+  zh: 8c4d009ef0ff7ff7
+/deepseek-ai-dsh-memory-curation/consolidation:
+  en: ab23002706c530fa
+  zh: eef73357bfb88357
+/deepseek-ai-dsh-memory-curation/the-restricted-tool-loop:
+  en: 771870f807cc0f87
+  zh: 4f78052969508352
+/deepseek-ai-dsh-memory-curation/cursors-and-attribution:
+  en: 9ac43a95449831d8
+  zh: eef9c903ecd2c879
+/deepseek-ai-dsh-memory-curation/invariants:
+  en: 6251d4a34132ffb7
+  zh: 96407ce982cc559a
+/deepseek-ai-dsh-memory-curation/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-memory-curation/model-experience/extraction-request:
+  en: 913aabc8e04e2e99
+  zh: f222f6212831e351
+/deepseek-ai-dsh-memory-curation/model-experience/extraction-request/what-the-model-sees:
+  en: b866c9ee596eb7f3
+  zh: d93e9718608bc15f
+/deepseek-ai-dsh-memory-curation/model-experience/extraction-request/token-effect:
+  en: e49d54d19bcfd653
+  zh: 001fc915bdce793a
+/deepseek-ai-dsh-memory-curation/model-experience/extraction-request/kv-cache-effect:
+  en: 529f967e820ca4cb
+  zh: 68d71929e32a363e
+/deepseek-ai-dsh-memory-curation/model-experience/consolidation-request:
+  en: 24df804e9d27624f
+  zh: be3812cfeab5bc55
+/deepseek-ai-dsh-memory-curation/model-experience/consolidation-request/what-the-model-sees:
+  en: 42238af41ca78325
+  zh: 0ae9bbaf101ecfbd
+/deepseek-ai-dsh-memory-curation/model-experience/consolidation-request/token-effect:
+  en: 3f1d8c269f39ec7f
+  zh: 8188816ea232e006
+/deepseek-ai-dsh-memory-curation/model-experience/consolidation-request/kv-cache-effect:
+  en: e2bffc9a82b66b5a
+  zh: 409e5c151a3ca567
+/deepseek-ai-dsh-memory-curation/known-limitations-and-deferred-work:
+  en: 83b89f62cdcca357
+  zh: d80908e33eb90f20
+/deepseek-ai-dsh-memory-curation/known-limitations-and-deferred-work/dev-note:
+  en: 2842600464d91442
+  zh: b8b5326692ee3653

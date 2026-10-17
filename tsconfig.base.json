@@ -398,6 +398,7 @@
       "@deepseek-ai/dsh-mcp-resources": ["./packages/mcp/mcp-resources/src"],
       "@deepseek-ai/dsh-memory": ["./packages/memory/memory/src"],
       "@deepseek-ai/dsh-memory-context": ["./packages/memory/memory-context/src"],
+      "@deepseek-ai/dsh-memory-curation": ["./packages/memory/memory-curation/src"],
       "@deepseek-ai/dsh-message-feedback": ["./packages/feedback/message-feedback/src"],
       "@deepseek-ai/dsh-model-access": ["./packages/llm/model-access/src"],
       "@deepseek-ai/dsh-model-provider-config": ["./packages/llm/model-provider-config/src"],

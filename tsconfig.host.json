@@ -414,6 +414,7 @@
     { "path": "./packages/mcp/mcp-resources" },
     { "path": "./packages/memory/memory" },
     { "path": "./packages/memory/memory-context" },
+    { "path": "./packages/memory/memory-curation" },
     { "path": "./packages/memory/tool-memory" },
     { "path": "./packages/host/apiproxy" },
     { "path": "./packages/host/directory-picker" },

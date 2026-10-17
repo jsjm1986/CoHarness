@@ -3,29 +3,35 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/memory/memory-context/README.md
 /:
-  en: 486acae44a51e17d
-  zh: 51b9928dfb867677
+  en: 178cb0d273c0316e
+  zh: 16cd523b71332f11
 /deepseek-ai-dsh-memory-context:
-  en: dcef28be93d67ac2
-  zh: 81cc94461b467c3e
+  en: b8dfedaa954522af
+  zh: e68d958ba886f91a
 /deepseek-ai-dsh-memory-context/summary:
-  en: 0bc1d609c679e600
-  zh: 3d092f990d17de40
+  en: 3e422c104615c045
+  zh: 3963eaf19b2573a4
 /deepseek-ai-dsh-memory-context/table-of-contents:
-  en: d7b17cd2c8d27b5b
-  zh: 3c1c7e19646530db
+  en: c4cbf1eb9239db12
+  zh: 4a7ff9b6aefe4e30
 /deepseek-ai-dsh-memory-context/configuration:
-  en: e9141dbbccf76c0f
-  zh: 0261bb14ff5053aa
+  en: 83c3c02b8bf68612
+  zh: a180673b0bc42cfd
 /deepseek-ai-dsh-memory-context/publication-semantics:
-  en: 4f4e486529600da3
-  zh: aab35225da470c28
+  en: cb68eecc0e3f636b
+  zh: b555ef79a25e607b
+/deepseek-ai-dsh-memory-context/per-question-recall:
+  en: b81431c71db912c2
+  zh: 40240a3109f4da8f
 /deepseek-ai-dsh-memory-context/catalog-frame:
-  en: 19b1f390ac25d1ae
-  zh: e087511294f9bc31
+  en: 1b8d9f82f2bd7221
+  zh: d101d70485076259
+/deepseek-ai-dsh-memory-context/recall-frame:
+  en: fa0ea0ba26380238
+  zh: cdec7e7e6592dae4
 /deepseek-ai-dsh-memory-context/byte-budget:
-  en: 18d4b2fa134104b5
-  zh: 584586fa987ab869
+  en: 9b9dae56a7718c03
+  zh: 01ccc2421d8fd567
 /deepseek-ai-dsh-memory-context/invariants:
   en: a995ae0700deea02
   zh: a2ae47bc11b44444
@@ -43,10 +49,22 @@
   zh: 0789c8b16e65d1ce
 /deepseek-ai-dsh-memory-context/model-experience/saved-memory-catalog-message/kv-cache-effect:
   en: 631d54d39f6d05e5
-  zh: 8a2c47c03a21a504
+  zh: 7dec4c15c11d5899
+/deepseek-ai-dsh-memory-context/model-experience/recall-selector-and-injected-memory:
+  en: c22e26d319f859c6
+  zh: c22e26d319f859c6
+/deepseek-ai-dsh-memory-context/model-experience/recall-selector-and-injected-memory/what-the-model-sees:
+  en: f81c67e4ff46fa48
+  zh: c085258e4109f11d
+/deepseek-ai-dsh-memory-context/model-experience/recall-selector-and-injected-memory/token-effect:
+  en: d1f3a8186585daeb
+  zh: 579a73997e964640
+/deepseek-ai-dsh-memory-context/model-experience/recall-selector-and-injected-memory/kv-cache-effect:
+  en: ecb5eead1d5473a2
+  zh: 514c327d9ec2a674
 /deepseek-ai-dsh-memory-context/known-limitations-and-deferred-work:
-  en: fda9f6693655b74b
-  zh: cc5a454c4585e0b7
+  en: 2842dbc040f0c328
+  zh: 7a95f2e8cbf83e30
 /deepseek-ai-dsh-memory-context/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

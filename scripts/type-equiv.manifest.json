@@ -2581,6 +2581,11 @@
       "doc": "docs/subsystems/memory.md",
       "symbol": "MemoryInvalidReason",
       "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryCursor",
+      "source": "packages/memory/memory/src/types.ts"
     }
   ]
 }

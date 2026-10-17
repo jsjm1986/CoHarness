@@ -89,6 +89,7 @@ export interface MemorySearchHit {
   readonly score: number
 }
 
+
 /** Validated save input. `expectedRevision` absent means create-only; present means replace-only. */
 export interface MemorySaveRequest {
   scope: MemoryScope
@@ -156,4 +157,25 @@ export interface MemoryScopeRequest {
 export interface MemoryReadRequest {
   readonly scope: MemoryScope
   readonly key: string
+}
+
+/**
+ * One durable curation cursor record in the `cursors` table. Cursors are
+ * keyed by their consumer (`extraction-<sessionId>` for the last reviewed
+ * session seq, `consolidation-<scopeId>` for the last consolidation run in
+ * that scope); each consumer reads only the fields it owns.
+ */
+export interface MemoryCursor {
+  /** Extraction: sequence number of the newest log event the last pass reviewed. */
+  readonly lastSeq?: number | undefined
+  /** Consolidation: ISO-8601 instant of the last committed run in the scope. */
+  readonly lastRunAt?: string | undefined
+  /** Consolidation: content digest of the scope when the last run committed. */
+  readonly lastDigest?: string | undefined
+  /**
+   * Consolidation: writes committed to the scope since the last run. The
+   * service increments this inside the same serialized write as the entry
+   * mutation, so the count survives restarts and plugin reloads.
+   */
+  readonly changedSince?: number | undefined
 }

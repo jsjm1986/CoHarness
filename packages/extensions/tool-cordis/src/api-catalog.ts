@@ -1520,6 +1520,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
+        signature: 'switches(): MemorySwitches',
+        description: 'The resolved curation/recall switches. Consumers read this at each decision point so a live settings change takes effect on the next pass.',
+        parameters: [],
+        returns: 'the active switch values.',
+      },
+      {
         signature: 'scopesFor(agent: Agent): readonly MemoryScope[]',
         description: 'The scopes this space offers a session. `personal` space returns the personal scope plus, when the session header carries `cwd`, the workspace scope keyed by `(cwd, sshTarget)`; `project` space returns the shared project scope only. A disabled `memory` section offers nothing, which empties the injected catalog and refuses every agent write.',
         parameters: [{ name: 'agent', description: 'The session\'s agent.' }],
@@ -1536,6 +1542,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Catalog rows of one scope in catalog order: kind (guidance, profile, background, resource), then `updated.at` desc, then key asc.',
         parameters: [{ name: 'scope', description: 'The scope to list.' }],
         returns: 'the ordered catalog rows (entries without bodies).',
+      },
+      {
+        signature: 'async entries(scope: MemoryScope): Promise<MemoryEntry[]>',
+        description: 'Full entries of one scope in catalog order — the same order as list. Consolidation uses this for its content digest and the whole-scope review input.',
+        parameters: [{ name: 'scope', description: 'The scope to list.' }],
+        returns: 'the ordered entries with bodies.',
       },
       {
         signature: 'async search( scopes: readonly MemoryScope[], query: string, ): Promise<MemorySearchHit[] | { ok: false; code: \'memory_invalid\'; reason: \'query\' }>',
@@ -1584,6 +1596,17 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Remove one entry as the calling member, under the same participant rules as memberSave.',
         parameters: [{ name: 'request', description: 'the delete input.' }],
         returns: 'the removed entry, or a refusal.',
+      },
+      {
+        signature: 'async getCursor(key: string): Promise<MemoryCursor | undefined>',
+        description: 'Read a durable curation cursor by its record key. Cursors live in the memory domain\'s `cursors` table so the service stays the sole write owner; the caller chooses the key via the exported helpers.',
+        parameters: [{ name: 'key', description: 'Cursor record key (see {@link memoryExtractionCursorKey} / {@link memoryConsolidationCursorKey}).' }],
+        returns: 'the stored cursor, if any.',
+      },
+      {
+        signature: 'async writeCursor(key: string, cursor: MemoryCursor): Promise<void>',
+        description: 'Commit a curation cursor, serialized on the same write chain as entry writes so an interleaved save cannot lose the advancement.',
+        parameters: [{ name: 'key', description: 'Cursor record key.' }, { name: 'cursor', description: 'The complete next cursor record.' }],
       },
     ],
   },
@@ -5267,7 +5290,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DeepSeekLlmApiExtensionRequest',
-    declaration: 'export interface DeepSeekLlmApiExtensionRequest {\n    readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>;\n    readonly sessionId?: string;\n    readonly endpoint?: string;\n    readonly purpose?: \'compaction\' | \'session-title\' | \'auto-review\';\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface DeepSeekLlmApiExtensionRequest {\n    readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>;\n    readonly sessionId?: string;\n    readonly endpoint?: string;\n    readonly purpose?: \'compaction\' | \'session-title\' | \'auto-review\' | \'memory\';\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'DeepSeekLlmApiJson',
@@ -5547,7 +5570,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: RequestMessage[];\n    system?: string;\n    tools?: ToolSchema[];\n    toolHistory?: ToolHistory;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'auto-review\';\n}',
+    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: RequestMessage[];\n    system?: string;\n    tools?: ToolSchema[];\n    toolHistory?: ToolHistory;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'auto-review\' | \'memory\';\n}',
   },
   {
     name: 'GenericCallView',
@@ -5966,6 +5989,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface MemoryAttribution {\n    readonly source: \'agent\' | \'extraction\' | \'consolidation\' | \'member\';\n    readonly sessionId?: SessionId;\n    readonly userId?: number;\n    readonly at: string;\n}',
   },
   {
+    name: 'MemoryCursor',
+    declaration: 'export interface MemoryCursor {\n    readonly lastSeq?: number | undefined;\n    readonly lastRunAt?: string | undefined;\n    readonly lastDigest?: string | undefined;\n    readonly changedSince?: number | undefined;\n}',
+  },
+  {
     name: 'MemoryDeleteRequest',
     declaration: 'export interface MemoryDeleteRequest {\n    scope: MemoryScope;\n    key: string;\n    expectedRevision?: MemoryRevision;\n}',
   },
@@ -6022,8 +6049,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface MemorySearchHit {\n    readonly entry: MemoryEntrySummary;\n    readonly excerpt: string;\n    readonly score: number;\n}',
   },
   {
+    name: 'MemorySwitches',
+    declaration: 'export interface MemorySwitches {\n    readonly enabled: boolean;\n    readonly extraction: boolean;\n    readonly consolidation: boolean;\n    readonly recall: boolean;\n}',
+  },
+  {
     name: 'MemoryWriter',
-    declaration: 'export type MemoryWriter = {\n    readonly kind: \'agent\';\n    readonly agent: Agent;\n    readonly signal?: AbortSignal;\n} | {\n    readonly kind: \'member\';\n    readonly participant?: CollaborationParticipant;\n};',
+    declaration: 'export type MemoryWriter = {\n    readonly kind: \'agent\';\n    readonly agent: Agent;\n    readonly signal?: AbortSignal;\n    readonly source?: \'extraction\' | \'consolidation\';\n} | {\n    readonly kind: \'member\';\n    readonly participant?: CollaborationParticipant;\n};',
   },
   {
     name: 'MemoryWriteResult',

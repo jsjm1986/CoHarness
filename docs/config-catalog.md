@@ -1999,7 +1999,7 @@ export interface ReconnectConfig {
 ## `@deepseek-ai/dsh-memory`
 
 - `inject`: `storageDomain`
-- `source`: [`packages/memory/memory/src/index.ts:70`](../packages/memory/memory/src/index.ts)
+- `source`: [`packages/memory/memory/src/index.ts:87`](../packages/memory/memory/src/index.ts)
 
 ```ts config-catalog
 /** Validated service configuration; field docs are the model-facing meaning. */
@@ -2014,6 +2014,12 @@ export interface Config {
   maxEntriesPerScope: number
   /** Search result cap. */
   searchMaxResults: number
+  /** Enable the background extraction curation pass; default off. */
+  extraction: boolean
+  /** Enable the scheduled consolidation curation pass; default off. */
+  consolidation: boolean
+  /** Enable per-question recall injection in `memory-context`; default off. */
+  recall: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory -->
@@ -2024,18 +2030,53 @@ export interface Config {
 ## `@deepseek-ai/dsh-memory-context`
 
 - `inject`: `memory` · `tools`
-- `source`: [`packages/memory/memory-context/src/index.ts:58`](../packages/memory/memory-context/src/index.ts)
+- `source`: [`packages/memory/memory-context/src/index.ts:80`](../packages/memory/memory-context/src/index.ts)
 
 ```ts config-catalog
 /** Model-facing saved-memory catalog configuration. */
 export interface Config {
   /** UTF-8 byte bound of the complete catalog message text, inclusive. */
   catalogMaxBytes: number
-  /** Publish the catalog inside delegated sessions too. */
+  /** Publish the catalog and run recall inside delegated sessions too. */
   delegatedSessions: boolean
+  /** UTF-8 byte bound of one injected recall message, inclusive. */
+  recallMaxBytes: number
+  /** UTF-8 byte bound of one recalled entry's injected content, inclusive. */
+  recallEntryMaxBytes: number
+  /** UTF-8 byte bound of the human-message text shown to the selector, inclusive. */
+  recallInputMaxBytes: number
+  /** UTF-8 byte bound of all recall text injected into one session, inclusive. */
+  recallSessionMaxBytes: number
+  /** Maximum entries one recall may select (selector cap is the same value). */
+  recallMaxSelections: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory-context -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-memory-curation -->
+<a id="deepseek-aidsh-memory-curation"></a>
+
+## `@deepseek-ai/dsh-memory-curation`
+
+- `inject`: `memory`
+- `source`: [`packages/memory/memory-curation/src/index.ts:54`](../packages/memory/memory-curation/src/index.ts)
+
+```ts config-catalog
+/** Curation scheduling and write budgets. Feature switches live in the `memory` settings namespace. */
+export interface Config {
+  /** Maximum `memory_save`/`memory_delete` calls one extraction pass may commit. */
+  extractionMaxWrites: number
+  /** Model-request bound for either pass: one request plus tool rounds. */
+  maxToolRounds: number
+  /** Maximum `memory_save`/`memory_delete` calls one consolidation run may commit. */
+  consolidationMaxWrites: number
+  /** Committed writes in a scope that make it consolidation-eligible. */
+  consolidationMinChanges: number
+  /** Minimum milliseconds between consolidation runs of one scope. */
+  consolidationIntervalMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory-curation -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-message-feedback -->
 <a id="deepseek-aidsh-message-feedback"></a>

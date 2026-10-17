@@ -8,7 +8,7 @@ import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { vi } from 'vitest'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
-import MemoryService, { type Config } from '../src/index.ts'
+import MemoryService, { type Config, type MemorySwitches } from '../src/index.ts'
 
 /** Create isolated services with an in-memory `memory` domain. */
 export async function memoryHarness(options: {
@@ -49,6 +49,20 @@ export function agentFor(
     id: session.id, session, ctx: ctx.extend(), options: {}, status: 'idle', inbox: unsupportedInbox(),
     send() {}, followup: (_m: UserMessage) => {}, steer() {}, inject() {}, cancel() {},
     whenIdle: async () => {}, runMaintenance: operation => operation(new AbortController().signal),
+  }
+}
+
+/** A settings service stub feeding `switches` through the `memory` section's `setSource` hook. */
+export function settingsStub(switches: MemorySwitches) {
+  return {
+    installSection(_ctx: unknown, _ns: unknown, _schema: unknown, _entry: unknown, hooks: {
+      setSource: (source: () => MemorySwitches) => void
+      onChange: () => void
+    }) {
+      hooks.setSource(() => switches)
+      hooks.onChange()
+      return { watch() {} }
+    },
   }
 }
 

@@ -6,11 +6,11 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
@@ -20,8 +20,10 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import MemoryService from '@deepseek-ai/dsh-memory'
 import * as MemoryContext from '../src/index.ts'
+import * as MemoryCuration from '@deepseek-ai/dsh-memory-curation'
 import * as ToolMemory from '@deepseek-ai/dsh-tool-memory'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 
 let root: string | undefined
 const contexts: Context[] = []
@@ -33,7 +35,7 @@ afterEach(async () => {
 })
 
 /** Boot the memory stack's cordis.yml through the real Loader over `storageRoot`. */
-async function boot(storageRoot: string): Promise<Context> {
+async function boot(storageRoot: string, memoryConfig = '{}'): Promise<Context> {
   const configPath = join(root!, 'cordis.yml')
   await writeFile(configPath, [
     "- name: '@deepseek-ai/dsh-session'",
@@ -46,7 +48,9 @@ async function boot(storageRoot: string): Promise<Context> {
     "- name: '@deepseek-ai/dsh-system-prompt'",
     "- name: '@deepseek-ai/dsh-tools'",
     "- name: '@deepseek-ai/dsh-memory'",
+    `  config: ${memoryConfig}`,
     "- name: '@deepseek-ai/dsh-memory-context'",
+    "- name: '@deepseek-ai/dsh-memory-curation'",
     "- name: '@deepseek-ai/dsh-tool-memory'",
     '',
   ].join('\n'))
@@ -66,6 +70,7 @@ async function boot(storageRoot: string): Promise<Context> {
     ['@deepseek-ai/dsh-tools', ToolRuntime],
     ['@deepseek-ai/dsh-memory', MemoryService],
     ['@deepseek-ai/dsh-memory-context', MemoryContext],
+    ['@deepseek-ai/dsh-memory-curation', MemoryCuration],
     ['@deepseek-ai/dsh-tool-memory', ToolMemory],
   ])
   const internal = ctx.loader.internal
@@ -134,5 +139,48 @@ describe('memory loader composition', () => {
     const text = catalog!.content[0]?.type === 'text' ? catalog!.content[0].text : ''
     expect(text).toContain('- `release-freeze` [background,')
     expect((catalog!.source as { entries?: { name: string }[] }).entries?.[0]?.name).toBe('release-freeze')
+  })
+
+  it('runs a loader-composed extraction pass that lands a durable extraction-stamped entry', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-memory-curation-loader-'))
+    const ctx = await boot(join(root, 'storage'), '{ extraction: true }')
+
+    const calls: GenerateOptions[] = []
+    let next = 0
+    ctx.provide('llm', {
+      stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        calls.push(options)
+        next += 1
+        if (next === 1) {
+          return (async function* () {
+            yield { type: 'block-start', index: 0, blockType: 'tool-call' }
+            yield {
+              type: 'tool-call-delta', index: 0, id: ToolCallId('ex-1'), name: 'memory_save',
+              argumentsDelta: JSON.stringify({ key: 'loader-fact', kind: 'background', summary: 'saved through the loader', content: 'durable from a composition test' }),
+            }
+            yield { type: 'finish', reason: { kind: 'stop' } }
+          })()
+        }
+        return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } } })()
+      },
+    } as never)
+
+    const value = await agent(ctx, 'curation-session', '/repo')
+    value.options.provider = 'test-provider'
+    value.options.model = 'test-model'
+    value.session.append('turn/start', { turn: 1 })
+    value.session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'remember the freeze' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    value.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+    await vi.waitFor(async () => {
+      const entry = await ctx.memory.read({ kind: 'personal' }, 'loader-fact')
+      expect(entry?.updated.source).toBe('extraction')
+    })
+    expect(calls.length).toBeGreaterThanOrEqual(1)
+    expect(calls[0]!.purpose).toBe('memory')
+    expect(calls[0]!.sessionId).toBe(value.session.id)
   })
 })

@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/memory/README.md
 /:
-  en: 887fa8ea54258536
-  zh: 9e09aec8a6bc59f6
+  en: 45b152444783a737
+  zh: 6c9c5a42db01ff1e
 /memory-space-scoped-durable-agent-memory:
   en: be65785753625afa
   zh: 7bdaa32d1dbfee13
 /memory-space-scoped-durable-agent-memory/summary:
-  en: 2f2c6b5b475ed027
-  zh: 67d4bf137e120ca4
+  en: 80303e0f02b2c310
+  zh: 7cc01057af6c27f2
 /memory-space-scoped-durable-agent-memory/table-of-contents:
-  en: 16927fd07fa4bdcf
-  zh: aa7981cbb012a76e
+  en: 769e25c7681581e0
+  zh: e7cfb422b7f0688e
 /memory-space-scoped-durable-agent-memory/scope-spaces:
   en: fe62735d48b6c352
   zh: 1c45d0a6529be3f1

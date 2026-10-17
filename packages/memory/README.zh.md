@@ -1,5 +1,5 @@
 ---
-description: "按空间划分作用域的持久代理记忆：代理今天保存的事实，后续会话仍然可见，分为主机侧服务、按会话目录发布器和面向模型的工具"
+description: "按空间划分作用域的持久代理记忆：代理今天保存的事实，后续会话仍然可见，分为主机侧服务、按会话目录发布器、面向模型的工具和可选的策展通道"
 kind: "package-group"
 ---
 # memory/ — 按空间划分作用域的持久代理记忆
@@ -12,14 +12,15 @@ kind: "package-group"
 
 ## 概述
 
-每个会话都从空白的上下文窗口开始。memory 组让代理把小型事实跨会话保存，并按*归属*划作用域：`personal`（关于用户，适用于所有工作区）、`workspace`（某个执行目标上的某个工作目录）或 `project`（受管项目内共享）。条目是 `memory` 存储域中的持久记录；逐会话的目录消息告诉模型现有什么，四个工具管理条目。
+每个会话都从空白的上下文窗口开始。memory 组让代理把小型事实跨会话保存，并按*归属*划作用域：`personal`（关于用户，适用于所有工作区）、`workspace`（某个执行目标上的某个工作目录）或 `project`（受管项目内共享）。条目是 `memory` 存储域中的持久记录；逐会话的目录消息告诉模型现有什么，四个工具管理条目，可选通道从已结束回合中提取记忆、整合各作用域、并按最新问题召回相关条目。
 
 ## 目录
 
 | 包 | ctx 键 | 角色 |
 |---|---|---|
 | [`memory`](memory/README.zh.md) | `ctx.memory` | 主机侧 `MemoryService`：作用域解析、校验、串行化写入、项目授权、有界搜索 |
-| [`memory-context`](memory-context/README.zh.md) | — | `agent/pre-step` 监听器，把已保存记忆目录发布为持久用户消息 |
+| [`memory-context`](memory-context/README.zh.md) | — | `agent/pre-step` 监听器，发布已保存记忆目录并支持可选的逐问题召回 |
+| [`memory-curation`](memory-curation/README.zh.md) | — | 可选的回合末提取通道与按间隔门控的整域整合通道 |
 | [`tool-memory`](tool-memory/README.zh.md) | — | 面向模型的 `memory_search` / `memory_read` / `memory_save` / `memory_delete` 及 `tool:memory` 提示词指引 |
 
 ## 作用域空间

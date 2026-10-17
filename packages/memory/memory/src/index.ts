@@ -18,8 +18,17 @@ import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-sett
 import type { Domain, KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { rankEntries, summaryOf } from './search.ts'
-import { memoryDomain, memoryRecordKey, memoryScopeId, memoryScopePrefix, type MemoryRecord } from './storage.ts'
+import {
+  memoryConsolidationCursorKey,
+  memoryDomain,
+  memoryRecordKey,
+  memoryScopeId,
+  memoryScopePrefix,
+  type MemoryCursorRecord,
+  type MemoryRecord,
+} from './storage.ts'
 import type {
+  MemoryCursor,
   MemoryDeleteRequest,
   MemoryEntry,
   MemoryEntrySummary,
@@ -44,14 +53,22 @@ export * from './types.ts'
  * Remote methods under the captured collaboration participant — an absent
  * participant means a runtime with no collaboration provider, which keeps
  * owner semantics. `signal` is the agent operation's cancellation carried
- * into the project authorization call. Host-only vocabulary: it names the
- * `Agent` runtime type, so it is exported from the service entry rather
- * than the client-safe `./types`.
+ * into the project authorization call; `source` stamps `extraction` or
+ * `consolidation` on curation writes and defaults to `agent`. Host-only
+ * vocabulary: it names the `Agent` runtime type, so it is exported from
+ * the service entry rather than the client-safe `./types`.
  */
 export type MemoryWriter =
-  | { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal }
+  | { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal; readonly source?: 'extraction' | 'consolidation' }
   | { readonly kind: 'member'; readonly participant?: CollaborationParticipant }
-export { memoryDomain, memoryRecordKey, memoryScopeId, memoryScopePrefix } from './storage.ts'
+export {
+  memoryConsolidationCursorKey,
+  memoryDomain,
+  memoryExtractionCursorKey,
+  memoryRecordKey,
+  memoryScopeId,
+  memoryScopePrefix,
+} from './storage.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -78,7 +95,41 @@ export interface Config {
   maxEntriesPerScope: number
   /** Search result cap. */
   searchMaxResults: number
+  /** Enable the background extraction curation pass; default off. */
+  extraction: boolean
+  /** Enable the scheduled consolidation curation pass; default off. */
+  consolidation: boolean
+  /** Enable per-question recall injection in `memory-context`; default off. */
+  recall: boolean
 }
+
+/**
+ * The `memory` settings namespace owns the feature's master switch and the
+ * three user-level curation/recall switches. Composition supplies the base
+ * value; a settings provider may override it live. Curation and recall are
+ * off by default.
+ */
+export const MEMORY_SETTINGS_NAMESPACE = settingsNamespace('memory')
+
+/** Resolved feature switches from the `memory` settings namespace. */
+export interface MemorySwitches {
+  /** `false` hides the scopes from agents and refuses every write; stored entries stay readable. */
+  readonly enabled: boolean
+  /** Turn-end extraction curation pass. */
+  readonly extraction: boolean
+  /** Interval-gated consolidation curation pass. */
+  readonly consolidation: boolean
+  /** Per-question recall injection. */
+  readonly recall: boolean
+}
+
+/** Schema of the `memory` settings section. */
+export const MEMORY_SETTINGS_SCHEMA: z<MemorySwitches> = z.object({
+  enabled: z.boolean().default(true),
+  extraction: z.boolean().default(false),
+  consolidation: z.boolean().default(false),
+  recall: z.boolean().default(false),
+})
 
 /**
  * Validate and brand a key candidate. Throws `TypeError` on an invalid slug —
@@ -102,19 +153,17 @@ export function MemoryRevision(value: string): MemoryRevision {
   return brandString<MemoryRevision>(value)
 }
 
-/** The `memory` settings namespace the Plugins-page card edits. */
-export const MEMORY_SETTINGS_NAMESPACE = settingsNamespace('memory')
-
-/** The `memory` settings section the service owns. */
-export interface MemorySettings {
-  /** `false` hides the scopes from agents and refuses every write; stored entries stay readable. */
-  enabled: boolean
+/**
+ * The recall/extraction word proxy: whitespace-separated tokens plus each
+ * Han ideograph as one unit, so CJK prose measures by characters the same
+ * way Latin prose measures by words. Extraction and recall thresholds
+ * consume this count, not raw length.
+ * @param text - The prose to measure.
+ * @returns the signal-word count.
+ */
+export function memorySignalWordCount(text: string): number {
+  return text.match(/[^\s\p{Script=Han}]+|\p{Script=Han}/gu)?.length ?? 0
 }
-
-/** Schema of the {@link MEMORY_SETTINGS_NAMESPACE} section. */
-export const MEMORY_SETTINGS_SCHEMA: z<MemorySettings> = z.object({
-  enabled: z.boolean().default(true),
-})
 
 /**
  * Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`,
@@ -139,6 +188,9 @@ export default class MemoryService extends TypertRemoteService {
     summaryMaxChars: z.number().step(1).min(20).max(500).default(150),
     maxEntriesPerScope: z.number().step(1).min(1).max(10000).default(200),
     searchMaxResults: z.number().step(1).min(1).max(50).default(10),
+    extraction: z.boolean().default(false),
+    consolidation: z.boolean().default(false),
+    recall: z.boolean().default(false),
   })
 
   /** The space selected at composition (`personal` or `project`). */
@@ -158,8 +210,8 @@ export default class MemoryService extends TypertRemoteService {
   /** Head of the serialized write chain. */
   private writeChain: Promise<unknown> = Promise.resolve()
 
-  /** Authoritative `memory` settings section; the composition entry stands until a scope attaches. */
-  private settings: () => MemorySettings = () => ({ enabled: true })
+  /** Live feature-switch source; falls back to the composition entry. */
+  private switchSource: () => MemorySwitches
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'memory')
@@ -170,13 +222,23 @@ export default class MemoryService extends TypertRemoteService {
       maxEntriesPerScope: config.maxEntriesPerScope,
       searchMaxResults: config.searchMaxResults,
     })
-    installSettingsSection(ctx, MEMORY_SETTINGS_NAMESPACE, MEMORY_SETTINGS_SCHEMA, { enabled: true }, {
+    const entry: MemorySwitches = {
+      enabled: true,
+      extraction: config.extraction,
+      consolidation: config.consolidation,
+      recall: config.recall,
+    }
+    this.switchSource = () => entry
+    installSettingsSection(ctx, MEMORY_SETTINGS_NAMESPACE, MEMORY_SETTINGS_SCHEMA, entry, {
       label: { en: 'Memory', zh: '记忆' },
       owner: 'project',
       projectWrite: 'manager',
-      setSource: (current) => { this.settings = current },
-      // Every read resolves the live source; nothing is derived to re-judge.
-      onChange: () => {},
+      setSource: (source) => {
+        this.switchSource = source
+      },
+      onChange: () => {
+        /* Reads are per-decision through {@link switches}; nothing memoizes. */
+      },
     })
     this.ready = ctx.storageDomain.open(memoryDomain)
     ctx.effect(async () => {
@@ -185,9 +247,23 @@ export default class MemoryService extends TypertRemoteService {
     })
   }
 
+  /**
+   * The resolved curation/recall switches. Consumers read this at each
+   * decision point so a live settings change takes effect on the next pass.
+   * @returns the active switch values.
+   */
+  switches(): MemorySwitches {
+    return this.switchSource()
+  }
+
   /** The open `entries` table. */
-  private async entries(): Promise<KvTable<string, MemoryRecord>> {
+  private async entriesTable(): Promise<KvTable<string, MemoryRecord>> {
     return (await this.ready).table('entries')
+  }
+
+  /** The open `cursors` table. */
+  private async cursorsTable(): Promise<KvTable<string, MemoryCursorRecord>> {
+    return (await this.ready).table('cursors')
   }
 
   /**
@@ -200,7 +276,7 @@ export default class MemoryService extends TypertRemoteService {
    * @returns scopes in catalog order.
    */
   scopesFor(agent: Agent): readonly MemoryScope[] {
-    if (!this.settings().enabled) return []
+    if (!this.switchSource().enabled) return []
     if (this.space === 'project') return [{ kind: 'project' }]
     const header = agent.session.header
     const scopes: MemoryScope[] = [{ kind: 'personal' }]
@@ -221,7 +297,7 @@ export default class MemoryService extends TypertRemoteService {
    */
   async read(scope: MemoryScope, key: string): Promise<MemoryEntry | undefined> {
     if (!KEY_PATTERN.test(key) || key.length > 64) return undefined
-    return (await this.entries()).get(memoryRecordKey(scope, key)) as MemoryEntry | undefined
+    return (await this.entriesTable()).get(memoryRecordKey(scope, key)) as MemoryEntry | undefined
   }
 
   /**
@@ -231,19 +307,20 @@ export default class MemoryService extends TypertRemoteService {
    * @returns the ordered catalog rows (entries without bodies).
    */
   async list(scope: MemoryScope): Promise<MemoryEntrySummary[]> {
-    return (await this.scopeEntries(scope)).map(summaryOf)
+    return (await this.entries(scope)).map(summaryOf)
   }
 
   /**
-   * One scope's stored entries in catalog order: kind (guidance, profile,
-   * background, resource), then `updated.at` desc, then key asc.
-   * @param scope - The scope to read.
-   * @returns the ordered stored entries.
+   * Full entries of one scope in catalog order — the same order as
+   * {@link list}. Consolidation uses this for its content digest and the
+   * whole-scope review input.
+   * @param scope - The scope to list.
+   * @returns the ordered entries with bodies.
    */
-  private async scopeEntries(scope: MemoryScope): Promise<MemoryEntry[]> {
+  async entries(scope: MemoryScope): Promise<MemoryEntry[]> {
     const prefix = memoryScopePrefix(scope)
     const entries: MemoryEntry[] = []
-    for (const [recordKey, entry] of (await this.entries()).entries()) {
+    for (const [recordKey, entry] of (await this.entriesTable()).entries()) {
       if (recordKey.startsWith(prefix)) entries.push(entry as MemoryEntry)
     }
     entries.sort((a, b) =>
@@ -271,7 +348,7 @@ export default class MemoryService extends TypertRemoteService {
     }
     const ids = new Set(scopes.map(scope => memoryScopeId(scope)))
     const entries: MemoryEntry[] = []
-    for (const [recordKey, entry] of (await this.entries()).entries()) {
+    for (const [recordKey, entry] of (await this.entriesTable()).entries()) {
       const scopeId = recordKey.slice(0, recordKey.indexOf('_'))
       if (ids.has(scopeId)) entries.push(entry as MemoryEntry)
     }
@@ -296,7 +373,7 @@ export default class MemoryService extends TypertRemoteService {
       const key = MemoryKey(request.key)
       const recordKey = memoryRecordKey(request.scope, key)
       const userId = await this.authorizeWrite(request.scope, writer)
-      const table = await this.entries()
+      const table = await this.entriesTable()
       const existing = table.get(recordKey) as MemoryEntry | undefined
       if (request.expectedRevision === undefined && existing !== undefined) {
         return { ok: false, code: 'memory_exists' }
@@ -312,7 +389,7 @@ export default class MemoryService extends TypertRemoteService {
       }
       const attribution: MemoryEntry['updated'] = writer.kind === 'agent'
         ? {
-          source: 'agent' as const,
+          source: writer.source ?? 'agent',
           sessionId: writer.agent.id,
           ...(userId !== undefined ? { userId } : {}),
           at: new Date().toISOString(),
@@ -333,6 +410,7 @@ export default class MemoryService extends TypertRemoteService {
         updated: attribution,
       }
       await table.put(recordKey, entry)
+      await this.noteScopeChange(request.scope)
       this.ctx.emit('memory/changed', memoryScopeId(request.scope), entry.key)
       return existing === undefined
         ? { ok: true, operation: 'create', entry }
@@ -357,13 +435,14 @@ export default class MemoryService extends TypertRemoteService {
       }
       const recordKey = memoryRecordKey(request.scope, MemoryKey(request.key))
       await this.authorizeWrite(request.scope, writer)
-      const table = await this.entries()
+      const table = await this.entriesTable()
       const existing = table.get(recordKey) as MemoryEntry | undefined
       if (existing === undefined) return { ok: false, code: 'memory_not_found' }
       if (request.expectedRevision !== undefined && existing.revision !== request.expectedRevision) {
         return { ok: false, code: 'memory_stale' }
       }
       await table.delete(recordKey)
+      await this.noteScopeChange(request.scope)
       this.ctx.emit('memory/changed', memoryScopeId(request.scope), existing.key)
       return { ok: true, operation: 'delete', entry: existing }
     })
@@ -379,22 +458,23 @@ export default class MemoryService extends TypertRemoteService {
    */
   @Remote('scopes')
   async memberScopes(): Promise<MemoryScopeCatalog> {
-    const enabled = this.settings().enabled
+    const enabled = this.switchSource().enabled
     const scopes: MemoryScopeView[] = []
     const view = (scope: MemoryScope, entries: number): MemoryScopeView => ({
       scope, writable: this.memberWritable(scope, enabled), entries,
     })
     if (this.space === 'project') {
-      const table = await this.entries()
+      const table = await this.entriesTable()
       return { enabled, scopes: [view({ kind: 'project' }, this.scopeSize(table, { kind: 'project' }))] }
     }
     const workspaces = new Map<string, { scope: MemoryScope; entries: number }>()
     let personalEntries = 0
-    for (const [, record] of (await this.entries()).entries()) {
+    for (const [, record] of (await this.entriesTable()).entries()) {
       const scope = (record as MemoryEntry).scope
-      if (scope.kind === 'personal') {
-        personalEntries += 1
-      } else if (scope.kind === 'workspace') {
+      /* v8 ignore next -- the write boundary refuses project records into a personal-runtime table. */
+      if (scope.kind !== 'personal' && scope.kind !== 'workspace') continue
+      if (scope.kind === 'personal') personalEntries += 1
+      else {
         const id = memoryScopeId(scope)
         const known = workspaces.get(id)
         if (known === undefined) workspaces.set(id, { scope, entries: 1 })
@@ -417,7 +497,7 @@ export default class MemoryService extends TypertRemoteService {
   @Remote('list')
   async memberList(request: MemoryScopeRequest): Promise<MemoryEntry[]> {
     if (!this.scopeOffered(request.scope)) return []
-    return this.scopeEntries(request.scope)
+    return this.entries(request.scope)
   }
 
   /**
@@ -506,6 +586,42 @@ export default class MemoryService extends TypertRemoteService {
       : participant.scope.kind === 'personal'
   }
 
+  /**
+   * Read a durable curation cursor by its record key. Cursors live in the
+   * memory domain's `cursors` table so the service stays the sole write
+   * owner; the caller chooses the key via the exported helpers.
+   * @param key - Cursor record key (see {@link memoryExtractionCursorKey} / {@link memoryConsolidationCursorKey}).
+   * @returns the stored cursor, if any.
+   */
+  async getCursor(key: string): Promise<MemoryCursor | undefined> {
+    const record = (await this.cursorsTable()).get(key)
+    if (record === undefined) return undefined
+    return { ...record }
+  }
+
+  /**
+   * Commit a curation cursor, serialized on the same write chain as entry
+   * writes so an interleaved save cannot lose the advancement.
+   * @param key - Cursor record key.
+   * @param cursor - The complete next cursor record.
+   */
+  async writeCursor(key: string, cursor: MemoryCursor): Promise<void> {
+    await this.serialize(async () => {
+      await (await this.cursorsTable()).put(key, { ...cursor })
+    })
+  }
+
+  /**
+   * Bump the consolidation `changedSince` counter for one scope inside the
+   * current serialized write. Runs only after the entry mutation commits.
+   */
+  private async noteScopeChange(scope: MemoryScope): Promise<void> {
+    const key = memoryConsolidationCursorKey(scope)
+    const cursors = await this.cursorsTable()
+    const existing = cursors.get(key)
+    await cursors.put(key, { ...existing, changedSince: (existing?.changedSince ?? 0) + 1 })
+  }
+
   /** Queue `work` behind the in-flight write; failures never wedge the chain. */
   private serialize<T>(work: () => Promise<T>): Promise<T> {
     const result = this.writeChain.then(work, work)
@@ -524,7 +640,7 @@ export default class MemoryService extends TypertRemoteService {
    * offers no scope at all.
    */
   private scopeRefusal(scope: MemoryScope, writer: MemoryWriter): MemoryWriteResult | undefined {
-    const available = this.settings().enabled && (this.space === 'project'
+    const available = this.switchSource().enabled && (this.space === 'project'
       ? scope.kind === 'project'
       : scope.kind === 'personal' || scope.kind === 'workspace')
     if (!available) return { ok: false, code: 'memory_invalid', reason: 'scope-unavailable' }
