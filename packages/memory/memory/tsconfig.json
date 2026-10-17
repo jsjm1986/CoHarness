@@ -21,10 +21,19 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../context/collaboration"
+    },
+    {
       "path": "../../context/execution-authority"
     },
     {
+      "path": "../../settings/settings"
+    },
+    {
       "path": "../../storage/storage-domain"
+    },
+    {
+      "path": "../../typert/protocol"
     }
   ]
 }

@@ -66,6 +66,7 @@
     "@deepseek-ai/dsh-client-ui-jobs": "workspace:*",
     "@deepseek-ai/dsh-client-ui-layout": "workspace:*",
     "@deepseek-ai/dsh-client-ui-usage-alert": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-memory": "workspace:*",
     "@deepseek-ai/dsh-client-ui-message-feedback": "workspace:*",
     "@deepseek-ai/dsh-client-ui-model-selection": "workspace:*",
     "@deepseek-ai/dsh-client-ui-permission-presets": "workspace:*",

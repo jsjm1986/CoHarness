@@ -146,12 +146,15 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`, `search`) are lock-free; writes serialize on a single chain inside the service so create/duplicate, revision, and full checks stay atomic.
 
+The `memory/*` Remote methods serve the browser surface: reads are member-wide inside a project runtime, while member writes capture the request's collaboration participant and require `rw` project membership — a runtime with no collaboration provider keeps owner semantics. The `memory` settings section switches the whole feature off: scopes vanish for agents and every write refuses `scope-unavailable`, while stored entries stay readable for the owner.
+
 ```ts cordis-catalog
 /**
  * The scopes this space offers a session. `personal` space returns the
  * personal scope plus, when the session header carries `cwd`, the workspace
  * scope keyed by `(cwd, sshTarget)`; `project` space returns the shared
- * project scope only.
+ * project scope only. A disabled `memory` section offers nothing, which
+ * empties the injected catalog and refuses every agent write.
  * @param agent - The session's agent.
  * @returns scopes in catalog order.
  */
@@ -191,7 +194,7 @@ async search( scopes: readonly MemoryScope[], query: string, ): Promise<MemorySe
  * replace-only (`memory_not_found`, `memory_stale`). Replaces are immune to
  * the scope cap; creates refuse `memory_full` at it.
  * @param request - The save input.
- * @param writer - Who is writing (agent today).
+ * @param writer - Who is writing (agent or member).
  * @returns the committed entry and the replaced record, or a refusal.
  */
 save(request: MemorySaveRequest, writer: MemoryWriter): Promise<MemoryWriteResult>
@@ -205,6 +208,54 @@ save(request: MemorySaveRequest, writer: MemoryWriter): Promise<MemoryWriteResul
  * @returns the removed entry, or a refusal.
  */
 delete(request: MemoryDeleteRequest, writer: MemoryWriter): Promise<MemoryWriteResult>
+
+/**
+ * The member-facing scope catalog. In `personal` space it lists the
+ * personal scope plus every workspace scope that holds entries; in
+ * `project` space the shared project scope alone. Each view answers
+ * whether the calling member may write it, so the browser only offers
+ * edit controls the caller is entitled to.
+ * @returns the scope catalog plus the `memory` section's enabled flag.
+ */
+@Remote('scopes') async memberScopes(): Promise<MemoryScopeCatalog>
+
+/**
+ * Read one scope's entries for the member browser surface. Reads are
+ * member-wide inside a project runtime; a scope the space does not offer
+ * simply has no records, so the answer is an empty list rather than a
+ * refusal.
+ * @param request - the scope to list.
+ * @returns every stored entry, content included, in catalog order.
+ */
+@Remote('list') async memberList(request: MemoryScopeRequest): Promise<MemoryEntry[]>
+
+/**
+ * Read one entry's full body for the member browser surface.
+ * @param request - the scope and raw key to read.
+ * @returns the stored entry, or undefined for a missing or out-of-space key.
+ */
+@Remote('read') async memberRead(request: MemoryReadRequest): Promise<MemoryEntry | undefined>
+
+/**
+ * Create or replace one entry as the calling member. The service
+ * captures the request's collaboration participant itself: `rw` project
+ * membership is required for the project scope, and a runtime with no
+ * collaboration provider keeps owner semantics. Validation, revision,
+ * and capacity refusals return in the ordinary write result; a missing
+ * principal or read-only membership rejects with the shared
+ * `collaboration-forbidden` refusal.
+ * @param request - the save input.
+ * @returns the committed entry and the replaced record, or a refusal.
+ */
+@Remote('save') async memberSave(request: MemorySaveRequest): Promise<MemoryWriteResult>
+
+/**
+ * Remove one entry as the calling member, under the same participant
+ * rules as {@link memberSave}.
+ * @param request - the delete input.
+ * @returns the removed entry, or a refusal.
+ */
+@Remote('delete') async memberDelete(request: MemoryDeleteRequest): Promise<MemoryWriteResult>
 ```
 
 Types: [Agent](core.md)
@@ -229,8 +280,8 @@ Emitted after a memory write commits. Consumers re-read through the service; the
  * @param scope - The scope id of the written entry.
  * @param key - The entry key.
  */
-'memory/changed'(this: Context, scope: string, key: string): void
+'memory/changed'(scope: string, key: string): void
 ```
 
-Source: [`packages/memory/memory/src/index.ts`](../../packages/memory/memory/src/index.ts)
+Source: [`packages/memory/memory/src/types.ts`](../../packages/memory/memory/src/types.ts)
 <!-- END GENERATED cordis-surface -->

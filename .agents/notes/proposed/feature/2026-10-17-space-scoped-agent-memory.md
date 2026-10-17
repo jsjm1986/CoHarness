@@ -81,7 +81,7 @@ Memory files lie outside every sandbox writable root, so under `read-only` and `
 - **Extraction** runs after a turn ends with reason `completed`. It skips a turn that already called `memory_save` or `memory_delete`, a turn without human prose, and a delegated session. Requests are coalesced per session (one running, one pending), and a durable per-session cursor in the memory domain bounds the transcript slice. The request replays the session's last request prefix — system head, surface messages, and the request header's tools, as compaction does in [`buildSummarizationInput`](../../../../packages/compaction/compaction-basic/src/region.ts) to reuse the provider's prefix cache — and appends an extraction instruction listing the current catalog. A bounded tool loop then executes only memory operations and returns every other tool call as an error result.
 - **Consolidation** runs after an extraction pass once a configured interval has elapsed and enough entry changes have accumulated in the scope. It reviews the whole scope to merge near-duplicates, delete contradicted or stale entries, and convert relative dates, with a larger turn bound.
 
-The `memory` settings namespace exposes `extraction`, `consolidation`, and `recall` switches, all off by default, on the Plugins page. With them off, memory changes only when the agent saves deliberately or a person edits it.
+The `memory` settings namespace exposes an `enabled` master switch plus the `extraction`, `consolidation`, and `recall` curation switches on the Plugins page; the curation switches are off by default. With them off, memory changes only when the agent saves deliberately or a person edits it.
 
 ## Per-question recall
 
