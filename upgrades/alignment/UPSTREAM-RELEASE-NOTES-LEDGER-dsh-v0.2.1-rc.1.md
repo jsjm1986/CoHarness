@@ -45,11 +45,14 @@ Session plugin 记录(#5677)、持久 PTC(#5035)、subagent Agent Presets(#4643)
 | 发送消息密钥脱敏 | `client/ui-secret-mask` | UI 重组后需按功能核接入点 |
 | 其余 | `boot/config-editor`、`telemetry/otel`、`host/product-telemetry-otel`、`experimental/{cua,cua-macos,badge-skill-bundle,webworker-packer,webworker-runtime}`、一批 `client/ui-*` 拆分包 | 多为上游内部实验基建 |
 
-## 结构性分歧(待统一决策)
+## 结构性分歧(待统一决策→已裁决)
 
-1. `runtime-diagnostics/invariants`:上游移除全部 `./invariant` 导出;本地保留且 `packages/AGENTS.md` 仍有 invariant 规则(产品诊断面)。
-2. `agent-instructions` 的 `dshHome` 逐行配置:上游已删(改进程 `DSH_HOME` 解析);本地 `config.ts` 保留。
-3. API 层:上游 `api/*-controller` 拆分 vs 本地 `apiproxy`/`gateway-*`;`remote-access` 移植依赖此项。
-4. `preset/agent-preset` + `agent-preset-registry` 声明式包 vs 本地 `agent-presets` 文件发现模型。
-5. #4394 subagent 架构分化。
-6. UI 面未包级定位条目(Agent 创建插件入口、collapse 时机、插件启停依赖同步/热重载、会话 ID 复制、窄窗口布局):UI 审查 12 在场/4 分叉/3 缺失,逐项核对后归入 L 或 N。
+1. `runtime-diagnostics/invariants`:**已裁决=跟随上游移除**(上游 `f028f25667d` 1355 文件删全部 `./invariant` 伴生+门禁;本地 44 个 src/invariant.ts + verify 门禁一并拆除,invariant 覆盖路径按上游 `96371534` 范式补成普通测试)。
+2. `agent-instructions` 的 `dshHome`:**误判,已对齐**——本地 config.ts 与 upstream master 逐字节一致(行级覆盖早已删,`resolveDiscoveryConfig` 保留 owner 注入参数;README 写明"遗留行键被忽略")。
+3. API 层:**已裁决=维持本地 `apiproxy`/`gateway-*` 主权**(upstream-sync.json 已锁 controller 全 replacedBy);`api/remote-access` 按**概念移植**处理——在 `typert-gateway/authorize` 接缝内引入 role/binding/policy 注册表 + per-principal 快照,`collaboration.authorize()` 作权威后端(~10-20 文件),不做 controller 拆分。
+4. preset 模型:**已裁决=执行完整 P5 迁移**(agent-preset + agent-preset-registry 双包,~200 文件;保留 realm split、`trust`/`authorable`/`projectWrite`/`modeSelectionEnabled` 治理字段、`agent-preset/recomposed` 事件;既有批准记录在 upstream-sync.json:1298 与 UPSTREAM-AUDIT-dsh-v0.2.0-rc.1)。
+5. #4394 subagent:**已裁决=补残余语义不迁统一激活**——catalog 加 `mode:'external'` 叶 + `delivery:'caller'` 等价物(~10-20 文件),保留外部可续接 Team 成员(fork 独有能力);subagent 包族 `upstream-sync.json` 记 verified-divergent。
+6. UI 面条目:五名项核算为 在场(Creator 入口、插件生命周期 dep-sync)/分叉(会话ID 条-展开在场复制缺、窄窗-任务在场插件页缺)/缺失(收起时机);全部 UI 缺口裁决为**补齐**(7 项:~2M+4S)。
+7. `ssh-helper-runtime`:**已裁决=全量移植**——`LaunchConfig` 改回上游 `kind:'node-script'|'embedded'` 判别联合 + pkg SEA 打包 + 两工作流适配 fork 管线(远端免 Node 为实质部署收窄)。
+8. rc.1 实验包:**已裁决=全部可移植项引入**(worktree、ui-secret-mask、cot-translation、claude-code-mods、DevTools inspector 组、webworker 对,分批落地);锁定产品包(deepseek-account 账号链、product-telemetry、config-editor)**维持排除**。
+9. rc.2(`dsh-v0.2.1-rc.2`,`687f282`,rc.1+9 提交)增量:web-deepseek-api 新包 + `web` seam search/fetchProvider Volatile 化 + ui-settings-web-search 卡 + `web-search-deepseek` locale + `web/deepseek-search-llm-request` 加 `thinking` + deepseek-fetch 快照场景——**全部直补**;`ui-deepseek-model-label-1017` 临时徽标**裁决=不引入,fork 用自有品牌**。
