@@ -91,7 +91,7 @@ subagent 的子 agent 通过 `composeFrom()` 加入其父方的常驻组装，�
 
 行的**包名**从宿主组装解析，而非从 preset 目录解析。Loader 通常按 entry 所属树的 `baseUrl` 解析，而对 preset 而言那就是组装文件所在之处；本地创作的 preset 位于用户主目录之下，Node 向上查找 `node_modules` 永远够不到 harness，因此每一个 `@deepseek-ai/dsh-*` 行都会导入失败。挂载在插入子树之前先记录宿主的基址，并把裸标识符送往那里。
 
-**相对**路径仍从 preset 自身的目录解析，因此 preset 自带的插件文件与 skill 目录会随它一同迁移。
+**相对**路径仍从 preset 自身的目录解析，因此 preset 自带的插件文件与 skill 目录会随它一同迁移。随发行附带的 `cordis` preset 正是借此挂载其 `skills/` 目录（经 `dsh-skill-filesystem`）：`cordis-plugin-development`（一份简短流程，配按需读取的 `references/` 与可复制的 `templates/` bundle）、`editing-cordis-compositions`，以及 `cordis-composition-reference`——其 `references/packages.md` 由 `scripts/gen-plugin-packages.ts` 生成并在 `doc-sync` 中做新鲜度校验。两个流程类 skill 都要求先读检查结果，再读 `Config.listConfigs` 返回的 `packageDir` 下的包 README，最后才是构建产物 `lib/` 或源码仓库。每个随发行附带的 `SKILL.md` 经 `skill` 工具渲染后的结果都低于 8192 字符——超过该阈值时标准 preset 的 tool-result pruner 会裁切结果。
 
 **绝对**文件系统路径则保留其自身位置。挂载会先将它转换为 `file:` URL 再交给 ESM 导入，从而使 POSIX 路径和 Windows 盘符或 UNC 路径都采用 Node 能够接受的说明符。
 

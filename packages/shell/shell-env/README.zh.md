@@ -7,13 +7,13 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-工具无关的 shell 环境插件：拥有 `ctx.shellEnv` 注册表，管理受信任的、每次执行收集的 `DSH_*` 变量，供模型可见的 shell 工具（`dsh-tool-bash`、`dsh-tool-pwsh`）收集进每次 shell 调用的环境。内置 shell 事实（`DSH_HOME`、`DSH_SHELL=1`、`DSH_SESSION_ID`）归注册表自身所有；其他插件可以注册额外的可枚举事实，注册随插件纤维（fiber）释放，重复所有权或未声明的运行时键会响亮失败。
+工具无关的 shell 环境插件：拥有 `ctx.shellEnv` 注册表，管理受信任的、每次执行收集的 `DSH_*` 变量，供模型可见的 shell 工具（`dsh-tool-bash`、`dsh-tool-pwsh`）收集进每次 shell 调用的环境。内置 shell 事实（`DSH_HOME`、`DSH_SHELL=1`、`DSH_SESSION_ID`、`DSH_PROFILE`、`DSH_PROFILE_DIR`）归注册表自身所有；其他插件可以注册额外的可枚举事实，注册随插件纤维（fiber）释放，重复所有权或未声明的运行时键会响亮失败。
 
 包根导出 Cordis 插件约定（`name`、`inject`、`Config`、`apply`）以及 `ShellEnvRegistry` 服务类及其 contributor 类型；消费方在加载本插件后使用 `ctx.shellEnv`。
 
 ## 概述
 
-`dsh-shell-env` 提供每次模型 shell 调用——bash 或 pwsh——所运行的受信 `DSH_*` 环境：内置事实如 `DSH_HOME`、`DSH_SHELL=1` 与 agent（智能体）的 `DSH_SESSION_ID`。插件作者可以注册自己的事实，带声明键、按每次执行收集，并随插件释放；重复所有权或未声明的运行时键会明确报错，而不是静默覆盖。注册表不会改变模型看到的其他任何内容——shell 工具拥有各自的 schema 与提示词。任何挂载了模型 shell 工具的组合都适合选择它；配置只决定 Harness 主目录。
+`dsh-shell-env` 提供每次模型 shell 调用——bash 或 pwsh——所运行的受信 `DSH_*` 环境：内置事实如 `DSH_HOME`、`DSH_SHELL=1`、agent（智能体）的 `DSH_SESSION_ID`，以及已启动 profile 的 `DSH_PROFILE` 与 `DSH_PROFILE_DIR`。插件作者可以注册自己的事实，带声明键、按每次执行收集，并随插件释放；重复所有权或未声明的运行时键会明确报错，而不是静默覆盖。注册表不会改变模型看到的其他任何内容——shell 工具拥有各自的 schema 与提示词。任何挂载了模型 shell 工具的组合都适合选择它；配置只决定 Harness 主目录。
 
 ## 目录
 
@@ -39,9 +39,9 @@ kind: "package-reference"
 <a id="managed-environment"></a>
 ## Managed environment
 
-每次前台与后台模型 shell 调用都会收到一份新收集的受信任 `DSH_*` 环境。`DSH_HOME` 是由 [`@deepseek-ai/dsh-home-paths`](../../util/home-paths/README.zh.md) 解析的 Harness 主目录绝对路径（`dshHome` 配置，然后环境变量 `$DSH_HOME`，然后 `~/.dsh`），`DSH_SHELL=1` 标识受管理的子进程。带 agent（智能体）的调用额外收到 `DSH_SESSION_ID=agent.session.header.id`；当活动的持久化 seam 定位到 JSONL 工件时，它们还会收到 `DSH_SESSION_JSONL=<绝对目标路径>`。JSONL 路径只是位置提示：首次 flush 之前它可能不存在，也不一定包含当前缓冲中的轮次，并且它不是授权凭据。
+每次前台与后台模型 shell 调用都会收到一份新收集的受信任 `DSH_*` 环境。`DSH_HOME` 是由 [`@deepseek-ai/dsh-home-paths`](../../util/home-paths/README.zh.md) 解析的 Harness 主目录绝对路径（`dshHome` 配置，然后环境变量 `$DSH_HOME`，然后 `~/.dsh`），`DSH_SHELL=1` 标识受管理的子进程。带 agent（智能体）的调用额外收到 `DSH_SESSION_ID=agent.session.header.id`；当活动的持久化 seam 定位到 JSONL 工件时，它们还会收到 `DSH_SESSION_JSONL=<绝对目标路径>`。JSONL 路径只是位置提示：首次 flush 之前它可能不存在，也不一定包含当前缓冲中的轮次，并且它不是授权凭据。当启动器提供了 profile 上下文时，每次调用还会收到 `DSH_PROFILE`（profile 名称）与 `DSH_PROFILE_DIR`（其绝对目录；其 `node_modules` 只保存 profile 安装的包，而 harness 自身的 bundle 从 dsh 安装中解析）；未带 profile 启动的组合会省略这两个变量。
 
-`ctx.shellEnv` 负责收集。其他插件可以注册一个受 effect 作用域约束的 contributor，带有稳定名称、已声明的键/描述以及 `resolve(execution: ToolExecution)`；重复所有权与未声明的运行时键会响亮失败，而 `list()` 只枚举声明、不执行 provider。Harness 内置键保留 `DSH_HOME`、`DSH_SHELL` 与 `DSH_SESSION_ID`；本插件的持久化翻译器通过读取与后端无关的 `sessionPersistence.locate()` seam 拥有 `DSH_SESSION_JSONL`。
+`ctx.shellEnv` 负责收集。其他插件可以注册一个受 effect 作用域约束的 contributor，带有稳定名称、已声明的键/描述以及 `resolve(execution: ToolExecution)`；重复所有权与未声明的运行时键会响亮失败，而 `list()` 只枚举声明、不执行 provider。Harness 内置键保留 `DSH_HOME`、`DSH_SHELL`、`DSH_SESSION_ID`、`DSH_PROFILE` 与 `DSH_PROFILE_DIR`；本插件的持久化翻译器通过读取与后端无关的 `sessionPersistence.locate()` seam 拥有 `DSH_SESSION_JSONL`。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -77,7 +77,7 @@ export function apply(ctx: Context): void {
 <a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
-- **`list()` 只枚举 contributor 声明的变量** — 注册表自有的内置键（`DSH_HOME`、`DSH_SHELL`、`DSH_SESSION_ID`）不包含在内，因此诊断、prompt 或 UI 代码不得把 `list()` 当作完整的环境目录。
+- **`list()` 只枚举 contributor 声明的变量** — 注册表自有的内置键（`DSH_HOME`、`DSH_SHELL`、`DSH_SESSION_ID`、`DSH_PROFILE`、`DSH_PROFILE_DIR`）不包含在内，因此诊断、prompt 或 UI 代码不得把 `list()` 当作完整的环境目录。
 
 **运行时不变式：** 不发布伴生入口。环境注册表会在每次注册和收集时校验所有权与收集值，也不发布可供伴生入口交叉检查的独立快照。
 

@@ -11,6 +11,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-app-boot'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import { ShellEnvRegistry } from '@deepseek-ai/dsh-shell-env'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
@@ -47,6 +48,21 @@ describe('ShellEnvRegistry', () => {
       DSH_SESSION_ID: 'session-a',
       DSH_SHELL: '1',
     })
+  })
+
+  it('collects the launcher-provided profile name and directory when a profile context exists', () => {
+    const ctx = new Context()
+    ctx.provide('profileContext', {
+      name: 'web', dir: '/profiles/web', patchPath: '/profiles/web/cordis.patch.yml', installAnchor: '/dsh/package.json',
+      cwd: '/work', home: '/home', startedBundles: [], overlays: [], telemetryDisabledEnv: undefined,
+    })
+    const registry = new ShellEnvRegistry(ctx, { dshHome: './test-dsh-home' })
+    expect(registry.collect(execution())).toMatchObject({ DSH_PROFILE: 'web', DSH_PROFILE_DIR: '/profiles/web' })
+    expect(() => registry.register({
+      name: 'profile-claimer',
+      variables: { DSH_PROFILE: { description: 'Reserved key.' } },
+      resolve: () => ({}),
+    })).toThrow(/reserved key "DSH_PROFILE"/)
   })
 
   it('resolves DSH_HOME from the ambient override or the user-home default', () => {
