@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-21-experimental-claude-code-mods-extraction.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-21-experimental-claude-code-mods-extraction.md
+/agent-note-experimental-claude-code-mods-extraction-and-deferred-upstream-packages:
+  en: d79f9f8c98146662
+  zh: 09f2c6c6a7fa4421
+/agent-note-experimental-claude-code-mods-extraction-and-deferred-upstream-packages/problem:
+  en: ccaa3d3f02158d42
+  zh: eb8ec8b80bf44a08
+/agent-note-experimental-claude-code-mods-extraction-and-deferred-upstream-packages/decision:
+  en: 6bd551e1bc8a3040
+  zh: 1e1138441c70bf88
+/agent-note-experimental-claude-code-mods-extraction-and-deferred-upstream-packages/alternatives-considered:
+  en: 87423591a2c78ade
+  zh: 097f879b3eb9edcb
+/agent-note-experimental-claude-code-mods-extraction-and-deferred-upstream-packages/consequences:
+  en: 7b045fd227e3603b
+  zh: 07d56ec5a31d4c66
+/agent-note-experimental-claude-code-mods-extraction-and-deferred-upstream-packages/verification:
+  en: e944321eaa2d7bb3
+  zh: 4828a8bc1a96452f
