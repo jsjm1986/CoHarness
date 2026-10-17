@@ -7,9 +7,9 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-Memory browser plugin, browser half: a `main` page reached through a `sidebar.panellist` entry that lists durable memory entries by scope and kind. The page reads the `memory/*` Remote API (`ctx.remote.memory`): `memory/scopes` returns the scopes the runtime offers — personal plus non-empty workspace scopes in a personal runtime, the shared project scope in a project runtime — each with a live entry count and a per-caller `writable` flag, and `memory/list` returns the selected scope's entries. The service reports `enabled` from the `memory` settings section, so the page can explain why every `writable` flag is down while stored entries stay inspectable.
+Memory browser plugin, browser half: a right-Sidebar `memory` tab type registered through `sidebarRightTabs`, opened from its guide entry, that lists durable memory entries on a day-grouped timeline. The tab reads the `memory/*` Remote API (`ctx.remote.memory`): `memory/scopes` returns the scopes the runtime offers — personal plus non-empty workspace scopes in a personal runtime, the shared project scope in a project runtime — each with a live entry count and a per-caller `writable` flag, and `memory/list` returns the selected scope's entries. On the first catalog load the tab prefers the workspace scope whose `directory` equals the on-screen Session's `cwd`, so the panel opens on the context the Agent writes into; a later manual selection survives catalog refreshes. The service reports `enabled` from the `memory` settings section, so the tab can explain why every `writable` flag is down while stored entries stay inspectable.
 
-Rows group by `kind` in catalog order (`guidance`, `profile`, `background`, `resource`) and carry the entry's update time, writer source, member id, short revision, and a preview that expands to the full Markdown body. Client-side search filters on key, summary, and content. Entries attributed to an agent write link to the source conversation through `uiWorkspace.openSession`, gated by the same Session/Workspace feed membership the Schedule page uses. Create, edit, and delete controls render only while the selected scope reports `writable`; the editor fences edits and deletes on the entry's `revision` so a concurrent change surfaces as `memory_stale`. A `memory/changed` forwarded event and every accepted write re-read the catalog and the open scope; an unmounted page holds no Remote subscription.
+Entries group by local update day (newest first) and carry the entry's time, writer source, member id, kind badge, and an expansion that reveals the update timestamp, short revision, and the full Markdown body. Client-side search filters on key, summary, and content. Entries attributed to an agent write link to the source conversation through `uiWorkspace.openSession`, gated by the same Session/Workspace feed membership the Schedule page uses. Create, edit, and delete controls render only while the selected scope reports `writable`; the editor fences edits and deletes on the entry's `revision` so a concurrent change surfaces as `memory_stale`. A `memory/changed` forwarded event and every accepted write re-read the catalog and the open scope; an unsubscribed tab holds no Remote subscription.
 
 A `plugins.item` card binds the `memory` settings namespace through `ctx.settingsScope` and offers the section's only switch, `enabled`, which hides the scopes from agents and refuses every write while the stored entries stay readable.
 
@@ -17,7 +17,7 @@ The `/client` exports are the plugin body (`apply`/`inject`), the source factory
 
 ## Summary
 
-The Web GUI gains a Memory page where a member browses, searches, and — where the service reports the scope writable — edits durable memory in both personal and project spaces, plus a Plugins-page card that switches the whole feature off.
+The Web GUI gains a Memory right-Sidebar tab where a member browses, searches, and — where the service reports the scope writable — edits durable memory in both personal and project spaces, plus a Plugins-page card that switches the whole feature off.
 
 ## Table of Contents
 

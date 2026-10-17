@@ -333,8 +333,8 @@
     - id: ui-project-activity
       name: '@deepseek-ai/dsh-client-ui-project-activity'
 
-    # Durable memory browser: the Memory main panel listing scoped entries,
-    # its sidebar entry, and the `memory` card on the Plugins page.
+    # Durable memory browser: the right-Sidebar Memory tab listing scoped
+    # entries, and the `memory` card on the Plugins page.
     - id: ui-memory
       name: '@deepseek-ai/dsh-client-ui-memory'
 

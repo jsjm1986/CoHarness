@@ -93,6 +93,37 @@ describe('createMemorySource', () => {
     })
   })
 
+  it('prefers the workspace scope matching the session directory on first load', async () => {
+    const test = harness({
+      scopes: vi.fn(async () => ({
+        ok: true as const,
+        value: catalog([
+          { scope: { kind: 'personal' }, writable: true, entries: 0 },
+          { scope: { kind: 'workspace', directory: '/repo/a' }, writable: true, entries: 2 },
+          { scope: { kind: 'workspace', directory: '/repo/b' }, writable: true, entries: 1 },
+        ]),
+      })),
+      sessionDirectory: () => '/repo/b',
+    })
+    await subscribed(test, async () => {
+      expect(test.hook.getSnapshot().selected).toBe(scopeKeyOf({ kind: 'workspace', directory: '/repo/b' }))
+      await vi.waitFor(() => {
+        expect(test.deps.list).toHaveBeenCalledWith({ kind: 'workspace', directory: '/repo/b' })
+      })
+    })
+  })
+
+  it('keeps a manual selection through catalog reloads', async () => {
+    const test = harness({ sessionDirectory: () => '/repo/b' })
+    await subscribed(test, async () => {
+      test.source.select('project')
+      expect(test.hook.getSnapshot().selected).toBe('project')
+      test.listeners.changed.forEach(listener => listener())
+      await vi.waitFor(() => { expect(test.deps.scopes).toHaveBeenCalledTimes(2) })
+      expect(test.hook.getSnapshot().selected).toBe('project')
+    })
+  })
+
   it('reports an error snapshot when the catalog read fails', async () => {
     const test = harness({
       scopes: vi.fn(async () => ({

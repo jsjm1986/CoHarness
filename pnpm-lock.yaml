@@ -3524,18 +3524,15 @@ importers:
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: workspace:*
         version: link:../ui-conversation
-      '@deepseek-ai/dsh-client-ui-layout':
-        specifier: workspace:*
-        version: link:../ui-layout
       '@deepseek-ai/dsh-client-ui-plugin-manager':
         specifier: workspace:*
         version: link:../ui-plugin-manager
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:*
         version: link:../ui-primitives
-      '@deepseek-ai/dsh-client-ui-sidebar':
+      '@deepseek-ai/dsh-client-ui-sidebar-right':
         specifier: workspace:*
-        version: link:../ui-sidebar
+        version: link:../ui-sidebar-right
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:*
         version: link:../ui-slots

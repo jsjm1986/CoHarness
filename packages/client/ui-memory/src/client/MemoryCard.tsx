@@ -4,7 +4,7 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 // Type-only: merges the Plugins page's `plugins.item` contract.
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { MemoryCardFace } from './memory-card-controller.ts'
-import css from './MemoryPage.module.css'
+import css from './MemoryCard.module.css'
 
 /** Props the renderer binds for the Memory card. */
 export type MemoryCardProps =

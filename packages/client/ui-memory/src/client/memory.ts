@@ -87,6 +87,39 @@ export function filterEntries(entries: readonly MemoryEntry[], query: string): M
     || entry.content.toLowerCase().includes(needle))
 }
 
+/** One rendered timeline section: a day key plus its entries, newest first. */
+export interface MemoryDaySection {
+  /** `YYYY-MM-DD` of the section's day, used as the React key and the today check. */
+  readonly day: string
+  readonly rows: readonly MemoryEntry[]
+}
+
+/** The local `YYYY-MM-DD` of an attribution timestamp, for day grouping. */
+function dayOf(iso: string): string {
+  const date = new Date(iso)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+/**
+ * Group entries into day sections newest-first for the timeline tab. Entries
+ * sort by `updated.at` descending inside and across sections; equal stamps
+ * keep catalog order.
+ * @param entries - scope entries already filtered by search.
+ * @returns day sections newest-first.
+ */
+export function groupEntriesByDay(entries: readonly MemoryEntry[]): MemoryDaySection[] {
+  const sorted = [...entries].sort((a, b) => Date.parse(b.updated.at) - Date.parse(a.updated.at))
+  const byDay = new Map<string, MemoryEntry[]>()
+  for (const entry of sorted) {
+    const day = dayOf(entry.updated.at)
+    const rows = byDay.get(day)
+    if (rows === undefined) byDay.set(day, [entry])
+    else rows.push(entry)
+  }
+  return [...byDay].map(([day, rows]) => ({ day, rows }))
+}
+
 /**
  * Find the scope view carrying `key`, falling back to the first offered scope.
  * @param views - the catalog's scope list.

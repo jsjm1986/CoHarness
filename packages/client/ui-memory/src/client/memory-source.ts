@@ -22,6 +22,13 @@ export interface MemorySourceDeps {
   readonly subscribeReset: (listener: () => void) => () => void
   /** Open one entry's source Session, when the row offers it. */
   readonly openSource: (sessionId: SessionId) => void
+  /**
+   * The on-screen Session's working directory, when it has one. A catalog
+   * arriving with no prior selection prefers the workspace scope whose
+   * `directory` matches, so the panel opens on the context the Agent writes
+   * into; other scopes stay one switch away.
+   */
+  readonly sessionDirectory?: () => string | undefined
 }
 
 /** What the page renders: the catalog, the selected scope, and its entries. */
@@ -106,9 +113,13 @@ export function createMemorySource(deps: MemorySourceDeps): MemoryInjected {
       return
     }
     const catalog = result.value
+    const directory = deps.sessionDirectory?.()
+    const contextual = directory === undefined
+      ? undefined
+      : catalog.scopes.find(view => view.scope.kind === 'workspace' && view.scope.directory === directory)
     const selected = catalog.scopes.some(view => scopeKeyOf(view.scope) === snapshot.selected)
       ? snapshot.selected
-      : scopeKeyOf(catalog.scopes[0]?.scope ?? { kind: 'personal' })
+      : scopeKeyOf((contextual ?? catalog.scopes[0])?.scope ?? { kind: 'personal' })
     publish({
       ...snapshot,
       status: 'ready',

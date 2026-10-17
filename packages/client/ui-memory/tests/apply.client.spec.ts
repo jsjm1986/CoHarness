@@ -1,4 +1,4 @@
-/** ui-memory apply: dictionaries, the three slot seats, and the Remote wiring. */
+/** ui-memory apply: dictionaries, the right-Sidebar tab registration, and the Remote wiring. */
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { apply, inject } from '../src/client/index.ts'
@@ -10,13 +10,14 @@ interface Recorded {
   key?: string
   order?: number
   locale?: string
-  inject?: () => unknown
+  inject?: (sessionId?: string) => unknown
   component: unknown
 }
 
 async function boot(options: {
   scopes?: () => Promise<unknown>
   list?: () => Promise<unknown>
+  cwd?: string
 } = {}) {
   const ctx = new Context()
   const registered: Recorded[] = []
@@ -52,7 +53,17 @@ async function boot(options: {
   }
   const settingsScope = { bind: vi.fn(() => scope) }
   const uiWorkspace = { openSession: vi.fn(), startSession: vi.fn() }
-  const sessions = { keyFor: (id: string) => id }
+  const sessions = {
+    keyFor: (id: string) => id,
+    list: { getSnapshot: () => ({ byId: options.cwd === undefined ? {} : { s1: { cwd: options.cwd } } }) },
+  }
+  const tabTypes: unknown[] = []
+  const sidebarRightTabs = {
+    register: vi.fn((definition: unknown) => {
+      tabTypes.push(definition)
+      return () => { tabTypes.splice(tabTypes.indexOf(definition), 1) }
+    }),
+  }
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
   ctx.provide('remote', remote as never)
@@ -60,9 +71,10 @@ async function boot(options: {
   ctx.provide('settingsScope', settingsScope as never)
   ctx.provide('uiWorkspace', uiWorkspace as never)
   ctx.provide('sessions', sessions as never)
+  ctx.provide('sidebarRightTabs', sidebarRightTabs as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
-  return { ctx, registered, dictionaries, api, on, settingsScope, uiWorkspace, fiber }
+  return { ctx, registered, dictionaries, api, on, settingsScope, uiWorkspace, fiber, tabTypes }
 }
 
 describe('ui-memory apply', () => {
@@ -71,16 +83,23 @@ describe('ui-memory apply', () => {
     expect(dictionaries.get('memory')).toEqual({ zh, en })
   })
 
-  it('registers the main page, sidebar entry, and plugins card', async () => {
-    const { registered } = await boot()
-    const main = registered.find(entry => entry.name === 'main')
-    expect(main?.key).toBe('memory')
-    expect(main?.locale).toBe('memory')
-    const panel = registered.find(entry => entry.name === 'sidebar.panellist')
-    expect(panel?.id).toBe('memory')
+  it('registers the right-Sidebar tab type, its body seat, and the plugins card', async () => {
+    const { registered, tabTypes } = await boot()
+    const type = tabTypes[0] as { id: string; kind: string; priority: string; guide: unknown[] }
+    expect(type).toMatchObject({
+      id: '@deepseek-ai/dsh-client-ui-memory',
+      kind: 'memory',
+      priority: 'builtin',
+    })
+    expect(type.guide).toHaveLength(1)
+    const body = registered.find(entry => entry.name === 'sidebar.right.pane.tab')
+    expect(body?.key).toBe('@deepseek-ai/dsh-client-ui-memory')
+    expect(body?.locale).toBe('memory')
     const card = registered.find(entry => entry.name === 'plugins.item')
     expect(card?.id).toBe('memory')
     expect(card?.locale).toBe('memory')
+    expect(registered.find(entry => entry.name === 'main')).toBeUndefined()
+    expect(registered.find(entry => entry.name === 'sidebar.panellist')).toBeUndefined()
   })
 
   it('binds the card to the memory settings namespace', async () => {
@@ -88,10 +107,10 @@ describe('ui-memory apply', () => {
     expect(settingsScope.bind).toHaveBeenCalledWith({ namespace: 'memory' })
   })
 
-  it('loads the catalog when the page face is subscribed', async () => {
+  it('loads the catalog when the tab face is subscribed', async () => {
     const { registered, api } = await boot()
-    const main = registered.find(entry => entry.name === 'main')
-    const face = main?.inject?.() as {
+    const body = registered.find(entry => entry.name === 'sidebar.right.pane.tab')
+    const face = body?.inject?.('s1') as {
       hooks: { memory: { subscribe: (l: () => void) => () => void; getSnapshot: () => { status: string } } }
     }
     const unsubscribe = face.hooks.memory.subscribe(() => {})

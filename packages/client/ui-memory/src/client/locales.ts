@@ -1,11 +1,13 @@
 /** Localized copy for the Memory page and its Plugins-page card. */
 const zh = {
-  'panel': '记忆',
-  'title': '记忆',
-  'description': '跨会话保留的事实，按作用域与类型整理',
   'scope.personal': '个人',
   'scope.project': '项目',
+  'scope.workspace': '工作区',
   'scope.entries': '{count} 条',
+  'scope.switch': '选择作用域',
+  'day.today': '今天',
+  'guide.title': '记忆',
+  'guide.description': '浏览与管理跨会话记忆',
   'disabled.notice': '记忆功能已关闭。可以在「插件」页的记忆卡片中重新开启。',
   'search.placeholder': '搜索记忆',
   'toolbar.refresh': '刷新',
@@ -56,12 +58,14 @@ const zh = {
 
 /** English copy, keyed identically to {@link zh}. */
 const en: typeof zh = {
-  'panel': 'Memory',
-  'title': 'Memory',
-  'description': 'Facts that survive sessions, organized by scope and kind',
   'scope.personal': 'Personal',
   'scope.project': 'Project',
+  'scope.workspace': 'Workspace',
   'scope.entries': '{count}',
+  'scope.switch': 'Choose scope',
+  'day.today': 'Today',
+  'guide.title': 'Memory',
+  'guide.description': 'Browse and edit durable memory',
   'disabled.notice': 'Memory is off. Re-enable it from the Memory card on the Plugins page.',
   'search.placeholder': 'Search memory',
   'toolbar.refresh': 'Refresh',
