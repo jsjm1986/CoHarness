@@ -8,6 +8,7 @@ import goalsRemote from '@deepseek-ai/dsh-goal/remote'
 import llmRemote from '@deepseek-ai/dsh-llm/remote'
 import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
 import scheduleRemote from '@deepseek-ai/dsh-schedule/remote'
+import memoryRemote from '@deepseek-ai/dsh-memory/remote'
 import fileReferencesRemote from '@deepseek-ai/dsh-file-reference/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import pluginManagerRemote from '@deepseek-ai/dsh-plugin-manager/remote'
@@ -41,6 +42,7 @@ export type {} from '@deepseek-ai/dsh-permission-presets/remote'
 export type {} from '@deepseek-ai/dsh-command-feedback/remote'
 export type {} from '@deepseek-ai/dsh-session-reference/remote'
 export type {} from '@deepseek-ai/dsh-schedule/remote'
+export type {} from '@deepseek-ai/dsh-memory/remote'
 export type {} from '@deepseek-ai/dsh-subagent/remote'
 export type * from '@deepseek-ai/dsh-subagent/client'
 // The forwarded-event allowlist's selection seat: without it in the consumer's
@@ -58,6 +60,7 @@ export type {} from '@deepseek-ai/dsh-command-feedback/types'
 export type {} from '@deepseek-ai/dsh-collaboration/types'
 export type {} from '@deepseek-ai/dsh-permission-presets/types'
 export type {} from '@deepseek-ai/dsh-schedule/client'
+export type {} from '@deepseek-ai/dsh-memory/client'
 export type {} from '@deepseek-ai/dsh-settings/types'
 
 /**
@@ -157,7 +160,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
-      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, pluginRegistryProbeRemote, messageFeedbackRemote,
+      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, pluginRegistryProbeRemote, memoryRemote, messageFeedbackRemote,
       permissionPresetsRemote, sessionFeedbackRemote,
       sessionReferencesRemote, subagentsRemote, scheduleRemote, userQuestionsRemote,
     ]) {

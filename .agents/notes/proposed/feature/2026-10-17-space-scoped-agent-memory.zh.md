@@ -81,7 +81,7 @@ kind 闭集为 `profile`（用户或团队是谁：角色、专长、偏好）�
 - **提取（extraction）** 在回合以 `completed` 原因结束后运行。已调用 `memory_save` 或 `memory_delete` 的回合、没有人类正文的回合以及委派会话都跳过。请求按会话合并（一个运行、一个挂起），记忆域中持久的每会话游标限定转录切片。请求重放会话上一次请求的前缀——system 头、surface 消息和请求头中的工具，与 compaction 在 [`buildSummarizationInput`](../../../../packages/compaction/compaction-basic/src/region.ts) 中复用 provider 前缀缓存的做法相同——并追加列出当前目录的提取指令。随后一个有界工具循环只执行记忆操作，其他工具调用一律作为错误结果返回。
 - **整理（consolidation）** 在一次提取 pass 之后运行，前提是距上次已过配置的间隔且该作用域积累了足够的条目变更。它审视整个作用域，合并近似重复、删除被推翻或过期的条目、转换相对日期，并使用更大的轮次上限。
 
-`memory` 设置命名空间在插件页提供 `extraction`、`consolidation` 与 `recall` 三个开关，默认全部关闭。关闭时，记忆只会因 agent 主动保存或有人编辑而改变。
+`memory` 设置命名空间在插件页提供一个 `enabled` 总开关，以及 `extraction`、`consolidation` 与 `recall` 三个整理开关；整理开关默认全部关闭。关闭时，记忆只会因 agent 主动保存或有人编辑而改变。
 
 ## Per-question recall
 

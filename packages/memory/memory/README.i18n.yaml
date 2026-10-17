@@ -12,8 +12,8 @@
   en: b189b438560b8161
   zh: 8ece7d663454c179
 /deepseek-ai-dsh-memory/table-of-contents:
-  en: bcbd9cef92956540
-  zh: 77bc4d05ce819450
+  en: e309b67bfbef9a22
+  zh: 822abb29805734bb
 /deepseek-ai-dsh-memory/configuration:
   en: 76f59bd6bf403f0e
   zh: af96d4b36bf77f05
@@ -21,8 +21,11 @@
   en: 859d5174d6700b18
   zh: a3d7dfe5d22d6106
 /deepseek-ai-dsh-memory/write-rules:
-  en: 8c40b1a332c5f1d8
-  zh: 3f921f1f58c54607
+  en: 8aaba5f7bb01c597
+  zh: 5f1e2f9887d3d640
+/deepseek-ai-dsh-memory/member-remote-surface:
+  en: ca968cfa7c396a02
+  zh: b1de11852a21170d
 /deepseek-ai-dsh-memory/storage:
   en: c40bd8f3e5a6882b
   zh: 9f2b494840ad8c56
@@ -42,8 +45,8 @@
   en: 785472418f32e1b1
   zh: 2b8954e94f015120
 /deepseek-ai-dsh-memory/known-limitations-and-deferred-work:
-  en: 09e5d733ebdf4a21
-  zh: 075922549eb773a5
+  en: cc18f33887a210d0
+  zh: 5f40923ed14164ea
 /deepseek-ai-dsh-memory/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

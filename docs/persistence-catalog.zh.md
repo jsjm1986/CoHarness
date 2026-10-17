@@ -7540,7 +7540,7 @@ SHA-256: `db7040128684f54c7c6cb2bd529e623f49f345d07786017a8f9bb5cbe253f422`
 
 SHA-256: `2e33b9307a72edc572a8eb86ae9720c7c2e2c415e61830cca1faa39e8fab354e`
 
-来源：[`packages/memory/memory/src/types.ts:37`](../packages/memory/memory/src/types.ts)
+来源：[`packages/memory/memory/src/types.ts:49`](../packages/memory/memory/src/types.ts)
 
 以下类型之一：
 
@@ -7555,7 +7555,7 @@ SHA-256: `2e33b9307a72edc572a8eb86ae9720c7c2e2c415e61830cca1faa39e8fab354e`
 
 SHA-256: `d21a48b908a626ca2315cd5c391ffc047e1fac90f5954e3e3b6a0d73cfe98980`
 
-来源：[`packages/memory/memory/src/types.ts:16`](../packages/memory/memory/src/types.ts)
+来源：[`packages/memory/memory/src/types.ts:28`](../packages/memory/memory/src/types.ts)
 
 以下类型之一：
 

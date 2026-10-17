@@ -5,8 +5,20 @@
  */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Emitted after a memory write commits. Consumers re-read through the
+     * service; the payload names the touched scope id and key only.
+     * @mode emit
+     * @param scope - The scope id of the written entry.
+     * @param key - The entry key.
+     */
+    'memory/changed'(scope: string, key: string): void
+  }
+}
 
 /**
  * Which scope families a runtime offers, selected by the `space` config:
@@ -77,13 +89,6 @@ export interface MemorySearchHit {
   readonly score: number
 }
 
-/**
- * Who is writing. The union is open for later writer kinds (members editing
- * in the browser); only `agent` exists today. `signal` is the operation's
- * cancellation carried into the project authorization call.
- */
-export type MemoryWriter = { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal }
-
 /** Validated save input. `expectedRevision` absent means create-only; present means replace-only. */
 export interface MemorySaveRequest {
   scope: MemoryScope
@@ -112,7 +117,43 @@ export type MemoryRefusalCode = 'memory_exists' | 'memory_not_found' | 'memory_s
  */
 export type MemoryWriteResult =
   | { readonly ok: true; readonly operation: 'create' | 'update' | 'delete'; readonly entry: MemoryEntry; readonly previous?: MemoryEntry }
-  | { readonly ok: false; readonly code: MemoryRefusalCode; readonly reason: MemoryInvalidReason | undefined }
+  | { readonly ok: false; readonly code: MemoryRefusalCode; readonly reason?: MemoryInvalidReason }
 
 /** Which write rule rejected a `memory_invalid` request; set only for that code. */
 export type MemoryInvalidReason = 'key' | 'summary' | 'content' | 'query' | 'scope-unavailable' | 'workspace-mismatch'
+
+/**
+ * One scope as the member-facing browser surface sees it: the addressing
+ * unit, whether the calling member may create, edit, and delete inside it,
+ * and its live entry count. `writable` is `false` for a read-only project
+ * member, for a member call without a bound request principal, and while
+ * the `memory` settings section disables the feature.
+ */
+export interface MemoryScopeView {
+  readonly scope: MemoryScope
+  readonly writable: boolean
+  readonly entries: number
+}
+
+/**
+ * The scope catalog the `memory/scopes` Remote method serves. `enabled`
+ * mirrors the `memory` settings section so the browser can explain why
+ * every `writable` flag is down; in a `personal` runtime `scopes` lists
+ * the personal scope plus each workspace scope that holds entries, and in
+ * a `project` runtime it lists the shared project scope alone.
+ */
+export interface MemoryScopeCatalog {
+  readonly enabled: boolean
+  readonly scopes: readonly MemoryScopeView[]
+}
+
+/** Wire request selecting one scope for the member `list` method. */
+export interface MemoryScopeRequest {
+  readonly scope: MemoryScope
+}
+
+/** Wire request selecting one entry for the member `read` method. */
+export interface MemoryReadRequest {
+  readonly scope: MemoryScope
+  readonly key: string
+}

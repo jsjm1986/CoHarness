@@ -2555,7 +2555,7 @@
     {
       "doc": "docs/subsystems/memory.md",
       "symbol": "MemoryWriter",
-      "source": "packages/memory/memory/src/types.ts"
+      "source": "packages/memory/memory/src/index.ts"
     },
     {
       "doc": "docs/subsystems/memory.md",

@@ -333,6 +333,11 @@
     - id: ui-project-activity
       name: '@deepseek-ai/dsh-client-ui-project-activity'
 
+    # Durable memory browser: the right-Sidebar Memory tab listing scoped
+    # entries, and the `memory` card on the Plugins page.
+    - id: ui-memory
+      name: '@deepseek-ai/dsh-client-ui-memory'
+
     # Per-message feedback: Like/Dislike plus an optional note in the
     # assistant-message action strip, over the messageFeedback Remote.
     - id: workspace-changes

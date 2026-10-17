@@ -204,6 +204,9 @@
         "packages/client/ui-layout/src/client/DocumentTitle.tsx"
       ]
     },
+    "client/ui-memory": {
+      "sovereignty": "owned"
+    },
     "client/ui-message-feedback": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",

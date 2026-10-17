@@ -12,7 +12,7 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import type { MemoryKey, MemoryRevision, MemoryScope } from './types.ts'
 

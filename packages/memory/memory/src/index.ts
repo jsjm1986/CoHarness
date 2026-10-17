@@ -8,12 +8,15 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { CollaborationError, collaborationRemoteRefusal, type CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
 import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { Domain, KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { rankEntries, summaryOf } from './search.ts'
 import { memoryDomain, memoryRecordKey, memoryScopeId, memoryScopePrefix, type MemoryRecord } from './storage.ts'
 import type {
@@ -22,31 +25,38 @@ import type {
   MemoryEntrySummary,
   MemoryInvalidReason,
   MemoryKey,
+  MemoryReadRequest,
   MemoryRevision,
   MemorySaveRequest,
   MemoryScope,
+  MemoryScopeCatalog,
+  MemoryScopeRequest,
+  MemoryScopeView,
   MemorySearchHit,
   MemoryWriteResult,
-  MemoryWriter,
 } from './types.ts'
 
 export * from './types.ts'
+
+/**
+ * Who is writing. `agent` writes through the model tools under the
+ * `memory` execution authorization; `member` writes through the browser
+ * Remote methods under the captured collaboration participant — an absent
+ * participant means a runtime with no collaboration provider, which keeps
+ * owner semantics. `signal` is the agent operation's cancellation carried
+ * into the project authorization call. Host-only vocabulary: it names the
+ * `Agent` runtime type, so it is exported from the service entry rather
+ * than the client-safe `./types`.
+ */
+export type MemoryWriter =
+  | { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal }
+  | { readonly kind: 'member'; readonly participant?: CollaborationParticipant }
 export { memoryDomain, memoryRecordKey, memoryScopeId, memoryScopePrefix } from './storage.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Durable memory service registered as `memory`; see {@link MemoryService}. */
     memory: MemoryService
-  }
-  interface Events {
-    /**
-     * Emitted after a memory write commits. Consumers re-read through the
-     * service; the payload names the touched scope id and key only.
-     * @mode emit
-     * @param scope - The scope id of the written entry.
-     * @param key - The entry key.
-     */
-    'memory/changed'(this: Context, scope: string, key: string): void
   }
 }
 
@@ -92,12 +102,34 @@ export function MemoryRevision(value: string): MemoryRevision {
   return brandString<MemoryRevision>(value)
 }
 
+/** The `memory` settings namespace the Plugins-page card edits. */
+export const MEMORY_SETTINGS_NAMESPACE = settingsNamespace('memory')
+
+/** The `memory` settings section the service owns. */
+export interface MemorySettings {
+  /** `false` hides the scopes from agents and refuses every write; stored entries stay readable. */
+  enabled: boolean
+}
+
+/** Schema of the {@link MEMORY_SETTINGS_NAMESPACE} section. */
+export const MEMORY_SETTINGS_SCHEMA: z<MemorySettings> = z.object({
+  enabled: z.boolean().default(true),
+})
+
 /**
  * Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`,
  * `search`) are lock-free; writes serialize on a single chain inside the
  * service so create/duplicate, revision, and full checks stay atomic.
+ *
+ * The `memory/*` Remote methods serve the browser surface: reads are
+ * member-wide inside a project runtime, while member writes capture the
+ * request's collaboration participant and require `rw` project
+ * membership — a runtime with no collaboration provider keeps owner
+ * semantics. The `memory` settings section switches the whole feature
+ * off: scopes vanish for agents and every write refuses
+ * `scope-unavailable`, while stored entries stay readable for the owner.
  */
-export default class MemoryService extends Service {
+export default class MemoryService extends TypertRemoteService {
   static inject = ['storageDomain']
 
   /** Validated config bound to this runtime's space. */
@@ -126,6 +158,9 @@ export default class MemoryService extends Service {
   /** Head of the serialized write chain. */
   private writeChain: Promise<unknown> = Promise.resolve()
 
+  /** Authoritative `memory` settings section; the composition entry stands until a scope attaches. */
+  private settings: () => MemorySettings = () => ({ enabled: true })
+
   constructor(ctx: Context, config: Config) {
     super(ctx, 'memory')
     this.space = config.space
@@ -134,6 +169,14 @@ export default class MemoryService extends Service {
       summaryMaxChars: config.summaryMaxChars,
       maxEntriesPerScope: config.maxEntriesPerScope,
       searchMaxResults: config.searchMaxResults,
+    })
+    installSettingsSection(ctx, MEMORY_SETTINGS_NAMESPACE, MEMORY_SETTINGS_SCHEMA, { enabled: true }, {
+      label: { en: 'Memory', zh: '记忆' },
+      owner: 'project',
+      projectWrite: 'manager',
+      setSource: (current) => { this.settings = current },
+      // Every read resolves the live source; nothing is derived to re-judge.
+      onChange: () => {},
     })
     this.ready = ctx.storageDomain.open(memoryDomain)
     ctx.effect(async () => {
@@ -151,11 +194,13 @@ export default class MemoryService extends Service {
    * The scopes this space offers a session. `personal` space returns the
    * personal scope plus, when the session header carries `cwd`, the workspace
    * scope keyed by `(cwd, sshTarget)`; `project` space returns the shared
-   * project scope only.
+   * project scope only. A disabled `memory` section offers nothing, which
+   * empties the injected catalog and refuses every agent write.
    * @param agent - The session's agent.
    * @returns scopes in catalog order.
    */
   scopesFor(agent: Agent): readonly MemoryScope[] {
+    if (!this.settings().enabled) return []
     if (this.space === 'project') return [{ kind: 'project' }]
     const header = agent.session.header
     const scopes: MemoryScope[] = [{ kind: 'personal' }]
@@ -186,6 +231,16 @@ export default class MemoryService extends Service {
    * @returns the ordered catalog rows (entries without bodies).
    */
   async list(scope: MemoryScope): Promise<MemoryEntrySummary[]> {
+    return (await this.scopeEntries(scope)).map(summaryOf)
+  }
+
+  /**
+   * One scope's stored entries in catalog order: kind (guidance, profile,
+   * background, resource), then `updated.at` desc, then key asc.
+   * @param scope - The scope to read.
+   * @returns the ordered stored entries.
+   */
+  private async scopeEntries(scope: MemoryScope): Promise<MemoryEntry[]> {
     const prefix = memoryScopePrefix(scope)
     const entries: MemoryEntry[] = []
     for (const [recordKey, entry] of (await this.entries()).entries()) {
@@ -195,7 +250,7 @@ export default class MemoryService extends Service {
       KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
       || b.updated.at.localeCompare(a.updated.at)
       || a.key.localeCompare(b.key))
-    return entries.map(summaryOf)
+    return entries
   }
 
   /**
@@ -229,7 +284,7 @@ export default class MemoryService extends Service {
    * replace-only (`memory_not_found`, `memory_stale`). Replaces are immune to
    * the scope cap; creates refuse `memory_full` at it.
    * @param request - The save input.
-   * @param writer - Who is writing (agent today).
+   * @param writer - Who is writing (agent or member).
    * @returns the committed entry and the replaced record, or a refusal.
    */
   save(request: MemorySaveRequest, writer: MemoryWriter): Promise<MemoryWriteResult> {
@@ -240,27 +295,33 @@ export default class MemoryService extends Service {
       if (invalid !== undefined) return invalid
       const key = MemoryKey(request.key)
       const recordKey = memoryRecordKey(request.scope, key)
-      const userId = await this.authorizeProject(request.scope, writer)
+      const userId = await this.authorizeWrite(request.scope, writer)
       const table = await this.entries()
       const existing = table.get(recordKey) as MemoryEntry | undefined
       if (request.expectedRevision === undefined && existing !== undefined) {
-        return { ok: false, code: 'memory_exists', reason: undefined }
+        return { ok: false, code: 'memory_exists' }
       }
       if (request.expectedRevision !== undefined && existing === undefined) {
-        return { ok: false, code: 'memory_not_found', reason: undefined }
+        return { ok: false, code: 'memory_not_found' }
       }
       if (request.expectedRevision !== undefined && existing !== undefined && existing.revision !== request.expectedRevision) {
-        return { ok: false, code: 'memory_stale', reason: undefined }
+        return { ok: false, code: 'memory_stale' }
       }
       if (existing === undefined && this.scopeSize(table, request.scope) >= this.limits.maxEntriesPerScope) {
-        return { ok: false, code: 'memory_full', reason: undefined }
+        return { ok: false, code: 'memory_full' }
       }
-      const attribution = {
-        source: 'agent' as const,
-        sessionId: writer.agent.id,
-        ...(userId !== undefined ? { userId } : {}),
-        at: new Date().toISOString(),
-      }
+      const attribution: MemoryEntry['updated'] = writer.kind === 'agent'
+        ? {
+          source: 'agent' as const,
+          sessionId: writer.agent.id,
+          ...(userId !== undefined ? { userId } : {}),
+          at: new Date().toISOString(),
+        }
+        : {
+          source: 'member' as const,
+          ...(userId !== undefined ? { userId } : {}),
+          at: new Date().toISOString(),
+        }
       const entry: MemoryEntry = {
         scope: request.scope,
         key,
@@ -295,17 +356,154 @@ export default class MemoryService extends Service {
         return { ok: false, code: 'memory_invalid', reason: 'key' }
       }
       const recordKey = memoryRecordKey(request.scope, MemoryKey(request.key))
-      await this.authorizeProject(request.scope, writer)
+      await this.authorizeWrite(request.scope, writer)
       const table = await this.entries()
       const existing = table.get(recordKey) as MemoryEntry | undefined
-      if (existing === undefined) return { ok: false, code: 'memory_not_found', reason: undefined }
+      if (existing === undefined) return { ok: false, code: 'memory_not_found' }
       if (request.expectedRevision !== undefined && existing.revision !== request.expectedRevision) {
-        return { ok: false, code: 'memory_stale', reason: undefined }
+        return { ok: false, code: 'memory_stale' }
       }
       await table.delete(recordKey)
       this.ctx.emit('memory/changed', memoryScopeId(request.scope), existing.key)
       return { ok: true, operation: 'delete', entry: existing }
     })
+  }
+
+  /**
+   * The member-facing scope catalog. In `personal` space it lists the
+   * personal scope plus every workspace scope that holds entries; in
+   * `project` space the shared project scope alone. Each view answers
+   * whether the calling member may write it, so the browser only offers
+   * edit controls the caller is entitled to.
+   * @returns the scope catalog plus the `memory` section's enabled flag.
+   */
+  @Remote('scopes')
+  async memberScopes(): Promise<MemoryScopeCatalog> {
+    const enabled = this.settings().enabled
+    const scopes: MemoryScopeView[] = []
+    const view = (scope: MemoryScope, entries: number): MemoryScopeView => ({
+      scope, writable: this.memberWritable(scope, enabled), entries,
+    })
+    if (this.space === 'project') {
+      const table = await this.entries()
+      return { enabled, scopes: [view({ kind: 'project' }, this.scopeSize(table, { kind: 'project' }))] }
+    }
+    const workspaces = new Map<string, { scope: MemoryScope; entries: number }>()
+    let personalEntries = 0
+    for (const [, record] of (await this.entries()).entries()) {
+      const scope = (record as MemoryEntry).scope
+      if (scope.kind === 'personal') {
+        personalEntries += 1
+      } else if (scope.kind === 'workspace') {
+        const id = memoryScopeId(scope)
+        const known = workspaces.get(id)
+        if (known === undefined) workspaces.set(id, { scope, entries: 1 })
+        else workspaces.set(id, { scope, entries: known.entries + 1 })
+      }
+    }
+    scopes.push(view({ kind: 'personal' }, personalEntries))
+    for (const workspace of workspaces.values()) scopes.push(view(workspace.scope, workspace.entries))
+    return { enabled, scopes }
+  }
+
+  /**
+   * Read one scope's entries for the member browser surface. Reads are
+   * member-wide inside a project runtime; a scope the space does not offer
+   * simply has no records, so the answer is an empty list rather than a
+   * refusal.
+   * @param request - the scope to list.
+   * @returns every stored entry, content included, in catalog order.
+   */
+  @Remote('list')
+  async memberList(request: MemoryScopeRequest): Promise<MemoryEntry[]> {
+    if (!this.scopeOffered(request.scope)) return []
+    return this.scopeEntries(request.scope)
+  }
+
+  /**
+   * Read one entry's full body for the member browser surface.
+   * @param request - the scope and raw key to read.
+   * @returns the stored entry, or undefined for a missing or out-of-space key.
+   */
+  @Remote('read')
+  async memberRead(request: MemoryReadRequest): Promise<MemoryEntry | undefined> {
+    if (!this.scopeOffered(request.scope)) return undefined
+    return this.read(request.scope, request.key)
+  }
+
+  /**
+   * Create or replace one entry as the calling member. The service
+   * captures the request's collaboration participant itself: `rw` project
+   * membership is required for the project scope, and a runtime with no
+   * collaboration provider keeps owner semantics. Validation, revision,
+   * and capacity refusals return in the ordinary write result; a missing
+   * principal or read-only membership rejects with the shared
+   * `collaboration-forbidden` refusal.
+   * @param request - the save input.
+   * @returns the committed entry and the replaced record, or a refusal.
+   */
+  @Remote('save')
+  async memberSave(request: MemorySaveRequest): Promise<MemoryWriteResult> {
+    return this.save(request, this.memberWriter())
+  }
+
+  /**
+   * Remove one entry as the calling member, under the same participant
+   * rules as {@link memberSave}.
+   * @param request - the delete input.
+   * @returns the removed entry, or a refusal.
+   */
+  @Remote('delete')
+  async memberDelete(request: MemoryDeleteRequest): Promise<MemoryWriteResult> {
+    return this.delete(request, this.memberWriter())
+  }
+
+  /**
+   * Whether the space offers a scope to member reads at all, independent
+   * of the `memory` section's enabled flag — a disabled feature hides its
+   * scopes from agents but keeps stored entries inspectable.
+   */
+  private scopeOffered(scope: MemoryScope): boolean {
+    return this.space === 'project'
+      ? scope.kind === 'project'
+      : scope.kind === 'personal' || scope.kind === 'workspace'
+  }
+
+  /**
+   * Resolve the member writer for one Remote write call. A runtime with no
+   * collaboration provider is the owner's, so the writer carries no
+   * participant; a capture failure means no verified caller stands behind
+   * the call and rejects with the shared refusal.
+   */
+  private memberWriter(): MemoryWriter {
+    const collaboration = this.ctx.get('collaboration')
+    if (collaboration === undefined) return { kind: 'member' }
+    try {
+      return { kind: 'member', participant: collaboration.capture().participant }
+    } catch (error: unknown) {
+      throw collaborationRemoteRefusal(error, 'write')
+    }
+  }
+
+  /**
+   * Whether the member behind the current Remote call may write `scope`.
+   * Mirrors {@link memberWriter}: absent collaboration means the owner,
+   * a capture failure means no verified caller — not writable.
+   */
+  private memberWritable(scope: MemoryScope, enabled: boolean): boolean {
+    if (!enabled) return false
+    const collaboration = this.ctx.get('collaboration')
+    if (collaboration === undefined) return true
+    let participant: CollaborationParticipant
+    try {
+      participant = collaboration.capture().participant
+    } catch {
+      // No verified request principal: the caller is not entitled to write.
+      return false
+    }
+    return scope.kind === 'project'
+      ? participant.scope.kind === 'project' && participant.scope.mode === 'rw'
+      : participant.scope.kind === 'personal'
   }
 
   /** Queue `work` behind the in-flight write; failures never wedge the chain. */
@@ -321,14 +519,15 @@ export default class MemoryService extends Service {
   /**
    * Write-scope admission. In `personal` space only personal+workspace are
    * addressable; in `project` space only project. An agent writer may touch
-   * only its own session's workspace scope.
+   * only its own session's workspace scope; a member writer reaches every
+   * workspace scope the personal space lists. A disabled `memory` section
+   * offers no scope at all.
    */
   private scopeRefusal(scope: MemoryScope, writer: MemoryWriter): MemoryWriteResult | undefined {
-    const available = this.space === 'project'
+    const available = this.settings().enabled && (this.space === 'project'
       ? scope.kind === 'project'
-      : scope.kind === 'personal' || scope.kind === 'workspace'
+      : scope.kind === 'personal' || scope.kind === 'workspace')
     if (!available) return { ok: false, code: 'memory_invalid', reason: 'scope-unavailable' }
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- MemoryWriter is an open union; the workspace rule is agent-only.
     if (writer.kind === 'agent' && scope.kind === 'workspace') {
       const own = this.scopesFor(writer.agent).find(candidate => candidate.kind === 'workspace')
       if (own === undefined) return { ok: false, code: 'memory_invalid', reason: 'scope-unavailable' }
@@ -358,18 +557,34 @@ export default class MemoryService extends Service {
   }
 
   /**
-   * Run the execution-authority check on an agent project write and return
-   * the attested primary-actor user id for attribution. Personal/workspace
-   * writes skip authorization; a missing provider under
-   * `executionAuthorityRequired` throws `execution/forbidden`; a policy
-   * denial propagates the authority's `RemoteError` unchanged.
+   * Authorize one write and return the user id recorded in attribution.
+   * An agent's project write runs the `memory` execution-authority check —
+   * a missing provider under `executionAuthorityRequired` throws
+   * `execution/forbidden`, and a policy denial (a member who lost the
+   * grant, or a private conversation, which is read-only for project
+   * memory) propagates the authority's `RemoteError` unchanged. A member
+   * write needs a captured collaboration participant: `rw` project
+   * membership for the project scope, the personal participant for
+   * personal/workspace scopes, and nothing when the runtime has no
+   * collaboration provider — owner semantics. Every denial throws the
+   * shared `collaboration-forbidden` refusal rather than a refusal result,
+   * because the caller is not entitled to the write at all.
    */
-  private async authorizeProject(scope: MemoryScope, writer: MemoryWriter): Promise<number | undefined> {
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- MemoryWriter is an open union; authorization is agent-only today.
-    if (scope.kind !== 'project' || writer.kind !== 'agent') return undefined
-    const state = await executionAuthorityOf(this.ctx)
-      ?.authorize('memory', writer.agent, writer.signal)
-    return state?.primaryActorUserId
+  private async authorizeWrite(scope: MemoryScope, writer: MemoryWriter): Promise<number | undefined> {
+    if (writer.kind === 'agent') {
+      if (scope.kind !== 'project') return undefined
+      const state = await executionAuthorityOf(this.ctx)
+        ?.authorize('memory', writer.agent, writer.signal)
+      return state?.primaryActorUserId
+    }
+    const participant = writer.participant
+    if (participant === undefined) return undefined
+    if (scope.kind === 'project'
+      ? participant.scope.kind !== 'project' || participant.scope.mode !== 'rw'
+      : participant.scope.kind !== 'personal') {
+      throw collaborationRemoteRefusal(new CollaborationError('forbidden'), 'write')
+    }
+    return participant.userId
   }
 
   /** Count live records of one scope (creates compare against the cap). */

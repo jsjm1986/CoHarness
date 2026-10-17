@@ -18,6 +18,7 @@ The host-plane durable memory service `ctx.memory`: scope resolution, validation
 - [Configuration](#configuration)
 - [Scopes and spaces](#scopes-and-spaces)
 - [Write rules](#write-rules)
+- [Member Remote surface](#member-remote)
 - [Storage](#storage)
 - [Search](#search)
 - [Events](#events)
@@ -61,7 +62,14 @@ Resolved values are exposed read-only as `service.space` and `service.limits`. T
 6. A create at the scope cap (`maxEntriesPerScope`) refuses `memory_full`; replaces and deletes never do.
 7. The write mints a fresh `randomUUID()` revision, keeps `created` on update, and stamps `updated` `{ source: 'agent', sessionId, userId?, at }`. The durable write resolves before the service returns, and `memory/changed` emits after the commit.
 
-Attribution `source` is a closed union (`agent`, `extraction`, `consolidation`, `member`); only `agent` writes today — the other kinds reserve the durable schema for the later extraction/consolidation/member writers.
+Attribution `source` is a closed union (`agent`, `extraction`, `consolidation`, `member`); `agent` and `member` writes exist today — `member` records browser edits through the Remote surface below, while `extraction`/`consolidation` reserve the durable schema for the curation pass.
+
+<a id="member-remote"></a>
+## Member Remote surface
+
+`MemoryService` is a `TypertRemoteService`; five `@Remote` methods serve the browser Memory page. `memory/scopes` returns the scope catalog — personal plus non-empty workspace scopes in a personal runtime, the project scope alone in a project runtime — with each view's live entry count and the calling member's `writable` flag, plus the `memory` section's `enabled` flag. `memory/list` and `memory/read` serve entries member-wide; the API proxy admits the three reads through `PROJECT_TYPERT_PROCESS_WIDE_READS`. `memory/save` and `memory/delete` write as the captured collaboration participant through `memberWriter()` and are admitted through `PROJECT_TYPERT_REGISTRY_AUTHORIZED`: a project-scope write requires a `project` participant with `mode: 'rw'`; personal/workspace writes require a `personal` participant; a missing principal or a read-only membership rejects with the shared `collaboration-forbidden` refusal. A runtime without a collaboration provider keeps owner semantics.
+
+The service registers the `memory` settings namespace (`installSettingsSection`, owner `project`, `projectWrite: 'manager'`) with one field, `enabled` (default `true`). Setting it `false` removes every scope from `scopesFor` — agents see no catalog and every write refuses `scope-unavailable` — while member reads and the stored entries stay inspectable.
 
 <a id="storage"></a>
 ## Storage
@@ -96,10 +104,10 @@ None directly: the service constructs no model input; its consumers' catalog and
 
 ## Known Limitations and Deferred Work
 
-- **Single-process visibility** — writes in one runtime are visible to that runtime's sessions; cross-runtime propagation (browser members, federation) is deferred to the member/curation PRs.
+- **Single-runtime visibility** — writes in one runtime are visible to that runtime's sessions and Remote members; cross-runtime propagation (federation) is deferred.
 - **Storage family only in the Web bundle** — `dsh-memory` requires `storageDomain`, which only the `web-app` bundle mounts; personal-space CLI/headless profiles keep the agent-plane rows inert until their host composition mounts storage and this service.
 - **`danger-full-access` can edit storage files** — the JSON documents sit under the Harness home in plain text; a session granted unrestricted filesystem access can read or corrupt them outside the service's write rules.
-- **No curation, recall, or member writers** — the attribution union reserves `extraction`, `consolidation`, and `member` sources, but only agent writes exist in this package generation.
+- **No curation or recall** — the attribution union reserves `extraction` and `consolidation` sources; the after-turn curation passes and the per-question recall selector are deferred to their own rows.
 
 <a id="dev-note"></a>
 ### Dev Note

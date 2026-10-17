@@ -1999,7 +1999,7 @@ export interface ReconnectConfig {
 ## `@deepseek-ai/dsh-memory`
 
 - `inject`: `storageDomain`
-- `source`: [`packages/memory/memory/src/index.ts:60`](../packages/memory/memory/src/index.ts)
+- `source`: [`packages/memory/memory/src/index.ts:70`](../packages/memory/memory/src/index.ts)
 
 ```ts config-catalog
 /** Validated service configuration; field docs are the model-facing meaning. */
@@ -4559,6 +4559,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-input-trigger` | — | [`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-jobs` | — | [`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-layout` | — | [`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-memory` | — | [`packages/client/ui-memory/src/index.ts`](../packages/client/ui-memory/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-message-feedback` | — | [`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-model-selection` | — | [`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-open-in-app` | — | [`packages/client/ui-open-in-app/src/index.ts`](../packages/client/ui-open-in-app/src/index.ts) |

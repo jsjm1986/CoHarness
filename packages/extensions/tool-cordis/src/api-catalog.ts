@@ -1507,7 +1507,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'memory',
     summary: 'Durable per-scope memory.',
-    description: 'Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`, `search`) are lock-free; writes serialize on a single chain inside the service so create/duplicate, revision, and full checks stay atomic.',
+    description: 'Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`, `search`) are lock-free; writes serialize on a single chain inside the service so create/duplicate, revision, and full checks stay atomic.\n\nThe `memory/*` Remote methods serve the browser surface: reads are member-wide inside a project runtime, while member writes capture the request\'s collaboration participant and require `rw` project membership — a runtime with no collaboration provider keeps owner semantics. The `memory` settings section switches the whole feature off: scopes vanish for agents and every write refuses `scope-unavailable`, while stored entries stay readable for the owner.',
     methods: [
       {
         signature: 'readonly space: \'personal\' | \'project\'',
@@ -1521,7 +1521,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'scopesFor(agent: Agent): readonly MemoryScope[]',
-        description: 'The scopes this space offers a session. `personal` space returns the personal scope plus, when the session header carries `cwd`, the workspace scope keyed by `(cwd, sshTarget)`; `project` space returns the shared project scope only.',
+        description: 'The scopes this space offers a session. `personal` space returns the personal scope plus, when the session header carries `cwd`, the workspace scope keyed by `(cwd, sshTarget)`; `project` space returns the shared project scope only. A disabled `memory` section offers nothing, which empties the injected catalog and refuses every agent write.',
         parameters: [{ name: 'agent', description: 'The session\'s agent.' }],
         returns: 'scopes in catalog order.',
       },
@@ -1546,13 +1546,43 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'save(request: MemorySaveRequest, writer: MemoryWriter): Promise<MemoryWriteResult>',
         description: 'Create or replace an entry. Without `expectedRevision` the write is create-only (`memory_exists` when the key is used); with it the write is replace-only (`memory_not_found`, `memory_stale`). Replaces are immune to the scope cap; creates refuse `memory_full` at it.',
-        parameters: [{ name: 'request', description: 'The save input.' }, { name: 'writer', description: 'Who is writing (agent today).' }],
+        parameters: [{ name: 'request', description: 'The save input.' }, { name: 'writer', description: 'Who is writing (agent or member).' }],
         returns: 'the committed entry and the replaced record, or a refusal.',
       },
       {
         signature: 'delete(request: MemoryDeleteRequest, writer: MemoryWriter): Promise<MemoryWriteResult>',
         description: 'Remove an entry. `expectedRevision` absent deletes unconditionally; present deletes only on a match (`memory_stale` otherwise). A missing key is always `memory_not_found`.',
         parameters: [{ name: 'request', description: 'The delete input.' }, { name: 'writer', description: 'Who is deleting.' }],
+        returns: 'the removed entry, or a refusal.',
+      },
+      {
+        signature: '@Remote(\'scopes\') async memberScopes(): Promise<MemoryScopeCatalog>',
+        description: 'The member-facing scope catalog. In `personal` space it lists the personal scope plus every workspace scope that holds entries; in `project` space the shared project scope alone. Each view answers whether the calling member may write it, so the browser only offers edit controls the caller is entitled to.',
+        parameters: [],
+        returns: 'the scope catalog plus the `memory` section\'s enabled flag.',
+      },
+      {
+        signature: '@Remote(\'list\') async memberList(request: MemoryScopeRequest): Promise<MemoryEntry[]>',
+        description: 'Read one scope\'s entries for the member browser surface. Reads are member-wide inside a project runtime; a scope the space does not offer simply has no records, so the answer is an empty list rather than a refusal.',
+        parameters: [{ name: 'request', description: 'the scope to list.' }],
+        returns: 'every stored entry, content included, in catalog order.',
+      },
+      {
+        signature: '@Remote(\'read\') async memberRead(request: MemoryReadRequest): Promise<MemoryEntry | undefined>',
+        description: 'Read one entry\'s full body for the member browser surface.',
+        parameters: [{ name: 'request', description: 'the scope and raw key to read.' }],
+        returns: 'the stored entry, or undefined for a missing or out-of-space key.',
+      },
+      {
+        signature: '@Remote(\'save\') async memberSave(request: MemorySaveRequest): Promise<MemoryWriteResult>',
+        description: 'Create or replace one entry as the calling member. The service captures the request\'s collaboration participant itself: `rw` project membership is required for the project scope, and a runtime with no collaboration provider keeps owner semantics. Validation, revision, and capacity refusals return in the ordinary write result; a missing principal or read-only membership rejects with the shared `collaboration-forbidden` refusal.',
+        parameters: [{ name: 'request', description: 'the save input.' }],
+        returns: 'the committed entry and the replaced record, or a refusal.',
+      },
+      {
+        signature: '@Remote(\'delete\') async memberDelete(request: MemoryDeleteRequest): Promise<MemoryWriteResult>',
+        description: 'Remove one entry as the calling member, under the same participant rules as memberSave.',
+        parameters: [{ name: 'request', description: 'the delete input.' }],
         returns: 'the removed entry, or a refusal.',
       },
     ],
@@ -4394,7 +4424,7 @@ export const EVENT_API: readonly EventApiEntry[] = [
   {
     name: 'memory/changed',
     mode: 'emit',
-    signature: '\'memory/changed\'(this: Context, scope: string, key: string): void',
+    signature: '\'memory/changed\'(scope: string, key: string): void',
     summary: 'Emitted after a memory write commits.',
     description: 'Emitted after a memory write commits. Consumers re-read through the service; the payload names the touched scope id and key only.',
     parameters: [{ name: 'scope', description: 'The scope id of the written entry.' }, { name: 'key', description: 'The entry key.' }],
@@ -5952,12 +5982,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type MemoryInvalidReason = \'key\' | \'summary\' | \'content\' | \'query\' | \'scope-unavailable\' | \'workspace-mismatch\';',
   },
   {
-    name: 'MemoryKey',
-    declaration: 'export type MemoryKey = Branded<\'MemoryKey\'>;',
-  },
-  {
     name: 'MemoryKind',
     declaration: 'export type MemoryKind = \'profile\' | \'guidance\' | \'background\' | \'resource\';',
+  },
+  {
+    name: 'MemoryReadRequest',
+    declaration: 'export interface MemoryReadRequest {\n    readonly scope: MemoryScope;\n    readonly key: string;\n}',
   },
   {
     name: 'MemoryRefusalCode',
@@ -5976,16 +6006,28 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type MemoryScope = {\n    readonly kind: \'personal\';\n} | {\n    readonly kind: \'workspace\';\n    readonly directory: string;\n    readonly sshTarget?: number;\n} | {\n    readonly kind: \'project\';\n};',
   },
   {
+    name: 'MemoryScopeCatalog',
+    declaration: 'export interface MemoryScopeCatalog {\n    readonly enabled: boolean;\n    readonly scopes: readonly MemoryScopeView[];\n}',
+  },
+  {
+    name: 'MemoryScopeRequest',
+    declaration: 'export interface MemoryScopeRequest {\n    readonly scope: MemoryScope;\n}',
+  },
+  {
+    name: 'MemoryScopeView',
+    declaration: 'export interface MemoryScopeView {\n    readonly scope: MemoryScope;\n    readonly writable: boolean;\n    readonly entries: number;\n}',
+  },
+  {
     name: 'MemorySearchHit',
     declaration: 'export interface MemorySearchHit {\n    readonly entry: MemoryEntrySummary;\n    readonly excerpt: string;\n    readonly score: number;\n}',
   },
   {
     name: 'MemoryWriter',
-    declaration: 'export type MemoryWriter = {\n    readonly kind: \'agent\';\n    readonly agent: Agent;\n    readonly signal?: AbortSignal;\n};',
+    declaration: 'export type MemoryWriter = {\n    readonly kind: \'agent\';\n    readonly agent: Agent;\n    readonly signal?: AbortSignal;\n} | {\n    readonly kind: \'member\';\n    readonly participant?: CollaborationParticipant;\n};',
   },
   {
     name: 'MemoryWriteResult',
-    declaration: 'export type MemoryWriteResult = {\n    readonly ok: true;\n    readonly operation: \'create\' | \'update\' | \'delete\';\n    readonly entry: MemoryEntry;\n    readonly previous?: MemoryEntry;\n} | {\n    readonly ok: false;\n    readonly code: MemoryRefusalCode;\n    readonly reason: MemoryInvalidReason | undefined;\n};',
+    declaration: 'export type MemoryWriteResult = {\n    readonly ok: true;\n    readonly operation: \'create\' | \'update\' | \'delete\';\n    readonly entry: MemoryEntry;\n    readonly previous?: MemoryEntry;\n} | {\n    readonly ok: false;\n    readonly code: MemoryRefusalCode;\n    readonly reason?: MemoryInvalidReason;\n};',
   },
   {
     name: 'Message',

@@ -17,6 +17,7 @@ kind: "package-reference"
 - [配置](#configuration)
 - [作用域与空间](#scopes-and-spaces)
 - [写入规则](#write-rules)
+- [成员 Remote 表面](#member-remote)
 - [存储](#storage)
 - [搜索](#search)
 - [事件](#events)
@@ -60,7 +61,14 @@ kind: "package-reference"
 6. 达到作用域上限（`maxEntriesPerScope`）的创建拒绝 `memory_full`；替换与删除永不受限。
 7. 写入铸造新的 `randomUUID()` 修订号，更新时保留 `created`，并把 `updated` 记为 `{ source: 'agent', sessionId, userId?, at }`。持久写入在服务返回前完成，`memory/changed` 在提交后发出。
 
-来源记录的 `source` 是封闭联合（`agent`、`extraction`、`consolidation`、`member`）；当前只有 `agent` 写入——其余种类为后续的提取/整合/成员写入者预留了持久模式。
+来源记录的 `source` 是封闭联合（`agent`、`extraction`、`consolidation`、`member`）；当前存在 `agent` 与 `member` 写入——`member` 记录经下述 Remote 表面产生的浏览器编辑，`extraction`/`consolidation` 为策展 pass 预留持久模式。
+
+<a id="member-remote"></a>
+## 成员 Remote 表面
+
+`MemoryService` 是 `TypertRemoteService`；五个 `@Remote` 方法服务浏览器记忆页面。`memory/scopes` 返回作用域目录——个人 runtime 中是个人作用域加上有条目的工作区作用域，项目 runtime 中仅项目作用域——每个视图附带实时条目数与调用成员的 `writable` 标志，以及 `memory` 段的 `enabled` 标志。`memory/list` 与 `memory/read` 向全体成员提供读取；API proxy 经 `PROJECT_TYPERT_PROCESS_WIDE_READS` 放行这三个读端点。`memory/save` 与 `memory/delete` 以捕获的协作参与者身份经 `memberWriter()` 写入，经 `PROJECT_TYPERT_REGISTRY_AUTHORIZED` 放行：项目作用域写入要求 `mode: 'rw'` 的项目参与者；个人/工作区作用域要求 `personal` 参与者；缺失主体或只读成员身份以共享的 `collaboration-forbidden` 拒绝。没有协作 provider 的 runtime 保持所有者语义。
+
+服务注册 `memory` 设置命名空间（`installSettingsSection`，owner `project`，`projectWrite: 'manager'`），仅含 `enabled` 一个字段（默认 `true`）。置为 `false` 会使 `scopesFor` 返回空——agent 看不到目录且一切写入拒绝 `scope-unavailable`——成员读取与已存条目仍可查看。
 
 <a id="storage"></a>
 ## 存储
@@ -96,10 +104,10 @@ None directly: the service constructs no model input; its consumers' catalog and
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
-- **单进程可见性** — 一个运行时中的写入只对该运行时的会话可见；跨运行时传播（浏览器成员、联邦）留给成员/策展 PR。
+- **单 runtime 可见性** — 一个 runtime 中的写入只对该 runtime 的会话与 Remote 成员可见；跨 runtime 传播（联邦）延后。
 - **存储族仅在 Web 包中挂载** — `dsh-memory` 依赖 `storageDomain`，而它目前只在 `web-app` 包中挂载；personal 空间的 CLI/headless profile 在其主机组合挂载存储与本服务之前，代理侧行保持惰性。
 - **`danger-full-access` 可以编辑存储文件** — JSON 文档以明文存于 Harness home 之下；被授予不受限文件系统访问的会话可以绕过服务的写入规则读取或破坏它们。
-- **尚无策展、召回或成员写入者** — 来源联合保留了 `extraction`、`consolidation`、`member` 来源，但当前包代际只存在代理写入。
+- **尚无策展或召回** — 来源联合保留了 `extraction`、`consolidation` 来源；回合后的策展 pass 与按问召回选择器延后到各自的行实现。
 
 <a id="dev-note"></a>
 ### 开发备注
