@@ -6,6 +6,7 @@ import {
   AdminRequestError,
   deleteUser,
   getDesktopPolicy,
+  getMemoryPolicy,
   getModelAccess,
   getPluginPolicy,
   getSshPolicy,
@@ -21,6 +22,7 @@ import {
   resetPassword,
   setDesktopPolicy,
   setMember,
+  setMemoryPolicy,
   setModelAccess,
   setPluginPolicy,
   setQuota,
@@ -242,6 +244,13 @@ function UserDetail({ userId }: { userId: number }) {
                   userId={userId}
                   read={getPluginPolicy}
                   write={setPluginPolicy}
+                />
+                <UserQualificationCard
+                  name={t('qualMemoryName')}
+                  description={t('qualMemoryDescription')}
+                  userId={userId}
+                  read={getMemoryPolicy}
+                  write={setMemoryPolicy}
                 />
                 <UserQualificationCard
                   key={`steward:${userId}:${user.role}:${user.status}`}

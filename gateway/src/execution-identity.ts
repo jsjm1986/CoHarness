@@ -67,7 +67,7 @@ interface InputRow {
 }
 
 interface ActorRow { id: string; public_id: string; role: 'admin' | 'member'; auto_review_eligible?: boolean }
-type Capability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop' | 'user-terminal' | 'ssh'
+type Capability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop' | 'user-terminal' | 'ssh' | 'memory'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 const HASH = /^[0-9a-f]{64}$/iu
 
@@ -418,7 +418,7 @@ export class GatewayExecutionIdentity {
   async authorize(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
     const request = object(value, ['sessionId', 'capability', 'unverifiedHistory', 'scopeId'])
     const sessionId = identity(request.sessionId), capability = request.capability
-    if (capability !== 'execute' && capability !== 'plugin-management' && capability !== 'auto-review' && capability !== 'desktop') throw new ExecutionIdentityError(400, 'invalid execution capability')
+    if (capability !== 'execute' && capability !== 'plugin-management' && capability !== 'auto-review' && capability !== 'desktop' && capability !== 'memory') throw new ExecutionIdentityError(400, 'invalid execution capability')
     await this.markUnverified(subject, sessionId, request.unverifiedHistory)
     return transaction(this.pool, async (client) => {
       if (request.scopeId !== undefined) {
@@ -872,6 +872,7 @@ export class GatewayExecutionIdentity {
     const resource = capability === 'plugin-management' ? 'plugin'
       : capability === 'desktop' ? 'desktop'
       : capability === 'ssh' ? 'ssh'
+      : capability === 'memory' ? 'memory'
       : capability === 'user-terminal' ? 'terminal' : undefined
     if (resource !== undefined) {
       // Plugin management keeps administrators unqualified by policy; every
@@ -892,6 +893,7 @@ export class GatewayExecutionIdentity {
       }
     }
     if (subject.target.kind === 'user') {
+      if (capability === 'memory') throw new ExecutionIdentityError(403, 'memory qualification applies only to project runtimes')
       if (result.rows.some(actor => publicNumber(actor.public_id, 'execution actor') !== subject.target.id)) throw new ExecutionIdentityError(403, 'personal execution cannot borrow another account')
       return
     }
@@ -912,6 +914,7 @@ export class GatewayExecutionIdentity {
             WHERE c.organization_id=d.organization_id AND c.id=d.session_id)
         FOR SHARE OF d,p`, [subject.organizationId, sessionId, subject.projectInternalId])).rows[0]
     if (session === undefined) throw new ExecutionIdentityError(403, 'execution Session is not writable in this runtime')
+    if (capability === 'memory' && session.visibility === 'private') throw new ExecutionIdentityError(403, 'project memory is read-only in private conversations')
     const members = await client.query<{ user_id: string; access_mode: string }>(`SELECT user_id,access_mode FROM harness.project_members
       WHERE organization_id=$1 AND project_id=$2 AND user_id=ANY($3::uuid[]) FOR SHARE`,
     [subject.organizationId, subject.projectInternalId, actorIds])

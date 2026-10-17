@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for 2026-10-17-space-scoped-agent-memory.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-10-17-space-scoped-agent-memory.md
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces:
+  en: f173c018151b1e8b
+  zh: ac6aef7e11e5ac32
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/problem:
+  en: 7cb23a3e85f8bd20
+  zh: e21a645d47215c8c
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/proposal:
+  en: 59e86442bb7c5f4c
+  zh: fb9ee24595b34878
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/spaces-and-scopes:
+  en: e08bd8077eaeb10b
+  zh: bd8b530a7130b82e
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/entries:
+  en: 1d8496869e16a42c
+  zh: cd0b267ecd76d0a5
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/storage:
+  en: 1ef9b48295e3367e
+  zh: 9d7ebcb73fc8c919
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/catalog-injection:
+  en: 9a182967938653ef
+  zh: fb069f5f8b25ed8e
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/model-tools:
+  en: 6de5ca95d957eed8
+  zh: 8b39a71b6d06d4a0
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/write-authorization:
+  en: f5d61236c7b69295
+  zh: 66585a6db1df1874
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/background-curation:
+  en: b98a7569f25bc54a
+  zh: 31ed6de5acabc122
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/per-question-recall:
+  en: 61b1fc2410965bdf
+  zh: 03cc01a0e9af33f6
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/earlier-session-lookup:
+  en: e2d354c2b54f3408
+  zh: 7af442689ed56dcc
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/browser-surface:
+  en: 4e365d0ad78a3e82
+  zh: 9b3c18e98a99b6ca
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/package-map:
+  en: b27fcab0b2f01acc
+  zh: bae977b422fa5edc
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/prior-art-zcode-verified-against-source:
+  en: a7cba5744f9279d7
+  zh: 79744282f81aab61
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/delivery-stages:
+  en: 801e86e029fc80c5
+  zh: 3a9eee0a8d61da3c
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/alternatives-considered:
+  en: 6f5d0629f5122ffc
+  zh: 8929f6b413897ddf
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/acceptance-criteria:
+  en: d8dcff2a3878ded3
+  zh: 7e717935b444d5e6
+/agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/risks:
+  en: 9d9d641af5776d38
+  zh: 6f657bb98c3fb11d

@@ -611,11 +611,14 @@ async function dispatch(
 
   if ((pathname === '/admin/api/desktops/permissions' || pathname === '/admin/api/terminals/permissions'
     || pathname === '/admin/api/ssh/permissions' || pathname === '/admin/api/plugins/permissions'
-    || pathname === '/admin/api/steward/permissions') && (method === 'GET' || method === 'POST')) {
+    || pathname === '/admin/api/steward/permissions' || pathname === '/admin/api/memory/permissions')
+    && (method === 'GET' || method === 'POST')) {
     const resource = pathname.includes('/terminals/') ? 'terminal' : pathname.includes('/ssh/') ? 'ssh'
-      : pathname.includes('/plugins/') ? 'plugin' : pathname.includes('/steward/') ? 'steward' : 'desktop'
+      : pathname.includes('/plugins/') ? 'plugin' : pathname.includes('/steward/') ? 'steward'
+      : pathname.includes('/memory/') ? 'memory' : 'desktop'
     const access = resource === 'terminal' ? deps.terminalAccess : resource === 'ssh' ? deps.sshAccess
-      : resource === 'plugin' ? deps.pluginAccess : resource === 'steward' ? deps.stewardAccess : deps.desktopAccess
+      : resource === 'plugin' ? deps.pluginAccess : resource === 'steward' ? deps.stewardAccess
+      : resource === 'memory' ? deps.memoryAccess : deps.desktopAccess
     if (access === undefined) { sendError(res, 503, `${resource}-access-unavailable`); return true }
     const ownerOf = resource === 'steward' ? stewardPolicyOwner : resourcePolicyOwner
     if (method === 'GET') {

@@ -1,6 +1,7 @@
 import { nodeConfigurationAuthority } from './postgres/node-configuration-authority.ts'
 import { loadManagedNodeEnvironment, NodeConfigurationStore } from './node-config-store.ts'
 import { DesktopAccess } from './desktop-access.ts'
+import { MemoryAccess } from './memory-access.ts'
 import { PluginAccess } from './plugin-access.ts'
 import { PostgresPluginState } from './plugin-state.ts'
 import { SshAccess } from './ssh-access.ts'
@@ -409,6 +410,7 @@ const deps: GatewayDeps = {
   terminalAccess: new TerminalAccess(context),
   sshAccess: new SshAccess(context),
   stewardAccess: new StewardAccess(context),
+  memoryAccess: new MemoryAccess(context),
   sshTargets: new PostgresSshTargetService(context),
   pluginManagement: new GatewayPluginManagement({ users, projects, instances, cfg, pluginState }, principalKeys.signer, context.nodeId),
   pluginState,

@@ -42,6 +42,7 @@ import {
   Switch,
 } from '../components/ui.tsx'
 import { formatCompact, formatMoney, Metric, PricingState, QuotaSummary } from '../components/usage.tsx'
+import { MemoryPermissions } from '../components/MemoryPermissions.tsx'
 import { zh as copyZh, en as copyEn, type ProjectDetailCopyKey } from './project-detail.copy.ts'
 
 type MatrixMode = GrantMode | 'none'
@@ -610,6 +611,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
               </>
             )}
           </Section>
+          <MemoryPermissions projectId={projectId} />
           <div className="dangerZone">
             <div><strong>{t('deleteProject')}</strong><p>{t('deleteHint')}</p></div>
             <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)}>{t('deleteProject')}</Button>
