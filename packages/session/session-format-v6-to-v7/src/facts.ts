@@ -10,10 +10,12 @@ import type { SessionFormatJsonObject, SessionFormatJsonValue } from '@deepseek-
  * @returns validated catalog payload.
  */
 export function catalogFact(value: SessionFormatJsonValue, subject = 'subagent/catalog'): SessionFormatJsonObject {
-  if (!isSessionFormatJsonObject(value) || (value['version'] !== 0 && value['version'] !== 1)
+  if (!isSessionFormatJsonObject(value) || (value['version'] !== 0 && value['version'] !== 1 && value['version'] !== 2)
     || typeof value['childId'] !== 'string'
-    || (value['mode'] !== 'continuable' && value['mode'] !== 'one-shot' && value['mode'] !== 'unknown')
-    || (value['version'] === 0 && value['mode'] === 'unknown')
+    || (value['mode'] !== 'continuable' && value['mode'] !== 'one-shot' && value['mode'] !== 'unknown' && value['mode'] !== 'external')
+    || (value['version'] === 0 && (value['mode'] === 'unknown' || value['mode'] === 'external'))
+    || (value['version'] === 1 && value['mode'] === 'external')
+    || (value['version'] === 2 && value['mode'] !== 'external')
     || (value['mode'] === 'continuable' && typeof value['label'] !== 'string')
     || (value['label'] !== undefined && typeof value['label'] !== 'string')) {
     throw new SessionFormatError(`${subject} requires a supported versioned catalog fact`)

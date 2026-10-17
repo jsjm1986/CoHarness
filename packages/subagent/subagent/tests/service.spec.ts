@@ -22,7 +22,10 @@ import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 function fakeParent(id = 'parent-1'): Agent {
-  return { id: SessionId(id) } as unknown as Agent
+  return {
+    id: SessionId(id),
+    session: { id: SessionId(id), header: { id: SessionId(id), cwd: process.cwd() }, append: vi.fn() },
+  } as unknown as Agent
 }
 
 const ALL_CAPS: SubagentCapabilities = {

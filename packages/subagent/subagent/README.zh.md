@@ -173,7 +173,7 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 <a id="parent-owned-catalog"></a>
 ## 父级持有的目录
 
-本地子 agent 创建成功后，会把一条 `subagent/catalog` 事实追加到父级 Session。一次性创建在提供方返回后记录；可继续创建在初始消息完成 inbox 准入后、返回子级 id 前记录。失败会释放子级而不发布补偿性 catalog 事件。一次性 catalog 追加失败会使该 run 被拒绝并保留 catalog 错误；dispose 失败只记录日志。`subagentCatalog` 投影排除 fork 继承的事实，并通过 Session 观察与客户端快照中的 `projections.values.subagentCatalog` 暴露直接子级列表。无效的自有 catalog 负载（包括不支持的版本）会拒绝投影恢复。其不可变存储与检查点校验使用 [`dsh-chunked-list`](../../util/chunked-list/README.zh.md)。视图按父级 catalog 事件顺序输出，D 条事实耗时 O(D)。排序、持久化成本与备选方案由[父级目录决策](../../../.agents/notes/implemented/architecture/2026-09-01-parent-owned-subagent-catalog.zh.md)记录。
+子 agent 创建成功后，会把一条 `subagent/catalog` 事实追加到父级 Session。一次性本地创建在提供方返回后记录；可继续创建在初始消息完成 inbox 准入后、返回子级 id 前记录。没有本地子会话的外部执行改为记录一条 version-2 `external` 叶条目，携带提供方铸造的 id 与调用方标签，使后代发现能把远端工作与本地子级一并列出；来自同步目录的 version-1 `unknown` 条目同样作为叶被接受。失败会释放子级而不发布补偿性 catalog 事件。一次性 catalog 追加失败会使该 run 被拒绝并保留 catalog 错误；dispose 失败只记录日志。`subagentCatalog` 投影排除 fork 继承的事实，并通过 Session 观察与客户端快照中的 `projections.values.subagentCatalog` 暴露直接子级列表。无效的自有 catalog 负载（包括不支持的版本）会拒绝投影恢复。其不可变存储与检查点校验使用 [`dsh-chunked-list`](../../util/chunked-list/README.zh.md)。视图按父级 catalog 事件顺序输出，D 条事实耗时 O(D)。排序、持久化成本与备选方案由[父级目录决策](../../../.agents/notes/implemented/architecture/2026-09-01-parent-owned-subagent-catalog.zh.md)记录。
 
 <a id="lifecycle-events"></a>
 ## 生命周期事件
