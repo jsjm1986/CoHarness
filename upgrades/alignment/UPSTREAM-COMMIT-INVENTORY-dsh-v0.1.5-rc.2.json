@@ -167,7 +167,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",
@@ -454,7 +454,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",
@@ -828,7 +828,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",
@@ -2018,7 +2018,7 @@
         "core/tools",
         "extensions/cordis-client-runner",
         "fs/tool-present",
-        "preset/agent-preset-registry"
+        "preset/agent-presets"
       ],
       "bucket": "carried"
     },
@@ -2531,7 +2531,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",
@@ -2847,7 +2847,7 @@
       "subject": "feat(minimal): align persistent bash output with the one-shot shell contract",
       "packages": [
         "bundle/sdk-minimal",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "shell/tool-bash-persistent"
       ],
       "bucket": "carried"
@@ -2940,7 +2940,7 @@
         "core/system-prompt",
         "core/tools",
         "extensions/tool-cordis",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "visualizer/tool-visualizer"
       ],
       "bucket": "carried"
@@ -3183,7 +3183,7 @@
         "core/system-prompt",
         "core/tools",
         "extensions/tool-cordis",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "visualizer/tool-visualizer"
       ],
       "bucket": "carried"
@@ -3392,7 +3392,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "sandbox/sandbox",
         "sandbox/sandbox-local",
         "sandbox/sandbox-policy",
@@ -5538,7 +5538,7 @@
       "packages": [
         "bundle/sdk-minimal",
         "client/ui-agent-preset",
-        "preset/agent-preset-registry"
+        "preset/agent-presets"
       ],
       "bucket": "carried"
     },
@@ -5935,7 +5935,7 @@
       "sha": "c46c3df2f250adc9117416a0f56e1ba5fc604bda",
       "subject": "test: cover projection-aware session helpers",
       "packages": [
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "session-query/session-query"
       ],
       "bucket": "carried"
@@ -6007,7 +6007,7 @@
         "jobs/jobs-local",
         "llm/llm-retry",
         "plan/plan-mode",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "schedule/schedule",
         "shell/tool-bash-persistent",
         "shell/tool-pwsh-persistent",
@@ -6043,7 +6043,7 @@
         "jobs/jobs-local",
         "llm/llm-retry",
         "plan/plan-mode",
-        "preset/agent-preset-registry",
+        "preset/agent-presets",
         "schedule/schedule",
         "session/session-projection",
         "shell/tool-bash-persistent",

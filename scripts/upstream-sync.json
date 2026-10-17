@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "syncedTag": "dsh-v0.2.0-rc.1",
-  "syncedCommit": "4878cdabd87d4041bdaff61d04c966883b9fd07a",
+  "syncedTag": "dsh-v0.2.1-rc.2",
+  "syncedCommit": "687f282e8625c6b8d11ff58211a90524be2e4317",
   "packages": {
     "acp/acp": {
       "sovereignty": "adapted"
@@ -56,7 +56,7 @@
     },
     "boot/plugin-market": {
       "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "boot/workspace-dependencies": {
       "sovereignty": "owned",
@@ -81,7 +81,7 @@
       "sovereignty": "tracked"
     },
     "bundle/web-app": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "client/connection": {
       "sovereignty": "adapted",
@@ -154,7 +154,6 @@
         "packages/client/ui-conversation/src/client/input/editor/ReferenceChip.module.css",
         "packages/client/ui-conversation/src/client/input/editor/ReferenceChip.tsx",
         "packages/client/ui-conversation/src/client/input/editor/chip-node.tsx",
-        "packages/client/ui-conversation/src/client/input/editor/claim-decor.ts",
         "packages/client/ui-conversation/src/client/input/editor/composer-editor.module.css",
         "packages/client/ui-conversation/src/client/input/editor/keymap.ts",
         "packages/client/ui-conversation/src/client/input/editor/projection.ts",
@@ -246,7 +245,7 @@
     },
     "client/ui-plugin-market": {
       "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "client/ui-primitives": {
       "sovereignty": "adapted",
@@ -389,7 +388,7 @@
       "sovereignty": "tracked"
     },
     "compaction/compaction-image-offload": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "compaction/compaction-tool-result-pruner": {
       "sovereignty": "tracked"
@@ -432,7 +431,7 @@
     },
     "context/harness-dev-context": {
       "note": ".agents/notes/implemented/bug-fix/2026-07-28-web-agent-runtime-context.md",
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "context/session-reference": {
       "sovereignty": "adapted"
@@ -457,10 +456,10 @@
       "note": ".agents/notes/implemented/bug-fix/2026-09-21-configured-agent-persistence-mount-race.md"
     },
     "core/agent-tool-presentation": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "core/scope": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "core/session": {
       "sovereignty": "adapted"
@@ -511,20 +510,20 @@
       "sovereignty": "tracked"
     },
     "experimental/api-speech-to-text": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "experimental/auto-review": {
       "sovereignty": "adapted"
     },
     "experimental/browser-use-chrome-devtools-mcp": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "experimental/browser-use-playwright-mcp": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "experimental/browser-use-runtime": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-10-15-session-working-directory.md"
     },
     "experimental/browser-use-stagehand-native": {
@@ -545,13 +544,13 @@
     },
     "experimental/plugin-market-bundle": {
       "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
-      "sovereignty": "owned"
+      "sovereignty": "tracked"
     },
     "experimental/ptc-runtime-python": {
       "sovereignty": "adapted"
     },
     "experimental/schedule-bundle": {
-      "sovereignty": "adapted",
+      "sovereignty": "owned",
       "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
     },
     "experimental/speech-to-text": {
@@ -566,7 +565,7 @@
       "sovereignty": "adapted"
     },
     "experimental/voice-input-bundle": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "extensions/cordis-client-runner": {
@@ -627,13 +626,13 @@
       "sovereignty": "adapted"
     },
     "hooks/hook-protocol": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "hooks/hooks-claude-code": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "hooks/hooks-codex": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "host/apiproxy": {
       "sovereignty": "owned"
@@ -753,7 +752,7 @@
     },
     "preset/agent-preset-registry": {
       "sovereignty": "adapted",
-      "note": "P5 two-package migration landed in 8a6aa525882: the upstream declaration model (register/generations/acquireScope/inspectCompositions) merged onto the fork file-discovery, authoring, inventory, and standing-generation core; realm split, trust governance, remote contract, and durable selection preserved"
+      "note": ".agents/notes/implemented/architecture/2026-10-22-preset-two-package-migration.md"
     },
     "preset/persona": {
       "sovereignty": "tracked"
@@ -762,19 +761,19 @@
       "sovereignty": "adapted"
     },
     "ptc-runtime/ptc-runtime-node": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "sandbox/sandbox": {
       "sovereignty": "tracked"
     },
     "sandbox/sandbox-local": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "sandbox/sandbox-policy": {
       "sovereignty": "tracked"
     },
     "sandbox/sandbox-windows-acl": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "schedule/schedule": {
       "sovereignty": "adapted"
@@ -801,7 +800,7 @@
       "sovereignty": "adapted"
     },
     "session-query/tool-session-query": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "session/session-checkpoint-policy": {
       "sovereignty": "tracked"
@@ -873,10 +872,10 @@
       "sovereignty": "adapted"
     },
     "session/session-title-all-prompts-llm": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned"
     },
     "session/session-title-first-prompt-llm": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "session/session-title-llm": {
       "sovereignty": "adapted"
@@ -885,10 +884,10 @@
       "sovereignty": "tracked"
     },
     "session/tool-working-directory": {
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "session/working-directory": {
-      "sovereignty": "owned",
+      "sovereignty": "adapted",
       "note": "packages/session/working-directory/README.md"
     },
     "settings/settings": {
@@ -902,13 +901,13 @@
       "sovereignty": "adapted"
     },
     "shell/bash-sandbox": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "shell/pwsh-local": {
       "sovereignty": "adapted"
     },
     "shell/pwsh-sandbox": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "shell/shell": {
       "sovereignty": "adapted"
@@ -932,19 +931,19 @@
       "sovereignty": "adapted"
     },
     "skill/skill-badge": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned"
     },
     "skill/skill-filesystem": {
       "sovereignty": "adapted"
     },
     "skill/skill-office": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "skill/tool-skill": {
       "sovereignty": "adapted"
     },
     "skill/tool-workspace-dependencies": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "spill/spill": {
       "sovereignty": "tracked"
@@ -965,7 +964,7 @@
       "sovereignty": "adapted"
     },
     "ssh/subprocess-ssh": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "storage/storage": {
       "sovereignty": "tracked"
@@ -1000,7 +999,7 @@
       "sovereignty": "adapted"
     },
     "subagent/subagent-in-process-driver": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "subagent/subagent-spawn-in-process": {
       "sovereignty": "adapted"
@@ -1027,7 +1026,7 @@
       "sovereignty": "adapted"
     },
     "terminal/tool-terminal": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "test-support/agent-loop-testkit": {
       "sovereignty": "adapted",
@@ -1038,7 +1037,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "test-support/llm-mock-server": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "test-support/llm-replay": {
       "sovereignty": "adapted"
@@ -1086,7 +1085,7 @@
       "sovereignty": "tracked"
     },
     "util/home-paths": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/http-proxy": {
       "sovereignty": "tracked"
@@ -1108,18 +1107,18 @@
       "sovereignty": "adapted"
     },
     "util/package-manifest": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
     },
     "util/plugin-market-index": {
       "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md",
-      "sovereignty": "owned"
+      "sovereignty": "tracked"
     },
     "util/time": {
       "sovereignty": "tracked"
     },
     "util/timeout": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/values": {
       "sovereignty": "adapted"
@@ -1135,7 +1134,7 @@
     },
     "web/web-deepseek-api": {
       "note": ".agents/notes/implemented/feature/2026-10-15-deepseek-search-fetch-api.md",
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "web/web-fetch-http": {
       "sovereignty": "adapted"
@@ -1150,13 +1149,13 @@
       "sovereignty": "adapted"
     },
     "webhook/webhook": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "webhook/webhook-github": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned"
     },
     "workflow/tool-ralph": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned"
     },
     "workflow/tool-workflow": {
       "sovereignty": "adapted"
@@ -1169,6 +1168,23 @@
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
+    },
+    "experimental/claude-code-mods": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/architecture/2026-10-21-experimental-claude-code-mods-extraction.md"
+    },
+    "experimental/client-ui-claude-code-mods": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-10-21-experimental-claude-code-mods-extraction.md"
+    },
+    "experimental/tool-worktree": {
+      "sovereignty": "tracked"
+    },
+    "experimental/worktree": {
+      "sovereignty": "tracked"
+    },
+    "ssh/ssh-helper-runtime": {
+      "sovereignty": "tracked"
     }
   },
   "upstreamOnly": [
@@ -1317,9 +1333,120 @@
       "replacedBy": "session/session-telemetry-otel"
     },
     {
-      "package": "runtime-diagnostics/invariants",
-      "reason": "upstream removed runtime invariant companions in dsh-v0.2.1-rc.2 (f028f25667d); projection/type gates own the former checks"
+      "package": "api/remote-access",
+      "reason": "upstream generalized Remote RBAC; the fork ports the access-snapshot concepts onto the collaboration authorize seam and keeps the controller-decomposition rejection",
+      "replacedBy": "context/collaboration"
+    },
+    {
+      "package": "client/ui-secret-mask",
+      "reason": "deferred: credential-masking display lane queued with the remaining UI completion items"
+    },
+    {
+      "package": "client/ui-deepseek-model-label-1017",
+      "reason": "temporary upstream release-badge plugin for the 1017 Flash model label; no fork product surface consumes it"
+    },
+    {
+      "package": "experimental/cua",
+      "reason": "Computer Use desktop-automation lane; no fork consumer"
+    },
+    {
+      "package": "experimental/cua-macos",
+      "reason": "macOS computer-use provider; no fork consumer"
+    },
+    {
+      "package": "experimental/inspector-profile",
+      "reason": "deferred: requires the excluded api/session-controller surface"
+    },
+    {
+      "package": "experimental/session-inspector",
+      "reason": "deferred: requires the excluded api/session-controller surface"
+    },
+    {
+      "package": "experimental/client-ui-cot-translation",
+      "reason": "deferred: requires the excluded deepseek-account provider surface"
+    },
+    {
+      "package": "experimental/cot-translation-bundle",
+      "reason": "deferred: requires the excluded deepseek-account provider surface"
+    },
+    {
+      "package": "experimental/translator",
+      "reason": "deferred: requires the excluded deepseek-account provider surface"
+    },
+    {
+      "package": "experimental/badge-skill-bundle",
+      "reason": "experimental bundle wrapper not carried; the fork composes skill-badge through its own preset/bundle surface"
+    },
+    {
+      "package": "experimental/ralph-bundle",
+      "reason": "experimental bundle wrapper not carried; the fork composes tool-ralph through its own preset/bundle surface"
+    },
+    {
+      "package": "experimental/session-titles-bundle",
+      "reason": "experimental bundle wrapper not carried; the fork composes session-title providers through its own preset/bundle surface"
+    },
+    {
+      "package": "experimental/terminal-bundle",
+      "reason": "experimental bundle wrapper not carried; the fork composes tool-terminal through its own preset/bundle surface"
+    },
+    {
+      "package": "experimental/session-search",
+      "reason": "experimental session-search lane not carried; pending decision on the workspace session-search tool surface"
+    },
+    {
+      "package": "schedule/tool-schedule",
+      "reason": "deferred: model-facing schedule tool declaration into presets is tracked as a remaining alignment gap; the fork ships schedule/schedule locally"
+    },
+    {
+      "package": "experimental/hook-protocol",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its hooks/ layout",
+      "replacedBy": "hooks/hook-protocol"
+    },
+    {
+      "package": "experimental/hooks-claude-code",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its hooks/ layout",
+      "replacedBy": "hooks/hooks-claude-code"
+    },
+    {
+      "package": "experimental/hooks-codex",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its hooks/ layout",
+      "replacedBy": "hooks/hooks-codex"
+    },
+    {
+      "package": "experimental/tool-terminal",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its terminal/ layout",
+      "replacedBy": "terminal/tool-terminal"
+    },
+    {
+      "package": "experimental/tool-ralph",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its workflow/ layout",
+      "replacedBy": "workflow/tool-ralph"
+    },
+    {
+      "package": "experimental/tool-session-query",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its session-query/ layout",
+      "replacedBy": "session-query/tool-session-query"
+    },
+    {
+      "package": "experimental/session-title-all-prompts-llm",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its session/ layout",
+      "replacedBy": "session/session-title-all-prompts-llm"
+    },
+    {
+      "package": "experimental/skill-badge",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its skill/ layout",
+      "replacedBy": "skill/skill-badge"
+    },
+    {
+      "package": "experimental/webhook",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its webhook/ layout",
+      "replacedBy": "webhook/webhook"
+    },
+    {
+      "package": "experimental/webhook-github",
+      "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its webhook/ layout",
+      "replacedBy": "webhook/webhook-github"
     }
   ],
-  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json"
+  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json"
 }

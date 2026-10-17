@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 3,
+  "reviewDate": "2026-10-22",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "previousTag": "dsh-v0.2.0-rc.1",
+    "previousCommit": "4878cdabd87d4041bdaff61d04c966883b9fd07a",
+    "targetTags": [
+      { "tag": "dsh-v0.2.1-alpha.1", "commit": "5badb15009ae1756c3afe0ae0cef1faafc290ccc" },
+      { "tag": "dsh-v0.2.1-alpha.2", "commit": "6851e496285b2c9670066fdd142e7e46da586649" },
+      { "tag": "dsh-v0.2.1-alpha.3", "commit": "2fbf4359b82fb94c03dcce0b831660d87f12ea5c" },
+      { "tag": "dsh-v0.2.1-alpha.4", "commit": "86a402200d95fecef4529d969836f1fe13c6cb0d" },
+      { "tag": "dsh-v0.2.1-alpha.5", "commit": "1517a4dbca0a2789ff1d41ba439600f8547d23fa" },
+      { "tag": "dsh-v0.2.1-rc.1", "commit": "1600d8a1e140dcde43a1a0941940a0480712c011" },
+      { "tag": "dsh-v0.2.1-rc.2", "commit": "687f282e8625c6b8d11ff58211a90524be2e4317" }
+    ]
+  },
+  "baseline": {
+    "commit": "8cb2cf1d3459d6fb121915c6b2e3375eef684af9",
+    "branch": "feat/upstream-sync-batch2"
+  },
+  "targetVersion": "0.2.1-rc.2.coharness.1",
+  "versionStatus": "proposed-release-families-unverified",
+  "status": "implementation-in-progress",
+  "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
+  "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json",
+  "auditEvidence": [
+    "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json",
+    "upgrades/alignment/UPSTREAM-RELEASE-NOTES-LEDGER-dsh-v0.2.1-rc.1.md",
+    ".agents/notes/implemented/architecture/2026-10-22-preset-two-package-migration.md",
+    ".agents/notes/implemented/architecture/2026-10-21-experimental-claude-code-mods-extraction.md"
+  ],
+  "verification": [
+    { "phase": "E12", "command": "pnpm exec tsx scripts/verify-upstream-sovereignty.ts", "exitCode": 0, "note": "63 tracked, 219 adapted, 46 owned, 2 replaced, 57 upstream-only package(s) conform to dsh-v0.2.1-rc.2" },
+    { "phase": "E12", "command": "pnpm run verify-upgrade-records", "exitCode": 0, "note": "20 record file(s) conform; rc.2 matrix partitions 9323 cumulative paths into 395 rows with 30 re-reviewed gate replays" },
+    { "phase": "E10", "command": "npx vitest run packages/preset/agent-preset-registry packages/preset/agent-preset", "exitCode": 0, "note": "188 preset tests pass including declared-generation lifecycle coverage" },
+    { "phase": "E9", "command": "pnpm exec tsc -b tsconfig.host.json tsconfig.client.json", "exitCode": 0, "note": "host and client aggregates compile after the invariant removal and claude-code-mods extraction" }
+  ],
+  "decisions": [
+    {
+      "id": "preset-two-package-migration",
+      "status": "adapt",
+      "localOwner": "preset owners",
+      "commitScope": ["packages/preset/"],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "agent-presets split into agent-preset + agent-preset-registry at 8a6aa525882; the upstream declaration model merged onto the fork file-discovery/authoring/inventory core; settings namespace preserved"
+    },
+    {
+      "id": "runtime-invariant-removal",
+      "status": "adapt",
+      "localOwner": "runtime diagnostics owners",
+      "commitScope": ["packages/", "scripts/", "docs/"],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream f028f25667d parity: 44 src/invariant.ts companions and their gates removed at b569ce4f87e; compensation specs retained where upstream kept them"
+    },
+    {
+      "id": "subagent-catalog-external-executions",
+      "status": "adapt",
+      "localOwner": "subagent owners",
+      "commitScope": ["packages/subagent/"],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "catalog gains versioned leaf entries for external executions at c73e7e911de; upstream unified-activation surface not ported by decision"
+    },
+    {
+      "id": "remote-access-concept-port",
+      "status": "adapt",
+      "localOwner": "collaboration/api owners",
+      "commitScope": ["packages/context/collaboration", "packages/api/"],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream api/remote-access RBAC concepts ported onto the collaboration.authorize seam at 95e354ad9ef; upstreamOnly records api/remote-access -> context/collaboration"
+    },
+    {
+      "id": "ssh-helper-runtime",
+      "status": "adapt",
+      "localOwner": "ssh owners",
+      "commitScope": ["packages/ssh/"],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "ported at 079462b5208 with executable launch kind adapted to the fork pipeline"
+    },
+    {
+      "id": "deepseek-search-fetch-apis",
+      "status": "adapt",
+      "localOwner": "web owners",
+      "commitScope": ["packages/web/web-deepseek-api"],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "rc.2 DeepSeek Search/Fetch API providers ported at a410ac34995 with a live provider switch"
+    },
+    {
+      "id": "claude-code-mods-extraction",
+      "status": "adapt",
+      "localOwner": "experimental owners",
+      "commitScope": ["packages/experimental/claude-code-mods", "packages/experimental/client-ui-claude-code-mods"],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "mod bridge and banner band extracted at 10cff3fb193 with import remaps; sibling experimental packages deferred with named blockers in the extraction note"
+    },
+    {
+      "id": "upgrade-guide-dispositions",
+      "status": "adapt",
+      "localOwner": "docs owners",
+      "commitScope": ["docs/upgrade-guide/", "upgrades/"],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "cb4fc43d05b: five upstream rc.2 guides not published because their underlying behavior is not carried; remove-runtime-invariants guide retained"
+    },
+    {
+      "id": "schedule-tool-preset-declaration",
+      "status": "defer",
+      "localOwner": "schedule/preset owners",
+      "commitScope": ["packages/schedule/", "packages/preset/"],
+      "reviewState": "deferred-platform-review",
+      "notes": "upstream schedule/tool-schedule declared into presets at rc.2; the fork ships schedule/schedule locally and records the preset declaration as an open gap"
+    },
+    {
+      "id": "python-alias-validation",
+      "status": "defer",
+      "localOwner": "python owners",
+      "commitScope": ["python/", "scripts/primary-runtime/"],
+      "reviewState": "deferred-platform-review",
+      "notes": "upstream primary-runtime python alias validation not carried; upgrade-guide disposition recorded at cb4fc43d05b"
+    },
+    {
+      "id": "bundled-numpy-pandas-tests",
+      "status": "defer",
+      "localOwner": "python owners",
+      "commitScope": ["python/"],
+      "reviewState": "deferred-platform-review",
+      "notes": "upstream exclusion of bundled NumPy/pandas test suites not carried; disposition recorded at cb4fc43d05b"
+    },
+    {
+      "id": "subpath-plugin-display-manifest",
+      "status": "defer",
+      "localOwner": "plugin-manager owners",
+      "commitScope": ["packages/boot/plugin-manager"],
+      "reviewState": "pending-cumulative-source-review",
+      "notes": "relevant code exists but requires deeper verification against upstream rc.2 semantics before the guide can be published"
+    },
+    {
+      "id": "ui-plugin-market-and-ui-gaps",
+      "status": "defer",
+      "localOwner": "client owners",
+      "commitScope": ["packages/client/"],
+      "reviewState": "deferred-platform-review",
+      "notes": "ui-plugin-market policy/violation review, ui-secret-mask, and remaining UI gap items queued; GUI-visible changes require the real-flow GIF before PR"
+    }
+  ]
+}

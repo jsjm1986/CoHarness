@@ -1897,11 +1897,11 @@
       "currentSovereignty": "adapted"
     },
     {
-      "area": "packages/preset/agent-preset-registry",
+      "area": "packages/preset/agent-presets",
       "status": "adapt",
-      "localOwner": "packages/preset/agent-preset-registry",
+      "localOwner": "packages/preset/agent-presets",
       "commitScope": [
-        "packages/preset/agent-preset-registry/"
+        "packages/preset/agent-presets/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "changeKind": "modified",

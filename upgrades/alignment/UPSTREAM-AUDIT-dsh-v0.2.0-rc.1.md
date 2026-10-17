@@ -9,7 +9,7 @@
 ## 架构级分叉（不允许文件级归并）
 
 1. **settings 存储模型**：上游 rc.1 把 settings 重写为 cordis profile patch 的 schema 投影并删除 `settings-file`；我方保留 settings.yaml + `projectWrite`/`projectWritePaths` + revision fencing 治理模型，`settings/settings-file` 降为 `owned`。上游的投影/脱敏/冲突处理按行为选择性吸收，绝不替换持久化地基。
-2. **preset 平面**：上游把 `preset/agent-preset-registry` 删除并拆为 `preset/agent-preset` + `preset/agent-preset-registry`（mount 424→272 行精简）；我方同路径扩展到 482 行且多出 Remote 契约/authoring/inventory 面。已批准迁移到上游双包结构，在 P5 独立相位把 remote/authoring/inventory 层重挂到新注册表上；迁移完成前 `preset/agent-preset-registry` 记 `owned`。
+2. **preset 平面**：上游把 `preset/agent-presets` 删除并拆为 `preset/agent-preset` + `preset/agent-preset-registry`（mount 424→272 行精简）；我方同路径扩展到 482 行且多出 Remote 契约/authoring/inventory 面。已批准迁移到上游双包结构，在 P5 独立相位把 remote/authoring/inventory 层重挂到新注册表上；迁移完成前 `preset/agent-presets` 记 `owned`。
 3. **session-format 同名碰撞**：上游 rc.1 新增 `packages/session/session-format-v3-to-v4`（streaming tool-role + attachment/link 迁移，V4），与我方同名 owned 包（流式块折叠，链已至 v6）语义完全不同。门禁新增 `upstreamShadowed` 字段表达「同键不同义」；上游 V4 事件内容（`developer/message`、`forked`、`plugin:<name>` source kind、attachment-link）作为 v6→v7 新边逐事件并入，已提交代次不可变。
 
 ## 编译/组合面硬约束
