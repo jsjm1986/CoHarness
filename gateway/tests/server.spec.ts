@@ -75,7 +75,7 @@ function installProjectCollaboration(deps: GatewayDeps): void {
     listConversations: () => [],
     readableSessionIds: () => [],
     setVisibility: () => { throw new Error('not implemented in route test') },
-    claimInteraction: () => false,
+    claimInteraction: () => false, listActivity: async () => ({ items: [] }),
   } satisfies GatewayCollaborationService
 }
 
@@ -470,7 +470,7 @@ describe('gateway server', () => {
       listConversations: () => [],
       readableSessionIds: () => [],
       setVisibility: () => { throw new Error('not implemented in context test') },
-      claimInteraction: () => false,
+      claimInteraction: () => false, listActivity: async () => ({ items: [] }),
     } satisfies GatewayCollaborationService
     const list = vi.spyOn(deps.projects, 'list')
     const detail = vi.spyOn(deps.projects, 'getById')
@@ -503,7 +503,7 @@ describe('gateway server', () => {
       listConversations: () => [],
       readableSessionIds: () => [],
       setVisibility: () => { throw new Error('not implemented in catalog test') },
-      claimInteraction: () => false,
+      claimInteraction: () => false, listActivity: async () => ({ items: [] }),
     } satisfies GatewayCollaborationService
     const cookie = await login(base, 'root-admin', 'pw-12345678')
     const response = await fetch(`${base}/account/api/workbench/catalog`, { headers: { cookie } })
@@ -564,7 +564,7 @@ describe('gateway server', () => {
       listConversations: () => [],
       readableSessionIds: () => [],
       setVisibility: () => { throw new Error('not implemented in legacy context test') },
-      claimInteraction: () => false,
+      claimInteraction: () => false, listActivity: async () => ({ items: [] }),
     } satisfies GatewayCollaborationService
     const detail = vi.spyOn(deps.projects, 'getById')
     const cookie = await login(base, 'root-admin', 'pw-12345678')
@@ -799,7 +799,7 @@ describe('gateway server', () => {
       listConversations: () => [],
       readableSessionIds: () => [],
       setVisibility: () => {},
-      claimInteraction: () => false,
+      claimInteraction: () => false, listActivity: async () => ({ items: [] }),
     }
     const cookie = await login(base, 'root-admin', 'pw-12345678')
     const response = await fetch(`${base}/account/api/conversations/%E0%A4%A`, {
@@ -817,7 +817,7 @@ it('checks the explicit project before returning or modifying a conversation wit
     projectsForUser: () => [], projectForUser: () => null,
     access: () => ({ sessionId: 'same', rootSessionId: 'same', projectId: 7, visibility: 'project', creatorUserId: 1,
       mode: 'rw', canRead: true, canWrite: true, canManage: true }),
-    listConversations: () => [], readableSessionIds: () => [], setVisibility, claimInteraction: () => false,
+    listConversations: () => [], readableSessionIds: () => [], setVisibility, claimInteraction: () => false, listActivity: async () => ({ items: [] }),
   }
   const cookie = await login(base, 'root-admin', 'pw-12345678')
   const headers = { cookie, origin: base, 'content-type': 'application/json' }

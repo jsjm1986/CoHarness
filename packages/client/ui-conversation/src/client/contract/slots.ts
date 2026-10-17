@@ -1028,6 +1028,17 @@ export interface ChatViewInjected {
   }
   /** Fork through the completed turn ending at the eligible message `seq`, then open the child. */
   forkAt: (seq: number) => void
+  /**
+   * Registrant hooks compartment: the renderer binds the pending cross-plugin
+   * reveal request for this Session to useRevealTarget (absent source when no
+   * viewport request exists — hook order stays constant).
+   */
+  hooks: {
+    /** Latest unrevealed scroll request naming a session-log seq in this Session. */
+    revealTarget: ObservableSnapshot<{ seq: number; nonce: number } | undefined>
+  }
+  /** Acknowledge the pending reveal request after the surface honors it. */
+  ackReveal: () => void
   /** Live work-details presentation policy derived from the persisted transcriptView preference. */
   presentation: ObservableSnapshot<ChatPresentationPolicy>
   /**
@@ -1043,7 +1054,7 @@ export interface ChatViewInjected {
 export type ChatViewSlotProps =
   PropsRuntime<'conversation.view'>
   & PropsRenderSlots<'conversation.chat.node' | 'conversation.message.images'>
-  & PropsStore<ChatStore> & ChatViewInjected & PropsLocale<'conversation'>
+  & PropsStore<ChatStore> & InjectFace<ChatViewInjected> & PropsLocale<'conversation'>
 
 /** Full props of the attachment plugin's composer entry. */
 export type ComposerAttachmentsProps =

@@ -47,6 +47,20 @@ export interface ConversationViewport {
    * @returns acceptance or an unknown-session result; duplicates only focus.
    */
   replaceActive(sessionId: SessionId): AddPaneResult
+  /** Focus a Session's pane and ask its chat surface to reveal one logged event.
+   * @param sessionId - visible, unarchived root Session.
+   * @param seq - event sequence the chat surface should bring into view.
+   */
+  reveal(sessionId: SessionId, seq: number): void
+  /** Observe the pending reveal request for one Session's chat surface.
+   * @param sessionId - Session whose surface may hold a pending request.
+   * @returns latest unrevealed request, or undefined once the surface acknowledges it.
+   */
+  revealTarget(sessionId: SessionId): ObservableSnapshot<{ seq: number; nonce: number } | undefined>
+  /** Mark a Session's pending reveal request consumed.
+   * @param sessionId - Session whose request was honored.
+   */
+  ackReveal(sessionId: SessionId): void
   /** Move one pane within the retained order, keeping its width preference.
    * @param sessionId - existing pane to move.
    * @param direction - adjacent position; moving past an end is a no-op.

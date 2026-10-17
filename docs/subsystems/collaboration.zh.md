@@ -207,6 +207,7 @@ interface CollaborationAuthority {
    * @param kind - interaction class whose ids occupy an independent namespace.
    * @param interactionId - stable approval or question request id.
    * @param outcome - exact response payload being committed.
+   * @param callId - tool call id when the pending interaction carries one.
    * @returns true for the first accepted responder; false after another responder won.
    */
   claimInteraction(
@@ -214,6 +215,7 @@ interface CollaborationAuthority {
     kind: CollaborationInteractionKind,
     interactionId: string,
     outcome: unknown,
+    callId?: string,
   ): Promise<boolean>
 }
 ```
@@ -330,9 +332,10 @@ abstract stamp(session: Session, message: UserMessage): Promise<UserMessage>
  * @param questionId - exact pending question identity verified by the transport.
  * @param answer - parser-validated answer.
  * @param scope - exact execution captured when the question opened.
+ * @param callId - tool call id of the pending question, when the transport carries one.
  * @returns whether the caller owns this answer, including an identical retry.
  */
-abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance): Promise<boolean>
+abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance, callId?: string): Promise<boolean>
 
 /**
  * Preserve captured execution identity across an asynchronous callback.

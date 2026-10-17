@@ -11,6 +11,7 @@ import type { PostgresRuntimeContext } from './runtime-context.ts'
 import { publicNumber } from './runtime-context.ts'
 import { transaction } from './database.ts'
 import type { ConversationVisibility } from './conversation-repository.ts'
+import type { ProjectActivityItem, ProjectActivityPage } from '../services.ts'
 
 interface AccessRow {
   session_id: string
@@ -29,6 +30,81 @@ interface LockedAuthority {
   userId: string
   accessMode: 'ro' | 'rw'
   administrator: boolean
+}
+
+interface ActivityRow {
+  kind: 'message' | 'answer'
+  session_id: string
+  seq: string
+  ts: Date
+  text: string | null
+  actor_label: string | null
+  actor_uid: string
+  question_args: string | null
+  outcome: unknown
+  conversation_title: string | null
+}
+
+/** Decode a `ts|sessionId|seq` feed cursor; malformed input reads as no cursor. */
+function parseActivityCursor(raw: string | undefined): { ts: string; sessionId: string; seq: number } | undefined {
+  if (raw === undefined) return undefined
+  const [tsRaw, sessionId, seqRaw] = raw.split('|')
+  const ts = Number(tsRaw)
+  const seq = Number(seqRaw)
+  if (tsRaw === undefined || sessionId === undefined || sessionId === '' || seqRaw === undefined
+    || !Number.isFinite(ts) || !Number.isSafeInteger(seq)) return undefined
+  return { ts: new Date(ts).toISOString(), sessionId, seq }
+}
+
+/** Render a claimed answer's selected labels and custom text into one bounded line. */
+function answerSummary(outcome: unknown): string {
+  const answers = (outcome as { answers?: unknown } | null)?.answers
+  if (!Array.isArray(answers)) return ''
+  return answers.map((entry) => {
+    const item = entry as { selected?: unknown; custom?: unknown }
+    const selected = Array.isArray(item.selected)
+      ? item.selected.filter((label): label is string => typeof label === 'string').join('、')
+      : ''
+    return [selected, typeof item.custom === 'string' ? item.custom : '']
+      .filter(text => text !== '').join('：')
+  }).filter(text => text !== '').join('；').slice(0, 300)
+}
+
+/** Extract the asked question texts from a serialized tool-call arguments payload. */
+function questionText(raw: string | null): string | undefined {
+  if (raw === null) return undefined
+  try {
+    const questions = (JSON.parse(raw) as { questions?: unknown }).questions
+    if (!Array.isArray(questions)) return undefined
+    const text = questions
+      .map(entry => (entry as { question?: unknown }).question)
+      .filter((question): question is string => typeof question === 'string' && question !== '')
+      .join('；').slice(0, 300)
+    return text === '' ? undefined : text
+  } catch {
+    return undefined
+  }
+}
+
+/** Normalize one UNION feed row into the wire item; `seq` -1 marks an unanchored answer. */
+function activityItem(row: ActivityRow): ProjectActivityItem {
+  const seq = Number(row.seq)
+  if (row.kind === 'message') {
+    return {
+      kind: 'message', sessionId: row.session_id, conversationTitle: row.conversation_title,
+      actorUserId: publicNumber(row.actor_uid, 'user'), actorLabel: row.actor_label ?? '',
+      occurredAt: row.ts.toISOString(), seq, text: row.text ?? '',
+    }
+  }
+  const question = questionText(row.question_args)
+  return {
+    kind: 'answer', sessionId: row.session_id, conversationTitle: row.conversation_title,
+    actorUserId: publicNumber(row.actor_uid, 'user'), actorLabel: row.actor_label ?? '',
+    occurredAt: row.ts.toISOString(), seq: seq < 0 ? null : seq,
+    text: answerSummary(row.outcome),
+    ...(question === undefined ? {} : { questionText: question }),
+    outcome: row.outcome,
+  }
 }
 
 /** PostgreSQL authority for project membership and shared-conversation access. */
@@ -422,6 +498,7 @@ export class PostgresCollaborationService {
     kind: 'approval' | 'question',
     interactionId: string,
     outcome: unknown,
+    callId?: string,
   ): Promise<boolean> {
     return transaction(this.context.pool, async (client) => {
       const locked = await this.lockedAccessRow(client, userId, sessionId, 'share')
@@ -434,12 +511,87 @@ export class PostgresCollaborationService {
       }
       const responderId = locked.authority.userId
       const inserted = await client.query(`INSERT INTO harness.conversation_interaction_responses(
-        organization_id,interaction_kind,interaction_id,conversation_id,responder_user_id,outcome
-      ) VALUES($1,$2,$3,$4,$5,$6::jsonb)
+        organization_id,interaction_kind,interaction_id,conversation_id,responder_user_id,outcome,call_id
+      ) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7)
       ON CONFLICT(organization_id,interaction_kind,interaction_id) DO NOTHING`,
-      [this.context.organizationId, kind, interactionId, locked.access.root_session_id, responderId, JSON.stringify(outcome)])
+      [this.context.organizationId, kind, interactionId, locked.access.root_session_id, responderId, JSON.stringify(outcome), callId ?? null])
       return inserted.rowCount === 1
     })
+  }
+
+  /**
+   * Read one page of member-activity rows for a project, newest first.
+   * @param userId - requesting member's public id; visibility matches listConversations.
+   * @param projectId - project public id whose root conversations feed the page.
+   * @param options - row cap (clamped to 200) and an opaque `before` cursor from the previous page.
+   * @returns normalized feed rows plus the cursor that resumes after the last row.
+   */
+  async listActivity(
+    userId: number,
+    projectId: number,
+    options: { limit: number; before?: string },
+  ): Promise<ProjectActivityPage> {
+    if (await this.projectForUser(projectId, userId) === null) throw new CollaborationDeniedError('not-member')
+    const before = parseActivityCursor(options.before)
+    const result = await this.context.pool.query<ActivityRow>(`WITH visible AS (
+      SELECT r.id,COALESCE(harness.human_session_title(r.title), (SELECT left(search.content, 80)
+        FROM harness.conversation_search search
+        WHERE search.session_id=r.id AND search.role='user'
+          AND harness.human_session_title(search.content) IS NOT NULL
+        ORDER BY search.occurred_at,search.event_seq LIMIT 1)) title
+      FROM harness.conversation_sessions r
+      JOIN harness.projects p ON p.id=r.project_id AND p.organization_id=r.organization_id
+      JOIN harness.users creator ON creator.id=r.creator_user_id AND creator.organization_id=r.organization_id
+      JOIN harness.users actor ON actor.organization_id=r.organization_id
+        AND actor.public_id=$3 AND actor.status='active'
+      JOIN harness.memberships membership ON membership.organization_id=r.organization_id
+        AND membership.user_id=actor.id AND membership.status='active'
+      LEFT JOIN harness.project_members member ON member.organization_id=r.organization_id
+        AND member.project_id=r.project_id AND member.user_id=actor.id
+      WHERE r.organization_id=$1 AND p.public_id=$2 AND r.id=r.root_session_id AND r.status<>'deleted'
+        AND (membership.role='admin' OR r.visibility='project' OR creator.id=actor.id)
+        AND (p.kind='steward' AND membership.role='admin' AND EXISTS (
+            SELECT 1 FROM harness.steward_access_policies sp
+            WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled)
+          OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))
+    ), feed AS (
+      SELECT 'message'::text kind,e.session_id,e.seq,e.occurred_at ts,
+        left(search_row.content,500) text,
+        COALESCE(NULLIF(e.event->'data'->'source'->'participant'->>'displayName',''),
+          e.event->'data'->'source'->'participant'->>'username') actor_label,
+        e.event->'data'->'source'->'participant'->>'userId' actor_uid,
+        NULL::text question_args,NULL::jsonb outcome
+      FROM harness.conversation_search search_row
+      JOIN harness.conversation_events e ON e.session_id=search_row.session_id
+        AND e.seq=search_row.event_seq
+      JOIN visible v ON v.id=e.session_id
+      WHERE search_row.role='user' AND e.event->'data'->'source'->'participant' IS NOT NULL
+      UNION ALL
+      SELECT 'answer',c.conversation_id,COALESCE(res.seq,-1),c.responded_at,
+        NULL,u.display_name,u.public_id::text,
+        call_args.event->'data'->>'arguments',c.outcome
+      FROM harness.conversation_interaction_responses c
+      JOIN visible v ON v.id=c.conversation_id
+      JOIN harness.users u ON u.id=c.responder_user_id AND u.organization_id=c.organization_id
+      LEFT JOIN harness.conversation_events res ON res.session_id=c.conversation_id
+        AND res.event_type='tool/result' AND res.event->'data'->>'callId'=c.call_id
+      LEFT JOIN harness.conversation_events call_args ON call_args.session_id=c.conversation_id
+        AND call_args.event_type='tool/call' AND call_args.event->'data'->>'callId'=c.call_id
+      WHERE c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
+    )
+    SELECT f.*,v.title conversation_title FROM feed f JOIN visible v ON v.id=f.session_id
+    WHERE ($4::timestamptz IS NULL OR (f.ts,f.session_id,f.seq) < ($4,$5,$6::bigint))
+    ORDER BY f.ts DESC,f.session_id,f.seq DESC LIMIT $7`,
+      [this.context.organizationId, projectId, userId,
+        before?.ts ?? null, before?.sessionId ?? '', before?.seq ?? 0,
+        Math.min(Math.max(options.limit, 1), 200) + 1])
+    const rows = result.rows.slice(0, Math.min(Math.max(options.limit, 1), 200))
+    const items = rows.map(row => activityItem(row))
+    const last = result.rows.length > rows.length ? rows.at(-1) : undefined
+    return {
+      items,
+      ...(last === undefined ? {} : { nextBefore: `${last.ts.getTime()}|${last.session_id}|${last.seq}` }),
+    }
   }
 
 }

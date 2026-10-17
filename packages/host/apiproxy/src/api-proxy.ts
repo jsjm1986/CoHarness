@@ -6523,6 +6523,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             'question',
             String(pending.rpcId),
             timedOut ? { timedOut: true } : { cancelled: true },
+            pending.wait?.callId,
           )) return { accepted: false, reason: 'not-pending' }
         } catch {
           return { accepted: false, reason: 'bad-response' }
@@ -6564,7 +6565,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const execution = executionAuthorityOf(ctx)
         const session = ctx.sessions.get(pending.sessionId)
         if (execution !== undefined) {
-          if (session === undefined || !await execution.answer(session, pending.rpcId, payload.answer, pending.executionScope)) {
+          if (session === undefined || !await execution.answer(session, pending.rpcId,
+            payload.answer, pending.executionScope, pending.wait?.callId)) {
             return { accepted: false, reason: 'not-pending' }
           }
         } else if (authorized.authority !== undefined && !await authorized.authority.claimInteraction(
@@ -6572,6 +6574,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           'question',
           String(pending.rpcId),
           payload.answer,
+          pending.wait?.callId,
         )) return { accepted: false, reason: 'not-pending' }
       } catch {
         return { accepted: false, reason: 'bad-response' }

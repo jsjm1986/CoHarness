@@ -646,9 +646,10 @@ export class GatewayExecutionIdentity {
    * @returns an idempotent claim and the canonical execution set
    */
   async question(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, value: unknown): Promise<ExecutionIdentityState & { claimed: true }> {
-    const request = object(value, ['sessionId', 'questionId', 'answer', 'scopeId'])
+    const request = object(value, ['sessionId', 'questionId', 'answer', 'scopeId', 'callId'])
     const sessionId = identity(request.sessionId), questionId = identity(request.questionId)
     const answer = JSON.stringify(request.answer)
+    const callId = request.callId === undefined ? null : identity(request.callId)
     if (answer === undefined) throw new ExecutionIdentityError(400, 'invalid execution question answer')
     const hash = createHash('sha256').update(request.scopeId === undefined ? answer
       : JSON.stringify({ answer: request.answer, scopeId: inputId(request.scopeId) })).digest('hex')
@@ -662,9 +663,9 @@ export class GatewayExecutionIdentity {
         const rootId = root.rows[0]?.root_session_id
         if (rootId === undefined) throw new ExecutionIdentityError(404, 'execution question Session is unavailable')
         await client.query(`INSERT INTO harness.conversation_interaction_responses(
-          organization_id,interaction_kind,interaction_id,conversation_id,responder_user_id,outcome)
-          VALUES($1,'question',$2,$3,$4,$5::jsonb) ON CONFLICT DO NOTHING`,
-        [subject.organizationId, questionId, rootId, actor, answer])
+          organization_id,interaction_kind,interaction_id,conversation_id,responder_user_id,outcome,call_id)
+          VALUES($1,'question',$2,$3,$4,$5::jsonb,$6) ON CONFLICT DO NOTHING`,
+        [subject.organizationId, questionId, rootId, actor, answer, callId])
         const claim = await client.query(`SELECT 1 FROM harness.conversation_interaction_responses
           WHERE organization_id=$1 AND interaction_kind='question' AND interaction_id=$2
             AND conversation_id=$3 AND responder_user_id=$4 AND outcome=$5::jsonb`,
