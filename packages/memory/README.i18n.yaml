@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/memory/README.md
+/:
+  en: 887fa8ea54258536
+  zh: 9e09aec8a6bc59f6
+/memory-space-scoped-durable-agent-memory:
+  en: be65785753625afa
+  zh: 7bdaa32d1dbfee13
+/memory-space-scoped-durable-agent-memory/summary:
+  en: 2f2c6b5b475ed027
+  zh: 67d4bf137e120ca4
+/memory-space-scoped-durable-agent-memory/table-of-contents:
+  en: 16927fd07fa4bdcf
+  zh: aa7981cbb012a76e
+/memory-space-scoped-durable-agent-memory/scope-spaces:
+  en: fe62735d48b6c352
+  zh: 1c45d0a6529be3f1
+/memory-space-scoped-durable-agent-memory/invariants:
+  en: 18f58fd38c5f6e95
+  zh: 799a6bc2630eaf1e
+/memory-space-scoped-durable-agent-memory/invariants/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

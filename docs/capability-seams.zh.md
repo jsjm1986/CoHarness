@@ -118,6 +118,10 @@ flowchart LR
   pkg_storage_domain["storage-domain"]
   svc_storageDomain["ctx.storageDomain<br/>Domain data facility"]
   pkg_workspace["workspace"]
+  pkg_memory["memory"]
+  svc_memory["ctx.memory<br/>Durable space-scoped memory records"]
+  pkg_memory_context["memory-context"]
+  pkg_tool_memory["tool-memory"]
   svc_messageFeedback["ctx.messageFeedback<br/>Lifecycle-bound message feedback"]
   pkg_workspace_changes["workspace-changes"]
   svc_workspaceChanges["ctx.workspaceChanges<br/>Host per-turn changed-file summaries"]
@@ -358,6 +362,7 @@ flowchart LR
   pkg_lsp_local --> svc_lsp
   pkg_mcp_client --> svc_mcpResources
   pkg_mcp_resources --> svc_mcpResources
+  pkg_memory --> svc_memory
   pkg_message_feedback --> svc_messageFeedback
   pkg_model_access --> svc_modelAccess
   pkg_model_provider_config --> svc_modelProviderConfig
@@ -497,6 +502,8 @@ flowchart LR
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
   svc_mcpResources --> pkg_mcp_resources
+  svc_memory --> pkg_memory_context
+  svc_memory --> pkg_tool_memory
   svc_modelAccess --> pkg_apiproxy
   svc_modelProviderConfig --> pkg_apiproxy
   svc_modelProviderConfig --> pkg_llm_pi_ai
@@ -551,6 +558,7 @@ flowchart LR
   svc_ssh --> pkg_sandbox_ssh
   svc_ssh --> pkg_subprocess_ssh
   svc_storage --> pkg_storage_domain
+  svc_storageDomain --> pkg_memory
   svc_storageDomain --> pkg_message_feedback
   svc_storageDomain --> pkg_workspace
   svc_subagentModelSelection --> pkg_tool_subagent
@@ -659,7 +667,8 @@ flowchart LR
 | `ctx.authorization` | `seam` | [`authorization`](../packages/credentials/authorization) | - | [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | flow 由了解如何取得某条凭据的插件注册，并以其写入的记录为键；seam 拥有交互和每键一次尝试的生命周期，但不拥有协议。 |
 | `ctx.sessionTelemetry` | `seam` | [`session-telemetry`](../packages/session/session-telemetry) | [`session-telemetry-otel`](../packages/session/session-telemetry-otel) | - | - | 该 seam 捕获会话记录、进行脱敏并交给一个后端；没有其他组件消费该服务，其输出会离开当前进程。 |
 | `ctx.storage` | `seam` | [`storage`](../packages/storage/storage) | [`storage-json`](../packages/storage/storage-json), [`storage-sqlite`](../packages/storage/storage-sqlite) | [`storage-domain`](../packages/storage/storage-domain) | - | 各后端以不同名称并列注册；数据形态（领域优先）挂载到枢纽上，并将类型化操作转换为不透明的 KV 单元原语。 |
-| `ctx.storageDomain` | `core` | [`storage-domain`](../packages/storage/storage-domain) | - | [`workspace`](../packages/workspace/workspace), [`message-feedback`](../packages/feedback/message-feedback) | - | 等待所有已配置后端就绪，然后将领域形态发布为一个受生命周期约束的服务，用于类型化持久状态。 |
+| `ctx.storageDomain` | `core` | [`storage-domain`](../packages/storage/storage-domain) | - | [`workspace`](../packages/workspace/workspace), [`message-feedback`](../packages/feedback/message-feedback), [`memory`](../packages/memory/memory) | - | 等待所有已配置后端就绪，然后将领域形态发布为一个受生命周期约束的服务，用于类型化持久状态。 |
+| `ctx.memory` | `core` | [`memory`](../packages/memory/memory) | - | [`memory-context`](../packages/memory/memory-context), [`tool-memory`](../packages/memory/tool-memory) | - | 将按作用域的创建与修订校验写入经由 storageDomain 串行化，在提交点发出 memory/changed 事件，并通过执行授权能力复核项目写入。 |
 | `ctx.messageFeedback` | `core` | [`message-feedback`](../packages/feedback/message-feedback) | - | - | - | 拥有本地逐 assistant 消息反馈、生命周期与目标校验、逐条目 compare-and-set 及 Host 一元 Remote 契约，且不进入 Session 历史或遥测。 |
 | `ctx.workspaceChanges` | `core` | [`workspace-changes`](../packages/deliverables/workspace-changes) | - | - | - | 按 Session 与事件序号提供 workspace/changes 公告的摘要及各文件的轮次前后比较，直至该 Session 释放；日志仅携带轮次。 |
 | `ctx.workspaceRegistry` | `core` | [`workspace`](../packages/workspace/workspace) | - | `apiproxy` | - | 通过领域设施拥有带 WorkspaceId 品牌类型的记录；稳定的 sessionIds 账户驱动 Host RPC 与 GUI 投影。 |

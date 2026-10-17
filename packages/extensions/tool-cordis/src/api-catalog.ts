@@ -1505,6 +1505,59 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'memory',
+    summary: 'Durable per-scope memory.',
+    description: 'Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`, `search`) are lock-free; writes serialize on a single chain inside the service so create/duplicate, revision, and full checks stay atomic.',
+    methods: [
+      {
+        signature: 'readonly space: \'personal\' | \'project\'',
+        description: 'The space selected at composition (`personal` or `project`).',
+        parameters: [],
+      },
+      {
+        signature: 'readonly limits: { readonly entryMaxBytes: number readonly summaryMaxChars: number readonly maxEntriesPerScope: number readonly searchMaxResults: number }',
+        description: 'Resolved write/search bounds.',
+        parameters: [],
+      },
+      {
+        signature: 'scopesFor(agent: Agent): readonly MemoryScope[]',
+        description: 'The scopes this space offers a session. `personal` space returns the personal scope plus, when the session header carries `cwd`, the workspace scope keyed by `(cwd, sshTarget)`; `project` space returns the shared project scope only.',
+        parameters: [{ name: 'agent', description: 'The session\'s agent.' }],
+        returns: 'scopes in catalog order.',
+      },
+      {
+        signature: 'async read(scope: MemoryScope, key: string): Promise<MemoryEntry | undefined>',
+        description: 'Look up one entry by scope and raw key. A malformed key simply cannot exist, so this resolves `undefined` rather than raising.',
+        parameters: [{ name: 'scope', description: 'The scope to read.' }, { name: 'key', description: 'Raw key text.' }],
+        returns: 'the stored entry, if any.',
+      },
+      {
+        signature: 'async list(scope: MemoryScope): Promise<MemoryEntrySummary[]>',
+        description: 'Catalog rows of one scope in catalog order: kind (guidance, profile, background, resource), then `updated.at` desc, then key asc.',
+        parameters: [{ name: 'scope', description: 'The scope to list.' }],
+        returns: 'the ordered catalog rows (entries without bodies).',
+      },
+      {
+        signature: 'async search( scopes: readonly MemoryScope[], query: string, ): Promise<MemorySearchHit[] | { ok: false; code: \'memory_invalid\'; reason: \'query\' }>',
+        description: 'Bounded term search across scopes. Scores every entry (key ×3, summary ×2, content ×1; whole-query containment `+10×w`, per contained term `+w×(1+min(occurrences,5))`), keeps score > 0, orders score desc, `updated.at` desc, key asc, caps at `searchMaxResults`.',
+        parameters: [{ name: 'scopes', description: 'Scopes to search (typically {@link scopesFor}).' }, { name: 'query', description: 'Raw query; NFKC-folded and lowercased.' }],
+        returns: 'ranked hits, or a `memory_invalid`/`query` refusal on empty input.',
+      },
+      {
+        signature: 'save(request: MemorySaveRequest, writer: MemoryWriter): Promise<MemoryWriteResult>',
+        description: 'Create or replace an entry. Without `expectedRevision` the write is create-only (`memory_exists` when the key is used); with it the write is replace-only (`memory_not_found`, `memory_stale`). Replaces are immune to the scope cap; creates refuse `memory_full` at it.',
+        parameters: [{ name: 'request', description: 'The save input.' }, { name: 'writer', description: 'Who is writing (agent today).' }],
+        returns: 'the committed entry and the replaced record, or a refusal.',
+      },
+      {
+        signature: 'delete(request: MemoryDeleteRequest, writer: MemoryWriter): Promise<MemoryWriteResult>',
+        description: 'Remove an entry. `expectedRevision` absent deletes unconditionally; present deletes only on a match (`memory_stale` otherwise). A missing key is always `memory_not_found`.',
+        parameters: [{ name: 'request', description: 'The delete input.' }, { name: 'writer', description: 'Who is deleting.' }],
+        returns: 'the removed entry, or a refusal.',
+      },
+    ],
+  },
+  {
     key: 'messageFeedback',
     summary: 'Storage-domain sidecar service.',
     description: 'Storage-domain sidecar service. It inspects persisted Session history and never creates or resumes an Agent or Session.',
@@ -4339,6 +4392,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'serverName', description: 'configured MCP server identity.' }, { name: 'invocation', description: 'immutable caller and invocation-owned transport cancellation.' }, { name: 'next', description: 'dispatch the request once policy admits it.' }],
   },
   {
+    name: 'memory/changed',
+    mode: 'emit',
+    signature: '\'memory/changed\'(this: Context, scope: string, key: string): void',
+    summary: 'Emitted after a memory write commits.',
+    description: 'Emitted after a memory write commits. Consumers re-read through the service; the payload names the touched scope id and key only.',
+    parameters: [{ name: 'scope', description: 'The scope id of the written entry.' }, { name: 'key', description: 'The entry key.' }],
+  },
+  {
     name: 'model-provider-config/updated',
     mode: 'emit',
     signature: '\'model-provider-config/updated\'(revision: number): void',
@@ -5869,6 +5930,62 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'McpResourceRequest',
     declaration: 'export type McpResourceRequest = {\n    method: \'resources/list\' | \'resources/templates/list\';\n    cursor?: string;\n} | {\n    method: \'resources/read\';\n    uri: string;\n};',
+  },
+  {
+    name: 'MemoryAttribution',
+    declaration: 'export interface MemoryAttribution {\n    readonly source: \'agent\' | \'extraction\' | \'consolidation\' | \'member\';\n    readonly sessionId?: SessionId;\n    readonly userId?: number;\n    readonly at: string;\n}',
+  },
+  {
+    name: 'MemoryDeleteRequest',
+    declaration: 'export interface MemoryDeleteRequest {\n    scope: MemoryScope;\n    key: string;\n    expectedRevision?: MemoryRevision;\n}',
+  },
+  {
+    name: 'MemoryEntry',
+    declaration: 'export interface MemoryEntry {\n    readonly scope: MemoryScope;\n    readonly key: MemoryKey;\n    readonly kind: MemoryKind;\n    readonly summary: string;\n    readonly content: string;\n    readonly revision: MemoryRevision;\n    readonly created: MemoryAttribution;\n    readonly updated: MemoryAttribution;\n}',
+  },
+  {
+    name: 'MemoryEntrySummary',
+    declaration: 'export type MemoryEntrySummary = Omit<MemoryEntry, \'content\'>;',
+  },
+  {
+    name: 'MemoryInvalidReason',
+    declaration: 'export type MemoryInvalidReason = \'key\' | \'summary\' | \'content\' | \'query\' | \'scope-unavailable\' | \'workspace-mismatch\';',
+  },
+  {
+    name: 'MemoryKey',
+    declaration: 'export type MemoryKey = Branded<\'MemoryKey\'>;',
+  },
+  {
+    name: 'MemoryKind',
+    declaration: 'export type MemoryKind = \'profile\' | \'guidance\' | \'background\' | \'resource\';',
+  },
+  {
+    name: 'MemoryRefusalCode',
+    declaration: 'export type MemoryRefusalCode = \'memory_exists\' | \'memory_not_found\' | \'memory_stale\' | \'memory_full\' | \'memory_invalid\';',
+  },
+  {
+    name: 'MemoryRevision',
+    declaration: 'export type MemoryRevision = Branded<\'MemoryRevision\'>;',
+  },
+  {
+    name: 'MemorySaveRequest',
+    declaration: 'export interface MemorySaveRequest {\n    scope: MemoryScope;\n    key: string;\n    kind: MemoryKind;\n    summary: string;\n    content: string;\n    expectedRevision?: MemoryRevision;\n}',
+  },
+  {
+    name: 'MemoryScope',
+    declaration: 'export type MemoryScope = {\n    readonly kind: \'personal\';\n} | {\n    readonly kind: \'workspace\';\n    readonly directory: string;\n    readonly sshTarget?: number;\n} | {\n    readonly kind: \'project\';\n};',
+  },
+  {
+    name: 'MemorySearchHit',
+    declaration: 'export interface MemorySearchHit {\n    readonly entry: MemoryEntrySummary;\n    readonly excerpt: string;\n    readonly score: number;\n}',
+  },
+  {
+    name: 'MemoryWriter',
+    declaration: 'export type MemoryWriter = {\n    readonly kind: \'agent\';\n    readonly agent: Agent;\n    readonly signal?: AbortSignal;\n};',
+  },
+  {
+    name: 'MemoryWriteResult',
+    declaration: 'export type MemoryWriteResult = {\n    readonly ok: true;\n    readonly operation: \'create\' | \'update\' | \'delete\';\n    readonly entry: MemoryEntry;\n    readonly previous?: MemoryEntry;\n} | {\n    readonly ok: false;\n    readonly code: MemoryRefusalCode;\n    readonly reason: MemoryInvalidReason | undefined;\n};',
   },
   {
     name: 'Message',

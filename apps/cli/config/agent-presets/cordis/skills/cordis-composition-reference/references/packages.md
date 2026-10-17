@@ -301,6 +301,14 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-mcp-client` | yes | MCP client bridge: connects to MCP servers and registers their tools on ctx.tools |
 | `@deepseek-ai/dsh-mcp-resources` | no | Scoped MCP resource discovery and reading through shared model tools |
 
+## memory
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-memory` | yes | Host-plane durable per-scope memory service: scoped facts that survive sessions |
+| `@deepseek-ai/dsh-memory-context` | yes | Agent-plane saved-memory catalog publication as durable user messages |
+| `@deepseek-ai/dsh-tool-memory` | no | Model-facing memory_search/read/save/delete tools plus saved-memory system-prompt guidance |
+
 ## plan
 
 | Package | Config | Description |
