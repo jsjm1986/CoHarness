@@ -44,7 +44,7 @@ After publication, the provider sends the prompt and collects streamed `agent_me
 <a id="capabilities-and-context"></a>
 ## Capabilities and context
 
-ACP advertises no start-time capabilities because this process cannot enforce the remote child's depth, tool filter, persona, or structured-output runtime. It also reports `inheritsParentContext: false`: the remote session starts fresh, and the only parent-derived input is the workspace cwd described above — no conversation context crosses the process boundary.
+ACP advertises no start-time capabilities because this process cannot enforce the remote child's preset, route options, depth, or structured-output runtime. It also reports `inheritsParentContext: false`: the remote session starts fresh, and the only parent-derived input is the workspace cwd described above — no conversation context crosses the process boundary.
 
 <a id="configuration"></a>
 ## Configuration
@@ -114,7 +114,7 @@ The package has no default export. Cordis loader unwrapping would otherwise hide
 
 #### What the model sees
 
-The remote child receives the standalone task content through ACP plus its own process's configured system prompt, tools, and fresh session. It receives no parent conversation. This provider advertises no optional start-time capabilities, so the local service rejects requests for `agentOptions`, persona, tool filtering, depth enforcement, or structured output instead of silently omitting them.
+The remote child receives the standalone task content through ACP plus its own process's configured system prompt, tools, and fresh session. It receives no parent conversation. This provider advertises no optional start-time capabilities, so the local service rejects requests for `agentPreset`, `agentOptions`, depth enforcement, or structured output instead of silently omitting them.
 
 #### Token effect
 
@@ -142,7 +142,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **A fresh process per run** — persistent-process pooling is a future optimization ([the seam Agent Note](../../../.agents/notes/implemented/feature/2026-06-21-subagent-capability-seam.md)).
 - **Remote prerequisites** — SSH targets need a preinstalled compatible ACP program with `loadSession`; this package never installs it or falls back to the Host.
-- **No optional start-time capabilities** — this provider cannot apply the local harness's `outputSchema`, depth cap, tool filter, or persona inside the remote process, so it advertises none and the service rejects requests that require them.
+- **No optional start-time capabilities** — this provider cannot apply `agentPreset`, `agentOptions`, `outputSchema`, or a depth cap inside the remote process, so it advertises none and the service rejects requests that require them.
 - **Only committed `agent_message_chunk` text is collected** — the automation server keeps reasoning, tool activity, plans, and other trace data in the child session log rather than emitting them on ACP.
 - **Permission prompts are auto-answered** (`permission: allow | reject`) — no human is surfaced a child's `session/request_permission`.
 

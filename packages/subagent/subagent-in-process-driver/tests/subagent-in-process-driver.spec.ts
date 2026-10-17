@@ -404,10 +404,17 @@ describe('startInProcessRun', () => {
     const { ctx, parent } = await setup([])
     const beforeAgents = ctx.agents.list().length
     const beforeSessions = ctx.sessions.list().length
-    await expect(startInProcessRun({
+    const failure = await startInProcessRun({
       ...request(parent),
-      toolFilter: { deny: ['unknown-tool'] },
-    }, {})).rejects.toThrow('unknown global tool')
+      agentPreset: 'missing-preset',
+      descriptor: snapshotSubagentDescriptor({
+        mode: 'continuable',
+        provider: 'test',
+        label: 'child task',
+      }),
+    }, {}).then(() => undefined, (error: unknown) => error)
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure instanceof Error ? failure.message : '').toContain('agent-presets service')
     expect(ctx.agents.list()).toHaveLength(beforeAgents)
     expect(ctx.sessions.list()).toHaveLength(beforeSessions)
   })

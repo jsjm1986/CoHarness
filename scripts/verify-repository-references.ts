@@ -20,6 +20,9 @@ const excludedPrefixes = [
   'upgrades/',
   'scripts/upstream-sync.json',
   'scripts/verify-upstream-sovereignty.spec.ts',
+  // Generated lockfiles cannot carry maintainer references; a hex-sized field
+  // colliding with a commit prefix is coincidental.
+  'python/sdk/uv.lock',
 ]
 const gitOutputLimit = 64 * 1024 * 1024
 

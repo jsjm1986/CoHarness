@@ -877,16 +877,17 @@ export class SubagentRuntime extends TypertRemoteService {
   }
 
   /** Reject the first requested capability that the provider lacks. */
-  private assertCapabilities(
-    provider: SubagentProvider,
-    request: Pick<SubagentStartRequest, 'agentOptions' | 'outputSchema' | 'maxDepth' | 'toolFilter' | 'persona'>,
-  ): void {
+  private assertCapabilities(provider: SubagentProvider, request: Omit<SubagentStartRequest, 'label' | 'signal'>): void {
+    if (request.agentPreset !== undefined && (!provider.capabilities.agentPreset || provider.inheritsParentContext)) {
+      throw new SubagentError(
+        `subagent provider "${provider.name}" does not support independent agent preset selection`,
+        'UNSUPPORTED_CAPABILITY',
+      )
+    }
     const needs: { when: boolean; cap: keyof SubagentCapabilities }[] = [
       { when: request.agentOptions !== undefined, cap: 'agentOptions' },
       { when: request.outputSchema !== undefined, cap: 'outputSchema' },
       { when: request.maxDepth !== undefined, cap: 'depthLimit' },
-      { when: request.toolFilter !== undefined, cap: 'toolFilter' },
-      { when: request.persona !== undefined, cap: 'persona' },
     ]
     for (const { when, cap } of needs) {
       if (when && !provider.capabilities[cap]) {
@@ -897,6 +898,7 @@ export class SubagentRuntime extends TypertRemoteService {
       }
     }
   }
+
 }
 
 export default SubagentRuntime

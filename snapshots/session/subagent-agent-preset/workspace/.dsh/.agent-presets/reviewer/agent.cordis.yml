@@ -1,0 +1,13 @@
+# Reviewer preset: file-reading persona plus a scoped delegation tool.
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    prefix: You are a file reviewer. Inspect the requested files and report your findings.
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+- id: reviewer-delegate
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: spawn
+    toolName: reviewer_delegate
+    modelSelectionSettings: true

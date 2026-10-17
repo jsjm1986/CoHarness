@@ -50,15 +50,14 @@ function limitSubagentDiagnostic(diagnostic: string): string {
 /**
  * The capability advertisement of an out-of-process backend: NONE. A child in
  * another process cannot honor parent-enforced start features
- * (`outputSchema`/`maxDepth`/`toolFilter`/`persona`), so the service rejects a
+ * (`agentOptions`/`agentPreset`/`outputSchema`/`maxDepth`), so the service rejects a
  * request needing any of them before `start` runs — never accepted-then-ignored.
  */
 export const NO_START_CAPABILITIES: SubagentCapabilities = Object.freeze({
+  agentOptions: false,
+  agentPreset: false,
   outputSchema: false,
   depthLimit: false,
-  toolFilter: false,
-  persona: false,
-  agentOptions: false,
 })
 
 /**

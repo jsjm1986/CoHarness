@@ -13,6 +13,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-agent-presets'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { foldConsumedWork } from '@deepseek-ai/dsh-agent'
@@ -129,10 +130,10 @@ export async function startInProcessRun(
     // durably on the child before composition and publication.
     await workingDirectory.set(child, request.cwd, request.signal)
     appendDelegatedPolicyOverrides(childCtx, child.session, inherited)
-    applyChildComposition(childCtx, parent, {
-      persona: request.persona,
-      toolFilter: request.toolFilter,
-    })
+    await applyChildComposition(childCtx, parent, { agentPreset: request.agentPreset })
+    if (request.agentPreset !== undefined) {
+      child.session.append('agent-preset/selected', { agentPreset: request.agentPreset })
+    }
     if (request.outputSchema !== undefined) {
       const runtime = childCtx.get('subagents')
       structured = attachStructuredRuntime(childCtx, request.outputSchema, () =>
@@ -147,7 +148,7 @@ export async function startInProcessRun(
   const handle = await parent.ctx.agents.create({
     sessionId: childId,
     parentAgent: parent,
-    meta: childSessionMeta(parent, childDepth, seed !== undefined),
+    meta: childSessionMeta(parent, childDepth, seed !== undefined, request.agentPreset),
     ...seed !== undefined ? { seed } : {},
     ...seed === undefined ? {} : { inheritedEventCount: activationBoundary },
     agentOptions: resolveChildAgentOptions(parent, request.agentOptions, childDepth),

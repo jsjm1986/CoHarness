@@ -12,20 +12,26 @@
   en: 1f703bada27ba909
   zh: a610f688d9cb8a75
 /deepseek-ai-dsh-subagent/table-of-contents:
-  en: 06ae5a99ee48a53d
-  zh: dfc2f378e2fe6d42
+  en: cb2346e239532669
+  zh: 96be653e1482895a
 /deepseek-ai-dsh-subagent/service-api:
-  en: 58a30d958fe53078
-  zh: 3b79e84f05f46323
+  en: fb847c698ea8e753
+  zh: fc61f14f28e59288
 /deepseek-ai-dsh-subagent/configuration:
   en: 5111984e43d3217f
   zh: f88f26215b72548c
 /deepseek-ai-dsh-subagent/capabilities:
-  en: fe3be6aefb1c0366
-  zh: 5e902a54e31161a1
+  en: 3b9745640525c3a5
+  zh: ca8504fe9b767112
+/deepseek-ai-dsh-subagent/child-presets:
+  en: 99ee91095f24fce1
+  zh: 7e854b9cdddeefcd
 /deepseek-ai-dsh-subagent/the-durable-descriptor:
-  en: f6adddd7bd4cf43c
-  zh: d08906b8584711c0
+  en: 33d68eba183a20ed
+  zh: b8d3e4397381a046
+/deepseek-ai-dsh-subagent/restoring-child-composition:
+  en: f0ddc94cc6b8942e
+  zh: 49facfab541c552d
 /deepseek-ai-dsh-subagent/delegation-depth:
   en: d1faff40fbf03204
   zh: 097c2d8f51ef955c

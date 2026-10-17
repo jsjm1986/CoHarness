@@ -61,6 +61,8 @@ import SessionStore, {
   type SessionHeader,
 } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 // Empty type imports carry the webServer/agents/sessionPersistence Context merges.
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -781,23 +783,19 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
 /**
  * Serialize a live session to the canonical raw session-JSONL layout — the
  * in-memory record-mode harvest, so the on-disk zstd default never matters.
+ * @param session - Captured live Session, including any inherited fork prefix.
+ * @returns Current-writer Session JSONL.
  */
-function rawSessionLog(session: Session): string {
-  const header = session.header
+export function rawSessionLog(session: Session): string {
+  const encodedEvents = (session.snapshotEvents() as unknown as readonly SessionFormatEvent[])
+    .map(event => sessionFormatCatalog.encodeCurrentEvent(event))
+  const header = sessionFormatCatalog.encodeCurrentHeader({
+    ...session.header,
+    delegationDepth: session.header.delegationDepth ?? 0,
+  }, session.inheritedEventCount)
   return [
-    JSON.stringify({
-      type: 'session',
-      version: header.version,
-      id: header.id,
-      createdAt: header.createdAt,
-      ...header.cwd === undefined ? {} : { cwd: header.cwd },
-      ...header.parentSession === undefined ? {} : { parentSession: header.parentSession },
-      isSeeded: header.isSeeded,
-      ...header.origin === undefined ? {} : { origin: header.origin },
-      ...header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth },
-      ...header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset },
-    }),
-    ...session.snapshotEvents().map(event => JSON.stringify(event)),
+    JSON.stringify(header),
+    ...encodedEvents.map(record => JSON.stringify(record)),
     '',
   ].join('\n')
 }

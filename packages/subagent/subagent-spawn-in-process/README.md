@@ -30,12 +30,12 @@ The spawn provider creates a fresh child `Agent` in the current process. The chi
 
 `start(request)` delegates to [`startInProcessRun`](../subagent-in-process-driver/README.md) with no seed and awaits publication before returning. The child receives parent working-directory/session lineage and inherits the parent's latest logged provider/model route unless overridden; it falls back to the parent's creation options before the first request is logged, but starts with an empty conversation.
 
-The shared driver owns depth checking, persona and tool-filter setup, structured output, required-signal cancellation, one-shot execution, result reading, and quiescent disposal. A startup rejection leaves no published child; provider unload after fulfillment does not revoke the holder-owned run.
+The shared driver owns depth checking, preset composition and descriptor replay, structured output, required-signal cancellation, one-shot execution, result reading, and quiescent disposal. A startup rejection leaves no published child; provider unload after fulfillment does not revoke the holder-owned run.
 
 <a id="capabilities"></a>
 ## Capabilities
 
-Spawn advertises `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: true }` because it controls the child's creation window and can enforce all four features.
+Spawn advertises `{ agentOptions: true, agentPreset: true, outputSchema: true, depthLimit: true }` because it constructs a fresh child and can enforce all four features. An `agentPreset` on the start request mounts that preset instead of inheriting the parent's composition.
 
 <a id="config"></a>
 ## Config
@@ -56,15 +56,15 @@ Spawn advertises `{ outputSchema: true, depthLimit: true, toolFilter: true, pers
 
 #### What the model sees
 
-The fresh child receives the task content verbatim as its only user message in a new empty conversation, with the parent provider, model, reasoning effort, output-token limit, and working directory by default. A configured persona shadows global prompt text in the child's scope; a tool filter removes named global tools from its schemas, executable lookup, and PTC mode SDK bindings while leaving independently registered guidance. No parent conversation message is included; the filter is composition, not an inherited authority grant.
+The fresh child receives the task content verbatim as its only user message in a new empty conversation, with the parent provider, model, reasoning effort, output-token limit, and working directory by default. The inherited or selected preset supplies tools and prompt sections. No parent conversation message is included.
 
 #### Token effect
 
-The child pays for a new independent context and history, and no parent-history token is duplicated. A persona changes the child's repeated prompt cost; a tool filter changes its schema or generated SDK cost.
+The child pays for a new independent context and history, and no parent-history token is duplicated. The preset's prompt and tools determine repeated prompt, schema, and generated SDK costs.
 
 #### KV Cache effect
 
-The child's request cache is independent of the parent's. Child history grows append-only, while persona, tool-filter, generated-SDK, provider, or model changes establish a different child prefix.
+The child's request cache is independent of the parent's. Child history grows append-only, while preset, generated-SDK, provider, or model changes establish a different child prefix.
 
 ### Parent tool result, indirectly
 
@@ -82,7 +82,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 ## Known Limitations and Deferred Work
 
-- **Fresh means no parent transcript** — the child inherits cwd, lineage, the latest logged route, and explicitly configured persona/tool restrictions, but none of the parent's conversation; use the fork provider when completed-turn context is required.
+- **Fresh means no parent transcript** — the child inherits cwd, lineage, the latest logged route, and the selected or inherited preset composition, but none of the parent's conversation; use the fork provider when completed-turn context is required.
 
 <a id="dev-note"></a>
 ### Dev Note

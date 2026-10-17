@@ -1115,7 +1115,10 @@ describe('dsh-subagent-acp', () => {
     const ctx = await setup()
     const provider = ctx.subagents.getProvider('acp')!
     expect(provider.capabilities).toEqual({
-      outputSchema: false, depthLimit: false, toolFilter: false, persona: false, agentOptions: false,
+      agentOptions: false,
+      agentPreset: false,
+      outputSchema: false,
+      depthLimit: false,
     })
   })
 

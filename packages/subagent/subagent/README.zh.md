@@ -20,7 +20,9 @@ subagent seam 允许一个 agent（智能体）通过具名提供方把工作委
 - [服务 API](#service-api)
 - [配置](#configuration)
 - [能力](#capabilities)
+- [子级 preset](#child-presets)
 - [持久化描述符](#the-durable-descriptor)
+- [恢复子级组合](#restoring-child-composition)
 - [委派深度](#delegation-depth)
 - [委派策略](#delegated-policy)
 - [一次性所有权与生命周期](#one-shot-ownership-and-lifecycle)
@@ -53,7 +55,7 @@ subagent seam 允许一个 agent（智能体）通过具名提供方把工作委
 | `listChildren(parentSessionId, signal?)` | 按 `createdAt`、再按 id 的顺序列出由会话支撑的直接 subagent，包括其 `one-shot`／`continuable` 模式、`running`／`inactive` 活动状态、根据 origin 分类得出的一层 `hasChildren` 提示，以及每个子级的诊断信息，且不会加载或恢复它们。该操作直接读取在线会话存储和可选的会话持久化（没有持久化时只枚举在线子级），并要求已挂载 `sessionProjections` 注册表；不要求 `ctx.agents`、继续执行管理器或任何查询服务。冷 inspection 的接纳最多为 10,000 个候选和 16 MiB 序列化 header；超大列表会在逐项读取开始前以 `SUBAGENT_LIST_CAPACITY_EXCEEDED` 失败。 |
 | `listDescendants(rootSessionId, signal?)` | 从同一份在线优先语料按稳定 pre-order 展平根的完整会话树，并为每个 subagent 条目附加持久 `parentId` 与相对根的 `depth`。普通会话与一次性 child 仍作为遍历节点，因此其下的可继续后代仍可发现。身份、diagnostic、依赖与取消约定均沿用 `listChildren()`。 |
 
-`SubagentStartRequest.label` 是由会话支撑的一次性 child 所使用的可选简短持久化显示标签。面向模型的委派会提供其已有的 `description`；底层调用方无需凭空构造展示元数据。可继续启动始终携带自身的必填标签。`signal` 是必填项，也是一次性 `start` 的规范取消通道。发布前中止会使 `start()` 在回滚后拒绝；发布后中止会取消已返回 run 的剩余轮次工作，但不会隐藏其 id。请求还可以选择模型、要求结构化输出、限制委派深度、约束子 agent 工具或设置子 agent persona。对于可继续启动或相邻 Agent 消息，调用方信号只负责 inbox 接受前的查找、物化和准入；此后，Activation 由管理器独立拥有，因此调用方取消既不会取消已接受的轮次，也不会 dispose（资源释放）子 agent。
+`SubagentStartRequest.label` 是由会话支撑的一次性 child 所使用的可选简短持久化显示标签。面向模型的委派会提供其已有的 `description`；底层调用方无需凭空构造展示元数据。可继续启动始终携带自身的必填标签。`signal` 是必填项，也是一次性 `start` 的规范取消通道。发布前中止会使 `start()` 在回滚后拒绝；发布后中止会取消已返回 run 的剩余轮次工作，但不会隐藏其 id。请求还可以选择模型、要求结构化输出、限制委派深度、或选择子 agent preset。对于可继续启动或相邻 Agent 消息，调用方信号只负责 inbox 接受前的查找、物化和准入；此后，Activation 由管理器独立拥有，因此调用方取消既不会取消已接受的轮次，也不会 dispose（资源释放）子 agent。
 
 Agent 消息的权限就是确切的相邻关系：发送方必须在线，目标必须是它的直接可继续子级（记录在子级持久化 header 的 `parentSession` 中），或者对驻留可继续子级而言是它的直接父级。冷恢复会在重建前检查该权限，并在最终无 await 的 inbox 准入区间再次检查，因此在物化期间被注销或替换的 parent 无法授权投递。记录下来的 `source` 只说明谁提供了所投递的消息，不授予任何权限。
 
@@ -86,12 +88,17 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 
 - `outputSchema`：强制执行结构化最终结果，一次性与可继续启动均适用；
 - `depthLimit`：强制执行 `maxDepth`；
-- `toolFilter`：应用请求的子 agent 工具限制；
-- `persona`：应用每个子 agent 独立的 persona。
+- `agentPreset`：挂载独立选择的子 agent preset；
+- `agentOptions`：覆盖受支持的子 agent 模型设置。
 
-每个进程内子 agent 都通过一次 `applyChildComposition(childCtx, parent, composition)` 调用完成组装：先加入父级的 agent-preset 组合，再应用子 agent 自己的 persona 和工具限制。加入父级组合正是子 agent 获得能力的途径：所有面向模型的行都位于 agent 平面，完全没有加入任何组合的子 agent 抵达模型时会看到空的工具注册表（见 [`dsh-agent-presets`](../../preset/agent-presets/README.zh.md)）。将父级作为参数是刻意设计：这让“组装子 agent 却不做该加入”在各调用点无法表达，而这正是这一次调用所要杜绝的缺陷。未组装 preset roster 的部署不加入任何组合、也不需要加入；其面向模型的行位于宿主组合中，子 agent 已能通过工具注册表的全局层解析到它们。
+每个进程内子 agent 都通过一次 `applyChildComposition(childCtx, parent, composition)` 调用完成组装：要么挂载子 agent 独立选择的 preset，要么加入父级的 agent-preset 组合，然后再应用子 agent 持久化描述符中的覆盖项。加入父级组合正是子 agent 获得能力的途径：所有面向模型的行都位于 agent 平面，完全没有加入任何组合的子 agent 抵达模型时会看到空的工具注册表（见 [`dsh-agent-presets`](../../preset/agent-presets/README.zh.md)）。将父级作为参数是刻意设计：这让“组装子 agent 却不做该加入”在各调用点无法表达，而这正是这一次调用所要杜绝的缺陷。未组装 preset roster 的部署不加入任何组合、也不需要加入；其面向模型的行位于宿主组合中，子 agent 已能通过工具注册表的全局层解析到它们。
 
-`childSessionMeta()` 把所加入的 preset id 记在子 agent 的持久化 header 上，理由与顶层会话记录自己的那一个相同：preset 决定了模型所见的工具 schema 与提示段，因此冷读子 agent 的历史时必须重建那份组装，而不是部署默认值。该值从父方**活着的** scope 链读取，而不是从父方 header 读取，因为在空白期切换过 preset 的父方运行在更新的那份组装上，而它的 header 仍写着旧的那个。
+`childSessionMeta()` 把所加入的 preset id 记在子 agent 的持久化 header 上，理由与顶层会话记录自己的那一个相同：preset 决定了模型所见的工具 schema 与提示段，因此冷读子 agent 的历史时必须重建那份组装，而不是部署默认值。独立选择的 preset 提供自己的 id；否则该值从父方**活着的** scope 链读取，而不是从父方 header 读取，因为在空白期切换过 preset 的父方运行在更新的那份组装上，而它的 header 仍写着旧的那个。
+
+<a id="child-presets"></a>
+## 子级 preset
+
+进程内 spawn 接受独立的 `agentPreset`；fork 与外部后端会拒绝该选项。未做选择时，本地子级加入父级当前的 preset 修订版；显式给出 id 时会挂载当前已挂载的修订版，即使该 id 与父级相同。模型选项通过 [`dsh-tool-subagent`](../tool-subagent/README.zh.md) 配置，persona 与工具在 [preset 组合](../../preset/agent-presets/README.zh.md)中配置。冷恢复会保留历史子级描述符中记录的 persona 与工具限制。
 
 可继续创建对应可选的 `SubagentProvider.prepareContinuable?()` 方法：方法是否存在就是能力检查，因此服务会在没有该方法的提供方上拒绝已配置的可继续启动，而具备该方法的提供方仍可服务普通一次性委派。该方法只返回已分离的 `ContinuableCreateSpec`（`{ seed? }`）。它只是数据，不携带任何能力：不包含 Agent、`AgentHandle`、提示词投递、结果、dispose 或恢复操作。准备完成后，身份预留、组合、Agent 创建、提示词投递、冷恢复、所有权和 dispose 均由继续执行管理器负责。一次性 `SubagentRun` 表示一次可 dispose 的前台委派，只有一个结果，且没有冷恢复操作。服务可以针对不同的同级子 agent 并发调用同一提供方：每次启动或准备都拥有各自的可变状态和取消路径，一项操作的失败、结果或清理不得使另一项操作结算或释放。提供方可以在内部按自身容量排队，但不得改变这项独立性约定。
 
@@ -101,6 +108,13 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 ## 持久化描述符
 
 该 Service Definition 拥有版本化的 `subagent/descriptor` 会话事件词汇（`src/descriptor.ts`）：`snapshotSubagentDescriptor()` 会在提供方工作之前校验并分离记录，`foldSubagentDescriptor()` 则会在从已加载子 agent 日志中恢复描述符之前，校验当前版本的完整 payload。每次由本地会话支撑的启动都会追加一个带有提供方名称与生命周期 `mode` 的描述符。`one-shot` 描述符可以携带调用方拥有的可选持久化显示 `label`；`continuable` 描述符要求其持久化创建标签，并另外记录已解析的子 agent `agentOptions.provider`／`model`，以及用于从持久化存储恢复的可选 `persona`／`toolFilter`。这些是显式字段，绝不是可通过合并扩展的 `AgentOptions` 对象，因此无关的扩展值不会破坏继续执行。描述符省略 `subagentDepth`（持久化 header 的 `delegationDepth` 是单调下界）和 `outputSchema`（单次 Activation 的结果约定）。该事件只进入日志：不含 `surfaceOp`，不进入模型历史，并由仅追加日志跨压缩（compaction）保留。格式错误的当前版本 payload 属于损坏；本运行时无法对不受支持的版本进行分类。
+
+<a id="restoring-child-composition"></a>
+## 恢复子级组合
+
+独立选择的 spawn 会在其第一个自有 `subagent/descriptor` 之前记录 `agent-preset/selected`。冷恢复会排除继承的事件前缀并校验该顺序，然后从既有的 `agentPreset` 投影中读取 preset id。挂载该 id 不要求原 subagent 提供方仍然注册。所选 preset 缺失或损坏会拒绝恢复，而不会回退到父级或部署默认值。
+
+首个自有描述符之前没有该选择记录的日志——包括历史的 spawn 与 fork 日志——保持对父级当前组合的 `composeFrom`。header 中的 preset id、继承而来的选择，或出现在描述符之后的选择，都不会让子级进入独立恢复路径，包括没有继承事件的 fork。Session 与描述符格式不变。独立冷恢复使用当前发现的 preset 定义，不跨重启保留更早的修订版。
 
 <a id="delegation-depth"></a>
 ## 委派深度

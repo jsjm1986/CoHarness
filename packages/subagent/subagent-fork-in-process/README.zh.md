@@ -39,7 +39,7 @@ subagent 启动时，父 agent 当前的工具调用轮次仍未结束：其日�
 
 `start(request)` 将已完成轮次的初始内容传给 [`startInProcessRun`](../subagent-in-process-driver/README.zh.md)，并等待子 agent 发布。共享驱动器负责取消、深度、定制、结果读取和 dispose（资源释放）。
 
-fork 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: true }`，与 spawn 相同。
+fork 声明 `{ agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true }`。不支持独立的 preset 选择，因为子 agent 继承父级的组合与历史；应加入父级的 preset 代际。
 
 <a id="config"></a>
 ## 配置
@@ -62,15 +62,15 @@ fork 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: 
 
 #### 模型看到什么
 
-子 agent 先接收由父级已配平的已完成轮次构成的前缀，再逐字接收新的任务内容。配置的 persona 会在子 agent 的全新作用域中遮蔽提示词文本；工具限制会过滤其全局协议 schema、可执行工具查找与 PTC mode SDK 绑定，但不影响独立指导内容。父级的工具视图与权限不会被继承；可选的结构化输出请求会添加仅属于子 agent 的约定；父级当前进行中的轮次会被排除。
+子 agent 先接收由父级已配平的已完成轮次构成的前缀，再逐字接收新的任务内容。它加入父级的 preset 代际，由 preset 提供 persona 和工具。父级 agent 局部限制不会被复制。可选的结构化输出请求会添加仅属于子 agent 的工具；父级当前进行中的轮次会被排除。
 
 #### Token 影响
 
-fork 会把保留的已完成历史复制到子 agent 的请求中，子 agent 随后独立累积自己的 token。persona 会改变重复提示词的成本；过滤会改变 schema 或生成 SDK 的成本；首轮 fork 没有继承历史。
+fork 会把保留的已完成历史复制到子 agent 的请求中，子 agent 随后独立累积自己的 token。首轮 fork 没有继承历史。
 
 #### KV Cache 影响
 
-在提供方与模型相同的前提下，子 agent 可以复用继承的逐字节相同前缀。persona、工具过滤、生成 SDK 或路由变化可能在继承历史之前使复用失效；后续子 agent 历史仅追加。可继续消息不会增加子级专属的系统提示词区段或工具 schema；父级 ID 与返回指导在初始用户任务中位于继承历史之后（见[保持 fork 缓存的 Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)）。
+在提供方与模型相同的前提下，子 agent 可以复用继承的逐字节相同前缀。结构化输出、生成 SDK、路由变化，或冷恢复时的历史 descriptor 覆盖，可能在继承历史之前使复用失效；后续子 agent 历史仅追加。可继续消息不会增加子级专属的系统提示词区段或工具 schema；父级 ID 与返回指导在初始用户任务中位于继承历史之后（见[保持 fork 缓存的 Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)）。
 
 ### 父级工具结果（间接）
 
@@ -90,7 +90,7 @@ fork 会把保留的已完成历史复制到子 agent 的请求中，子 agent �
 ## 已知限制与暂缓事项
 
 - **初始内容是一次性快照**：子 agent 只能看到 fork 时父 agent 已完成的轮次，看不到父 agent 此后记录的任何内容；不会实时共享上下文。
-- **fork 生命周期策略因组合而异**：基础组合包与 ACP/headless 示例把 fork 委派工具绑定为 `backgroundMode: one-shot`，而 Web 应用的 agent preset（`ptc`、`cordis`、`standard`）选择 `continuable`。两者都让继承前缀保持可复用，因为父子双方的消息工具定义逐字节一致；显式的 persona、工具过滤、生成 SDK 或路由变化仍可能破坏这种一致性。理由见 [缓存保持型 fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)。
+- **fork 生命周期策略因组合而异**：基础组合包与 ACP/headless 示例把 fork 委派工具绑定为 `backgroundMode: one-shot`，而 Web 应用的 agent preset（`ptc`、`cordis`、`standard`）选择 `continuable`。两者都让继承前缀保持可复用，因为父子双方的消息工具定义逐字节一致；结构化输出、生成 SDK、路由变化或冷恢复时还原的历史描述符覆盖仍可能破坏这种一致性。理由见 [缓存保持型 fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)。
 
 <a id="dev-note"></a>
 ### 开发备注

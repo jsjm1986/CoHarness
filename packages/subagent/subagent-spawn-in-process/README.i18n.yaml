@@ -15,11 +15,11 @@
   en: 4344d382275a0989
   zh: 2ab4e6ee3580c86a
 /deepseek-ai-dsh-subagent-spawn-in-process/behavior:
-  en: 9743d8dea0ea39b4
-  zh: 22345fcc992832ad
+  en: 685c89fee1f7ff67
+  zh: c6e581fddf94e714
 /deepseek-ai-dsh-subagent-spawn-in-process/capabilities:
-  en: 77b967cf90154137
-  zh: 5ea93a736ea6b3cd
+  en: 43f34afd24dfaf6c
+  zh: cd135847c0d3ca6b
 /deepseek-ai-dsh-subagent-spawn-in-process/config:
   en: ba7564989d8ce7b3
   zh: 0c5c8cd5855bda9e
@@ -33,14 +33,14 @@
   en: 05e6180f1498fdf9
   zh: 2b05d2b97bfa67da
 /deepseek-ai-dsh-subagent-spawn-in-process/model-experience/child-agent-request/what-the-model-sees:
-  en: 2035bdd8640e5a8a
-  zh: 5afa645d7dbe31a5
+  en: c9dfab9a4d363fed
+  zh: 6cb3b0914ccb73e2
 /deepseek-ai-dsh-subagent-spawn-in-process/model-experience/child-agent-request/token-effect:
-  en: e74d21e38e4a53a9
-  zh: 6a5e3ef5fe0f4f14
+  en: eb373a4b35a4b548
+  zh: 9537d0e466e8bcd9
 /deepseek-ai-dsh-subagent-spawn-in-process/model-experience/child-agent-request/kv-cache-effect:
-  en: 78d800b26fb3b0af
-  zh: 313169b62c29af1d
+  en: 6da85bad412c741e
+  zh: c9af9fd1b4e7eed2
 /deepseek-ai-dsh-subagent-spawn-in-process/model-experience/parent-tool-result-indirectly:
   en: 75d061c2151624a7
   zh: 71e58e020b60ff90
@@ -54,8 +54,8 @@
   en: f5d5f97a153f7c70
   zh: afc7da8783b348c6
 /deepseek-ai-dsh-subagent-spawn-in-process/known-limitations-and-deferred-work:
-  en: 2c13ae6a7c210280
-  zh: 340a4d1118697326
+  en: 36270ddb2aa05625
+  zh: 31b52b3763435847
 /deepseek-ai-dsh-subagent-spawn-in-process/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

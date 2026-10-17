@@ -25,8 +25,10 @@ export function apply(ctx: Context, config: Config): void {
           : { enableRunInBackground: config.enableRunInBackground }),
         ...(config.backgroundMode === undefined ? {} : { backgroundMode: config.backgroundMode }),
         ...(config.agentOptions === undefined ? {} : { agentOptions: config.agentOptions }),
-        ...(config.persona === undefined ? {} : { persona: config.persona }),
-        ...(config.toolFilter === undefined ? {} : { toolFilter: config.toolFilter }),
+        ...(config.agentPreset === undefined ? {} : { agentPreset: config.agentPreset }),
+        ...(config.allowedAgentPresets === undefined
+          ? {}
+          : { allowedAgentPresets: config.allowedAgentPresets }),
         ...(config.maxDepth === undefined ? {} : { maxDepth: config.maxDepth }),
       }, agent.session)
     })
