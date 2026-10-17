@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-cordis-host-runner",
   "description": "Dynamic package registry, authorized Host execution, and read-only runtime inspection",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
