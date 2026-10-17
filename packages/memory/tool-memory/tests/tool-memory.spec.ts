@@ -268,7 +268,7 @@ describe('dsh-tool-memory', () => {
       title: 'Save memory k',
       diffs: [{ path: 'memory/personal/k', oldText: null, newText: 'new body' }],
     })
-    const presentResult = save.presentResult as ((a: unknown, r: unknown) => unknown) | undefined
+    const presentResult = save.presentResult?.bind(save) as ((a: unknown, r: unknown) => unknown) | undefined
     expect(presentResult?.(args, { isError: true })).toBeUndefined()
     expect(presentResult?.(args, {
       isError: false,
@@ -281,7 +281,7 @@ describe('dsh-tool-memory', () => {
     const projectArgs = { key: 'k', kind: 'guidance', summary: 's', content: 'fallback' }
     expect(projectSave.presentCall?.(projectArgs))
       .toMatchObject({ diffs: [{ path: 'memory/project/k', oldText: null, newText: 'fallback' }] })
-    const projectResult = projectSave.presentResult as ((a: unknown, r: unknown) => unknown) | undefined
+    const projectResult = projectSave.presentResult?.bind(projectSave) as ((a: unknown, r: unknown) => unknown) | undefined
     expect(projectResult?.(projectArgs, { isError: false }))
       .toMatchObject({ diffs: [{ path: 'memory/project/k', oldText: null, newText: 'fallback' }] })
     await project.ctx.fiber.dispose()

@@ -331,6 +331,7 @@ function escapeText(value: string): string {
 function catalogHistory(agent: Agent): { visibleDigest?: string; published: boolean } {
   const visible = new Set(agent.session.surface.nodes)
   let published = false
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of agent.session.snapshotEvents().toReversed()) {
     if (event.type !== 'user/message' || event.data.source.kind !== 'memory-catalog') continue
     const parsed = readCatalog(event.data.source)

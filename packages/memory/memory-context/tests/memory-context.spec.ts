@@ -386,7 +386,7 @@ describe('memory-context', () => {
     // A malformed catalog record, a plain user message, and a non-catalog
     // replacement that shadows the durable catalog all precede it in the log.
     const malformed = agent.session.append('user/message',
-      createUserMessage({ content: [{ type: 'text', text: 'x' }], source: { kind: 'memory-catalog', form: 'catalog', entries: JSON.parse('"nope"') } }),
+      createUserMessage({ content: [{ type: 'text', text: 'x' }], source: { kind: 'memory-catalog', form: 'catalog', entries: 'nope' as never } }),
       { surfaceOp: 'append' })
     h.ctx.emit('session/event', agent.session, malformed)
     const plain = agent.session.append('user/message',
