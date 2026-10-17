@@ -59,10 +59,10 @@ declare module '@deepseek-ai/dsh-llm' {
  */
 const PTC_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call directly — a tool call naming any other tool fails. Reach every tool the SDK declares below from inside the program.`
 
-const SDK_RENDERERS: Record<string, (schemas: ToolSdkSchema[]) => string> = {
+const SDK_RENDERERS: Record<string, (schemas: ToolSdkSchema[], programFormat: 'function-body' | 'repl') => string> = {
   typescript: renderToolsSdk,
   python: renderToolsSdkPy,
-} satisfies Record<PtcSdkLanguage, (schemas: ToolSdkSchema[]) => string>
+} satisfies Record<PtcSdkLanguage, (schemas: ToolSdkSchema[], programFormat: 'function-body' | 'repl') => string>
 
 export {
   defineTool,
@@ -216,7 +216,7 @@ export interface ToolOutputDefinition {
   readonly schema: JsonSchemaNode
   /** Pure projection from validated arguments and value to Native/model content. */
   render(args: unknown, value: JsonValue): ContentBlock[]
-  /** Pure replayable presentation projection, computed only for top-level calls. */
+  /** Pure replayable presentation projection for native and nested calls. */
   presentationMeta?(args: unknown, value: JsonValue): JsonValue
 }
 
@@ -307,9 +307,9 @@ export interface ToolResult {
   isError: boolean
   /**
    * The tool-private presentation payload projected by its output declaration.
-   * It is persisted verbatim on `tool/result` for Host presenters and Client
-   * renderers to narrow independently. Absent when the tool declared no
-   * projector or the call was nested under a composite transport.
+   * It is persisted on `tool/result` or `tool/ptc-dispatch` for Host presenters
+   * and Client renderers to narrow independently. Absent when the tool
+   * declared no projector.
    */
   meta?: JsonValue
 }
@@ -913,7 +913,7 @@ export class ToolRuntime extends Service {
         const render = SDK_RENDERERS[runtime.language]
         /* v8 ignore next -- requirePtcRuntime rejects an unknown language before this runs. */
         if (render === undefined) throw new Error(`dsh-tools: no SDK renderer for ${runtime.language}`)
-        return render(this.sdkSchemas(context.scope))
+        return render(this.sdkSchemas(context.scope), runtime.programFormat)
       },
     }
   }
@@ -948,9 +948,9 @@ export class ToolRuntime extends Service {
    */
   private requirePtcTransport(): ToolDefinition {
     this.ptcTransport ??= createRunCodeTool(this, {
-      // Only Agent-owned PTC requires directory state; native registries
-      // and unowned programs can run without this service.
       resolveWorkingDirectory: async (exec) => {
+        // Only Agent-owned PTC requires directory state; native registries
+        // and unowned programs can run without this service.
         if (exec.agent === undefined) return undefined
         const directories = this.ctx.get('workingDirectory')
         if (directories === undefined) throw new Error('dsh-tools: run_code with an Agent requires workingDirectory')
@@ -1852,7 +1852,7 @@ export class ToolRuntime extends Service {
     }
     const content = snapshotProjection(tool.name, 'render', rendered)
     let meta: JsonValue | undefined
-    if (exec.parent === undefined && tool.output.presentationMeta !== undefined) {
+    if (tool.output.presentationMeta !== undefined) {
       let projected: JsonValue
       try {
         projected = tool.output.presentationMeta(exec.arguments, value)

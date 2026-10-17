@@ -15,14 +15,14 @@
   en: 093c82ff02c36632
   zh: 01da5fc425f6d8b6
 /agent-note-client-derived-presentation-from-raw-session-tool-events/terminology:
-  en: 836a596324e79861
-  zh: 66bb4f6f638ac62c
+  en: 68ab8f808d18be24
+  zh: 3afa11f18e3cbb6f
 /agent-note-client-derived-presentation-from-raw-session-tool-events/architecture-and-ownership:
   en: 5cc496057205b298
   zh: 160158394dfa2df3
 /agent-note-client-derived-presentation-from-raw-session-tool-events/architecture-and-ownership/tool-execution-and-persistence:
-  en: 675a1da36b918a3b
-  zh: 88b8d338e9cfcd79
+  en: 20501f3ecc30c9ca
+  zh: b7c831e6046c150f
 /agent-note-client-derived-presentation-from-raw-session-tool-events/architecture-and-ownership/host-journal-reads:
   en: 36345a3eb5801cdf
   zh: 498fd14beaaadd9c

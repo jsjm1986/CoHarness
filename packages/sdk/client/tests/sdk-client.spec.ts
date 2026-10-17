@@ -127,6 +127,102 @@ describe('DeepSeekHarness', () => {
     expect(closed).toBe(true)
   })
 
+  it('preserves Auto review denial details in native and PTC session events', async () => {
+    const receipt = {
+      type: 'agent/inbox/spliced',
+      data: {
+        target: 'next-turn',
+        start: 0,
+        inserted: [{ id: 'accepted-message', role: 'user', content: [], source: { kind: 'user' } }],
+      },
+    }
+    const nativeResult = {
+      type: 'tool/result',
+      data: {
+        turn: 1,
+        step: 1,
+        message: {
+          source: { kind: 'tool', callId: 'native-call' },
+          content: [{
+            type: 'tool-result',
+            toolCallId: 'native-call',
+            content: [{ type: 'text', text: 'Error: blocked by policy' }],
+            isError: true,
+          }],
+          role: 'user',
+          id: 'native-result',
+        },
+        error: {
+          name: 'AutoReviewDeniedError',
+          code: 'AUTO_REVIEW_DENIED',
+          reason: ' native raw\nreason ',
+        },
+      },
+    }
+    const ptcStart = {
+      type: 'tool/ptc-dispatch-start',
+      data: {
+        rootCallId: 'run-code-call',
+        parentCallId: 'run-code-call',
+        subCallId: 'run-code-call:ptc:1',
+        name: 'bash',
+        arguments: { command: 'git push --force' },
+      },
+    }
+    const ptcResult = {
+      type: 'tool/ptc-dispatch',
+      data: {
+        rootCallId: 'run-code-call',
+        parentCallId: 'run-code-call',
+        subCallId: 'run-code-call:ptc:1',
+        name: 'bash',
+        arguments: { command: 'git push --force' },
+        isError: true,
+        content: [{ type: 'text', text: 'Error: blocked by policy' }],
+        meta: { cwd: '/selected', path: '/selected/note.txt', view: { line: 3 } },
+        error: {
+          name: 'AutoReviewDeniedError',
+          code: 'AUTO_REVIEW_DENIED',
+          reason: ' ptc raw\nreason ',
+        },
+      },
+    }
+    const notifications = [
+      { method: 'session.event', params: { sessionId: 'owned', event: receipt } },
+      { method: 'session.event', params: { sessionId: 'owned', event: nativeResult } },
+      { method: 'session.event', params: { sessionId: 'owned', event: ptcStart } },
+      { method: 'session.event', params: { sessionId: 'owned', event: ptcResult } },
+      { method: 'session.status', params: { sessionId: 'owned', status: 'idle' } },
+    ] as HarnessNotification[]
+    const harness = {
+      start: () => Promise.resolve(),
+      client: {
+        prompt: () => Promise.resolve('accepted-message'),
+        subscribeSessionTree: () => ({
+          next: async () => {
+            const notification = notifications.shift()
+            if (notification === undefined) throw new Error('scripted notification queue exhausted')
+            return notification
+          },
+          tryNext: () => notifications.shift(),
+          close: () => {},
+          async * [Symbol.asyncIterator]() {},
+        }),
+      },
+    } as unknown as DeepSeekHarness
+
+    const result = await new HarnessSession(harness, 'owned').run('go')
+
+    expect(result.events).toEqual([receipt, nativeResult, ptcStart, ptcResult])
+    expect(result.events.find(event => event.type === 'tool/ptc-dispatch')?.data.meta)
+      .toEqual({ cwd: '/selected', path: '/selected/note.txt', view: { line: 3 } })
+    for (const event of result.events.filter(event => event.type.startsWith('tool/ptc-dispatch'))) {
+      expect(event.data).not.toHaveProperty('description')
+      expect(event.data).not.toHaveProperty('parameters')
+      expect(event.data).not.toHaveProperty('schema')
+    }
+  })
+
   it('preserves execution constraints as events without treating them as assistant output', async () => {
     const harness = harnessWith({ FAKE_EXECUTION_EVENT: '1', FAKE_TEXT: 'visible response' })
     const result = await harness.run('go')

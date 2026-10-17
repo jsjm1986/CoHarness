@@ -9,7 +9,8 @@
 // The block union's defining home is runtime (fold-product types); this
 // contract only forwards it (type-definition authority stays with the layer
 // that produces the values).
-import { abbreviateHomePath } from '@deepseek-ai/dsh-client-runtime/client'
+import { abbreviateHomePath, isAbsoluteWorkspacePath } from '@deepseek-ai/dsh-client-runtime/client'
+import { recordedAbsolutePath } from './recorded-path.ts'
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import type { LocaleKeysOf } from '@deepseek-ai/dsh-client-ui-slots'
 
@@ -148,9 +149,9 @@ export interface ToolRowModel {
   titleKey: ToolTitleKey
   summary: string
   /**
-   * Filesystem path from args (`path` / `file_path`) when the row is a file
-   * tool; absent for URL reads and non-file tools. The chat view resolves
-   * relative values against the session cwd before opening.
+   * Operation-time absolute result path for file rows. Old results without
+   * location metadata retain their argument fallback; running relative paths
+   * stay unavailable until their result identifies the target.
    */
   filePath: string | undefined
   /** Original argument payload retained for expansion-time formatting. */
@@ -301,6 +302,12 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   // Preparing calls carry no dispatched arguments: null, distinct from an
   // empty-string payload on a started or window-truncated call.
   const argsRaw = done ? block.call?.argsRaw ?? '' : block.phase === 'start' ? block.argsRaw : null
+  const argumentPath = argsRaw === null ? undefined : deriveFilePath(variant, argsRaw)
+  const recordedPath = done ? recordedAbsolutePath(block.meta, 'path') : undefined
+  const canUseArgumentPath = argumentPath !== undefined
+    && (isAbsoluteWorkspacePath(argumentPath) || done && !block.isError && block.parentCallId === undefined)
+  const filePath = argumentPath === undefined ? undefined
+    : recordedPath ?? (canUseArgumentPath ? argumentPath : undefined)
   const state: ToolRowState = !done
     ? (block.phase === 'preparing' ? 'preparing' : 'running')
     : block.error?.code === 'interrupted' ? 'stopped'
@@ -323,7 +330,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     variant,
     titleKey: toolKey ?? VARIANT_TITLE_KEYS[variant],
     summary,
-    filePath: argsRaw === null ? undefined : deriveFilePath(variant, argsRaw),
+    filePath,
     bodyRaw: argsRaw === null || argsRaw === '' ? null : argsRaw,
     output,
     errorSummary,

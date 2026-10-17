@@ -83,9 +83,9 @@ export interface ToolCallCommonProps {
   /** Open an argument path at its optional requested line through the Host. */
   openFile: (path: string, options?: { line?: number }) => void
   /**
-   * Whether this call is a run_code sub-dispatch: nested calls persist no
-   * presentationMeta and no wire views, so the owner carries the fact (the
-   * node has no parent link).
+   * Whether this call is a run_code sub-dispatch: historical nested records
+   * persist no presentationMeta and nested calls carry no wire views, so the
+   * owner carries the fact (the node has no parent link).
    */
   nested?: boolean | undefined
   /**

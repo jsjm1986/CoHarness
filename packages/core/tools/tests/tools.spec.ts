@@ -631,7 +631,7 @@ describe('ToolRuntime', () => {
     })
   })
 
-  it('suppresses presentation metadata only for nested composite dispatches', async () => {
+  it('projects presentation metadata for native and nested composite dispatches', async () => {
     const ctx = await setup()
     ctx.tools.register({
       ...echoTool,
@@ -647,7 +647,8 @@ describe('ToolRuntime', () => {
       parent: Symbol('outer') as ToolExecutionToken,
     })
     expect(direct.meta).toEqual({ card: true })
-    expect(nested.meta).toBeUndefined()
+    expect(nested.meta).toEqual({ card: true })
+    expect(Object.isFrozen(nested.meta)).toBe(true)
     expect(nested.isError ? undefined : nested.value).toBe('')
   })
 

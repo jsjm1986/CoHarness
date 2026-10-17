@@ -560,8 +560,10 @@ describe('built-in conversation node Definitions', () => {
         subCallId: 'child',
         name: 'read',
         arguments: { path: 'README.md' },
-        isError: false,
+        isError: true,
+        error: { name: 'AutoReviewDeniedError', code: 'AUTO_REVIEW_DENIED', reason: 'blocked' },
         content: [{ type: 'text', text: 'contents' }],
+        meta: { cwd: '/selected', path: '/selected/README.md' },
       }),
       at(16, 'tool/result', {
         turn: 2,
@@ -571,7 +573,11 @@ describe('built-in conversation node Definitions', () => {
     ], true)
     const before = node(snapshot(history), 'tool-call')
     expect((before?.data as ToolChatData).root.subCalls).toMatchObject([
-      { kind: 'tool-result', callId: 'child', call: { name: 'read' } },
+      {
+        kind: 'tool-result', callId: 'child', parentCallId: 'history-root', call: { name: 'read' },
+        error: { name: 'AutoReviewDeniedError', code: 'AUTO_REVIEW_DENIED', reason: 'blocked' },
+        meta: { cwd: '/selected', path: '/selected/README.md' },
+      },
     ])
 
     history.prepend([
@@ -590,7 +596,11 @@ describe('built-in conversation node Definitions', () => {
     const after = node(snapshot(history), 'tool-call')
     expect(after?.key).toBe(before?.key)
     expect((after?.data as ToolChatData).root.subCalls).toMatchObject([
-      { kind: 'tool-result', callId: 'child', call: { name: 'read' } },
+      {
+        kind: 'tool-result', callId: 'child', parentCallId: 'history-root', call: { name: 'read' },
+        error: { name: 'AutoReviewDeniedError', code: 'AUTO_REVIEW_DENIED', reason: 'blocked' },
+        meta: { cwd: '/selected', path: '/selected/README.md' },
+      },
     ])
 
     const firstChild = (after?.data as ToolChatData).root.subCalls[0]

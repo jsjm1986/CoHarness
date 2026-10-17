@@ -1,5 +1,6 @@
 import { setSandboxMode } from '@deepseek-ai/dsh-sandbox-policy'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, ToolCallId  } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -10,7 +11,6 @@ import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcRunRequest, PtcRunResult } from '@deepseek-ai/dsh-ptc-runtime'
 import ToolRuntime, { CodeRunFailedError, RUN_CODE_NAME, TOOL_ABORTED_BEFORE_DISPATCH, defineContentToolFixture, defineTool } from '@deepseek-ai/dsh-tools'
-import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import type { Config, JsonSchemaNode, PostToolDecision, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -135,6 +135,42 @@ async function runCode(
     ...extras.signal ? { signal: extras.signal } : {},
   })
 }
+
+it('logs detached frozen nested metadata without changing the binding value or log-content policy', async () => {
+  const { ctx, runtime } = await setup({ mode: 'ptc' })
+  try {
+    const metadata = { cwd: '/selected', path: '/selected/note.txt' }
+    ctx.tools.register(defineTool({
+      name: 'location', description: 'Read a fixture.', parameters: {},
+      output: {
+        schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }],
+        presentationMeta: () => metadata,
+      }, execute: async () => 'original contents',
+    }))
+    ctx.on('tools/ptc-dispatch-log', async () => [{ type: 'text', text: 'redacted durable preview' }])
+    const session = Session.create(SessionId('ptc-location'))
+    const agent = { ctx, session } as Agent
+    runtime.behavior = async (request) => {
+      const value = await request.bindings[0]!.functions.location!({})
+      expect(value).toBe('original contents')
+      metadata.cwd = '/later'
+      metadata.path = '/later/other.txt'
+      return { logs: [], value }
+    }
+    const result = await runCode(ctx, 'return await tools.location({})', { agent })
+    expect(result.isError).toBe(false)
+    expect(result.content).toEqual([{ type: 'text', text: 'original contents' }])
+    const event = session.snapshotEvents().find(event => event.type === 'tool/ptc-dispatch')
+    expect(event?.data.content).toEqual([{ type: 'text', text: 'redacted durable preview' }])
+    expect(event?.data.meta).toEqual({ cwd: '/selected', path: '/selected/note.txt' })
+    expect(Object.isFrozen(event?.data.meta)).toBe(true)
+    const restored = Session.create(session.id, session.snapshotEvents(), session.header)
+    expect(restored.snapshotEvents().find(event => event.type === 'tool/ptc-dispatch')?.data.meta)
+      .toEqual({ cwd: '/selected', path: '/selected/note.txt' })
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
 
 describe('mode-aware wire contribution', () => {
   it('rejects an unsupported presentation mode in configuration', () => {
@@ -421,9 +457,34 @@ describe('mode-aware wire contribution', () => {
     const sdk = assembly.sections.find(section => section.name === 'tools:sdk')
     expect(sdk?.text).toContain('class Tools(Protocol):')
     expect(sdk?.text).toContain('async def echo(self, args:')
-    expect(sdk?.text).toContain('`code`, the program to execute')
+    expect(sdk?.text).toContain('and `description`, a short summary of what the program does')
     expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
     expect(assembly.tools[0]?.description).toContain('Execute a Python program')
+  })
+
+  it.each(['typescript', 'python'])('lists code before description for a %s runtime', async (language) => {
+    const { ctx, systemPrompt } = await setup({ mode: 'ptc', runtime: { language } })
+    try {
+      const parameters = ctx.tools.get(RUN_CODE_NAME)!.parameters
+      expect(Object.keys(parameters.properties as Record<string, unknown>).slice(0, 2))
+        .toEqual(['code', 'description'])
+      expect(parameters).toHaveProperty('required', ['code', 'description'])
+      expect(parameters).toHaveProperty('properties.description.description',
+        expect.not.stringContaining('Provide `description` before `code`'))
+      const assembly = await systemPrompt.assemble()
+      expect(assembly.tools.find(tool => tool.name === RUN_CODE_NAME)?.parameters).toEqual(parameters)
+      expect(assembly.tools.find(tool => tool.name === RUN_CODE_NAME)?.description)
+        .toContain('arguments: `code`')
+
+      // defineTool validates its captured static schema, independently of the runtime parameters getter.
+      const rejected = await ctx.tools.execute({
+        signal: testToolSignal, callId: ToolCallId('argument-order'), name: RUN_CODE_NAME, arguments: {},
+      })
+      expect(rejected).toHaveProperty('error.message',
+        'invalid arguments: missing required property "code"; missing required property "description"')
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('emits a TypeScript-flavored run_code schema under a typescript runtime', async () => {
@@ -432,13 +493,29 @@ describe('mode-aware wire contribution', () => {
     const assembly = await systemPrompt.assemble()
     const runCodeSchema = assembly.tools.find(tool => tool.name === RUN_CODE_NAME)
     expect(runCodeSchema?.description).toContain('Execute a TypeScript program')
-    expect(runCodeSchema?.description).toContain('`code`, the program to execute')
+    expect(runCodeSchema?.description).toContain('`code`, the BODY of an async function')
     // Both required arguments are named here, not only in the parameter
     // schema: prose that describes the call as "pass the program" is what
     // leads a model to emit `{code}` alone and fail INVALID_ARGS.
     expect(runCodeSchema?.description).toContain('`description`')
     const codeParam = (runCodeSchema?.parameters as { properties: { code: { description: string } } }).properties.code
-    expect(codeParam.description).toBe("The TypeScript program to execute, following this tool's execution instructions.")
+    expect(codeParam.description).toBe('The program: the body of an async TypeScript function.')
+  })
+
+  it('keeps REPL instructions while ordering code before description', async () => {
+    const { ctx, runtime, systemPrompt } = await setup({ mode: 'ptc' })
+    Object.defineProperty(runtime, 'programFormat', { value: 'repl' })
+    try {
+      const assembly = await systemPrompt.assemble()
+      const schema = assembly.tools.find(tool => tool.name === RUN_CODE_NAME)!
+      expect(schema.parameters).toHaveProperty('required', ['code', 'description'])
+      expect(schema.description).not.toContain('BODY of an async function')
+      expect(schema.description).toContain('`code`, the program to execute')
+      expect(assembly.sections.find(section => section.name === 'tools:sdk')?.text)
+        .not.toContain('the body of an async TypeScript function')
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('emits a Python-flavored run_code schema under a python runtime (matches the SDK language)', async () => {
@@ -493,6 +570,7 @@ describe('mode-aware wire contribution', () => {
 
   it('removes run_code and the SDK section when the registry fiber disposes (HMR safety)', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
     await ctx.plugin(FakeRuntime, {})
     const fiber = await ctx.plugin(ToolRuntime, { mode: 'ptc' })
@@ -1531,11 +1609,40 @@ describe('the run_code dispatch bridge', () => {
 
   it('executing run_code under a missing runtime is a structured isError, not a crash', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
     await ctx.plugin(ToolRuntime, { mode: 'ptc' })
     const result = await runCode(ctx, 'program')
     expect(result.isError).toBe(true)
     expect((result.content[0] as { text: string }).text).toContain('requires a PTC runtime')
+  })
+
+  it('refuses an agent-owned program before dispatch when its directory owner is missing', async () => {
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SystemPrompt)
+      await ctx.plugin(ToolRuntime, { mode: 'ptc' })
+      await ctx.plugin(FakeRuntime)
+      const runtime = ctx.ptcRuntime as FakeRuntime
+      const calls = registerEcho(ctx)
+      const { agent, events } = fakeAgent()
+      runtime.behavior = async (request) => {
+        await request.bindings[0]!.functions.echo!({ value: 'blocked' })
+        return { logs: [] }
+      }
+
+      const result = await runCode(ctx, 'return await tools.echo({ value: "blocked" })', { agent })
+
+      expect(result.isError).toBe(true)
+      expect(result.content).toEqual([{
+        type: 'text', text: 'Error: dsh-tools: run_code with an Agent requires workingDirectory',
+      }])
+      expect(runtime.lastRequest).toBeUndefined()
+      expect(calls).toEqual([])
+      expect(events).toEqual([])
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('presents the model-authored description as the execute-card title over the program input', async () => {
@@ -1883,6 +1990,7 @@ describe('the run_code dispatch bridge', () => {
 
   it('direct construction rejects a non-positive parallel sub-call cap at load', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
     expect(() => new ToolRuntime(ctx, { mode: 'ptc', maxParallelSubCalls: 0 }))
       .toThrow('maxParallelSubCalls must be a positive integer')
@@ -1890,6 +1998,7 @@ describe('the run_code dispatch bridge', () => {
 
   it('direct construction in PTC mode defaults the parallel sub-call cap', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
     const registry = new ToolRuntime(ctx, { mode: 'ptc' })
     expect(registry.get(RUN_CODE_NAME)).toBeDefined()
@@ -1897,6 +2006,7 @@ describe('the run_code dispatch bridge', () => {
 
   it('defaults to native mode under direct construction with no config', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
     const registry = new ToolRuntime(ctx)
     expect(registry.get(RUN_CODE_NAME)).toBeUndefined()
@@ -1905,6 +2015,7 @@ describe('the run_code dispatch bridge', () => {
   })
   it('denies a model-direct native-tool call under PTC mode as UNKNOWN_TOOL', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
     const registry = new ToolRuntime(ctx, { mode: 'ptc' })
     registerEcho(ctx, 'write')
@@ -1925,6 +2036,7 @@ describe('the run_code dispatch bridge', () => {
 
   it('routes a pre-aborted collapsed call through ABORTED_BEFORE_DISPATCH', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt, {})
     const registry = new ToolRuntime(ctx, { mode: 'ptc' })
     registerEcho(ctx, 'write')

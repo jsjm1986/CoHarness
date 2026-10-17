@@ -9,7 +9,7 @@ Verify your work by running the code or tests. Keep answers brief and factual.
 
 Check the [exit code: N] marker on every bash result; investigate failures before moving on.
 
-Use the read tool — not shell commands like cat, sed, head, or tail — to inspect text files. Use offset and limit to read a line range or continue a large file.
+Use the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.
 
 Read an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.
 
@@ -35,9 +35,9 @@ Use subagent in the background by default. Start independent delegations togethe
 
 ## Writing code for run_code
 
-`run_code` takes two required arguments: `code`, the program to execute — and `description`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly. When no separate `bash` schema is supplied, invoke a declared `bash` binding inside `run_code`:
+`run_code` takes two required arguments: `code`, the program to execute, and `description`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly. When no separate `bash` schema is supplied, invoke a declared `bash` binding inside `run_code`:
 
-`run_code({ code: "console.log(await tools.bash({ command: 'pwd', description: 'Show current directory' }))", description: "Show current directory" })`
+`run_code({ code: "console.log(await tools.bash({ description: 'Show current directory', command: 'pwd' }))", description: "Show current directory" })`
 
 Inside the program:
 

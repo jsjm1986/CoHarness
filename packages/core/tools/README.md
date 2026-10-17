@@ -131,7 +131,7 @@ Tools optionally own pure `presentCall()` and `presentResult()` render intents, 
 - Call views are `{ card: 'generic', title, kind?, rawInput?, content?, locations? }`, `{ card: 'terminal', title, description?, cwd? }`, or `{ card: 'diff', title, diffs, locations? }`.
 - Result views are `{ card: 'generic', title?, content? }`, `{ card: 'terminal', title?, output?, exitCode?, signal? }`, `{ card: 'diff', title?, diffs }`, `{ card: 'search', shape, title?, truncated, total, … }` (a completed discovery search — grouped-by-file matches for `shape: 'matches'` (grep) or a flat path list for `shape: 'paths'` (glob), with `truncated`/`total` so a UI never presents a capped result as complete; the view carries no result text and a search has no `card: 'search'` call-time analogue), `{ card: 'read', title?, path, offset, lines, totalLines, lang?, content? }` (a completed file read → a line-numbered, optionally syntax-highlighted code view; `offset` is the 1-based first line the window requested, kept even when `lines` is empty; `lines` is `{ number, text }[]` keeping each file line number, and `content` is the envelope-stripped text a UI without read support falls back to), or `{ card: 'web', kind: 'search' | 'fetch', title?, … }` (a completed web retrieval; the `kind` arms carry the structured search sources or the fetch summary, and a UI without the `web` capability falls back to the raw result content).
 
-Returning `undefined` selects generic fallback. Presenters depend only on their arguments and the durable result because UIs call them during live streaming and log replay. `output.presentationMeta(args, value)` derives JSON metadata for direct top-level calls; that metadata persists with `tool/result` and returns to `presentResult`, while the canonical value itself remains execution-local and is never replayed. Nested Code dispatches do not compute metadata. `defineTool` soft-validates older logged arguments and falls back instead of crashing replay. `dsh-tool-bash` and `dsh-tool-fs` are the reference implementations; the [canonical-output Agent Note](../../../.agents/notes/implemented/architecture/2026-07-20-canonical-tool-output-contract.md) owns the value/presentation split and the [render-intent Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.md) owns card vocabulary.
+Returning `undefined` selects generic fallback. Presenters depend only on their arguments and the durable result because UIs call them during live streaming and log replay. `output.presentationMeta(args, value)` derives JSON metadata for native and nested calls; that metadata persists with `tool/result` or the nested call's `tool/ptc-dispatch` record and returns to `presentResult`, while the canonical value itself remains execution-local and is never replayed. `defineTool` soft-validates older logged arguments and falls back instead of crashing replay. `dsh-tool-bash` and `dsh-tool-fs` are the reference implementations; the [canonical-output Agent Note](../../../.agents/notes/implemented/architecture/2026-07-20-canonical-tool-output-contract.md) owns the value/presentation split and the [render-intent Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.md) owns card vocabulary.
 
 A terminal result may carry `exitCode: null` when a settled run has no known exit code. Consumers preserve that fact and distinguish it from successful code `0`; a terminating signal remains authoritative.
 
@@ -174,22 +174,25 @@ Prefix-stable while visible definitions and their order are unchanged. Registrat
 
 #### What the model sees
 
-PTC mode exposes the generated [`run_code` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tools), the SDK instructions below, and the generated exact SDK block for the loaded runtime's language. The TypeScript instructions identify generated declarations as program-only bindings. When the current `bash` parameter schema accepts the example arguments, they also show a complete `run_code` call around `tools.bash(...)`. The `tools:sdk` section uses first-party order 5000 and disables prompt-variable interpolation, preserving literal `{{…}}` text in tool descriptions and schemas for both runtime languages. Under `ptc`, the prompt also carries the `tools:ptc-only` rule earlier in the first-party order, so the model reads which tools it may call before it reads what each one is for.
+PTC mode exposes the generated [`run_code` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tools), the SDK instructions below, and the generated exact SDK block for the loaded runtime's language. Both runtime languages list `code` before `description`; this is presentation order, not an enforced JSON member order. The TypeScript instructions use a return-value example for function-body runtimes and a printed-output example for REPL runtimes. They identify generated declarations as program-only bindings. When the current `bash` parameter schema accepts the example arguments, they also show a complete `run_code` call around `tools.bash(...)`. The `tools:sdk` section uses first-party order 5000 and disables prompt-variable interpolation, preserving literal `{{…}}` text in tool descriptions and schemas for both runtime languages. Under `ptc`, the prompt also carries the `tools:ptc-only` rule earlier in the first-party order, so the model reads which tools it may call before it reads what each one is for.
 
 ##### TypeScript PTC mode SDK instructions with bash
 
 ```markdown
-
 ## Writing code for run_code
 
-`run_code` takes two required arguments: `code` — the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped) — and `description`, a short summary of what the program does. Inside the program:
+`run_code` takes two required arguments: `code`, the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped), and `description`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly. When no separate `bash` schema is supplied, invoke a declared `bash` binding inside `run_code`:
+
+`run_code({ code: "return await tools.bash({ description: 'Show current directory', command: 'pwd' })", description: "Show current directory" })`
+
+Inside the program:
 
 - Call tools as `await tools.name(args)` — quoted access for exotic names: `tools["my-tool"](args)`. Every call resolves to the tool's typed canonical JSON value. Tool arguments must be lossless JSON.
 - A FAILED tool call rejects with `ToolCallError`, whose `toolName` identifies the failed tool and whose `message` is human-readable — `try/catch` it to handle and continue.
 - Independent read-only calls MAY overlap under `Promise.all` (safe calls run concurrently; mutating calls run alone, in submission order). Sequence dependent work with `await`.
-- Emit results with `return` and/or `console.log(...)`. ONLY what you print or return comes back to you — intermediate tool results never enter the conversation, so extract just what you need.
+- Emit results with `return` and/or `console.log(...)`. Only what you print or return is program output. A successful tool result containing an image is attached after the run so you can inspect it on the next step; every other intermediate result stays out of the conversation, so extract just what you need.
 
-The available tools:
+Program-only SDK bindings:
 ```
 
 #### Token effect

@@ -133,7 +133,7 @@ ctx.tools.register(defineTool({
 - 调用视图为 `{ card: 'generic', title, kind?, rawInput?, content?, locations? }`、`{ card: 'terminal', title, description?, cwd? }` 或 `{ card: 'diff', title, diffs, locations? }`。
 - 结果视图为 `{ card: 'generic', title?, content? }`、`{ card: 'terminal', title?, output?, exitCode?, signal? }`、`{ card: 'diff', title?, diffs }`、`{ card: 'search', shape, title?, truncated, total, … }`（已完成的发现型搜索——`shape: 'matches'`（grep）为按文件分组的匹配，`shape: 'paths'`（glob）为扁平路径列表，配 `truncated`/`total` 使 UI 永不把被截断的结果当作完整结果呈现；该视图不携带结果文本，且搜索没有 `card: 'search'` 的调用时对应视图）、`{ card: 'read', title?, path, offset, lines, totalLines, lang?, content? }`（已完成的文件读取→带行号、可选语法高亮的代码视图；`offset` 是窗口请求的 1-based 起始行，即使 `lines` 为空也保留；`lines` 是 `{ number, text }[]`，保留每一行的文件行号，`content` 是去除读取结果外层封装后的正文，供不支持读取视图的 UI 回退显示）或 `{ card: 'web', kind: 'search' | 'fetch', title?, … }`（已完成的 web 检索；`kind` 各分支携带结构化的搜索来源或抓取摘要，不具备 `web` 能力的 UI 回退到原始结果内容）。
 
-返回 `undefined` 会选择通用回退。呈现器只依赖其参数和持久结果，因为 UI 会在实时流式输出和日志回放期间调用它们。`output.presentationMeta(args, value)` 为直接的顶层调用派生 JSON 元数据；该元数据随 `tool/result` 持久化并传回 `presentResult`，而规范值本身仍只存在于执行局部，绝不会回放。嵌套 Code 分发不会计算元数据。`defineTool` 会软验证较旧的日志参数并回退，而不会使回放崩溃。`dsh-tool-bash` 与 `dsh-tool-fs` 是参考实现；[规范输出 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-20-canonical-tool-output-contract.zh.md) 规定值／呈现拆分，[呈现意图 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.zh.md) 规定卡片词汇。
+返回 `undefined` 会选择通用回退。呈现器只依赖其参数和持久结果，因为 UI 会在实时流式输出和日志回放期间调用它们。`output.presentationMeta(args, value)` 为原生与嵌套调用派生 JSON 元数据；该元数据随 `tool/result` 或嵌套调用的 `tool/ptc-dispatch` 记录持久化并传回 `presentResult`，而规范值本身仍只存在于执行局部，绝不会回放。`defineTool` 会软验证较旧的日志参数并回退，而不会使回放崩溃。`dsh-tool-bash` 与 `dsh-tool-fs` 是参考实现；[规范输出 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-20-canonical-tool-output-contract.zh.md) 规定值／呈现拆分，[呈现意图 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.zh.md) 规定卡片词汇。
 
 终端结果可以携带 `exitCode: null`，表示已结算运行没有已知退出码。消费方保留该事实，将其与成功退出码 `0` 区分；终止信号仍然具有优先权。
 
@@ -177,22 +177,25 @@ agent loop 将连续的 `parallel` 调用归入有界滚动池，并把每个 `e
 
 #### 模型看到什么
 
-PTC mode 会公开生成的 [`run_code` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tools)、下方 SDK 说明，以及按所加载运行时语言生成的精确 SDK 块。TypeScript 说明会把生成声明明确标为只能在程序内使用的绑定。当当前 `bash` 参数 schema 接受示例参数时，说明还会给出以 `run_code` 包住 `tools.bash(...)` 的完整调用。`tools:sdk` 段使用 first-party 顺序 5000，并关闭提示词变量插值，使两种运行时语言都原样保留工具描述和 schema 中的 `{{…}}` 文本。在 `ptc` 下，提示词还会带上处于更早 first-party 顺序的 `tools:ptc-only` 规则，让模型先读到「可以调用哪些工具」再读「每个工具做什么」。
+PTC mode 会公开生成的 [`run_code` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tools)、下方 SDK 说明，以及按所加载运行时语言生成的精确 SDK 块。两种运行时语言都将 `code` 列在 `description` 前；这是呈现顺序，不强制 JSON 成员顺序。TypeScript 说明对函数体运行时使用返回值示例，对 REPL 运行时使用打印输出示例，并把生成声明明确标为只能在程序内使用的绑定。当当前 `bash` 参数 schema 接受示例参数时，说明还会给出以 `run_code` 包住 `tools.bash(...)` 的完整调用。`tools:sdk` 段使用 first-party 顺序 5000，并关闭提示词变量插值，使两种运行时语言都原样保留工具描述和 schema 中的 `{{…}}` 文本。在 `ptc` 下，提示词还会带上处于更早 first-party 顺序的 `tools:ptc-only` 规则，让模型先读到「可以调用哪些工具」再读「每个工具做什么」。
 
 ##### 带 bash 的 TypeScript PTC mode SDK 说明
 
 ```markdown
-
 ## Writing code for run_code
 
-`run_code` takes two required arguments: `code` — the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped) — and `description`, a short summary of what the program does. Inside the program:
+`run_code` takes two required arguments: `code`, the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped), and `description`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly. When no separate `bash` schema is supplied, invoke a declared `bash` binding inside `run_code`:
+
+`run_code({ code: "return await tools.bash({ description: 'Show current directory', command: 'pwd' })", description: "Show current directory" })`
+
+Inside the program:
 
 - Call tools as `await tools.name(args)` — quoted access for exotic names: `tools["my-tool"](args)`. Every call resolves to the tool's typed canonical JSON value. Tool arguments must be lossless JSON.
 - A FAILED tool call rejects with `ToolCallError`, whose `toolName` identifies the failed tool and whose `message` is human-readable — `try/catch` it to handle and continue.
 - Independent read-only calls MAY overlap under `Promise.all` (safe calls run concurrently; mutating calls run alone, in submission order). Sequence dependent work with `await`.
-- Emit results with `return` and/or `console.log(...)`. ONLY what you print or return comes back to you — intermediate tool results never enter the conversation, so extract just what you need.
+- Emit results with `return` and/or `console.log(...)`. Only what you print or return is program output. A successful tool result containing an image is attached after the run so you can inspect it on the next step; every other intermediate result stays out of the conversation, so extract just what you need.
 
-The available tools:
+Program-only SDK bindings:
 ```
 
 #### Token 影响
