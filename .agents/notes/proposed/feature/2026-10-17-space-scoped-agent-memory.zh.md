@@ -39,7 +39,7 @@ runtime 约束了这种存储放在哪里、谁能写：
 
 ## Entries
 
-一个条目是一条事实：带品牌的 `key`（小写字母、数字和单个连字符，至多 64 个字符，作用域内唯一）、`kind`、用于目录和召回的一行 `summary`（至多 150 个字符）、不超过配置字节上限的 Markdown `content`、每次写入都会变化的不透明品牌 `revision`，以及记录写入来源（`agent`、`extraction`、`consolidation` 或 `member`）、会话 id、runtime 已知时的公开用户 id 和时间的 `created`/`updated` 出处。
+一个条目是一条事实：带品牌的 `key`（小写字母、数字和单个连字符，至多 64 个字符，作用域内唯一）、`kind`、用于目录和召回的一行 `summary`（至多 150 个字符）、不超过配置字节上限的 Markdown `content`、每次写入都会变化的不透明品牌 `revision`，以及记录写入来源（`agent`、`extraction`、`consolidation` 或 `member`）、会话 id、runtime 已知时的公开用户 id 和时间的 `created`/`updated` 字段。
 
 kind 闭集为 `profile`（用户或团队是谁：角色、专长、偏好）、`guidance`（agent 应如何工作：纠正与已确认的做法，并附原因）、`background`（代码和历史都看不出的目标、约束、决定与截止日期，使用绝对日期）、`resource`（工作区之外的信息在哪里）。服务在写入前校验每个字段与每作用域的条目上限。条目之间不带链接语法。
 
@@ -76,7 +76,7 @@ kind 闭集为 `profile`（用户或团队是谁：角色、专长、偏好）�
 
 ## Background curation
 
-`dsh-memory-curation` 是一个带两个可选 pass 的 agent 平面行。两者都在触发回合捕获的执行身份下运行，在第一次模型调用之前完成授权，携带该身份发送 `purpose: 'memory'` 以把用量归到发起成员，并且只通过 `ctx.memory` 以各自的出处来源写入。
+`dsh-memory-curation` 是一个带两个可选 pass 的 agent 平面行。两者都在触发回合捕获的执行身份下运行，在第一次模型调用之前完成授权，携带该身份发送 `purpose: 'memory'` 以把用量归到发起成员，并且只通过 `ctx.memory` 以各自的写入来源写入。
 
 - **提取（extraction）** 在回合以 `completed` 原因结束后运行。已调用 `memory_save` 或 `memory_delete` 的回合、没有人类正文的回合以及委派会话都跳过。请求按会话合并（一个运行、一个挂起），记忆域中持久的每会话游标限定转录切片。请求重放会话上一次请求的前缀——system 头、surface 消息和请求头中的工具，与 compaction 在 [`buildSummarizationInput`](../../../../packages/compaction/compaction-basic/src/region.ts) 中复用 provider 前缀缓存的做法相同——并追加列出当前目录的提取指令。随后一个有界工具循环只执行记忆操作，其他工具调用一律作为错误结果返回。
 - **整理（consolidation）** 在一次提取 pass 之后运行，前提是距上次已过配置的间隔且该作用域积累了足够的条目变更。它审视整个作用域，合并近似重复、删除被推翻或过期的条目、转换相对日期，并使用更大的轮次上限。
@@ -93,7 +93,7 @@ ZCode 的 `ReadSessionContext` 对应已有的 `tool-session-query` 工具。它
 
 ## Browser surface
 
-`dsh-client-ui-memory` 在侧边栏增加记忆页面。个人空间中它显示个人作用域和每个有条目的工作区作用域；项目空间中显示项目作用域。页面按 kind 分组条目、支持搜索，并展示每个条目的内容、修订时间、出处和指向来源对话的链接。当服务报告该作用域对调用者可写时，可以创建、编辑和删除条目。插件页上的一张卡片编辑 `memory` 设置命名空间。
+`dsh-client-ui-memory` 在侧边栏增加记忆页面。个人空间中它显示个人作用域和每个有条目的工作区作用域；项目空间中显示项目作用域。页面按 kind 分组条目、支持搜索，并展示每个条目的内容、修订时间、写入者记录和指向来源对话的链接。当服务报告该作用域对调用者可写时，可以创建、编辑和删除条目。插件页上的一张卡片编辑 `memory` 设置命名空间。
 
 ## Package map
 
@@ -116,7 +116,7 @@ standard、PTC 与 Cordis preset 挂载 agent 平面行；minimal preset 不挂�
 | 一事实一 Markdown 文件，`user` / `feedback` / `project` / `reference` 类型与 `[[name]]` 链接 | 每个 key 一条经校验的条目，`profile` / `guidance` / `background` / `resource` kind，无链接语法 |
 | agent 维护、每会话加载一次的 `MEMORY.md` 索引 | 由服务推导、变化时重新发布的目录 |
 | 记忆路径上的 Write 与 Edit，由权限规则自动放行 | 专用记忆工具；共享项目写入需要 `memory` 能力 |
-| 写入 frontmatter 的 `originSessionId` | 每个条目的创建与更新出处 |
+| 写入 frontmatter 的 `originSessionId` | 每个条目的创建与更新字段 |
 | 每个成功回合后的后台提取 agent | 提取 pass，默认关闭 |
 | 已实现但未接线的 dream 整理 pass | 整理 pass，默认关闭 |
 | 经辅助选择器的语义召回，在交付代码中关闭 | 按问召回，默认关闭 |
@@ -165,7 +165,7 @@ standard、PTC 与 Cordis preset 挂载 agent 平面行；minimal preset 不挂�
 
 - **目录成本。** 每次重新发布都会把目录加入对话。字节预算、单行摘要和仅在变化时发布限制了成本；语料较大时依靠 `memory_search` 与召回而非目录。
 - **记忆质量。** agent 可能保存低价值或错误的事实，提取会放大这一点。整理默认关闭，指导排除可推导事实，整理 pass 合并与修剪，人也可以编辑或删除任何条目。
-- **持久化的不可信文本。** 在一个对话中写入的内容会进入之后的对话。目录与召回把记忆表述为带日期的背景而非指令，出处标明每个写入者，项目写入需要车道授权。
+- **持久化的不可信文本。** 在一个对话中写入的内容会进入之后的对话。目录与召回把记忆表述为带日期的背景而非指令，条目的写入者字段标明每个写入者，项目写入需要车道授权。
 - **秘密。** 模型可能违背指导保存凭据。成员可以删除；服务不检查内容中的秘密。
 - **单进程可见性。** 域状态以内存为准，因此共享同一 Harness home 的两个独立进程在重启前看不到彼此的写入。Gateway runtime 每个空间运行一个进程。
 - **不设限的会话。** `danger-full-access` 可以直接修改存储文件，绕过服务的检查。

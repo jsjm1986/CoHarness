@@ -5324,7 +5324,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ExecutionCapability',
-    declaration: 'export type ExecutionCapability = \'execute\' | \'plugin-management\' | \'auto-review\' | \'desktop\';',
+    declaration: 'export type ExecutionCapability = \'execute\' | \'plugin-management\' | \'auto-review\' | \'desktop\' | \'memory\';',
   },
   {
     name: 'ExecutionInheritance',

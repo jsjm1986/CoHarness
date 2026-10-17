@@ -39,7 +39,7 @@ A workspace scope is identified by the session's execution target and its canoni
 
 ## Entries
 
-An entry is one fact: a branded `key` (lowercase letters, digits, and single hyphens, at most 64 characters, unique within its scope), a `kind`, a one-line `summary` of at most 150 characters used by the catalog and by recall, Markdown `content` up to a configured byte limit, an opaque branded `revision` that changes on every write, and `created`/`updated` provenance recording the writer's source (`agent`, `extraction`, `consolidation`, or `member`), the session id, the public user id when the runtime knows it, and the time.
+An entry is one fact: a branded `key` (lowercase letters, digits, and single hyphens, at most 64 characters, unique within its scope), a `kind`, a one-line `summary` of at most 150 characters used by the catalog and by recall, Markdown `content` up to a configured byte limit, an opaque branded `revision` that changes on every write, and `created`/`updated` fields recording the writer's source (`agent`, `extraction`, `consolidation`, or `member`), the session id, the public user id when the runtime knows it, and the time.
 
 The closed kind set is `profile` (who the user or team is: role, expertise, preferences), `guidance` (how the agent should work: corrections and confirmed approaches, with the reason), `background` (goals, constraints, decisions, and deadlines that neither the code nor its history shows, with absolute dates), and `resource` (where to find information outside the workspace). The service validates every field and a per-scope entry limit before it writes. Entries carry no link syntax between one another.
 
@@ -76,7 +76,7 @@ Memory files lie outside every sandbox writable root, so under `read-only` and `
 
 ## Background curation
 
-`dsh-memory-curation` is an agent-plane row with two opt-in passes. Both run under the execution identity captured at the triggering turn, authorize before their first model call, send `purpose: 'memory'` with that identity so usage is attributed to the initiating member, and write only through `ctx.memory` with their own provenance source.
+`dsh-memory-curation` is an agent-plane row with two opt-in passes. Both run under the execution identity captured at the triggering turn, authorize before their first model call, send `purpose: 'memory'` with that identity so usage is attributed to the initiating member, and write only through `ctx.memory` with their own write source.
 
 - **Extraction** runs after a turn ends with reason `completed`. It skips a turn that already called `memory_save` or `memory_delete`, a turn without human prose, and a delegated session. Requests are coalesced per session (one running, one pending), and a durable per-session cursor in the memory domain bounds the transcript slice. The request replays the session's last request prefix — system head, surface messages, and the request header's tools, as compaction does in [`buildSummarizationInput`](../../../../packages/compaction/compaction-basic/src/region.ts) to reuse the provider's prefix cache — and appends an extraction instruction listing the current catalog. A bounded tool loop then executes only memory operations and returns every other tool call as an error result.
 - **Consolidation** runs after an extraction pass once a configured interval has elapsed and enough entry changes have accumulated in the scope. It reviews the whole scope to merge near-duplicates, delete contradicted or stale entries, and convert relative dates, with a larger turn bound.
@@ -93,7 +93,7 @@ ZCode's `ReadSessionContext` corresponds to the existing `tool-session-query` to
 
 ## Browser surface
 
-`dsh-client-ui-memory` adds a Memory page in the sidebar. In a personal space it shows the personal scope and each workspace scope that holds entries; in a project space it shows the project scope. The page groups entries by kind, searches them, and shows each entry's content, revision time, provenance, and a link to the source conversation. It creates, edits, and deletes entries when the service reports the scope writable for the caller. A Plugins-page card edits the `memory` settings namespace.
+`dsh-client-ui-memory` adds a Memory page in the sidebar. In a personal space it shows the personal scope and each workspace scope that holds entries; in a project space it shows the project scope. The page groups entries by kind, searches them, and shows each entry's content, revision time, writer record, and a link to the source conversation. It creates, edits, and deletes entries when the service reports the scope writable for the caller. A Plugins-page card edits the `memory` settings namespace.
 
 ## Package map
 
@@ -116,7 +116,7 @@ The standard, PTC, and Cordis presets mount the agent-plane rows; the minimal pr
 | One Markdown fact per file with `user` / `feedback` / `project` / `reference` types and `[[name]]` links | One validated entry per key with `profile` / `guidance` / `background` / `resource` kinds and no link syntax |
 | Agent-maintained `MEMORY.md` index loaded once per session | Catalog derived by the service and republished whenever it changes |
 | Write and Edit on memory paths, auto-allowed by a permission rule | Dedicated memory tools; shared project writes require the `memory` capability |
-| `originSessionId` stamped into frontmatter | Created and updated provenance on every entry |
+| `originSessionId` stamped into frontmatter | Created and updated writer fields on every entry |
 | Background extraction agent after each successful round | Extraction pass, off by default |
 | Dream consolidation pass, implemented but not triggered | Consolidation pass, off by default |
 | Semantic recall through an auxiliary selector, disabled in the shipped code | Per-question recall, off by default |
@@ -165,7 +165,7 @@ The standard, PTC, and Cordis presets mount the agent-plane rows; the minimal pr
 
 - **Catalog cost.** Each republication adds the catalog to the conversation. The byte budget, one-line summaries, and change-only republication bound the cost; a large corpus relies on `memory_search` and recall instead of the catalog.
 - **Memory quality.** Agents may save low-value or wrong facts, and extraction amplifies this. Curation is off by default, the guidance excludes derivable facts, consolidation merges and prunes, and people can edit or delete any entry.
-- **Persisted untrusted text.** Content written from one conversation reaches later conversations. The catalog and recall frame memory as dated background rather than instructions, provenance identifies every writer, and project writes require the lane.
+- **Persisted untrusted text.** Content written from one conversation reaches later conversations. The catalog and recall frame memory as dated background rather than instructions, the entry's writer fields identify every writer, and project writes require the lane.
 - **Secrets.** A model may save a credential despite the guidance. Members can delete it; the service does not inspect content for secrets.
 - **Single-process visibility.** Domain state is authoritative in memory, so two standalone processes sharing one Harness home do not see each other's writes until they restart. Gateway runtimes run one process per space.
 - **Unconfined sessions.** `danger-full-access` can modify the storage files directly, bypassing the service's checks.

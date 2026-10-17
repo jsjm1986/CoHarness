@@ -25556,7 +25556,7 @@
         "packages/context/execution-authority/src/types.ts#ExecutionState"
       ],
       "sources": [
-        "packages/context/execution-authority/src/types.ts:18"
+        "packages/context/execution-authority/src/types.ts:23"
       ]
     },
     {
@@ -25818,7 +25818,7 @@
       "digest": "49ad6261b87a955db2668305dd1b3619eca23c6217335c7fdbe2d6349441b803",
       "names": [],
       "sources": [
-        "packages/context/execution-authority/src/types.ts:58"
+        "packages/context/execution-authority/src/types.ts:63"
       ]
     },
     {
@@ -25830,7 +25830,7 @@
       "digest": "49fa466ab5d5016a79202598a9a3cccd75fec282d3a26e52e2474f6fb2557419",
       "names": [],
       "sources": [
-        "packages/context/execution-authority/src/types.ts:38"
+        "packages/context/execution-authority/src/types.ts:43"
       ]
     },
     {
@@ -26628,7 +26628,7 @@
       "digest": "7a3103768bff2bde766f5f5beb06620a0dea729b4ab4c9fac6d8643ee08f3cbe",
       "names": [],
       "sources": [
-        "packages/context/execution-authority/src/types.ts:56"
+        "packages/context/execution-authority/src/types.ts:61"
       ]
     },
     {
@@ -27146,7 +27146,7 @@
       "digest": "9765aeaa7df4aca4e08797ec00225100899dd54a4c873fe281d2d664939f55d7",
       "names": [],
       "sources": [
-        "packages/context/execution-authority/src/types.ts:39"
+        "packages/context/execution-authority/src/types.ts:44"
       ]
     },
     {
@@ -27371,7 +27371,7 @@
       "digest": "a45e7b210dbd22e33c98b25f5d1ea7a57aec847a8ea0da514ae9525317685e11",
       "names": [],
       "sources": [
-        "packages/context/execution-authority/src/types.ts:22"
+        "packages/context/execution-authority/src/types.ts:27"
       ]
     },
     {
@@ -27582,7 +27582,7 @@
         "packages/context/execution-authority/src/types.ts#ExecutionEvent"
       ],
       "sources": [
-        "packages/context/execution-authority/src/types.ts:37"
+        "packages/context/execution-authority/src/types.ts:42"
       ]
     },
     {
@@ -28140,7 +28140,7 @@
         "packages/context/execution-authority/src/types.ts#ExecutionInheritance"
       ],
       "sources": [
-        "packages/context/execution-authority/src/types.ts:28"
+        "packages/context/execution-authority/src/types.ts:33"
       ]
     },
     {

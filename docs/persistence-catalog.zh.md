@@ -558,7 +558,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'gateway/continuation': { readonly key: string; readonly scope: ExecutionInheritance }
 ```
 
-来源：[`packages/context/execution-authority/src/types.ts:58`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:63`](../packages/context/execution-authority/src/types.ts)
 
 <a id="gatewayexecution--log-only"></a>
 
@@ -569,7 +569,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'gateway/execution': ExecutionEvent
 ```
 
-来源：[`packages/context/execution-authority/src/types.ts:54`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:59`](../packages/context/execution-authority/src/types.ts)
 
 <a id="gatewayscoped-execution--log-only"></a>
 
@@ -580,7 +580,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'gateway/scoped-execution': { readonly version: 1 }
 ```
 
-来源：[`packages/context/execution-authority/src/types.ts:56`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:61`](../packages/context/execution-authority/src/types.ts)
 
 ### `goal/*`
 
@@ -4160,7 +4160,7 @@ SHA-256: `81a6fccc775c0a082791a4fa3bb916b6355c8877c0ca6e1780e5cf01366b0cd3`
 
 SHA-256: `49ad6261b87a955db2668305dd1b3619eca23c6217335c7fdbe2d6349441b803`
 
-来源：[`packages/context/execution-authority/src/types.ts:58`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:63`](../packages/context/execution-authority/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -4187,7 +4187,7 @@ SHA-256: `820864922123bf28895e9074ada5d705c65ce0cff058b3807e1b2a5fa3686d70`
 
 SHA-256: `9765aeaa7df4aca4e08797ec00225100899dd54a4c873fe281d2d664939f55d7`
 
-来源：[`packages/context/execution-authority/src/types.ts:39`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:44`](../packages/context/execution-authority/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -4200,7 +4200,7 @@ SHA-256: `9765aeaa7df4aca4e08797ec00225100899dd54a4c873fe281d2d664939f55d7`
 
 SHA-256: `49fa466ab5d5016a79202598a9a3cccd75fec282d3a26e52e2474f6fb2557419`
 
-来源：[`packages/context/execution-authority/src/types.ts:38`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:43`](../packages/context/execution-authority/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -4221,7 +4221,7 @@ SHA-256: `043444942c4fcd7f8221f145723715868eea25e85057881fa15107dcd82fb629`
 
 SHA-256: `a45e7b210dbd22e33c98b25f5d1ea7a57aec847a8ea0da514ae9525317685e11`
 
-来源：[`packages/context/execution-authority/src/types.ts:22`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:27`](../packages/context/execution-authority/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -4247,7 +4247,7 @@ SHA-256: `8086a722e54f2867cebf78c887cdef6c9ed7438313a0a133f6d2f3ce72d99944`
 
 SHA-256: `7a3103768bff2bde766f5f5beb06620a0dea729b4ab4c9fac6d8643ee08f3cbe`
 
-来源：[`packages/context/execution-authority/src/types.ts:56`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:61`](../packages/context/execution-authority/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -6242,7 +6242,7 @@ SHA-256: `a22081ae530077819c4e3b947eab400c6d977c992e6cee3bf833c7d49a7fac89`
 
 SHA-256: `aeed2f1c957b0f3c958ea5430152c8b5a2388bfc764056af6399b98767cbb0bb`
 
-来源：[`packages/context/execution-authority/src/types.ts:37`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:42`](../packages/context/execution-authority/src/types.ts)
 
 以下类型之一：
 
@@ -6255,7 +6255,7 @@ SHA-256: `aeed2f1c957b0f3c958ea5430152c8b5a2388bfc764056af6399b98767cbb0bb`
 
 SHA-256: `d8a190eb207b11fe1eeb5abfbbf6bb8003d0922e2465b02204dc85ab170d9ba0`
 
-来源：[`packages/context/execution-authority/src/types.ts:28`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:33`](../packages/context/execution-authority/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -6271,7 +6271,7 @@ SHA-256: `d8a190eb207b11fe1eeb5abfbbf6bb8003d0922e2465b02204dc85ab170d9ba0`
 
 SHA-256: `36e52319f9a1d2c949b1f3505fd3815380d135c5da294df0fc992c8a0e7f7ffc`
 
-来源：[`packages/context/execution-authority/src/types.ts:18`](../packages/context/execution-authority/src/types.ts)
+来源：[`packages/context/execution-authority/src/types.ts:23`](../packages/context/execution-authority/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
