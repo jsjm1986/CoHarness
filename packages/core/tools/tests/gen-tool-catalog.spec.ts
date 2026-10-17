@@ -30,6 +30,7 @@ describe('gen-tool-catalog collectToolCatalog', () => {
       'cordis_inspect_query', 'cordis_inspect_self', 'create_goal', 'edit', 'exit_plan_mode', 'followup_task', 'get_goal', 'glob', 'grep',
       'interrupt_agent', 'interrupt_agent', 'job_kill', 'job_list', 'job_output',
       'list_agents', 'list_agents', 'list_mcp_resource_templates', 'list_mcp_resources', 'load_workspace_dependencies', 'lsp',
+      'memory_delete', 'memory_read', 'memory_save', 'memory_search',
       'plugin_manager', 'present', 'pwsh', 'pwsh', 'ralph',
       'read', 'read_image', 'read_mcp_resource', 'run_code', 'schedule_create', 'schedule_delete',
       'schedule_list', 'schedule_update', 'send_message', 'send_message', 'session_event_read', 'session_event_search',
