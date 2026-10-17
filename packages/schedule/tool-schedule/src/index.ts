@@ -1,6 +1,9 @@
 /**
- * Agent-scoped consumers of the shared Host Schedule management service.
- * @module @deepseek-ai/dsh-schedule
+ * Model-facing `schedule_create`, `schedule_list`, `schedule_update`, and
+ * `schedule_delete` tools over the Host `ctx.schedule` service. Mounting the
+ * plugin registers them in the mounting scope, so a preset decides which
+ * agents receive them; every call acts on the calling Agent's Session.
+ * @module @deepseek-ai/dsh-tool-schedule
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -9,12 +12,21 @@ import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { delegationDepthOf } from '@deepseek-ai/dsh-subagent'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
-import { MAX_TITLE_LENGTH, MIN_EVERY_INTERVAL_SECONDS, REQUIRED_TITLE_MESSAGE, ScheduleId, ScheduleInputError, scheduleView } from './domain.ts'
-import type {} from './index.ts'
+import {
+  MAX_TITLE_LENGTH, MIN_EVERY_INTERVAL_SECONDS, REQUIRED_TITLE_MESSAGE, ScheduleId, ScheduleInputError, scheduleView,
+} from '@deepseek-ai/dsh-schedule'
 import type {
   AtInput, CronInput, DailyInput, WeeklyInput, InternalScheduleError, ScheduleCreateValue, ScheduleDeleteValue,
   ScheduleListValue, ScheduleTimingChange, ScheduleToolError, ScheduleUpdateValue,
-} from './types.ts'
+} from '@deepseek-ai/dsh-schedule'
+
+/** Plugin name registered with the Loader. */
+export const name = 'tool-schedule'
+
+/** Host services this plugin consumes. The Schedule service is resolved per
+ * scope, so a preset that declares this plugin stays inert while the shipped
+ * composition keeps that service off. */
+export const inject = ['tools']
 
 const SHARED_VIEW_PROPERTIES = {
   id: { type: 'string', required: true },
@@ -183,6 +195,14 @@ const UPDATE_DESCRIPTION =
   'Change a reminder in place, keeping its id. Supply a new title, prompt, or at most one timing parameter; '
   + 'omitted fields keep their stored values. To change a relative delay, create a new reminder.'
 
+const CREATE_TITLE_DESCRIPTION =
+  `Concise task name in the user's language, at most ${MAX_TITLE_LENGTH} characters. `
+  + 'Name only the core action and subject; keep essential target identifiers such as PR numbers and branch names. '
+  + 'Do not include execution frequency (e.g. daily, hourly), scheduled dates/times, time zones, task status, '
+  + 'or configuration and execution details (e.g. read-only mode, profile-tag filters), even when embedded in the requested or existing title. '
+  + 'Do not append parenthetical notes. '
+  + 'Put scheduling information in the timing parameters and execution instructions in prompt.'
+
 /** Deterministic model content for every canonical Schedule value. */
 function renderValue(_args: unknown, value: unknown): ContentBlock[] {
   // The ToolRuntime has already validated the value against the lossless-JSON output schema.
@@ -207,9 +227,8 @@ function operationError(error: unknown): ScheduleToolError {
 
 /**
  * Refuse a caller that is a delegated child. A subagent cannot use reminders at
- * all — delivery resolves the bound Session through the shared controller, which
- * rejects a child's live Agent — so every tool rejects before dispatch instead of
- * relying on the registration scope alone.
+ * all, so every tool rejects before dispatch instead of relying on the mounting
+ * preset's tool filter alone.
  * @param agent - the calling agent, when the outer call has one.
  * @returns the stable refusal, or undefined for a top-level caller.
  */
@@ -414,162 +433,158 @@ const SELECTOR_PARAMETERS = {
 } as const
 
 /**
- * Register all four Schedule tools in one exact agent scope.
- * @param rootCtx - Host context owning the shared Schedule service.
- * @param toolCtx - Exact agent-scoped context receiving the definitions.
- * @param agent - Exact live owner whose session the tools mutate.
- * @returns Idempotent aggregate disposer for the four registrations.
+ * Register the four Schedule tools in the mounting scope.
+ *
+ * Each call mutates the Session of the Agent that dispatched it, so a mount
+ * outside an agent scope still registers the tools but every call without a
+ * caller Agent is refused as an internal failure.
+ * @param ctx - Context owning the `tools` registry and the Host `schedule` service.
  */
-export function registerScheduleTools(
-  rootCtx: Context,
-  toolCtx: Context,
-  agent: Agent,
-): () => void {
-  const disposers: Array<() => void> = []
+export function apply(ctx: Context): void {
+  ctx.inject(['schedule'], (scheduleCtx) => { registerScheduleTools(scheduleCtx) })
+}
 
-  try {
-    disposers.push(toolCtx.tools.register(defineTool({
-      name: 'schedule_create',
-      description: CREATE_DESCRIPTION,
-      parameters: {
-        prompt: {
-          type: 'string',
-          required: true,
-          description: 'Reminder content to present when the target becomes due.',
-        },
-        title: {
-          type: 'string',
-          required: true,
-          description: `Task name of at most ${MAX_TITLE_LENGTH} characters, shown on the task card and in task lists.`,
-        },
-        after_seconds: {
-          type: 'number',
-          description: 'Delay in whole seconds.',
-        },
-        ...SELECTOR_PARAMETERS,
+/**
+ * Register the four reminder tools in the scope that resolved the Schedule
+ * service.
+ * @param ctx - Scope whose `schedule` service the tools act through.
+ */
+function registerScheduleTools(ctx: Context): void {
+  ctx.tools.register(defineTool({
+    name: 'schedule_create',
+    description: CREATE_DESCRIPTION,
+    parameters: {
+      prompt: {
+        type: 'string',
+        required: true,
+        description: 'Reminder content to present when the target becomes due.',
       },
-      output: { schema: CREATE_OUTPUT_SCHEMA, render: renderValue },
-      async execute(args, exec): Promise<ScheduleCreateValue> {
-        const refusal = subagentCallerRefusal(exec.agent)
-        if (refusal !== undefined) return refusal
-        if (exec.agent !== agent) return internalError()
-        const invalid = validateCreateArgs(args)
-        if (invalid !== undefined) return invalid
-        if (exec.signal.aborted) return internalError()
-        try {
-          return scheduleView(await rootCtx.schedule.create(agent.session.id, args, exec.signal), Date.now())
-        } catch (error: unknown) {
-          return operationError(error)
-        }
+      title: {
+        type: 'string',
+        required: true,
+        description: CREATE_TITLE_DESCRIPTION,
       },
-      presentCall: args => present('Create reminder', 'other', args.prompt),
-    })))
+      after_seconds: {
+        type: 'number',
+        description: 'Delay in whole seconds.',
+      },
+      ...SELECTOR_PARAMETERS,
+    },
+    output: { schema: CREATE_OUTPUT_SCHEMA, render: renderValue },
+    async execute(args, exec): Promise<ScheduleCreateValue> {
+      const agent = exec.agent
+      if (agent === undefined) return internalError()
+      const refusal = subagentCallerRefusal(agent)
+      if (refusal !== undefined) return refusal
+      const invalid = validateCreateArgs(args)
+      if (invalid !== undefined) return invalid
+      if (exec.signal.aborted) return internalError()
+      try {
+        return scheduleView(await ctx.schedule.create(agent.session.id, args, exec.signal), Date.now())
+      } catch (error: unknown) {
+        return operationError(error)
+      }
+    },
+    presentCall: args => present('Create reminder', 'other', args.prompt),
+  }))
 
-    disposers.push(toolCtx.tools.register(defineTool({
-      name: 'schedule_list',
-      description: LIST_DESCRIPTION,
-      parameters: {},
-      output: { schema: LIST_OUTPUT_SCHEMA, render: renderValue },
-      async execute(_args, exec): Promise<ScheduleListValue> {
-        const refusal = subagentCallerRefusal(exec.agent)
-        if (refusal !== undefined) return refusal
-        if (exec.agent !== agent) return internalError()
-        if (exec.signal.aborted) return internalError()
-        try {
-          const records = await rootCtx.schedule.list({ sessionId: agent.session.id })
-          return records.map(record => scheduleView(record, Date.now()))
-        } catch (error: unknown) {
-          return operationError(error)
-        }
-      },
-      presentCall: () => present('List reminders', 'read'),
-    })))
+  ctx.tools.register(defineTool({
+    name: 'schedule_list',
+    description: LIST_DESCRIPTION,
+    parameters: {},
+    output: { schema: LIST_OUTPUT_SCHEMA, render: renderValue },
+    async execute(_args, exec): Promise<ScheduleListValue> {
+      const agent = exec.agent
+      if (agent === undefined) return internalError()
+      const refusal = subagentCallerRefusal(agent)
+      if (refusal !== undefined) return refusal
+      if (exec.signal.aborted) return internalError()
+      try {
+        const records = await ctx.schedule.list({ sessionId: agent.session.id })
+        return records.map(record => scheduleView(record, Date.now()))
+      } catch (error: unknown) {
+        return operationError(error)
+      }
+    },
+    presentCall: () => present('List reminders', 'read'),
+  }))
 
-    disposers.push(toolCtx.tools.register(defineTool({
-      name: 'schedule_delete',
-      description: DELETE_DESCRIPTION,
-      parameters: {
-        id: { type: 'string', required: true, description: 'Schedule id returned by schedule_list.' },
-      },
-      output: { schema: DELETE_OUTPUT_SCHEMA, render: renderValue },
-      async execute(args, exec): Promise<ScheduleDeleteValue> {
-        if (args.id.length === 0 || args.id.trim() !== args.id) {
-          return { code: 'invalid_rule', message: 'schedule_delete id must be non-empty without surrounding whitespace.' }
-        }
-        const id = ScheduleId(args.id)
-        const refusal = subagentCallerRefusal(exec.agent)
-        if (refusal !== undefined) return refusal
-        if (exec.agent !== agent) return internalError()
-        if (exec.signal.aborted) return internalError()
-        try {
-          return await rootCtx.schedule.delete({ sessionId: agent.session.id, id }, exec.signal)
-        } catch (error: unknown) {
-          return operationError(error)
-        }
-      },
-      presentCall: args => present('Delete reminder', 'other', args.id),
-    })))
+  ctx.tools.register(defineTool({
+    name: 'schedule_delete',
+    description: DELETE_DESCRIPTION,
+    parameters: {
+      id: { type: 'string', required: true, description: 'Exact schedule id.' },
+    },
+    output: { schema: DELETE_OUTPUT_SCHEMA, render: renderValue },
+    async execute(args, exec): Promise<ScheduleDeleteValue> {
+      if (args.id.length === 0 || args.id.trim() !== args.id) {
+        return { code: 'invalid_rule', message: 'schedule_delete id must be non-empty without surrounding whitespace.' }
+      }
+      const id = ScheduleId(args.id)
+      const agent = exec.agent
+      if (agent === undefined) return internalError()
+      const refusal = subagentCallerRefusal(agent)
+      if (refusal !== undefined) return refusal
+      if (exec.signal.aborted) return internalError()
+      try {
+        return await ctx.schedule.delete({ sessionId: agent.session.id, id }, exec.signal)
+      } catch (error: unknown) {
+        return operationError(error)
+      }
+    },
+    presentCall: args => present('Delete reminder', 'other', args.id),
+  }))
 
-    disposers.push(toolCtx.tools.register(defineTool({
-      name: 'schedule_update',
-      description: UPDATE_DESCRIPTION,
-      parameters: {
-        id: { type: 'string', required: true, description: 'Schedule id returned by schedule_list.' },
-        title: {
-          type: 'string',
-          description: `New task name of at most ${MAX_TITLE_LENGTH} characters.`,
-        },
-        prompt: {
-          type: 'string',
-          description: 'New reminder content.',
-        },
-        ...SELECTOR_PARAMETERS,
+  ctx.tools.register(defineTool({
+    name: 'schedule_update',
+    description: UPDATE_DESCRIPTION,
+    parameters: {
+      id: { type: 'string', required: true, description: 'Schedule id returned by schedule_list.' },
+      title: {
+        type: 'string',
+        description: 'New task name; follow the schedule_create title rules.',
       },
-      output: { schema: UPDATE_OUTPUT_SCHEMA, render: renderValue },
-      async execute(args, exec): Promise<ScheduleUpdateValue> {
-        const refusal = subagentCallerRefusal(exec.agent)
-        if (refusal !== undefined) return refusal
-        if (exec.agent !== agent) return internalError()
-        const invalid = validateUpdateArgs(args)
-        if (invalid !== undefined) return invalid
-        if (exec.signal.aborted) return internalError()
-        const id = ScheduleId(args.id)
-        try {
-          const sessionId = agent.session.id
-          const expected = (await rootCtx.schedule.list({ sessionId }))
-            .find(record => record.id === id)
-          if (expected === undefined) {
-            // The catalog also holds inactive reminders, which is the one not-found
-            // case the model can act on: it has to create a new reminder instead.
-            const ended = (await rootCtx.schedule.catalog())
-              .some(entry => entry.sessionId === sessionId && entry.id === id)
-            return { id, updated: false, code: ended ? 'schedule_ended' : 'schedule_not_found' }
-          }
-          const change = timingChangeFrom(args)
-          const result = await rootCtx.schedule.update({
-            sessionId,
-            id,
-            expected,
-            ...(change === undefined ? {} : { change }),
-            ...(args.title === undefined ? {} : { title: args.title }),
-            ...(args.prompt === undefined ? {} : { prompt: args.prompt }),
-          }, exec.signal)
-          return 'record' in result ? scheduleView(result.record, Date.now()) : result
-        } catch (error: unknown) {
-          return operationError(error)
+      prompt: {
+        type: 'string',
+        description: 'New reminder content.',
+      },
+      ...SELECTOR_PARAMETERS,
+    },
+    output: { schema: UPDATE_OUTPUT_SCHEMA, render: renderValue },
+    async execute(args, exec): Promise<ScheduleUpdateValue> {
+      const agent = exec.agent
+      if (agent === undefined) return internalError()
+      const refusal = subagentCallerRefusal(agent)
+      if (refusal !== undefined) return refusal
+      const invalid = validateUpdateArgs(args)
+      if (invalid !== undefined) return invalid
+      if (exec.signal.aborted) return internalError()
+      const id = ScheduleId(args.id)
+      try {
+        const sessionId = agent.session.id
+        const expected = (await ctx.schedule.list({ sessionId }))
+          .find(record => record.id === id)
+        if (expected === undefined) {
+          // The catalog also holds inactive reminders, which is the one not-found
+          // case the model can act on: it has to create a new reminder instead.
+          const ended = (await ctx.schedule.catalog())
+            .some(entry => entry.sessionId === sessionId && entry.id === id)
+          return { id, updated: false, code: ended ? 'schedule_ended' : 'schedule_not_found' }
         }
-      },
-      presentCall: args => present('Update reminder', 'other', args.id),
-    })))
-  } catch (error) {
-    for (const dispose of disposers.reverse()) dispose()
-    throw error
-  }
-
-  let active = true
-  return () => {
-    if (!active) return
-    active = false
-    for (const dispose of disposers.reverse()) dispose()
-  }
+        const change = timingChangeFrom(args)
+        const result = await ctx.schedule.update({
+          sessionId,
+          id,
+          expected,
+          ...(change === undefined ? {} : { change }),
+          ...(args.title === undefined ? {} : { title: args.title }),
+          ...(args.prompt === undefined ? {} : { prompt: args.prompt }),
+        }, exec.signal)
+        return 'record' in result ? scheduleView(result.record, Date.now()) : result
+      } catch (error: unknown) {
+        return operationError(error)
+      }
+    },
+    presentCall: args => present('Update reminder', 'other', args.id),
+  }))
 }

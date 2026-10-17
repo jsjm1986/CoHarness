@@ -778,6 +778,9 @@
     "schedule/schedule": {
       "sovereignty": "adapted"
     },
+    "schedule/tool-schedule": {
+      "sovereignty": "tracked"
+    },
     "sdk/client": {
       "sovereignty": "adapted"
     },
@@ -1392,10 +1395,6 @@
     {
       "package": "experimental/session-search",
       "reason": "experimental session-search lane not carried; pending decision on the workspace session-search tool surface"
-    },
-    {
-      "package": "schedule/tool-schedule",
-      "reason": "deferred: model-facing schedule tool declaration into presets is tracked as a remaining alignment gap; the fork ships schedule/schedule locally"
     },
     {
       "package": "experimental/hook-protocol",

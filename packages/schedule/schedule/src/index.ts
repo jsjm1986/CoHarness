@@ -9,7 +9,6 @@ import { delegationDepthOf } from '@deepseek-ai/dsh-subagent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace'
 import { ScheduleRuntime } from './runtime.ts'
-import { registerScheduleTools } from './tools.ts'
 import { scheduleDomain } from './storage.ts'
 import { deliveryHistoryPage } from './delivery-history.ts'
 import { resolveScheduleUpdate } from './update.ts'
@@ -25,7 +24,6 @@ import type {
 } from './types.ts'
 
 export type * from './types.ts'
-export { registerScheduleTools } from './tools.ts'
 export { scheduleDomain } from './storage.ts'
 export type { ScheduleTask } from './storage.ts'
 export type { RecurringOccurrence } from './domain.ts'
@@ -33,6 +31,7 @@ export {
   SCHEDULE_CHANGE_VERSION,
   MIN_EVERY_INTERVAL_SECONDS,
   MAX_TITLE_LENGTH,
+  REQUIRED_TITLE_MESSAGE,
   ScheduleId,
   ScheduleInputError,
   ScheduleLogError,
@@ -99,7 +98,7 @@ const DEFAULT_DELIVERY_HISTORY_RECORDS = 200
  * service is the plugin that registers that listener.
  */
 export class ScheduleService extends TypertRemoteService {
-  static inject = ['agents', 'sessions', 'tools', 'storageDomain', 'sessionController', 'sessionPersistence']
+  static inject = ['agents', 'sessions', 'storageDomain', 'sessionController', 'sessionPersistence']
 
   static Config: z<Config> = z.object({
     deliveryHistoryDays: z.number().step(1).min(1).max(3650).default(DEFAULT_DELIVERY_HISTORY_DAYS),
@@ -165,27 +164,6 @@ export class ScheduleService extends TypertRemoteService {
       this.runtime.requestDrive()
       return cleanup
     })
-    const registered = new WeakSet<object>()
-    const attached = new Map<import('@deepseek-ai/dsh-agent').Agent, () => Promise<void>>()
-    const attach = (agent: import('@deepseek-ai/dsh-agent').Agent): void => {
-      if (this.stopping || registered.has(agent) || !ctx.agents.roots().includes(agent)) return
-      registered.add(agent)
-      // The plugin-scope effect is what tears the Agent-scoped registration down when this
-      // plugin unloads, so it must also be disposed when the Agent itself is released.
-      attached.set(agent, ctx.effect(
-        () => agent.ctx.effect(() => registerScheduleTools(ctx, agent.ctx, agent)),
-      ))
-    }
-    ctx.on('agent/created', ({ agent }) => { attach(agent) })
-    ctx.on('agent/disposed', ({ agent }) => {
-      const detach = attached.get(agent)
-      if (detach === undefined) return
-      attached.delete(agent)
-      // `agent/disposed` declares a void listener, so the disposer promise is not returned;
-      // this teardown chain is synchronous, and a failure throws into
-      // `AgentRegistry.emitDisposed`, which reports it as a listener throw.
-      void detach()
-    })
     ctx.on('session/created', (session) => {
       // Historical Schedule events remain readable but do not populate Host tasks.
       // A throwing `session/created` listener rolls the attach back, so an unreadable
@@ -227,7 +205,6 @@ export class ScheduleService extends TypertRemoteService {
         activity()
       }
     }, 'schedule.archiveAdmission()')
-    for (const agent of ctx.agents.roots()) attach(agent)
   }
 
   async [Service.init](): Promise<void> {
@@ -240,7 +217,7 @@ export class ScheduleService extends TypertRemoteService {
    * The request must supply a title; a missing, blank-after-trim, or over-long
    * title rejects with `invalid_prompt` instead of deriving one from the prompt.
    * A Session a delegated child owns rejects with `subagent_session`, because delivery
-   * can never reach it.
+   * can never reach it: the child is one whose delegation depth is above zero.
    * The record is built from the clock reading taken before the request joins the
    * serialized queue, so a create that waits behind a longer operation keeps its
    * request-time anchor and may already be due when the queue reaches it.
@@ -339,7 +316,9 @@ export class ScheduleService extends TypertRemoteService {
    * Delete one task belonging to the selected Session, leaving queued messages intact.
    *
    * The row is removed: the task no longer schedules, leaves `list` and `catalog`, and its
-   * saved delivery records go with it.
+   * saved delivery records go with it. A task bound to a Session a delegated child owns
+   * stays deletable even though creation and timing edits refuse that binding, so a task
+   * stored before that rule existed remains removable.
    * @param request - Session and exact task identity.
    * @param signal - Optional cancellation checked before persistence begins, including after FIFO waits.
    * @returns Whether that Session owned a deleted task. Cancellation does not roll back an in-flight write.
@@ -367,8 +346,8 @@ export class ScheduleService extends TypertRemoteService {
    * Each supplied field replaces its stored value; an omitted field keeps it. A name or
    * instruction change alone does not reset the committed target. A Session a delegated
    * child owns returns the non-mutating `subagent_session` result, so an edit cannot
-   * re-arm a task bound to a Session delivery can never reach, and management views can
-   * explain the refusal through the ordinary result they already render.
+   * re-arm a task bound to a Session delivery can never reach, and the Web editor can
+   * explain the refusal through the ordinary result it already renders.
    * @param request - Task binding, complete observed record, and any combination of timing, name, and instruction.
    * @param signal - Cancellation checked after domain readiness and FIFO waits, before persistence begins.
    * @returns The committed record, unchanged record for a no-op, or a non-mutating input/lookup/conflict/refusal result.

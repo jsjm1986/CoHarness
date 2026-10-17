@@ -79,6 +79,12 @@
 - id: tool-jobs
   name: '@deepseek-ai/dsh-tool-jobs'
 
+# Reminder management (schedule_create/list/update/delete) registers into this
+# preset's scope: the Host `schedule` service owns storage and delivery, so the
+# tool Consumer needs no realm and presets that omit it get no reminder tools.
+- id: tool-schedule
+  name: '@deepseek-ai/dsh-tool-schedule'
+
 # ── skills ──────────────────────────────────────────────────────────────────
 
 # The skill REGISTRY lives in the host composition and is layered per scope:

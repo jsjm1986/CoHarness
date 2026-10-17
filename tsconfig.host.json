@@ -279,6 +279,7 @@
     { "path": "./packages/goal/command-goal" },
     { "path": "./packages/feedback/command-feedback" },
     { "path": "./packages/schedule/schedule" },
+    { "path": "./packages/schedule/tool-schedule" },
     { "path": "./packages/context/time-context" },
     { "path": "./packages/context/file-reference" },
     { "path": "./packages/context/file-reference-local" },

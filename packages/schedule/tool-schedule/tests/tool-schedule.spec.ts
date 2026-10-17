@@ -3,10 +3,9 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ToolExecutionToken } from '@deepseek-ai/dsh-tools'
-import { registerScheduleTools } from '../src/tools.ts'
-import { MAX_TITLE_LENGTH, REQUIRED_TITLE_MESSAGE, ScheduleId, createAfterScheduleRecord } from '../src/domain.ts'
-import { scheduleDomain } from '../src/storage.ts'
-import { harness, agentFor } from './harness.ts'
+import * as ToolSchedule from '../src/index.ts'
+import { MAX_TITLE_LENGTH, REQUIRED_TITLE_MESSAGE, ScheduleId, createAfterScheduleRecord, scheduleDomain } from '@deepseek-ai/dsh-schedule'
+import { agentFor, harness, mountToolSchedule } from './harness.ts'
 
 const tests: Awaited<ReturnType<typeof harness>>[] = []
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-16T00:00:00Z')) })
@@ -18,18 +17,17 @@ afterEach(async () => {
 async function setup(options: Parameters<typeof harness>[0] = {}) {
   const test = await harness(options); tests.push(test)
   const agent = agentFor(test.ctx)
-  test.ctx.effect(() => test.ctx.agents.enter(agent, undefined))
-  const dispose = registerScheduleTools(test.ctx, test.ctx, agent)
-  return { ...test, agent, dispose }
+  const scope = await mountToolSchedule(test.ctx, agent)
+  return { ...test, agent, scope }
 }
 async function execute(test: Awaited<ReturnType<typeof setup>>, name: string, args: unknown, agent: Agent = test.agent) {
-  return await test.ctx.agents.withInitiator(agent, () => test.ctx.tools.execute({
+  return await test.ctx.tools.execute({
     callId: ToolCallId('schedule-call'), signal: new AbortController().signal, name, arguments: args, agent,
-  }))
+  })
 }
 
 async function executeBody(test: Awaited<ReturnType<typeof setup>>, name: string, args: unknown, signal: AbortSignal) {
-  const definition = test.ctx.tools.get(name)
+  const definition = test.ctx.tools.get(name, test.agent)
   if (definition === undefined) throw new Error('missing Schedule tool')
   return await definition.execute(args, {
     callId: ToolCallId('body-call'), rootCallId: ToolCallId('body-call'), token: Symbol('test-body') as ToolExecutionToken,
@@ -38,12 +36,18 @@ async function executeBody(test: Awaited<ReturnType<typeof setup>>, name: string
 }
 
 describe('Schedule model tools', () => {
-  it('refuses every tool for a delegated child caller', async () => {
+  it('registers the four tools only in the mounting Agent scope', async () => {
     const test = await setup()
-    const parent = agentFor(test.ctx, 'delegating-parent')
-    test.ctx.agents.enter(parent, undefined)
-    const child = agentFor(test.ctx, 'delegated-child', { delegationDepth: 1 })
-    test.ctx.agents.enter(child, parent)
+    for (const name of ['schedule_create', 'schedule_list', 'schedule_delete', 'schedule_update']) {
+      expect(test.ctx.tools.get(name, test.agent)).toBeDefined()
+      expect(test.ctx.tools.get(name)).toBeUndefined()
+      expect(test.ctx.tools.get(name, agentFor(test.ctx, `unrelated-${name}`))).toBeUndefined()
+    }
+  })
+
+  it('refuses a call dispatched without a caller Agent in every tool', async () => {
+    const test = await harness(); tests.push(test)
+    await test.ctx.plugin(ToolSchedule)
     const cases = [
       ['schedule_create', { prompt: 'Check', after_seconds: 60, title: 'Check' }],
       ['schedule_list', {}],
@@ -51,7 +55,29 @@ describe('Schedule model tools', () => {
       ['schedule_update', { id: 'task-1', title: 'Check' }],
     ] as const
     for (const [name, args] of cases) {
-      const result = await execute(test, name, args, child)
+      const result = await test.ctx.tools.execute({
+        callId: ToolCallId('agentless-call'), signal: new AbortController().signal, name, arguments: args,
+      })
+      expect(result.isError).toBe(false)
+      expect(result.value).toEqual({ code: 'internal_error', message: 'The schedule operation failed.' })
+    }
+  })
+
+  it('refuses every tool for a delegated child caller', async () => {
+    const test = await harness(); tests.push(test)
+    const child = agentFor(test.ctx, 'delegated-child', { delegationDepth: 1 })
+    await test.ctx.agents.register(child)
+    await test.ctx.plugin(ToolSchedule)
+    const cases = [
+      ['schedule_create', { prompt: 'Check', after_seconds: 60, title: 'Check' }],
+      ['schedule_list', {}],
+      ['schedule_delete', { id: 'task-1' }],
+      ['schedule_update', { id: 'task-1', title: 'Check' }],
+    ] as const
+    for (const [name, args] of cases) {
+      const result = await test.ctx.tools.execute({
+        callId: ToolCallId('child-call'), signal: new AbortController().signal, name, arguments: args, agent: child,
+      })
       expect(result.isError).toBe(false)
       expect(result.value).toEqual({ code: 'subagent_session', message: 'A delegated subagent cannot use reminders.' })
     }
@@ -104,7 +130,7 @@ describe('Schedule model tools', () => {
     const schema = test.ctx.tools.schemas(test.agent).find(item => item.name === 'schedule_create')
     const parameters = schema?.parameters as { properties: Record<string, { type?: string; description?: string }>; required: string[] }
     expect(parameters.properties.title?.type).toBe('string')
-    expect(parameters.properties.title?.description).toContain('task card')
+    expect(parameters.properties.title?.description).toContain('Concise task name')
     expect(parameters.required).toEqual(expect.arrayContaining(['prompt', 'title']))
     const created = await execute(test, 'schedule_create', {
       prompt: 'Check the queue\nand the backlog', title: '  Queue check  ', every_seconds: 300,
@@ -309,25 +335,27 @@ describe('Schedule model tools', () => {
     expect(await test.service.list({ sessionId: test.agent.session.id })).toEqual([])
   })
 
-  it('cannot use a tool bound to another Agent or delete another Session task', async () => {
+  it('cannot reach the tools from another Agent or delete another Session task', async () => {
     const test = await setup()
     const foreign = agentFor(test.ctx, 'foreign')
     const record = await test.service.create(SessionId('foreign'), {
       prompt: 'Keep', after_seconds: 60, title: 'Keep',
     })
-    expect((await execute(test, 'schedule_list', {}, foreign)).value).toMatchObject({ code: 'internal_error' })
+    expect((await execute(test, 'schedule_list', {}, foreign)).isError).toBe(true)
     expect((await execute(test, 'schedule_delete', { id: record.id })).value)
       .toMatchObject({ deleted: false, code: 'schedule_not_found' })
     expect(await test.service.list({ sessionId: foreign.session.id })).toEqual([record])
   })
 
-  it('contains storage failure and unregisters all tools on disposal', async () => {
+  it('contains storage failure and unregisters all tools on scope disposal', async () => {
     const test = await setup()
     test.pool.failNextWrites = 1
     expect((await execute(test, 'schedule_create', { prompt: 'Failed', after_seconds: 60, title: 'Failed' })).value)
       .toMatchObject({ code: 'internal_error' })
-    test.dispose()
-    test.dispose()
+    await test.scope.dispose()
+    for (const name of ['schedule_create', 'schedule_list', 'schedule_delete', 'schedule_update']) {
+      expect(test.ctx.tools.get(name, test.agent)).toBeUndefined()
+    }
     expect((await execute(test, 'schedule_list', {})).isError).toBe(true)
   })
 
@@ -343,13 +371,13 @@ describe('Schedule model tools', () => {
         { card: 'generic', title: 'Update reminder', kind: 'other', rawInput: 'missing' }],
     ] as const
     for (const [name, args, presentation] of cases) {
-      const definition = test.ctx.tools.get(name)
+      const definition = test.ctx.tools.get(name, test.agent)
       expect(definition?.presentCall?.(args)).toEqual(presentation)
       const result = await execute(test, name, args)
       expect(result.isError).toBe(false)
       expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(result.value) }])
     }
-    expect(test.ctx.tools.get('schedule_create')?.presentCall?.({ prompt: 42 })).toBeUndefined()
+    expect(test.ctx.tools.get('schedule_create', test.agent)?.presentCall?.({ prompt: 42 })).toBeUndefined()
   })
 
   it.each(['', ' padded', 'padded '])('rejects a malformed delete identity %j', async (id) => {
@@ -364,7 +392,7 @@ describe('Schedule model tools', () => {
   ])('rejects another Agent using %s', async (name, args) => {
     const test = await setup()
     const foreign = agentFor(test.ctx, 'other-tool-caller')
-    expect((await execute(test, name, args, foreign)).value).toMatchObject({ code: 'internal_error' })
+    expect((await execute(test, name, args, foreign)).isError).toBe(true)
     expect(await test.service.list({ sessionId: test.agent.session.id })).toEqual([])
   })
 
@@ -529,8 +557,7 @@ describe('Schedule model tools', () => {
       prompt: 'Keep', every_seconds: 300, title: 'Keep',
     })
     const foreign = agentFor(test.ctx, 'other-update-caller')
-    expect((await execute(test, 'schedule_update', { id: record.id, title: 'Foreign' }, foreign)).value)
-      .toMatchObject({ code: 'internal_error' })
+    expect((await execute(test, 'schedule_update', { id: record.id, title: 'Foreign' }, foreign)).isError).toBe(true)
     expect((await test.service.list({ sessionId: test.agent.session.id }))[0])
       .toMatchObject({ title: 'Keep' })
   })
@@ -559,20 +586,6 @@ describe('Schedule model tools', () => {
     expect((await execute(test, 'schedule_update', { id: record.id, title: 'Renamed' })).value)
       .toEqual({ code: 'internal_error', message: 'The schedule operation failed.' })
     expect(await test.service.list({ sessionId: test.agent.session.id })).toEqual([record])
-  })
-
-  it('removes earlier registrations if registering a later tool fails', async () => {
-    const test = await setup()
-    test.dispose()
-    const register = test.ctx.tools.register.bind(test.ctx.tools)
-    const failure = new Error('registration failed')
-    vi.spyOn(test.ctx.tools, 'register')
-      .mockImplementationOnce(definition => register(definition))
-      .mockImplementationOnce(() => { throw failure })
-    expect(() => registerScheduleTools(test.ctx, test.ctx, test.agent)).toThrow(failure)
-    expect(test.ctx.tools.get('schedule_create')).toBeUndefined()
-    expect(test.ctx.tools.get('schedule_list')).toBeUndefined()
-    expect(test.ctx.tools.get('schedule_delete')).toBeUndefined()
   })
 
 })

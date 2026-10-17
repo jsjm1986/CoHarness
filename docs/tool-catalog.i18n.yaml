@@ -9,8 +9,8 @@
   en: ddbe8316ec6b1363
   zh: b2d705c03641df84
 /tool-schema-catalog/tool-package-map:
-  en: b4848e1ebd63fcc7
-  zh: aaaf2c30f136ba94
+  en: cc02076365319748
+  zh: 64a18d4678c4d1b2
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -186,23 +186,23 @@
   en: 0b517f13dfde11fe
   zh: b7ee7482e8ecde56
 /tool-schema-catalog/deepseek-ai-dsh-tool-goal/update-goal:
-  en: e6b92fac5aad585c
-  zh: 6b3cdd87b059a98f
-/tool-schema-catalog/deepseek-ai-dsh-schedule:
-  en: 573da0cf49b1eed6
-  zh: 573da0cf49b1eed6
-/tool-schema-catalog/deepseek-ai-dsh-schedule/schedule-create:
-  en: 0a10b5db8919d316
-  zh: b43eaab7956d0d65
-/tool-schema-catalog/deepseek-ai-dsh-schedule/schedule-delete:
-  en: cff096695f06e298
-  zh: 237fd857ebbd5faa
-/tool-schema-catalog/deepseek-ai-dsh-schedule/schedule-list:
-  en: d8543c8503d0947e
-  zh: a6d3e689318f277d
-/tool-schema-catalog/deepseek-ai-dsh-schedule/schedule-update:
-  en: 3d5e2517b510238b
-  zh: 94ab0b084a3888cb
+  en: 5f8a1d6e44e57d09
+  zh: d757489fdacde22d
+/tool-schema-catalog/deepseek-ai-dsh-tool-schedule:
+  en: 9fd2eccb1ee51372
+  zh: 9fd2eccb1ee51372
+/tool-schema-catalog/deepseek-ai-dsh-tool-schedule/schedule-create:
+  en: 606fc2b8d62ba044
+  zh: 7523e106168c2ab2
+/tool-schema-catalog/deepseek-ai-dsh-tool-schedule/schedule-delete:
+  en: 5fc994535c95cd6b
+  zh: 1910b545d7b92379
+/tool-schema-catalog/deepseek-ai-dsh-tool-schedule/schedule-list:
+  en: 5bcfc051e364df29
+  zh: b77e60c123800eb1
+/tool-schema-catalog/deepseek-ai-dsh-tool-schedule/schedule-update:
+  en: b9f4691532157a1d
+  zh: 8a0597790dc5f999
 /tool-schema-catalog/deepseek-ai-dsh-tool-lsp:
   en: 32982123b1f0e5bc
   zh: 32982123b1f0e5bc

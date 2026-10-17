@@ -13,7 +13,7 @@ The mechanism is two seams. Entry contexts chain to the context a subtree was pl
 
 ## Summary
 
-Use `dsh-agent-preset-registry` to give each session the tools, prompt sections, and skills named by one preset's `agent.cordis.yml`. One process can run sessions with different presets while keeping their state separate. The preset list combines shipped definitions with configured and user roots, reports why a preset cannot start, and can create a local preset by copying an existing one. Deployments and users can choose defaults and whether new-session surfaces offer the choice at all; only an empty session may switch presets. Treat every authored preset as trusted configuration because it grants the capabilities of the plugins it selects. A plugin can also declare a preset in code through `ctx.agentPresets.register`; declared presets join the same roster as system rows and compose agents through their own generations.
+Use `dsh-agent-preset-registry` to give each session the tools, prompt sections, and skills named by one preset's `agent.cordis.yml`. One process can run sessions on different presets with state kept separate. The roster combines shipped, configured, and user roots, reports why a preset cannot start, and authors local presets by copy. Deployments and users choose defaults and whether new-session surfaces offer a choice; only empty sessions may switch presets. Treat every authored preset as trusted configuration because it grants the capabilities of the plugins it selects. Plugins may declare presets through `ctx.agentPresets.register`; declarations join the roster and compose through their own generations.
 
 ## Table of Contents
 

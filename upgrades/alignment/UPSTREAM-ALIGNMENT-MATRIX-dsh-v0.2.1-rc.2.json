@@ -14558,15 +14558,15 @@
     },
     {
       "area": "packages/schedule/tool-schedule",
-      "status": "defer",
+      "status": "retain",
       "localOwner": "packages/schedule/tool-schedule",
       "commitScope": [
         "packages/schedule/tool-schedule/"
       ],
-      "reviewState": "deferred-platform-review",
+      "reviewState": "pending-cumulative-source-review",
       "phase": "P4",
       "phaseAssignment": "cross-audit-dsh-v0.2.1-rc.2",
-      "targetAssessment": "deferred-this-release",
+      "targetAssessment": "increment-review-required",
       "cumulativeFiles": [
         "packages/schedule/tool-schedule/README.i18n.yaml",
         "packages/schedule/tool-schedule/README.md",
@@ -14577,10 +14577,8 @@
         "packages/schedule/tool-schedule/tests/tool-schedule.spec.ts",
         "packages/schedule/tool-schedule/tsconfig.json"
       ],
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "deferred: model-facing schedule tool declaration into presets is tracked as a remaining alignment gap; the fork ships schedule/schedule locally"
-      },
+      "localSovereignty": "tracked",
+      "localPlan": "P4 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
       "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 0/8 target files byte-identical locally; 0 carry fork diffs; 8 not carried; 0 removed upstream this round."
     },
     {

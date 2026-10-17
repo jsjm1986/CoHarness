@@ -19,6 +19,8 @@
 
 发布的 Web profile 不含 Schedule。打开插件管理页，在“官方”分组中启用“自动化任务”；可选实验性 bundle `@deepseek-ai/dsh-experimental-schedule-bundle` 随即加入 Schedule 及其时钟上下文，后者把当前时间和浏览器时区交给模型。在请求模型创建提醒前，先配置模型 provider。
 
+`standard`、`cordis` 和 `ptc` preset 声明四个提醒工具，因此这些 preset 提供 `schedule_create`、`schedule_list`、`schedule_update` 和 `schedule_delete`；`minimal` preset 不声明。被委派的子 agent 看不到这四个工具，因为三个 preset 的委派行已将其 deny；即使某个调用仍能到达工具，也会被拒绝。
+
 向模型提出创建、列出、修改或删除提醒的请求。模型使用 `schedule_create`、`schedule_list`、`schedule_update` 和 `schedule_delete`（更新原地修改一条提醒，保留其 id 与已保存的投递记录）；「自动化任务」页面的「新建」操作则为创建打开一个新会话，其 composer 已写好该请求。支持正整数秒的一次性延迟、绝对日期时间、至少一分钟的固定间隔、带 IANA 时区的每日本地时间、带 IANA 时区和 ISO 星期（周一 1 至周日 7）的每周本地时间，以及带显式 IANA 时区的五字段 cron 表达式（表达式以规范化形式保存）。
 
 例如，请求：“每天 Asia/Shanghai 时区 23:00 提醒我查看天气。”打开自动化任务页面并选择刚创建的提醒，检查频率显示的是每日规则和所需时区，而非仅一次。一次性提醒不会在投递后变成重复任务。

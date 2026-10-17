@@ -13,7 +13,7 @@ kind: "package-reference"
 
 ## 概述
 
-使用 `dsh-agent-preset-registry` 为每个会话提供某个 preset 的 `agent.cordis.yml` 所指定的工具、提示词段落与 skill（技能）。一个进程可以运行使用不同 preset 的会话，同时保持它们的状态相互隔离。preset 名单合并随附定义、已配置根目录与用户根目录，会报告 preset 无法启动的原因，也能通过复制现有 preset 创建本地 preset。部署与用户都可选择默认值、以及新会话表层是否提供选择；只有空会话可以切换 preset。请将每个自行编写的 preset 视为受信任配置，因为它会授予其所选插件的能力。插件也可以通过 `ctx.agentPresets.register` 在代码中声明 preset；声明的 preset 以 system 身份并入同一份名单，并通过自己的代际组装 agent。
+使用 `dsh-agent-preset-registry` 为每个会话提供某个 preset 的 `agent.cordis.yml` 所指定的工具、提示词段落与 skill（技能）。一个进程可以运行使用不同 preset 的会话，并保持状态相互隔离。名单合并随附、已配置与用户三类根目录，会报告 preset 无法启动的原因，也能通过复制产生本地 preset。部署与用户选择默认值以及新会话表层是否提供选择；只有空会话可切换 preset。请将每个自行编写的 preset 视为受信任配置，因为它会授予其所选插件的能力。插件也可通过 `ctx.agentPresets.register` 声明 preset；声明并入同一名单并按各自代际组装。
 
 ## 目录
 
