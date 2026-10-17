@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-memory-context",
   "description": "Agent-plane saved-memory catalog publication as durable user messages",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
