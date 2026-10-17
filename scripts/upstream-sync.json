@@ -748,9 +748,12 @@
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md"
     },
+    "preset/agent-preset": {
+      "sovereignty": "tracked"
+    },
     "preset/agent-preset-registry": {
-      "sovereignty": "owned",
-      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.0-rc.1.md"
+      "sovereignty": "adapted",
+      "note": "P5 two-package migration landed in 8a6aa525882: the upstream declaration model (register/generations/acquireScope/inspectCompositions) merged onto the fork file-discovery, authoring, inventory, and standing-generation core; realm split, trust governance, remote contract, and durable selection preserved"
     },
     "preset/persona": {
       "sovereignty": "tracked"
@@ -1307,16 +1310,6 @@
     {
       "package": "llm/llm-deepseek-account",
       "reason": "account provider excluded; the API-key provider split is carried without it"
-    },
-    {
-      "package": "preset/agent-preset",
-      "reason": "slated for P5 adoption in the two-package preset migration",
-      "replacedBy": "preset/agent-preset-registry"
-    },
-    {
-      "package": "preset/agent-preset-registry",
-      "reason": "slated for P5 adoption in the two-package preset migration",
-      "replacedBy": "preset/agent-preset-registry"
     },
     {
       "package": "telemetry/otel",
