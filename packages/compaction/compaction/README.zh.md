@@ -105,7 +105,6 @@ kind: "package-reference"
 | [`src/tool-pairing.ts`](src/tool-pairing.ts) | 两个边界 helper 背后的每会话切分点平衡缓存 |
 | [`src/checkpoint.ts`](src/checkpoint.ts) | 无 Cordis 依赖的检查点来源构造函数与谓词（`./checkpoint` 叶子） |
 | [`src/brand.ts`](src/brand.ts) | `CompactionId` 品牌化标识 |
-| [`src/invariant.ts`](src/invariant.ts) | 不变量配套组件：校验 `compaction/start`→`summary`→`end` 标记对、其属主轮次包裹与检查点关联 |
 
 ### 锁与串行化
 
@@ -133,7 +132,6 @@ kind: "package-reference"
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -155,7 +153,6 @@ kind: "package-reference"
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明无论加载哪个后端，压缩都无法做到的事；它们是当前包约束。
 

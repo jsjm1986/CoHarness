@@ -19,7 +19,6 @@ DeepSeek Harness 为每个 harness home 使用一个匿名标识符，以关联�
 
 - [存储约定](#storage-contract)
 - [组合](#composition)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -34,12 +33,8 @@ DeepSeek Harness 为每个 harness home 使用一个匿名标识符，以关联�
 <a id="composition"></a>
 ## 组合
 
-本包是共享库，并非 Cordis 插件。消费方直接导入 `getOrCreateAnonymousUserId()`。其不变式伴生插件刻意留空，因为本包既不拥有事件流，也不拥有任何可以在不触发创建身份这一副作用的情况下检查的公开可变关系。`DSH_TELEMETRY_DISABLED` 只会停止遥测导出，不会禁止直接反馈确认或 DeepSeek 提供方标头。
+本包是共享库，并非 Cordis 插件。消费方直接导入 `getOrCreateAnonymousUserId()`。`DSH_TELEMETRY_DISABLED` 只会停止遥测导出，不会禁止直接反馈确认或 DeepSeek 提供方标头。
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该 id 只创建一次，作为单行持久记录保存，此后不可变；没有变化中的关系可供观测。
 
 <a id="model-experience"></a>
 ## 模型体验

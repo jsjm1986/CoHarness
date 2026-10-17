@@ -18,7 +18,6 @@ fork 提供方会创建一个进程内子 agent（智能体），并以父 agent
 - [初始内容边界](#seed-boundary)
 - [启动与能力](#start-and-capabilities)
 - [配置](#config)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -48,12 +47,6 @@ fork 声明 `{ agentOptions: true, agentPreset: false, outputSchema: true, depth
 |---|---|
 | `providerName` | `ctx.subagents` 上的注册表名称（默认 `fork`）。 |
 运行生命周期、模型继承与深度跟踪均为共享行为，见 [`dsh-subagent-spawn-in-process`](../subagent-spawn-in-process/README.zh.md)。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。所有运行机制位于共享的进程内驱动器中；提供方只贡献带种子会话的 fork 入口。
-
 
 <a id="model-experience"></a>
 ## 模型体验

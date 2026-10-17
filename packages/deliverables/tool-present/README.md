@@ -53,8 +53,6 @@ The tool resolves paths through the configured filesystem provider and checks re
 
 The pure `./types` entry declares `PresentedFile` and the Session event without importing Host runtime code. The Web consumer validates persisted declarations before displaying or opening them. New declarations store absolute paths; legacy relative declarations retain the viewed Session's original workspace as their base.
 
-**Runtime invariant:** No companion is published. Tool and event registrations are effect-owned, and the Session log owns file declarations; the plugin maintains no independent file-content store.
-
 </details>
 
 -----

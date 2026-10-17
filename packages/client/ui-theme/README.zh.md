@@ -30,7 +30,6 @@ kind: "package-reference"
 ## 目录
 
 - [设置权限与兼容性](#settings-authority-and-compatibility)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -41,12 +40,6 @@ kind: "package-reference"
 ## 设置权限与兼容性
 
 外观控件显示账户偏好；项目策略可以强制当前界面使用浅色或深色方案。账户级 scope 在报告 `loading`、`writable: false` 或写入处于 `saving` 时禁用选择；项目和提供方限制会在行内显示，服务在取得可写账户视图前也会拒绝直接调用 `setTheme`。字号与字体写入经由同一绑定 scope：scope 只读时行仍可交互，但写入被拒绝，服务继续显示持久化值。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该偏好的持久归属是 Host settings namespace；`ThemeRuntime` 只保留已解析快照，其针对推送变更与重连的行为由单元规格断言。
-
 
 <a id="model-experience"></a>
 ## 模型体验

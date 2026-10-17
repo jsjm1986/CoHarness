@@ -23,7 +23,6 @@ agent preset 的各个表层：General 设置中的一行，用于选择新建�
 - [它读什么、写什么](#what-it-reads-and-writes)
 - [管理分区](#the-management-section)
 - [何时不显示这些表层](#when-the-surfaces-are-absent)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -93,12 +92,6 @@ preset 自行发布描述，长度不限，而网格让每一行卡片等高—�
 ## 何时不显示这些表层
 
 未组装任何 preset 的部署返回空名单，本行、chip、标签与分区都不渲染任何内容——此时每个会话共用宿主组装，也就无从选择或管理。未配置可写根目录的部署返回 `authorable: false`，分区随之退化为只读浏览：随附组装仍可在查看器中打开，但每个复制操作都被禁用并以原因作提示，而不是给出一个创建必然失败的对话框。名册返回 `modeSelectionEnabled: false` 时，chip 与 General 行都不渲染——分区继续管理名单、但其选择类操作被禁用，会话标题标签仍如实报告每个会话创建时所用的 preset。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。这些界面通过 settings 与远程调用读取并修改 Host 拥有的 preset 名册；插件只贡献 slot 占位内容，自身不保留 preset 数据。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -33,7 +33,6 @@ Under the product CLI, resolution reads the launcher's frozen [environment snaps
 - [Permissions](#permissions)
 - [Hot reload](#hot-reload)
 - [Security boundary](#security-boundary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -104,11 +103,6 @@ External edits publish `credentials/reference-updated` per changed reference aft
 The document is `0600` under a `0700` directory, which stops other OS users — **not** the model. Tool processes (bash, the filesystem tools) run as the same user, and the shipped `workspace-write` file policy confines mutations rather than reads, so they can read this file exactly like any other file the user owns; no sandbox mode singles it out. What the harness does hold to is narrower: it never hands the model a resolved path to the document, and never loads it into the process environment — unlike `$DSH_HOME/.env`, which is the user's ordinary environment layer (see [app-boot's Harness-home layers](../../boot/app-boot/README.md#profiles)) — so reaching the value takes a deliberate read of a path the agent was not given.
 
 That is discretion, not a boundary. A deployment that must keep provider keys away from its own agent cannot get there with file permissions; an OS-keychain provider — a store the model's processes cannot read at all — is the deferred answer and belongs beside this provider as a sibling package.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each resolution derives its answer from the layered sources at call time under the documented precedence; the file layer's behavior is asserted by specs and no credential cache is published.
 
 <a id="model-experience"></a>
 ## Model Experience

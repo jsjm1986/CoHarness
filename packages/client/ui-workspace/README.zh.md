@@ -39,18 +39,11 @@ Session 行渲染运行时的实时 `pendingInteraction` 分类：审批显示**
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。Workspace 与 Session 列表由运行时镜像与 Host 调用渲染；浏览器不拥有工作区数据。
-
 
 <a id="model-experience"></a>
 ## 模型体验

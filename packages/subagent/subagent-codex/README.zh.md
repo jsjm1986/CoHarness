@@ -20,7 +20,6 @@ kind: "package-bundle"
 - [配置](#configuration)
 - [持续成员](#persistent-members)
 - [产品兼容性与证据](#product-compatibility-and-evidence)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -144,12 +143,6 @@ dsh --profile <name>
 生成的 schema 证据与包测试会固定全部十六种 error-info variant、HTTP status 所在位置、六个生命周期阶段、进程结果、终止原因映射、unknown 回退、脱敏、权限顺序、取消、并发与清理聚合。无密钥真实产品测试会驱动包内 wrapper 连接回环 Responses fixture，并观测包内 argv、确切的 Bearer 密钥、原始任务、逐字节完全一致的最终回答、线程级 `never` 对环境中 `on-request` 的覆盖、自动评审启动、不产生文件副作用的无人值守拒绝、真实 `internalServerError`、测试拥有临时存储中的显式危险绕过写入、携带安全退出事实的进程／协议失败，以及 wrapper／原生进程完全停稳。同一层级还会证明两个命名实例保留彼此独立的环境与原生模式。
 
 如果安装时省略 optional dependencies、当前平台不受支持，或所选载荷缺失，第一次委派会在 `initialize` 阶段以安全 `unknown` 类别和已观测到的进程结果失败。原始 wrapper 文本只保留在 Host stderr；提供方既不会探测宿主 CLI，也不会用它重试。独立 wrapper fixture 会另行证明原生载荷失败与不存在宿主回退。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次运行向委托工作区中的一个临时 Codex 线程提交一个任务并返回其结果；运行之间不保留会话状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

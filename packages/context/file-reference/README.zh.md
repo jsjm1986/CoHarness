@@ -19,18 +19,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该 seam 定义列表契约与 `@file` 语法；索引、缓存与失效由提供方拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -37,7 +37,6 @@ The set is curated for common source, config, script, data, and markup extension
 - **No content sniffing** — a file with an absent or unknown extension stays plain text even when its bytes are unambiguous; the table never inspects content.
 - **Curated, not exhaustive** — the table is smaller than Shiki's grammar catalog and GitHub linguist; adding a language means adding both the extension entry and the Client grammar registration.
 
-
 <a id="dev-note"></a>
 ### Dev Note
 
@@ -47,5 +46,3 @@ The set is curated for common source, config, script, data, and markup extension
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. This utility owns no mutable runtime relationship.

@@ -52,7 +52,6 @@ Git 与目录分配通过挂载的子进程及沙箱提供方执行，沿用调�
 | [`src/process.ts`](src/process.ts) | 约束字面参数、限制输出并等待进程终止 |
 | [`src/directory.ts`](src/directory.ts) | 申请目标目录并初始化新建工作树父目录的忽略文件 |
 
-本包不发布运行时不变量伴随入口：Git 拥有工作树注册信息，工作目录服务拥有 Session 目录；本包不保留二者的独立投影。
 
 </details>
 

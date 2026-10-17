@@ -52,8 +52,6 @@ Git and directory allocation run through the mounted subprocess and sandbox prov
 | [`src/process.ts`](src/process.ts) | Confine literal argv, cap output, and await process termination |
 | [`src/directory.ts`](src/directory.ts) | Claim the destination and initialize a newly created pool's ignore file |
 
-No runtime invariant companion is published: Git owns checkout registration and the working-directory service owns the Session directory; this package retains no independent projection of either.
-
 </details>
 
 -----

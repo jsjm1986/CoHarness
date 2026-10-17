@@ -17,18 +17,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次 `pick` 派生一个平台选择器并给出其结果；选择器状态不会在调用后存活。
-
 
 <a id="model-experience"></a>
 ## 模型体验

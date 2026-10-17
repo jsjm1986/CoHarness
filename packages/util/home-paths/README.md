@@ -48,7 +48,6 @@ Shared filesystem path helpers for DeepSeek Harness user data.
 
 This package is intentionally small and harness-dep-free so product packages can share user-data path conventions without depending on one another.
 
-**Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its resolution rules and value algebra are enforced by unit tests.
 
 <a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work

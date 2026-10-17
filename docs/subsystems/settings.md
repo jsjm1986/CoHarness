@@ -337,15 +337,12 @@ Source: [`packages/settings/settings/src/types.ts`](../../packages/settings/sett
 
 #### `settings/updated` — emit
 
-Committed change to one registered namespace's resolved value. Emitted after the provider persisted (for `update`) or published (`provider`) the change; never emitted when the resolved value is deep-equal. Listener failures are contained and logged — a sync throw and an async rejection alike — except `INVARIANT`-coded failures, which rethrow after every listener ran; that rethrow reaches the emitter only from synchronous listeners, so invariant checks on this event must not be async functions.
-
 ```ts cordis-catalog
 /**
  * Committed change to one registered namespace's resolved value. Emitted
  * after the provider persisted (for `update`) or published (`provider`)
  * the change; never emitted when the resolved value is deep-equal.
  * Listener failures are contained and logged — a sync throw and an async
- * rejection alike — except `INVARIANT`-coded failures, which rethrow
  * after every listener ran; that rethrow reaches the emitter only from
  * synchronous listeners, so invariant checks on this event must not be
  * async functions.

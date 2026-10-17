@@ -27,17 +27,11 @@ Use this package to browse every subagent conversation beneath a parent session,
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The tree renders the runtime's subagent catalog mirror and opens rows through `SessionRuntime.openSubagent()`; expansion and clock state are component-local.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -16,7 +16,6 @@ kind: "package-reference"
 - [使用本包](#use-this-package)
 - [执行授权](#execution-authorization)
 - [撤权与取消](#revocation-and-cancellation)
-- [不变量](#invariants)
 - [进一步阅读](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
@@ -62,10 +61,6 @@ Gateway 数据库需要执行身份迁移 030、031 和[不可变执行范围迁
 
 提供者销毁时取消其传输生命周期并排空拥有的检查。操作信号约束单次授权和转发请求。执行器仍负责在取消后终止并排空自己拥有的工作。
 
-<a id="invariants"></a>
-## 不变量
-
-本包不发布 invariant 伴生模块，因为本地镜像无法独立证明当前 PostgreSQL 权限。提供者验证不可变执行范围引用，并在执行准入时重新核验授权。
 
 <a id="further-exploration"></a>
 ## 进一步阅读
@@ -73,7 +68,6 @@ Gateway 数据库需要执行身份迁移 030、031 和[不可变执行范围迁
 - [已验证的执行参与者](../../../.agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.zh.md) — 信任与委派决策。
 - [Auto 审查授权与归因](../../../.agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.zh.md) — 审查器准入与计费归属。
 - [当前账户权限 UI](../../client/ui-permission-presets/README.zh.md) — 账户资格的展示。
-
 
 <a id="model-experience"></a>
 ## 模型体验

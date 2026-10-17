@@ -17,7 +17,6 @@ kind: "package-library"
 
 - [Remote 声明](#remote-declarations)
 - [Typert 协议](#typert-protocol)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -45,12 +44,6 @@ kind: "package-library"
 Host 装配以转发给消费端的 Host 事件扩展 `TypertRemoteEventSelection`，从而收窄 `ctx.remote.$on` 的键面；`TypertForwardableEvent` 陈述单向投递根本能承载哪些形状，把 Scope 化事件与有返回值的事件排除在外。`TypertClientRemote` 承载该面的两种角色：消费方经 `$on` 订阅，持有 Host 帧 sink 的 Client 半经 `$dispatch` 交出帧。
 
 查找包与 Context 包同时负责该约定的两侧：声明合并提供静态关联，运行时提供方则向 `ctx.typert` 注册身份解析。查找提供方或宿主 Context 提供方提供稳定声明与默认解析器，宿主组合可以另行配置同步或异步解析器；策略拒绝可用 `TypertLookupFailure` 携带由边界适配器拥有的失败值。严格编解码器携带生成的 schema；`src-json` 编解码器标识约束更弱的源码启动路径。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。纯声明与编解码库，无服务注册；其契约由类型层使用与编解码规格强制。
-
 
 <a id="model-experience"></a>
 ## 模型体验

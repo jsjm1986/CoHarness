@@ -16,7 +16,7 @@ The generic helper also duplicated domain policy. Its marker map said which plug
 
 `SessionStore.appendOutOfBand()`, `OutOfBandSessionEventMap`, and `OutOfBandSessionEventType` do not exist. A plugin that owns a log-only event appends it through `Session`; when the operation promises durability, it explicitly awaits `ctx.sessions.flush(session)`. No turn is opened solely to obtain that checkpoint.
 
-Core session invariants continue to enforce core-owned execution relations: turn and step numbering, enclosure of steering, assistant, tool, todo, and request-header events, and same-step tool call/result pairing. Core permits merge-extensible events between turns because only their declaring plugin knows whether they are execution-scoped or standalone. Plugin invariant companions remain responsible for their own event relations.
+Core permits merge-extensible events between turns because only their declaring plugin knows whether they are execution-scoped or standalone.
 
 The title service appends `session/title` directly after its existing service, revision, cancellation, and live-session checks. The bundled model helper appends its literal `session/title-llm-request` record before dispatch. Persistence admits both through the bounded `session/event` path and drains them at ordinary checkpoints and lifecycle teardown; neither append forces a flush merely because it is between turns. A fallback, auxiliary request record, or accepted provider title may therefore appear after `turn/end` and before the next `turn/start`. Manual compaction uses the same between-turn capability for a `compaction/* { turn: null }` bracket, but explicitly flushes the closed attempt because `/compact` promises durability before releasing queued prompt admission.
 
@@ -32,11 +32,7 @@ The historical [universal turn-enclosure decision](../../archived/architecture/2
 
 **Store titles as mutable session metadata.** This avoids between-turn events but creates a second mutation, replay, persistence, and fork protocol beside the append-only log. Titles remain replayable latest-wins events instead.
 
-**Require every plugin event to declare standalone eligibility to core.** This keeps a central allowlist but makes absence mean an execution relation that core cannot verify. Merge-extensible unions already assign semantic ownership to the declaring plugin; its invariant companion is the correct enforcement point.
-
 ## Verification
-
-Core invariant tests accept an unknown plugin event between turns while continuing to reject built-in execution events there. Hook, plan-mode, PTC mode dispatch, and approval invariant companions reject their execution-scoped events when no turn is open; the compaction companion separately accepts a balanced `turn: null` manual bracket between turns and requires numeric owners to match an open turn. Session-title service tests pin one direct fallback event under concurrent refresh, detached-session rejection, and newest-revision acceptance. JSONL and SQLite round trips preserve a title appended after `turn/end` through the persistence lifecycle drain, and fork tests retain a standalone log-only tail while rejecting boundaries inside an open turn. A keyless assembled ACP snapshot delays the model-backed title until after `turn/end` and pins one standalone provider title with no synthetic turn. Generated API and type-equivalence catalogs contain no removed symbol.
 
 ## Consequences
 

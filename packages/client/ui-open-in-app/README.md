@@ -81,5 +81,3 @@ None; this package neither assembles nor sends a provider request.
 The feature-level decisions, including the split into the host package and this surface, are recorded in the [promotion Agent Note](../../../.agents/notes/implemented/architecture/2026-09-08-upstream-alpha2-selective-sync.md).
 
 </details>
-
-**Runtime invariant:** No companion is published. The plugin registers one dictionary effect and one header-slot entry whose disposal the HMR-safety spec proves; availability and choice live in the controller's snapshot stores with no second copy to diverge.

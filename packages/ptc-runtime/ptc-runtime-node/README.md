@@ -103,9 +103,6 @@ Program parse errors and thrown exceptions are `exception`; deadline expiry is `
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-No invariant companion is published: launch ordering, control-channel lifetime and output bounds are enforced inside the runtime; no relation persists across calls to observe.
-
-
 The host owns policy, deadlines, binding lookup and process cleanup. The child owns program evaluation and binding proxies; model-written code is an untrusted peer even when its messages use the expected control descriptor.
 
 ### Launch and control

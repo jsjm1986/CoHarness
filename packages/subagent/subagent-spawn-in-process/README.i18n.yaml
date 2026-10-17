@@ -12,8 +12,8 @@
   en: 84d0a0acfc4251fe
   zh: 8480ddf68e377522
 /deepseek-ai-dsh-subagent-spawn-in-process/table-of-contents:
-  en: 4344d382275a0989
-  zh: 2ab4e6ee3580c86a
+  en: 9635e69e159526c0
+  zh: 31682cf35b11a910
 /deepseek-ai-dsh-subagent-spawn-in-process/behavior:
   en: 685c89fee1f7ff67
   zh: c6e581fddf94e714
@@ -21,11 +21,8 @@
   en: 43f34afd24dfaf6c
   zh: cd135847c0d3ca6b
 /deepseek-ai-dsh-subagent-spawn-in-process/config:
-  en: ba7564989d8ce7b3
-  zh: 0c5c8cd5855bda9e
-/deepseek-ai-dsh-subagent-spawn-in-process/invariants:
-  en: 76c4260f07bc20e2
-  zh: b09ea7436a4e01a1
+  en: 902c2c51479a54d5
+  zh: 7d58462c9e837d6e
 /deepseek-ai-dsh-subagent-spawn-in-process/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

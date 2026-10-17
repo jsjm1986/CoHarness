@@ -77,7 +77,6 @@ The package is built on one separation: the atomic commit owns the swap, and the
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | `writeFileAtomic` and `withFileLock`, the package's whole surface |
-| — | No runtime invariant companion is published; this pure filesystem primitive owns no event stream or mutable runtime data; its replacement contract is enforced by unit tests. |
 
 ### Write path
 
@@ -118,7 +117,6 @@ Nothing here enters a request prefix, so provider cache reuse is unaffected.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define where the package is not the right tool. They are current package constraints, not a task backlog.
 

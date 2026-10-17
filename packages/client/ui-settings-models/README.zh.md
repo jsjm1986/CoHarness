@@ -30,7 +30,6 @@ DeepSeek 步骤会从同一个 Models 联接快照得出首次运行就绪状态
 ## 目录
 
 - [模型列表与端点询问](#model-list-and-endpoint-interrogation)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -45,12 +44,6 @@ pi-ai profile 的 `models` 列表就在卡片上编辑：一行一个模型，�
 **获取可用模型**会针对表单**当前显示**的端点调用 `llm.discoverModels`，包括已修改但尚未保存的 API 地址和已键入但尚未存储的密钥，因此新增一个提供方是一趟走完，而不是「先保存再回来」。已保存的组织或项目受管理路由在密钥框留空时会由服务端提供加密保存的密钥，具名的已配置路由则在 Host 内部提供其 profile `headers`；这些标头仍是 `settings.yaml` 或 Cordis 配置中的部署配置，Models 页面没有对应编辑器。OpenAI 兼容端点既可以填写根前缀，也可以填写以 `/v1` 结尾的前缀；Anthropic Messages 同时接受 `/v1/models` 与 `/models`，消息请求会规范化末尾的 `/v1`。宿主会先请求输入前缀，只有响应明确表明路径不匹配时才尝试另一个，并保留类似 `INSUFFICIENT_BALANCE: Insufficient account balance` 的短脱敏中转诊断。回复会打开一个可搜索的选择框而不是直接写入：已配置过的候选默认不勾选，因此采纳一次选择绝不会覆盖用户已更正的容量。搜索按模型 id 与可选显示名匹配，且不会清除被隐藏项的勾选；**全选**／**取消全选**只作用于当前可见的结果；点击**添加所选**之前不会写入任何内容。发现结果声明输入模态时，采纳会把它们写入 `models[].input`；端点列表没有声明模态时则保持 `input` 未设置，因为端点能力未知。无法被询问的提供方只是绕路而非死路——适配器自己的消息会显示在各行旁边，而这些行仍可手工编辑。
 
 **添加自定义提供方**用来声明 pi-ai 未提供的路由。它是独立的一张卡片而非在编辑器上加字段，因为路由 id 正是在这里被*选定*的，而在选定之前 settings 地址并不存在：一次 `settings.mutate` 在 `providers.<route>` 上设置整个 profile，密钥则经 `credentials.set` 单独传递。Provider ID 只要求非空，不受目录或 shell 标识符格式限制；`org-` 与 `project-` 命名空间保留给受管理路由，凭据引用独立派生，特殊名称会加入稳定后缀以避免冲突。创建时仍要求端点、受支持的协议和至少一个唯一模型，这是适配器完成请求路由所需的最低事实。容量不参与门控，适配器会为省略的容量使用回退值。协议选项来自 namespace 自身的 schema，因此始终与适配器一致。密钥留空会保留提供方原生鉴权。如果 profile 写入成功而密钥写入失败，提供方仍会保留，重试只写凭据。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。页面在渲染时联接 `llm.providers`、`settings.describe` 与 `credentials.describe` 有线域；提供方与凭据状态仍由 Host 拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

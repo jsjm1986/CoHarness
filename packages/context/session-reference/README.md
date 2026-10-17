@@ -18,7 +18,6 @@ English | [中文](README.zh.md)
 - [Public API](#public-api)
 - [Snapshot semantics](#snapshot-semantics)
 - [Configuration](#configuration)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -49,11 +48,6 @@ The context source is `{ kind: 'session-reference', version: 1, references }`; e
 | `maxReferenceBytes` | `65536` | Maximum serialized JSON bytes for one reference object. |
 
 Retention applies `maxReferenceBytes` independently to each source, keeps compact checkpoints and the newest message before dropping older non-checkpoint units, and uses `dsh-output-retention` head/tail truncation with an exact UTF-8 omission notice. If one source's fixed serialized fields cannot fit, preparation fails with `SESSION_REFERENCE_BUDGET_EXCEEDED` instead of returning a partial context.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Snapshots are read-only views delegated to `ctx.sessionQuery`; the resolver keeps no session data of its own.
 
 <a id="model-experience"></a>
 ## Model Experience

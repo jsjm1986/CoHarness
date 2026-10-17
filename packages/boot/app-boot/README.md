@@ -157,7 +157,6 @@ The exports each own one stage of the boot: config resolution and snapshot repla
 | [`src/profile-sanitize.ts`](src/profile-sanitize.ts) | Profile patch backup and recovery bundle activation |
 | [`src/config-schema/`](src/config-schema/) | Profile schema generation, discovery, native projection, and result types |
 | [`src/profile-resolution/`](src/profile-resolution/) | Runtime resolver, package-metadata service, and built Worker bootstrap |
-| — | No runtime invariant companion is published; one interception owns each runtime resolution, and dual mode compares the independently materialized result at resolution time. |
 
 </details>
 

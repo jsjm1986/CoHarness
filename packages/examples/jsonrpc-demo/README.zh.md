@@ -13,13 +13,11 @@ kind: "package-reference"
 
 使用 `dsh-sdk-jsonrpc-demo` 作为纯 bin 应用：引导外部 `cordis.yml`，经 `jsonrpc` 入口以换行分隔的 stdio 服务 SDK 客户端。配置组合脊骨、后端与服务插件；发布的 `dsh-jsonrpc-agent` bin 从配置项目解析裸插件。
 
-
 ## 目录
 
 - [配置发现](#config-discovery)
 - [退出生命周期](#exit-lifecycle)
 - [stdout 是协议](#stdout-is-the-protocol)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -42,12 +40,6 @@ stdin EOF 和 `SIGTERM` 会 dispose（释放资源）根上下文，等待完全
 ## stdout 是协议
 
 stdout 只承载 JSON-RPC 帧。bin 和启动守卫在 stderr 上输出诊断，配置必须省略 stdout logger。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。本包提供一个入口点与一份 `cordis.yml`；所有运行时关系属于被组合的插件。
-
 
 <a id="model-experience"></a>
 ## 模型体验

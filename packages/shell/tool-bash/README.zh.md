@@ -26,7 +26,6 @@ kind: "package-reference"
 - [工具仅使用具名参数构建请求](#the-tool-builds-its-request-from-named-args-only)
 - [权限与升权](#permissions-and-escalation)
 - [逐会话模式切换](#per-session-mode-switching)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -81,12 +80,6 @@ kind: "package-reference"
 ## 逐会话模式切换
 
 对于启用沙箱的执行器，每次调用依次按单次升权、会话覆盖、执行器默认值解析模式。未启用沙箱以及没有 agent 的调用不携带会话覆盖。策略归属方贡献当前且不区分具体能力的常驻模式；拒绝结果仍负责特定于该操作的有效模式与重试引导。参见 [`dsh-shell` 折叠计算](../shell/README.zh.md)和[沙箱切换约定](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。工具把模型调用适配到 `ctx.shell` 执行器与 `ctx.jobs` 运行时上；进程与 job 状态由那些服务拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

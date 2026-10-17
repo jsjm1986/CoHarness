@@ -109,7 +109,6 @@ interface GoalProjection {
 
 Host checkpoint 状态会在 wire 值外包裹回放完整性事实。`current` 是提供给客户端的值，`seenGoalIds` 防止严格回放期间复用 goal id，`failure` 记录首个无效的自有事件，同时不会拆掉 projection 驱动。
 
-
 ```ts type-equiv
 /** Strict checkpoint state used to derive the current goal client value. */
 interface GoalProjectionState {

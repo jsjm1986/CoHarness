@@ -53,7 +53,7 @@ V4 codec 复用 V3 物理封帧。原生 V4 读取拒绝 `assistant/chunk` 行�
 <details>
 <summary>实现内部 — 点击展开</summary>
 
-[Stage](src/migration.ts) 持有每个 artifact 的源到目标序号映射、待结算尝试组与继承切点状态。紧凑 run 增量展开。[Codec](src/codec.ts) 在冻结的 V3 codec 外叠加 chunk 拒绝；[恢复器](src/validation.ts) 在版本调整后的 artifact 上委托 V3 校验。本库不发布运行时不变式伴随，因为它不拥有可独立观测的注册或状态副本。
+[Stage](src/migration.ts) 持有每个 artifact 的源到目标序号映射、待结算尝试组与继承切点状态。紧凑 run 增量展开。[Codec](src/codec.ts) 在冻结的 V3 codec 外叠加 chunk 拒绝；[恢复器](src/validation.ts) 在版本调整后的 artifact 上委托 V3 校验。本库不拥有可独立观测的注册或状态副本。
 
 </details>
 

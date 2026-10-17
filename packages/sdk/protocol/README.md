@@ -17,7 +17,6 @@ The shared wire protocol for the DeepSeek Harness SDK runtime: one newline-delim
 
 - [Transport](#transport)
 - [Wire types](#wire-types)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -49,11 +48,6 @@ The shared wire protocol for the DeepSeek Harness SDK runtime: one newline-delim
 | server→client | `subagent.finished` | `SubagentFinishedNotification` (in-process runs only) |
 
 `HarnessSdkRequestMap` and `HarnessSdkNotificationMap` index these by method name. `SessionPromptResult.messageId` identifies the queued `UserMessage`; it does not identify a later assistant message, turn ending, or prompt result. Clients combine the open-ended `session.event` stream with agent-wide `session.status` according to their own activity ownership. `session/wait` accepts `{ sessionId }` for an existing SDK-owned session and returns `{}` after the root stays idle and progressing managed descendant work finishes; idle descendants with parked input remain resident without blocking this wait, and unknown ids or live Agent failures without a newer committed terminal reject. Notifications committed during the wait precede its response on the same transport. `session/resume` accepts a non-empty persisted `{ sessionId }` and returns `{}` after restoring that exact session; it requires initialization and the original persistence store, sends no new input, and rejects missing, unreadable, incompatible, or occupied sessions without creating a replacement. `SubagentFinishedNotification.lastAssistantMessage` contains the child's last non-empty assistant message or, when no such message exists, its accumulated assistant text; the field is absent when the child produced neither. `InitializeParams.maxTokens` is an optional positive safe integer that caps each conversation-model output for SDK-created agents and their in-process descendants; omission allows the selected adapter's exact-model default to apply, or otherwise preserves provider behavior. The notification payload types depend on `SessionEvent` (`dsh-session`), `ContentBlock` (`dsh-llm`), and `SubagentStopReason` (`dsh-subagent`) — the protocol streams full session-log envelopes, so the session vocabulary is part of the wire contract. `serverInfo.name` stays the wire-stable `deepseek-harness-sdk-runtime`.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A pure wire-format library; its codec and type algebra are enforced by unit specs.
 
 <a id="model-experience"></a>
 ## Model Experience

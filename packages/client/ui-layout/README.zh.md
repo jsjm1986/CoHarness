@@ -21,18 +21,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。面板几何与折叠是展示层本地的服务状态；框架的 slot 注册通过 HMR 安全性规格证明其释放。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -64,7 +64,6 @@ export function SessionSeq(value: number): SessionSeq {
 
 该包只负责这一原语。保持无依赖意味着，例如 `dsh-jobs` 可以为 `JobId` 使用品牌类型，而无需仅为使用 `Branded` 而导入不相关的功能包。
 
-**运行时不变式：** 不发布伴生入口。这个纯工具不拥有事件流或可变运行时数据；其值代数由单元测试保障。
 
 <a id="dev-note"></a>
 ## 开发备注

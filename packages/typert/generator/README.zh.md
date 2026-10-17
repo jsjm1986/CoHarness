@@ -20,7 +20,6 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 - [分析模型](#analysis-model)
 - [产物生成与选择性发布](#emission-and-opt-in-publication)
 - [本仓库的 Cordis 投影](#repository-specific-cordis-projection)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -49,12 +48,6 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 ## 本仓库的 Cordis 投影
 
 包根导出中包含本仓库 Cordis 目录使用的模型驱动提取逻辑、完整性检查和确定性文本渲染器。它们接受 `CordisCatalogPolicy`；由仓库持有的类型链接、基础类型／豁免类型分类和继承的 Cordis 条目仍位于 `scripts/gen-cordis-catalog.ts`，并由调用方显式传入。因此，生成器包只包含投影机制，不会隐式复制本仓库的文档分类体系。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。从源类型到 `FaceModel`/`TypeGraph` 数据的编译期变换；其输出由生成器规格断言，它不运行任何运行时状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

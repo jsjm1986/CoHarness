@@ -186,7 +186,6 @@ Continuable children do not create `SubagentRun` or Jobs. The continuation manag
 
 When `ctx.sessionProjections` is available, the service registers two projection units. `subagentTiming` resets at each descriptor so a fork seed's ancestor work cannot enter the child's total, then accumulates `turn/start` → `turn/end` active time and retains same-cut `active.since` and `active.through` bounds for an open turn; while that turn remains open, `active.through` follows the latest folded event, giving an inactive consumer a conservative crash bound without mixing in newer session metadata. `subagent` folds the durable identity — mode plus creation label — from `subagent/descriptor` events with the same last-wins reset discipline, so a fork seed's ancestor descriptor stands only until the child's own overrides it; a malformed or unrecognized-version payload folds to the serializable `null` sentinel — indistinguishable from a log with no descriptor, and surviving every JSON push frame so a consumer replaces a stale identity instead of keeping it — and never throws.
 
-
 <a id="collection-model"></a>
 ## Collection model
 

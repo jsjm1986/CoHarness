@@ -105,7 +105,6 @@ The replacement sits inside the lock bracket, so a crash between `compaction/sta
 | [`src/tool-pairing.ts`](src/tool-pairing.ts) | Per-session cut-balance cache behind the two boundary helpers |
 | [`src/checkpoint.ts`](src/checkpoint.ts) | Cordis-free checkpoint source constructor and predicate (`./checkpoint` leaf) |
 | [`src/brand.ts`](src/brand.ts) | `CompactionId` branded identity |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion: validates the `compaction/start`→`summary`→`end` bracket, its owner-turn enclosure, and checkpoint correlation |
 
 ### Locking and serialization
 
@@ -153,7 +152,6 @@ A successful backend replacement invalidates reuse from the first shadowed histo
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits describe what condensation cannot do, regardless of which backend is loaded; they are the current package constraints.
 

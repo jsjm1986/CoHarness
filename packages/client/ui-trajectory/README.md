@@ -25,17 +25,11 @@ The Trajectory tab lets you inspect agent activity as a turn-aware ledger and in
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The ledger renders the session's authoritative event log; selection, inspection, and scroll state are presentation-local.
 
 <a id="model-experience"></a>
 ## Model Experience

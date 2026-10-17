@@ -67,8 +67,6 @@ DSH 有意在调用摘要器前记录 `compaction/start`。缓慢或崩溃的尝
 
 尾部扫描会分别查找当前轮次、未匹配的 compaction start 与最新 `session/end-seed`。位于最新 end-seed 之后的未匹配 start 是活动锁，会阻塞每个压缩入口点。位于较新 end-seed 之前的未匹配 start 属于更早的会话生命周期，已经陈旧，因此不会卡住恢复或 fork 后的会话。
 
-压缩不变量在 seed 回放期间使用同一项转换逻辑：`session/end-seed` 会清除未闭合的历史追踪状态。此场景不要求构造函数实时发布该边界；回放才是承重路径。
-
 客户端请求投影会在 `session/end-seed` 时刻将未匹配的压缩请求以中断状态结束，并清除其活动索引。因此，后续 `compaction/start` 会创建一个独立请求，而不是让该遗留的未匹配请求永久保持运行状态或将其覆盖。
 
 事务追加 start 后，每次后续失败都会进行一次闭合尝试。闭合失败会有意留下可见且具有阻塞作用的未匹配 start，并且不尝试 flush。已闭合的手动尝试即使报告预期失败也会 flush。完成必需的闭合与 flush 清理后，取消仍保留原始原因优先级。
@@ -97,7 +95,7 @@ DSH 有意在调用摘要器前记录 `compaction/start`。缓慢或崩溃的尝
 
 ## 验证
 
-agent loop（智能体循环）测试覆盖同一 tick 内的优先权、保留 ID 与 FIFO 生命周期、会唤醒和静默的排队工作、幂等释放、`whenIdle()`、取消与 teardown。压缩测试覆盖独立与数字形式的不变量 owner、end-seed 回放、活动与陈旧未匹配标记、listener 重入、所选区段漂移、commit 与闭合失败、flush 顺序、原始取消原因、raw output 与 usage 保留，以及自动／手动互斥。
+agent loop（智能体循环）测试覆盖同一 tick 内的优先权、保留 ID 与 FIFO 生命周期、会唤醒和静默的排队工作、幂等释放、`whenIdle()`、取消与 teardown。压缩测试覆盖 end-seed 回放、活动与陈旧未匹配标记、listener 重入、所选区段漂移、commit 与闭合失败、flush 顺序、原始取消原因、raw output 与 usage 保留，以及自动／手动互斥。
 
 命令包固定注册行为、Loader 组合、参数拒绝、精确的成功／失败文本、取消、不进入模型历史的保证，以及 dispose 在中止使执行器停止等待处理器后，仍会跨越相互独立的闭合与 flush 边界等待该处理器结算。客户端运行时投影测试固定 end-seed 中断，以及随后一次独立尝试的完成。`queued-manual-compact` 终端快照通过已组装 TUI 驱动真实按键：`/help` 可发现该命令；被暂停的摘要会接纳一个排队提示词和即时注入；`turn: null` 标记与 flush 先于排队提示词轮次；命令生命周期保持纯日志；派生顺序固定为检查点 → 注入 → 排队提示词。
 

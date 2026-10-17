@@ -18,7 +18,6 @@ The Gateway context endpoint reads the project catalog once and maps the already
 
 The frontend static server marks Vite-style hashed files under `/assets/` as immutable for one year. The HTML entry and non-hashed files keep their existing response headers, so release selection and index injection remain unchanged.
 
-
 ## Alternatives considered
 
 **Replace the independent runtime and full reload with a hot scope connection.** Rejected for this change because it would alter process isolation, connection ownership, draft lifetime, and failure handling. The existing scope handoff remains the authority.

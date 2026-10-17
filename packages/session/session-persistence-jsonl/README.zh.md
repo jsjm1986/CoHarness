@@ -22,7 +22,6 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - [物理编码](#physical-encoding)
 - [持久性与崩溃语义](#durability-and-crash-semantics)
 - [写入路径](#write-path)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -81,10 +80,6 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 
 明文正文按有界字节窗口扫描，保留解码后的事件，不构建完整原始文件缓冲区。读取之间检查取消，revision 变化时重试。后继 generation 写完临时文件后重新校验源 revision；源发生变化或消失时拒绝发布。后继 generation 按有界批次编码，在事件和写入之间检查取消。压缩读取和逻辑 preparation 仍保留完整输入或事件数组。
 
-<a id="invariants"></a>
-## 不变量
-
-不发布运行时不变式伴生插件：存储协调器保证代次不可变和追加顺序，持久化测试直接核对文件；此提供方不保留独立的领域索引。
 
 <a id="model-experience"></a>
 ## 模型体验

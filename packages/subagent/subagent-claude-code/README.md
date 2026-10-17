@@ -21,7 +21,6 @@ Install this Profile Bundle when a delegated task should run as a fresh, unatten
 - [Configuration](#configuration)
 - [Persistent members](#persistent-members)
 - [Product compatibility and evidence](#product-compatibility-and-evidence)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -150,11 +149,6 @@ Installing with optional dependencies omitted, using an unsupported platform, or
 Loader composition proves that the Bundle default, two additional named Claude instances, and the existing Codex package coexist without starting either product.
 
 The project owner's identity-scoped distribution authorization covers the official SDK and the official CLI/platform payloads declared by each SDK version. [`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) discloses the current optional payload closure without classifying its declared terms as permissive; unrelated non-permissive runtime dependencies continue to fail the notices gate.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run submits one task through the vendor SDK in the delegating workspace and returns its result; no session state is retained between runs.
 
 <a id="model-experience"></a>
 ## Model Experience

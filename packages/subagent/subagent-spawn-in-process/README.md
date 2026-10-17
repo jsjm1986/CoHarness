@@ -18,7 +18,6 @@ The spawn provider creates a fresh child `Agent` in the current process. The chi
 - [Behavior](#behavior)
 - [Capabilities](#capabilities)
 - [Config](#config)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -43,11 +42,6 @@ Spawn advertises `{ agentOptions: true, agentPreset: true, outputSchema: true, d
 | Key | Meaning |
 |---|---|
 | `providerName` | Registry name on `ctx.subagents` (default `spawn`). |
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The child Agent is created and disposed within the call by the shared driver; the provider owns no post-run state.
 
 <a id="model-experience"></a>
 ## Model Experience

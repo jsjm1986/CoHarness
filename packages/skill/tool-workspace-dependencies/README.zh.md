@@ -65,7 +65,6 @@ kind: "package-reference"
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 清单校验、路径推导、原地与安装两种准备方式、工具注册。 |
-| — | 不发布运行时不变量伴随入口：每次准备都校验 payload 清单，工具注册表负责注册生命周期。 |
 
 </details>
 
@@ -78,7 +77,6 @@ kind: "package-reference"
 - [工具注册表](../../core/tools/README.zh.md)——注册与 schema。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验

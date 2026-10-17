@@ -25,7 +25,6 @@ The package root exposes the Cordis plugin contract, `PiAiAdapter`, and `support
 - [Vocabulary differences](#vocabulary-differences)
 - [App attribution](#app-attribution)
 - [Dependency weight](#dependency-weight)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -207,11 +206,6 @@ Every request carries the shared attribution header from dsh-llm's `attributionH
 ## Dependency weight
 
 pi-ai installs several provider SDKs and lazy-loads the one selected by the catalog model. The dependency weight is isolated to this opt-in adapter package.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Provider profiles are fixed configuration resolved per request; the adapter keeps no cross-request state beyond the immutable route table.
 
 <a id="model-experience"></a>
 ## Model Experience

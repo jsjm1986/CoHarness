@@ -21,7 +21,6 @@ kind: "package-reference"
 - [数据、生命周期与持久性](#data-lifecycle-and-durability)
 - [服务与 Host Remote 契约](#service-and-host-remote-contract)
 - [Compare-and-set 与幂等性](#compare-and-set-and-idempotency)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知局限与延后工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -82,12 +81,6 @@ message feedback 不是 Session 日志内容或 Session 投影。它不发出 `f
 按 Session 划分的 promise 队列覆盖检查、持久性校验、伴随记录读取、比较与整行写入。这些语义会串行化经由同一服务实例的并发变更；storage-domain 自身没有跨进程条件写。
 
 Plugin disposal 会先关闭变更接纳，排空已进入各个 Session 队列的所有操作，然后才关闭 storage domain。disposal 开始后提交的变更会以生命周期故障拒绝，不会进入正在关闭的 domain。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。Sidecar 行通过其所属存储域持久化，并由同一 Remote 界面暴露；不存在第二份可能分歧的副本。
-
 
 ## 模型体验
 

@@ -30,7 +30,6 @@ Disposal refuses new transport operations and stops mirror publication. Every di
 ## Table of Contents
 
 - [Model list and endpoint interrogation](#model-list-and-endpoint-interrogation)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -45,11 +44,6 @@ A pi-ai profile's `models` list is edited on the card: one row per model showing
 **Fetch available models** asks `llm.discoverModels` about the endpoint the form **currently shows**, including a base URL edited but not yet saved and a key typed but not yet stored, so adding a provider is one pass instead of save-then-return. A saved managed organization or project route supplies its encrypted key when the key field is blank, and a named configured route supplies its profile `headers` inside the Host; those headers remain deployment configuration in `settings.yaml` or Cordis config and have no Models-page editor. OpenAI-compatible endpoints accept either a root prefix or one ending in `/v1`; Anthropic Messages accepts either `/v1/models` or `/models` and normalizes a trailing `/v1` for message calls. The host probes the entered prefix and its alternate only when the response clearly identifies a path mismatch, and keeps a short redacted relay diagnostic such as `INSUFFICIENT_BALANCE: Insufficient account balance`. The reply opens a searchable picker rather than being written: candidates already configured start unchecked, so adopting a selection never overwrites a capacity the user corrected. Search matches model ids and optional display names without clearing hidden selections, while **Select all** / **Deselect all** affect only the visible results; nothing is written until **Add selected**. When discovery discloses input modalities, adoption writes them to `models[].input`; an endpoint listing that omits modalities leaves `input` unset because endpoint capability is unknown. A provider that cannot be interrogated is a detour, not a dead end — the adapter's own message appears beside the rows, which stay editable by hand.
 
 **Add a custom provider** declares a route pi-ai does not ship. It is its own card rather than the editor with extra fields, because the route id is being chosen here and the settings address does not exist until it is: one `settings.mutate` sets the whole profile at `providers.<route>`, and the key travels separately through `credentials.set`. Provider IDs are accepted as non-empty names without a catalog or shell-identifier restriction; the `org-` and `project-` namespaces remain reserved for managed routes, credential references are derived independently, and unusual names receive a stable suffix. The create button still requires an endpoint, a supported protocol, and at least one uniquely identified model because those are the minimum facts the adapter needs to route a request. Capacities do not gate it: the adapter's fallbacks size a model the endpoint described by id alone. The protocol choices come from the namespace schema, so they stay aligned with the adapter. Leaving the key blank preserves provider-native authentication. When a profile write succeeds but the key write fails, the provider remains visible and the retry writes only the credential.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The page joins the `llm.providers`, `settings.describe`, and `credentials.describe` wire domains at render time; provider and credential state remain owned on the Host.
 
 <a id="model-experience"></a>
 ## Model Experience

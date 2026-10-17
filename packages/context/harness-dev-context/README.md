@@ -75,10 +75,6 @@ Read these pages when the package-level contract is not enough. They move from t
 
 -----
 
-## Invariants
-
-**Runtime invariant:** No companion is published. The projection admits paragraphs from committed `system/message` events, the durable session log is the only authority for the admitted text, and the two context lines are resolved fresh at each request.
-
 <a id="model-experience"></a>
 ## Model Experience
 

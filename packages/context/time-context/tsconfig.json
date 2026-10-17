@@ -21,9 +21,6 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../test-support/loader-smoke"
     },
     {

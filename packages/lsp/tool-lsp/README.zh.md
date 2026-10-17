@@ -19,7 +19,6 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 
 - [工具](#the-tool)
 - [配置](#configuration)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -41,12 +40,6 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 | `maxLocations` | `100` | 出现省略标记前可渲染位置的最大数量。 |
 | `maxResultChars` | `16000` | 完整渲染结果的最大长度，包括截断元数据。 |
 | `timeoutMs` | `60000` | 由 `dsh-tool-call-timeout-policy` 强制执行的工具调用超时预算；覆盖完整的排队打开／查询／关闭生命周期，且模型不可配置。 |
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。工具对 `ctx.lsp` 的每个请求做校验、转换与限界；提供方状态留在 seam 之后。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -38,8 +38,6 @@ Sandbox state is deliberately ephemeral: timeout and disposal delete the remote 
 
 ## Verification
 
-Focused package suites pin sandbox lifecycle, canonical path framing, filesystem metadata and atomic versions, subprocess publication/rollback, terminal text I/O and session cleanup, output limits, cancellation, disposal, and invariant registration. A credential-gated Loader composition exercises the same three-package provider through source imports and built exports, including FS/Bash visibility, hostile login profiles, byte-split UTF-8 output, process and terminal cleanup, LSP queries, host-workspace isolation, and final sandbox deletion.
-
 ## Alternatives considered
 
 **Keep one PTY and LSP package per remote provider.** Rejected because provider mechanics would be repeated above the existing seams. The deletion test exposes the problem: deleting those adapters should not scatter domain behavior into the remote provider; the generic consumers already own it.

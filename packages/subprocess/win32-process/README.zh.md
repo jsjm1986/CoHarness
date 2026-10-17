@@ -49,9 +49,6 @@ g++ -std=c++20 -municode -O2 -o abi-probe.exe verify/abi-probe.cpp && ./abi-prob
 
 Koffi 的 `STARTUPINFOW` 与 `PROCESS_INFORMATION` 定义还会在模块加载时断言各自的 64 位大小。该探针还固定指针与句柄宽度、Unicode 环境标志，以及用于判断完全停稳的基础 Job accounting record 大小与 `ActiveProcesses` 偏移；其余已记录偏移和常量也由该探针提供证据。
 
-
-**运行时不变式：** 不发布伴生入口。操作只持有调用内的原生句柄。
-
 <a id="model-experience"></a>
 ## 模型体验
 

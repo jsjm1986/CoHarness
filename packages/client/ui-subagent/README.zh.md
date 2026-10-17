@@ -27,18 +27,11 @@ one-shot child 始终选用只读编辑器，并将 transcript（文本记录）
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该树渲染运行时的 subagent 目录镜像，并通过 `SessionRuntime.openSubagent()` 打开行；展开与时钟状态是组件本地的。
-
 
 <a id="model-experience"></a>
 ## 模型体验

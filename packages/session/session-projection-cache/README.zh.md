@@ -29,7 +29,6 @@ kind: "package-reference"
 - [冷读（`coldSnapshot(meta, inheritedEventCount, events)`）](#cold-read-coldsnapshotmeta-inheritedeventcount-events)
 - [升级兼容性](#upgrade-compatibility)
 - [组合](#composition)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知局限与延后工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -80,12 +79,6 @@ kind: "package-reference"
 ```
 
 注入 `storageDomain`、`sessionProjections`、`sessions`。没有这一行时，投影系统只跑 live（水位缓存；冷读在实现了它的载体处退回全量日志折叠）。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。缓存记录是通过存储域写入与读取的持久文档；服务投影同一存储，不保留影子副本。
-
 
 ## 模型体验
 

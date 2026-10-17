@@ -18,7 +18,6 @@ kind: "package-reference"
 - [这里会出现什么](#what-appears-here)
 - [扩展点](#extension-point)
 - [写入](#writes)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -51,11 +50,6 @@ kind: "package-reference"
 密钥也可能从别的表层写入——模型页寻址的是同一个引用——而那不改变任何 settings 分节，因此表单会在转发来的 `credentials/reference-updated` 事件报告它所关注的引用时重读。
 
 字段是否被覆盖，取决于它是否出现在原始用户层中，而非取决于它的值；重置会清除该字段，使其重新继承组装层。secret 角色的字段绝不搭乘响应，因此密钥控件初始为空、只报告是否已配置，并经由 credentials 领域而非 settings 分节写入；空草稿不写入任何东西，保留已存密钥。替换必须取得本次写入的成功响应，旧密钥仍然存在不能证明替换成功。即使引用未变，凭据读取也会拒绝已被后续请求取代的响应。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。插件配置值位于 Host 插件 settings namespace 中；该包贡献条目注册与基于该远程文档的逐字段绑定。
 
 <a id="model-experience"></a>
 ## 模型体验

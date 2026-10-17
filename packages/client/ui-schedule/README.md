@@ -67,8 +67,6 @@ A restored task tab carries no navigation parameters, because the Sidebar persis
 
 Subscriptions exist only while the framework observes a source. The final unsubscribe releases event listeners and invalidates pending responses. Components receive framework-bound `useCatalog` hooks and explicit action callbacks. The mounted Records view reads `schedule.history` with the selected task's original Session binding; catalog and list responses omit full history. Components own disposable search, filtering, selection, confirmation, and history-page state. Reminder records remain Host-owned and do not come from historical Session projections or browser-local demo data.
 
-No runtime invariant companion is published because the catalogs render Host-owned task state and own only disposable query and interaction state.
-
 </details>
 
 <a id="further-exploration"></a>

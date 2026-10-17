@@ -32,4 +32,3 @@ Schedule 会给每个活跃根 Agent 的请求增加四个工具 schema，并在
 - 启用后的安装会给每个活跃根 Agent 增加四个工具 schema，并在每个符合条件的步骤追加一条持久时钟消息；该读数对模型可见且持久，因此它与其他 user 消息一样参与回放、压缩，并出现在导出的 Session 日志中。
 - 插件管理页在该 bundle 下列出这三行，显示各自包的 `locale/*.json` 声明的标题、它们的状态，并在 bundle 打开时为每行提供开关；关掉其中一行会让 Schedule 缺少这一部分。
 - 未选中该 bundle 时，按 id 定位 `time-context` 或 `schedule` 的 profile 补丁或 `--patch` overlay 匹配不到任何条目，加载器会为它报告 `patch: entry <id> not found` 警告；`ui-schedule` 仍可匹配，因为随发行版交付的组合驻留了它，选中该 bundle 会让它连同宿主行一起启用。
-- 该开关只涉及配置：`src/index.ts` 是空模块，运行时内容由 patch 承载，包本身不拥有可变的运行时状态，因此不发布不变量伴随模块。

@@ -19,7 +19,6 @@ The model-facing `ralph` tool runs a fixed foreground workflow that gives one im
 - [Lifecycle and cancellation](#lifecycle-and-cancellation)
 - [Render intent](#render-intent)
 - [Config](#config)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -58,11 +57,6 @@ The pending call is a `generic` card titled `ralph`; the immutable objective is 
 | `maxResultChars` | `16384` | Maximum characters in the complete successful parent result. |
 
 All config values are normalized and validated when the plugin applies, including direct application outside Loader schema normalization. Provider capabilities are resolved immediately before each call because provider registration can change under plugin lifecycle and HMR.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run executes one foreground workflow through the engine and subagent seams; child state is owned by those services.
 
 <a id="model-experience"></a>
 ## Model Experience

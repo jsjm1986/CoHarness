@@ -17,17 +17,11 @@ Resolution is one pure boot-time sample (`resolveDirectoryPickerBackend`), expor
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The chooser resolves the host situation once at boot and mounts the matching backend as an ordinary Loader entry; there is no ongoing picker state.
 
 <a id="model-experience"></a>
 ## Model Experience

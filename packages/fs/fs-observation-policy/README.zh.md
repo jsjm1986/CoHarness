@@ -34,7 +34,6 @@ await ctx.plugin(FsPolicy)
 - [已观察状态是先前观察记录；新鲜度由提供方 CAS 保证](#observed-state-is-the-prior-observation-record-freshness-is-provider-cas)
 - [单 slot、先到者胜](#single-slot-first-wins)
 - [不与方法耦合](#no-method-coupling)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -76,12 +75,6 @@ await ctx.plugin(FsPolicy)
 ## 不与方法耦合
 
 由于插件只通过事件影响外部世界，移除它不会在服务注入边界破坏 `@deepseek-ai/dsh-tool-fs`：工具会直接落到裸 `ctx.fs` 提供方（无条件写入/编辑，无已观察状态）。重新加载插件后，策略会重新生效。相比必需的方法服务，这种可平稳增删的性质正是事件门禁的全部目的。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。观测记账是私有的每会话策略状态，只在已安装的 `fs/*` 门内被查阅；每个结果都可通过 fs 调用结果本身观测。
-
 
 <a id="model-experience"></a>
 ## 模型体验

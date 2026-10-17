@@ -302,9 +302,6 @@ export function expectedDshPackageFiles(manifest: PackageManifest): readonly str
     ...new Set(icons),
     ...[...localeFiles].sort(),
     'lib/index.js',
-    // Packages with an invariant export publish its runtime as a separate
-    // bundle; the package-invariant gate validates the source/export pairing.
-    ...manifest.exports?.['./invariant'] ? ['lib/invariant.js'] : [],
     ...manifest.bin ? ['lib/bin.js'] : [],
     // Worker-thread packages ship a CJS worker entry; the browser worker
     // bundle is an ES module a page loads with `new Worker(type: 'module')`.
@@ -542,16 +539,6 @@ export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): st
     }
     if (rootEntry?.default !== './lib/index.js') {
       errors.push(`${label}: package.json exports["."].default must be "./lib/index.js"`)
-    }
-    const invariantExport = exportFields(manifest.exports?.['./invariant'])
-    if (invariantExport?.types !== undefined && invariantExport.types !== './lib/types/invariant.d.ts') {
-      errors.push(`${label}: package.json exports["./invariant"].types must be "./lib/types/invariant.d.ts"`)
-    }
-    if (invariantExport?.default !== undefined && invariantExport.default !== './lib/invariant.js') {
-      errors.push(`${label}: package.json exports["./invariant"].default must be "./lib/invariant.js"`)
-    }
-    if (invariantExport && (invariantExport.types === undefined || invariantExport.default === undefined)) {
-      errors.push(`${label}: package.json exports["./invariant"] must declare both types and default targets`)
     }
     const expectedFiles = expectedDshPackageFiles(manifest)
     if (!sameStringList(manifest.files, expectedFiles)) {

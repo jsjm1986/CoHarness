@@ -63,8 +63,6 @@ Reviewer 从当前 Session surface 与待执行调用重建五个分区：固定
 
 卸载时先关闭选择与 review admission，经由既有 preset writer 将 Gateway 受管 Auto Session 迁移到 Workspace write，将独立本地 Session 迁移到 Full access，再中止并等待在途 review 结清，最后撤回 listener 与 contribution。本地 Full access 切换保留原旋钮值；受管切换恢复普通沙箱与审批设置。持久 Auto Session 缺少完整 integration 时不能发布；安装后重新打开需要用户显式操作。重装只恢复选项，不把存活 Session 切回 Auto。
 
-本包不发布 runtime invariant companion：同一个 effect 拥有选择准入、review 登记、取消与清理，不存在能与这些自有操作相互偏离的独立观察。
-
 每次 reviewer 请求携带 Session 身份与 `purpose: auto-review` 用于计量。受管请求还携带执行权威确认的不可变输入见证和一位主要发起人；这些字段是内部账务元数据，不进入 Provider 请求正文或 reviewer 文本。无论参与人数量多少，一次请求只生成一条用量记录。
 
 </details>
@@ -80,7 +78,6 @@ Reviewer 从当前 Session surface 与待执行调用重建五个分区：固定
 - [Tools](../../core/tools/README.zh.md)——执行、取消与 PTC 结果传播。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验

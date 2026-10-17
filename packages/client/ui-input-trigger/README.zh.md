@@ -25,18 +25,11 @@ MenuView 把菜单 store 渲染进 `conversation.input.overlay` slot（列表类
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。触发源名册是由 HMR 安全性规格证明的 effect 所属注册集合；仲裁是逐请求的控制器状态，没有持久关系。
-
 
 <a id="model-experience"></a>
 ## 模型体验

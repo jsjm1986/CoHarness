@@ -17,18 +17,15 @@
 /agent-note-typescript-program-backed-semantic-gates/decision/a-event-relations-follow-receiver-and-value-types:
   en: 0ec7e6cc9623e532
   zh: 1f5fa2edf9e3dd08
-/agent-note-typescript-program-backed-semantic-gates/decision/b-scoped-event-routing-generates-one-typed-resolver-map:
-  en: 23387f412e248728
-  zh: e92ae52feae44f1d
 /agent-note-typescript-program-backed-semantic-gates/decision/semantic-gaps-fail-explicitly:
-  en: abd17df643b7dc5d
-  zh: 33b985fb5729aa9f
+  en: af138885c830c2ef
+  zh: 5a9ad38c390a5d14
 /agent-note-typescript-program-backed-semantic-gates/verification:
-  en: 09f65bf8592958cd
-  zh: 71ef1203d291b127
+  en: 7578aa4cb1054c4a
+  zh: 474a7524c8b741e6
 /agent-note-typescript-program-backed-semantic-gates/alternatives-considered:
   en: cdd5dd5512457e2a
   zh: ccef89865c42b61f
 /agent-note-typescript-program-backed-semantic-gates/consequences:
-  en: f38bcf04a45b512f
-  zh: 3a0fb0e5302f9e2e
+  en: 9af12314ae2e0bd4
+  zh: 1b72a0bde9ce623f

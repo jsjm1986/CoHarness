@@ -14,7 +14,6 @@ kind: "package-reference"
 ## 目录
 
 - [展示与所有权](#presentation-and-ownership)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -31,11 +30,6 @@ kind: "package-reference"
 Host 激活与页面本地装载是独立事实。Host 已运行某个 Client 部分时，页面仍可能提供装载入口；全局停止会影响所有页面。面板独立展示当前页面的渲染失败和 Host 激活结果，因此失败的组件可以与成功的激活回执同时出现。
 
 `/client` 入口导出插件体及其注入接口、运行状态、端口和事件类型。[Client 运行器](../cordis-client-runner/README.zh.md)负责浏览器装载与清理；[Host 运行器](../cordis-host-runner/README.zh.md)负责定义与执行。
-
-<a id="invariants"></a>
-## 不变量
-
-不发布不变量伴随模块。面板消费 Host 状态，卡片投影持久化事件；本包不持有独立的定义状态。
 
 
 <a id="model-experience"></a>

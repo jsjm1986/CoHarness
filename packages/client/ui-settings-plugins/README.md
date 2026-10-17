@@ -18,7 +18,6 @@ Use the sidebar's **Plugins** page to inspect and manage the plugins this deploy
 - [What appears here](#what-appears-here)
 - [Extension point](#extension-point)
 - [Writes](#writes)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -51,11 +50,6 @@ Saving writes each staged field through the client settings scope, which fences 
 A key can also be written from another surface — the Models page addresses the same reference — which changes no settings section, so the form re-reads on the forwarded `credentials/reference-updated` event for the reference it watches.
 
 A field's presence in the raw user layer — not its value — is what marks it overridden; a reset clears that field so it re-inherits the composition layer. Secret-role fields never ride a response, so a key control starts blank, reports only whether one is configured, and writes through the credentials domain rather than the settings section; a blank draft writes nothing and keeps the stored key. A replacement requires its own successful write response: the presence of an older key cannot acknowledge it. Credential reads reject superseded responses even when the reference is unchanged.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Plugin configuration values live in the Host plugin settings namespaces; the package contributes item registrations and per-field bindings over that remote document.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -22,7 +22,6 @@ Two-sided Typert RPC endpoint for Host and Client Cordis environments. The Host 
 - [Host service: `TypertGatewayService` (ctx key: `typertGateway`)](#host-service-typertgatewayservice-ctx-key-typertgateway)
 - [Media references](#media-references)
 - [Client service: `ClientRemote` (ctx key: `remote`)](#client-service-clientremote-ctx-key-remote)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -57,11 +56,6 @@ Each call validates positional inputs, constructs the descriptor's exact named `
 Generated declaration merges provide the TypeScript API through the shared `TypertClientRemote` contract. The Client entry contains no Host Service or Host Cordis interface merge, and method lookup and invocation use ordinary objects and functions rather than a JavaScript Proxy.
 
 The invocation waterfall surrounds only the resolved business method. Authorization and Agent lookups finish first, so a request identity wrapper cannot lend the caller’s authority to cold lookup work.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each invocation resolves the live descriptor, business Service, and codecs at call time; the gateway keeps no per-endpoint state that could diverge from the registered contributions.
 
 <a id="model-experience"></a>
 ## Model Experience

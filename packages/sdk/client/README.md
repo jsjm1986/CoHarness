@@ -19,7 +19,6 @@ The public launch options select `dshBin`, a runtime `profile` (default `sdk`), 
 
 - [DeepSeekHarness](#deepseekharness)
 - [HarnessClient](#harnessclient)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -59,11 +58,6 @@ The protocol client under the owned-run API: explicit `start()`/`initialize()`/`
 `HarnessClientOptions.env` replaces the child environment entirely when given (`undefined` inherits the parent's); callers own credential policy — `scrubbedParentEnv` from `dsh-subprocess` is the shared scrub base for isolation-minded launches. Selecting a different `dshHome` removes an inherited `DSH_MANAGED_DATA_MANIFEST`, so an independent child does not claim files in its parent's backup inventory. A same-home launch retains it; an explicit complete `env` may name the child's own inventory.
 
 The client exposes the transport's line, pending-request, inbound-concurrency, output, and per-subscription notification-queue limits; each defaults to the protocol bounds and rejects non-positive values. Timeout and teardown grace values must be positive safe integer milliseconds no greater than Node's 2,147,483,647 ms timer limit. High-level `HarnessSession.run()` calls for the same session id are serialized, while different session ids may progress concurrently.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A pure library with no plugin surface; request correlation and subscription delivery are covered by unit specs and it owns no harness-side state.
 
 <a id="model-experience"></a>
 ## Model Experience

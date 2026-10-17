@@ -37,7 +37,7 @@ kind: "package-reference"
 <details>
 <summary>维护者信息 — 点击展开</summary>
 
-`resolve()` 捕获 Provider 实例、录音和语言。`transcribe()` 拒绝已撤销或替换的注册。注册的清理函数先拒绝新请求，再取消已接收的请求并等待 Provider 完成；Provider 必须响应取消。服务不会回退到其他识别器或上传音频。不发布运行时不变量伴随模块，因为注册表是 Provider 与准备状态观测的唯一来源。
+`resolve()` 捕获 Provider 实例、录音和语言。`transcribe()` 拒绝已撤销或替换的注册。注册的清理函数先拒绝新请求，再取消已接收的请求并等待 Provider 完成；Provider 必须响应取消。服务不会回退到其他识别器或上传音频。
 
 `defaultProvider` 与 `language` 是 volatile Config 字段，作为组合默认值：`configure()` 通过 `settings` 服务把传入的字段合并进 `speech-to-text` 用户分区，运行中的实例读取注册 scope 的解析值即可生效，无需重挂载。没有 `settings` 时 `configure()` 失败，并在保存前拒绝所选 Provider 不支持的语言。Provider 通过 `languages` 公布支持的语言提示；`resolve()` 在转写前校验所选提示。观察者通过完整 `SpeechSnapshot` 接收 Provider 拥有的准备状态；关闭观察者不会取消准备。
 

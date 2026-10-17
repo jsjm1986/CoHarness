@@ -23,7 +23,6 @@ Use this package to choose the agent preset for a new Web GUI session, see the a
 - [What it reads and writes](#what-it-reads-and-writes)
 - [The management section](#the-management-section)
 - [When the surfaces are absent](#when-the-surfaces-are-absent)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -93,11 +92,6 @@ Setting the default writes the `agent-presets` settings namespace, which the hos
 ## When the surfaces are absent
 
 A deployment that composes no presets answers with an empty roster, and the row, the chip, the label, and the section all render nothing — every session then shares the host composition, and there is nothing to choose between or manage. A deployment that configures no writable root answers `authorable: false`, and the section stays a read-only browser: the shipped compositions still open in the viewer, but every copy action is disabled with the reason as its tooltip rather than offering a dialog whose create always fails. A roster answering `modeSelectionEnabled: false` hides the chip and the General row — the section keeps managing the roster with its selection affordances disabled, and the header label still reports what each session was created with.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The surfaces read and mutate the Host-owned preset roster through settings and remote calls; the plugin contributes slot occupants and keeps no preset data of its own.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -18,7 +18,6 @@ The **local-filesystem** implementation of the [`@deepseek-ai/dsh-spill`](../spi
 - [Storage layout](#storage-layout)
 - [Config](#config)
 - [Startup cleanup](#startup-cleanup)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -50,11 +49,6 @@ Files land at `<root>/session-<hash>/​<random>-<safeName>`:
 One best-effort sweep starts after activation without delaying service availability. It scans the configured root and prior default `dsh-spill-*` roots under the OS temp directory, deletes regular files whose modification time is strictly older than the configured cutoff, prunes empty session directories, and removes only empty prior-default roots. A long-lived process does not sweep again until restart. Disposal waits for the sweep, and a concurrent write recreates a session directory if cleanup removes it.
 
 The sweep resolves filesystem identities, never follows or deletes symlinks, and skips unrelated entries. On POSIX it admits only roots and session directories owned by the current user, not writable by group or others, and protected from replacement through their ancestor path; writable sticky temporary directories such as `/tmp` are permitted. Unsafe paths produce a warning and remain untouched. Filesystem and warning-sink failures are contained, so cleanup cannot fail activation or a concurrent spill write. The [startup cleanup Agent Note](../../../.agents/notes/implemented/feature/2026-09-14-spill-local-startup-cleanup.md) records the retention decision.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each spill writes one session-scoped file that is itself the record; the backend keeps no index to compare.
 
 <a id="model-experience"></a>
 ## Model Experience

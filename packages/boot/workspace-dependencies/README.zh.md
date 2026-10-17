@@ -47,7 +47,7 @@ pnpm exec tsx scripts/workspace-runtime/verify-installed.ts --source .artifacts/
 
 [CLI 补丁](../../../apps/cli/config/workspace-dependencies.cordis.patch.yml)在所选 profile 中启用工具。将 `DSH_WORKSPACE_RUNTIME_SOURCE` 设置为部署方持有的载荷绝对路径，并向 `dsh --profile sdk`、`web` 或 `headless` 传入此补丁。私有安装位置是所选 Harness home 下的 `workspace-runtime`。可以使用 `--dump-config` 检查解析后的组合。部署打包必须在应用旁携带载荷；npm 插件本身不包含解释器。
 
-安装器检查清单版本与平台身份，暂存完整副本，再在共享跨进程写入锁下替换安装树。替换中断后可以恢复前一棵树。复用同一清单会保留用户额外安装的包；返回的发行版本仅描述内置载荷。不发布运行期 invariant 伴生模块：安装检查在发布时执行，工具注册表负责注册释放。
+安装器检查清单版本与平台身份，暂存完整副本，再在共享跨进程写入锁下替换安装树。替换中断后可以恢复前一棵树。复用同一清单会保留用户额外安装的包；返回的发行版本仅描述内置载荷。
 
 <a id="dev-note"></a>
 ## 开发备注
@@ -55,7 +55,6 @@ pnpm exec tsx scripts/workspace-runtime/verify-installed.ts --source .artifacts/
 安装器源自固定 alpha.2 的 `desktop-host` 实现。CoHarness 将其作为 CLI 和 Gateway 运行时可使用的插件，增加跨进程安装串行化，并拒绝当前执行目标无法使用的路径。[Office 技能](../../skill/skill-office/README.zh.md)提供文档工作流；[computer-use](../../computer-use/computer-use/README.zh.md)负责桌面访问。
 
 <a id="model-experience"></a>
-
 
 ## 模型体验
 

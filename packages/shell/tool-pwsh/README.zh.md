@@ -91,7 +91,6 @@ kind: "package-reference"
 | [`src/index.ts`](src/index.ts) | 插件入口：工具注册、提示词区段、参数校验、升权、请求组装 |
 | [`src/background.ts`](src/background.ts) | 把已结算的进程映射为通用任务结果词汇，并把输出环读取渲染为进程读取 |
 | [`src/render.ts`](src/render.ts) | 模型侧结果文本：流、标记、截断通知（bash 孪生） |
-| — | 不发布运行时不变式伴生入口；除所属 seam 强制执行的约定外，本包不公开独立的事件序列或可变数据关系。 |
 
 ### 渲染与退出标记
 
@@ -116,7 +115,6 @@ kind: "package-reference"
 - [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-pwsh)——每个受支持配置字段及其源声明。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -201,7 +199,6 @@ Non-zero exits are reported as `[exit code: N]` markers; investigate failures be
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明工具何时不合适或需要特别小心。它们是当前包约束，不是任务积压。
 

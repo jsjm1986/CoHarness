@@ -51,14 +51,11 @@ kind: "package-reference"
 
 该插件会前置一个 `agent/pre-step` 监听器，并先行委托下游。需要注入且下游决策进入步骤时，它会向返回批次追加一条带来源的 `UserMessage`。AgentLoop 在 `step/start` 之后、请求派生之前记录最终批次。决策被拒绝、监听器失败或信号已经中止时，不会记录任何内容。
 
-每个读数都使用确切的快照来源 `{ kind: 'plugin', plugin: 'time-context', form: 'snapshot', sections: [{ name: 'time-context', text: <same text> }] }`。`./invariant` 配套模块会校验该形状，根据原始 `user-rpc` 消息重新派生当前轮次的浏览器策略，并检查时间戳时区与经过时长基线。
-
 正数间隔调度会扫描原始持久会话事件，查找最新一条归因于插件的消息，其中包括已被压缩（compaction）遮蔽的读数。因此，它无需进程本地缓存也能在恢复后继续生效。正数间隔可以有意让后续请求复用现有历史，而不添加新读数；Schedule Web overlay 会省略该间隔。
 
 第 1 步从最新一条在其之前持久化的用户、助手或工具结果消息起测量。为该步骤拟议的提示词尚未追加。后续步骤从同一轮次中前一个 time-context 事件起测量。缺少基线时报告 `unavailable`，挂钟时间倒退时将经过时长限制为零。
 
 读数记录的是已进入的步骤，不是已完成或已传输的请求。后续准备失败时，该读数可能留在历史中。消息会保留在派生会话历史中，直到压缩将其遮蔽；`request/header` 不含 time-context 状态，请求重建会使用每个 `step/start` 之后的完整持久表层前缀。
-
 
 <a id="model-experience"></a>
 ## 模型体验

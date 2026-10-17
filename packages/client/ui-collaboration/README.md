@@ -15,11 +15,9 @@ Workbench sharing, read-only composer selection and creation eligibility follow 
 
 Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client: an account scope selector, staged root-conversation visibility, a conversation sharing menu, and a read-only project composer policy. One plugin contributes these through existing Client slots and session-create waterfall events, so shared project conversations work without a separate account surface.
 
-
 ## Table of Contents
 
 - [User interface contract](#user-interface-contract)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -41,11 +39,6 @@ Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client
 Account context also publishes the active scope's project identity — public id, display name, and management capability — and the current account's Full and Auto choice qualifications into the existing runtime UI policy. Refresh starts by withdrawing verification; a failed request keeps display context but does not retain permission eligibility. Connection reset aborts and discards the previous context request. Consumers combine that account value with their own connection's deployment facts, following the [permission UI rules](../ui-permission-presets/README.md).
 
 Context loads coalesce only non-forced calls; a forced post-mutation refresh supersedes and aborts the old context read, and neither obsolete success nor failure publishes. The request slot is assigned before deferred transport runs or subscribers are notified. Conversation-detail forced refresh retains its coalesced trailing-read semantics.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Collaboration truth lives on the Gateway behind authenticated endpoints; the plugin stages only request-scoped selections and composer policy in the page.
 
 <a id="model-experience"></a>
 ## Model Experience

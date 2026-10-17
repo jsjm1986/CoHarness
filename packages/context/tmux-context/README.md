@@ -18,7 +18,6 @@ Opt-in durable context naming the tmux session, window, and pane this agent proc
 - [Config](#config)
 - [How it reads tmux](#how-it-reads-tmux)
 - [Timing semantics](#timing-semantics)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -58,11 +57,6 @@ State is pulled on every eligible turn — a moved, renamed, or re-laid-out pane
 ## Timing semantics
 
 The plugin prepends an `agent/pre-step` listener. When an injection is due and the downstream decision enters the proposed step, it prepends one sourced `UserMessage` to the returned batch. AgentLoop records that context after `step/start` with source `{ kind: 'plugin', plugin: 'tmux-context' }`. Change suppression and interval scheduling scan the raw durable session events for the latest injection of this source, so the schedule survives compaction and resumed processes without process-local cache state; sessions schedule independently. A downstream pre-step listener that rejects or fails prevents the reading from being recorded.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Pane facts are sampled fresh from tmux on each turn; nothing is retained between samples.
 
 <a id="model-experience"></a>
 ## Model Experience

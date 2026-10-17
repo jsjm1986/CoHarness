@@ -13,7 +13,6 @@ Prompt-side context for `ctx.userDocs`. The plugin validates the uploaded docume
 
 Use `dsh-userdoc-context` for prompt-side context over `ctx.userDocs`: it validates uploaded document ids before a prompt is admitted, chooses inline text or a path-only representation per document, and records the admitted snapshot in the Session log so the model sees a stable view.
 
-
 ## Table of Contents
 
 - [Public API](#public-api)

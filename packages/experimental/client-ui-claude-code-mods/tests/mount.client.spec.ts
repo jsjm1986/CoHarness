@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SurfaceSnapshot } from '@deepseek-ai/dsh-experimental-claude-code-mods/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteError, type TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
@@ -19,8 +19,8 @@ function assertBandInjected(value: Record<string, unknown>): asserts value is Re
   assert(typeof value.hooks === 'object' && value.hooks !== null)
 }
 
-/** A fake `watchBand` stream handle the test feeds by hand. */
-function stream() {
+/** A fake `watchBand` stream the test feeds by hand; the AbortSignal the caller passes ends it. */
+function stream(signal?: AbortSignal) {
   const queue: SurfaceSnapshot[] = []
   let wake: (() => void) | undefined
   let closed = false
@@ -30,9 +30,6 @@ function stream() {
     push(snapshot: SurfaceSnapshot) { queue.push(snapshot); wake?.() },
     fail(error: unknown) { failure = error; wake?.() },
     close() { closed = true; wake?.() },
-    send() {},
-    end() {},
-    dispose() { handle.disposed(); closed = true; wake?.() },
     async *[Symbol.asyncIterator](): AsyncIterator<SurfaceSnapshot> {
       while (true) {
         const next = queue.shift()
@@ -44,6 +41,7 @@ function stream() {
       }
     },
   }
+  signal?.addEventListener('abort', () => { handle.disposed(); closed = true; wake?.() }, { once: true })
   return handle
 }
 
@@ -59,8 +57,8 @@ async function fixture() {
   }
   new Remote()
   const streams = new Map<string, ReturnType<typeof stream>>()
-  const watchBand = vi.fn((sessionId: SessionId) => {
-    const handle = stream()
+  const watchBand = vi.fn((sessionId: SessionId, signal?: AbortSignal) => {
+    const handle = stream(signal)
     streams.set(sessionId, handle)
     return handle
   })

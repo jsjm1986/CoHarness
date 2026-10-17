@@ -37,18 +37,11 @@ store 家族（输入 `defineStore` 规范／输出 `StoreHandle<T, A>`）为 st
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。注册表核心是纯组合机制，其 register/dispose 语义由单元规格强制；它不拥有领域状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

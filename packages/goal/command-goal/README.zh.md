@@ -17,7 +17,6 @@ kind: "package-reference"
 
 - [命令约定](#command-contract)
 - [组合](#composition)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -59,12 +58,6 @@ kind: "package-reference"
 随附 `dsh` 基础配置启用持久 goal 栈和此命令；Web 客户端提供其交互适配器。ACP（Agent Client Protocol）自动化应用启用领域与模型工具，但不挂载命令适配器；`goals: false` 会移除该栈。无 UI 的 `agent-spine-demo` 必须显式配置 `goals: {}`，避免无头单次调用方在不知情时从一个物理轮次变为包含多个 Round 的操作。
 
 受管 Goal 创建、编辑和恢复在激活后续回合前证明当前人类命令的来源。目标附件保留相同执行范围。状态、暂停和清除不建立执行授权，即使执行链无法继续也仍可使用。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该命令是一次委托给 `ctx.goals` 域的注册；目标状态不在此处持有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

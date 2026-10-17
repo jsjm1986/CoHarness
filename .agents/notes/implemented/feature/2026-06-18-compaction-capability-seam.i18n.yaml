@@ -39,14 +39,14 @@
   en: 1c71cf67450e78d5
   zh: fb44b3cf5cee070a
 /agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/blocking-via-a-log-recorded-lock-plus-a-crash-recoverable-failure-taxonomy:
-  en: 5aed57a49e031b1e
-  zh: 1424f332197ef541
+  en: 6c3878b3ec1aebb8
+  zh: 10175d34ddf1c543
 /agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/alternatives-considered:
   en: 24a7bb1949445136
   zh: 7914ea99f498ed67
 /agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/consequences:
-  en: d46b4ebf81883f6f
-  zh: 9dcdb0b34d6375cf
+  en: 3c006fdfcd868717
+  zh: 2853b06e3edd1e5c
 /agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/testing:
-  en: 843476bd607fe832
-  zh: 50be0b06553a54d0
+  en: f806b689b448d824
+  zh: 5d1efad98c231c6c

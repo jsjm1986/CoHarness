@@ -46,7 +46,6 @@ kind: "package-bundle"
 
 [`cordis.patch.yml`](cordis.patch.yml) 插入 `worktree` 运行时行与 `tool-worktree` 消费方行。[`src/index.ts`](src/index.ts) 注册一个带类型的工具。运行时创建操作拥有 Git 行为、取消处理与工作目录切换。工具将运行时记录作为规范返回值，并渲染为 JSON；Host 展示使用通用卡片。销毁插件会注销工具。
 
-本包不发布运行时不变量伴随入口，因为工具不保留独立于工作树运行时的状态。
 
 </details>
 

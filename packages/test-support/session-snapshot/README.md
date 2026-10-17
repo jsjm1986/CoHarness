@@ -122,7 +122,6 @@ The shared core owns manifests, generation-qualified role selection, workspace s
 | [`src/workspace.ts`](src/workspace.ts) | Scenario workspace setup and complete expected-state comparison |
 | [`src/suite.ts`](src/suite.ts) | Scenario-table suite factory, fixture guards, record/refresh write-back |
 | [`src/index.ts`](src/index.ts) | Package entry re-exporting the four layers |
-| — | No runtime invariant companion is published; this test-support package owns no production event stream or mutable data; consuming test suites exercise its behavior. |
 
 ### Data flow
 
@@ -156,7 +155,6 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the kit needs special care. They are current package constraints, not a task backlog.
 

@@ -18,7 +18,7 @@ Unknown ids return `false` at the domain contract. `workspace.delete({ workspace
 
 ## Durable commit and publication
 
-Registry operations serialize create and delete. Deletion first writes the Workspace order without the id, then removes the entity from the cache, then deletes the table row. The table deletion is the notification commit point: the package invariant accepts it only after the cache stopped publishing the entity, and the Host emits `host/workspace-removed` only from that committed deletion. A table-write failure restores the cache and prior durable order; no removal frame is published.
+Registry operations serialize create and delete. Deletion first writes the Workspace order without the id, then removes the entity from the cache, then deletes the table row. The table deletion is the notification commit point: the cache has already stopped publishing the entity, and the Host emits `host/workspace-removed` only from that committed deletion. A table-write failure restores the cache and prior durable order; no removal frame is published.
 
 The Host stream keeps its committed-id set through the preceding global-order write and removes the id only on the table deletion. Create rollback therefore emits no false removal, while every connected tab receives exactly the id needed to delete its projection.
 

@@ -20,7 +20,6 @@ The SDK provider runs each subagent as a complete DeepSeek Harness runtime in a 
 - [Capabilities and context](#capabilities-and-context)
 - [Configuration](#configuration)
 - [Process boundary](#process-boundary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -87,11 +86,6 @@ The provider advertises `agentOptions: true`, with `agentPreset`/`outputSchema`/
 The child environment is the [`dsh-subprocess`](../../subprocess/README.md) seam's `scrubbedParentEnv()` base — ambient credential-shaped and `DSH_*` names dropped — with explicit `config.env` values merged after the scrub. The child is spawned by the SDK client rather than through `ctx.subprocess` (the subprocess README's documented exception for SDK-managed transports), which is why this backend applies the scrub itself. The JSON-RPC wire is the real serialization boundary.
 
 The package has no default export. Cordis loader unwrapping would otherwise hide the named `inject` metadata; see [postmortem 0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The child is a full peer runtime owning its composition and session; the provider drives it over stdio JSON-RPC and keeps no mirrored state.
 
 <a id="model-experience"></a>
 ## Model Experience

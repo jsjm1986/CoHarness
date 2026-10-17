@@ -18,7 +18,6 @@ kind: "package-reference"
 - [持久状态与回放](#durable-state-and-replay)
 - [展示与导航](#presentation-and-navigation)
 - [装配](#composition)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -43,12 +42,6 @@ kind: "package-reference"
 ## 装配
 
 本包把 Definition、locale 字典和 `workflow-run` renderer 都注册为 Cordis effect；移除客户端 entry 会撤销三者。shipped Web bundle 在 `ui-conversation` 与 `ui-tool` 之后装配该插件。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。节点定义是对持久 `tool-workflow/*` session 事件的纯重建；除渲染出的节点外不增加状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

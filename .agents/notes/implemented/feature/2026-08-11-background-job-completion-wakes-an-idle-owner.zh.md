@@ -38,7 +38,7 @@ Status: implemented
 
 `cancelForTeardown` 现在会把记录标记为 `reported`，与 `kill()` 在取消之后所做的完全一致。当通知只是一次无害的注入时，这处不对称看不出来；而会唤醒的报告方会把它变成每个 teardown 层级一次模型请求，作用在宿主正要销毁的 agent 上。
 
-`reported` 本来就是正确的那个 bit——「kill、read 或 wait 已报告或承诺报告终止状态」——而 teardown 是一次没有调用方的 kill。用它可以让该结算的每一个观察者都保持完整：`onJobDone` 仍会触发，因此运行时不变量与强制失败路径依旧被覆盖，只有通知报告方会安静下来。
+`reported` 本来就是正确的那个 bit——「kill、read 或 wait 已报告或承诺报告终止状态」——而 teardown 是一次没有调用方的 kill。用它可以让该结算的每一个观察者都保持完整：`onJobDone` 仍会触发，因此强制失败路径依旧被覆盖，只有通知报告方会安静下来。
 
 ### 完成是最后才宣布的
 

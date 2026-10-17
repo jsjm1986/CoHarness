@@ -23,18 +23,11 @@ Escape 关闭列表并把焦点交还触发器，在其外部按下指针同理�
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。Job 记录完全经由运行时的 `jobsBySession` 与 `observedJobs` 镜像到达；本包自身不发起 RPC，只持有弹层可见性。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -80,7 +80,7 @@ Each service retains its domain rule. Named command and prompt views use the sha
 
 `agentEvents(context, agent)` constructs the agent's carrier and injects the same agent as the event subject. Session, tool, approval, prompt, and subagent services likewise derive routing from the object they already own instead of accepting an unrelated key.
 
-The type marker rejects ordinary bare-receiver mistakes, and development invariants cover direct JavaScript or casted dispatch. The subject remains explicit because routing correctness and useful event data are different concerns.
+The type marker rejects ordinary bare-receiver mistakes; direct JavaScript or casted dispatch is not checked at runtime. The subject remains explicit because routing correctness and useful event data are different concerns.
 
 ## Agent creation: one transaction owns the complete operation
 
@@ -178,7 +178,7 @@ Append follows one sequence:
 5. Notify each observer independently, containing synchronous and asynchronous failures.
 6. Release append state and honor a detach requested during publication.
 
-No observer error makes a committed event look uncommitted, and one bad listener cannot starve later listeners. Session invariants stage their transition before commit and apply it only when the same event reaches the contained post-commit observer.
+No observer error makes a committed event look uncommitted, and one bad listener cannot starve later listeners.
 
 `flush()` starts every persistence listener and awaits every result before reporting failure. This deliberate all-settled behavior prevents a synchronous failure from starving another backend or final flush.
 
@@ -322,8 +322,6 @@ Readonly contracts describe borrowed same-process values. `Scoped<T>` marks even
 TypeScript cannot govern JavaScript casts, direct Cordis dispatch, process messages, or durable files, so runtime enforcement remains at those escape points.
 
 ### Runtime invariants cover cross-service facts
-
-The `dsh-scope/invariant` companion verifies, when selected, that every declared scoped event uses a marked carrier and that event families exposing a subject use the matching key. The separate `dsh-session/invariant` contribution stages trace validation before append commit and advances after the same event commits; both register through `ctx.invariants`.
 
 The plugin does not police trusted setup by scanning registries or reject prompt assembly objects fabricated through casts. Those checks would turn composition contracts into speculative runtime machinery without protecting a real external boundary.
 

@@ -108,6 +108,7 @@ async function harness(
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
@@ -116,7 +117,6 @@ async function harness(
   const retryFiber = await ctx.plugin(Object.assign((inner: Context) => {
     retry.apply(inner, {}, internals)
   }, { inject: retry.inject }))
-  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   const disposeAdapter = ctx.llm.registerAdapter(['mock', 'other'], adapter)
   return { ctx, retryFiber, disposeAdapter }
@@ -172,6 +172,30 @@ afterEach(async () => {
   vi.useRealTimers()
   await context?.fiber.dispose()
   context = undefined
+})
+
+describe('retry projection', () => {
+  it('keeps the same state when a recorded retry is applied again', async () => {
+    type Definition = { key: string; apply(state: object, event: SessionEvent): object }
+    const definitions: Definition[] = []
+    const { ctx } = await harness(new ScriptedAdapter([]), undefined, (inner) => {
+      const projections = inner.sessionProjections
+      const register = projections.register.bind(projections)
+      projections.register = (spec: Definition) => {
+        definitions.push(spec)
+        return register(spec as never)
+      }
+    })
+    const definition = definitions.find(spec => spec.key === 'llmRetry')!
+    const event: SessionEvent = {
+      type: 'llm/retry',
+      data: { provider: 'mock', policyKey: 'policy', retry: 1, retryId: 'retry-1' },
+    } as never
+    const state = definition.apply({}, event)
+
+    expect(definition.apply(state, event)).toBe(state)
+    await ctx.fiber.dispose()
+  })
 })
 
 describe('provider-routed retry policy', () => {

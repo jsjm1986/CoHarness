@@ -18,7 +18,6 @@ Model-facing tools over the live cordis runtime the agent itself runs inside: in
 
 The [extensions subsystem page](../../docs/subsystems/extensions.md) records the generated `ctx.cordisInspect` and `ctx.dynamicCordisRunner` service API.
 
-
 ## Summary
 
 The extensions group provides read-only runtime API discovery for agents, process-local runners for programmatic and browser consumers, and historical generated-plugin cards. Creator mode installs persistent plugins through [Plugin Manager](../boot/plugin-manager/README.md). Choose a child package for inspection, Host execution, Client execution, or browser controls.

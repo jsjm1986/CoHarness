@@ -30,8 +30,11 @@
   en: e7ead24911d9d6c8
   zh: d50edc487c596a67
 /sessions/surface-types/surfaceintent-the-parameter-to-session-append:
-  en: b0c023fddc0f2b0e
-  zh: e82631e9e09ba686
+  en: 9ec95db9133ffaec
+  zh: 41c08fef5fa9fdb6
+/sessions/surface-types/plugin-owned-message-projections:
+  en: f1f73607d650620f
+  zh: b3ef72f19fb5ee3d
 /sessions/surface-types/sessionsurface-the-live-readonly-surface-projection:
   en: 1e6525f96da63695
   zh: 334ed18f40e07262
@@ -45,20 +48,20 @@
   en: 3da7cf286a31a66f
   zh: 2a6acab3aa69f794
 /sessions/live-session-fork-api:
-  en: e779481af02174c6
-  zh: 848a6a0a797c7d29
+  en: c72c73ce4b4c697c
+  zh: 8a34785a92df0ad5
 /sessions/why-a-turn-ended-turnendreasonmap:
   en: f564f220e9c54d99
   zh: d9d010b564683874
 /sessions/execution-enclosure-and-standalone-events:
-  en: 5d33a4901131123a
-  zh: 5700f156f2a0f7de
+  en: 9091c5446e8cb9a2
+  zh: dd7e050911cf5432
 /sessions/the-end-seed-boundary-session-end-seed:
   en: b38cc50b8d6a8fc2
   zh: b908b338cabf9af5
 /sessions/plugin-contributed-log-only-events:
-  en: 1288f1d205b29db1
-  zh: 6e851c605bb45080
+  en: fe27b09374170855
+  zh: 149302dcd1f22da8
 /sessions/plugin-contributed-log-only-events/plugin-records:
   en: 15102fd0b937fbf3
   zh: 37ebf1d715db097c

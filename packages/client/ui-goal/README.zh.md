@@ -19,18 +19,11 @@ Web GUI 的 goal 界面同时显示持久 goal 状态及当前的进程本地激
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。实时目标经由 `goal` session 投影到达，变更经由 `ctx.remote.goals` 进行；插件不拥有领域存储或刷新链。
-
 
 <a id="model-experience"></a>
 ## 模型体验

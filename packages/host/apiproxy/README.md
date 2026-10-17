@@ -29,13 +29,11 @@ The Host retains its create, resume and fork handles for `hostSessionLifecycle`.
 
 Use `dsh-host-apiproxy` as the shared API gateway: a zero-dependency TypeScript API contract importable from the browser, a fetch carrier pair, and the host-side `ApiProxyService` (`ctx.apiProxy`) that every HTTP carrier wraps. Its `workspaceFiles.*` methods serve session-relative file reads under authorization, containment, and version guards with advertised bounds.
 
-
 ## Table of Contents
 
 - [The shared Agent default (`agent-default-model` Settings section)](#the-shared-agent-default-agent-default-model-settings-section)
 - [Contract layer (`/api`)](#contract-layer-api)
 - [Carrier layer (`/client` + root)](#carrier-layer-client--root)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -126,11 +124,6 @@ The A purpose-restricted `plugin-admin` caller may describe and atomically mutat
 Direct `SessionsApi` / `SubagentsApi` and `IApiClient` history results stay expanded `{ events, hasMore, projections? }` plus optional `omittedSpans`. `detail: 'conversation'` omits historical `assistant/chunk` runs under a completed append-origin `assistant/message` after pagination and reports those inclusive seq ranges; omitted `detail` and `'full'` keep every event. Successful Fetch `session.history` and `subagent.history` responses use physical `records`, including losslessly packed remaining chunk rows, and round-trip `omittedSpans`; the client validates and expands them before exposing the logical result. The size target measures the complete uncompressed `server-response` JSON in UTF-8 bytes and cuts only at complete append-origin message groups; a suffix cut clips `omittedSpans` to seqs inside the returned suffix. One indivisible group may exceed the target. Malformed packed records fail before runtime state changes; unknown ordinary or extended chunk events remain ordinary events. Persistence, the session format, and Conversation assembly are unchanged. [`historyPageTargetBytes`](../../client/connection/README.md) owns the deployment target; the [lossless history wire pagination decision](../../../.agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.md) and [two-tier conversation history](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md) record the rationale.
 
 The `inbox` projection reconstructs pending input from Session-owned durable splices without restoring an Agent. Gateway authorization still governs history reads; cold queue mutations retain the live-Agent requirement.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Request dispatch delegates to the owning session services and registered handlers; the gateway composes transport and policy without owning domain state.
 
 <a id="model-experience"></a>
 ## Model Experience

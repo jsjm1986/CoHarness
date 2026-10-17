@@ -17,7 +17,6 @@ File-backed settings provider. One YAML or JSON document carries every namespace
 
 - [Config](#config)
 - [Behavior](#behavior)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -50,11 +49,6 @@ Defaulting is one explicit `resolveSpec(config)` step; an unsupported extension 
 - **Dispose quiesces in every watch mode.** Teardown marks the provider closed, closes the watcher when present, then waits out every queued or in-flight document operation, so nothing publishes after disposal.
 - **Self-write suppression by content.** The provider caches the last good text; a watcher event whose content equals the cache (its own write included) is a no-op.
 - **Host configuration adapters receive the resolved path.** `ctx.settings.documentPath` is the absolute `resolveSpec()` filename, including a custom YAML/JSON path; `prepareDocument()` preserves an existing file or exclusively creates an absent empty file with owner-only permissions before the Host opens it. The browser receives only an availability flag, never reconstructs `$DSH_HOME`, and never submits a filesystem target.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The document on disk is the single authority: updates re-read it under a writer lock before writing back, and external edits republish, so no second durable copy exists to diverge.
 
 <a id="model-experience"></a>
 ## Model Experience

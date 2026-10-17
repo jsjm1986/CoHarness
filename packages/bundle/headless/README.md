@@ -17,17 +17,11 @@ After the Loader settles, the runner reads the shared [`ctx.agentDefaultModel`](
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The patch layer inserts profile rows whose plugins own their relationships; the headless-runner plugin reads one startup request and owns no persistent state.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -22,7 +22,6 @@ Historical CoHarness headers and packed streams are decoded by `coharnessJsonlFo
 - [Physical encoding](#physical-encoding)
 - [Durability and crash semantics](#durability-and-crash-semantics)
 - [Write path](#write-path)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -81,10 +80,6 @@ The plugin copies frozen session events into one write handle per live session. 
 
 Plaintext body reads scan bounded byte windows and retain decoded events without a complete raw-file buffer. They check cancellation between reads and retry changed revisions. Successor publication rechecks the source revision after writing the temporary file; a changed or missing source refuses publication. Successors are encoded in bounded batches with cancellation checks between events and writes. Compressed reads and logical preparation still retain complete input or event arrays.
 
-<a id="invariants"></a>
-## Invariants
-
-No runtime invariant companion is published: immutable-generation and append ordering are enforced by the storage coordinator and checked against files in persistence tests; this provider keeps no independent domain index.
 
 <a id="model-experience"></a>
 ## Model Experience

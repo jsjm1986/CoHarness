@@ -17,7 +17,6 @@ Standalone model-facing `str_replace_editor` over `ctx.fs`. It can be composed w
 
 - [Config](#config)
 - [Tool](#tool)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -36,11 +35,6 @@ Standalone model-facing `str_replace_editor` over `ctx.fs`. It can be composed w
 ## Tool
 
 The schema provides `view`, `create`, `str_replace`, and `insert` over absolute paths. File views use one-based line numbers and preserve content tabs, so displayed text remains valid literal replacement input; directory views omit hidden, dependency, and Python-cache entries and descend two levels. A metadata miss from `view`, `str_replace`, or `insert` records confirmed absence before returning `FS_NOT_FOUND`, so a later `create` can recover an externally deleted path through the mounted policy's guarded-create flow; absence never authorizes `str_replace` or `insert`. Replacement requires one unique literal match and reports errors only in the public `old_str` vocabulary. Insert follows the selected zero-based insertion boundary without adding an implicit trailing newline. Mutations preserve tabs outside the requested edit.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The editor adapts model calls onto `ctx.fs`; all file state belongs to the mounted provider.
 
 <a id="model-experience"></a>
 ## Model Experience

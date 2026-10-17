@@ -127,9 +127,6 @@ Tab 域按（Session，Tab id）保留带 brand 的 occurrence id、导航、中
 
 该列里的每个字符串都来自 `sidebarRight` 语言命名空间，包括套件的无障碍名称。tab 的标题在 tab 铸造时固定；类型的显示名跟随当前语言。
 
-
-**运行时不变量：** 不发布 companion。两个服务（`sidebarRight`、`sidebarRightTabs`）在同一个 effect 内经 `ctx.reflect.provide` 提供并随之拆除；屏幕上的会话与 Tab 域 occurrence 的生命周期由本包的 spec 直接断言，不存在会与之分歧的独立观察。
-
 <a id="model-experience"></a>
 ## 模型体验
 

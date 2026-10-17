@@ -37,7 +37,6 @@ Deployment consumers must verify runtime identity, stop writers, exclude project
 
 Descriptor identity checks reject replacement files between validation and access. Reads remain bounded if the inventory grows concurrently; the 16 MiB limit applies to ownership metadata, not application files. Malformed, incomplete, oversized and link-shaped inventories fail. File flush and POSIX directory flush precede successful registration.
 
-**Runtime invariant:** No companion is published. This library validates its persisted records on each read; providers own the data and lifecycle, and an inventory path may legitimately precede file creation.
 
 </details>
 

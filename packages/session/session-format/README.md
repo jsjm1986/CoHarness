@@ -18,7 +18,6 @@ The released chain is assembled in `@deepseek-ai/dsh-session-format-catalog`: th
 ## Table of Contents
 
 - [Ownership and safety](#ownership-and-safety)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -39,11 +38,6 @@ The released chain is assembled in `@deepseek-ai/dsh-session-format-catalog`: th
 - Whole-artifact migration validates every adjacent target, including migrations implemented with incremental stages. Streaming stages own event validation and flush in source-to-target order; the stream does not run whole-artifact validators.
 
 The catalog is a pure value operation. JSONL, Gateway, and SQLite adapters remain responsible for their own raw bytes, crash-tail recovery, backups, and atomic publication.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A pure migration library: chains compile deterministically from the format catalog and conversion produces new generations without mutating sources.
 
 <a id="model-experience"></a>
 ## Model Experience

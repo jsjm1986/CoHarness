@@ -13,13 +13,11 @@ ACP automation server app: the default agent spine, client-created agents throug
 
 Use `dsh-acp-demo` as the ACP automation server app: the default agent spine, client-created agents through `dsh-acp`, JSONL persistence, and semantic checkpointing behind one JSON-RPC stdio bin. Programmatic clients create fresh sessions; the package mounts no human UI.
 
-
 ## Table of Contents
 
 - [Composition](#composition)
 - [Config](#config)
 - [Bin](#bin)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -67,11 +65,6 @@ The shipped [`examples/acp-agent/cordis.yml`](../../../examples/acp-agent/cordis
 ## Bin
 
 `dsh-acp-demo [--config path-to-cordis.yml]` (short form `-c`; default `./cordis.yml`) loads the gitignored `.env`, except in replay mode; `DSH_SNAPSHOT=replay` selects the sibling `cordis.snapshot.yml`; stdin EOF disposes the context and flushes sessions before exit. Loader's installed optional `node-addon-require-builtin` peer resolves bare plugin specifiers for the built bin under plain Node. Diagnostics use stderr because stdout is the ACP wire.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The demo wires existing plugins behind one bin; session state belongs to the composed runtime and the ACP server package.
 
 <a id="model-experience"></a>
 ## Model Experience

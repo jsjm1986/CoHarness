@@ -21,7 +21,6 @@ Agents can use local skills from the repository, a custom directory, or the user
 - [Discovery](#discovery)
 - [Catalog Change Detection](#catalog-change-detection)
 - [Skill Format](#skill-format)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -83,11 +82,6 @@ Skills can be single-level directory bundles (`<name>/SKILL.md`) or flat Markdow
 The two invocation fields accept YAML booleans and the case-insensitive forms `true`/`false`, `yes`/`no`, `on`/`off`, and `1`/`0`. `disable-model-invocation: true` excludes the skill from model-facing catalogs and loaders; `user-invocable: false` excludes it from human-facing commands. Each omitted field defaults to permitting its surface, and the provider always emits both positive internal policy values, including when both keys are absent. A rejected camel-case spelling or a non-boolean invocation value drops the entire skill from discovery with a warning instead of discarding only that field or falling back to a permissive default. Invocation policy fails closed because ignoring invalid data could expose a skill on a disabled surface; wrong-typed optional `whenToUse` and `metadata` values are omitted because neither currently grants invocation.
 
 The catalog and body have separate lifecycles. Discovery parses frontmatter to produce the summary. Every `skill(name)` load rereads and reparses the current file, so body edits need no hash, revision, cache invalidation, or proactive model notification. A frontmatter rename between discovery and loading rejects the stale name and invalidates the provider; the next catalog observation publishes the new name.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Skills are discovered from the filesystem, which remains the only catalog authority; the provider keeps no second index to compare.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -219,7 +219,6 @@ interface SubprocessCollectedOutputs {
 }
 ```
 
-
 ## Outcomes carry exit facts only
 
 `done` reports Node's close-event vocabulary and no cause classification — the service kills on abort but never decides why (the caller reads the deadline signal it owns, e.g. the bash executor's `timedOut`/`aborted` split). Collected output stays readable through `handle.collected` after settlement, so batch and streaming callers share one access path.

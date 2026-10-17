@@ -21,18 +21,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。Host 拥有持久反馈；客户端控制器管理可销毁的读取、草稿和提交状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -28,7 +28,6 @@ The package carries browser-to-Host Remote calls, exact Fetch responses, and con
 - [Host configuration](#host-configuration)
 - [/api browser-trust fence](#api-browser-trust-fence)
 - [`/api` WebSocket downlinks](#api-websocket-downlinks)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -59,11 +58,6 @@ Each browser downlink keeps a head-indexed queue capped at 1,024 frames and 8 Mi
 `/api/events.mux` and `/api/events.host` each accept a WebSocket upgrade and send only the corresponding `ServerRequest` text messages to the browser; the client sends no application data over these sockets. If either socket ends, the current connection generation fails and rebuilds both streams; readiness still requires both sockets to be open and the `host.describe` HTTP call to succeed. Host teardown terminates both sockets, aborts their sources, and waits for source cleanup before returning. Ordinary network GETs to these paths return 426 with no SSE fallback; `toFetchHandler`'s SSE codec serves only the isomorphic in-process carrier.
 
 `connection/request` is the Host-side waterfall around every request accepted by the browser-trust fence. It receives the entry-time Node request headers and a `kind` of `http` or `upgrade`, then completes before RPC dispatch or event-stream opening. Authentication and request-context listeners must treat the headers as immutable and call `next()` so independent plugins compose; returning without delegation prevents later listeners and the carrier handler from running.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Connection state is generation-scoped and re-established from each host handshake; consumers observe the same published values, leaving no second relation that can diverge.
 
 <a id="model-experience"></a>
 ## Model Experience

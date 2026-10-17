@@ -17,7 +17,6 @@ Private image, PDF and download URLs carry the Connection’s confirmed account 
 
 Use `dsh-client-ui-documents` as the workspace document manager in the Web UI: organize folders, preview, upload, move, download, delete, and insert stored documents into the conversation input. The picker captures its destination Session when opened, so switching panes mid-dialog never sends a document to the wrong composer.
 
-
 ## Table of Contents
 
 - [Installation](#installation)
@@ -104,7 +103,6 @@ The manager reads and writes the same durable `/api/documents` store that conver
 - Trashed documents remain recoverable only for the provider's retention window; purge is permanent, while active documents remain until deleted.
 - Folder deletion is empty-only; the UI does not recursively delete a folder tree.
 
-**Runtime invariant:** No companion is published. Document UI state is owned by the client session and has no independent event or mutable-data relation for this package to assert.
 
 <a id="dev-note"></a>
 ### Dev Note

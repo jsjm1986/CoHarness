@@ -63,6 +63,5 @@ kind: "package-bundle"
 <details>
 <summary>维护者信息 — 点击展开</summary>
 
-未发布不变量伴随物：补丁层只声明插件行；启用与工具挂载通过 Loader 组合被观察。
 
 </details>

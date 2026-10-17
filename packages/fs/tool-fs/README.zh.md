@@ -129,9 +129,6 @@ kind: "package-reference"
 
 -----
 
-
-**运行时不变式：** 不发布伴生入口。这个模型侧 adapter 没有独立 lifecycle stream；执行关系由它调用的 capability seam 负责。
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -241,7 +238,6 @@ Read a file before editing it (the default fs-observation-policy requires it), u
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明工具套件何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是通用文件系统对比或任务积压。
 

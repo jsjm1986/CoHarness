@@ -17,18 +17,11 @@ Loader 结算后，runner 读取共享的 [`ctx.agentDefaultModel`](../../core/a
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。补丁层插入 profile 行，其插件各自拥有自身关系；headless-runner 插件只读取一次启动请求，不拥有持久状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -17,7 +17,6 @@ Use `dsh-agent-tool-presentation` in an [agent preset](../../preset/agent-preset
 
 - [Why a row rather than a registry](#why-a-row-rather-than-a-registry)
 - [What it does](#what-it-does)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -39,11 +38,6 @@ What a preset can own is the **presentation** of that registry. `ctx.tools.prese
 `mode` is required rather than defaulted, because a preset without this row already gets the deployment default; an omitted value would mean the row was composed for nothing.
 
 One agent declares one presentation. A second declaration in the same composition is refused rather than merged: two answers to "which form does the model see" is a contradiction, not an override.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The package contributes one declarative preset row consumed at composition time; it owns no runtime state.
 
 <a id="model-experience"></a>
 ## Model Experience

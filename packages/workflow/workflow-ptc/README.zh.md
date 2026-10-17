@@ -85,7 +85,6 @@ Node PTC 提供方的 `maxPendingCalls` 也限制工作流并发：子 agent 启
 | [`src/runtime.ts`](src/runtime.ts) | VM 求值、辅助函数约定与组合器 |
 | [`src/realm.ts`](src/realm.ts) | 跨 VM realm 的无损 JSON 物化 |
 | [`src/meta.ts`](src/meta.ts) | 元数据校验与规范化 |
-| — | 不发布运行时不变式伴生入口；工作流服务负责事件配对，PTC 负责受管进程观测。 |
 
 ### 值与子 agent 归属
 
@@ -116,7 +115,6 @@ Host 分别跟踪待完成的提供方启动与已发布子 agent。共享中止
 - [工作流沙箱复用](../../../.agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.zh.md)——执行归属与取舍。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -12,8 +12,8 @@
   en: 8ff708e868c265c4
   zh: 9b727e6b7a15fa64
 /deepseek-ai-dsh-cordis-host-runner/table-of-contents:
-  en: b7616c1d36a37565
-  zh: ae3ff2a06a09dcf0
+  en: 3875c44657db5095
+  zh: 31f667a219529b54
 /deepseek-ai-dsh-cordis-host-runner/what-it-does:
   en: 52756c146db39480
   zh: 1402c874f617af78
@@ -30,11 +30,8 @@
   en: 4204585e094bffe6
   zh: a082d326785e11b8
 /deepseek-ai-dsh-cordis-host-runner/export-shape:
-  en: 46e30d04cf525d78
-  zh: 6a44b27367a5caa3
-/deepseek-ai-dsh-cordis-host-runner/invariants:
-  en: 466bd6d3492e9bac
-  zh: 50930480f4a6f205
+  en: 58e1bafaa16d6ad4
+  zh: 1baf2a37023a1d46
 /deepseek-ai-dsh-cordis-host-runner/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -49,7 +46,7 @@
   zh: e66545088d00956a
 /deepseek-ai-dsh-cordis-host-runner/model-experience/run-outcomes-refusals-and-diagnostics-relayed-to-the-owning-session/kv-cache-effect:
   en: bbc4338c3035757a
-  zh: 2f10fe4f38a56afb
+  zh: c3f54c9e10e246ce
 /deepseek-ai-dsh-cordis-host-runner/known-limitations-and-deferred-work:
   en: 369b31bc7cbd3f01
   zh: 8ce6d4d4b3e8bea1

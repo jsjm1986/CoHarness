@@ -21,17 +21,11 @@ This package provides the Web GUI's three-column AppFrame, edge-column widths, a
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Panel geometry and collapse are presentation-local service state; the frame's slot registrations prove disposal through the HMR-safety spec.
 
 <a id="model-experience"></a>
 ## Model Experience

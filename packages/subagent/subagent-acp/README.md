@@ -21,7 +21,6 @@ Use this package to delegate a task to an ACP-compatible agent running in a fres
 - [Persistent members (`resume`)](#persistent-members-resume)
 - [Stop-reason mapping](#stop-reason-mapping)
 - [Process boundary](#process-boundary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -101,11 +100,6 @@ With `resume` unset the provider stays one-shot only — no `prepareContinuable`
 The child spawns through the [`dsh-subprocess`](../../subprocess/subprocess/README.md) seam: credential-shaped ambient variables and ambient `DSH_*` names are removed by the shared scrub, then explicit `config.env` values merge after it (an intended `DEEPSEEK_API_KEY` survives, and a `DSH_*` deployment fact such as `DSH_PERMISSION_MODE` reaches the child the same way — the scrub drops only its stale ambient namesake), stderr is inherited to the parent's own stream, and disposal applies this plugin's EOF window before the subprocess-owned SIGTERM→SIGKILL escalation and managed-range join. The provider documents its containment and observation limits. The ACP wire is the real serialization boundary; same-process subagent values are not defensively cloned.
 
 The package has no default export. Cordis loader unwrapping would otherwise hide the named `inject` metadata; see [postmortem 0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run drives one child over the ACP wire; the child's runtime owns its session and the provider holds only the in-flight client.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -14,7 +14,6 @@ The Web turn tail shows recorded workspace changes and explicit file deliveries.
 ## Table of Contents
 
 - [Historical review and current files](#historical-review-and-current-files)
-- [Invariants](#invariants)
 - [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -32,12 +31,6 @@ Review shows one file at a time with unified or side-by-side hunks, line wrappin
 Reads use the Session's runtime connection and ApiProxy authorization. The Host checks Session access and recorded paths before and after asynchronous reads. Client readers belong to the retained Session, discard cached results on connection replacement, and abort on disposal. A review resource must declare the same Session as its sidebar. Hidden tabs do not initiate comparisons.
 
 Delivery cards preserve file descriptions and provide preview, default-application, registered-application, and file-manager actions. The menu re-queries `host.fileApplications` on each open so a handler installed after delivery still appears; the Host revalidates a chosen id against current handlers, so a stale row fails instead of silently opening the default. Native actions require an explicitly independent local Host, base runtime, loopback access, and an available desktop opener. Gateway users receive authorized previews without access to the server desktop. The manager action reveals the file on macOS/Windows and opens its containing folder on Linux, where no selection API exists.
-
-<a id="invariants"></a>
-## Invariants
-
-No companion is published: the UI projects durable events and authorized read results; the recorder and resource services own the file relationships.
-
 
 <a id="further-exploration"></a>
 ## Further Exploration

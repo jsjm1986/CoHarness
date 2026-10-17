@@ -167,11 +167,9 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       // whose remaining branches need real-composition/process harnesses.
       // TODO(gui): cover and remove with the client test lane above.
       'packages/client/modules/src/index.ts',
-      'packages/client/modules/src/invariant.ts',
       'packages/client/modules/src/client/index.ts',
       'packages/client/modules/src/client/manifest.ts',
       'packages/client/hmr/src/index.ts',
-      'packages/client/hmr/src/invariant.ts',
       'packages/client/connection/src/index.ts',
       'packages/client/connection/src/http-bridge.ts',
       // Account/project HTTP decoders are covered by their transport suites
@@ -230,7 +228,6 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       // registry's drive tails need the same maturing lanes. TODO(gui):
       // cover and remove with the client test lane above.
       'packages/interaction/commands/src/index.ts',
-      'packages/interaction/commands/src/invariant.ts',
       'packages/session/session-projection/src/index.ts',
       // Debt the first hosted-runner coverage run reported, carried as an
       // explicit shrink-only roster (scripts/coverage-baseline.ts).

@@ -18,7 +18,6 @@ const PARSER_PRELOAD_SOURCE = 'packages/client/modules/src/index.ts'
 const STATIC_PRESET_SOURCE = 'packages/client/tsdown.client.ts'
 const CORDIS = '@deepseek-ai/cordis'
 const DSH_PREFIX = '@deepseek-ai/dsh-'
-export const DSH_INVARIANTS = '@deepseek-ai/dsh-invariants'
 const CLIENT_WEB = '@deepseek-ai/dsh-client-web'
 
 /** One workspace package's browser-module declaration. */
@@ -595,13 +594,6 @@ function expectedSections(
     for (const location of locations) add(name, location)
   }
   for (const name of pkg.inject) add(name, 'dsh.client.inject')
-  const invariantsRule = expected.get(DSH_INVARIANTS)
-  // An invariant companion is checked by the in-repo diagnostics harness, so
-  // importing dsh-invariants only from src/invariant.ts is a dev relationship.
-  if (invariantsRule !== undefined
-    && [...invariantsRule.origins].every(origin => origin.endsWith('/src/invariant.ts'))) {
-    expected.set(DSH_INVARIANTS, { kind: 'dev', origins: invariantsRule.origins })
-  }
   return expected
 }
 

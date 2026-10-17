@@ -19,7 +19,6 @@ The package root exports the Cordis plugin contract (`name`, `inject`, `Config`,
 
 - [Config](#config)
 - [Managed environment](#managed-environment)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -59,11 +58,6 @@ export function apply(ctx: Context): void {
 ```
 
 The overlay is computed from the current `ToolExecution` and passed through the dedicated `ShellExecRequest.dshEnv` channel. The local executors remove all inherited `DSH_*` before merging that snapshot, so nested harnesses and concurrent parent/child agents cannot leak stale identities. `process.env` is never modified. The shell tools' descriptions teach the generic `$DSH_*` convention rather than naming persistence-specific variables or adding a permanent system-prompt section.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The registry is a contribution set with effect-scoped disposal; collected variables are computed per shell call from the registered facts.
 
 <a id="model-experience"></a>
 ## Model Experience

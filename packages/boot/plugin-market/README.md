@@ -112,6 +112,4 @@ Append-only: results enter the conversation as ordinary tool results and do not 
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-No invariant companion is published: index fetch errors and cache state are observed through the service and its consumers; the market holds no cross-request relation of its own.
-
 </details>

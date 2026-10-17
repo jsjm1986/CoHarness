@@ -154,7 +154,7 @@ agent-presets:
 
 **某一行把服务发布进了根 realm。** 这类服务是进程级全局的，因此第二个发布同名服务的 preset 会与第一个相撞，宿主读取方也会把某一个 preset 的实例当成所有会话的。确实需要自带服务的 preset，应把它放在 `isolate` realm 之后——entry 本地 realm 让两个 preset 的同名服务互不相干，正如它从前隔开两个会话——否则该服务应改放进宿主组装。
 
-最后一条规则由本包的运行时不变量在每次服务通知时复查，因为从定时器或异步续体中发布的行会绕过一次性审计。
+挂载会拒绝有行向根 realm 发布服务的 preset；该检查只在挂载时执行一次，因此在激活后从定时器或异步续体中发布的行会逃脱检查。
 
 <a id="a-preset-file-is-an-input-never-a-persistence-target"></a>
 ## preset 文件是输入，不是持久化目标
@@ -167,7 +167,6 @@ agent-presets:
 ## 信任
 
 preset 就是组装，因此一个 preset 的权限恰好等于它所引用的插件。`user` preset——无论由人还是由 agent 写出——与 shell 访问权限同级；`trust` 字段的存在是为了让消费方呈现这一差异，而不是用来强制隔离。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -99,8 +99,6 @@ Completion values and binding arguments cross as exact JSON: values serialize wi
 <a id="further-exploration"></a>
 ## Further Exploration
 
-Read these when the runtime contract is not enough. They move from the seam definition to the design record and the companion backend. No runtime invariant companion is published because the backend has no mutable cross-component relationship to observe beyond the runtime contract's own settlement and byte-cap guarantees.
-
 - [PTC runtime seam](../../ptc-runtime/ptc-runtime/README.md) — the abstract contract this backend implements.
 - [fd-3 protocol Agent Note](../../../.agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md) — design rationale and wire contract.
 - [Settlement-fixes Agent Note](../../../.agents/notes/archived/bug-fix/2026-07-31-code-runtime-python-settlement-fixes.md) — settlement, metering, and containment fixes and their regression cases.
@@ -121,7 +119,6 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define what the package does and does not cover; they are current package constraints, not a task backlog.
 
@@ -151,7 +148,5 @@ These limits define what the package does and does not cover; they are current p
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>
-
-No `./invariant` companion: the backend keeps no mutable cross-component relationship for an assertion to observe. Its guarantees are the runtime contract's per-run settlement and byte-cap outcomes, verified through the protocol mirror and spec suites rather than a shared-state reporter.
 
 </details>

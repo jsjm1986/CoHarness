@@ -26,7 +26,6 @@ Use `dsh-client-ui-primitives` to build web-client controls and render agent out
 - [Search results](#search-results)
 - [Web retrieval](#web-retrieval)
 - [Compatibility](#compatibility)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -87,11 +86,6 @@ Use `dsh-client-ui-primitives` to build web-client controls and render agent out
 ## Compatibility
 
 `useMediaQuery` shares one native listener per query and falls back to `addListener`/`removeListener` for older WebViews. `holdInert` uses native `HTMLElement.inert` when available and also keeps `aria-hidden` plus tab stops safe while an overlay owns the page. Theme styles define a `100vh` viewport fallback before the layout plugin publishes its visual-viewport height. `relativeTime` buckets a dated moment into a compact unit-plus-magnitude pair so every surface dating a session agrees; the words stay in each plugin's own dictionary.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Pure React atoms own no runtime state; their rendering contract is asserted by unit specs.
 
 <a id="model-experience"></a>
 ## Model Experience

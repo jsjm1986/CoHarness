@@ -16,7 +16,6 @@ Use this package with a session persistence backend to make work durable before 
 ## Table of Contents
 
 - [Plugin (namespace: `session-checkpoint-policy`)](#plugin-namespace-session-checkpoint-policy)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -41,11 +40,6 @@ Persistence and checkpoint scheduling are intentionally separate Cordis plugins.
 The policy wraps `llm/stream` lazily, so the downstream stream is not constructed until the live session's buffered request events are durable. It wraps `tools/execute` after pre-execute policy and guards; a top-level tool body runs only after its recorded call is durable. If cancellation lands while that flush is pending, the wrapper returns the canonical `ABORTED_BEFORE_DISPATCH` result without entering the tool body. Nested tool dispatches reuse the outer model-visible call's checkpoint. `agent/pre-step` persists the preceding response/result batch before request derivation.
 
 Checkpoint rejection is fail-closed at the model and tool boundaries: neither the adapter nor the top-level tool body runs. A step-boundary rejection fails the turn before another request starts. Concurrent tool checkpoints share the session store's serialized persistence drain and cannot duplicate sequence numbers.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The policy triggers checkpoints on the owning session at defined boundaries; it stores no checkpoint data itself.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -19,17 +19,11 @@ Agents can load the official "powered by dsh" badge skill from this bundled prov
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The contribution is a static bundled skill registration whose disposal is proven by the registry's HMR-safety spec.
 
 <a id="model-experience"></a>
 ## Model Experience

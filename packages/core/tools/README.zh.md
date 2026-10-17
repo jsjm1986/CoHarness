@@ -155,7 +155,6 @@ ctx.tools.register(defineTool({
 
 agent loop 将连续的 `parallel` 调用归入有界滚动池，并把每个 `exclusive` 调用视为顺序屏障。只有分发／主体会重叠；策略、持久结果和上下文仍保持模型顺序。PTC mode 绑定通过桥接层自己的池复用同一套分类。[并行工具调用 Agent Note](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.zh.md) 规定已交付声明及其原理。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 

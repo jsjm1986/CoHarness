@@ -29,7 +29,6 @@ This package keeps durable per-session projection checkpoints so history lists, 
 - [Cold read (`coldSnapshot(meta, inheritedEventCount, events)`)](#cold-read-coldsnapshotmeta-inheritedeventcount-events)
 - [Upgrade compatibility](#upgrade-compatibility)
 - [Composition](#composition)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -80,11 +79,6 @@ The domain stores one version-stamped document per session under `<root>/session
 ```
 
 Injects `storageDomain`, `sessionProjections`, `sessions`. Without this row the projection system runs live-only (watermark cache; cold reads fall back to full log folds wherever a carrier implements them).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Cache records are durable documents written and read through the storage domain; the service projects that same store and keeps no shadow copy.
 
 <a id="model-experience"></a>
 ## Model Experience

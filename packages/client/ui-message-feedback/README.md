@@ -21,17 +21,11 @@ Message controls retain editable ratings and notes in the Host-owned sidecar. A 
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The Host owns durable feedback; the client controllers own disposable reads, drafts, and submission state.
 
 <a id="model-experience"></a>
 ## Model Experience

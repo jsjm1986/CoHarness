@@ -22,7 +22,6 @@ Its consumers are the ACP and headless `stream-json` snapshot suites plus the We
 - [Config](#config)
 - [Exports](#exports)
 - [Plugin export shape](#plugin-export-shape)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -97,11 +96,6 @@ Official DeepSeek replay settles registered request extensions only after a scri
 ## Plugin export shape
 
 Named `name` / `inject` / `Config` / `apply`, with **no default export**: the cordis Loader's `unwrapExports` does `exports.default ?? exports`, so a stray default would collapse the module to the bare function and drop the `inject` namespace (see [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The adapter replays one fixed recorded transcript per test; no live provider relation exists.
 
 <a id="model-experience"></a>
 ## Model Experience

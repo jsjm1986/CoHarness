@@ -62,7 +62,6 @@ pnpm exec tsx scripts/build-exe-for-ssh-helper.ts
 <details>
 <summary>实现细节 — 点击展开</summary>
 
-未发布不变量伴随物：归档完整性、协议版本与运行时类型在连接启动时完成验证；载体自身不持有跨请求的可观察关系。
 
 载体通过仓库带补丁的 `pkg --sea` 流程内嵌完整依赖集合。入口分派 SSH helper、托管子进程启动器或 PTC worker。共享的[部署函数](../../../scripts/executable-packaging.ts) 也用于 Python SDK 构建器。生产部署会在调用构建工具前恢复开发依赖安装状态，避免 pnpm 的自动依赖检查将它们删除。
 

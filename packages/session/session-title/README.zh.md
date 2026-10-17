@@ -56,7 +56,6 @@ fork 出的会话会原样继承种子中的标题事件。首消息节奏不会
 
 参见[会话标题数据结构](../../../docs/subsystems/session-title.zh.md)与[已实现决策](../../../.agents/notes/implemented/feature/2026-07-21-log-backed-session-titles.zh.md)。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 

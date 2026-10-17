@@ -144,7 +144,6 @@ None; this package neither assembles nor sends a provider request.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define the reach of the management view; they are current package constraints.
 
 - **Page lifetime** — refreshing the browser loses the tracked request and output. Reconnecting within the same page can recover an active request; completed results are not retained by the Host. Profile file locking serializes installation writes.
@@ -164,5 +163,3 @@ These limits define the reach of the management view; they are current package c
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. The panel reads Host-owned facts, and the registry-probe cache stores one comparison result without an independently maintained projection.

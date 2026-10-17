@@ -20,7 +20,6 @@ This package renders everything the conversation UI shows about attachments: one
 - [Attachment rail](#attachment-rail)
 - [Message images and the lightbox](#message-images-and-the-lightbox)
 - [Drop overlay](#drop-overlay)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -41,11 +40,6 @@ This package renders everything the conversation UI shows about attachments: one
 ## Drop overlay
 
 `DropOverlay` is the full-viewport invitation shown while a file drag is over the page: illustration, title, and a limits line while drops are accepted (`disabled` swaps the blocked illustration and hides the limits line). The layer is pointer-inert — the owner's document-level drag listeners keep the enter/leave count and decide accept/reject; the overlay only shows state. It portals to the body like the lightbox.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The package contributes presentation occupants to conversation-declared slots; attachment data, loading, and callbacks arrive through the slot owner's inject face.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -20,7 +20,6 @@ SDK 提供方会在全新的子进程中把每个 subagent 作为完整的 DeepS
 - [能力与上下文](#capabilities-and-context)
 - [配置](#configuration)
 - [进程边界](#process-boundary)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -87,12 +86,6 @@ Provider 宣告 `agentOptions: true`，而 `agentPreset`/`outputSchema`/`depthLi
 子进程环境以 [`dsh-subprocess`](../../subprocess/README.zh.md) seam 的 `scrubbedParentEnv()` 为基础，先移除疑似凭据和名称为 `DSH_*` 的环境变量，再合并显式 `config.env` 值。子进程由 SDK 客户端 spawn，而不是经由 `ctx.subprocess` spawn（这是 subprocess README 中记录的 SDK 托管传输例外），因此本后端会自行执行环境清理。JSON-RPC 协议格式才是真正的序列化边界。
 
 本包没有默认导出。否则 Cordis loader 解包会隐藏具名 `inject` 元数据；见[事故复盘（postmortem）0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。子方是拥有自身组合与会话的完整对等运行时；提供方通过 stdio JSON-RPC 驱动它，不保留镜像状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

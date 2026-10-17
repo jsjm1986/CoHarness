@@ -20,7 +20,6 @@ Install `@deepseek-ai/dsh-subagent-codex` into a Profile when delegated work sho
 - [Configuration](#configuration)
 - [Persistent members](#persistent-members)
 - [Product compatibility and evidence](#product-compatibility-and-evidence)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -144,11 +143,6 @@ The production wire intentionally implements only the app-server methods require
 Generated schema evidence and package tests pin all sixteen error-info variants, HTTP-status locations, six lifecycle stages, process outcomes, stop-reason mapping, unknown fallback, sanitization, permission ordering, cancellation, concurrency, and cleanup aggregation. The keyless real-product test drives the package wrapper against a loopback Responses fixture and observes the package-local argv, exact Bearer key, original task, byte-exact final answer, thread-level `never` overriding ambient `on-request`, automatic-review startup, unattended rejection without file side effects, a real `internalServerError`, explicit dangerous-bypass writing in suite-owned temporary storage, process/protocol failure with safe exit facts, and wrapper/native quiescence. The same tier proves two named instances retain separate environments and native modes.
 
 Installing with optional dependencies omitted, using an unsupported platform, or losing the selected payload makes the first delegation fail at `initialize` with the safe `unknown` category and any observed process outcome. Raw wrapper text remains on Host stderr; the provider neither probes a host CLI nor retries with one. An isolated wrapper fixture separately proves the native payload failure and absence of host fallback.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run submits one task to an ephemeral Codex thread in the delegating workspace and returns its result; no session state is retained between runs.
 
 <a id="model-experience"></a>
 ## Model Experience

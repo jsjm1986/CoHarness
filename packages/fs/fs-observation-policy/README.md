@@ -34,7 +34,6 @@ await ctx.plugin(FsPolicy)
 - [Observed state is the prior-observation record; freshness is provider CAS](#observed-state-is-the-prior-observation-record-freshness-is-provider-cas)
 - [Single-slot, first-wins](#single-slot-first-wins)
 - [No method coupling](#no-method-coupling)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -76,11 +75,6 @@ The `fs/write-intent`/`fs/edit-intent` slots hold exactly one decider — this p
 ## No method coupling
 
 Because the plugin influences the world only through events, removing it does not break `@deepseek-ai/dsh-tool-fs` at a service-injection boundary: the tool falls through to the bare `ctx.fs` provider (unconditional write/edit, no observed-state). Loading it back layers the policy on. That graceful add/remove is the whole point of the event gate over a mandatory method service.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Observation bookkeeping is private per-session policy state consulted only inside the installed `fs/*` gate; every outcome is observable through the fs call result itself.
 
 <a id="model-experience"></a>
 ## Model Experience

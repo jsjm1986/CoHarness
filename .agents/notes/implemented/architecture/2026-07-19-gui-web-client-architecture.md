@@ -85,7 +85,7 @@ The dynamic ui-renderer plugin owns the ctx↔React adapter, application-level i
 
 ## Directory shape
 
-Client packages live under `packages/client/*`, with `apps/web` as the thin Vite application over the shell's boot export. Plugin packages keep their browser half under `src/client/`; **every build artifact lands in `lib/`** — the node half as `lib/index.js`/`lib/invariant.js`, the browser bundle as `lib/client.js` (the shared tsdown client preset emits both; there is no `dist/` directory, and `exports["./client"]` points at `./lib/client.js`). `ui-slots`, runtime, and ui-renderer form the infrastructure direction; feature plugins cooperate through services and slots rather than importing presentation implementations.
+Client packages live under `packages/client/*`, with `apps/web` as the thin Vite application over the shell's boot export. Plugin packages keep their browser half under `src/client/`; **every build artifact lands in `lib/`** — the node half as `lib/index.js`, the browser bundle as `lib/client.js` (the shared tsdown client preset emits both; there is no `dist/` directory, and `exports["./client"]` points at `./lib/client.js`). `ui-slots`, runtime, and ui-renderer form the infrastructure direction; feature plugins cooperate through services and slots rather than importing presentation implementations.
 
 A multi-domain plugin package additionally splits its client half by future package boundaries — ui-conversation is the exemplar:
 

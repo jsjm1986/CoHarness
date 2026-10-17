@@ -22,9 +22,10 @@ The markers are lock time points, not an exclusive container. An unrelated idle 
 
 These variants are merged inside a `declare module '@deepseek-ai/dsh-session/types'` block, so — unlike the top-level types on the other subsystem pages — they are not pasted as a drift-checked ` ```ts type-equiv ` block (the `verify-type-equiv` extractor matches only top-level declarations by name). The payload table above is the catalog entry; follow the source link for the authoritative fields.
 
-## `CompactionResult`
+<a id="image-offload"></a>
+## Image offload
 
-What a successful compaction returns to its caller: the bookkeeping-event seqs, safe summary projection, shadowed range and seqs, and estimated token count.
+`compaction-image-offload` owns the `image/offload` declaration and its pure message projection. Each target identifies a current input node and exact depth-first image occurrences. The event preserves node and message identities and carries no `surfaceOp`. The [package README](../../packages/compaction/compaction-image-offload/README.md) owns recovery policy, registration, and detached replay.
 
 ```ts type-equiv
 /** Exact input-image occurrences selected by one durable offload decision. */
@@ -35,6 +36,10 @@ interface ImageOffloadTarget {
   imageIndexes: number[]
 }
 ```
+
+## `CompactionResult`
+
+What a successful compaction returns to its caller: the bookkeeping-event seqs, safe summary projection, shadowed range and seqs, and estimated token count.
 
 ```ts type-equiv
 /** Result of a successful compaction operation. */

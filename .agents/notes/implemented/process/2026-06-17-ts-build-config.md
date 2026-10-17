@@ -25,7 +25,6 @@ Concrete constraints:
     - Directly typechecking `vendor/*/src` under the root strict config triggers many type errors outside this project's ownership.
     - Package dependencies under `packages/*/*` on `vendor` are resolved to the `vendor/*/lib` for different tsconfig strictness.
 
-
 ## Decision
 
 In-package relative imports use explicit `.ts` specifiers.

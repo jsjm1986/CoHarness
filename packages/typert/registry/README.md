@@ -18,7 +18,6 @@ Package reflection is keyed by `<package>#<face>`. Schemas are keyed by `<packag
 ## Table of Contents
 
 - [Public API](#public-api)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -38,11 +37,6 @@ Package reflection is keyed by `<package>#<face>`. Schemas are keyed by `<packag
 - `typertKey()` and `typertPackageKey()` compose the two stable identity forms.
 
 The `@deepseek-ai/dsh-typert-registry/types` subpath contains the pure contribution and record contracts. [`dsh-typert-loader`](../loader/README.md) discovers and registers generated host artifacts in Loader compositions; direct `ctx.typert.register()` supports other composition owners.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Contributions register atomically and withdraw with the calling fiber, so the registry's contents are exactly the live effect set proven by disposal specs.
 
 <a id="model-experience"></a>
 ## Model Experience

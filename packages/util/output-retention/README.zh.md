@@ -109,7 +109,6 @@ const footer = formatRetentionNotice(
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | `ItemRetainer`、`TextRetainer`、`describeOmitted`、`formatRetentionNotice` 与 `truncateWithoutSplittingSurrogatePair` |
-| — | 不发布运行时不变式伴生入口；这个纯工具不拥有事件流或可变运行时数据；其值代数由单元测试保证。 |
 
 ### 两个 retainer，两种资源模型
 
@@ -138,7 +137,6 @@ const footer = formatRetentionNotice(
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -152,7 +150,6 @@ const footer = formatRetentionNotice(
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明 retainer 刻意不覆盖什么。它们是当前包约束，不是任务积压。
 

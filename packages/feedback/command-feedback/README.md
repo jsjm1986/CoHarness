@@ -19,7 +19,6 @@ Trigger-independent session feedback plus human-facing `/feedback` capture. The 
 - [Session-sharing disclosure](#session-sharing-disclosure)
 - [What this plugin does and does not do](#what-this-plugin-does-and-does-not-do)
 - [Composition](#composition)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -72,11 +71,6 @@ The producer injects only `commands`. A custom app mounts the registry plus this
 ```
 
 The shipped `dsh` base mounts this command unconditionally; it has no configuration and no dependency on the persisted-goal stack. The Web client exposes it through the command adapter. Headless mode, ACP automation, and JSON-RPC do not provide a command adapter, so they do not expose it.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The package's only effects are one append to the owning session log and a global command registration; there is no mutable relation to assert.
 
 <a id="model-experience"></a>
 ## Model Experience

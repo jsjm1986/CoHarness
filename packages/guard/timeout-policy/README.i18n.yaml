@@ -12,8 +12,8 @@
   en: 745e3c8642ed9ea9
   zh: c8cfd6a3b0c3c9bf
 /dsh-tool-call-timeout-policy/table-of-contents:
-  en: 8f1c283b3da5e44c
-  zh: fafdc50a0465e2e2
+  en: 251a7075e748c550
+  zh: fbe78b986ea82a01
 /dsh-tool-call-timeout-policy/plugin-namespace-timeout-policy:
   en: e97e794a559ec425
   zh: 2d4bfbec15baace5
@@ -24,11 +24,8 @@
   en: 765bfd9b04b1c470
   zh: d372328886437f14
 /dsh-tool-call-timeout-policy/plugin-namespace-timeout-policy/composing-with-other-tools-execute-wrappers:
-  en: 4eed467374011ee9
-  zh: bf01556afa86b2dc
-/dsh-tool-call-timeout-policy/invariants:
-  en: 14e192f3e685cf1e
-  zh: 87e3facefee07f5b
+  en: f6950d43920f3a63
+  zh: 26db852bdb423517
 /dsh-tool-call-timeout-policy/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

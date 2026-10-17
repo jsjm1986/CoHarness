@@ -26,7 +26,7 @@ Package invariants follow the upstream `omit-unneeded-invariant-companions` poli
 
 ## Consequences
 
-The auto-review outcome vocabulary under caller cancellation reads `AUTO_REVIEW_DENIED` locally; porting future upstream spec rows must re-check which side of the race they assert. Invariant ownership is now opt-in per package, so adding a real invariant requires the companion, the reference, the export, and the README reason's removal together. `knip` is the local dependency-hygiene gate: bundle packages whose `dependencies` exist only as the cordis.yml resolver manifest carry `@deepseek-ai/.+` ignores, and mandated Cordis peer/dev pairs are ignored globally. `benchmarks` is a terminal-io-only subset; the remaining upstream suites, the coverage-partition rewrite that consumes `coverage-canonical-locations.ts`, and the `tsdown.client.ts` consumer of `bundle-input-isolation.ts` remain pending sync work.
+The auto-review outcome vocabulary under caller cancellation reads `AUTO_REVIEW_DENIED` locally; porting future upstream spec rows must re-check which side of the race they assert. `knip` is the local dependency-hygiene gate: bundle packages whose `dependencies` exist only as the cordis.yml resolver manifest carry `@deepseek-ai/.+` ignores, and mandated Cordis peer/dev pairs are ignored globally. `benchmarks` is a terminal-io-only subset; the remaining upstream suites, the coverage-partition rewrite that consumes `coverage-canonical-locations.ts`, and the `tsdown.client.ts` consumer of `bundle-input-isolation.ts` remain pending sync work.
 
 ## Verification
 

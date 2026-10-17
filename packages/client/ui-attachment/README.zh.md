@@ -20,7 +20,6 @@ kind: "package-reference"
 - [附件栏](#attachment-rail)
 - [消息图片与灯箱](#message-images-and-the-lightbox)
 - [拖放遮罩](#drop-overlay)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -41,12 +40,6 @@ kind: "package-reference"
 ## 拖放遮罩
 
 `DropOverlay` 是文件拖拽悬停页面时的全视口邀请层：插画、标题，接受拖放时再加一行上限说明（`disabled` 换为禁用插画并隐藏上限行）。该层不接收指针事件——持有方的 document 级拖拽监听器负责 enter/leave 计数和接受与否的判定；遮罩只呈现状态。与灯箱一样经 body portal 渲染。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。本包向会话声明的 slot 贡献展示占位内容；附件数据、加载与回调都经由 slot 所有方的 inject 面到达。
-
 
 <a id="model-experience"></a>
 ## 模型体验

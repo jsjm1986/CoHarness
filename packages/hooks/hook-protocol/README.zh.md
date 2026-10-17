@@ -55,7 +55,6 @@ Codex 有意重新实现了 Claude Code hook 协议的一个*子集*，包括相
 
 Hook 调用／结果记录必须位于一个尚未结束的轮次内。`UserPromptSubmit`、`PreToolUse`、`PostToolUse` 与 `Stop` 按构造满足这条由所有者定义的关系。`SessionStart` 在轮次 1 之前运行，因此没有 `hook/*` 记录；其获准的上下文会在 inbox 中保持待处理，直到唤醒交付打开一个轮次，详见 hooks Agent Note。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 

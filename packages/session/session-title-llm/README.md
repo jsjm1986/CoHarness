@@ -19,7 +19,6 @@ This package is a library, not a Cordis plugin. The provider plugins call `regis
 
 - [Route and failure contract](#route-and-failure-contract)
 - [Configuration](#configuration)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -46,11 +45,6 @@ Every field is required except the paired route override; there are no library d
 | `maxOutputTokens` | Positive auxiliary generation token cap. |
 | `timeoutMs` | Positive end-to-end deadline within the runtime timer limit. |
 | `provider`, `model` | Optional explicit route; both or neither. |
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The package is shared per-request policy — framing, budgets, assembly — returning normalized text; it owns no durable title state.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -26,10 +26,6 @@
       "types": "./lib/types/external.d.ts",
       "default": "./lib/types/external.js"
     },
-    "./invariant": {
-      "types": "./lib/types/invariant.d.ts",
-      "default": "./lib/invariant.js"
-    },
     "./client": {
       "types": "./lib/types/client.d.ts",
       "default": "./lib/types/client.js"
@@ -47,7 +43,6 @@
   },
   "files": [
     "lib/index.js",
-    "lib/invariant.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts",
     "lib/typert.host.js",
@@ -73,7 +68,6 @@
     "@deepseek-ai/dsh-collaboration": "workspace:*",
     "@deepseek-ai/dsh-execution-authority": "workspace:*",
     "@deepseek-ai/dsh-fs": "workspace:*",
-    "@deepseek-ai/dsh-invariants": "workspace:*",
     "@deepseek-ai/dsh-jobs": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-managed-data": "workspace:*",
@@ -132,7 +126,6 @@
     "@deepseek-ai/dsh-collaboration": "workspace:*",
     "@deepseek-ai/dsh-execution-authority": "workspace:*",
     "@deepseek-ai/dsh-fs": "workspace:*",
-    "@deepseek-ai/dsh-invariants": "workspace:*",
     "@deepseek-ai/dsh-jobs": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-managed-data": "workspace:*",

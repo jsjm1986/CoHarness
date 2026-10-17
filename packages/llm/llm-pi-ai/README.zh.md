@@ -25,7 +25,6 @@ kind: "package-reference"
 - [词汇差异](#vocabulary-differences)
 - [应用归因](#app-attribution)
 - [依赖体量](#dependency-weight)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -132,7 +131,6 @@ pi-ai 依据提供方 id 与 baseURL 决定每个请求的形状：系统提示�
 
 路由完全无法服务时解析仍会失败得响亮，并点名出问题的路由与模型：catalog 未提供的路由需要 `api`、`baseURL`，以及一个由唯一标识的模型组成的非空 `models` 列表。该解析在分节 schema 内部运行，因此无法服务的 profile 会在**写入之处**被拒绝——`settings.mutate` 以 `settings-rejected` 点名路由与模型——而不是先存下来、再悄悄让该 namespace 下每条路由失效。对于已经存下的、在此失败的分节，settings seam 会保留该 namespace 上一份可用值，因此这不会把部署卡死。`api` 接受 `supportedProtocols()` 中的协议，且仅在 catalog 无法提供协议时才需要：catalog 中不存在的模型会继承其同门模型一致同意的协议，因此向单协议 catalog 路由添加模型无需重述任何内容。
 
-
 `baseURL` 是该路由下每个模型使用的前缀，因此仍支持 `https://proxy.example.com:8443` 等私有 proxy；省略它的 catalog 路由会保留每个 catalog 模型自己的端点。OpenAI 兼容请求先使用输入前缀；只有响应明确表示端点路径不对（404/405，或成功响应声明了非 SSE 类型）时，才尝试一次末尾 `/v1` 切换项，并把可用前缀只记在进程内。这个缓存与端点询问共享，在 profile 快照改变时清空，且不会把规范化后的 URL 写回设置。Anthropic 请求始终使用规范化后的 base，让 SDK 精确追加 `/v1/messages`，无论输入是否包含 `/v1`。在 catalog 路由上点名 `api` 会把整条路由改指到该协议，这正是部署把某个提供方在 Responses 与 Chat Completions 之间迁移的方式。
 
 `supportedProtocols()` 刻意窄于 pi-ai 的完整流式 API 集合：它只保留 profile 能用密钥、端点与标头**完整描述**的那些协议。Bedrock 要用 AWS 凭据与 region 做 SigV4 签名，Vertex 需要 project、location 与应用默认凭据，Azure 需要提供方环境外加 api-version，Codex 走 OAuth——提供它们只会交回一个无法完成认证的路由。catalog 路由仍可经自己的 provider 抵达这些协议；被拒绝的只有显式覆盖。
@@ -208,12 +206,6 @@ entry config 与可编辑的 `llm-pi-ai` settings namespace 属于个人 Provide
 ## 依赖体量
 
 pi-ai 会安装多个提供方 SDK，并延迟加载 catalog 模型所选的 SDK。该可选适配器包将依赖体量隔离在自身范围内。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。提供方 profile 是逐请求解析的固定配置；除不可变路由表外，适配器不保留跨请求状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

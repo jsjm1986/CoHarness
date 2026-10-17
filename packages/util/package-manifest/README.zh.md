@@ -43,7 +43,7 @@ const manifest: DshPackageManifest = {
 }
 ```
 
-`DshPackageManifest` 描述 DSH 使用的 package.json 字段，其中 `name` 和 `version` 必填；它不是完整的 npm schema（模式）。本地 profile 读取方使用 `Partial<DshPackageManifest>`，因为 profile 无需发布版本。`DshManifest` 仅描述 `dsh` 下的公共作者字段。TypeScript 检查示例并删除 `import type`；这些接口不解析 JSON，也不写入文件。
+`DshPackageManifest` 描述 DSH 使用的 package.json 字段，其中 `name` 和 `version` 必填；它不是完整的 npm schema（模式）。本地 profile 读取方使用 `Partial<DshPackageManifest>`，因为 profile 无需发布版本。`DshManifest` 仅描述 `dsh` 下的公共作者字段。`DshBundleManifest.patch` 是一个 patch 文件路径，或一个有序的路径列表，均相对于包根目录；launcher 按列表顺序把它们作为同一个组合包层应用。TypeScript 检查示例并删除 `import type`；这些接口不解析 JSON，也不写入文件。
 
 以下元数据字段均可选。省略时，格式版本或兼容的宿主版本保持未声明状态；读取方不推断默认值。
 
@@ -64,7 +64,7 @@ const manifest: DshPackageManifest = {
 <details>
 <summary>实现细节——点击展开</summary>
 
-包根仅重新导出 [`src/types.ts`](src/types.ts) 中的声明。要求的运行时不变量伴随模块有意保持为空，因为本包没有运行时状态或可独立观察的关系。
+包根仅重新导出 [`src/types.ts`](src/types.ts) 中的声明。本包
 
 </details>
 
@@ -77,14 +77,6 @@ const manifest: DshPackageManifest = {
 - [公共包元数据](../../../.agents/notes/implemented/architecture/2026-09-10-public-package-manifest.zh.md)——字段位置与读取方归属。
 
 <a id="model-experience"></a>
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。无运行时行为的纯类型声明；解析、校验与默认值由读取方拥有。
-
-
-<a id="model-experience"></a>
 ## 模型体验
 
 无，因为本包仅导出类型。
@@ -93,7 +85,6 @@ const manifest: DshPackageManifest = {
 
 类型声明不增加模型输入，因此不影响提供方的缓存复用。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>

@@ -106,7 +106,7 @@ compaction/end      → log-only. Releases the lock (carries `error` on a recove
 
 `compaction/end` 保留其 `error?` 字段（与 `tool/result` 的自包含错误一致——一个事件即可区分成功与失败，无需关联兄弟事件）。没有单独的 `compaction/error` 事件。
 
-**核心会话修复保持对压缩无感知——这是有意为之。** `interruptedTurnClosers` 从不被教导 `compaction/*`。通用 `session/end-seed` 生命周期边界提供压缩所有者所需的证据；压缩不变量与后端负责解释它，无需向核心添加插件专属修复。
+**核心会话修复保持对压缩无感知——这是有意为之。** `interruptedTurnClosers` 从不被教导 `compaction/*`。通用 `session/end-seed` 生命周期边界提供压缩所有者所需的证据；压缩后端负责解释它，无需向核心添加插件专属修复。
 
 ## 曾考虑的替代方案
 
@@ -122,12 +122,11 @@ compaction/end      → log-only. Releases the lock (carries `error` on a recove
 - **自动扩展点**：`agent/pre-step`（`@mode waterfall`）在请求派生前处理压力，`agent/request-error`（`@mode waterfall`）处理失败步骤关闭后的最终请求失败。pre-step 的 payload 携带已领取批次、轮次、步骤与 signal（参见 [payload-object 事件决策](../architecture/2026-08-06-agent-event-payload-objects.zh.md)），不携带压缩专属的提示词/前缀 payload。
 - **`SessionEventMap`** 通过可合并扩展的声明合并获得 `compaction/start` / `compaction/summary` / `compaction/end`；`SurfaceEventType` **未被**触及。这些是会话事件，不是 cordis `Events`，因此事件分类门禁无需新增条目。
 - **`dsh-compaction`** 拥有 `COMPACT_CHECKPOINT_SOURCE`、`isCompactCheckpointSource(source)`、`toolPairingBalancedBefore(session, seq)` 与 `toolPairingBalancedAfter(session, seq)`。该标记用于跨后端实现识别替换摘要。带缓存的 surface 边缘检查会防止 `compactRegion` 和 `compactIfNeeded` 拆分工具调用/结果对，按 seq 校验当前成员关系，从每个切割点的一条平衡序列回答两侧边缘，并拒绝陈旧或缺失的 seq 与孤立结果。
-- **`dsh-session`** 通过唯一的 surface 管理器校验位置替换、引用的来源事件是否覆盖完整，以及仅内容的单节点 `tool/result` 重写。其不变式配套插件将新追加的工具结果视为执行，要求存在已打开的步骤与待处理调用，而压缩配套组件负责维护数字轮次 owner 与独立 `null` owner 事件对之间的关系。
 - **接线**：`examples/tui-agent/cordis.yml` 依次加载零配置的 `dsh-token-meter`、`dsh-compaction-tool-result-pruner`、`dsh-compaction-basic`，然后加载 `dsh-command-compact`；服务级默认值使组合无需重复数值策略即可使用。
 
 ## 测试
 
-- **单元测试：** 使用真实 Loader 和 invariant 插件覆盖完整单元保留、修剪配置与回放、富块顺序、元数据保留、收敛、`compaction/end` 的两种结果、开放尾部拒绝、仅修剪与带摘要的溢出恢复、generation 证明、上限和原始错误保留。
+- **单元测试：** 真实 Loader 覆盖完整单元保留、修剪配置与回放、富块顺序、元数据保留、收敛、`compaction/end` 的两种结果、开放尾部拒绝、仅修剪与带摘要的溢出恢复、generation 证明、上限和原始错误保留。
 - **循环测试：** 测试固定 pre-step 发生在前一个 `step/end` 之后、下一个 `step/start` 之前，使用实际 `agent/request` 路由，关闭失败步骤，分配新的重试编号，并覆盖完整的抛出/带内溢出 → 压缩 → 重建重试组合。
 - **手动测试：** 无需模型密钥即可固定 maintenance 串行化、标记顺序、注入保留、活动／陈旧未匹配标记分类、取消、闭合／flush 失败、命令映射以及排队 TUI 流程。
 - **带密钥 e2e：** 真实模型和 bash 会话在降低的限制下触发压缩，记录完整的 `compaction/start…end` 对，缩小 surface，并完成任务。

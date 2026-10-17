@@ -49,7 +49,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/client/ui-collaboration/src/client/index.ts',
   'packages/client/ui-collaboration/src/index.ts',
   'packages/context/archive-gateway/src/index.ts',
-  'packages/context/collaboration-context/src/invariant.ts',
   'packages/context/collaboration-context/src/participant.ts',
   'packages/context/collaboration-gateway/src/index.ts',
   'packages/context/collaboration/src/index.ts',

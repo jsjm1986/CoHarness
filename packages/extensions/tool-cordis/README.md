@@ -33,8 +33,6 @@ The toolset cannot define, activate, stop, or remove dynamic Plugins. Those reti
 
 Host providers combine the generated [API catalog](src/api-catalog.ts), the live Loader tree projected through the app-boot Config projector, and the requesting Agent's live tool registry. Client providers synchronize manifests and answer queries from a connected page. Inspection returns data rather than invoking business service methods. Cordis effects own the tool, provider, prompt, and reference-listener registrations; unloading the plugin removes them.
 
-No invariant companion is published because inspection reads its providers directly and maintains no independent runtime projection. The toolset has no configuration; query transport and retained dynamic definitions belong to the host runner.
-
 <a id="model-experience"></a>
 ## Model Experience
 

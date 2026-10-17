@@ -106,7 +106,7 @@ The lifecycle boundary makes crash state unambiguous:
 
 `compaction/end` keeps its `error?` field (mirroring `tool/result`'s self-contained error — one event tells success from failure without correlating a sibling). There is no separate `compaction/error` event.
 
-**Core session repair stays compaction-agnostic — deliberately.** `interruptedTurnClosers` is never taught about `compaction/*`. The general `session/end-seed` lifecycle boundary supplies the evidence the compaction owner needs; the compaction invariant and backend interpret it without adding plugin-specific repair to core.
+**Core session repair stays compaction-agnostic — deliberately.** `interruptedTurnClosers` is never taught about `compaction/*`. The general `session/end-seed` lifecycle boundary supplies the evidence the compaction owner needs; the compaction backend interprets it without adding plugin-specific repair to core.
 
 ## Alternatives considered
 
@@ -122,12 +122,11 @@ The lifecycle boundary makes crash state unambiguous:
 - **Automatic extension points**: `agent/pre-step` (`@mode waterfall`) handles pressure before request derivation and `agent/request-error` (`@mode waterfall`) handles final request failures after the failed step closes. The pre-step payload carries the claimed batch, turn, step, and signal (see the [payload-object events decision](../architecture/2026-08-06-agent-event-payload-objects.md)), with no compaction-only prompt/prefix payload.
 - **`SessionEventMap`** gains `compaction/start` / `compaction/summary` / `compaction/end` by declaration merging (merge-extensible); `SurfaceEventType` is **not** touched. These are session events, not cordis `Events`, so the event-taxonomy gate needs no entry.
 - **`dsh-compaction`** owns `COMPACT_CHECKPOINT_SOURCE`, `isCompactCheckpointSource(source)`, `toolPairingBalancedBefore(session, seq)`, and `toolPairingBalancedAfter(session, seq)`. The marker identifies replacement summaries across backend implementations. The cached surface-edge checks prevent `compactRegion` and `compactIfNeeded` from splitting a tool-call/result pair, validate current membership by seq, answer both edges from one per-cut balance sequence, and reject stale or missing seqs and orphan results.
-- **`dsh-session`** validates positional replacement, complete cited source-event coverage, and content-only single-node `tool/result` rewrites through its one surface manager. Its invariant companion treats fresh appended tool results as executions that require an open step and pending call, while the compaction companion owns numeric-turn versus standalone-null bracket relations.
 - **Wiring**: `examples/tui-agent/cordis.yml` loads zero-config `dsh-token-meter`, `dsh-compaction-tool-result-pruner`, `dsh-compaction-basic`, then `dsh-command-compact`; service-wide defaults make the composition usable without repeated numeric policy.
 
 ## Testing
 
-- **Unit:** Real Loader and invariant plugins cover whole-unit retention, pruning configuration and replay, rich-block ordering, metadata preservation, convergence, both `compaction/end` outcomes, open-tail refusal, pruning-only and summarized overflow recovery, generation proof, caps, and original-error preservation.
+- **Unit:** Real Loader coverage pins whole-unit retention, pruning configuration and replay, rich-block ordering, metadata preservation, convergence, both `compaction/end` outcomes, open-tail refusal, pruning-only and summarized overflow recovery, generation proof, caps, and original-error preservation.
 - **Loop:** Tests pin pre-step after the preceding `step/end` and before the next `step/start`, actual `agent/request` routing, closed failed steps, fresh retry numbering, and complete thrown/in-band overflow → compaction → reconstructed retry composition.
 - **Manual:** Maintenance serialization, marker ordering, injection retention, live/stale orphan classification, cancellation, close/flush failures, command mapping, and the queued TUI journey are pinned without a model key.
 - **With-key e2e:** A real model and bash session with lowered limits triggers compaction, records a complete `compaction/start…end` pair, shrinks the surface, and finishes the task.

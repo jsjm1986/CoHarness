@@ -26,7 +26,6 @@ kind: "package-library"
 - [搜索结果](#search-results)
 - [Web 检索](#web-retrieval)
 - [兼容性](#compatibility)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -87,12 +86,6 @@ kind: "package-library"
 ## 兼容性
 
 `useMediaQuery` 为每个查询复用一个原生监听器，并在旧版 WebView 中回退到 `addListener`／`removeListener`。`holdInert` 在可用时使用原生 `HTMLElement.inert`，同时在浮层占有页面期间保持 `aria-hidden` 与 tab 停靠点安全。主题样式会先定义 `100vh` 视口回退，待 layout 插件发布可视视口高度后再覆盖。`relativeTime` 把某个时刻归入紧凑的"单位＋数量"桶，使所有为会话标注时间的界面对同一时刻给出一致读数；具体文案保留在各插件自己的词典中。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。纯 React 原子组件不拥有运行时状态；其渲染契约由单元规格断言。
-
 
 <a id="model-experience"></a>
 ## 模型体验

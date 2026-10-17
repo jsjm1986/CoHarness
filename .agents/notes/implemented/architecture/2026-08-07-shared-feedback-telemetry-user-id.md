@@ -28,5 +28,5 @@ The extraction preserves the existing random UUID, home resolution, process memo
 
 - One harness home has one anonymous id shared by feedback acknowledgements, session telemetry exports, and direct DeepSeek requests.
 - The feedback package depends only on the identity capability, not the telemetry seam or OTel SDK.
-- The package is a justified shared library with three consumers; its empty invariant companion explains why reading the private file is not a useful runtime relationship check.
+- The package is a justified shared library with three consumers.
 - The original anonymous-user-id Note remains authoritative for storage and privacy semantics, while this Note supersedes only its OTel-local ownership decision.

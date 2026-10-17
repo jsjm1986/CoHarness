@@ -30,7 +30,6 @@ The two paths are mutually exclusive by construction. `scrollbar-width`/`scrollb
 ## Table of Contents
 
 - [Settings authority and compatibility](#settings-authority-and-compatibility)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -41,11 +40,6 @@ The two paths are mutually exclusive by construction. `scrollbar-width`/`scrollb
 ## Settings authority and compatibility
 
 Appearance controls render the account preference while a project policy may force the active light or dark scheme. The account-backed scope disables selection when it reports `loading`, `writable: false`, or a `saving` write; project and provider restrictions are shown inline, and the service refuses a direct `setTheme` call until a writable account view exists. Font-size and font-family writes go through the same bound scope: when the scope is read-only the rows stay interactive but writes are refused and the service keeps showing the durable values. The theme listener supports both `addEventListener` and legacy `addListener` MediaQueryList implementations. The design stylesheet supplies a `100vh` viewport fallback and the client visual-viewport measurement overrides it when available; all `--ds-*` and `--dsw-*` references are checked against CSS declarations by the token-contract test, with runtime-owned viewport height as the explicit exception.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The preference's durable home is the Host settings namespace; `ThemeRuntime` keeps only the resolved snapshot, asserted by unit specs against pushed changes and reconnects.
 
 <a id="model-experience"></a>
 ## Model Experience

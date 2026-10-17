@@ -23,17 +23,11 @@ This package renders the background-job surface of the Web GUI: a session-header
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Job records arrive entirely through the runtime's `jobsBySession` and `observedJobs` mirrors; the package issues no RPC itself and holds only popover visibility.
 
 <a id="model-experience"></a>
 ## Model Experience

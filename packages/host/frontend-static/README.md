@@ -17,17 +17,11 @@ Serve the built Web shell to browsers from its configured distribution directory
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Responses are served statelessly from the dist tree; the only registration is the claimed fallback seat, whose disposal is proven by the HMR-safety spec.
 
 <a id="model-experience"></a>
 ## Model Experience

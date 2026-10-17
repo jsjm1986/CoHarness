@@ -19,7 +19,6 @@ kind: "package-reference"
 - [生命周期与取消](#lifecycle-and-cancellation)
 - [渲染意图](#render-intent)
 - [配置](#config)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -58,12 +57,6 @@ kind: "package-reference"
 | `maxResultChars` | `16384` | 返回给父级的完整成功结果最大字符数。 |
 
 插件应用时会规范化并校验所有配置值，也包括绕过 Loader schema 规范化而直接应用的情况。每次调用前都会立即解析提供方能力，因为提供方注册可能随插件生命周期和热模块替换（HMR）变化。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次运行通过引擎与 subagent seam 执行一个前台工作流；子方状态由那些服务拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

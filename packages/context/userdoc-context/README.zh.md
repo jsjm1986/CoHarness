@@ -13,7 +13,6 @@ kind: "package-reference"
 
 使用 `dsh-userdoc-context` 获得 `ctx.userDocs` 的提示词侧上下文：它在提示词被受理前校验上传文档 id，按文档选择内联文本或仅路径表示，并把已受理快照记入会话日志，让模型看到稳定视图。
 
-
 ## 目录
 
 - [公共 API](#public-api)
@@ -29,7 +28,6 @@ kind: "package-reference"
 `prepareUserDocAttachments()` 在 Host 调用 `followup()` 或 `steer()` 前解析整批文档。它强制执行 `UserDocLimits.maxFilesPerMessage` 与 `maxMessageBytes`；不超过 `maxInlineTextBytes` 的文件会读取一次，只有严格 UTF-8 字节才会内联。其他文件保留为路径引用，由 agent 已有的文件系统工具读取。`renderUserDocAttachment()` 把冻结后的表示渲染为文本块。
 
 确切的 `user/message` 事件追加后，插件为每个文档追加一个 `userdoc/attached` 事件。每个事件包含所引用的消息标识、文档索引、元数据，以及出现在用户消息中的表示，因此重放可以验证模型可见的文档上下文由 Host 准入，而不是由浏览器提供。
-
 
 <a id="model-experience"></a>
 ## 模型体验

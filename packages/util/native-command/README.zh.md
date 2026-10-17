@@ -68,7 +68,6 @@ const { stdout, stderr } = await runNativeCommand('osascript', ['-e', script], s
 | [`src/index.ts`](src/index.ts) | 命令运行器与路径打开器的公共导出 |
 | [`src/runner.ts`](src/runner.ts) | 无 shell 的 `execFile` 适配器 |
 | [`src/path-opener.ts`](src/path-opener.ts) | 桌面探测、打开意图、浏览器偏好与 WSL 转换 |
-| — | 不发布运行时不变式伴生入口；每次运行都是一次无状态的子进程往返，不拥有事件流或可变运行时数据；相关行为由单元测试保障。 |
 
 ### execFile 给了运行器什么
 
@@ -90,7 +89,6 @@ const { stdout, stderr } = await runNativeCommand('osascript', ['-e', script], s
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -106,7 +104,6 @@ const { stdout, stderr } = await runNativeCommand('osascript', ['-e', script], s
 <a id="known-limitations-and-deferred-work"></a>
 
 Linux 的关联查询和指定应用启动需要 GIO。缺少原生命令时查询失败，缺失的图标返回 null；调用方可以保留文件定位作为备用动作。
-
 
 这些限制说明本运行器何时不是合适的工具。它们是当前包约束，不是任务积压。
 

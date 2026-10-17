@@ -106,7 +106,7 @@ export function apply(ctx: Context, config: Config) {
 }
 ```
 
-（facility 卸载顺序：先 dispose 各域（排空写链）再从枢纽摘名——排空期间在途写仍发 `domain/changed`，事件一致性 invariant 经 facility 反查域，要求此时域名仍可解析。）
+（facility 卸载顺序：先 dispose 各域（排空写链）再从枢纽摘名——排空期间在途写仍发 `domain/changed`，因此此时域名仍须可解析。）
 
 域声明（spec 对象由拥有该域的包定义导出，是类型与运行时的唯一真源；schema 用 zod，`z.infer` 推导类型不重复声明——记录模型下期要投影成 RPC wire schema，wire 边界全是 zod；schemastery 仍只管插件 Config）：
 

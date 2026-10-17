@@ -37,17 +37,11 @@ The store family (`defineStore` spec in / `StoreHandle<T, A>` out) types the sto
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The registry core is a pure composition mechanism whose register/dispose semantics are enforced by unit specs; it owns no domain state.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -21,17 +21,11 @@ Use this package to give the dsh web client a Settings panel, connection-recover
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The shell projects the `settings.section` and `settings.onboarding` ledgers contributed by registrants; durable values stay in Host settings namespaces.
 
 <a id="model-experience"></a>
 ## Model Experience

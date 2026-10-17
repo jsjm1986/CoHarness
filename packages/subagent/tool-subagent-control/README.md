@@ -21,17 +21,11 @@ The tool performs no lifecycle routing — residency, cold resume, and authoriza
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The controls are thin registrations over `ctx.subagents`; agent state belongs to the registry and its providers.
 
 <a id="model-experience"></a>
 ## Model Experience

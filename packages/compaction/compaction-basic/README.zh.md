@@ -137,7 +137,6 @@ kind: "package-reference"
 | [`src/summarizer.ts`](src/summarizer.ts) | 默认 `ctx.llm.stream()` 摘要、检查点框定、安全摘要投影 |
 | [`src/config.ts`](src/config.ts) | 加载时验证与路由模型策略解析 |
 | [`src/types.ts`](src/types.ts) | `BasicCompactionConfig` 与已解析策略词汇 |
-| — | 不发布运行时不变式配套条目；除所属 seam 强制执行的约定外，本包不公开独立事件序列或可变数据关系。持久标记对仍可在会话日志中观察。 |
 
 </details>
 
@@ -156,7 +155,6 @@ kind: "package-reference"
 - [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-compaction-basic)——每个受支持配置字段及其源声明。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -238,7 +236,6 @@ Rules:
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明自动压缩何时不合适，或何时需要特别注意；它们是当前包约束。
 

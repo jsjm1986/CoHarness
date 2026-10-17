@@ -12,8 +12,8 @@
   en: 4821bd83813408c7
   zh: 2e5c721a19f549e7
 /deepseek-ai-dsh-session-persistence-jsonl/table-of-contents:
-  en: 95f074d29642aeb7
-  zh: db4801be0d4a3062
+  en: 757efd48df7248f8
+  zh: 38c27f579adffcfc
 /deepseek-ai-dsh-session-persistence-jsonl/on-disk-layout:
   en: 7e6bcc4a579589ea
   zh: 4073ef93db30c74e
@@ -27,11 +27,8 @@
   en: cf3ca013cce79e30
   zh: e1f029d95c51009e
 /deepseek-ai-dsh-session-persistence-jsonl/write-path:
-  en: 85a6a82cfef9676d
-  zh: e03fc94e465fa578
-/deepseek-ai-dsh-session-persistence-jsonl/invariants:
-  en: e70bbb3036345c2b
-  zh: f1b052f7101ebc47
+  en: ca6a93d2d24ed1e4
+  zh: aa1715e1ac316bb1
 /deepseek-ai-dsh-session-persistence-jsonl/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

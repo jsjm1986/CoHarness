@@ -45,6 +45,8 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'agentTeams/view': { action: 'read', path: ['agentId'] },
   'agentTeams/createTask': { action: 'write', path: ['agentId'], execution: 'request' },
   'agentTeams/updateTask': { action: 'write', path: ['agentId'], execution: 'request' },
+  'claudeCodeMods/watchBand': { action: 'read', path: ['agentId'] },
+  'claudeCodeMods/pressBand': { action: 'write', path: ['agentId'], execution: 'operation' },
   'sessionFeedback/record': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
   'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'request' },
   'userQuestions/attachWait': { action: 'read', path: ['agentId'] },

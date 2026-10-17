@@ -21,17 +21,11 @@ With `dsh-typert-loader` mounted, every package that mounts in a Loader composit
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The plugin registers generated contributions with `ctx.typert` at load; artifact data is owned by the registry.
 
 <a id="model-experience"></a>
 ## Model Experience

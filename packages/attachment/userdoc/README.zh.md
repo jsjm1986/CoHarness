@@ -27,21 +27,13 @@ kind: "package-reference"
 
 使用 `dsh-userdoc` 作为文档接缝：`ctx.userDocs` 把文件与文件夹存入运行时的文档工作区并返回携带真实绝对路径的引用，代理因此用普通文件系统与 shell 工具即可读取文档。它与 `dsh-attachment` 有意相反——后者的对象内容寻址、对文件工具不可见；图片走附件路径，文档走文件系统路径。
 
-
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与待完成工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该 seam 把每次调用解析到已挂载后端并返回真实路径；文档状态完全位于提供方之后。
-
 
 <a id="model-experience"></a>
 ## 模型体验

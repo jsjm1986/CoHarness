@@ -17,7 +17,6 @@ kind: "package-reference"
 
 - [模型](#model)
 - [配置](#config)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -39,12 +38,6 @@ kind: "package-reference"
 | Key | 类型 | 默认值 | 含义 |
 | --- | --- | --- | --- |
 | `root` | string | 必填，无默认值（cwd 回退会让文件散落各处） | 保存单元文件的目录；按需以 `0o700` 创建 |
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。后端把每个域规格映射到一个根目录下的文件；布局与版本由后端规格断言，不存在第二个存储。
-
 
 <a id="model-experience"></a>
 ## 模型体验

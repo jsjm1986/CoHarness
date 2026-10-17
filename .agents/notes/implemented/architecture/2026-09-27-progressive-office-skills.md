@@ -10,7 +10,6 @@ Combined authoring and rendering instructions spend context on operations unrela
 
 ## Decision
 
-
 The [Office provider](../../../../packages/skill/skill-office/README.md) lists a compact router and six format-specific authoring or operation skills. The model loads full instructions by name and selects rendering for appearance-focused changes unless the user explicitly skips it. Rendering uses a private, randomly named temporary directory inside the task workspace and removes it after inspection. Skills invoke the configured LibreOffice Kit CLI through ordinary Bash or PowerShell. SDK and Desktop own their Office composition separately; ordinary Web and the shared base do not mount these plugins.
 
 Carriers own interpreter and resource locations. Operation skills append the configured Node and CLI paths only when their bodies are loaded; authoring skills use the selected Python and validate saved documents by reopening them with the same libraries. Loading instructions does not prepare engines or authoring payloads. Ordinary shell execution retains its existing permissions and process management.

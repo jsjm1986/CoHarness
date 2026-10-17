@@ -411,16 +411,6 @@ describe('deepEqualJson', () => {
 })
 
 describe('review regressions', () => {
-  it('propagates an invariant-coded listener failure instead of containing it', async () => {
-    const { ctx, provider } = await boot()
-    ctx.on('settings/updated', () => {
-      throw Object.assign(new Error('forged relation'), { code: 'INVARIANT' })
-    })
-    ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
-    expect(() => { provider.pushExternal({ 'ui-theme': { theme: 'light' } }) })
-      .toThrow(/forged relation/)
-  })
-
   it('serializes concurrent updates so neither patch is lost', async () => {
     const { ctx, provider } = await boot({ persistDelayMs: 10 })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
@@ -1256,15 +1246,4 @@ describe('revision and conflict detection', () => {
     await new Promise(resolve => setTimeout(resolve, 10))
   })
 
-  it('propagates an invariant-coded document listener failure instead of containing it', async () => {
-    const ctx = await mounted()
-    ctx.settings.register(REV, RevSchema)
-    ctx.on('settings/document-updated', () => {
-      throw Object.assign(new Error('forged revision'), { code: 'INVARIANT' })
-    })
-    expect(() => {
-      (ctx.settings as unknown as { publish(doc: Record<string, unknown>): void })
-        .publish({ rev: { b: 'edited on disk' } })
-    }).toThrow(/forged revision/)
-  })
 })

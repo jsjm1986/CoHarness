@@ -102,6 +102,4 @@ The carrier adds no request-prefix content.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-No invariant companion is published: archive integrity, protocol version and runtime kind are verified during connection startup; the carrier holds no cross-request relation to observe.
-
 </details>

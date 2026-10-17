@@ -21,18 +21,11 @@ Web 用户需要从同一个 `@` 补全菜单提及文件、文件夹或会话�
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。候选按 token 在短生命周期的 `referenceCandidates` 会话引用下，经 `fileReferences/list` 与 `sessionReferenceResolver/candidates` 远程接口获取；来源在请求之间不保留候选状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

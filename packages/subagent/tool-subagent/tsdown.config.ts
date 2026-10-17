@@ -14,6 +14,5 @@ const base = {
 /** Build the delegation tool and its Host-owned model-selection settings entry. */
 export default defineConfig([
   { ...base, entry: ['lib/types/index.js'] },
-  { ...base, entry: ['lib/types/invariant.js'] },
   { ...base, entry: ['lib/types/model-selection-settings.js'] },
 ])

@@ -20,7 +20,6 @@ kind: "package-reference"
 - [状态与刷新](#state-and-refresh)
 - [配置](#configuration)
 - [预算与有界读取](#budgeting-and-bounded-reads)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -103,12 +102,6 @@ export interface Config {
 渲染会优先保留最具体的指令文件。它会先丢弃完整的较宽泛文件，再截断最具体文件，并发出可见 `Workspace instruction budget ...` 通知，其中指名已省略与已截断路径。渲染后字节数绝不超过 `maxBytes`。
 
 即使提供方元数据省略大小，或文件在元数据探测后增长，指令内容仍会通过 `streamText()` 在 `maxSourceBytes` 下读取。超大文件会被忽略；在动态对账期间，它会暂时不可用，而不是被移除。该插件不保留进程级 cache，绝不缓存指令文本。其会话本地 scope cache 只将提供方版本用作快速失效信号；失效后，对有界读取计算的 SHA-1 仍是存储在结构化消息来源中的跨提供方内容标识。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。注入链被提交进持久历史，后续发现从会话自身的工具调用与 `fs/*` 事件派生；不保留单独的可变记录。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -13,20 +13,13 @@ Gateway quota warnings in the global Web shell. The browser plugin contributes o
 
 Use `dsh-client-ui-usage-alert` for Gateway quota warnings in the Web shell. One `shell.overlay` entry reads the authenticated `/account/api/usage` summary on mount and displays the durable natural-month 80%/100% crossings already computed by the gateway; a failed advisory read leaves the shell unchanged.
 
-
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The banner displays durable quota crossings already computed by the Gateway from a single advisory read; it owns no usage state.
 
 <a id="model-experience"></a>
 ## Model Experience

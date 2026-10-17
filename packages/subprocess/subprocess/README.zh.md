@@ -103,7 +103,6 @@ const output = handle.collected.stdout?.readFrom(0)
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：抽象 `SubprocessRuntime`、`ctx.subprocess` 注册、共享的 `scrubbedParentEnv` 清除 |
 | [`src/types.ts`](src/types.ts) | 词汇：spawn spec、stdio 模式、句柄、读取器、结果、`DSH_*` 命名空间 |
-| — | 不发布运行时不变式伴生入口；这个无状态 Service Definition 负责 spawn spec 与句柄类型，观察则由 Service Providers 负责。 |
 
 ### 数据模型与流程
 
@@ -131,7 +130,6 @@ spawn 会立即返回活动句柄，而不公开目标身份。`done` 独立报�
 
 终端消费者通过 `terminalEnvironment()` 读取 provider 平台和首选 shell，通过 `resolveExecutable()` 验证候选。确定未找到可执行文件时抛出 `SubprocessExecutableNotFoundError`，传输故障仍单独报告。`spawnTerminal` 要求 `terminalType` 和初始尺寸，返回的 handle 通过 `resize(cols, rows)` 调整尺寸，不重新分配进程。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -145,7 +143,6 @@ spawn 会立即返回活动句柄，而不公开目标身份。`done` 独立报�
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明该 seam 何时不合适，或何时把工作留给消费方。它们是当前包约束，不是对比或任务积压。
 

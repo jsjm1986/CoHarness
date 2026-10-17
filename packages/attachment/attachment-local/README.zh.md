@@ -23,18 +23,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与待完成工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。已发布对象是按内容哈希寻址的不可变文件，且分段原子发布路径由文件系统层规格断言；提供方自身不保留可变索引。
-
 
 <a id="model-experience"></a>
 ## 模型体验

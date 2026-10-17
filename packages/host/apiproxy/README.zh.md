@@ -29,13 +29,11 @@ Host 为 `hostSessionLifecycle` 保存创建、恢复与 fork 句柄。永久清
 
 使用 `dsh-host-apiproxy` 作为共享 API 网关：零依赖、浏览器可导入的 TypeScript API 契约、一对 fetch 载体，以及每个 HTTP 载体包装的宿主侧 `ApiProxyService`（`ctx.apiProxy`）。其 `workspaceFiles.*` 方法在授权、包含性与版本防护下按公开界限提供会话相对文件读取。
 
-
 ## 目录
 
 - [共享 Agent 默认值（`agent-default-model` Settings 分节）](#the-shared-agent-default-agent-default-model-settings-section)
 - [约定层（`/api`）](#contract-layer-api)
 - [载体层（`/client` + 根路径）](#carrier-layer-client--root)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -126,12 +124,6 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-presets`](../../pr
 直接的 `SessionsApi` / `SubagentsApi` 与 `IApiClient` 历史结果仍是展开后的 `{ events, hasMore, projections? }`，外加可选的 `omittedSpans`。`detail: 'conversation'` 在分页之后省略已完成追加来源 `assistant/message` 之下的历史 `assistant/chunk` 游程，并报告这些闭区间 seq 范围；缺失的 `detail` 与 `'full'` 保留全部事件。成功的 Fetch `session.history` 与 `subagent.history` 响应使用物理 `records`（含无损打包的剩余 chunk 行），并往返 `omittedSpans`；客户端先校验并展开，再暴露逻辑结果。大小目标按完整未压缩 `server-response` JSON 的 UTF-8 字节计量，且只在完整的追加来源消息组处截断；后缀裁切会把 `omittedSpans` 限制到返回后缀内的 seq。一个不可分割的消息组可以超过该目标。畸形打包记录会在运行时状态变更前失败；未知的普通或扩展 chunk 事件仍按普通事件处理。持久化、会话格式与 Conversation 组装不变。[`historyPageTargetBytes`](../../client/connection/README.zh.md) 持有部署目标；[无损历史线分页决策](../../../.agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.zh.md) 与 [两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md) 记录原委。
 
 `inbox` 投影从 Session 自有的持久化 splice 重建待处理输入，不恢复 Agent。历史读取仍由 Gateway 授权控制；冷队列修改继续要求 live Agent。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。请求分发委托给所属会话服务与已注册处理器；网关组合传输与策略而不拥有领域状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

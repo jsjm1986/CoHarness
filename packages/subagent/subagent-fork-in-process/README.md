@@ -18,7 +18,6 @@ The fork provider creates an in-process child seeded with the parent's completed
 - [Seed boundary](#seed-boundary)
 - [Start and capabilities](#start-and-capabilities)
 - [Config](#config)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -48,11 +47,6 @@ Fork advertises `{ agentOptions: true, agentPreset: false, outputSchema: true, d
 |---|---|
 | `providerName` | Registry name on `ctx.subagents` (default `fork`). |
 See [`dsh-subagent-spawn-in-process`](../subagent-spawn-in-process/README.md) for the run lifecycle, model inheritance, and depth tracking — all shared.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. All run mechanics live in the shared in-process driver; the provider contributes only the seeded-session fork entry.
 
 <a id="model-experience"></a>
 ## Model Experience

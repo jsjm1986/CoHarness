@@ -17,7 +17,6 @@ With `dsh-typert-protocol`, business packages can expose Host methods to Remote 
 
 - [Remote declarations](#remote-declarations)
 - [Typert protocol](#typert-protocol)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -45,11 +44,6 @@ Business packages extend `TypertLookupMap` and `TypertContextMap` to associate H
 The Host assembly extends `TypertRemoteEventSelection` with the Host events it forwards to consumers, which narrows the `ctx.remote.$on` key face; `TypertForwardableEvent` states the shapes a one-way delivery can carry at all, excluding Scope-bound and answered events. `TypertClientRemote` carries both roles of that surface: consumers subscribe through `$on`, and the Client half owning the host frame sink hands frames over through `$dispatch`.
 
 Lookup and Context packages own both sides of their contract: declaration merging supplies the static association, while runtime providers register identity resolution with `ctx.typert`. A lookup or Host Context provider supplies the stable declaration and default resolver, while Host composition may separately configure a synchronous or asynchronous resolver; policy rejections may use `TypertLookupFailure` to carry a failure value owned by the boundary adapter. Strict codecs carry generated schemas; `src-json` codecs identify the weaker source-launch path.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A pure declaration-and-codec library with no service registration; its contracts are enforced by type-level use and codec specs.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -67,6 +67,4 @@ None.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-No invariant companion is published: page state derives from the plugin market service and session stores; the view holds no independently observed relation.
-
 </details>

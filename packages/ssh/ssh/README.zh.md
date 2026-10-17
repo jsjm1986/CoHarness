@@ -56,7 +56,6 @@ kind: "package-reference"
 <details>
 <summary>实现细节 — 点击展开</summary>
 
-未发布不变量伴随物：hello 摘要校验、流端点能力与租约清理通过协议自身被观察；适配器自身不持有可独立观察的关系。
 
 OpenSSH 主连接承载私有管理 RPC。每条程序流使用独立转发的 Unix 套接字和独立 SSH 通道。程序 stdout 无法伪造管理回复，也不会占用控制流的通道窗口；SSH 传输拥塞仍会影响共享连接。
 

@@ -29,18 +29,11 @@ Web GUI 允许用户通过 `/model` 弹窗或 composer 模型控件切换既有�
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。两个界面共享每会话一个由 host 支持的 `ModelDirectory`；选择与 effort 状态仍由该解析器与会话拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

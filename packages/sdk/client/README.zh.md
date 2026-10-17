@@ -19,7 +19,6 @@ kind: "package-library"
 
 - [DeepSeekHarness](#deepseekharness)
 - [HarnessClient](#harnessclient)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -59,12 +58,6 @@ console.log(result.finalResponse)
 `HarnessClientOptions.env` 给定时整体替换子进程环境（`undefined` 继承父进程环境）；凭据策略归调用方——`dsh-subprocess` 的 `scrubbedParentEnv` 是面向隔离启动的共享擦除基底。选择不同的 `dshHome` 会移除继承的 `DSH_MANAGED_DATA_MANIFEST`，避免独立子进程把文件登记到父进程的备份清单。同目录启动会保留该变量；显式完整 `env` 可以指定子进程自己的清单。
 
 客户端公开传输层的行长度、待处理请求、入站并发、输出以及每个订阅的通知队列上限；默认值遵循协议上限，非正数会被拒绝。超时和退出宽限值必须是正的安全整数毫秒，且不超过 Node 的 2,147,483,647 毫秒计时器上限。同一个 session id 的高层 `HarnessSession.run()` 调用会串行执行，不同 session id 仍可并发推进。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。无插件面的纯库；请求关联与订阅投递由单元规格覆盖，它不拥有 harness 侧状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

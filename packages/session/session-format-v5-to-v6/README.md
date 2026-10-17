@@ -33,8 +33,6 @@ V5 headers without `sshTarget` and headers carrying any positive safe-integer `s
 
 The V6 codec delegates event framing and validation to the existing V5 codec. The migration forwards each event unchanged and observes the inherited-cut marker without collecting another artifact copy. Header-only migration changes only `version`; whole-artifact validation applies the V5 event rules under the V6 version marker.
 
-No runtime invariant companion is published: this pure library has no registrations or independently mutable state to compare. Its codec and migration behavior is exercised by direct conversion tests and the JSONL provider's immutable-generation tests.
-
 <a id="model-experience"></a>
 ## Model Experience
 

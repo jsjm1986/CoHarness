@@ -38,7 +38,7 @@ The bound exists because this chain is self-exciting in a way subagent settlemen
 
 `cancelForTeardown` now marks the record `reported`, exactly as `kill()` does after cancelling. The asymmetry was invisible while the notice was a harmless inject; a waking reporter turns it into one model request per teardown layer, on agents the host is destroying.
 
-`reported` was already the right bit — "a kill, read, or wait has reported or committed to report the terminal state" — and teardown is a kill without a caller. Using it keeps every observer of the settlement intact: `onJobDone` still fires, so runtime invariants and the force-fail path stay covered, and only notice reporters go quiet.
+`reported` was already the right bit — "a kill, read, or wait has reported or committed to report the terminal state" — and teardown is a kill without a caller. Using it keeps every observer of the settlement intact: `onJobDone` still fires, so the force-fail path stays covered, and only notice reporters go quiet.
 
 ### Completion is announced last
 

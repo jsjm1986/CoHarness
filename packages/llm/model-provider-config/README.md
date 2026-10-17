@@ -15,7 +15,6 @@ Organization route ids use the deployment-reserved `org-*` namespace. Project ro
 
 Use `dsh-model-provider-config` as the Service Definition for organization- and project-managed model Providers. A Provider publishes an immutable route snapshot on `ctx.modelProviderConfig` and emits `model-provider-config/updated` after each committed revision; adapter Consumers register those routes without copying them into user settings.
 
-
 ## Table of Contents
 
 - [Model Experience](#model-experience)

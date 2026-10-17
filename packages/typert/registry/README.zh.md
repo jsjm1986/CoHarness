@@ -18,7 +18,6 @@ kind: "package-reference"
 ## 目录
 
 - [公开 API](#public-api)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -38,12 +37,6 @@ kind: "package-reference"
 - `typertKey()` 和 `typertPackageKey()` 构造两种稳定的标识形式。
 
 `@deepseek-ai/dsh-typert-registry/types` 子路径包含注册项和记录的纯类型约定。[`dsh-typert-loader`](../loader/README.zh.md) 会在 Loader 组合中发现并注册生成的宿主侧产物；其他组合所有者可以直接调用 `ctx.typert.register()`。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。贡献原子地注册并随调用 fiber 撤回，因此注册表内容恰好是释放规格所证明的实时 effect 集。
-
 
 <a id="model-experience"></a>
 ## 模型体验

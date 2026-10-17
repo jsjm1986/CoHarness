@@ -15,7 +15,6 @@ kind: "package-reference"
 
 - [使用本包](#use-this-package)
 - [运行时约定](#runtime-contract)
-- [不变量](#invariants)
 - [进一步阅读](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
@@ -40,18 +39,12 @@ kind: "package-reference"
 
 读取时必需的 `gateway/execution` 事件保留已接受的参与者事实和委派限制。保存或传出新式执行范围前，其 Session 记录 `gateway/scoped-execution`；不支持范围授权的读取者必须拒绝该日志。缺少此准入标记的执行范围状态无效。`gateway/continuation` 独立记录自动执行的来源。不含范围引用的旧记录仍可读取；这些事件词表扩展不改变 Session 结构格式。生成元数据可以携带已验证输入引用和一个主要计费参与者；其计费用途由 [Auto 审查归因](../../../.agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.zh.md) 负责。
 
-<a id="invariants"></a>
-## 不变量
-
-本包定义服务和持久类型，但不拥有可独立变化的状态，因此不发布不变量配套入口。提供者负责当前授权并验证持久化输入引用。
-
 <a id="further-exploration"></a>
 ## 进一步阅读
 
 - [已验证的执行参与者](../../../.agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.zh.md) — 身份、委派和权限交集决策。
 - [Gateway Runtime](../gateway-runtime/README.zh.md) — 签名请求身份和私有传输。
 - [Agent 发起人范围](../../../.agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.zh.md) — 在编排入口恢复真正的 Agent。
-
 
 <a id="model-experience"></a>
 ## 模型体验

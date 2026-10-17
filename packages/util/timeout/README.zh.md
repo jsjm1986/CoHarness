@@ -23,7 +23,6 @@ kind: "package-library"
 - [`timeoutMs <= 0` 哨兵值](#the-timeoutms--0-sentinel)
 - [使用形态](#usage-shape)
 - [哪些操作不设置超时](#what-does-not-get-a-timeout)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -79,12 +78,6 @@ export async function runWithDeadline(upstream: AbortSignal | undefined, timeout
 ## 哪些操作不设置超时
 
 本地文件 `read`/`write`/`edit` 不接受 `timeoutMs`：文件 IO 不设时限地运行，因为截止时间会中止操作系统仍会完成的工作。详见[文件系统子系统页面](../../../docs/subsystems/filesystem.zh.md)。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。零依赖纯库；信号与分类代数由单元规格强制。
-
 
 <a id="model-experience"></a>
 ## 模型体验

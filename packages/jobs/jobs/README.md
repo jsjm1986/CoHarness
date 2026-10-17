@@ -86,7 +86,6 @@ This section explains the design decisions behind the contract and points at the
 | [`src/brand.ts`](src/brand.ts) | `JobId` branded identifier, importable without the agent dependency |
 | [`src/archive-admission.ts`](src/archive-admission.ts) | The `job` family of the Workspace registry's archive admission, installed by the seam's constructor for every implementation |
 | [`src/idle-release.ts`](src/idle-release.ts) | The jobs veto on `agent/idle-release-check`, installed by the seam's constructor for every implementation |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion: checks the announced event protocol per job (registered first, one settlement, removal last) and each announced projection against the registry's own read |
 
 ### Service operations
 
@@ -125,7 +124,6 @@ No direct invalidation; the named consumers own any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the contract is a poor fit. They are current package constraints, not a task backlog.
 

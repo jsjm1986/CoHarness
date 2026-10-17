@@ -49,8 +49,6 @@ The `repair.ts` module synthesizes `tool/result` closers for orphaned tool calls
 
 ### Invariants
 
-`Session` validates `sourceEventSeqs` and `surfaceOp` at the always-on seed/append boundary: `assistant/message` carries no source list; other source lists are non-empty, unique, earlier, and known; replacement endpoints exist in surface order; and `sourceEventSeqs` covers every shadowed node. These are single-record acceptance and storage-projection rules, not optional invariant-service contributions.
-
 Every surface-eligible event must carry `surfaceOp` or it would disappear from derived history. Typed `append` overloads enforce this for literal event types; runtime checks in `append` and the seed constructor cover widened unions and loaded logs. Invalid seeds are rejected rather than upgraded under the pre-release format policy.
 
 ## Alternatives considered

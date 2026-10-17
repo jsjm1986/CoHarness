@@ -22,7 +22,6 @@ Session telemetry lets deployments send ordered copies of session activity for r
 - [The handoff cursor](#the-handoff-cursor)
 - [The fixed chunk projection](#the-fixed-chunk-projection)
 - [The logical record](#the-logical-record)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -65,11 +64,6 @@ Only the first `assistant/chunk` of each `(turn, step)` ships; the rest are drop
 ## The logical record
 
 `SessionTelemetryRecord`: `channel` (`ledger` | `ops`), `time` (epoch ms), `severity` (pre-mapped: ERROR for `tool/result.isError`, `turn/end` error reasons, and `agent-error`; INFO for other captured records, while `sessionTelemetry/record` policies may assign WARN), identity-only `attributes` (`session.id`, `event.type`, `event.seq`, `session.format_version`, plus `session.cwd`/`session.parent_id`/`session.seed_length` when the header has them), and the complete deep-copied `event.data` as `body` — post-redaction. Operational records carry `sessionTelemetry.op` (`agent-error` | `shutdown`) and `session.id`, and deliberately NO `event.seq`/`event.type` — signals to alert on, not entries to sum; `agent-error` normalizes its arbitrary thrown value into a stable `{ name, message }` body. Delivery downstream of the handoff is the backend SDK's; duplicates remain possible (cursor-less re-adoption, SDK retries), so receivers dedupe on `(session.id, event.seq)`.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Capture passes each session record to the mounted sink; batching, retry, and loss policy belong to the backend SDK, so the seam holds no telemetry relation.
 
 <a id="model-experience"></a>
 ## Model Experience

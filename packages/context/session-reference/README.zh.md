@@ -18,7 +18,6 @@ kind: "package-reference"
 - [公开 API](#public-api)
 - [快照语义](#snapshot-semantics)
 - [配置](#configuration)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -49,12 +48,6 @@ kind: "package-reference"
 | `maxReferenceBytes` | `65536` | 一个引用对象的最大序列化 JSON 字节数。 |
 
 保留会对每个源独立应用 `maxReferenceBytes`，保留 compact 检查点与最新消息，再丢弃较旧的非检查点单元，并使用 `dsh-output-retention` 头部／尾部截断和精确 UTF-8 省略通知。如果某个源的固定序列化字段本身就超出限额，准备会以 `SESSION_REFERENCE_BUDGET_EXCEEDED` 失败，而不返回部分上下文。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。快照是委托给 `ctx.sessionQuery` 的只读视图；解析器自身不保留会话数据。
-
 
 <a id="model-experience"></a>
 ## 模型体验

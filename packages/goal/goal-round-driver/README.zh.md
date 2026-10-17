@@ -64,7 +64,6 @@ kind: "package-reference"
 
 取消会移除 inbox 中待处理的工作，或留下 agent 范围的 aborted 状态。在下一次 idle 检查点，驱动器会暂停存在已预留或已准入尝试的 goal，避免取消后自动重启；与 goal 尝试无关的取消只会撤销进程本地续行权限。取消到达 idle 时仍排在 inbox 中的 Round 提示词会被撤回，之后的人类输入不会排在它后面等待。如果 pause 变更失败，驱动器会回退到停用续行。插件 teardown 会关闭准入，停用所有活跃 goal 的续行，以 `parent` cause 取消正在进行的工作，并在事件防护仍生效的情况下等待驱动器和 agent 完全停稳。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 

@@ -21,7 +21,6 @@ See the [LSP capability seam Agent Note](../../.agents/notes/implemented/archite
 
 The subsystem reference — operations, coordinates, requests/results, `LspError` — is [docs/subsystems/lsp.md](../../docs/subsystems/lsp.md); design rationale in the [LSP capability seam Agent Note](../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.md).
 
-
 ## Summary
 
 The lsp group lets agents navigate code through configured language servers: go to definitions, find references and implementations, and read hover documentation. Use `lsp-stdio` to connect local stdio language-server commands and extension mappings, and `tool-lsp` to make those operations available to the model. The shared `lsp` package keeps provider choice and normalized results consistent, so changing servers does not change model requests. Deployments must supply and configure their language servers; this group ships none.

@@ -27,9 +27,6 @@
       "path": "../../core/system-prompt"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../session/session-projection"
     },
     {

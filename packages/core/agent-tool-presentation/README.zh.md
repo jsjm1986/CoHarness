@@ -17,7 +17,6 @@ kind: "package-reference"
 
 - [为什么是一行插件，而不是把注册表搬下来](#why-a-row-rather-than-a-registry)
 - [它做什么](#what-it-does)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -39,12 +38,6 @@ preset 能拥有的是这份注册表的**呈现方式**。`ctx.tools.presentAs(
 `mode` 是必填而非有默认值：不带这一行的 preset 本来就会拿到部署默认值，省略它等于这一行白组装了。
 
 一个 agent 只声明一次呈现方式。同一份组装里的第二次声明会被拒绝而不是合并：对「模型看到哪种形态」给出两个答案是矛盾，不是覆盖。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。本包贡献一行在组合时消费的声明式 preset；它不拥有运行时状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -21,7 +21,6 @@ This package is a transport adapter, not a UI integration or a capability seam. 
 - [Protocol contract](#protocol-contract)
 - [Lifecycle](#lifecycle)
 - [Running](#running)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -72,11 +71,6 @@ ACP requires each prompt response to carry a `stopReason`, but the bridge does n
 ## Running
 
 `pnpm --dir /path/to/deepseek-harness run demo:acp` boots the repository's automation server composition. A parent harness can spawn it through [`@deepseek-ai/dsh-subagent-acp`](../../subagent/subagent-acp/README.md); other ACP clients need only the core methods above.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The server translates each ACP frame into `ctx.agents` operations; session lifecycle stays owned by the runtime it drives, so there is no adapter-owned relation to compare.
 
 <a id="model-experience"></a>
 ## Model Experience

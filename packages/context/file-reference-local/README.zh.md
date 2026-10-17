@@ -18,7 +18,6 @@ agent（智能体）及宿主 UI 可以用各 agent 本地工作区中经过排�
 ## 目录
 
 - [配置](#configuration)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -35,12 +34,6 @@ agent（智能体）及宿主 UI 可以用各 agent 本地工作区中经过排�
 | `excludedDirectories` | `[".git", "node_modules"]` | 遍历和候选项中排除的目录基名。 |
 
 所有数值都必须是正的安全整数。排除名称必须是非空基名，且不能包含 `/` 或 `\`。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每 agent 索引是按需从文件系统重建的有界缓存；文件系统仍是唯一权威。
-
 
 <a id="model-experience"></a>
 ## 模型体验

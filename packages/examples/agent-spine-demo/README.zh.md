@@ -15,14 +15,12 @@ kind: "package-reference"
 
 使用 `dsh-agent-spine-demo` 作为默认的无执行器、无界面 agent 脊骨捆绑插件：harness agent 所需的固定服务集，循环的 `agents` 列表作为配置转发——应用只需加入口与可换后端即可组出可用代理。
 
-
 ## 目录
 
 - [它加载的插件树](#the-tree-it-loads)
 - [有意留在组合包外的组件](#what-it-deliberately-leaves-outside-the-bundle)
 - [配置](#config)
 - [为何使用代码组合包，而非共享 YAML include](#why-a-code-bundle-not-a-shared-yaml-include)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -49,12 +47,6 @@ kind: "package-reference"
 @deepseek-ai/dsh-goal-round-driver     optional same-session goal-round driver
 @deepseek-ai/dsh-llm-retry        provider-routed request retry policy
 @deepseek-ai/dsh-jobs-local      generic background-job registry
-@deepseek-ai/dsh-invariants       configurable invariant registry service
-@deepseek-ai/dsh-session/invariant
-@deepseek-ai/dsh-agent/invariant
-@deepseek-ai/dsh-scope/invariant
-@deepseek-ai/dsh-agent-loop/invariant
-                                  package-owned relational checks
 @deepseek-ai/dsh-tool-bash        the model-facing bash schema (unless toolBash=false)
 @deepseek-ai/dsh-agent-instructions  AGENTS.md/CLAUDE.md workspace context loader
 @deepseek-ai/dsh-tool-skill       session-prefix skill catalog + model-facing loader schema
@@ -81,13 +73,11 @@ kind: "package-reference"
 
 ```ts
 import type { Config } from '@deepseek-ai/dsh-agent-spine-demo'
-// { agents?, maxParallelToolCalls?, inbox?, includeHarnessIdentity?, includeRuntimeContext?, persona?, toolOrder?, tools?, dshHome?, sessionTitle?, skills?, workspaceContext, toolBash?, jobs?, toolJobs?, goals?, invariants? }
+// { agents?, maxParallelToolCalls?, inbox?, includeHarnessIdentity?, includeRuntimeContext?, persona?, toolOrder?, tools?, dshHome?, sessionTitle?, skills?, workspaceContext, toolBash?, jobs?, toolJobs?, goals? }
 // workspaceContext requires { maxBytes } or false; the other owner schemas supply defaults.
 ```
 
-组合包将每个字段转发给拥有它的子节点。应用包提供预创建的 agent：无头和 JSON-RPC 组合会创建 `main`，ACP 应用则在 `session/new` 按需创建 agent。`inbox.maxMessages` 和 `inbox.maxBytes` 限制每个 agent 的待处理输入，防止循环积累无界排队消息。`includeRuntimeContext: false` 会转发给 `dsh-system-prompt`，为新建会话抑制所有动态上下文快照，但不禁用其策略服务。提示词、工具、标题、skill、工作区上下文、不变式、目标和任务设置沿用其所属包记录的 schema 与默认值；`jobs.maxConcurrentJobsPerOwner` 配置本地 Service Provider，并与面向模型的 `toolJobs` 控制工具相互独立。`pickSpineConfig()` 只复制该组合包拥有的字段，`dshHome` 值冲突会在组合时失败。
-
-例如，`{ invariants: { enabled: true, package_allowlist: ['^@deepseek-ai/dsh-'], package_blocklist: ['agent-loop$'] } }` 会让包拥有的配套插件保持挂载，但抑制被阻止的拥有者。Blocklist 匹配优先于 allowlist 匹配；正则表达式与生命周期规则见 [`dsh-invariants`](../../runtime-diagnostics/invariants/README.zh.md)。
+组合包将每个字段转发给拥有它的子节点。应用包提供预创建的 agent：无头和 JSON-RPC 组合会创建 `main`，ACP 应用则在 `session/new` 按需创建 agent。`inbox.maxMessages` 和 `inbox.maxBytes` 限制每个 agent 的待处理输入，防止循环积累无界排队消息。`includeRuntimeContext: false` 会转发给 `dsh-system-prompt`，为新建会话抑制所有动态上下文快照，但不禁用其策略服务。提示词、工具、标题、skill、工作区上下文、目标和任务设置沿用其所属包记录的 schema 与默认值；`jobs.maxConcurrentJobsPerOwner` 配置本地 Service Provider，并与面向模型的 `toolJobs` 控制工具相互独立。`pickSpineConfig()` 只复制该组合包拥有的字段，`dshHome` 值冲突会在组合时失败。
 
 <a id="why-a-code-bundle-not-a-shared-yaml-include"></a>
 ## 为何使用代码组合包，而非共享 YAML include
@@ -95,12 +85,6 @@ import type { Config } from '@deepseek-ai/dsh-agent-spine-demo'
 YAML include 可以去重配置，却无法拥有 bin 或提供入口默认值。ACP 应用包默认接出协议纯净的 stdout，但叶节点仍可添加不安全的 logger。组合包子节点把服务注册到根 isolate-keyed store，因此叶节点的同级插件无需依赖加载顺序即可通过注入看到它们。
 
 重试策略可能在新的编号步骤中重复失败的请求。重试状态、提供方错误和失败的部分分片不进入模型历史；每次提供方尝试仍可能产生计费；always 模式没有尝试次数上限；入口从所有已记录步骤推导用量；重建的请求保留先前前缀，以便复用提供方缓存。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该 spine 是静态组合清单；每个已加载服务自行拥有其运行时关系。
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -115,7 +99,6 @@ YAML include 可以去重配置，却无法拥有 bin 或提供入口默认值�
 ## 已知限制与暂缓事项
 
 - **大部分主干集合固定在代码中**：`apply()` 始终挂载核心服务；配置可以省略组合包内的目标、skill、bash 与任务控制工具，但要替换循环或删除其他主干成员，就必须组合另一个组合包。
-- **不变式服务与配套插件仍是固定成员**：`invariants.enabled: false` 或包筛选器会抑制检查，但不会移除服务或配套插件注册；Session 始终启用的校验与冻结是另一套机制。
 
 <a id="dev-note"></a>
 ### 开发备注

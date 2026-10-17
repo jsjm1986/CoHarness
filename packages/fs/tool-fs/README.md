@@ -238,7 +238,6 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define when the tool suite is a poor fit or needs special operational care. They are current package constraints, not a general filesystem comparison or a task backlog.
 
 - **No model-facing directory listing ships** — `ctx.fs.listDir` serves provider code such as skill discovery, while the sibling `dsh-tool-fs-search` package supplies ripgrep-backed `glob` and `grep` rather than extending the filesystem seam.
@@ -258,5 +257,3 @@ These limits define when the tool suite is a poor fit or needs special operation
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. This model-facing adapter has no independent lifecycle stream; execution relations are owned by the capability seam it calls.

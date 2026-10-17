@@ -15,14 +15,12 @@ The plugin never imports ConversationRoot, ChatView, InputBar, or another presen
 
 Use `dsh-client-ui-workbench` to present up to four existing Workspace sessions as one multi-pane conversation workbench, with a session chooser plus pane selection, ordering, ratio, and mode controls. Each pane renders through the ordinary conversation slot owner under an explicit session scope, so injected controls always resolve the active pane rather than a cached target.
 
-
 Cross-runtime loading and creation share the current navigation intent. Selecting another pane, switching presentation or named layouts, or unloading the plugin prevents older responses from replacing the active pane. A completed Host creation remains in the catalog even when its navigation was superseded.
 
 ## Table of Contents
 
 - [Composition](#composition)
 - [View state](#view-state)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -58,11 +56,6 @@ The conversation chooser excludes archived roots and inactive blank drafts. Pers
 The catalog’s `personalComplete` flag distinguishes a verified personal directory from a temporarily unavailable one. Incomplete personal results preserve saved personal metadata without requesting the missing runtime; project membership rows remain authoritative. Legacy raw-ID migration waits for completeness across all possible owners. Layout edits and conversation creation from that layout remain disabled with an explanation and an explicit directory retry; ordinary single-conversation use and Workspace startup remain available. A failed account catalog never proves absence; only an explicitly independent Host may restore from its local directory.
 
 An authorized catalog entry remains in the saved layout when its runtime is manually stopped or temporarily unreachable. An unloaded pane shows that state without conversation content; background restoration never requests an explicit start. The existing workspace start action and catalog refresh can restore it. Explicit authorization denial or a confirmed missing Session removes the pane, and account changes clear the active view.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Pane selection, order, and ratios are component state over the `conversationViewport` capability; sessions remain owned by the runtime.
 
 <a id="model-experience"></a>
 ## Model Experience

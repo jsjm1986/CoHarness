@@ -43,11 +43,6 @@ The version-1 `dsh_plugin_packages` field contains `{ name, version }` or `{ nam
 
 <a id="model-experience"></a>
 
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The `dsh_plugin_packages` field is computed per request from the live Loader inventory; no inventory copy is retained.
-
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -72,7 +67,6 @@ None; package lifecycle changes do not alter the model-visible prefix.
 - **Loader-backed package identity only** — programmatic child fibers and in-memory dynamic plugins do not have authoritative npm name/version identity and remain outside this inventory.
 - **Unavailable identities are omitted** — the inventory can be partial when package metadata is unavailable.
 - **In-place package replacement requires restart** — manifest identities are cached for the process lifetime. Loader enable, disable, mount, unmount, and ordinary source HMR still refresh the active entry set, but replacing a mounted package's manifest with another version in the same process is not a supported upgrade path.
-
 
 <a id="dev-note"></a>
 ### Dev Note

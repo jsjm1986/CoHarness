@@ -25,17 +25,11 @@ When users type `/` or `@` at the caret in the Web GUI, this package opens a gro
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The trigger source roster is an effect-owned registration set proven by the HMR-safety spec; arbitration is per-request controller state with no durable relation.
 
 <a id="model-experience"></a>
 ## Model Experience

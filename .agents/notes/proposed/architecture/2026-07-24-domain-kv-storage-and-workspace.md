@@ -106,7 +106,7 @@ export function apply(ctx: Context, config: Config) {
 }
 ```
 
-(Facility unmount order: dispose each domain first (drain its write chain), then remove the name from the hub — in-flight writes still emit `domain/changed` during the drain, and the event-consistency invariant resolves domains back through the facility, so the name must stay resolvable at that point.)
+(Facility unmount order: dispose each domain first (drain its write chain), then remove the name from the hub — in-flight writes still emit `domain/changed` during the drain, so the name must stay resolvable at that point.)
 
 Domain declarations (the spec object is defined and exported by the package that owns the domain — the single source of type and runtime truth; schemas use zod with `z.infer` deriving the types without re-declaration — the record model projects into RPC wire schemas next phase and the wire boundary is all zod; schemastery still owns plugin Config only):
 

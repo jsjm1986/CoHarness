@@ -35,7 +35,6 @@ kind: "package-reference"
 
 - [不提交内容的动作](#non-submitting-actions)
 - [弹层可用性](#popup-availability)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -51,12 +50,6 @@ kind: "package-reference"
 ## 弹层可用性
 
 弹层选项可以禁用并说明原因，指针和键盘选择都会拒绝这些选项。业务 spec 可以订阅已捕获选项的失效通知。该订阅仅在自身弹层打开时存在，也只关闭自身弹层；关闭、替换、成功选择或作用域释放都会清理订阅。重新打开时获取最新选项，不建立另一套目录缓存。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。命令目录是按会话键控的缓存，经由所属命令界面重新拉取；它镜像 host 数据而非拥有一个关系。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -95,7 +95,6 @@ kind: "package-reference"
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：`/compact` 注册、参数拒绝、错误码映射、生命周期排空 |
-| — | 不发布运行时不变式伴随条目；该命令适配器不拥有任何状态或事件流；压缩 seam 拥有平衡且具持久性的事务，命令注册表拥有注册与分发生命周期。 |
 
 </details>
 
@@ -113,7 +112,6 @@ kind: "package-reference"
 - [排队手动压缩 Agent Note](../../../.agents/notes/implemented/feature/2026-07-30-queued-manual-compaction.zh.md)——按需压缩如何与运行中的轮次串行化。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -136,7 +134,6 @@ kind: "package-reference"
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明该命令何时不合适；它们是当前包约束。
 

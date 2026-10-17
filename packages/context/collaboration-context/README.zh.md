@@ -13,7 +13,6 @@ kind: "package-reference"
 
 使用 `dsh-collaboration-context` 在共享项目会话中提供持久的模型可见参与者归属。它在 `agent/pre-step` 监听，识别最终用户消息上的已认证项目参与者元数据，并在其前插入一条成对归属消息，使模型看到发言者身份。
 
-
 ## 目录
 
 - [运行时约定](#runtime-contract)
@@ -31,7 +30,6 @@ kind: "package-reference"
 - 格式错误的参与者元数据会在模型准入前抛错，而不会静默丢弃归属信息。个人消息和不含参与者元数据的消息保持不变。
 - 监听器先通过 `agent/pre-step` waterfall 委托，再转换最终获准的消息，因此后续策略不能把提示与参与者消息分开。
 - Web Chat transcript 不渲染这条提示；它用同一份参与者快照为随后的人类气泡标注发送者（[决策](../../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.zh.md)）。
-
 
 <a id="model-experience"></a>
 ## 模型体验

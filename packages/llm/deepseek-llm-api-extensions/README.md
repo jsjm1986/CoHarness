@@ -33,11 +33,6 @@ The registry owns addition and lifecycle, not field semantics. `@deepseek-ai/dsh
 
 <a id="model-experience"></a>
 
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Contributions are validated declarations applied while serializing each request; the registry holds no per-request relation.
-
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -53,7 +48,6 @@ None; registry fields are model-hidden provider metadata and do not alter the se
 
 - **Official DeepSeek requests only** — the registry intentionally has no provider-neutral routing or pi-ai adapter integration.
 - **No field ordering contract** — JSON object member order follows registration preparation but receivers address fields by name.
-
 
 <a id="dev-note"></a>
 ### Dev Note

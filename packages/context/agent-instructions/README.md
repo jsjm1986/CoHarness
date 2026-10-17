@@ -20,7 +20,6 @@ Per-session workspace instruction loading for `AGENTS.md`-compatible files. The 
 - [State And Refresh](#state-and-refresh)
 - [Configuration](#configuration)
 - [Budgeting And Bounded Reads](#budgeting-and-bounded-reads)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -103,11 +102,6 @@ Each user-global root holds one `AGENTS.md` with no local overlay; both candidat
 Rendering preserves the most specific instruction files first. It drops whole broader files before truncating the most-specific file and emits a visible `Workspace instruction budget ...` notice naming omitted and truncated paths. The rendered bytes never exceed `maxBytes`.
 
 Instruction content is read through `streamText()` under `maxSourceBytes`, even when provider metadata omits size or a file grows after its metadata probe. An oversized file is ignored; during dynamic reconciliation it is temporarily unavailable rather than removed. The plugin keeps no process-wide cache and never caches instruction prose. Its session-local scope cache uses provider versions only as a fast invalidation signal; after invalidation, SHA-1 over the bounded read remains the cross-provider content identity stored in the structured message source.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The injected chain is committed into durable history and later discoveries are derived from the session's own tool calls and `fs/*` events; no separate mutable record is kept.
 
 <a id="model-experience"></a>
 ## Model Experience

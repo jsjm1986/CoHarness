@@ -19,7 +19,6 @@ kind: "package-reference"
 
 - [仅限 scope 内使用](#scope-only)
 - [配置](#config)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -41,12 +40,6 @@ kind: "package-reference"
 | `includeRuntimeContext` | `true` | 是否为此 agent 作用域包含可选运行时上下文；false 会抑制可选贡献，但不禁用拥有它们的服务；必需贡献仍然保留 |
 
 `text` 与任何提示词段落一样是模板：完整的 `{{…}}` 组在提示词**渲染**时（而非组装时）严格解析为已注册的提示词变量。空文本同样占据该槽位，因此会把部署级人设整个遮蔽掉，然后在渲染时消失。启用 `complete: true` 时，组装仍会解析上下文、工具、变量和协作式监听器，之后提示词注册表将这份确切人设恢复为唯一段落；身份、工具引导或监听器都无法追加提示词文本。启用 `includeRuntimeContext: false` 时，此作用域的可选上下文提供方不会被求值，组装监听器的贡献也会被丢弃，除非注册为必需。必需提供方在组装与请求准入阶段仍然生效。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。本包贡献一行声明式组合；解析后的提示词由 preset 组合拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

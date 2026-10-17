@@ -17,7 +17,6 @@ Run `dsh --profile web` to open a browser GUI with chat, model and settings mana
 
 - [Listening, trust, and public deployments](#public-deployments)
 - [Model retry defaults](#model-retry-defaults)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -47,11 +46,6 @@ Neither the advertised URL nor the browser-trust fence protects the port itself,
 ## Model retry defaults
 
 Web uses the shared bounded normal default of five eligible retries after the initial request. The `deepseek-official` route and settings-added pi-ai routes use that default when they omit `retryPolicy`; explicit provider policies still win. Web adds no retry-specific composition override, so the same omission behavior applies to non-Web profiles.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The patch layer inserts host and client rows whose plugins own their relationships; the web-runtime glue resolves static entry points and holds no observable state.
 
 <a id="model-experience"></a>
 ## Model Experience

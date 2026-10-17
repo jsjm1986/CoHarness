@@ -82,7 +82,6 @@ ctx.commands.register({
 | [`src/index.ts`](src/index.ts) | `CommandRuntime` 服务：注册、作用域、分派、生命周期事件 |
 | [`src/types.ts`](src/types.ts) | 命令定义、描述符、执行与结果类型 |
 | [`src/brand.ts`](src/brand.ts) | 稳定命令定义标识和每次执行的生命周期 id |
-| [`src/invariant.ts`](src/invariant.ts) | 不变式伴生插件：按会话日志配对 `command/run` 与 `command/done` |
 
 ### 生命周期事件
 
@@ -112,7 +111,6 @@ ctx.commands.register({
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -134,7 +132,6 @@ ctx.commands.register({
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明注册表不提供什么。它们是当前包约束，不是 UI 积压事项。
 

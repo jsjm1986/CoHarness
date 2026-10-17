@@ -25,7 +25,6 @@ Two-sided BFF for Host Remote capabilities selected by this application. The Hos
 
 - [Forwarded Host events](#forwarded-host-events)
 - [Build boundary](#build-boundary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -51,11 +50,6 @@ That exception is not just a `files` entry. The root `tsconfig.base.json` maps `
 The package-local `clientBundle(..., { hostPhase: true })` makes Host tsdown bundle the Host entry and the later Client tsdown bundle only the browser entry. Ordinary Client plugins remain single Client projects and produce both their Node loader entry and browser bundle during Client tsdown; do not copy this package's split merely because a package has both `src/index.ts` and `src/client/index.ts`.
 
 Agent lookup reserves its Session identity across asynchronous inspection and resume. The Host retains each resumed factory handle through `onResumed`; concurrent lookups share one creation and one ownership transfer. Permanent removal refuses an in-flight lookup, and a reserved removal refuses new lookup admission.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Every contribution is mounted through `ctx.remote.$mount()` as an effect withdrawn with the assembly fiber, and identity resolution is per-call policy over the live Agent registry.
 
 <a id="model-experience"></a>
 ## Model Experience

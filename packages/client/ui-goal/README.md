@@ -19,17 +19,11 @@ The Web GUI goal surface shows both the durable goal state and its current proce
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The live goal arrives through the `goal` session projection and mutations go through `ctx.remote.goals`; the plugin owns no domain store or refresh chain.
 
 <a id="model-experience"></a>
 ## Model Experience

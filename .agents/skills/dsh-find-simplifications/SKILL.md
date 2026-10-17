@@ -24,7 +24,6 @@ A strong simplification removes, folds, or demotes something real and has clear 
 - A seam has methods every implementation must support but no consumer uses.
 - A separate package exists only for test/demo/support code and adds publish or dependency overhead.
 - A feature implements speculative product generality: multi-session/session-load, background job rosters, live registry invalidation, mid-turn steering, tool-owned UI rendering, and similar designs with no product owner.
-- An invariant, rollback path, set of expected outputs, or special-case test exists only to protect an unused API.
 - Hand-rolled code reimplements what a well-maintained external package or a Node builtin at the engine floor already provides, and the swap would delete the implementation plus its dedicated tests ([dependency policy](../../notes/implemented/process/2026-07-26-dependencies-over-hand-rolling.md)).
 - The simplified behavior may differ slightly, but the new behavior is still reasonable and easier to explain.
 

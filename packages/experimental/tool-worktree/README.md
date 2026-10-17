@@ -46,8 +46,6 @@ Call `create_worktree({ name?: string, from?: string })`. Success returns the ca
 
 [`cordis.patch.yml`](cordis.patch.yml) inserts the `worktree` runtime row and the `tool-worktree` consumer row. [`src/index.ts`](src/index.ts) registers one typed tool. Runtime creation owns Git behavior, cancellation, and the working-directory change. The tool returns the runtime record as its canonical value and renders that record as JSON; its Host presentation uses the generic card. Disposal unregisters the tool.
 
-No runtime invariant companion is published because the tool retains no state independently of the worktree runtime.
-
 </details>
 
 -----

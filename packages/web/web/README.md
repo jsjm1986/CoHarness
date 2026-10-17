@@ -30,7 +30,6 @@ Use `dsh-web` to search the web or fetch a URL without tying callers to a specif
 - [Service API (`ctx.web`)](#service-api-ctxweb)
 - [Selection](#selection)
 - [Vocabulary](#vocabulary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -70,11 +69,6 @@ The failure branches throw `WebError`, whose structured code (plus message detai
 ## Vocabulary
 
 `WebSearchRequest` (`query`, `maxResults?`) → `WebSearchResult` (`content?`, `sources[]`, `truncated`); each `WebSearchSource` has a required `url` and optional `title`/`snippet`/`publishedAt` (Perplexity citations may be URL-only). `WebFetchRequest` (`url`) → `WebFetchResult` (final `url`, `statusCode`, `body`, `truncated`); cancellation is a direct optional `AbortSignal` argument to `search()`/`fetch()`. `WebFetchBody` is a CLOSED discriminated union (`html` | `text`) owned here — consumers `switch` to exhaustiveness so a new kind breaks their compilation until handled. See `src/types.ts` for the full contracts and the `WebError` code taxonomy.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam defines the search/fetch contract over providers; vendor state stays behind each provider.
 
 <a id="model-experience"></a>
 ## Model Experience

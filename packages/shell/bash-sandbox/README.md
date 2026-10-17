@@ -83,7 +83,6 @@ The executor is the sandboxing Service Provider for the `ctx.shell` seam: it inh
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `SandboxBashExecutor`, per-process fact retention, run/start wrapping |
 | [`src/helpers.ts`](src/helpers.ts) | Denial, runner-failure, and runner-spawn-failure classification |
-| — | No runtime invariant companion is published; classification is observable in results, and this package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam. |
 | `tests/` | Exercised behavior across the bwrap, Landlock, and Seatbelt runners |
 
 ### Main flow
@@ -164,7 +163,6 @@ Append-only; newly visible content follows the reusable request prefix and does 
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when this executor is not a general security boundary. They are current package constraints, not a roadmap.
 

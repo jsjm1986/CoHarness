@@ -17,17 +17,11 @@ The plugin uses the complete required [shared LLM configuration](../session-titl
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each revision is generated through `ctx.llm` and committed through the title seam with newer revisions aborting stale work; no title state is kept outside the committed result.
 
 <a id="model-experience"></a>
 ## Model Experience

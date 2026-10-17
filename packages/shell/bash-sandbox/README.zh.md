@@ -83,7 +83,6 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：`SandboxBashExecutor`、按进程保留事实、run/start 包装 |
 | [`src/helpers.ts`](src/helpers.ts) | 拒绝、runner 失败与 runner spawn 失败分类 |
-| — | 不发布运行时不变式伴生入口；分类可在结果中观察，且除归属 seam 所强制执行的约定外，本包不公开独立事件序列或可变数据关系。 |
 | `tests/` | 跨 bwrap、Landlock 与 Seatbelt runner 演练的行为 |
 
 ### 主要流程
@@ -115,7 +114,6 @@ kind: "package-reference"
 - [沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md) —— 沙箱设计、升权与切换约定。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -166,7 +164,6 @@ kind: "package-reference"
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明本执行器何时不是通用安全边界。它们是当前包约束，不是路线图。
 

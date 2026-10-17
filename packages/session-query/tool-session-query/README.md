@@ -16,7 +16,6 @@ Use `dsh-tool-session-query` to let a model search earlier sessions, inspect eve
 ## Table of Contents
 
 - [Configuration](#configuration)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -38,11 +37,6 @@ The caller comes exclusively from `ToolExecution.exec.agent`. Cross-session acce
 Every trusted `ctx.sessionQuery` call crosses one model-boundary sanitizer. Caller cancellation is checked first and preserved exactly. Available corpus and provider diagnostics, including safely inspectable nested causes, are logged internally on a best-effort basis; unprintable failures use a fixed log placeholder. Diagnostic formatting and error classification are independently guarded, so an unprintable cause cannot escape or prevent a safely classified outer error, while unsafe classification or logging falls back to the fixed `SESSION_QUERY_TOOL_FAILED` code and message. Local argument-validation and authorization errors retain their precise tool-owned messages.
 
 The package deliberately performs no byte or character truncation and does not import a spill backend. Deployments that need bounded inline output mount `@deepseek-ai/dsh-spill-policy`, which can replace the rendered text after execution while retaining the complete result.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The tools are registrations over `ctx.sessionQuery`; corpus state stays behind the query seam.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -122,7 +122,6 @@ spill 场景通过真实本地提供方保存到私有临时根目录。fixture 
 | [`src/workspace.ts`](src/workspace.ts) | 场景 workspace 设置与完整预期状态比较 |
 | [`src/suite.ts`](src/suite.ts) | 场景表套件工厂、fixture 保护、录制/刷新回写 |
 | [`src/index.ts`](src/index.ts) | 再导出四个层的包入口 |
-| — | 不发布运行时不变式伴生入口；该测试支持包不拥有任何生产事件流或可变数据；消费它的测试套件会检验该工具包。 |
 
 ### 数据流
 
@@ -144,7 +143,6 @@ spill 场景通过真实本地提供方保存到私有临时根目录。fixture 
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -158,7 +156,6 @@ spill 场景通过真实本地提供方保存到私有临时根目录。fixture 
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明何时需要对该工具包特别小心。它们是当前包约束，不是任务积压。
 

@@ -21,7 +21,6 @@ This package lets applications persist and resume session event logs through a b
 - [Invariants every backend must honor](#invariants-every-backend-must-honor)
 - [The write coordinator](#the-write-coordinator)
 - [Metadata and location types](#metadata-and-location-types)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -103,10 +102,6 @@ The coordinator asserts the stored id and compares stored/live cwd before repair
 
 Re-exported from `dsh-session`: `SessionHeader` (immutable session metadata: `version`, `id`, `createdAt`, `cwd?`, `parentSession?`, `seedLength?`, `origin?`, `delegationDepth?`, `draft?`). `SessionPersistenceSnapshot.content`, when supplied by an authoritative backend, carries `blank`, `visibleContentSeq`, and `lastPromptAt` for cold list projections. `SessionLocation` is `{ readonly kind: string; readonly path: string }`; its path is an absolute backend target, not proof that the artifact exists or contains an unflushed turn.
 
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The write coordinator's per-session controllers are private serialization state; durable truth is the stored log, and batching, repair, and adoption are asserted by coordinator specs.
 
 <a id="model-experience"></a>
 ## Model Experience

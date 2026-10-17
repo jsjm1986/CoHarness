@@ -25,18 +25,11 @@ Trajectory 标签页让你以按轮次组织的事件记录表和交互式时间
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该台账渲染会话的权威事件日志；选择、检视与滚动状态是展示层本地的。
-
 
 <a id="model-experience"></a>
 ## 模型体验

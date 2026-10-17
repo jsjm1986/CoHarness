@@ -64,7 +64,7 @@ This decision preserves the caller-owned framing decision from [unwrapped inject
 - Idle `inject()` immediately appends one durable inbox insertion but no model-visible `user/message`; a later waking delivery may start pre-step processing.
 - Active-turn injection is claimed at the nearest later pre-step boundary, after complete tool-result batches and before the request that consumes it.
 - Rejected or failed pre-step drops its claimed batch; input inserted after the claim remains pending.
-- Unit, persistence/resume, invariant, and TUI coverage pin event order, claim ownership, and durable replay.
+- Unit, persistence/resume, and TUI coverage pin event order, claim ownership, and durable replay.
 
 ## Consequences
 

@@ -21,7 +21,6 @@ Use `dsh-lsp-stdio` to give agents definitions, references, implementations, and
 - [Configuration](#configuration)
 - [Protocol behavior](#protocol-behavior)
 - [Security boundary](#security-boundary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -69,11 +68,6 @@ Initialization advertises `general.positionEncodings: ['utf-16']`, `workspace: {
 ## Security boundary
 
 The provider trusts its configured server and claims no sandbox confinement. It delegates canonical identity, containment, regular-file streaming, UTF-8 validation, and file-URI encoding to `ctx.fs`; it rejects missing, non-regular, non-UTF-8, oversized, or canonically out-of-workspace query sources before server startup. Containment is evaluated before the stream opens and does not promise stable-handle identity across concurrent path replacement. Result locations may be external, but an external path cannot become a query source. A deployment must mount filesystem and subprocess providers for the same execution world; split-world composition is invalid.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each registered provider owns one language-server child through `ctx.subprocess`; lifecycle and isolation are covered by provider specs and the plugin keeps no cross-server state.
 
 <a id="model-experience"></a>
 ## Model Experience

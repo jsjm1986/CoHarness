@@ -16,7 +16,6 @@ Authorize each managed request and its inherited execution chain using the curre
 - [Use this package](#use-this-package)
 - [Execution authorization](#execution-authorization)
 - [Revocation and cancellation](#revocation-and-cancellation)
-- [Invariants](#invariants)
 - [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -62,10 +61,6 @@ An idle Agent's owned running or stopping jobs retain their required qualificati
 
 Provider disposal aborts its transport lifetime and drains owned checks. Operation signals bound individual authorization and relay requests. The owning executor remains responsible for terminating and draining its work after cancellation.
 
-<a id="invariants"></a>
-## Invariants
-
-No invariant companion is published because a local mirror cannot independently prove current PostgreSQL permissions. The provider validates immutable scope references and rechecks authorization at execution admission.
 
 <a id="further-exploration"></a>
 ## Further Exploration

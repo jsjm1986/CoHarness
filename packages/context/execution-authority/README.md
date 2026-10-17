@@ -15,7 +15,6 @@ Carry verified human input identities through a Session and its delegated work, 
 
 - [Use this package](#use-this-package)
 - [Runtime contract](#runtime-contract)
-- [Invariants](#invariants)
 - [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -40,12 +39,6 @@ Delegation captures the actual initiating Agent before asynchronous creation. `r
 
 The required-on-read `gateway/execution` event preserves accepted participant facts and delegation restrictions. Before storing or exposing a modern scope, its Session records `gateway/scoped-execution`; readers without scoped authorization must reject that log. Scoped state without this admission marker is invalid. `gateway/continuation` separately records the source of automatic work. Old records without scope references remain readable; these vocabulary additions do not change the structural Session format. Generation metadata can carry the verified input references and one primary billing actor; [Auto review attribution](../../../.agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.md) owns their billing use.
 
-<a id="invariants"></a>
-## Invariants
-
-No invariant companion is published because this package defines the service and durable types but owns no independently changing state. Providers own current authorization and validate persisted input references.
-
-<a id="further-exploration"></a>
 ## Further Exploration
 
 - [Verified execution participants](../../../.agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.md) — identity, delegation, and permission-intersection decisions.

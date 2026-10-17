@@ -846,7 +846,6 @@ Source: [`packages/schedule/schedule/src/types.ts:365`](../packages/schedule/sch
 
  *
  * Only the `Session` constructor and `buildForkSeed` may create this marker.
- * The invariant companion deliberately constrains nothing here, so a plugin
  * appending one would silently classify every live bracket before it as seed history.
  *
  * An owner of a standalone open/close bracket (`compaction/start` …

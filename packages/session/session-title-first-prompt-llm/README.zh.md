@@ -17,18 +17,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。摘要通过 `ctx.llm` 生成并经标题 seam 对照一个确切 seq 提交；除已提交结果外不保留标题状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -761,9 +761,6 @@
     "ptc-runtime/ptc-runtime-node": {
       "sovereignty": "adapted"
     },
-    "runtime-diagnostics/invariants": {
-      "sovereignty": "tracked"
-    },
     "sandbox/sandbox": {
       "sovereignty": "tracked"
     },
@@ -1325,6 +1322,10 @@
       "package": "telemetry/otel",
       "reason": "excluded; session telemetry stays on the self-contained session-telemetry-otel",
       "replacedBy": "session/session-telemetry-otel"
+    },
+    {
+      "package": "runtime-diagnostics/invariants",
+      "reason": "upstream removed runtime invariant companions in dsh-v0.2.1-rc.2 (f028f25667d); projection/type gates own the former checks"
     }
   ],
   "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json"

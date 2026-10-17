@@ -19,7 +19,6 @@ kind: "package-library"
 
 - [路由与失败约定](#route-and-failure-contract)
 - [配置](#configuration)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -48,12 +47,6 @@ kind: "package-library"
 | `maxOutputTokens` | 辅助生成的正整数 token 上限。 |
 | `timeoutMs` | 运行时定时器限制内的正数端到端时限。 |
 | `provider`, `model` | 可选显式路由；二者同时提供或同时省略。 |
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。本包是共享的逐请求策略——取景、预算、组装——返回规范化文本；它不拥有持久标题状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

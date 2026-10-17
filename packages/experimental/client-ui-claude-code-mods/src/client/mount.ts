@@ -68,7 +68,6 @@ function watchSession(ctx: Context, sessionId: SessionId, onEnd: () => void): { 
     store,
     dispose: () => {
       controller.abort()
-      handle.dispose()
     },
   }
 }

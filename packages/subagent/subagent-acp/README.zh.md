@@ -21,7 +21,6 @@ ACP（Agent Client Protocol）提供方会在全新的子进程中运行每个 s
 - [持续成员（`resume`）](#persistent-members-resume)
 - [结束原因映射](#stop-reason-mapping)
 - [进程边界](#process-boundary)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -101,12 +100,6 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 子进程经由 [`dsh-subprocess`](../../subprocess/subprocess/README.zh.md) seam spawn：共享的凭据清除先移除疑似凭据的环境变量和环境中已有的 `DSH_*` 名称，显式 `config.env` 值在清除之后合并（有意转发的 `DEEPSEEK_API_KEY` 会保留下来，`DSH_PERMISSION_MODE` 这类 `DSH_*` 部署事实也以同样的方式到达子进程——清除只丢弃其陈旧的同名环境值），stderr 会继承到父进程自身的流，dispose 则先应用本插件的 EOF 时间窗，再由子进程责任方执行 SIGTERM→SIGKILL 升级并等待受管进程范围退出。提供方负责说明其进程约束和观察能力的限制。ACP 协议格式（wire format）是真正的序列化边界；同进程 subagent 值不会为防御目的而克隆。
 
 本包没有默认导出。否则 Cordis loader 的解包会隐藏具名 `inject` 元数据；见[事故复盘（postmortem）0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次运行通过 ACP 有线驱动一个子方；子方的运行时拥有其会话，提供方只持有进行中的客户端。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -157,7 +157,6 @@ Loader 结算后，app-boot 在仅 optional 条目未激活时输出警告。如
 | [`src/profile-sanitize.ts`](src/profile-sanitize.ts) | profile patch 备份与恢复 bundle 启用状态 |
 | [`src/config-schema/`](src/config-schema/) | Profile schema 生成、发现、原生投影与结果类型 |
 | [`src/profile-resolution/`](src/profile-resolution/) | 运行时 resolver、package metadata 服务与构建后 Worker bootstrap |
-| — | 不发布运行时不变式伴生入口；每个 runtime resolution 只有一个拦截所有，dual 模式在解析时比对独立物化的结果。 |
 
 </details>
 

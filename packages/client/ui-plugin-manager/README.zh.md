@@ -144,7 +144,6 @@ Host 入口通过生成的 Remote 接口暴露 `pluginRegistryProbe.fastest()`�
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 这些限制界定了管理视图的范围；它们是当前包的约束。
 
 - **页面生命周期**——刷新浏览器会丢失跟踪的请求与输出。同一页面内重连可以恢复活动请求；Host 不保留已完成的结果。profile 文件锁串行化安装写入。
@@ -164,5 +163,3 @@ Host 入口通过生成的 Remote 接口暴露 `pluginRegistryProbe.fastest()`�
 无。
 
 </details>
-
-**运行时不变式：** 不发布伴生检查。面板读取 Host 事实，安装源探测缓存只保存一次比较结果，没有独立维护的投影。

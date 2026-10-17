@@ -177,12 +177,12 @@ it('folds unknown-mode and external executions as leaf discovery rows', () => {
 })
 
 it('rejects mismatched catalog versions and restores checkpointed state', () => {
-  const bad = (version: number, mode: string) => ({
+  const bad = (version: number, mode: string): SessionEvent => ({
     type: 'subagent/catalog' as const,
     seq: SessionSeq(0),
     time: 0,
-    data: { version, childId: 'x', childCreatedAt: 1, mode, label: 'l' },
-  })
+    data: { version, childId: SessionId('x'), childCreatedAt: 1, mode, label: 'l' },
+  } as unknown as SessionEvent)
   const state = subagentCatalogProjectionDefinition.init(header, SessionLogOffset(0))
   for (const event of [bad(0, 'external'), bad(1, 'external'), bad(2, 'one-shot'), bad(3, 'external')]) {
     expect(() => subagentCatalogProjectionDefinition.apply(state, event)).toThrow()

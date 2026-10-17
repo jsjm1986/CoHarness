@@ -20,7 +20,6 @@ The analyzer can use independent `ts.Program` instances seeded from `tsconfig.ho
 - [Analysis Model](#analysis-model)
 - [Emission and Opt-in Publication](#emission-and-opt-in-publication)
 - [Repository-specific Cordis projection](#repository-specific-cordis-projection)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -49,11 +48,6 @@ Publication is package opt-in, and business packages without the corresponding p
 ## Repository-specific Cordis projection
 
 The root package export includes the model-driven extraction, completeness checks, and deterministic text renderers used by this repository's Cordis catalogs. They accept a `CordisCatalogPolicy`; repository-owned type links, foundation/exemption classifications, and inherited Cordis entries remain in `scripts/gen-cordis-catalog.ts` and are passed in explicitly. The generator package therefore contains projection mechanics, not a hidden copy of this repository's documentation taxonomy.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A compile-time transform from source types to `FaceModel`/`TypeGraph` data; its output is asserted by generator specs and it runs no runtime state.
 
 <a id="model-experience"></a>
 ## Model Experience

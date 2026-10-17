@@ -103,6 +103,4 @@ This provider contributes no request-prefix content. Its consumers own model-vis
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-No invariant companion is published: the verified hello digest, stream endpoint capabilities and lease cleanup are observed through the protocol itself; the adapter adds no independently observed relation.
-
 </details>

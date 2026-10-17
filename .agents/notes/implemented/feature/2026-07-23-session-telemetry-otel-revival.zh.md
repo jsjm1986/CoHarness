@@ -16,7 +16,6 @@ Status: implemented
 - **`session-telemetry/record` waterfall（瀑布式事件）** —— 相对分支版本的增量，也是该 seam 的脱敏扩展点。每条记录抵达任何后端前必经此处；seam 自身不带任何规则——最内层 `next()` 原样透传，部署方以监听器挂载自己的规则（通过变换 `next()` 的返回值堆叠），抛异常的规则将该记录 fail-closed 扣下。脱敏只作用于导出副本；canonical log 永不改写。
 - **`@deepseek-ai/dsh-session-telemetry-otel`** —— 参考后端：OTel 日志流水线（`LoggerProvider` → 本包字节/条数有界处理器 → OTLP/HTTP exporter），经 `exporter`/`processor` passthrough 与 `maxRequestBytes` 上限配置。`DISABLED` 是默认值，且不构造任何传输；[反馈门控遥测决策](2026-08-05-feedback-gated-session-telemetry.zh.md)定义了需显式启用的 `FULL` 与 `FEEDBACK_ONLY` 投递模式，这两种模式要求 `exporter.url`，且不移动脱敏或后端边界。[无缓冲反馈回放](../simplification/2026-08-06-buffer-free-feedback-telemetry.zh.md)避免在内存中创建会话前缀的第二份副本。
 
-
 边界公理保持不变：harness 的职责止于 `emit()`。请求批处理与字节/条数排队归本包（为采集端字节上限）；传输重试与 socket 丢失策略仍属 reporting SDK——投递是尽力而为（崩溃时至多一次），两份 README 对此如实陈述。
 
 ## 考虑过的替代方案

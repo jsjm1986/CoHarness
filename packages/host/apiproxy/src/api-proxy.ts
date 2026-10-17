@@ -222,6 +222,8 @@ export const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
   // participant's readable Sessions — the task store is global, visibility is not.
   'schedule/catalog',
   'pluginInventory/list',
+  'pluginMarket/listIndexes',
+  'pluginMarket/search',
   'dynamicCordisRunner/inventory',
   'llm/listProviders',
   'llm/listConfigurableProviders',
@@ -286,6 +288,9 @@ export const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set
   'agentPresets/read',
   'agentPresets/copy',
   'agentPresets/deletePreset',
+  // Index sources are shared mutable state persisted through Settings;
+  // participants without manage rights must not reconfigure them.
+  'pluginMarket/setIndexes',
   // Speech provider selection is shared mutable state; participants without
   // manage rights must not reconfigure the voice path for other members.
   'speech/configure',

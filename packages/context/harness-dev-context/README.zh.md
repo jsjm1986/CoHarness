@@ -75,10 +75,6 @@ kind: "package-reference"
 
 -----
 
-## Invariants
-
-**运行时不变量：** 不发布伴随模块。投影从已提交的 `system/message` 事件中准入段落，持久会话日志是准入文本的唯一权威，两条上下文行在每次请求时即时解析。
-
 <a id="model-experience"></a>
 ## 模型体验
 

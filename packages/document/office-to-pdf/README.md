@@ -64,8 +64,6 @@ The defaults retain 8 PDFs/128 MiB and 64 source aliases, admit 32 readers and 8
 
 Invalid engine metadata, missing required assets, and conversion errors reject the request instead of switching engines. The shared WASM engine uses LibreOffice's CPU image filter. Native conversion uses its separate platform engine.
 
-Each concurrent slot lazily creates and reuses one kit converter. The provider writes authorized input into a private temporary directory, reads a bounded regular PDF, and removes the directory before settling. Canceling an admitted reader does not block later queued work. Reader cancellation releases only that reader; the final reader and provider disposal cancel shared work. Disposal reports `unavailable` to outstanding readers and joins conversions and converter teardown. No runtime invariant companion is published because active operations and scratch cleanup have one lifetime owner.
-
 The ApiProxy file reader owns request authorization and cancellation; the converter owns admitted reads, conversion, cache, and engine teardown. Source-read failures pass through, and conversion failures expose a classified reason without engine diagnostics.
 
 </details>

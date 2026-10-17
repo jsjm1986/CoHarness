@@ -307,7 +307,7 @@ export async function assertReleaseReadiness(candidate: ReleaseCandidate, author
       if (environment === 'real-provider' && (!Array.isArray(stable.providerAssertions) || stable.providerAssertions.length === 0)) {
         throw new Error('release readiness: no executed provider assertion evidence')
       }
-      if (environment === 'artifact' && !['built-bin-smoke', 'node-next-types', 'built-package-invariants', 'publint', 'npm-pack', 'python-runtime', 'python-release', 'native-pack'].includes(String(requirement.check))) {
+      if (environment === 'artifact' && !['built-bin-smoke', 'node-next-types', 'publint', 'npm-pack', 'python-runtime', 'python-release', 'native-pack'].includes(String(requirement.check))) {
         throw new Error('release readiness: a source check is not published-artifact proof')
       }
     }

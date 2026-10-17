@@ -19,7 +19,6 @@ kind: "package-reference"
 - [测量约定](#measurement-contract)
 - [会话投影](#session-projections)
 - [组合](#composition)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -81,11 +80,6 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 ```
 
 两个插件都有可用默认值。meter 保持与模型路由和可选压缩无关。部署会在 LLM 适配器上配置容量，并在 `dsh-compaction-basic` 上配置压缩策略。
-
-<a id="invariants"></a>
-## 不变量
-
-不发布运行时不变式伴生插件：计量器从持久事件和当前请求上下文派生估算，没有可供独立比对的权威数据。
 
 
 <a id="model-experience"></a>

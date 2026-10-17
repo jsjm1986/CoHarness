@@ -154,7 +154,7 @@ A directly-plugged subtree is absent from `ctx.loader.entries()`, so no boot aud
 
 **A row that published a service into the root realm.** Such a service is process-global, so the second preset publishing the same name collides with the first, and a host reader would resolve one preset's instance for every session. A preset that genuinely owns a service puts it behind an `isolate` realm — entry-local realms keep two presets' same-named services apart exactly as they once kept two sessions' apart — or the service belongs in the host composition instead.
 
-The package invariant re-checks that last rule on every service notification, because a row that publishes from a timer or an asynchronous continuation would escape the one-shot audit.
+Mounting rejects a preset whose rows leaked a root-realm service; the check runs once at mount, so a row that publishes from a timer or an asynchronous continuation afterward escapes it.
 
 <a id="a-preset-file-is-an-input-never-a-persistence-target"></a>
 ## A preset file is an input, never a persistence target

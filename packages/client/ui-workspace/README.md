@@ -39,17 +39,11 @@ This package lets users browse grouped or flat Session lists, choose a Workspace
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Workspace and Session lists render from runtime mirrors and Host calls; the browser owns no workspace data.
 
 <a id="model-experience"></a>
 ## Model Experience

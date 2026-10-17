@@ -102,7 +102,6 @@ The package is a registry plus a cooperative assembly pipeline. One `assemble()`
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `SystemPrompt` service, config, assembly pipeline, `renderPrompt` |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion |
 
 ### Assembly and rendering
 
@@ -170,13 +169,11 @@ Prefix-stable while the visible schema set, rendering, and order are unchanged. 
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define when prompt assembly needs special care. They are current package constraints, not a task backlog.
 
 - **Deployment-authored prompt text is config/composition only** — this plugin owns the global persona prefix and suffix defaults, creator plugins may register agent-scoped shadows, and other sections come from the plugin that owns the fact; there is no end-user prompt-editing API.
 - **No inline escape syntax in interpolated text** — use `interpolate: false` when a whole section must preserve literal braces.
 - **`toolOrder` misconfiguration surfaces at prompt assembly (the first turn), not at boot** — only shape violations throw at config load.
-
 
 <a id="dev-note"></a>
 ### Dev Note

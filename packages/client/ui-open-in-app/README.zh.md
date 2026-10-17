@@ -57,8 +57,6 @@ kind: "package-reference"
 -----
 
 
-**运行时不变量：** 不发布 companion。插件注册一个词典 effect 与一个头部 slot 条目，HMR 安全测试已证明其可处置；可用性与选择存于 controller 的 snapshot store，没有可能分叉的第二份副本。
-
 <a id="model-experience"></a>
 ## 模型体验
 

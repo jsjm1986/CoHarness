@@ -20,7 +20,6 @@ kind: "package-reference"
 - [stdout 即协议](#stdout-is-the-protocol)
 - [关闭与退出语义](#shutdown-and-exit-semantics)
 - [协议说明](#wire-notes)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -55,12 +54,6 @@ Stdout 只承载 JSON-RPC 帧。部署不得组合 stdout logger；诊断应写�
 `session/resume` 在初始化后接受持久化的 `{ sessionId }`，待其 Agent 就绪后返回 `{}`。它通过 `agents.resume()` 加载历史、修复最后一个被中断的轮次，并保留存储的起始目录和当前有效目录，同时应用初始化时选定的模型路由。它不发送新输入。会话缺失、不可读、不兼容或被占用时，请求失败且不创建替代会话；已经持有或仍在打开的 id 视为被占用。对正在恢复的标识发送提示词时，会等待恢复完成；shutdown 会等待进行中的恢复并释放其 Agent。历史事件保留在日志中，不会作为新通知重新发送。
 
 `session/wait` 观察已有 SDK 会话，直到受管理后代及其触发的根 Agent 后续轮次完成。它拒绝未知或已释放的根 Agent，不会创建会话，并在后代检查期间根 Agent 持续空闲后响应。收件箱消息处于停放状态的空闲子级继续驻留，但不延迟此响应；后续唤醒输入可使其继续运行。完成前发出的会话通知在 stdio 传输上先于响应到达。Agent 的运行时错误会保留在对应的确切会话中，直到后续提交的 `turn/end` 记录结果；否则等待请求会失败，即使错误发生在等待请求之前。终止事件已经记录的错误仍通过会话事件表达，后续成功的活动会清除较早的运行时错误。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。服务器把每个 stdio 帧翻译为 harness 调用；会话状态留在它所驱动的运行时中。
-
 
 <a id="model-experience"></a>
 ## 模型体验

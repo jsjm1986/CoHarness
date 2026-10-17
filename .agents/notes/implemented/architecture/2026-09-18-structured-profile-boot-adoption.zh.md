@@ -17,7 +17,6 @@
 - `packages/boot/app-boot`、`packages/boot/cmdline`、`packages/host/plugin-inventory` 与 `apps/cli` 源码对齐上游；`apps/web/tests/scaffold.ts` 保留本地 gateway/downlink 脚手架，仅修签名。
 - 出厂 agent-preset 根目录作为派生补丁存留，追加在 `readProfilePatches` 结果之后——与 telemetry patch 同一位置；上游等价的 `includeShippedRoot` 随 7E 的 `agent-presets` 迁移落地，届时本地启动器补丁退役。
 - base 与 web bundle 的 `cordis.patch.yml` 接入 `dsh-hmr` 行（`root: []`、`disabled` 依赖缺失的 `profileContext`）与 plugin-manager 行；旧的 web 侧 HMR 禁用被移除，因为新包对 web 安全。
-- 新包 `dsh-hmr`、`dsh-plugin-manager`、`dsh-lazy-require`、`dsh-acp-app`、`dsh-sdk-app`、`dsh-sdk-minimal`、`dsh-mcp-resources` 落地并带本地 explained-empty invariant 伴随——遵循本地伴随政策而非上游放宽后的门禁。
 - `apps/cli` 的 `js-yaml` 升 `^5.2.3` 与 vendored include 对齐；`SystemPrompt` 配置转发 `persona` 改名 `personaPrefix`，`SubagentCapabilities.persona` 保留其独立语义。
 
 ## 已考虑的替代方案

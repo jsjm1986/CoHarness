@@ -21,7 +21,6 @@ import type { ContentBlock, GenerateOptions, MessageId, StreamChunk } from '@dee
 import { ToolCallId, createUserMessage, LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { defineContentToolFixture, type ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime, {
   SubagentError,
@@ -31,7 +30,6 @@ import SubagentRuntime, {
 } from '../src/index.ts'
 import type { SubagentRunEndInfo, SubagentRunInfo } from '../src/index.ts'
 import type { SubagentPromptRequestId } from '../src/control-types.ts'
-import * as SubagentInvariant from '../src/invariant.ts'
 import { loadStoredSession } from './persistence-helpers.ts'
 import {
   continuationActivations,
@@ -1166,8 +1164,6 @@ describe('direct-child Queue residency routing', () => {
 
   it('cold-resumes after the initial provider unregisters', async () => {
     const { ctx, parent } = await setup([textResponse('first'), textResponse('after resume')])
-    await ctx.plugin(InvariantRegistry)
-    await ctx.plugin(SubagentInvariant)
     const disposeProvider = ctx.subagents.registerProvider({
       name: 'retired',
       capabilities: { agentOptions: false, agentPreset: false, outputSchema: false, depthLimit: false },

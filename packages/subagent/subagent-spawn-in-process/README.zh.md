@@ -18,7 +18,6 @@ spawn 提供方会在当前进程中创建一个全新的子 `Agent`。子 agent
 - [行为](#behavior)
 - [能力](#capabilities)
 - [配置](#config)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -43,12 +42,6 @@ spawn 声明 `{ agentOptions: true, agentPreset: true, outputSchema: true, depth
 | 键 | 含义 |
 |---|---|
 | `providerName` | `ctx.subagents` 上的注册表名称（默认 `spawn`）。 |
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。子 Agent 由共享驱动器在调用内创建并释放；提供方不拥有运行后状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

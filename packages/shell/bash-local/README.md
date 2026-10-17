@@ -88,7 +88,6 @@ The executor is a Service Provider for the `ctx.shell` seam built on the subproc
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `LocalBashExecutor`, `Config`, settings-section wiring |
-| — | No runtime invariant companion is published; this package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam. |
 | `tests/executor.spec.ts` | Exercised behavior: budgets, classification, background handles, ownership |
 | `tests/settings.spec.ts` | Settings layering over the composition entry |
 
@@ -133,7 +132,6 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when this executor is a poor fit. They are current package constraints, not a roadmap.
 

@@ -11,6 +11,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AttachmentStore from '@deepseek-ai/dsh-attachment'
+import { collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import LlmRuntime, { LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import ModelAccessPolicy from '@deepseek-ai/dsh-model-access'
@@ -497,6 +498,7 @@ describe('Web session model selection', () => {
       },
       expiresAt: Date.now() + 60_000,
       signal: new AbortController().signal,
+      capabilities() { return collaborationCapabilities(this.participant) },
       authorize: id => Promise.resolve({
         sessionId: id,
         rootSessionId: id,

@@ -21,18 +21,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。插件在加载时把生成的贡献注册到 `ctx.typert`；产物数据由注册表拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -21,17 +21,11 @@ This package provides the in-app directory-browsing surface for the Web GUI: a S
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Every listing and creation is delegated to the Host directory-picker backend through `ctx.workspaces`; the dialog holds only transient interaction state.
 
 <a id="model-experience"></a>
 ## Model Experience

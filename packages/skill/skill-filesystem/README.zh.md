@@ -21,7 +21,6 @@ agent（智能体）可以使用来自仓库、自定义目录或用户 agent �
 - [发现](#discovery)
 - [目录变更检测](#catalog-change-detection)
 - [skill 格式](#skill-format)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -83,12 +82,6 @@ skill 可以是单层目录 bundle（`<name>/SKILL.md`），也可以是平铺 M
 这两个调用字段接受 YAML 布尔值，以及不区分大小写的 `true`/`false`、`yes`/`no`、`on`/`off` 和 `1`/`0`。`disable-model-invocation: true` 会从面向模型的目录和 loader 中排除该 skill；`user-invocable: false` 会从面向用户的命令中排除该 skill。每个省略的字段都默认为允许对应接口调用；提供方始终输出两个正向内部策略值，即使两个键都不存在也不例外。若使用驼峰拼写或提供非布尔调用值，系统会记录警告并从发现结果中排除整个 skill，而不是只丢弃该字段或回退到宽松的默认值。调用策略校验遵循失败时默认拒绝原则，因为忽略无效数据可能会在已禁用的接口上暴露 skill；类型错误的可选 `whenToUse` 和 `metadata` 值则会被省略，因为这两个字段目前都不授予调用权限。
 
 目录与正文具有独立的生命周期。发现阶段解析 frontmatter 以生成概述。每次 `skill(name)` 加载都会重新读取并解析当前文件，因此正文编辑不需要 hash、修订号、缓存失效或主动通知模型。若在发现与加载之间更改 frontmatter 中的名称，系统会拒绝陈旧名称并使提供方失效；下一次目录观察会发布新名称。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。skill 从文件系统发现，文件系统仍是唯一的目录权威；提供方不保留可供比较的第二索引。
-
 
 <a id="model-experience"></a>
 ## 模型体验

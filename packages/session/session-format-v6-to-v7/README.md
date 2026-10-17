@@ -33,8 +33,6 @@ V6 `kind: 'plugin'` message sources are rewritten to the namespaced `plugin:<nam
 
 The migration forwards each V6 event through source rewriting, tool-result lifting, and content migration, then validates the result under the V7 delivery rules: header fields, message sources, developer data, system-message fields, lifecycle relationships, fork results, and retired-syntax rejection. A header-only migration changes only `version`; whole-artifact validation applies the V7 event rules after conversion.
 
-No runtime invariant companion is published: this pure library has no registrations or independently mutable state to compare. Its codec and migration behavior is exercised by direct conversion tests and the JSONL provider's immutable-generation tests.
-
 <a id="model-experience"></a>
 ## Model Experience
 

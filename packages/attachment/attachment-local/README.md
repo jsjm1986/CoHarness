@@ -23,17 +23,11 @@ Store images and generic file attachments durably below `DSH_HOME` on the machin
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Published objects are immutable files addressed by content hash, and the staged atomic-publish path is asserted by filesystem-level specs; the provider keeps no mutable index of its own.
 
 <a id="model-experience"></a>
 ## Model Experience

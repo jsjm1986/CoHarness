@@ -22,17 +22,11 @@ The service does not validate catalog membership. A provider route may serve an 
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The service publishes one configured default value; there is no mutable relation for an invariant to observe.
 
 <a id="model-experience"></a>
 ## Model Experience

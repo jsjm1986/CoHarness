@@ -42,7 +42,6 @@ Status: implemented
 
 6 个常驻实例可承接正常 PR 流量。启用热备演练时，其稳态负载是每次 master 推送一个串行作业；禁用时，该池没有工作流产生的热备负载。若仍出现排队，用组织级注册 token（组织 Settings → Actions → Runners → New runner）追加注册实例。复制现有 runner 目录时**必须排除身份文件**——`rsync -a --exclude '.runner*' --exclude '.credentials*' --exclude '_diag' --exclude '_work' <src>/ <dst>/`（通配同时排除 `.runner_migrated`/`.credentials_migrated`——GitHub 会在迁移过的运行器上写入这些文件，它们同样会触发 already-configured 拒绝）——再跑 `config.sh`（原样拷贝 `.runner`/`.credentials` 会使其以 "already configured" 拒绝），然后**启动监听器**：`sudo ./svc.sh install ubuntu && sudo ./svc.sh start`。仅注册不会上线；只有启动了服务的 runner 才会增加容量。每个约一分钟。
 
-
 ### 切回
 
 删除 `DSH_CI_FAILOVER_LINUX` 或 `DSH_CI_FAILOVER_WINDOWS` 变量（或改为 `selfhosted` 以外的任何值），新的运行会解析到可移植的标准托管标签；若 `DSH_CI_ENTERPRISE_RUNNERS_ENABLED=true`，则解析到具名企业池。若故障期间追加注册过实例，将其移除。

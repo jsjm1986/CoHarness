@@ -12,8 +12,8 @@
   en: 6b5e57117bbe75a1
   zh: 7e45ce6130eac0fc
 /deepseek-ai-dsh-session-telemetry-otel/table-of-contents:
-  en: db0de18be046e070
-  zh: 7409aef706c82a04
+  en: 07b0c23ae611283e
+  zh: a9eaf3f3ca02632c
 /deepseek-ai-dsh-session-telemetry-otel/config:
   en: 651291bc4a3eb127
   zh: a62ad83cd936d405
@@ -21,11 +21,8 @@
   en: b16ca55cdd42b153
   zh: c1aab273173ccd0c
 /deepseek-ai-dsh-session-telemetry-otel/field-mapping:
-  en: 4f6d2fe686113055
-  zh: a12a1823ad2ab93e
-/deepseek-ai-dsh-session-telemetry-otel/invariants:
-  en: 7877c3ded46fe0db
-  zh: 9340b87b8341ba7a
+  en: 307379a7628108c1
+  zh: d47f18bf0dbed9e8
 /deepseek-ai-dsh-session-telemetry-otel/model-experience:
   en: a5a1c890ddacd9a9
   zh: 019c0d113e141853

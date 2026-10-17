@@ -115,5 +115,3 @@ The isolation policy deliberately gives up some browser compatibility:
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. `BrowserNavigation` is the sole URL-state writer; the store receives its immutable snapshots, and focused controller and component tests exercise publication and cleanup directly.
