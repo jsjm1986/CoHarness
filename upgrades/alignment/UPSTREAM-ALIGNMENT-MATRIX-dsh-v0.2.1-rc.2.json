@@ -4088,7 +4088,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "localPlan": "P9 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
-      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 168/773 target files byte-identical locally; 388 carry fork diffs; 217 not carried; 6 removed upstream this round."
+      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 177/773 target files byte-identical locally; 388 carry fork diffs; 208 not carried; 6 removed upstream this round."
     },
     {
       "area": "non-package:lefthook.yml",
@@ -4329,7 +4329,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "localPlan": "P9 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
-      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 1741/7874 target files byte-identical locally; 3368 carry fork diffs; 2765 not carried; 9 removed upstream this round."
+      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 1752/7874 target files byte-identical locally; 3366 carry fork diffs; 2756 not carried; 9 removed upstream this round."
     },
     {
       "area": "non-package:patches",
@@ -4790,7 +4790,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "localPlan": "P1 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
-      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 146/413 target files byte-identical locally; 181 carry fork diffs; 86 not carried; 9 removed upstream this round.",
+      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 148/413 target files byte-identical locally; 181 carry fork diffs; 84 not carried; 9 removed upstream this round.",
       "gateReplays": [
         {
           "path": "scripts/release/publish.ts",
@@ -14554,7 +14554,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "localPlan": "P4 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
-      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 22/35 target files byte-identical locally; 13 carry fork diffs; 0 not carried; 5 removed upstream this round."
+      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 23/35 target files byte-identical locally; 12 carry fork diffs; 0 not carried; 5 removed upstream this round."
     },
     {
       "area": "packages/schedule/tool-schedule",
@@ -14579,7 +14579,7 @@
       ],
       "localSovereignty": "tracked",
       "localPlan": "P4 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
-      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 0/8 target files byte-identical locally; 0 carry fork diffs; 8 not carried; 0 removed upstream this round."
+      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 8/8 target files byte-identical locally; 0 carry fork diffs; 0 not carried; 0 removed upstream this round."
     },
     {
       "area": "packages/sdk/client",
@@ -15945,7 +15945,7 @@
     },
     {
       "area": "packages/skill/tool-workspace-dependencies",
-      "status": "adapt",
+      "status": "retain",
       "localOwner": "packages/skill/tool-workspace-dependencies",
       "commitScope": [
         "packages/skill/tool-workspace-dependencies/"
@@ -15963,14 +15963,14 @@
         "packages/skill/tool-workspace-dependencies/tests/primary-runtime-copy.spec.ts",
         "packages/skill/tool-workspace-dependencies/tests/tool-workspace-dependencies.spec.ts"
       ],
-      "localSovereignty": "adapted",
+      "localSovereignty": "tracked",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/skill/tool-workspace-dependencies",
         "reviewState": "pending-cumulative-source-review"
       },
       "localPlan": "P1 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
-      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 1/8 target files byte-identical locally; 6 carry fork diffs; 1 not carried; 0 removed upstream this round."
+      "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-17: 3/8 target files byte-identical locally; 5 carry fork diffs; 0 not carried; 0 removed upstream this round."
     },
     {
       "area": "packages/spill/spill",
