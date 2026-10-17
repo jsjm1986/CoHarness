@@ -1,9 +1,12 @@
 /** Member-facing Remote surface: scope catalog, list/read, and participant-gated writes. */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
+import type { Context } from '@deepseek-ai/cordis'
+import type { SettingsSectionHooks } from '@deepseek-ai/dsh-settings'
 import { agentFor, memoryHarness } from './harness.ts'
-import type { MemoryScope } from '../src/index.ts'
+import MemoryService, { type Config } from '../src/index.ts'
+import type { MemoryScope, MemorySettings } from '../src/index.ts'
 
 const projectScope: MemoryScope = { kind: 'project' }
 const personalScope: MemoryScope = { kind: 'personal' }
@@ -159,5 +162,86 @@ describe('member writes', () => {
     ])
     expect([a, b].filter(r => r.ok)).toHaveLength(1)
     expect([a, b].filter(r => !r.ok && r.code === 'memory_exists')).toHaveLength(1)
+  })
+})
+
+/** A settings-service fake that exposes the installed section's hooks. */
+function fakeSettings(captured: { hooks?: SettingsSectionHooks<MemorySettings> }) {
+  return {
+    installSection: (_owner: Context, _ns: string, _schema: unknown, entry: MemorySettings,
+      hooks: SettingsSectionHooks<MemorySettings>) => {
+      hooks.setSource(() => entry)
+      hooks.onChange()
+      captured.hooks = hooks
+    },
+  }
+}
+
+describe('scope catalog edges', () => {
+  it('counts every entry inside a repeated workspace scope', async () => {
+    const test = await memoryHarness()
+    const agent = agentFor(test.ctx, 'mw', { cwd: '/tmp/work' })
+    await test.service.save({ ...input, scope: workspaceScope, key: 'a' }, { kind: 'agent', agent })
+    await test.service.save({ ...input, scope: workspaceScope, key: 'b' }, { kind: 'agent', agent })
+    const catalog = await test.service.memberScopes()
+    expect(catalog.scopes.find(view => view.scope.kind === 'workspace')?.entries).toBe(2)
+  })
+
+  it('offers nothing and reports unwritable while the memory section is disabled', async () => {
+    const captured: { hooks?: SettingsSectionHooks<MemorySettings> } = {}
+    const test = await memoryHarness({
+      beforeService: (ctx) => { ctx.provide('settings', fakeSettings(captured)) },
+    })
+    const hooks = captured.hooks
+    if (hooks === undefined) throw new Error('settings section was not installed')
+    hooks.setSource(() => ({ enabled: false }))
+    hooks.onChange()
+    const agent = agentFor(test.ctx, 'off', { cwd: '/tmp/work' })
+    expect(test.service.scopesFor(agent)).toEqual([])
+    const catalog = await test.service.memberScopes()
+    expect(catalog.enabled).toBe(false)
+    expect(catalog.scopes.every(view => !view.writable)).toBe(true)
+  })
+
+  it('reports writable=false when the caller cannot be captured', async () => {
+    const test = await memoryHarness({
+      config: { space: 'project' },
+      beforeService: (ctx) => { ctx.provide('collaboration', fakeCollaboration(undefined)) },
+    })
+    expect((await test.service.memberScopes()).scopes[0]?.writable).toBe(false)
+  })
+})
+
+describe('catalog ordering and foreign scopes', () => {
+  it('orders rows by kind, recency, then key, and skips records outside the scope', async () => {
+    vi.useFakeTimers()
+    try {
+      const test = await memoryHarness()
+      const agent = agentFor(test.ctx, 'sort', { cwd: '/tmp/work' })
+      vi.setSystemTime(new Date('2026-10-17T00:00:01.000Z'))
+      await test.service.save({ ...input, scope: personalScope, key: 'b' }, { kind: 'agent', agent })
+      await test.service.save({ ...input, scope: personalScope, key: 'a' }, { kind: 'agent', agent })
+      vi.setSystemTime(new Date('2026-10-17T00:00:02.000Z'))
+      await test.service.save({ ...input, scope: personalScope, key: 'c' }, { kind: 'agent', agent })
+      await test.service.save({ ...input, scope: personalScope, key: 'd', kind: 'background' }, { kind: 'agent', agent })
+      await test.service.save({ ...input, scope: workspaceScope, key: 'w' }, { kind: 'agent', agent })
+      expect((await test.service.list(personalScope)).map(entry => entry.key)).toEqual(['c', 'a', 'b', 'd'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('skips records whose scope belongs to another space', async () => {
+    const test = await memoryHarness({ config: { space: 'project' } })
+    test.ctx.provide('executionAuthority', { authorize: async () => ({ primaryActorUserId: 1 }) })
+    const agent = agentFor(test.ctx, 'pj', {})
+    await test.service.save({ ...input, scope: projectScope, key: 'p' }, { kind: 'agent', agent })
+    await test.fiber.dispose()
+    const fiber = await test.ctx.plugin(MemoryService, { space: 'personal' } as Config)
+    try {
+      expect((await test.ctx.memory.memberScopes()).scopes.map(view => view.scope.kind)).toEqual(['personal'])
+    } finally {
+      await fiber.dispose()
+    }
   })
 })

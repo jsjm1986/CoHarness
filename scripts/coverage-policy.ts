@@ -156,6 +156,10 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       'packages/client/ui-conversation/src/client/*',
       'packages/client/ui-primitives/src/DisclosureRow.tsx',
       'packages/client/ui-project-activity/src/*',
+      // Memory tab's right-sidebar timeline view is browser GUI debt; the
+      // tested client source stays under `src/client/` with the view files.
+      // TODO(gui): cover and remove with the client test lane above.
+      'packages/client/ui-memory/src/client/*',
       'packages/client/ui-tool/src/*',
       'packages/client/ui-slots/src/*',
       'packages/client/ui-layout/src/*',
