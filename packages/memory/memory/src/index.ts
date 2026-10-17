@@ -231,6 +231,16 @@ export default class MemoryService extends TypertRemoteService {
    * @returns the ordered catalog rows (entries without bodies).
    */
   async list(scope: MemoryScope): Promise<MemoryEntrySummary[]> {
+    return (await this.scopeEntries(scope)).map(summaryOf)
+  }
+
+  /**
+   * One scope's stored entries in catalog order: kind (guidance, profile,
+   * background, resource), then `updated.at` desc, then key asc.
+   * @param scope - The scope to read.
+   * @returns the ordered stored entries.
+   */
+  private async scopeEntries(scope: MemoryScope): Promise<MemoryEntry[]> {
     const prefix = memoryScopePrefix(scope)
     const entries: MemoryEntry[] = []
     for (const [recordKey, entry] of (await this.entries()).entries()) {
@@ -240,7 +250,7 @@ export default class MemoryService extends TypertRemoteService {
       KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
       || b.updated.at.localeCompare(a.updated.at)
       || a.key.localeCompare(b.key))
-    return entries.map(summaryOf)
+    return entries
   }
 
   /**
@@ -407,16 +417,7 @@ export default class MemoryService extends TypertRemoteService {
   @Remote('list')
   async memberList(request: MemoryScopeRequest): Promise<MemoryEntry[]> {
     if (!this.scopeOffered(request.scope)) return []
-    const prefix = memoryScopePrefix(request.scope)
-    const entries: MemoryEntry[] = []
-    for (const [recordKey, entry] of (await this.entries()).entries()) {
-      if (recordKey.startsWith(prefix)) entries.push(entry as MemoryEntry)
-    }
-    entries.sort((a, b) =>
-      KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
-      || b.updated.at.localeCompare(a.updated.at)
-      || a.key.localeCompare(b.key))
-    return entries
+    return this.scopeEntries(request.scope)
   }
 
   /**

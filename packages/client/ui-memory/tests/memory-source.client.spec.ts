@@ -118,7 +118,7 @@ describe('createMemorySource', () => {
     await subscribed(test, async () => {
       test.source.select('project')
       expect(test.hook.getSnapshot().selected).toBe('project')
-      test.listeners.changed.forEach(listener => listener())
+      test.listeners.changed.forEach((listener) => { listener() })
       await vi.waitFor(() => { expect(test.deps.scopes).toHaveBeenCalledTimes(2) })
       expect(test.hook.getSnapshot().selected).toBe('project')
     })
