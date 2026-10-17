@@ -1,5 +1,7 @@
 /**
  * Model-facing, workspace-authorized session-history search and read tools.
+ * Authorization is `cwd` equality, tightened by the composed `collaboration`
+ * participant-readable session set when that service is present.
  *
  * @module @deepseek-ai/dsh-tool-session-query
  */
