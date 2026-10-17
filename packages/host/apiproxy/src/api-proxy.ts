@@ -3,7 +3,7 @@
  * narrow RpcRequest<P> and echoes request.rpcId on the RpcResponse<T>.
  */
 
-import { REMOTE_SESSION_POLICIES, remoteSessionId } from './api/remote-session-routing.ts'
+import { lookupRemoteSessionPolicy, remoteSessionId } from './api/remote-session-routing.ts'
 import { hostSessionLifecycle } from './session-lifecycle.ts'
 import type {} from '@deepseek-ai/dsh-plugin-manager'
 import type {} from '@deepseek-ai/dsh-plugin-market'
@@ -353,7 +353,7 @@ export function invokeTypertRemote(ctx: Context, payload: TypertGatewayAuthoriza
       return rows.filter(entry => readable.has((entry as { sessionId: SessionId }).sessionId))
     })
   }
-  const rule = REMOTE_SESSION_POLICIES[payload.endpoint]
+  const rule = lookupRemoteSessionPolicy(payload.endpoint)
   if (rule === undefined || rule.action === 'read' || rule.execution !== 'request') return invoke()
   const id = remoteSessionId(payload.endpoint, payload.args)
   const agent = id === undefined ? undefined : ctx.agents.get(brandSessionId(id))
@@ -394,7 +394,7 @@ export async function authorizeTypertRemote(
   }
   const collaboration = ctx.get('collaboration')
   if (collaboration === undefined) return
-  const policy = REMOTE_SESSION_POLICIES[payload.endpoint]
+  const policy = lookupRemoteSessionPolicy(payload.endpoint)
   const action = policy?.action ?? 'manage'
   let authority: CollaborationAuthority
   try {

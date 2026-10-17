@@ -2,6 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import type { GatewayRequestPrincipal, GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
 import GatewayCollaboration from '../src/index.ts'
 
 const PRINCIPAL: GatewayRequestPrincipal = {
@@ -141,4 +142,37 @@ describe('GatewayCollaboration', () => {
     expect(request).toHaveBeenCalledTimes(2)
     await fiber.dispose()
   })
+})
+
+it('derives scope-level capabilities without contacting the gateway', async () => {
+  const runtime = {
+    requireCurrent: () => PRINCIPAL,
+    request: vi.fn(),
+    sessionCreation: () => undefined,
+  } as unknown as GatewayRuntime
+  const ctx = new Context()
+  ctx.provide('gatewayRuntime', runtime)
+  const fiber = ctx.plugin(GatewayCollaboration)
+  await fiber.await()
+
+  const authority = ctx.collaboration.capture()
+  expect(authority.capabilities()).toEqual({ actions: ['read', 'write', 'approve'] })
+  expect(runtime.request).not.toHaveBeenCalled()
+
+  const personal = {
+    ...PRINCIPAL,
+    claims: { ...PRINCIPAL.claims, scope: { kind: 'personal' } },
+  } as GatewayRequestPrincipal
+  const managed = {
+    ...PRINCIPAL,
+    claims: { ...PRINCIPAL.claims, scope: { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'rw', canManage: true } },
+  } as GatewayRequestPrincipal
+  const readOnly = {
+    ...PRINCIPAL,
+    claims: { ...PRINCIPAL.claims, scope: { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'ro' } },
+  } as GatewayRequestPrincipal
+  await fiber.dispose()
+  expect(collaborationCapabilities({ userId: 9, username: 'lin', displayName: 'Lin', role: 'user', scope: personal.claims.scope })).toEqual({ actions: ['read', 'write', 'approve', 'manage'] })
+  expect(collaborationCapabilities({ userId: 9, username: 'lin', displayName: 'Lin', role: 'user', scope: managed.claims.scope })).toEqual({ actions: ['read', 'write', 'approve', 'manage'] })
+  expect(collaborationCapabilities({ userId: 9, username: 'lin', displayName: 'Lin', role: 'user', scope: readOnly.claims.scope })).toEqual({ actions: ['read'] })
 })

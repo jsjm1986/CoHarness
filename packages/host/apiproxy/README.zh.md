@@ -62,7 +62,7 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 分层与协议决策记录在 [GUI 分层与 RPC 协议 RFC](../../../.agents/notes/implemented/architecture/2026-07-19-gui-layering-and-rpc-protocol.zh.md) 中；浏览器侧消费架构记录在 [Web 客户端架构 RFC](../../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.zh.md) 中。
 
-组合 `ctx.collaboration` 后，项目 scope 下的 Session 操作会在观察或修改对话前授权被寻址的根对话，而列表、搜索结果、stream 发布、workspace 引用和已附加 Session 数量会过滤不可读 Session id。只依赖 scope 的写操作要求已捕获的 `rw` 模式，且项目路径会保持在已配置项目根内。Typert Remote 分发使用明确的项目 allowlist：`commands/list`、`fileReferences/list` 与 `sessionReferenceResolver/candidates` 需要 Session `read`；`commands/execute`、`goals/*`、`messageFeedback/put` 与 `messageFeedback/delete` 需要 `write`；`messageFeedback/list` 需要 `read`；所有未分类或进程级 Remote 都会被拒绝。个人 principal 与未组合协作能力的组合保留普通 API 行为。
+组合 `ctx.collaboration` 后，项目 scope 下的 Session 操作会在观察或修改对话前授权被寻址的根对话，而列表、搜索结果、stream 发布、workspace 引用和已附加 Session 数量会过滤不可读 Session id。只依赖 scope 的写操作要求已捕获的 `rw` 模式，且项目路径会保持在已配置项目根内。Typert Remote 分发使用明确的项目 allowlist：`commands/list`、`fileReferences/list` 与 `sessionReferenceResolver/candidates` 需要 Session `read`；`commands/execute`、`goals/*`、`messageFeedback/put` 与 `messageFeedback/delete` 需要 `write`；`messageFeedback/list` 需要 `read`；所有未分类或进程级 Remote 都会被拒绝。Host 扩展通过 `registerRemoteSessionPolicy(endpoint, policy)` 声明自己的 Session 级端点——同一名字二次声明会抛错，因此一个端点的访问类只有一个所有者——`lookupRemoteSessionPolicy` 把内建与已注册条目一并解析供分发、wire 映射与 `remoteSessionId` 使用。个人 principal 与未组合协作能力的组合保留普通 API 行为。
 
 Mux 与 Host stream 仅合并尚未完成的授权请求。每批发布都会复核 Session 可读性，包括已入队的基线、workspace 引用、归档列表和 Session 范围的转发事件。先前读成功不会授权后续投递，中止会丢弃缓冲帧。
 

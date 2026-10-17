@@ -4,7 +4,9 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Context } from '@deepseek-ai/cordis'
 import Collaboration, {
   CollaborationError,
+  collaborationCapabilities,
   type CollaborationAccess,
+  type CollaborationCapabilities,
   type CollaborationAction,
   type CollaborationAuthority,
   type CollaborationInteractionKind,
@@ -159,6 +161,10 @@ class GatewayAuthority implements CollaborationAuthority {
         `Gateway session creation authorization failed: ${String(error)}`,
       )
     }
+  }
+
+  capabilities(): CollaborationCapabilities {
+    return collaborationCapabilities(this.participant)
   }
 
   async authorize(sessionId: SessionIdentity, action: CollaborationAction): Promise<CollaborationAccess> {
