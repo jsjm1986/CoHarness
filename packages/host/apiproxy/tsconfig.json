@@ -93,7 +93,7 @@
       "path": "../../llm/model-provider-config"
     },
     {
-      "path": "../../preset/agent-presets"
+      "path": "../../preset/agent-preset-registry"
     },
     {
       "path": "../../schedule/schedule"

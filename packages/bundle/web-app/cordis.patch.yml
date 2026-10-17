@@ -513,14 +513,14 @@
 # Only the SHIPPED root is an assembly fact: it sits beside the installed app's
 # own config, so `apps/cli`'s `composeProfile` resolves and patches it in — the
 # same treatment `distIndex` gets on the webserver row. The writable root is
-# `dsh-agent-presets`' own default (`includeUserRoot`), so a composition that
+# `dsh-agent-preset-registry`' own default (`includeUserRoot`), so a composition that
 # never reaches that patch still finds a person's presets.
 - insert:
     - id: office-to-pdf
       name: '@deepseek-ai/dsh-office-to-pdf'
 
-    - id: agent-presets
-      name: '@deepseek-ai/dsh-agent-presets'
+    - id: agent-preset-registry
+      name: '@deepseek-ai/dsh-agent-preset-registry'
       config:
         default: standard
 

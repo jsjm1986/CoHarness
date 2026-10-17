@@ -160,7 +160,7 @@ async function realHarness(
   const parent = {
     id: 'real-parent',
     ctx,
-    session: { header: { cwd: instance.workspace } },
+    session: { header: { cwd: instance.workspace }, append: () => {} },
   } as unknown as Agent
   return {
     harness: {
@@ -347,12 +347,12 @@ describe('real @openai/codex 0.153.4 product', () => {
     const safeParent = {
       id: 'safe-parent',
       ctx,
-      session: { header: { cwd: safeInstance.workspace } },
+      session: { header: { cwd: safeInstance.workspace }, append: () => {} },
     } as unknown as Agent
     const bypassParent = {
       id: 'bypass-parent',
       ctx,
-      session: { header: { cwd: bypassInstance.workspace } },
+      session: { header: { cwd: bypassInstance.workspace }, append: () => {} },
     } as unknown as Agent
     const safeController = new AbortController()
 

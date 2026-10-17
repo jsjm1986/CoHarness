@@ -7,7 +7,7 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The agent-preset surfaces: a General-settings row choosing which [preset](../../preset/agent-presets/README.md) new sessions are composed from, a chip on the new-session screen choosing the next session's, a read-only label in the session header, and a settings section that manages the roster — copy, delete, default, and the way into a preset's own files.
+The agent-preset surfaces: a General-settings row choosing which [preset](../../preset/agent-preset-registry/README.md) new sessions are composed from, a chip on the new-session screen choosing the next session's, a read-only label in the session header, and a settings section that manages the roster — copy, delete, default, and the way into a preset's own files.
 
 Each retained Workbench Session owns its preset chip and roster reads. Reads resolve the currently mounted namespace in that Session’s Context and recheck its generation before publishing the reply. Selection captures that Session’s browser identity, so focusing another pane cannot redirect a pending choice. The no-session creation flow and settings retain their current-space staged choice; it never applies to a different runtime’s blank Session.
 

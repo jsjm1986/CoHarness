@@ -748,7 +748,7 @@
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md"
     },
-    "preset/agent-presets": {
+    "preset/agent-preset-registry": {
       "sovereignty": "owned",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.0-rc.1.md"
     },
@@ -1311,12 +1311,12 @@
     {
       "package": "preset/agent-preset",
       "reason": "slated for P5 adoption in the two-package preset migration",
-      "replacedBy": "preset/agent-presets"
+      "replacedBy": "preset/agent-preset-registry"
     },
     {
       "package": "preset/agent-preset-registry",
       "reason": "slated for P5 adoption in the two-package preset migration",
-      "replacedBy": "preset/agent-presets"
+      "replacedBy": "preset/agent-preset-registry"
     },
     {
       "package": "telemetry/otel",

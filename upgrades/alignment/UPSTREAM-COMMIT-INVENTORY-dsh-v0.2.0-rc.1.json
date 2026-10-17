@@ -6810,7 +6810,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-presets",
+        "preset/agent-preset-registry",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",
@@ -7084,7 +7084,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-presets",
+        "preset/agent-preset-registry",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",
@@ -8669,7 +8669,7 @@
         "llm/plugin-package-inventory-deepseek",
         "preset/agent-preset",
         "preset/agent-preset-registry",
-        "preset/agent-presets",
+        "preset/agent-preset-registry",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sdk/server",
@@ -8993,7 +8993,7 @@
       "packages": [
         "bundle/web-app",
         "extensions/tool-cordis",
-        "preset/agent-presets"
+        "preset/agent-preset-registry"
       ],
       "bucket": "carried"
     },
@@ -9221,7 +9221,7 @@
       "packages": [
         "core/system-prompt",
         "extensions/tool-cordis",
-        "preset/agent-presets"
+        "preset/agent-preset-registry"
       ],
       "bucket": "carried"
     },
@@ -13925,7 +13925,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-presets",
+        "preset/agent-preset-registry",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",
@@ -14244,7 +14244,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-presets",
+        "preset/agent-preset-registry",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",
@@ -14611,7 +14611,7 @@
         "lsp/tool-lsp",
         "mcp/mcp-client",
         "plan/plan-mode",
-        "preset/agent-presets",
+        "preset/agent-preset-registry",
         "preset/persona",
         "runtime-diagnostics/invariants",
         "sandbox/sandbox",

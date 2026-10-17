@@ -248,7 +248,7 @@ export function composeRows(layers: readonly PatchOptions[][]): Map<string, Entr
  * @returns the roster patch, or `undefined` when the composition has no roster row.
  */
 export function resolveShippedPresetPatch(rows: ReadonlyMap<string, EntryOptions>): PatchOptions | undefined {
-  const row = rows.get('agent-presets')
+  const row = rows.get('agent-preset-registry')
   if (row === undefined) return undefined
   const config: unknown = row.config ?? {}
   if (typeof config !== 'object' || config === null || Array.isArray(config) || isJsExpr(config)) {
@@ -259,7 +259,7 @@ export function resolveShippedPresetPatch(rows: ReadonlyMap<string, EntryOptions
     throw new TypeError(`${NAME}: agent-presets config.roots must be a literal array — the launcher prepends the shipped preset root into it`)
   }
   return {
-    id: 'agent-presets',
+    id: 'agent-preset-registry',
     config: {
       ...(config as Record<string, unknown>),
       roots: [{ path: SHIPPED_PRESET_ROOT, trust: 'system' }, ...(configured as unknown[])],

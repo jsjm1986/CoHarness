@@ -7,7 +7,7 @@ import { Context, FiberState, type Plugin } from '@deepseek-ai/cordis'
 import { PluginPackages, readPluginMeta, type RuntimeResolution } from '@deepseek-ai/dsh-app-boot'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
-import type { AgentPresets } from '@deepseek-ai/dsh-agent-presets'
+import type { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
 import PluginInventoryGateway from '../src/index.ts'
 
 const contexts: Context[] = []
@@ -115,7 +115,7 @@ describe('PluginInventoryGateway', () => {
           { entryId: null, moduleName: 'local-plugin/private', enabled: false },
         ],
       }],
-    } as Partial<AgentPresets> as never)
+    } as Partial<AgentPresetRegistry> as never)
 
     expect(await inventory.list()).toEqual({
       entries: [],
@@ -212,7 +212,7 @@ describe('PluginInventoryGateway', () => {
         },
         { id: 'damaged', trust: 'user', isDefault: false, broken: 'the composition file is missing', rows: [] },
       ],
-    } as Partial<AgentPresets> as never)
+    } as Partial<AgentPresetRegistry> as never)
 
     const snapshot = await inventory.list()
     expect(snapshot.agentPresets).toEqual([

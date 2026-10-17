@@ -202,7 +202,7 @@
       "status": "adapt",
       "localOwner": "Preset and webhook owners",
       "commitScope": [
-        "packages/preset/agent-presets",
+        "packages/preset/agent-preset-registry",
         "packages/preset/agent-preset",
         "packages/preset/agent-preset-registry"
       ],

@@ -19,7 +19,7 @@
 # A service row here MUST sit inside a group carrying an `isolate` realm.
 # Without one it publishes into the root realm, where it is process-global
 # rather than per-session and the second session mounting this preset collides
-# with the first; `dsh-agent-presets` rejects that at mount. `true` means an
+# with the first; `dsh-agent-preset-registry` rejects that at mount. `true` means an
 # entry-local realm — one private instance per mounted session, which is the
 # default this deployment wants. A shared label would instead pool one instance
 # across every session naming it.

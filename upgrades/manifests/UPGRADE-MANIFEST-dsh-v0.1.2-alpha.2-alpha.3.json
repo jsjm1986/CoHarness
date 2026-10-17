@@ -137,8 +137,8 @@
       "scripts/verify-npm-install-layout.ts"
     ],
     "inventoryAndLocales": [
-      "packages/preset/agent-presets/src/composition-inventory.ts",
-      "packages/preset/agent-presets/src/display.ts",
+      "packages/preset/agent-preset-registry/src/composition-inventory.ts",
+      "packages/preset/agent-preset-registry/src/display.ts",
       "packages/host/plugin-inventory/src/index.ts",
       "packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.tsx",
       "packages/client/ui-permission-presets/src/client/locales.ts"

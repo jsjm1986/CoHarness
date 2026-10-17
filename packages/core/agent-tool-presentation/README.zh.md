@@ -7,11 +7,11 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-[agent preset](../../preset/agent-presets/README.zh.md) 用来声明「模型看到的工具是哪一种形态」的那一行：`native`（全部 schema）或 `ptc`（只有 `run_code` 加一份生成的 TypeScript SDK）。
+[agent preset](../../preset/agent-preset-registry/README.zh.md) 用来声明「模型看到的工具是哪一种形态」的那一行：`native`（全部 schema）或 `ptc`（只有 `run_code` 加一份生成的 TypeScript SDK）。
 
 ## 概述
 
-在 [agent preset](../../preset/agent-presets/README.zh.md) 中使用 `dsh-agent-tool-presentation`，可固定模型看到全部原生工具 schema，还是只有带生成 SDK 的 `run_code`。每个 preset 可独立选择，因此 native 与 PTC agent 可以共享同一进程，而不共享工具目录。选择 `ptc` 需要兼容的 PTC 运行时；没有该运行时的部署会在挂载时拒绝 preset，不会等到收到第一条提示词。使用本包时 `mode` 字段为必填；省略本包则沿用部署默认值。
+在 [agent preset](../../preset/agent-preset-registry/README.zh.md) 中使用 `dsh-agent-tool-presentation`，可固定模型看到全部原生工具 schema，还是只有带生成 SDK 的 `run_code`。每个 preset 可独立选择，因此 native 与 PTC agent 可以共享同一进程，而不共享工具目录。选择 `ptc` 需要兼容的 PTC 运行时；没有该运行时的部署会在挂载时拒绝 preset，不会等到收到第一条提示词。使用本包时 `mode` 字段为必填；省略本包则沿用部署默认值。
 
 ## 目录
 
@@ -33,7 +33,7 @@ preset 能拥有的是这份注册表的**呈现方式**。`ctx.tools.presentAs(
 <a id="what-it-does"></a>
 ## 它做什么
 
-`native` 立即生效。PTC mode 则等待 `ctx.ptcRuntime`——这是一个宿主平面服务（[`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.zh.md)）：若某个 preset 在未组装运行时的部署上选择 PTC mode，本行就停在 pending，`dsh-agent-presets` 会指名此 id 拒绝挂载。另一种做法——先乐观应用——会把失败推迟到该会话的第一次请求，那时操作者对 preset 和组装都已无从下手。
+`native` 立即生效。PTC mode 则等待 `ctx.ptcRuntime`——这是一个宿主平面服务（[`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.zh.md)）：若某个 preset 在未组装运行时的部署上选择 PTC mode，本行就停在 pending，`dsh-agent-preset-registry` 会指名此 id 拒绝挂载。另一种做法——先乐观应用——会把失败推迟到该会话的第一次请求，那时操作者对 preset 和组装都已无从下手。
 
 `mode` 是必填而非有默认值：不带这一行的 preset 本来就会拿到部署默认值，省略它等于这一行白组装了。
 

@@ -76,7 +76,7 @@ const CODEX_PLATFORM_PACKAGES = [
 
 const fakeParent = {
   id: 'parent',
-  session: { header: { cwd: process.cwd() } },
+  session: { header: { cwd: process.cwd() }, append: () => {} },
 } as unknown as Agent
 
 function request(
@@ -755,7 +755,7 @@ describe('task admission and package contracts', () => {
       prompt: [{ type: 'text', text: 'task' }],
       parent: {
         id: 'parent-without-cwd',
-        session: { header: {} },
+        session: { header: {}, append: () => {} },
       } as unknown as Agent,
       signal: new AbortController().signal,
     }))
@@ -2197,7 +2197,7 @@ describe('run lifecycle and quiescence', () => {
 
     const invalidCwdParent = {
       id: 'parent-with-invalid-cwd',
-      session: { header: { cwd: 'relative/SECRET_TOKEN' } },
+      session: { header: { cwd: 'relative/SECRET_TOKEN' }, append: () => {} },
     } as unknown as Agent
     const invalidCwdError: unknown = await ctx.subagents.start('codex-diagnostic', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],

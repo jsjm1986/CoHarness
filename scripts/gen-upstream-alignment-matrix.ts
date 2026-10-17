@@ -88,20 +88,15 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
     rejectReason: 'Same-key upstream package with unrelated semantics: CoHarness owns session-format-v3-to-v4 for the released v3→v4 edge, while upstream rc.1 uses the key for its V4-generation line. Recorded upstreamShadowed in scripts/upstream-sync.json. Upstream V4 event vocabulary (developer/message, forked, tool-role streaming, attachments, plugin:<name>) is absorbed event-by-event into the fork v6→v7 edge — never file-merged.',
     localDisposition: 'Owner decision: retain v6 generation; absorb upstream event semantics via a new adjacent v6→v7 migration edge in P4.',
   },
-  'packages/preset/agent-presets': {
-    status: 'adapt',
-    targetAssessment: 'increment-review-required',
-    localDisposition: 'Owner decision: migrate to the upstream two-package structure (agent-preset + agent-preset-registry) in P5 while preserving derivePatches hooks, the Typert Remote contract, realm split, and the settings namespace. All consumers rewire in the same phase.',
-  },
   'packages/preset/agent-preset': {
-    status: 'required',
+    status: 'adapt',
     targetAssessment: 'inherited-scope-review-required',
-    localDisposition: 'Upstream preset payload half of the two-package split; carried in P5 with the registry, re-hung on the fork remote/authoring layer.',
+    localDisposition: 'Upstream preset authoring skill pack (skills/templates/locales) carried in P5 alongside the registry split; the fork js-yaml line is 5.x. The fork file-model presets keep their embedded skills, so the packaged skills serve upstream-style declared presets.',
   },
   'packages/preset/agent-preset-registry': {
-    status: 'required',
+    status: 'adapt',
     targetAssessment: 'inherited-scope-review-required',
-    localDisposition: 'Upstream preset registry half of the two-package split (acquireScope/recompose/select + remoteExportList). Carried in P5; fork webhook/subagent/apiproxy consumers rewire onto it.',
+    localDisposition: 'Owner decision: migrated to the upstream two-package structure in P5 while preserving the Typert Remote contract, realm split, authoring/inventory layers, and the settings namespace. The registry merges the upstream declaration model (register/generations/acquireScope/inspectCompositions) onto the fork file-discovery and standing-generation core; all consumers rewired in the same phase.',
   },
   'packages/settings/settings-file': {
     status: 'reject',

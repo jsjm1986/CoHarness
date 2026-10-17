@@ -219,7 +219,7 @@ N01、N03、N04 会共同修改 ChatView 的分页锚点、尾部折叠和 usage
 | F04 | `implemented` | `packages/host/directory-picker-native/src/win32-dialog-bindings.ts` | UTF-16 unit 测试已通过；Windows runner 仍缺 |
 | F05 | `baseline-equivalent` | `packages/client/ui-tool` 已有 terminal/generic 展开卡 | 本次只要求 pwsh/错误路径回归；无替换计划 |
 | F06 | `implemented` | `apps/cli/src/profile-boot.ts`、`dump-config.ts` | shipped preset root 测试已通过；旧 profile 需回归 |
-| F07 | `implemented` | `packages/preset/agent-presets/src/{discovery,specifier}.ts` | broken health/diagnostic 测试已通过 |
+| F07 | `implemented` | `packages/preset/agent-preset-registry/src/{discovery,specifier}.ts` | broken health/diagnostic 测试已通过 |
 | F08 | `baseline-equivalent` | minimal preset 当前不挂载 goal | 只做配置 dump/快照回归，不额外挂载服务 |
 | F09 | `implemented` | `packages/fs/tool-str-replace-editor/src/index.ts` | null placeholder schema/工具测试已通过 |
 | F10 | `implemented` | `packages/core/tools/src/index.ts`、code/PTC tests | direct-call guard 与历史 `code` alias 已覆盖 |
@@ -407,7 +407,7 @@ pnpm run verify-third-party-notices
 | 改动面 | 必跑范围 |
 | --- | --- |
 | PTY/进程 | `packages/subprocess/subprocess-local`、`packages/terminal/terminal-bash`、`packages/shell/tool-bash-persistent` |
-| Win32/preset/editor | `packages/host/directory-picker-native`、`packages/preset/agent-presets`、`packages/fs/tool-str-replace-editor` |
+| Win32/preset/editor | `packages/host/directory-picker-native`、`packages/preset/agent-preset-registry`、`packages/fs/tool-str-replace-editor` |
 | Session/codec/token/image | `packages/core/session`、`packages/session/session-persistence*`、`packages/llm/token-meter`、`packages/llm/llm-deepseek`、`packages/attachment`、`packages/compaction` |
 | UI/input/locale | `packages/client/locale`、`packages/client/ui-conversation`、`packages/client/ui-user-questions`、`packages/client/ui-primitives`、`packages/client/ui-tool`、`packages/client/ui-trajectory` |
 | Remote/Gateway | `packages/api/*`、`packages/host/apiproxy`、`packages/client/connection`、`packages/client/runtime`、`gateway/tests` |

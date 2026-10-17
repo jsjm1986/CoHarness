@@ -20,7 +20,7 @@ import type {} from '@deepseek-ai/dsh-api-terminal-controller'
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentSetup, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
-import type {} from '@deepseek-ai/dsh-agent-presets/types'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
@@ -79,8 +79,8 @@ import {
   InvalidPresetIdError, PresetExistsError, PresetMountError,
   PresetNotWritableError, resolveSessionPreset,
   UnknownPresetError,
-} from '@deepseek-ai/dsh-agent-presets'
-import type { PresetBearingSession } from '@deepseek-ai/dsh-agent-presets'
+} from '@deepseek-ai/dsh-agent-preset-registry'
+import type { PresetBearingSession } from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {
   ApiProxy, ConfigurableProviderView, CredentialView, DiscoveredModelView, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
@@ -5753,9 +5753,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const preset = await presets.resolve(agentPreset)
           // Same line as copy/remove draw: the shipped install is not the
           // user's to manage, and pointing an editor into it invites edits an
-          // upgrade will silently overwrite.
-          if (preset.trust !== 'user') {
-            throw new PresetNotWritableError(preset.id, 'it ships with the deployment')
+          // upgrade will silently overwrite. A declared preset has no
+          // directory at all — its composition lives in code.
+          if (preset.trust !== 'user' || preset.path === undefined) {
+            throw new PresetNotWritableError(preset.id, preset.path === undefined
+              ? 'it is declared by a plugin'
+              : 'it ships with the deployment')
           }
           // The id resolved against the Host's own roots is what selects the
           // directory — no browser payload carries a path in either direction

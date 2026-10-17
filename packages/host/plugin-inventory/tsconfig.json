@@ -12,7 +12,7 @@
       "path": "../../boot/app-boot"
     },
     {
-      "path": "../../preset/agent-presets"
+      "path": "../../preset/agent-preset-registry"
     },
     {
       "path": "../../util/package-manifest"

@@ -1804,13 +1804,13 @@
     "d2c3345795169400442563b4923671c090a724eacaaae7f0c190297b967c1c4d": 1,
     "dfa30a521aae411e70eee81fc4c0511178589d0656dea01c1c97131bfe097793": 1
   },
-  "packages/preset/agent-presets/tests/composition-inventory.spec.ts": {
+  "packages/preset/agent-preset-registry/tests/composition-inventory.spec.ts": {
     "d605b1b21956ba1f53673edb27c22a40631b6d1af18286ae1d0cf81c5ce1ea8b": 1
   },
-  "packages/preset/agent-presets/tests/mount.spec.ts": {
+  "packages/preset/agent-preset-registry/tests/mount.spec.ts": {
     "92cb9ce1fc5e337381501a17571425bff9c50e31b92c9a8c2460976b652d6283": 3
   },
-  "packages/preset/agent-presets/tests/user-root.spec.ts": {
+  "packages/preset/agent-preset-registry/tests/user-root.spec.ts": {
     "4b091634b70445a68ff23a94065070b1c0b75a68712b1813bf417120a174422d": 1
   },
   "packages/ptc-runtime/ptc-runtime-node/tests/host-failures.spec.ts": {

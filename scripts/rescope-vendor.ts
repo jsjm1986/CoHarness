@@ -103,7 +103,7 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   // TODO(alpha.2): restore apps/cli/tests/web-agent-presets.e2e.ts with the
   // shipped-presets port that exports SHIPPED_PRESET_ROOT.
   { file: 'apps/web/tests/agent-preset-authoring.e2e.ts', upstream: ['cordis'] },
-  { file: 'packages/preset/agent-presets/tests/session.spec.ts', upstream: ['cordis'] },
+  { file: 'packages/preset/agent-preset-registry/tests/session.spec.ts', upstream: ['cordis'] },
   // The preset's own composition: its header comment and its system prompt name
   // the preset a model mounts, so the scoped name would send the model after an
   // id no roster reports.

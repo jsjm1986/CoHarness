@@ -27,7 +27,7 @@ import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-test
 const mockServer = fileURLToPath(new URL('./mock-acp-server.ts', import.meta.url))
 
 /** A parent Agent stub. The directory fixture reads its session header's cwd as the effective workspace the child inherits. */
-const fakeParent = { id: 'parent', session: { header: { cwd: process.cwd() } } } as unknown as Agent
+const fakeParent = { id: 'parent', session: { header: { cwd: process.cwd() }, append: () => {} } } as unknown as Agent
 
 function request(text = 'p', signal = new AbortController().signal) {
   return { prompt: [{ type: 'text' as const, text }], parent: fakeParent, signal }
@@ -164,7 +164,7 @@ describe('child env layering (through the subprocess seam)', () => {
     // config.env; the seam's scrub drops only the AMBIENT namesakes, so the
     // explicit entry merges after it and the child must see the value.
     const ctx = await setup({ MOCK_ECHO_ENV: 'DSH_ACP_TEST_FACT', DSH_ACP_TEST_FACT: 'managed' })
-    const parent = { id: 'parent', session: { header: { cwd: process.cwd() } } } as unknown as Agent
+    const parent = { id: 'parent', session: { header: { cwd: process.cwd() }, append: () => {} } } as unknown as Agent
     const run = await ctx.subagents.start('acp', withExecutionContext(ctx, {
       label: 'p', prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal,
     }))
@@ -345,7 +345,7 @@ describe('cwd resolution', () => {
     const workdir = realpathSync(mkdtempSync(join(tmpdir(), 'acp-parent-cwd-')))
     try {
       const ctx = await setup({ MOCK_ECHO_CWD: '1' })
-      const parent = { id: 'parent', session: { header: { cwd: workdir } } } as unknown as Agent
+      const parent = { id: 'parent', session: { header: { cwd: workdir }, append: () => {} } } as unknown as Agent
       const run = await ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
       const result = await run.result
       await run.dispose()
@@ -438,7 +438,7 @@ describe('cwd resolution', () => {
     // header, and resolving it against the server process cwd would silently
     // re-introduce the launch-directory dependency this resolution removes.
     const ctx = await setup({})
-    const parent = { id: 'parent', session: { header: { cwd: 'relative/workspace' } } } as unknown as Agent
+    const parent = { id: 'parent', session: { header: { cwd: 'relative/workspace' }, append: () => {} } } as unknown as Agent
     await expect(ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })))
       .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
   })
@@ -449,7 +449,7 @@ describe('cwd resolution', () => {
     writeFileSync(file, 'x')
     try {
       const ctx = await setup({})
-      const parent = { id: 'parent', session: { header: { cwd: file } } } as unknown as Agent
+      const parent = { id: 'parent', session: { header: { cwd: file }, append: () => {} } } as unknown as Agent
       await expect(ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })))
         .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
     } finally {
@@ -466,7 +466,7 @@ describe('cwd resolution', () => {
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(LocalSubprocessRuntime)
       await ctx.plugin(acp, { providerName: 'acp', command: 'touch', args: [sentinel], permission: 'reject', env: {} })
-      const parent = { id: 'parent', session: { header: { cwd: join(tmp, 'vanished') } } } as unknown as Agent
+      const parent = { id: 'parent', session: { header: { cwd: join(tmp, 'vanished') }, append: () => {} } } as unknown as Agent
       await expect(ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })))
         .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
       expect(existsSync(sentinel)).toBe(false)

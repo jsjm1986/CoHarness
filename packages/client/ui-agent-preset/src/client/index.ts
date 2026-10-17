@@ -53,8 +53,8 @@ export {
 } from './section-store.ts'
 export type { AgentPresetOption, AgentPresetSettingsState } from './settings-store.ts'
 export { AGENT_PRESET_SETTINGS_NS, writeDefaultPreset } from './settings-store.ts'
-export { presetDisplayText } from '@deepseek-ai/dsh-agent-presets/display'
-export type { PresetDisplaySource, PresetDisplayText } from '@deepseek-ai/dsh-agent-presets/display'
+export { presetDisplayText } from '@deepseek-ai/dsh-agent-preset-registry/display'
+export type { PresetDisplaySource, PresetDisplayText } from '@deepseek-ai/dsh-agent-preset-registry/display'
 
 /** Required services (cordis fiber inject). */
 export const inject = [

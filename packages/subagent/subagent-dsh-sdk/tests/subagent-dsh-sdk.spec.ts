@@ -29,7 +29,7 @@ import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-test
 const fakeRuntime = fileURLToPath(new URL('../../../sdk/client/tests/fake-runtime.ts', import.meta.url))
 
 /** A parent Agent stub. The directory fixture reads its session header's cwd as the effective workspace the child inherits. */
-const fakeParent = { id: 'parent', session: { header: { cwd: process.cwd() } } } as unknown as Agent
+const fakeParent = { id: 'parent', session: { header: { cwd: process.cwd() }, append: () => {} } } as unknown as Agent
 
 function request(text = 'p', signal = new AbortController().signal) {
   return { label: text, prompt: [{ type: 'text' as const, text }], parent: fakeParent, signal }

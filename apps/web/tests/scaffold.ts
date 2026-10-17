@@ -450,7 +450,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // Only the shipped root: a developer's own `~/.dsh/.agent-presets` must not be
     // able to change a golden.
     {
-      id: 'agent-presets',
+      id: 'agent-preset-registry',
       config: {
         default: 'standard',
         roots: [{ path: SHIPPED_PRESET_DIR, trust: 'system' }],
@@ -544,7 +544,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       ? []
       // Never the derived harness-home root: a developer's own presets must not
       // be able to change a golden, whatever roots a scenario asks for.
-      : [{ id: 'agent-presets', config: { ...options.agentPresets, includeUserRoot: false } }],
+      : [{ id: 'agent-preset-registry', config: { ...options.agentPresets, includeUserRoot: false } }],
     ...options.toolsMode === undefined ? [] : [{ id: 'tools', config: { mode: options.toolsMode } }],
     // The shipped Web bundle already owns both runners and the Cordis UI. This
     // scenario adds only the model-facing tools that exercise those services.

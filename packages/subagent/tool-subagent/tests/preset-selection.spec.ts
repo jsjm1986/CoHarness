@@ -9,7 +9,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import AgentPresets, { PresetMountError } from '@deepseek-ai/dsh-agent-presets'
+import AgentPresetRegistry, { PresetMountError } from '@deepseek-ai/dsh-agent-preset-registry'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -54,7 +54,7 @@ async function setup(config: Omit<tool.Config, 'provider'>, providerConfig: Part
   ctx.loader.builtins.include = Include
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(AgentPresets, { default: 'writer', roots: [{ path: presetsRoot, trust: 'system' }], includeUserRoot: false })
+  await ctx.plugin(AgentPresetRegistry, { default: 'writer', roots: [{ path: presetsRoot, trust: 'system' }], includeUserRoot: false })
   const presets = new Map<string, () => void>()
   for (const id of ['writer', 'reviewer']) {
     registerPreset(presetsRoot, { id, description: `${id} persona`, plugins: [] })

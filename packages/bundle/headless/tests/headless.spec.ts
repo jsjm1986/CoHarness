@@ -116,7 +116,7 @@ function appendTurn(
   })
 }
 
-/** Append the preset-selection event owned by dsh-agent-presets. */
+/** Append the preset-selection event owned by dsh-agent-preset-registry. */
 function selectPreset(session: Session, agentPreset: string): void {
   const target = session as unknown as { append(type: string, data: unknown): void }
   target.append('agent-preset/selected', { agentPreset })

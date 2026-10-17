@@ -20,8 +20,8 @@ import type { WorkspaceId } from '../src/api/workspace.ts'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import {
   InvalidPresetIdError, PresetExistsError, UnknownPresetError,
-} from '@deepseek-ai/dsh-agent-presets'
-import type {} from '@deepseek-ai/dsh-agent-presets/types'
+} from '@deepseek-ai/dsh-agent-preset-registry'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import { createApiProxy } from '../src/api-proxy.ts'
 import { describe, expect, it } from 'vitest'
 

@@ -12,7 +12,7 @@ import Include from '@deepseek-ai/cordis-plugin-include'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import AgentPresets, { UnknownPresetError } from '@deepseek-ai/dsh-agent-presets'
+import AgentPresetRegistry, { UnknownPresetError } from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -61,7 +61,7 @@ async function setup() {
   await ctx.plugin(JsonlSessionPersistence, { root: join(root, 'sessions') })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(TestSessionQuery)
-  const presets = await ctx.plugin(AgentPresets, {
+  const presets = await ctx.plugin(AgentPresetRegistry, {
     default: 'coding',
     roots: [{ path: join(root, 'presets'), trust: 'system' }],
     includeUserRoot: false,

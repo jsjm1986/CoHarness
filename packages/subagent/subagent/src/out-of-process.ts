@@ -150,7 +150,7 @@ export async function resolveChildExecution(
 ): Promise<ChildExecution> {
   signal.throwIfAborted()
   const remote = agent.session.header.sshTarget !== undefined
-  const environmentForAgent = remote ? (await import('@deepseek-ai/dsh-agent-presets')).environmentForAgent : undefined
+  const environmentForAgent = remote ? (await import('@deepseek-ai/dsh-agent-preset-registry')).environmentForAgent : undefined
   const subprocess = environmentForAgent === undefined ? agent.ctx.get('subprocess') : environmentForAgent(ctx, agent, 'subprocess')
   if (subprocess === undefined) throw new Error('External member execution target has no subprocess provider')
   const workingDirectory = ctx.get('workingDirectory')

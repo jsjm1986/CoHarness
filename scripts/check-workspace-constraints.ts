@@ -72,7 +72,7 @@ const desktopApplicationDirectory = 'apps/desktop'
 const localArtifactDirs = new Set(['node_modules'])
 const appPackageFiles: Readonly<Record<string, readonly string[]>> = {
   // Local sovereignty: config/ still carries the shipped presets until they
-  // move into dsh-agent-presets.
+  // move into dsh-agent-preset-registry.
   '@deepseek-ai/dsh': ['lib/*.js', 'lib/types/*.d.ts', 'config'],
   '@deepseek-ai/dsh-desktop-host': [
     'lib/index.js',
@@ -216,7 +216,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-experimental-inspector': ['lib/worker.js'],
   // TODO(alpha.2): restore 'presets' when the shipped compositions move from
   // apps/cli/config into the roster package.
-  '@deepseek-ai/dsh-agent-presets': [],
+  '@deepseek-ai/dsh-agent-preset-registry': [],
   // Creator's composition guidance travels with the declaration package.
   '@deepseek-ai/dsh-agent-preset': ['skills'],
   // The Web Host mounts the default-off settings owner independently of each

@@ -181,13 +181,13 @@ export interface InboxLimits {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-loop -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-agent-presets -->
-<a id="deepseek-aidsh-agent-presets"></a>
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-agent-preset-registry -->
+<a id="deepseek-aidsh-agent-preset-registry"></a>
 
-## `@deepseek-ai/dsh-agent-presets`
+## `@deepseek-ai/dsh-agent-preset-registry`
 
 - `inject`: `loader`
-- `source`: [`packages/preset/agent-presets/src/preset.ts:52`](../packages/preset/agent-presets/src/preset.ts)
+- `source`: [`packages/preset/agent-preset-registry/src/preset.ts:52`](../packages/preset/agent-preset-registry/src/preset.ts)
 
 ```ts config-catalog
 /** Plugin config: which preset is the default, and where presets live. */
@@ -218,7 +218,7 @@ export interface PresetRoot {
  */
 export type PresetTrust = 'system' | 'user'
 ```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-presets -->
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-preset-registry -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-agent-spine-demo -->
 <a id="deepseek-aidsh-agent-spine-demo"></a>

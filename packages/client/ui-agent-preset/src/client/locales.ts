@@ -197,8 +197,8 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
 /** Shared browser-safe preset display resolution. */
 export {
   presetDisplayText,
-} from '@deepseek-ai/dsh-agent-presets/display'
+} from '@deepseek-ai/dsh-agent-preset-registry/display'
 export type {
   PresetDisplaySource,
   PresetDisplayText,
-} from '@deepseek-ai/dsh-agent-presets/display'
+} from '@deepseek-ai/dsh-agent-preset-registry/display'

@@ -25250,7 +25250,7 @@
         "event:agent-preset/selected[0].data"
       ],
       "sources": [
-        "packages/preset/agent-presets/src/session.ts"
+        "packages/preset/agent-preset-registry/src/session.ts"
       ]
     },
     {

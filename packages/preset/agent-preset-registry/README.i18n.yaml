@@ -1,0 +1,70 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/preset/agent-preset-registry/README.md
+/:
+  en: d5ac01c9c587f150
+  zh: 61495d48365178df
+/dsh-agent-preset-registry:
+  en: 086a602d8ac039d9
+  zh: 0360db4af22fa017
+/dsh-agent-preset-registry/summary:
+  en: 46ddb4dc565a8bcb
+  zh: d8de3ac507a6f0e6
+/dsh-agent-preset-registry/table-of-contents:
+  en: 2d61db45444313f1
+  zh: 5feefd8b1f07dd5a
+/dsh-agent-preset-registry/service-agentpresets-ctx-key-agentpresets:
+  en: 7f4404257ca850e6
+  zh: d24056ec7adf0f8f
+/dsh-agent-preset-registry/service-agentpresets-ctx-key-agentpresets/where-to-call-mount:
+  en: 5aee6aca527a4c9a
+  zh: ed02ffb5115d8fae
+/dsh-agent-preset-registry/service-agentpresets-ctx-key-agentpresets/composing-a-child-agent:
+  en: c7195bbd639635a5
+  zh: 8a9182f195cd9135
+/dsh-agent-preset-registry/service-agentpresets-ctx-key-agentpresets/which-preset-a-session-runs:
+  en: 74749d067b8dfe05
+  zh: 3fac1e401e2ad098
+/dsh-agent-preset-registry/service-agentpresets-ctx-key-agentpresets/switching-a-blank-agent:
+  en: d2fd1dd92f99a0d6
+  zh: 249c67cb7d97064c
+/dsh-agent-preset-registry/authoring:
+  en: c9f723cff2a1c834
+  zh: bd730f123adae597
+/dsh-agent-preset-registry/authoring/how-a-preset-s-rows-resolve:
+  en: 71ad2f505830aa8a
+  zh: fba636a87f13274a
+/dsh-agent-preset-registry/authoring/display-metadata:
+  en: 44da4feeefc3f8aa
+  zh: 8e5469c588c4ce76
+/dsh-agent-preset-registry/config:
+  en: 1c37c5acdd6c947a
+  zh: 13480dcc2bbdeb68
+/dsh-agent-preset-registry/config/the-writable-root-is-this-package-s-the-shipped-root-is-the-app-s:
+  en: c7ef46a1f29be812
+  zh: 8939e06da4dde8dd
+/dsh-agent-preset-registry/config/the-default-preset-and-picker-visibility-are-settings:
+  en: 515d7ac2de3c4de5
+  zh: a79b58a0c8da623e
+/dsh-agent-preset-registry/what-a-mount-rejects:
+  en: cae8fffde99212e2
+  zh: a1fc2a0a5fa0af01
+/dsh-agent-preset-registry/a-preset-file-is-an-input-never-a-persistence-target:
+  en: 45fb7f549ed28713
+  zh: 3304c389f7c59d60
+/dsh-agent-preset-registry/trust:
+  en: 52c4013bde89d654
+  zh: 96ec65f542a34f50
+/dsh-agent-preset-registry/model-experience:
+  en: 07ca03c481bc35f3
+  zh: e64e2305ac5f8d54
+/dsh-agent-preset-registry/model-experience/kv-cache-effect:
+  en: adc2966aced4becb
+  zh: a80008797d5a4313
+/dsh-agent-preset-registry/known-limitations-and-deferred-work:
+  en: ecb9032450a30ecf
+  zh: e5089e69ed6faf34
+/dsh-agent-preset-registry/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

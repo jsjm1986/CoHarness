@@ -8,7 +8,7 @@
  */
 
 import type { ClientRemote, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
-import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-presets/types'
+import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-preset-registry/types'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsWritableReason } from '@deepseek-ai/dsh-client-runtime/client'

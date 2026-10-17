@@ -81,7 +81,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async importOriginal => ({
 
 const fakeParent = {
   id: 'parent',
-  session: { header: { cwd: process.cwd() } },
+  session: { header: { cwd: process.cwd() }, append: () => {} },
 } as unknown as Agent
 
 function request(
@@ -803,7 +803,7 @@ describe('task admission and package contracts', () => {
       ...request(),
       parent: {
         id: 'parent-without-cwd',
-        session: { header: {} },
+        session: { header: {}, append: () => {} },
       } as unknown as Agent,
     }))
     expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ cwd: process.cwd() }))
@@ -814,7 +814,7 @@ describe('task admission and package contracts', () => {
 
     const invalidCwdParent = {
       id: 'parent-with-invalid-cwd',
-      session: { header: { cwd: 'relative/SECRET_TOKEN' } },
+      session: { header: { cwd: 'relative/SECRET_TOKEN' }, append: () => {} },
     } as unknown as Agent
     const invalidCwd = ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
       ...request(),

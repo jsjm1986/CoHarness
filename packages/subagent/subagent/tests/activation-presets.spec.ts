@@ -18,7 +18,7 @@ import Include from '@deepseek-ai/cordis-plugin-include'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import AgentPresets from '@deepseek-ai/dsh-agent-presets'
+import AgentPresetRegistry from '@deepseek-ai/dsh-agent-preset-registry'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -60,7 +60,7 @@ async function setupPresetHost(
   await mountLocalActivations(ctx)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(AgentPresets, {
+  await ctx.plugin(AgentPresetRegistry, {
     default: 'coding',
     roots: [{ path: presetsRoot, trust: 'system' }],
     includeUserRoot: false,

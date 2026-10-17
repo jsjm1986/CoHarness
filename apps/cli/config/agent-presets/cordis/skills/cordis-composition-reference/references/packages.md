@@ -315,7 +315,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
-| `@deepseek-ai/dsh-agent-presets` | yes | Per-session agent composition from preset cordis.yml files for the DeepSeek Harness |
+| `@deepseek-ai/dsh-agent-preset-registry` | yes | Per-session agent composition from preset cordis.yml files for the DeepSeek Harness |
 | `@deepseek-ai/dsh-persona` | yes | Composition-authored deployment persona section for the DeepSeek Harness |
 
 ## ptc-runtime

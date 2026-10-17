@@ -33,7 +33,7 @@
 | --- | --- | --- |
 | 连接异常提示、自动重试、立即重连 | 已适配 | `packages/client/connection/src/client/{connection,index}.ts`、`packages/client/ui-settings-general/src/client/SettingsRoot.tsx`、`packages/client/ui-primitives/src/ConnectionIndicator.tsx`；保留本地 `connected/reconnecting` 状态，对 UI 映射为断线/恢复，避免改动现有消费者的状态联合类型。未复制上游依赖浏览器 `online/offline` 事件的暂停器：CoHarness 的 Connection 直接拥有双 logical stream，网络可用性由下一代 transport 结果决定。 |
 | 会话头部显示活动 Schedule | 已适配 | 新增 `packages/schedule/schedule/src/projection.ts`、`packages/client/ui-schedule`；默认 Web row 保持禁用，`examples/web-schedule` 显式启用，避免给普通部署增加 Schedule 工具和定时器。 |
-| 插件按会话/全局分组、Preset 切换与跨预设搜索 | 已适配 | `packages/preset/agent-presets/src/{composition-inventory,display}.ts`、`packages/host/plugin-inventory`、`packages/client/ui-settings-plugin-inventory`；活跃 mount 读取真实 Fiber，未挂载 preset 只解析文件，无法求值的 `!!js` 保留 `conditional`。 |
+| 插件按会话/全局分组、Preset 切换与跨预设搜索 | 已适配 | `packages/preset/agent-preset-registry/src/{composition-inventory,display}.ts`、`packages/host/plugin-inventory`、`packages/client/ui-settings-plugin-inventory`；活跃 mount 读取真实 Fiber，未挂载 preset 只解析文件，无法求值的 `!!js` 保留 `conditional`。 |
 | 菜单、滚动、工具文件链接、diff 统计 | 基线等价 | CoHarness alpha.1 已有 stale-while-revalidate 菜单、固定历史窗口、文件链接和折叠 diff totals；本轮没有用上游 focused 包覆盖本地组件。 |
 | macOS/Linux 会话加载减少 FS 检查 | 已适配 | `packages/session/session-persistence-jsonl/src/index.ts` 仅在 Windows 对 ENOENT 做父路径 probe；POSIX 继续依靠 ENOTDIR，减少每次探测的 stat。 |
 | 长会话和高频实时消息效率 | 已适配/基线等价 | Session projection 的 per-session watermark、raw view identity 去重和现有 `FrameQueue` 已保留；本轮补上 detached append 追赶和稳定 view 测试。 |
@@ -106,7 +106,7 @@
 
 - 运行时与 vendoring：`vendor/loader/src/internal.ts`、九个 vendor manifest、`packages/util/atomic-write`、`packages/session/session-persistence-jsonl`、`packages/client/connection`。
 - 投影与 Schedule：`packages/session/session-projection`、`packages/session/session-projection-cache`、`packages/schedule/schedule`、`packages/client/ui-schedule`、`examples/web-schedule`。
-- Preset/插件清单：`packages/preset/agent-presets`、`packages/host/plugin-inventory`、`packages/client/ui-settings-plugin-inventory`、`packages/client/ui-agent-preset` 的共享 display export。
+- Preset/插件清单：`packages/preset/agent-preset-registry`、`packages/host/plugin-inventory`、`packages/client/ui-settings-plugin-inventory`、`packages/client/ui-agent-preset` 的共享 display export。
 - Web 对话与图片：`packages/core/agent-loop`、`packages/client/ui-conversation`、`packages/client/ui-primitives`、`packages/client/ui-input-trigger`、`packages/client/ui-settings-general`、`packages/client/ui-permission-presets`、`packages/fs/tool-fs`、`packages/subagent/subagent`、`packages/host/apiproxy`。
 - 本轮优先适配：`packages/goal/goal`、`packages/goal/tool-goal`、`packages/core/agent`、`packages/client/ui-reference`、`packages/client/ui-tool`、`packages/client/ui-trajectory`、`scripts/verify-package-dependencies.ts`、`scripts/benchmark-npm-resolution.ts`、`scripts/verify-npm-install-layout.ts`。
 - 真实浏览器回归：`apps/web/tests/reference-drill.e2e.ts` 与 `apps/web/tests/snapshots/reference-drill/ui.expected.md`。
@@ -118,8 +118,8 @@
 
 ```text
 CI=true pnpm install --no-frozen-lockfile
-CI=true pnpm exec tsc -b packages/client/ui-primitives/tsconfig.json packages/client/ui-conversation/tsconfig.json packages/client/ui-settings-plugin-inventory/tsconfig.json packages/preset/agent-presets/tsconfig.json packages/schedule/schedule/tsconfig.json packages/host/plugin-inventory/tsconfig.json packages/web/web-search-deepseek/tsconfig.json
-CI=true pnpm exec vitest run packages/client/connection packages/fs/tool-fs packages/client/ui-primitives packages/client/ui-conversation packages/client/ui-settings-plugin-inventory packages/client/ui-permission-presets packages/client/ui-settings-general packages/client/ui-agent-preset packages/client/ui-schedule packages/schedule/schedule packages/preset/agent-presets packages/host/plugin-inventory packages/web/web-search-deepseek packages/session/session-projection packages/session/session-projection-cache packages/subagent/subagent packages/host/apiproxy packages/util/atomic-write packages/boot/app-boot/tests/loader-shape.compat.spec.ts packages/client/ui-input-trigger --no-file-parallelism --maxWorkers=1
+CI=true pnpm exec tsc -b packages/client/ui-primitives/tsconfig.json packages/client/ui-conversation/tsconfig.json packages/client/ui-settings-plugin-inventory/tsconfig.json packages/preset/agent-preset-registry/tsconfig.json packages/schedule/schedule/tsconfig.json packages/host/plugin-inventory/tsconfig.json packages/web/web-search-deepseek/tsconfig.json
+CI=true pnpm exec vitest run packages/client/connection packages/fs/tool-fs packages/client/ui-primitives packages/client/ui-conversation packages/client/ui-settings-plugin-inventory packages/client/ui-permission-presets packages/client/ui-settings-general packages/client/ui-agent-preset packages/client/ui-schedule packages/schedule/schedule packages/preset/agent-preset-registry packages/host/plugin-inventory packages/web/web-search-deepseek packages/session/session-projection packages/session/session-projection-cache packages/subagent/subagent packages/host/apiproxy packages/util/atomic-write packages/boot/app-boot/tests/loader-shape.compat.spec.ts packages/client/ui-input-trigger --no-file-parallelism --maxWorkers=1
 CI=true pnpm run typecheck
 CI=true pnpm run lint
 CI=true pnpm run doc-sync

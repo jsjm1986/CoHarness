@@ -91,14 +91,14 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 - `agentPreset`：挂载独立选择的子 agent preset；
 - `agentOptions`：覆盖受支持的子 agent 模型设置。
 
-每个进程内子 agent 都通过一次 `applyChildComposition(childCtx, parent, composition)` 调用完成组装：要么挂载子 agent 独立选择的 preset，要么加入父级的 agent-preset 组合，然后再应用子 agent 持久化描述符中的覆盖项。加入父级组合正是子 agent 获得能力的途径：所有面向模型的行都位于 agent 平面，完全没有加入任何组合的子 agent 抵达模型时会看到空的工具注册表（见 [`dsh-agent-presets`](../../preset/agent-presets/README.zh.md)）。将父级作为参数是刻意设计：这让“组装子 agent 却不做该加入”在各调用点无法表达，而这正是这一次调用所要杜绝的缺陷。未组装 preset roster 的部署不加入任何组合、也不需要加入；其面向模型的行位于宿主组合中，子 agent 已能通过工具注册表的全局层解析到它们。
+每个进程内子 agent 都通过一次 `applyChildComposition(childCtx, parent, composition)` 调用完成组装：要么挂载子 agent 独立选择的 preset，要么加入父级的 agent-preset 组合，然后再应用子 agent 持久化描述符中的覆盖项。加入父级组合正是子 agent 获得能力的途径：所有面向模型的行都位于 agent 平面，完全没有加入任何组合的子 agent 抵达模型时会看到空的工具注册表（见 [`dsh-agent-preset-registry`](../../preset/agent-preset-registry/README.zh.md)）。将父级作为参数是刻意设计：这让“组装子 agent 却不做该加入”在各调用点无法表达，而这正是这一次调用所要杜绝的缺陷。未组装 preset roster 的部署不加入任何组合、也不需要加入；其面向模型的行位于宿主组合中，子 agent 已能通过工具注册表的全局层解析到它们。
 
 `childSessionMeta()` 把所加入的 preset id 记在子 agent 的持久化 header 上，理由与顶层会话记录自己的那一个相同：preset 决定了模型所见的工具 schema 与提示段，因此冷读子 agent 的历史时必须重建那份组装，而不是部署默认值。独立选择的 preset 提供自己的 id；否则该值从父方**活着的** scope 链读取，而不是从父方 header 读取，因为在空白期切换过 preset 的父方运行在更新的那份组装上，而它的 header 仍写着旧的那个。
 
 <a id="child-presets"></a>
 ## 子级 preset
 
-进程内 spawn 接受独立的 `agentPreset`；fork 与外部后端会拒绝该选项。未做选择时，本地子级加入父级当前的 preset 修订版；显式给出 id 时会挂载当前已挂载的修订版，即使该 id 与父级相同。模型选项通过 [`dsh-tool-subagent`](../tool-subagent/README.zh.md) 配置，persona 与工具在 [preset 组合](../../preset/agent-presets/README.zh.md)中配置。冷恢复会保留历史子级描述符中记录的 persona 与工具限制。
+进程内 spawn 接受独立的 `agentPreset`；fork 与外部后端会拒绝该选项。未做选择时，本地子级加入父级当前的 preset 修订版；显式给出 id 时会挂载当前已挂载的修订版，即使该 id 与父级相同。模型选项通过 [`dsh-tool-subagent`](../tool-subagent/README.zh.md) 配置，persona 与工具在 [preset 组合](../../preset/agent-preset-registry/README.zh.md)中配置。冷恢复会保留历史子级描述符中记录的 persona 与工具限制。
 
 可继续创建对应可选的 `SubagentProvider.prepareContinuable?()` 方法：方法是否存在就是能力检查，因此服务会在没有该方法的提供方上拒绝已配置的可继续启动，而具备该方法的提供方仍可服务普通一次性委派。该方法只返回已分离的 `ContinuableCreateSpec`（`{ seed? }`）。它只是数据，不携带任何能力：不包含 Agent、`AgentHandle`、提示词投递、结果、dispose 或恢复操作。准备完成后，身份预留、组合、Agent 创建、提示词投递、冷恢复、所有权和 dispose 均由继续执行管理器负责。一次性 `SubagentRun` 表示一次可 dispose 的前台委派，只有一个结果，且没有冷恢复操作。服务可以针对不同的同级子 agent 并发调用同一提供方：每次启动或准备都拥有各自的可变状态和取消路径，一项操作的失败、结果或清理不得使另一项操作结算或释放。提供方可以在内部按自身容量排队，但不得改变这项独立性约定。
 

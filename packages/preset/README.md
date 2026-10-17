@@ -11,7 +11,8 @@ An **agent preset** is a directory holding one `agent.cordis.yml`. Mounting it u
 
 | Package | Role | ctx key |
 |---|---|---|
-| `agent-presets/` | Preset vocabulary, filesystem discovery over trusted and user-authored roots, and the guarded per-agent mount | `ctx.agentPresets` |
+| `agent-preset-registry/` | Preset vocabulary, filesystem discovery over trusted and user-authored roots, and the guarded per-agent mount | `ctx.agentPresets` |
+| `agent-preset/` | Declares a preset composition from an ordinary cordis row instead of a preset directory | — |
 | `persona/` | The agent persona as a composable row, so a preset can change identity and not only tools | — |
 
 The presets the deployment ships live in [`apps/cli/config/agent-presets/`](../../apps/cli/config/agent-presets) — one directory each, and that directory listing is the roster. Naming them here too would be a second list to keep in step, and the first one to fall behind.
@@ -24,4 +25,4 @@ The [`AgentPresets` reference](../../docs/subsystems/core.md#ctxagentpresets--ag
 
 ## Summary
 
-The preset group provides per-session agent composition: an agent preset is a directory holding one `agent.cordis.yml`, and a session composed from a preset runs that preset's tools, prompt sections, and skills while every other session keeps its own. `agent-presets` owns the roster — discovery over configured roots plus the harness home, the guarded per-agent mount, and copy-only authoring — and `persona` supplies the composable row that lets a preset change an agent's identity and not only its tools. Together they let one process run several differently composed agents at once.
+The preset group provides per-session agent composition: an agent preset is a directory holding one `agent.cordis.yml`, and a session composed from a preset runs that preset's tools, prompt sections, and skills while every other session keeps its own. `agent-preset-registry` owns the roster — discovery over configured roots plus the harness home, the guarded per-agent mount, and copy-only authoring — and `persona` supplies the composable row that lets a preset change an agent's identity and not only its tools. Together they let one process run several differently composed agents at once.
