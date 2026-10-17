@@ -18,7 +18,7 @@ Status: implemented
 
 **meter 属于宿主平面。** `dsh-token-meter` 回到宿主组装，并离开各 preset 的 `isolate` 映射，于是 `compaction-basic` 与 `tool-result-pruner` 在自己的 realm 内部解析到那一份宿主实例。preset 保留 realm 与压缩后端——preset 选择的是它的 agent 是否压缩，而不是它的 token 是否被计。这正是 `tasks` 与 `goals` 已经采用的判据，只是这次适用于一个因**投影**触达面而不该归 preset 所有的 Service：当一个单元的空值与真实值无法区分时，只要它注册进的那张表是进程级的，它就不能是逐组装的。
 
-有三处限制不在此处修复，而是记录在会咬到它们的地方：投影 key 是否存在不能当作逐会话的能力信号（[`dsh-session-projection`](../../../../packages/session/session-projection/README.zh.md)）；被替代的常驻代际永不回收，而设置页的编写流程把它变成每次保存的代价（[`dsh-agent-presets`](../../../../packages/preset/agent-presets/README.zh.md)）；通过 `cordis_mount` 挂上的临时插件属于组装而非挂载它的会话（[`dsh-tool-cordis`](../../../../packages/extensions/tool-cordis/README.zh.md)）。
+有三处限制不在此处修复，而是记录在会咬到它们的地方：投影 key 是否存在不能当作逐会话的能力信号（[`dsh-session-projection`](../../../../packages/session/session-projection/README.zh.md)）；被替代的常驻代际永不回收，而设置页的编写流程把它变成每次保存的代价（[`dsh-agent-presets`](../../../../packages/preset/agent-preset-registry/README.zh.md)）；通过 `cordis_mount` 挂上的临时插件属于组装而非挂载它的会话（[`dsh-tool-cordis`](../../../../packages/extensions/tool-cordis/README.zh.md)）。
 
 ## 测试
 

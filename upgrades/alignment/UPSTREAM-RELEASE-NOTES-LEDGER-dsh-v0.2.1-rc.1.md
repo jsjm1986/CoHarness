@@ -65,9 +65,9 @@ Session plugin 记录(#5677)、持久 PTC(#5035)、subagent Agent Presets(#4643)
 |---|---|---|
 | `remove-runtime-invariants` | **已落地**(E9) | 三件套与上游逐字节一致 |
 | `account-sign-in-errors` | **不引入** | `deepseek-account*` 账号链维持排除(决策项 8 产品锁定);fork 无 `SignInErrorCode` 面 |
-| `schedule-bundle-retired` | **不适用+缺口登记** | fork 从未发布 `experimental-schedule-bundle`,套餐移除无对应面;preset 声明 `tool-schedule`/`time-context` 是真实代码缺口,记入待移植 |
+| `schedule-bundle-retired` | **不适用+缺口已补** | fork 从未发布 `experimental-schedule-bundle`,套餐移除无对应面;preset 声明 `tool-schedule` 缺口已在 `3bd8b04bf09` 补齐 |
 | `subpath-plugin-display-manifest` | **待核** | fork plugin-manager 在 `boot/plugin-manager`,display manifest 语义未核;与 ui-plugin-market 违规复查并轨 |
-| `primary-runtime-python-aliases` | **随代码延迟** | 上游 sibling-link 校验未移植;指南须随 `scripts/primary-runtime` 校验改动一并回填 |
-| `bundled-python-tests` | **随代码延迟** | runtime 打包剔除 numpy/pandas tests 未落地;同上随代码回填 |
+| `primary-runtime-python-aliases` | **已落地** | sibling-link 校验已移植 `primaryRuntimePythonAliases`/`copyPrimaryRuntime` + smoke 校验;指南三件套与上游逐字节一致 |
+| `bundled-python-tests` | **已落地** | `prunePrimaryRuntimePythonTests` 已移植并在 wheel 解包后调用,同步裁剪 RECORD;指南三件套与上游逐字节一致 |
 
 未写指南记录无对应行为的分歧,避免文档声称未承载的迁移。
