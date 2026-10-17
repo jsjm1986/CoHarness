@@ -265,7 +265,7 @@ describe('persistent Node REPL', () => {
     try {
       Object.defineProperty(process, 'pkg', { configurable: true, value: {} })
       await expect(setup()).rejects.toThrow('requires a node-script launch')
-      const { runtime } = await setup({ nodeExecutable: process.execPath, bootstrapPath: join(process.cwd(), 'persistent-process.js') })
+      const { runtime } = await setup({ launch: { kind: 'node-script', executable: process.execPath, bootstrapPath: join(process.cwd(), 'persistent-process.js') } })
       expect(runtime.programFormat).toBe('repl')
     } finally {
       if (previous === undefined) Reflect.deleteProperty(process, 'pkg')

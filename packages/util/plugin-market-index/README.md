@@ -69,6 +69,6 @@ None of its own. The tool result that carries plugins owns its request's cache b
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-None.
+No invariant companion is published: index fetch, validation and cache behavior surface through the owning market service; the library adds no independently observed state relation.
 
 </details>

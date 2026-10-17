@@ -1,8 +1,8 @@
 # Agent Note: rc.2 client surface parity for conversation, workspace, and settings
 
-English | [中文](2026-10-18-rc2-client-surface-parity.zh.md)
-
 Status: implemented
+
+English | [中文](2026-10-18-rc2-client-surface-parity.zh.md)
 
 ## Problem
 

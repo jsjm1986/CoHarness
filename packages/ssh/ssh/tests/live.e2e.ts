@@ -1,7 +1,6 @@
 /** Opt-in acceptance against an explicitly configured, disposable POSIX SSH workspace. */
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { pathToFileURL } from 'node:url'
 import { once } from 'node:events'
 import type { ChildProcess } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -28,6 +27,7 @@ const enabled = configPath !== undefined && process.platform !== 'win32'
 
 async function setup() {
   const config = JSON.parse(readFileSync(configPath as string, 'utf8')) as Config
+  if (config.launch.kind !== 'node-script') throw new Error('live.e2e requires a Node script deployment; executable acceptance is owned by ssh-helper-runtime')
   const ctx = new Context()
   const projection = ctx.plugin(SessionProjectionRegistry)
   const policy = ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: config.workspace })
@@ -56,7 +56,7 @@ async function processResult(handle: SubprocessHandle) {
 async function removeOwned(test: Awaited<ReturnType<typeof setup>>) {
   try {
     const handle = test.ctx.subprocess.spawn({
-      argv: [test.hello.node, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', test.root],
+      argv: [test.hello.executable, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', test.root],
       cwd: test.hello.workspace, stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 500,
     })
     await processResult(handle)
@@ -68,13 +68,13 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
     const test = await setup()
     try {
       const prepared = await test.ctx.ssh.request('process.prepare', {
-        argv: [test.hello.node, '-e', 'process.stdout.write("legitimate-target")'], cwd: test.root, graceMs: 500,
+        argv: [test.hello.executable, '-e', 'process.stdout.write("legitimate-target")'], cwd: test.root, graceMs: 500,
         stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', control: 'pipe' },
       }, preparedSchema)
       const endpoint = prepared.streams.control!
       const attack = "let connected=false,secure=false;const s=require('node:tls').connect({path:process.argv[1],ciphers:'PSK-AES256-GCM-SHA384',minVersion:'TLSv1.2',maxVersion:'TLSv1.2',pskCallback:()=>({identity:'dsh-stream',psk:Buffer.alloc(32)}),checkServerIdentity:()=>undefined});s.on('connect',()=>{connected=true});s.on('secureConnect',()=>{secure=true});s.on('error',()=>{});s.on('close',()=>process.stdout.write(JSON.stringify({connected,secure})));"
       const attacker = test.ctx.subprocess.spawn({
-        argv: (await test.ctx.sandbox.confine([test.hello.node, '-e', attack, endpoint.path], {
+        argv: (await test.ctx.sandbox.confine([test.hello.executable, '-e', attack, endpoint.path], {
           mode: 'read-only', workspaceRoot: test.root,
         })).argv,
         cwd: test.root, stdio: { stdin: 'ignore', stdout: { maxBytes: 4096 }, stderr: { maxBytes: 4096 } }, graceMs: 500,
@@ -111,15 +111,15 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       const edited = await ctx.fs.editText(target, { oldString: 'alpha', newString: 'beta', replaceAll: false }, { version: first.version })
       expect(edited).toMatchObject({ before: 'alpha\n', after: 'beta\n' })
       expect(Buffer.from(await ctx.fs.readByteRange(target, { offset: 1, length: 3 })).toString()).toBe('eta')
-      const chunks = []
-      for await (const chunk of await ctx.fs.streamText(target)) chunks.push(chunk)
-      expect(chunks.join('')).toBe('beta\n')
       const currentVersion = (await ctx.fs.stat(target))!.version
       expect(Buffer.from(await ctx.fs.readByteRange(target, { offset: 0, length: 4, expectedVersion: currentVersion })).toString()).toBe('beta')
       await expect(ctx.fs.readByteRange(target, { offset: 0, length: 4, expectedVersion: first.version })).rejects.toMatchObject({ code: 'FS_STALE_VERSION' })
       const stale = await ctx.fs.streamText(target, undefined, first.version)
       await expect(stale[Symbol.asyncIterator]().next()).rejects.toMatchObject({ code: 'FS_STALE_VERSION' })
       expect(await ctx.fs.listDir(await ctx.fs.resolve(root), undefined, 1)).toHaveLength(1)
+      const chunks = []
+      for await (const chunk of await ctx.fs.streamText(target)) chunks.push(chunk)
+      expect(chunks.join('')).toBe('beta\n')
       const policy: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: root }
       const argv = (await ctx.sandbox.confine(['/bin/bash', '-c', 'cat text.txt; printf "shell\n" > text.txt'], policy)).argv
       const result = await processResult(ctx.subprocess.spawn({
@@ -131,12 +131,12 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
         .rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
       const createLink = 'const fs=require(\'node:fs\');const root=process.argv[1];fs.mkdirSync(root+\'/physical/child\',{recursive:true});fs.mkdirSync(root+\'/lexical\');fs.symlinkSync(root+\'/physical/child\',root+\'/lexical/link\');'
       await processResult(ctx.subprocess.spawn({
-        argv: [hello.node, '-e', createLink, root], cwd: root,
+        argv: [hello.executable, '-e', createLink, root], cwd: root,
         stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 500,
       }))
       const resolved = await ctx.fs.resolve('file.txt', { cwd: `${root}/lexical/link/..` })
       expect(ctx.fs.processPath(resolved)).toBe(`${root}/physical/file.txt`)
-      expect(ctx.fs.fileUrl(resolved)).toBe(pathToFileURL(`${root}/physical/file.txt`).href)
+      expect(ctx.fs.fileUrl(resolved)).toBe(`file://${root}/physical/file.txt`)
       await ctx.fs.writeText(resolved, 'physical')
       expect(await ctx.fs.readText(await ctx.fs.resolve(`${root}/physical/file.txt`))).toBe('physical')
     } finally { await removeOwned(test) }
@@ -146,7 +146,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
     const test = await setup()
     try {
       const code = 'const fs=require(\'node:fs\');const s=new(require(\'node:net\').Socket)({fd:7,readable:true,writable:true,allowHalfOpen:true});let a=[];s.on(\'data\',b=>a.push(b));s.on(\'end\',()=>{let denied;try{fs.writeFileSync(\'forbidden\',\'bad\')}catch(e){denied=e.code}process.stdout.write(JSON.stringify({pid:process.pid,denied,cgroup:process.platform===\'linux\'?fs.readFileSync(\'/proc/self/cgroup\',\'utf8\'):\'\'}));process.stderr.write(\'stderr\');s.end(Buffer.concat(a))});'
-      const argv = (await test.ctx.sandbox.confine([test.hello.node, '-e', code], { mode: 'read-only', workspaceRoot: test.root })).argv
+      const argv = (await test.ctx.sandbox.confine([test.hello.executable, '-e', code], { mode: 'read-only', workspaceRoot: test.root })).argv
       const handle = test.ctx.subprocess.spawn({
         argv, cwd: test.root,
         stdio: { stdin: 'ignore', stdout: { maxBytes: 4096 }, stderr: { maxBytes: 4096 }, control: 'pipe' }, graceMs: 1000,
@@ -174,7 +174,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
     try {
       const code = 'const s=new(require(\'node:net\').Socket)({fd:7,readable:true,writable:true});const b=Buffer.alloc(65536,120);let n=0;function pump(){while(n<10000){n++;if(!process.stdout.write(b))return}}process.stdout.on(\'drain\',pump);s.on(\'data\',v=>s.write(v));pump();setInterval(()=>{},1000);'
       handle = test.ctx.subprocess.spawn({
-        argv: (await test.ctx.sandbox.confine([test.hello.node, '-e', code], { mode: 'workspace-write', workspaceRoot: test.root })).argv,
+        argv: (await test.ctx.sandbox.confine([test.hello.executable, '-e', code], { mode: 'workspace-write', workspaceRoot: test.root })).argv,
         cwd: test.root, stdio: { stdin: 'ignore', stdout: 'pipe', stderr: { maxBytes: 1024 }, control: 'pipe' }, graceMs: 500,
       })
       const reply = once(handle.control!, 'data')
@@ -220,37 +220,22 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
     const victim = await setup()
     const victimConnection = victim.ctx.ssh
     try {
-      // Linux scope ownership includes detached descendants; macOS owns the POSIX process group.
-      const code = "const fs=require('node:fs');const child=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{detached:process.platform==='linux',stdio:'ignore'});child.unref();fs.appendFileSync('launches','one\\n');process.stdout.write(JSON.stringify({pid:process.pid,child:child.pid,cgroup:process.platform==='linux'?fs.readFileSync('/proc/self/cgroup','utf8'):null}));setInterval(()=>{},1000);"
+      const code = 'const fs=require(\'node:fs\');require(\'node:child_process\').spawn(process.execPath,[\'-e\',\'setInterval(()=>{},1000)\'],{detached:true,stdio:\'ignore\'}).unref();fs.appendFileSync(\'launches\',\'one\\n\');process.stdout.write(fs.readFileSync(\'/proc/self/cgroup\',\'utf8\'));setInterval(()=>{},1000);'
       const handle = victim.ctx.subprocess.spawn({
-        argv: [victim.hello.node, '-e', code], cwd: victim.root,
+        argv: [victim.hello.executable, '-e', code], cwd: victim.root,
         stdio: { stdin: 'ignore', stdout: 'pipe', stderr: { maxBytes: 4096 } }, graceMs: 500,
       })
       const [bytes] = await once(handle.stdout!, 'data') as [Buffer]
-      const started = JSON.parse(Buffer.from(bytes).toString()) as { pid: number; child: number; cgroup: string | null }
-      expect(started.pid).toBeGreaterThan(0)
-      expect(started.child).toBeGreaterThan(0)
-      const scope = started.cgroup === null ? undefined : `/sys/fs/cgroup${started.cgroup.trim().split('::')[1]}`
-      const scopeTarget = scope === undefined ? undefined : await observer.ctx.fs.resolve(scope)
-      if (victim.hello.platform === 'linux') {
-        expect(scope).toMatch(/dsh-subprocess-[^\n]+\.scope$/)
-        expect(await observer.ctx.fs.stat(scopeTarget!)).toBeDefined()
-      }
+      const scope = `/sys/fs/cgroup${Buffer.from(bytes).toString().trim().split('::')[1]}`
+      expect(scope).toMatch(/dsh-subprocess-[^\n]+\.scope$/)
+      const scopeTarget = await observer.ctx.fs.resolve(scope)
+      expect(await observer.ctx.fs.stat(scopeTarget)).toBeDefined()
       const sshChild = Reflect.get(victim.ctx.ssh, 'child') as ChildProcess
       sshChild.kill('SIGKILL')
       await expect(handle.done).rejects.toThrow(/disconnect|closed|SSH/i)
       await expect(handle.waitForExit()).rejects.toThrow()
-      const retained = async () => {
-        if (scopeTarget !== undefined) return await observer.ctx.fs.stat(scopeTarget) !== undefined
-        const probe = await processResult(observer.ctx.subprocess.spawn({
-          argv: [observer.hello.node, '-e', "const live=process.argv.slice(1).filter(pid=>{try{process.kill(Number(pid),0);return true}catch(e){if(e.code==='ESRCH')return false;throw e}});process.stdout.write(JSON.stringify(live))", String(started.pid), String(started.child)],
-          cwd: observer.root, stdio: { stdin: 'ignore', stdout: { maxBytes: 4096 }, stderr: { maxBytes: 4096 } }, graceMs: 500,
-        }))
-        expect(probe.exitCode).toBe(0)
-        return (JSON.parse(probe.stdout as string) as string[]).length > 0
-      }
       const deadline = Date.now() + 40_000
-      while (await retained()) {
+      while (await observer.ctx.fs.stat(scopeTarget)) {
         if (Date.now() >= deadline) throw new Error('SSH disconnect retained its remote managed scope')
         await delay(100)
       }
@@ -260,7 +245,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       await victimConnection.dispose()
       try {
         await processResult(observer.ctx.subprocess.spawn({
-          argv: [observer.hello.node, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', victim.root],
+          argv: [observer.hello.executable, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', victim.root],
           cwd: observer.root, stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 500,
         }))
       } finally { await removeOwned(observer) }
@@ -270,7 +255,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
   it.skipIf(bootstrap === undefined)('runs PTC remotely with empty environment, bindings, denial and a bounded hot loop', async () => {
     const test = await setup()
     const fiber = test.ctx.plugin(NodePtcRuntime, {
-      nodeExecutable: test.ctx.ssh.nodeExecutable, bootstrapPath: test.ctx.ssh.bootstrapPath,
+      launch: test.ctx.ssh.ptcLaunch,
     })
     try {
       await fiber
@@ -303,15 +288,13 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       await test.ctx.fs.writeText(await test.ctx.fs.resolve(`${test.root}/tsconfig.json`), '{"compilerOptions":{"strict":true}}')
       await test.ctx.fs.writeText(await test.ctx.fs.resolve(`${test.root}/source.ts`), 'export const answer: number = 42\nexport const doubled = answer * 2\n')
       stdio = test.ctx.plugin(LspStdio, { servers: { remoteTypescript: {
-        command: test.hello.node, args: [languageServer as string, '--stdio'], extensionToLanguage: { '.ts': 'typescript' },
+        command: test.hello.executable, args: [languageServer as string, '--stdio'], extensionToLanguage: { '.ts': 'typescript' },
       } } })
       await stdio
       const request = { filePath: 'source.ts', workspaceRoot: test.root, position: { line: 1, character: 24 } }
       const definition = await test.ctx.lsp.query({ ...request, operation: 'goToDefinition' })
-      expect(definition).toMatchObject({ kind: 'locations', resolvedWorkspaceUri: pathToFileURL(test.root).href })
-      if (definition.kind === 'locations') {
-        expect(definition.locations).toContainEqual(expect.objectContaining({ uri: pathToFileURL(`${test.root}/source.ts`).href }))
-      }
+      expect(definition).toMatchObject({ kind: 'locations', resolvedWorkspaceUri: `file://${test.root}` })
+      if (definition.kind === 'locations') expect(definition.locations).toContainEqual(expect.objectContaining({ uri: `file://${test.root}/source.ts` }))
       const hover = await test.ctx.lsp.query({ ...request, operation: 'hover' })
       expect(hover.kind).toBe('hover')
       if (hover.kind === 'hover') expect(hover.hover?.contents).toContain('number')

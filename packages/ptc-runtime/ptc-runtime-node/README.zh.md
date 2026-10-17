@@ -54,8 +54,7 @@ kind: "package-reference"
 | `maxMessageBytes` | `134,217,728` | 控制帧、未完成参数字节和排队控制写入的上限 |
 | `maxPendingCalls` | `128` | 同时进行的 Host 绑定调用数量上限 |
 | `graceMs` | `3,000` | 受管终止与输出排空宽限时间 |
-| `nodeExecutable` | 当前 Node 可执行文件 | 在子进程执行世界中解析的可执行文件 |
-| `bootstrapPath` | 包内 bootstrap | 该执行世界中预先安装的构建后 bootstrap 的可选绝对路径 |
+| `launch` | 本地载体 | 子进程环境中显式的 `{ kind: "node-script", executable, bootstrapPath? }` 或 `{ kind: "embedded", executable }` |
 
 [配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-ptc-runtime-node)定义可接受的配置字段。`resolve(request)` 将 cwd 默认设为沙箱策略的工作区根目录，并补全数值或 null 截止选择与执行策略；`run(spec)` 接受这些已解析输入，不补缺省值。
 
@@ -76,7 +75,7 @@ kind: "package-reference"
     executionMode: persistent-in-memory
 ```
 
-保存补丁，在使用 PTC 工具展示的配置中通过 `dsh headless --patch <path>` 加载。默认的 `per-call` 模式不跨调用保留程序内存。修改配置会重载提供方并释放其执行资源。单文件打包宿主使用内存保留模式时，必须将 `nodeExecutable` 指向 Node，并将 `bootstrapPath` 指向本包构建出的 `persistent-process.js`。
+保存补丁，在使用 PTC 工具展示的配置中通过 `dsh headless --patch <path>` 加载。默认的 `per-call` 模式不跨调用保留程序内存。修改配置会重载提供方并释放其执行资源。单文件打包宿主使用内存保留模式时，需要使用 `node-script` 启动方式，将 `launch.executable` 指向 Node，并将 `launch.bootstrapPath` 指向本包构建出的 `persistent-process.js`。
 
 每个存活 Agent 保留独立进程，跨 `run_code` 调用和轮次保留顶层变量、函数及导入模块。使用 `await import(...)`、`console.log(...)` 和末尾 JSON 表达式；不支持顶层 `return`。Node REPL 使用非严格模式，给未声明的名称赋值会创建保留的全局变量。`_` 和 `_error` 是普通的保留全局变量，不使用交互式 REPL 的结果设置器。声明遵循 Node REPL 规则，包括重复声明已有 `let`、`const` 或 `class` 名称时报错；应给可变绑定赋值或选择新名称。开头的 `{ ... }` 按语句块执行，可以包含顶层 await 和临时声明；需要返回对象表达式时，用圆括号包裹。保留的函数和工具方法引用调用当前执行的绑定。必须等待所有工具调用；已完成执行的回调不能在后续执行中调用工具。
 
@@ -104,6 +103,8 @@ PTC 消费方按 [dsh-tools](../../core/tools/README.zh.md#ptc-mode) 的说明�
 <details>
 <summary>实现内部——点击展开</summary>
 
+未发布不变量伴随物：启动顺序、控制通道生命周期与输出边界在运行时内部强制执行；不存在跨调用留存的可观察关系。
+
 Host 负责策略、截止时间、绑定查找和进程清理。子进程负责程序求值与绑定代理；即使使用预期的控制描述符，模型编写的代码仍是不可信对端。
 
 ### 启动与控制
@@ -114,19 +115,22 @@ Host 擦除可擦除类型，在配置的执行世界中解析可执行文件与
 
 ### 源代码与构建后 bootstrap
 
-源代码执行加载仅含可擦除语法的 bootstrap 依赖，不依赖同级包的构建后导出。构建后执行使用包内 `process.js` 入口。无法映射 Host bootstrap 的执行世界需要预先安装兼容的 `bootstrapPath`；不会假设 Host 路径对应同一个远程文件。
+源代码执行加载仅含可擦除语法的 bootstrap 依赖，不依赖同级包的构建后导出。构建后脚本通过 `process.js` 运行逐次程序，通过 `persistent-process.js` 运行保留状态的 REPL。保留模式要求 `node-script` 启动方式。远端脚本部署提供对应的 `launch.bootstrapPath`。内嵌载体通过 `launch.executable` 启动私有 worker。`resolveLaunch()` 在构造时选择本地默认值；显式的远端调用不依赖客户端自身是否打包。不会假设 Host 路径对应同一个远程文件。
 
 ### 源码索引
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 配置、解析、策略、绑定与受管执行 |
+| [`src/index.ts`](src/index.ts) | 默认提供方的解析、策略、绑定与受管执行 |
+| [`src/config.ts`](src/config.ts) | 执行模式、限制校验与默认值 |
+| [`src/persistent.ts`](src/persistent.ts) | 内存保留模式的进程所有权、执行截止与清理 |
+| [`src/persistent-process.ts`](src/persistent-process.ts) | 子进程 REPL、保留声明与当前绑定分派 |
+| [`src/output-stream.ts`](src/output-stream.ts) | 有界流捕获与进程输出排空 |
 | [`src/launch.ts`](src/launch.ts) | 可执行文件／bootstrap 参数与执行世界资源映射 |
 | [`src/process.ts`](src/process.ts) | 子进程握手、环境清空与程序生命周期 |
 | [`src/bootstrap.ts`](src/bootstrap.ts) | 程序求值、绑定代理与输出捕获 |
 | [`src/channel.ts`](src/channel.ts) | 分帧、有界写入与协议失败 |
 | [`src/output-ledger.ts`](src/output-ledger.ts) | Host 外层结果计量 |
-| — | 不发布运行时不变式配套模块；分帧与进程清理跨进程边界强制执行，不依靠同进程中的独立观测。 |
 
 </details>
 
@@ -144,7 +148,6 @@ Host 擦除可擦除类型，在配置的执行世界中解析可执行文件与
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -154,7 +157,6 @@ Host 擦除可擦除类型，在配置的执行世界中解析可执行文件与
 
 不直接失效；具名消费方负责请求前缀的任何变更。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>

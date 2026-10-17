@@ -56,6 +56,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/ssh/fs-ssh': { kind: 'indirect', reason: 'The remote filesystem delegates model rendering to the existing filesystem consumers.' },
   'packages/ssh/subprocess-ssh': { kind: 'indirect', reason: 'The remote process provider delegates model rendering to Bash, terminal, LSP and ptc-runtime consumers.' },
   'packages/ssh/sandbox-ssh': { kind: 'indirect', reason: 'The remote confinement provider returns enforcement facts to its existing tool consumers.' },
+  'packages/ssh/ssh-helper-runtime': { kind: 'none', reason: 'The private executable carrier registers no model-facing content; its providers and consumers own operation results.' },
+  'packages/experimental/worktree': { kind: 'indirect', reason: 'The worktree tool renders creation results; the working-directory service owns model-visible directory context.' },
   'packages/deliverables/workspace-changes': { kind: 'indirect', reason: 'Recording failures stop execution through agent-loop and the tool pipeline; historical comparison content remains client-only.' },
   'packages/client/ui-dockkit': { kind: 'none', reason: 'Browser docking and layout primitives register no model-visible content.' },
   'packages/client/ui-sidebar-browser': { kind: 'none', reason: 'Browser tabs register no model-visible content.' },

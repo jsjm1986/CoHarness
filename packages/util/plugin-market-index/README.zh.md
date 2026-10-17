@@ -66,6 +66,8 @@ import { MarketIndexError, marketInstallTarget, parseMarketIndex } from '@deepse
 <a id="dev-note"></a>
 ### 开发备注
 
+未发布不变量伴随物：索引获取、校验与缓存行为通过所属市场服务被呈现；本库自身不持有可独立观察的状态关系。
+
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 

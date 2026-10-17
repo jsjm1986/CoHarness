@@ -103,4 +103,4 @@ Tool results append after the existing conversation prefix. Provider registratio
 <a id="dev-note"></a>
 ### Dev Note
 
-None.
+No invariant companion is published: credential scope, redirect refusal and request budgets are enforced inside each provider call; the providers hold no cross-request state to observe.

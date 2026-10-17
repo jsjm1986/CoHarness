@@ -131,6 +131,6 @@ Skill results append to history without changing tool declarations, and loaded t
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-None.
+No invariant companion is published: the provider supplies skill documents and path guidance only; model-facing behavior is owned by the skill registry and `dsh-tool-skill`.
 
 </details>

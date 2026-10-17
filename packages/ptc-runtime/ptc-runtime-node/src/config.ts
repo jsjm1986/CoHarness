@@ -1,11 +1,12 @@
 /** Execution mode and resource limits for the Node PTC provider. */
-import { isAbsolute } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type { LaunchConfig } from './launch.ts'
 
 /** Deployment-varying runtime bounds and launch choices. */
-export interface Config extends LaunchConfig {
+export interface Config {
+  /** Worker invocation in the subprocess world; omitted selects the local carrier. */
+  launch?: LaunchConfig
   /** per-call starts fresh processes; persistent-in-memory retains a REPL per owner under the same file policy. */
   executionMode?: 'per-call' | 'persistent-in-memory'
   /** Default elapsed deadline, including nested tool and approval waits. */
@@ -25,12 +26,10 @@ export interface Config extends LaunchConfig {
 }
 
 /** Configuration after Loader defaults and executable selection. */
-export type ResolvedConfig = Required<Omit<Config, 'bootstrapPath'>> & Pick<Config, 'bootstrapPath'>
+export type ResolvedConfig = Required<Config>
 /** Loader defaults for the Node PTC provider. */
 export const NodeConfig: z<Config> = z.object({
   executionMode: z.union([z.const('per-call'), z.const('persistent-in-memory')]).default('per-call'),
-  nodeExecutable: z.string(),
-  bootstrapPath: z.string(),
   timeoutMs: z.number().default(120_000),
   maxTimeoutMs: z.number().default(600_000),
   maxOutputBytes: z.number().default(67_108_864),
@@ -38,6 +37,10 @@ export const NodeConfig: z<Config> = z.object({
   maxMessageBytes: z.number().default(134_217_728),
   maxPendingCalls: z.number().default(128),
   graceMs: z.number().default(3_000),
+  launch: z.union([
+    z.object({ kind: z.const('node-script').required(), executable: z.string().required(), bootstrapPath: z.string() }),
+    z.object({ kind: z.const('embedded').required(), executable: z.string().required() }),
+  ]),
 })
 
 /**
@@ -55,6 +58,4 @@ export function validateConfig(config: ResolvedConfig): void {
   if (!Number.isSafeInteger(config.maxMessageBytes) || config.maxMessageBytes > 0xffff_ffff) throw new Error('ptc-runtime-node: maxMessageBytes must fit an unsigned 32-bit frame length')
   if (!Number.isSafeInteger(config.maxPendingCalls)) throw new Error('ptc-runtime-node: maxPendingCalls must be an integer')
   if (!Number.isSafeInteger(config.maxOldGenerationSizeMb)) throw new Error('ptc-runtime-node: maxOldGenerationSizeMb must be an integer')
-  if (config.nodeExecutable.length === 0) throw new Error('ptc-runtime-node: nodeExecutable must be non-empty')
-  if (config.bootstrapPath !== undefined && !isAbsolute(config.bootstrapPath)) throw new Error('ptc-runtime-node: bootstrapPath must be absolute')
 }

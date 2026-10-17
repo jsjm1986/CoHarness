@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-四个 [SSH 提供方](../../../../packages/ssh/README.zh.md)采用上游 alpha.2 实现。部署方管理的一条 OpenSSH 连接承载管理 RPC 和独立认证的程序流。预装 helper 及可选 PTC bootstrap 必须符合配置摘要；严格主机校验和禁止 Agent 转发仍为强制要求。
+四个 [SSH 提供方](../../../../packages/ssh/README.zh.md)采用上游实现，包括 [POSIX SSH 运行时决策](2026-09-11-posix-ssh-runtime.zh.md)覆盖的可执行 helper 分发形态。部署方管理的一条 OpenSSH 连接承载管理 RPC 和独立认证的程序流。预装 helper 及可选 PTC bootstrap 必须符合配置摘要；严格主机校验和禁止 Agent 转发仍为强制要求。
 
 提供方保留受保护文件写入、异步启动、取消和受管进程清理语义。断连操作在独立观察前结果未知；连接不会自动重连或重放。模型凭据与 Session 持久化保留在 Harness 主机。远端 helper 禁止通过 SIGUSR1 激活调试器。
 

@@ -67,6 +67,6 @@ Host 的 [`pluginMarket.search`](../../boot/plugin-market/README.zh.md#use-this-
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 
-无。
+未发布不变量伴随物：页面状态由插件市场服务与会话存储推导；视图自身不持有可独立观察的关系。
 
 </details>

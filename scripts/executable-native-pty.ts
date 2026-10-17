@@ -1,4 +1,4 @@
-/** Resolve the native node-pty input used by the Python SDK runtime builder. */
+/** Resolve the native node-pty input used by the SDK and SSH executable builders. */
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,7 +18,7 @@ export function resolveLinuxNodePtyAddon(
   const prebuilt = join(packageDirectory, 'prebuilds', `linux-${arch}`, 'pty.node')
   if (existsSync(prebuilt)) return prebuilt
   throw new Error(
-    `build-exe-for-python-sdk: node-pty addon is absent from both ${built} and ${prebuilt}.`,
+    `executable-native-pty: node-pty addon is absent from both ${built} and ${prebuilt}.`,
   )
 }
 
@@ -39,7 +39,7 @@ export function resolveWindowsNodePtyAddons(
   ]
   const missing = addons.filter(path => !existsSync(path))
   if (missing.length > 0) {
-    throw new Error(`build-exe-for-python-sdk: Windows node-pty addons are missing: ${missing.join(', ')}.`)
+    throw new Error(`executable-native-pty: Windows node-pty addons are missing: ${missing.join(', ')}.`)
   }
   return addons
 }

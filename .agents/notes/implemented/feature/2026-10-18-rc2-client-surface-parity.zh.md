@@ -1,8 +1,8 @@
 # Agent Note: rc.2 客户端表面对齐——会话、工作区与设置
 
-[English](2026-10-18-rc2-client-surface-parity.md) | 中文
-
 Status: implemented
+
+[English](2026-10-18-rc2-client-surface-parity.md) | 中文
 
 ## Problem
 

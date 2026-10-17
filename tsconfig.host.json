@@ -169,6 +169,7 @@
     { "path": "./packages/deliverables/tool-present" },
     { "path": "./packages/deliverables/workspace-changes" },
     { "path": "./packages/ssh/ssh" },
+    { "path": "./packages/ssh/ssh-helper-runtime" },
     { "path": "./packages/ssh/fs-ssh" },
     { "path": "./packages/ssh/subprocess-ssh" },
     { "path": "./packages/ssh/sandbox-ssh" },

@@ -22,9 +22,11 @@
     "./process": {
       "types": "./lib/types/process-entry.d.ts",
       "default": "./lib/process.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/process.js",
     "lib/persistent-process.js",

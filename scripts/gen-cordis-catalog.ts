@@ -141,6 +141,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   officeToPdf: 'office-to-pdf.md',
   webhookRuntime: 'webhook.md',
   workspaceRegistry: 'workspace.md',
+  worktrees: 'worktrees.md',
 }
 
 /**
@@ -658,6 +659,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   JobEvents: 'jobs.md',
   JobSettleCause: 'jobs.md',
   CreateTeamTaskRequest: 'agent-team.md',
+  CreateWorktreeRequest: 'worktrees.md',
+  CreatedWorktree: 'worktrees.md',
   SendTeamMessageRequest: 'agent-team.md',
   SendTeamMessageResult: 'agent-team.md',
   SpawnTeammateRequest: 'agent-team.md',

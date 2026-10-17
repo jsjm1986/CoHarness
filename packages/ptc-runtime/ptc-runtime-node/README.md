@@ -54,8 +54,7 @@ Configure the provider row after its required services are available:
 | `maxMessageBytes` | `134,217,728` | Limit for a control frame, outstanding argument bytes and queued control writes |
 | `maxPendingCalls` | `128` | Maximum simultaneous host binding calls |
 | `graceMs` | `3,000` | Managed termination and output-drain grace |
-| `nodeExecutable` | Current Node executable | Executable resolved in the subprocess execution world |
-| `bootstrapPath` | Package bootstrap | Optional absolute path to a preinstalled built bootstrap in that world |
+| `launch` | Local carrier | Explicit `{ kind: "node-script", executable, bootstrapPath? }` or `{ kind: "embedded", executable }` in the subprocess world |
 
 The [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-ptc-runtime-node) defines accepted config fields. `resolve(request)` defaults cwd to the sandbox policy workspace root and supplies the numeric or null deadline choice and execution policy; `run(spec)` accepts those resolved inputs and does not fill missing values.
 
@@ -76,7 +75,7 @@ Set `executionMode: persistent-in-memory` on the existing `@deepseek-ai/dsh-ptc-
     executionMode: persistent-in-memory
 ```
 
-Save the patch and pass its path to `dsh headless --patch <path>` in a composition with PTC tool presentation. The default `per-call` mode retains no program memory between calls. Changing the configuration reloads the provider and releases its execution resources. Packaged single-executable hosts must set `nodeExecutable` to Node and `bootstrapPath` to this package's built `persistent-process.js` for in-memory execution.
+Save the patch and pass its path to `dsh headless --patch <path>` in a composition with PTC tool presentation. The default `per-call` mode retains no program memory between calls. Changing the configuration reloads the provider and releases its execution resources. Packaged single-executable hosts require a `node-script` launch with `launch.executable` pointing to Node and `launch.bootstrapPath` pointing to this package's built `persistent-process.js` for in-memory execution.
 
 Each live Agent keeps its own process and top-level variables, functions, and imported modules across `run_code` calls and turns. Use `await import(...)`, `console.log(...)`, and a final JSON expression; top-level `return` is not supported. Assignments to undeclared names create retained globals under Node REPL’s non-strict evaluation. `_` and `_error` are ordinary retained globals, without interactive REPL result setters. Node REPL declaration rules apply, including errors on redeclaring existing `let`, `const`, or `class` names; assign to a mutable binding or choose a new name. A leading `{ ... }` is a statement block and can contain top-level await and temporary declarations; parenthesize an object expression to return it. Retained functions and saved tool methods call the current evaluation's bindings. All tool calls must be awaited; callbacks from a completed evaluation cannot invoke tools in a later evaluation.
 
@@ -104,29 +103,35 @@ Program parse errors and thrown exceptions are `exception`; deadline expiry is `
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+No invariant companion is published: launch ordering, control-channel lifetime and output bounds are enforced inside the runtime; no relation persists across calls to observe.
+
+
 The host owns policy, deadlines, binding lookup and process cleanup. The child owns program evaluation and binding proxies; model-written code is an untrusted peer even when its messages use the expected control descriptor.
 
 ### Launch and control
 
-The host strips erasable types, resolves the executable and bootstrap in the configured execution world, awaits argv confinement through `ctx.sandbox`, then spawns through `ctx.subprocess`. Cancellation is checked again after confinement, so a provider returning after cancellation cannot start the program. After adopting the inherited control channel, the child retains only executable-search, Windows system, and temporary paths in its OS environment and replaces the program-visible `process.env` with an empty dictionary. Windows ACL setup receives the parent's distinct `TEMP` and `TMP` values for shared grant locks, then replaces both with its private directory before starting the program. These native paths keep nested process creation and native temporary-file APIs functional. The host preserves `ELECTRON_RUN_AS_NODE` only for child startup so the Desktop executable runs the Node bootstrap; the bootstrap removes the selector before evaluating model code. The heap limit uses Node argv or a provider-created `NODE_OPTIONS` value for packaged executables; ambient loader and inspector flags are discarded.
+For per-call execution, the host strips erasable types, resolves the executable and bootstrap in the configured execution world, awaits argv confinement through `ctx.sandbox`, then spawns through `ctx.subprocess`. Cancellation is checked again after confinement, so a provider returning after cancellation cannot start the program. After adopting the inherited control channel, the child retains only executable-search, Windows system, and temporary paths in its OS environment and replaces the program-visible `process.env` with an empty dictionary. Windows ACL setup receives the parent's distinct `TEMP` and `TMP` values for shared grant locks, then replaces both with its private directory before starting the program. These native paths keep nested process creation and native temporary-file APIs functional. The host preserves `ELECTRON_RUN_AS_NODE` only for child startup so the Desktop executable runs the Node bootstrap; the bootstrap removes the selector before evaluating model code. The heap limit uses Node argv or a provider-created `NODE_OPTIONS` value for packaged executables; ambient loader and inspector flags are discarded.
 
 Length-framed JSON travels separately from stdout/stderr. The host bounds frames and queued writes, validates call identity and declared binding names before dispatch, and refuses invalid traffic. The child flushes its terminal frame and keeps the control channel open until the host closes it. After submitting that frame, it ignores later binding replies and sends no further program control messages. Output capture meters serialized logs plus the completion or diagnostic; fixed result-envelope fields and sandbox metadata are outside that ledger.
 
 ### Source and built bootstraps
 
-Source execution loads an erasable-only bootstrap closure without relying on sibling built exports. Built execution uses the packaged `process.js` entry. An execution world that cannot map the host bootstrap requires a preinstalled compatible `bootstrapPath`; a host path is never assumed to name the same remote file.
+Source execution loads an erasable-only bootstrap closure without relying on sibling built exports. Built script execution uses `process.js` for per-call programs or `persistent-process.js` for retained REPL environments. Persistent mode requires a `node-script` launch. A remote script deployment supplies the matching `launch.bootstrapPath`. Embedded carriers launch their private worker through `launch.executable`. `resolveLaunch()` selects the local default during construction; an explicit remote invocation never depends on whether the client itself is packaged. A host path is never assumed to name the same remote file.
 
 ### Source map
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Configuration, resolution, policy, bindings and managed execution |
+| [`src/index.ts`](src/index.ts) | Node provider: mode selection, per-call resolution, policy and managed execution |
+| [`src/config.ts`](src/config.ts) | Execution mode, validated limits and defaults |
+| [`src/persistent.ts`](src/persistent.ts) | In-memory process ownership, evaluation deadlines and cleanup |
+| [`src/persistent-process.ts`](src/persistent-process.ts) | Child REPL, retained declarations and current binding dispatch |
+| [`src/output-stream.ts`](src/output-stream.ts) | Bounded stream capture and process-output draining |
 | [`src/launch.ts`](src/launch.ts) | Executable/bootstrap arguments and execution-world asset mapping |
 | [`src/process.ts`](src/process.ts) | Child handshake, environment clearing and program lifecycle |
 | [`src/bootstrap.ts`](src/bootstrap.ts) | Program evaluation, binding proxies and output capture |
 | [`src/channel.ts`](src/channel.ts) | Framing, bounded writes and protocol failures |
 | [`src/output-ledger.ts`](src/output-ledger.ts) | Host accounting for the outer result |
-| — | No runtime invariant companion is published; framing and process cleanup are enforced across the process boundary rather than through independent same-process observations. |
 
 </details>
 

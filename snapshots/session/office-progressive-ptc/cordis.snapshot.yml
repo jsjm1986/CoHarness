@@ -60,7 +60,9 @@
 
 - id: ptc-runtime
   config:
-    nodeExecutable: !!js process.cwd() + '/office-ptc-node'
+    launch:
+      kind: node-script
+      executable: !!js process.cwd() + '/office-ptc-node'
 
 - id: tool-bash
   disabled: true

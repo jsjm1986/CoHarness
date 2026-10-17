@@ -54,14 +54,15 @@ const POLICIES: Readonly<Record<TranscriptViewMode, Omit<ChatPresentationPolicy,
   },
 }
 
-/**
- * Resolve the policy constant for one mode. The same mode always yields the
- * same object, so selectors over a policy see stable identities.
- * @param mode - persisted work-details mode.
- * @returns the mode's presentation policy.
- */
 const COMBINED_POLICIES = new Map<string, ChatPresentationPolicy>()
 
+/**
+ * Resolve the policy constant for one mode and collapse timing. The same pair
+ * always yields the same object, so selectors over a policy see stable identities.
+ * @param mode - persisted work-details mode.
+ * @param collapseTiming - when completed work details fold.
+ * @returns the pair's presentation policy.
+ */
 export function presentationPolicyFor(
   mode: TranscriptViewMode,
   collapseTiming: CollapseTiming = 'completion',

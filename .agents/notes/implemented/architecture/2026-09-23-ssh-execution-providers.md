@@ -10,7 +10,7 @@ Remote workspaces need filesystem identities, process paths, terminals and sandb
 
 ## Decision
 
-The four [SSH providers](../../../../packages/ssh/README.md) use the upstream alpha.2 implementation. One deployment-owned OpenSSH connection carries administrative RPC and separately authenticated program streams. The preinstalled helper and optional PTC bootstrap must match their configured digests; strict host verification and disabled agent forwarding remain mandatory.
+The four [SSH providers](../../../../packages/ssh/README.md) use the upstream implementation, including the executable helper distribution covered by the [POSIX SSH runtime decision](2026-09-11-posix-ssh-runtime.md). One deployment-owned OpenSSH connection carries administrative RPC and separately authenticated program streams. The preinstalled helper and optional PTC bootstrap must match their configured digests; strict host verification and disabled agent forwarding remain mandatory.
 
 Providers preserve guarded filesystem writes, asynchronous launch, cancellation and managed process cleanup. A disconnected operation has an unknown outcome until independently observed; the connection never reconnects or replays it automatically. Model credentials and Session persistence remain on the Harness host. The remote helper disables debugger activation through SIGUSR1.
 

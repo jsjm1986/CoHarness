@@ -183,9 +183,9 @@ class Kernel {
   }
 
   private async start(cwd: string): Promise<void> {
-    const executable = await this.ctx.subprocess.resolveExecutable(this.config.nodeExecutable, undefined, this.controller.signal)
+    const executable = await this.ctx.subprocess.resolveExecutable(this.config.launch.executable, undefined, this.controller.signal)
     if (this.closed) return
-    const argv = [executable, `--max-old-space-size=${this.config.maxOldGenerationSizeMb}`, ...bootstrapArgs(this.ctx.fs, this.config, this.config.maxMessageBytes, true)]
+    const argv = [executable, `--max-old-space-size=${this.config.maxOldGenerationSizeMb}`, ...bootstrapArgs(this.ctx.fs, this.config.launch, this.config.maxMessageBytes, true)]
     const policy = this.policy
     this.confined = policy.mode === 'danger-full-access' ? undefined : await this.ctx.sandbox.confine(argv, { ...policy, mode: policy.mode }, this.controller.signal)
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- Cancellation can close the kernel during confinement.
@@ -299,7 +299,7 @@ export class InMemoryExecution {
    * @param processes - Provider-owned policy invalidation and cleanup.
    */
   constructor(private readonly ctx: Context, private readonly config: ResolvedConfig, private readonly processes: PolicyProcesses) {
-    if ('pkg' in process && this.config.bootstrapPath === undefined) throw new Error('Persistent PTC requires a node-script launch')
+    if (this.config.launch.kind === 'embedded') throw new Error('Persistent PTC requires a node-script launch')
     ctx.effect(() => async () => {
       this.disposed = true
       const results = await Promise.allSettled([...this.kernels].map(kernel => kernel.dispose()))

@@ -416,8 +416,8 @@ describe('persistent PTC host protocol', () => {
     await expect(h.runtime.run({ ...request, cwd: process.cwd(), timeoutMs: Infinity })).rejects.toThrow('resolved inputs')
     for (const config of [
       { timeoutMs: 0 }, { maxMessageBytes: 0x1_0000_0000 }, { maxOutputBytes: 3 }, { graceMs: 2_147_483_648 },
-      { nodeExecutable: '' },
-      { nodeExecutable: process.execPath, bootstrapPath: 'relative' },
+      { launch: { kind: 'node-script', executable: '' } },
+      { launch: { kind: 'node-script', executable: process.execPath, bootstrapPath: 'relative' } },
     ] satisfies Config[]) {
       await expect(setup(config)).rejects.toThrow('ptc-runtime-node')
     }

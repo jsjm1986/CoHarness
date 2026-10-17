@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-fs'
 import { replyToBinding, validateBindings } from './bindings.ts'
 import { JsonChannel } from './channel.ts'
-import { bootstrapArgs } from './launch.ts'
+import { bootstrapArgs, resolveLaunch } from './launch.ts'
 import { NodeConfig, validateConfig } from './config.ts'
 import { PolicyProcesses } from './policy-processes.ts'
 import { InMemoryExecution } from './persistent.ts'
@@ -53,7 +53,7 @@ export class NodePtcRuntime extends PtcRuntime {
 
   constructor(ctx: Context, config: Config) {
     super(ctx)
-    this.config = { ...config, nodeExecutable: config.nodeExecutable ?? process.execPath } as ResolvedConfig
+    this.config = { ...config, launch: resolveLaunch(config.launch) } as ResolvedConfig
     validateConfig(this.config)
     this.processes = new PolicyProcesses(ctx)
     if (this.config.executionMode === 'persistent-in-memory') {
@@ -105,7 +105,7 @@ export class NodePtcRuntime extends PtcRuntime {
   async run(spec: PtcRunSpec): Promise<PtcRunResult> {
     if (this.disposed) throw new Error('ptc-runtime-node: run after disposal')
     const controller = new AbortController()
-    const completion = Promise.withResolvers<undefined>()
+    const completion = Promise.withResolvers<void>()
     const unregister = spec.sandboxPolicy === undefined ? undefined : this.processes.register(spec.sandboxPolicy, async () => {
       controller.abort(new Error('sandbox mode changed'))
       await completion.promise
@@ -125,7 +125,7 @@ export class NodePtcRuntime extends PtcRuntime {
     } finally {
       unregister?.()
       this.live.delete(live)
-      completion.resolve(undefined)
+      completion.resolve()
     }
   }
 
@@ -208,14 +208,14 @@ export class NodePtcRuntime extends PtcRuntime {
         })),
         maxOutputBytes: this.config.maxOutputBytes,
       }
-      const executable = await this.ctx.subprocess.resolveExecutable(this.config.nodeExecutable, undefined, signal)
+      const executable = await this.ctx.subprocess.resolveExecutable(this.config.launch.executable, undefined, signal)
       // Abort callbacks can settle execution before or during an awaited operation.
       // oxlint-disable-next-line typescript/no-unnecessary-condition
       if (settled) return await result.promise
-      const packaged = 'pkg' in process && this.config.bootstrapPath === undefined
+      const packaged = this.config.launch.kind === 'embedded'
       const heapFlag = `--max-old-space-size=${this.config.maxOldGenerationSizeMb}`
       const argv = [executable, ...packaged ? [] : [heapFlag],
-        ...bootstrapArgs(this.ctx.fs, this.config, this.config.maxMessageBytes)]
+        ...bootstrapArgs(this.ctx.fs, this.config.launch, this.config.maxMessageBytes)]
       confined = policy.mode === 'danger-full-access' ? undefined : await this.ctx.sandbox.confine(argv, { ...policy, mode: policy.mode }, signal)
       // oxlint-disable-next-line typescript/no-unnecessary-condition -- Cancellation can settle during awaited confinement.
       if (settled) return await result.promise

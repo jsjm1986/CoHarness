@@ -63,6 +63,6 @@ Switching the bundle on or off adds or removes one tool schema in Creator sessio
 <details>
 <summary>Maintainer details — click to expand</summary>
 
-None.
+No invariant companion is published: the patch layer only declares plugin rows; enablement and tool mounting are observed through Loader composition.
 
 </details>
