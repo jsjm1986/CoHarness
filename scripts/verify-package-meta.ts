@@ -1,8 +1,9 @@
-/** Validate source locale metadata, Node resource exports, and package publication selections. */
+/** Validate source locale metadata, official SVG artwork, Node resource exports, and publication selections. */
 
 import { globSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, matchesGlob, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { JSDOM } from 'jsdom'
 import { readPluginMeta, resolvePluginResource } from '../packages/boot/app-boot/src/package-meta.ts'
 
 interface Manifest {
@@ -17,6 +18,7 @@ interface SourceJson {
   metadata: boolean
   invalid: boolean
   icon?: unknown
+  packageName?: string
 }
 
 function sourceJsonFiles(dir: string): SourceJson[] {
@@ -31,7 +33,12 @@ function sourceJsonFiles(dir: string): SourceJson[] {
     if (typeof contents !== 'object' || contents === null || Array.isArray(contents)) {
       return { file, metadata: false, invalid: true }
     }
-    return { file, metadata: Object.hasOwn(contents, 'meta'), invalid: false, icon: 'icon' in contents ? contents.icon : undefined }
+    const name = 'name' in contents ? contents.name : undefined
+    return {
+      file, metadata: Object.hasOwn(contents, 'meta'), invalid: false,
+      icon: 'icon' in contents ? contents.icon : undefined,
+      ...basename(file) === 'package.json' && typeof name === 'string' && name.trim() !== '' ? { packageName: name } : {},
+    }
   })
 }
 
@@ -66,11 +73,53 @@ function published(file: string, files: string[]): boolean {
     && !files.some(pattern => pattern.startsWith('!') && covered(pattern.slice(1)))
 }
 
-function packageProblems(manifestPath: string): string[] {
+/** Structural artwork conventions only; not an SVG sanitizer or a rendered-pixel check. */
+function svgArtworkProblems(icon: string, parser: DOMParser): string[] {
+  const prefix = 'data:image/svg+xml;base64,'
+  if (!icon.startsWith(prefix)) return []
+  const document = parser.parseFromString(Buffer.from(icon.slice(prefix.length), 'base64').toString('utf8'), 'image/svg+xml')
+  if (document.querySelector('parsererror') !== null) return ['SVG icon must contain well-formed XML']
+  const svg = document.documentElement
+  if (svg.localName !== 'svg' || svg.namespaceURI !== 'http://www.w3.org/2000/svg') {
+    return ['SVG icon must have an svg root in the SVG namespace']
+  }
+  const problems: string[] = []
+  if (svg.getAttribute('viewBox') !== '0 0 36 36' || svg.getAttribute('width') !== '36' || svg.getAttribute('height') !== '36') {
+    problems.push('SVG icon must use width="36" height="36" viewBox="0 0 36 36"')
+  }
+  if (svg.querySelector('path, rect, circle, ellipse, line, polyline, polygon') === null) {
+    problems.push('SVG icon must contain geometry')
+  }
+  if (svg.querySelector('script, style, image, foreignObject, text, animate, animateTransform, animateMotion, set') !== null) {
+    problems.push('SVG icon must use self-contained geometry without scripts, styles, images, foreignObject, text, or animation')
+  }
+  const elements = [svg, ...svg.querySelectorAll('*')]
+  const ids = elements.flatMap(element => element.hasAttribute('id') ? [element.id] : [])
+  const uniqueIds = new Set(ids)
+  if (uniqueIds.size !== ids.length) problems.push('SVG icon must use unique ids')
+  for (const element of elements) {
+    for (const attribute of element.attributes) {
+      if (/^on/iu.test(attribute.name)) problems.push(`SVG icon must not use event handler ${attribute.name}`)
+      const references = [...attribute.value.matchAll(/url\(([^)]+)\)/gu)].map(match => (match[1] ?? '').replace(/['"]/gu, '').trim())
+      if (attribute.localName === 'href') references.push(attribute.value)
+      for (const reference of references) {
+        if (!reference.startsWith('#') || !uniqueIds.has(reference.slice(1))) {
+          problems.push(`SVG icon reference ${reference} must name a local id`)
+        }
+      }
+    }
+  }
+  return problems
+}
+
+function packageProblems(manifestPath: string, parser: DOMParser): string[] {
   const problems: string[] = []
   const dir = realpathSync(dirname(manifestPath))
   const pkg = JSON.parse(readFileSync(manifestPath, 'utf8')) as Manifest
   const documents = sourceJsonFiles(dir)
+  const nestedPackages = documents.filter(document => document.file !== 'package.json' && document.packageName !== undefined)
+    .map(document => ({ file: document.file, prefix: `${dirname(document.file).replaceAll('\\', '/')}/` }))
+  const children = nestedPackages.filter(child => !nestedPackages.some(parent => child !== parent && child.file.startsWith(parent.prefix)))
   const byPath = new Map(documents.map(document => [join(dir, document.file), document]))
   const parentURL = pathToFileURL(join(dir, 'package.json')).href
   const specifierOf = (plugin: string): string => pkg.name + (plugin === '.' ? '' : plugin.slice(1))
@@ -143,6 +192,9 @@ function packageProblems(manifestPath: string): string[] {
         : displayManifest !== undefined && typeof iconDocument?.icon === 'string'
           ? resolve(dirname(displayManifest), iconDocument.icon)
           : lookup(`${specifier}/icon`)
+      if (pkg.name.startsWith('@deepseek-ai/dsh-') && meta?.icon !== undefined) {
+        problems.push(...svgArtworkProblems(meta.icon, parser).map(problem => `${iconTarget ?? specifier}: ${problem}`))
+      }
       for (const target of [displayManifest, iconTarget]) {
         if (target === undefined) continue
         const file = relative(dir, target).replaceAll('\\', '/')
@@ -189,6 +241,8 @@ function packageProblems(manifestPath: string): string[] {
 
   for (const document of documents) {
     const requests = alternatives.get(document.file)
+    // Named nested packages own unclaimed resources; explicit outer exports still require validation.
+    if (requests === undefined && children.some(child => document.file.startsWith(child.prefix))) continue
     if (!document.file.split('/').includes('locale') && requests === undefined) continue
     if (!document.metadata && !document.invalid) continue
     if (claimed.has(join(dir, document.file))) continue
@@ -198,18 +252,26 @@ function packageProblems(manifestPath: string): string[] {
     })) continue
     problems.push(`${manifestPath}: exports must expose ${document.file} as a plugin locale resource with an en.json discovery baseline`)
   }
-  return problems
+  return problems.concat(children.flatMap(child => packageProblems(join(dir, child.file), parser)))
 }
 
 /**
- * Check static plugin locale metadata and resource publication without evaluating plugin entries or reading built output.
+ * Check workspace and named nested package metadata without evaluating plugin entries or reading built output.
+ * Selected SVG icons in @deepseek-ai/dsh-* packages follow official artwork conventions.
+ * Other packages and supported raster icons keep their metadata and publication checks.
  * @param root - repository or fixture root.
- * @returns diagnostics for an empty package corpus, invalid metadata, inaccessible resources, or omitted publication files.
+ * @returns diagnostics for an empty package corpus, invalid metadata or SVG artwork, inaccessible resources, or omitted publication files.
  */
 export function packageMetaProblems(root: string): string[] {
   const manifests = globSync('packages/*/*/package.json', { cwd: root }).map(path => path.replaceAll('\\', '/'))
   if (manifests.length === 0) return [`${root}: no workspace package manifests found`]
-  return manifests.flatMap(path => packageProblems(join(root, path)))
+  const { window } = new JSDOM()
+  try {
+    const parser = new window.DOMParser()
+    return manifests.flatMap(path => packageProblems(join(root, path), parser))
+  } finally {
+    window.close()
+  }
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -218,6 +280,6 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     console.error(problems.join('\n'))
     process.exitCode = 1
   } else {
-    console.log('verify-package-meta: plugin locale metadata, resource exports, and publication files are valid.')
+    console.log('verify-package-meta: plugin locale metadata, SVG artwork, resource exports, and publication files are valid.')
   }
 }
