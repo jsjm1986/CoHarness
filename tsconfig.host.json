@@ -403,6 +403,8 @@
     { "path": "./packages/experimental/plugin-market-bundle" },
     { "path": "./packages/experimental/schedule-bundle" },
     { "path": "./packages/experimental/tool-agent-team" },
+    { "path": "./packages/experimental/tool-worktree" },
+    { "path": "./packages/experimental/worktree" },
     { "path": "./packages/browser-use/browser-use" },
     { "path": "./packages/computer-use/computer-use" },
     { "path": "./packages/webhook/webhook" },
