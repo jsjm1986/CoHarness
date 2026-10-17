@@ -32,13 +32,14 @@ describe('verify-plugin-surfaces', () => {
       '@deepseek-ai/dsh-model-governance',
       '@deepseek-ai/dsh-steward-tools',
     ])
-    expect(facts.dynamicClientPackages.length).toBe(58)
+    expect(facts.dynamicClientPackages.length).toBe(59)
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-workbench')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-open-in-app')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-cordis')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-cordis-client-runner')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-api-gateway')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-session-log-export')
+    expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-plugin-market')
     expect(facts.staticClientPackages).toEqual([
       '@deepseek-ai/dsh-client-ui-dockkit',
       '@deepseek-ai/dsh-client-ui-primitives',

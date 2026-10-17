@@ -163,6 +163,7 @@ export const SERVICE_PAGE: Record<string, string> = {
  */
 export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   connection: 'interface-typed (HostConnectionHandle); implementing class HostConnectionService is declared in rpc-host.ts — packages/client/connection/README.md owns the API',
+  deepseekAccount: 'optional DeepSeek account lane, unprovided in this distribution — packages/web/web-deepseek-api/README.md owns the optional seam',
   webTerminals: 'client-side terminal view models — packages/api/terminal-controller/README.md owns the API',
   sidebarRight: 'client-face navigation service — packages/client/ui-sidebar-right/README.md owns the API',
   sidebarRightTabs: 'client-face tab registry — packages/client/ui-sidebar-right/README.md owns the API',

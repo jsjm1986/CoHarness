@@ -31,7 +31,7 @@ import { SubagentLimitsCard } from './SubagentLimitsCard.tsx'
 import { SubagentLimitsCardController } from './subagent-limits-card-controller.ts'
 import { AGENT_LOOP_NS, AgentLoopCardController } from './agent-loop-card-controller.ts'
 import { SHELL_NS, BashCardController } from './bash-card-controller.ts'
-import { WEB_SEARCH_NS, WebSearchCardController } from './web-search-card-controller.ts'
+import { WEB_API_NS, WEB_NS, WEB_SEARCH_NS, WebSearchCardController } from './web-search-card-controller.ts'
 import { en, zh } from './locales.ts'
 
 export type { PluginFormProps } from './PluginForm.tsx'
@@ -63,7 +63,11 @@ export function apply(ctx: ClientContext): void {
   const subagent = new SubagentLimitsCardController(ctx.settingsScope.bind({ namespace: 'subagent' }))
   const subagentModels = new SubagentModelSelectionCardController(
     ctx.settingsScope.bind({ namespace: SUBAGENT_MODEL_SELECTION_NS }), api)
-  const webSearch = new WebSearchCardController(ctx.settingsScope.bind({ namespace: WEB_SEARCH_NS }), api)
+  const webSearch = new WebSearchCardController({
+    web: ctx.settingsScope.bind({ namespace: WEB_NS }),
+    messages: ctx.settingsScope.bind({ namespace: WEB_SEARCH_NS }),
+    api: ctx.settingsScope.bind({ namespace: WEB_API_NS }),
+  }, api)
 
   // The credential a card reports is not part of any settings section, so its
   // scope publishes nothing when one is written. This is the only signal that

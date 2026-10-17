@@ -14,7 +14,8 @@ kind: "package-group"
 | [`web/`](web/README.zh.md) | 定义 web 提供方注册、选择和共享错误 | `ctx.web` |
 | [`web-search-exa/`](web-search-exa/README.zh.md) | 通过 Exa 提供 web 搜索 | 注册到 `ctx.web` |
 | [`web-search-perplexity/`](web-search-perplexity/README.zh.md) | 通过 Perplexity 提供 web 搜索 | 注册到 `ctx.web` |
-| [`web-search-deepseek/`](web-search-deepseek/README.zh.md) | 提供 DeepSeek 原生 web 搜索 | 注册到 `ctx.web` |
+| [`web-search-deepseek/`](web-search-deepseek/README.zh.md) | 通过 DeepSeek Messages 搜索网页 | 注册到 `ctx.web` |
+| [`web-deepseek-api/`](web-deepseek-api/README.zh.md) | 通过 DeepSeek Search 与 Fetch API 搜索和抓取网页 | 注册到 `ctx.web` |
 | [`web-fetch-http/`](web-fetch-http/README.zh.md) | 抓取公共 HTTP 和 HTTPS 资源 | 注册到 `ctx.web` |
 | [`tool-web/`](tool-web/README.zh.md) | 向模型公开 web 搜索和抓取 | 注册到 `ctx.tools` |
 
@@ -25,4 +26,4 @@ kind: "package-group"
 
 ## 概述
 
-`web/` 包让模型通过 `web_search` 与 `web_fetch` 工具搜索公共 web 和抓取 HTTP(S) 页面。部署可为搜索选择 Exa、Perplexity 或 DeepSeek，并通过匿名 HTTP(S) 访问抓取页面；可用性与资源上限取决于配置的提供方。该家族用于搜索和页面检索，不用于交互式浏览、内容提取或逐 URL 策略执行。提供方变化时，模型仍能获得一致的工具行为、取消与错误报告。
+`web/` 包让模型通过 `web_search` 与 `web_fetch` 工具搜索公共 web 和抓取 HTTP(S) 页面。部署可为搜索选择 Exa、Perplexity 或 DeepSeek，并通过匿名 HTTP(S) 或 DeepSeek 抓取页面；可用性与资源上限取决于配置的提供方。该家族用于搜索和页面检索，不用于交互式浏览、内容提取或逐 URL 策略执行。提供方变化时，模型仍能获得一致的工具行为、取消与错误报告。

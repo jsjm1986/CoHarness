@@ -54,6 +54,10 @@
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.md"
     },
+    "boot/plugin-market": {
+      "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
+      "sovereignty": "owned"
+    },
     "boot/workspace-dependencies": {
       "sovereignty": "owned",
       "note": ".agents/notes/proposed/testing/2026-09-25-coharness-fixture-alignment.md"
@@ -240,6 +244,10 @@
         "packages/client/ui-plugin-manager/src/client/sanitize-install-input.ts"
       ]
     },
+    "client/ui-plugin-market": {
+      "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
+      "sovereignty": "owned"
+    },
     "client/ui-primitives": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
@@ -328,18 +336,10 @@
     },
     "client/ui-subagent": {
       "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
-      "removedUpstreamPaths": [
-        "packages/client/ui-subagent/src/client/sidebar-chat/SidebarChat.module.css",
-        "packages/client/ui-subagent/src/client/sidebar-chat/index.tsx"
-      ]
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "client/ui-theme": {
-      "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/client/ui-theme/src/client/FontSizeRow.module.css",
-        "packages/client/ui-theme/src/client/FontSizeRow.tsx"
-      ]
+      "sovereignty": "adapted"
     },
     "client/ui-tool": {
       "sovereignty": "adapted"
@@ -430,6 +430,10 @@
     "context/gateway-runtime": {
       "sovereignty": "owned"
     },
+    "context/harness-dev-context": {
+      "note": ".agents/notes/implemented/bug-fix/2026-07-28-web-agent-runtime-context.md",
+      "sovereignty": "owned"
+    },
     "context/session-reference": {
       "sovereignty": "adapted"
     },
@@ -506,6 +510,10 @@
     "experimental/agent-team-profile": {
       "sovereignty": "tracked"
     },
+    "experimental/api-speech-to-text": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
     "experimental/auto-review": {
       "sovereignty": "adapted"
     },
@@ -525,17 +533,41 @@
     "experimental/client-ui-agent-team": {
       "sovereignty": "adapted"
     },
+    "experimental/client-ui-voice-input": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
     "experimental/computer-use-cua-driver-mcp": {
       "sovereignty": "adapted"
     },
     "experimental/computer-use-cua-driver-native": {
       "sovereignty": "adapted"
     },
+    "experimental/plugin-market-bundle": {
+      "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
+      "sovereignty": "owned"
+    },
     "experimental/ptc-runtime-python": {
       "sovereignty": "adapted"
     },
+    "experimental/schedule-bundle": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
+    },
+    "experimental/speech-to-text": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/speech-to-text-sensevoice": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
     "experimental/tool-agent-team": {
       "sovereignty": "adapted"
+    },
+    "experimental/voice-input-bundle": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "extensions/cordis-client-runner": {
       "sovereignty": "adapted"
@@ -724,7 +756,7 @@
       "sovereignty": "tracked"
     },
     "ptc-runtime/ptc-runtime": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "ptc-runtime/ptc-runtime-node": {
       "sovereignty": "adapted"
@@ -906,7 +938,7 @@
       "sovereignty": "adapted"
     },
     "skill/skill-office": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "skill/tool-skill": {
       "sovereignty": "adapted"
@@ -1054,7 +1086,7 @@
       "sovereignty": "tracked"
     },
     "util/home-paths": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/http-proxy": {
       "sovereignty": "tracked"
@@ -1079,11 +1111,15 @@
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
     },
+    "util/plugin-market-index": {
+      "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md",
+      "sovereignty": "owned"
+    },
     "util/time": {
       "sovereignty": "tracked"
     },
     "util/timeout": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/values": {
       "sovereignty": "adapted"
@@ -1096,6 +1132,10 @@
     },
     "web/web": {
       "sovereignty": "adapted"
+    },
+    "web/web-deepseek-api": {
+      "note": ".agents/notes/implemented/feature/2026-10-15-deepseek-search-fetch-api.md",
+      "sovereignty": "owned"
     },
     "web/web-fetch-http": {
       "sovereignty": "adapted"
@@ -1129,30 +1169,6 @@
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
-    },
-    "experimental/api-speech-to-text": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
-    },
-    "experimental/client-ui-voice-input": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
-    },
-    "experimental/schedule-bundle": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
-    },
-    "experimental/speech-to-text": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
-    },
-    "experimental/speech-to-text-sensevoice": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
-    },
-    "experimental/voice-input-bundle": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     }
   },
   "upstreamOnly": [

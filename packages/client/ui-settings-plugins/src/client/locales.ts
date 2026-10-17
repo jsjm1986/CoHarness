@@ -24,6 +24,8 @@ export type PluginsSettingsLocaleKey =
   | 'webSearchTitle' | 'webSearchDescription'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeyManaged' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
+  | 'webSearchUseSearchApi' | 'webSearchUseSearchApiHint' | 'webSearchSearchGuide' | 'webSearchSearchGuideUrl'
+  | 'webSearchApiBaseUrl' | 'webSearchApiBaseUrlHint' | 'webSearchCount' | 'webSearchCountHint' | 'webSearchInvalidCount'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -83,11 +85,20 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchApiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
   webSearchApiKeyManaged: 'This key is managed by the deployment administrator and cannot be changed in the project scope.',
   webSearchApiKeySet: 'A key is configured.',
-  webSearchApiKeyUnset: 'No key is configured; search is unavailable until one is.',
-  webSearchBaseUrl: 'Endpoint',
-  webSearchBaseUrlHint: 'Leave blank to use the provider default.',
+  webSearchApiKeyUnset: 'No key is configured; only conversations using a DeepSeek Account model can search, through the default endpoint.',
+  webSearchBaseUrl: 'Messages API base URL',
+  webSearchBaseUrlHint: 'Include the API prefix, such as https://api.deepseek.com/anthropic/v1. The provider appends /messages. Leave blank to restore the default.',
   webSearchMaxUses: 'Max searches per request',
-  webSearchMaxUsesHint: 'How many times one request may search before it must answer.',
+  webSearchMaxUsesHint: 'How many searches the auxiliary model may run within one Messages request. Applies only to the Messages API.',
+  webSearchUseSearchApi: 'Use the new Web Search API',
+  webSearchUseSearchApiHint: 'Off by default: search runs through DeepSeek Messages. For the new Web Search API\'s features and pricing, see the ',
+  webSearchSearchGuide: 'Search & Fetch guide',
+  webSearchSearchGuideUrl: 'https://api-docs.deepseek.com/guides/search',
+  webSearchApiBaseUrl: 'Search / Fetch API base URL',
+  webSearchApiBaseUrlHint: 'Include the API prefix, such as https://api.deepseek.com/v1/tools. The provider appends /search or /fetch. Leave blank to restore the default.',
+  webSearchCount: 'Results per search',
+  webSearchCountHint: 'Results returned per query: an integer from 1 to 50, default 10. This controls result count, not search calls. web_search keeps no more sources than its own result limit.',
+  webSearchInvalidCount: 'Enter an integer from 1 to 50, or leave blank to use the default.',
 }
 
 /** Simplified Chinese copy. */
@@ -148,9 +159,18 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   webSearchApiKeyHint: '不写入设置文件。留空表示保持当前密钥。',
   webSearchApiKeyManaged: '此密钥由部署管理员管理，项目空间中不能修改。',
   webSearchApiKeySet: '已配置密钥。',
-  webSearchApiKeyUnset: '未配置密钥；配置之前搜索不可用。',
-  webSearchBaseUrl: '接口地址',
-  webSearchBaseUrlHint: '留空则使用提供方默认地址。',
+  webSearchApiKeyUnset: '未配置密钥；仅使用 DeepSeek 账号模型的对话可以通过默认接口地址搜索。',
+  webSearchBaseUrl: 'Messages API 基础地址',
+  webSearchBaseUrlHint: '填写含 API 前缀的地址，例如 https://api.deepseek.com/anthropic/v1；程序追加 /messages，留空恢复默认。',
   webSearchMaxUses: '单次请求最多搜索次数',
-  webSearchMaxUsesHint: '一次请求在必须作答前最多可以搜索多少次。',
+  webSearchUseSearchApi: '启用新版 Web 搜索 API',
+  webSearchUseSearchApiHint: '默认关闭，搜索通过 DeepSeek Messages 完成。新版 Web 搜索 API 功能与计费详见',
+  webSearchSearchGuide: '网页搜索与抓取指南',
+  webSearchSearchGuideUrl: 'https://api-docs.deepseek.com/zh-cn/guides/search',
+  webSearchApiBaseUrl: 'Search / Fetch API 基础地址',
+  webSearchApiBaseUrlHint: '填写含 API 前缀的地址，例如 https://api.deepseek.com/v1/tools；程序追加 /search 或 /fetch，留空恢复默认。',
+  webSearchCount: '每次搜索结果数',
+  webSearchCountHint: '每个查询返回的结果条数，须为 1–50 的整数，默认 10；不控制搜索调用次数。web_search 保留的来源数不超过其自身的结果上限。',
+  webSearchInvalidCount: '请填 1–50 的整数；留空表示使用默认值。',
+  webSearchMaxUsesHint: '辅助模型在一次 Messages 请求内最多可执行的搜索次数，仅适用于 Messages API。',
 }

@@ -30,7 +30,7 @@ kind: "package-reference"
 
 「插件」页的「插件配置」分组渲染两份账本的交集：已组装客户端注册的 `plugins.item` 条目，以及 Host 服务的 settings 命名空间。被服务却无条目认领的命名空间什么都不渲染——它归别的界面所有，或本部署没有为它提供浏览器半侧；命名空间未被本部署服务的条目会被过滤，因此未组装的插件不留空壳。卡片按注册顺序出现；对同一个包一起安装的条目这是稳定的，对跨插件的条目则不稳定：包与包之间的 apply 顺序是无约束的。
 
-条目覆盖 shell 执行器（`shell`）、工具调用并行度（`agent-loop`）、委派深度与容量（`subagent`）、精确模型路由（`subagent-model-selection`）以及 DeepSeek 搜索提供方（`web-search-deepseek`）。委派控件保留上游整数校验、重置和帮助说明。深度为零会禁用继承该设置的委派工具；工具显式设置的深度优先。容量统计同一根 Agent 下所有深度的存活后代，不计根 Agent 本身。
+条目覆盖 shell 执行器（`shell`）、工具调用并行度（`agent-loop`）、委派深度与容量（`subagent`）、精确模型路由（`subagent-model-selection`）以及 DeepSeek 搜索提供方（`web`、`web-search-deepseek`、`web-deepseek-api`）。委派控件保留上游整数校验、重置和帮助说明。深度为零会禁用继承该设置的委派工具；工具显式设置的深度优先。容量统计同一根 Agent 下所有深度的存活后代，不计根 Agent 本身。
 
 处于项目作用域时，这些页面只会开放 Host 注册时同时声明 `owner: project` 与 `projectWrite: manager` 的 namespace。项目 owner 和组织管理员可以保存共享运行时值；其他成员仍能看到表单和行内所有者说明，但不会发出写入请求。账户、组织、部署和模型 Provider 设置继续由各自的所属界面管理。
 

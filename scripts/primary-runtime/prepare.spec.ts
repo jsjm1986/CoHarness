@@ -95,7 +95,7 @@ it('copies complete Office resources outside the application archive and removes
     const source = join(root, 'package', 'assets')
     const destination = join(root, 'Contents', 'Resources', 'runtime', 'office-skills')
     for (const name of ['office-docx', 'office-pptx', 'office-xlsx']) {
-      await mkdir(join(source, name))
+      await mkdir(join(source, name), { recursive: true })
       await writeFile(join(source, name, 'SKILL.md'), `# ${name}\n`)
     }
     await prepareOfficeSkillAssets(source, destination)

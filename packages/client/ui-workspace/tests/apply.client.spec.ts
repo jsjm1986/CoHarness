@@ -402,8 +402,8 @@ describe('ui-workspace apply', () => {
     const toast = faceOf(entry(b.slots, 'shell.overlay', 'workspace.row-toast')) as RowToastInjected
 
     // A Host refusal keeps the stable `code: message` form in the notice.
-    b.startSession.mockImplementationOnce((_workspaceId: unknown, onFailure?: (reason: unknown) => void) => {
-      onFailure?.(Object.assign(new Error('workspace connect failed: workspace-archived: gone'), {
+    b.startSession.mockImplementationOnce((_workspaceId: unknown, options?: { onFailure?: (reason: unknown) => void }) => {
+      options?.onFailure?.(Object.assign(new Error('workspace connect failed: workspace-archived: gone'), {
         name: 'WorkspaceConnectError', rpcError: { code: 'workspace-archived', message: 'gone' },
       }))
     })
@@ -415,8 +415,8 @@ describe('ui-workspace apply', () => {
       expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createFailed', message: 'workspace-archived: gone', seq: 1 })
     })
     // Any other failure reports its own message.
-    b.startSession.mockImplementationOnce((_workspaceId: unknown, onFailure?: (reason: unknown) => void) => {
-      onFailure?.(new Error('plain failure'))
+    b.startSession.mockImplementationOnce((_workspaceId: unknown, options?: { onFailure?: (reason: unknown) => void }) => {
+      options?.onFailure?.(new Error('plain failure'))
     })
     b.ctx.uiWorkspace.startSession()
     await vi.waitFor(() => {
