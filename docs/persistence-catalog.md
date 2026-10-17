@@ -7538,7 +7538,7 @@ Sources: [`packages/memory/memory-context/src/index.ts:29`](../packages/memory/m
 
 SHA-256: `2e33b9307a72edc572a8eb86ae9720c7c2e2c415e61830cca1faa39e8fab354e`
 
-Sources: [`packages/memory/memory/src/types.ts:37`](../packages/memory/memory/src/types.ts)
+Sources: [`packages/memory/memory/src/types.ts:49`](../packages/memory/memory/src/types.ts)
 
 One of:
 
@@ -7553,7 +7553,7 @@ One of:
 
 SHA-256: `d21a48b908a626ca2315cd5c391ffc047e1fac90f5954e3e3b6a0d73cfe98980`
 
-Sources: [`packages/memory/memory/src/types.ts:16`](../packages/memory/memory/src/types.ts)
+Sources: [`packages/memory/memory/src/types.ts:28`](../packages/memory/memory/src/types.ts)
 
 One of:
 

@@ -25894,7 +25894,7 @@
         "packages/memory/memory/src/types.ts#MemoryKind"
       ],
       "sources": [
-        "packages/memory/memory/src/types.ts:37"
+        "packages/memory/memory/src/types.ts:49"
       ]
     },
     {
@@ -28537,7 +28537,7 @@
         "packages/memory/memory/src/types.ts#MemoryScopeKind"
       ],
       "sources": [
-        "packages/memory/memory/src/types.ts:16"
+        "packages/memory/memory/src/types.ts:28"
       ]
     },
     {

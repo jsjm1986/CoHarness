@@ -82,11 +82,18 @@ interface MemorySearchHit {
 
 ```ts type-equiv
 /**
- * Who is writing. The union is open for later writer kinds (members editing
- * in the browser); only `agent` exists today. `signal` is the operation's
- * cancellation carried into the project authorization call.
+ * Who is writing. `agent` writes through the model tools under the
+ * `memory` execution authorization; `member` writes through the browser
+ * Remote methods under the captured collaboration participant — an absent
+ * participant means a runtime with no collaboration provider, which keeps
+ * owner semantics. `signal` is the agent operation's cancellation carried
+ * into the project authorization call. Host-only vocabulary: it names the
+ * `Agent` runtime type, so it is exported from the service entry rather
+ * than the client-safe `./types`.
  */
-type MemoryWriter = { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal }
+type MemoryWriter =
+  | { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal }
+  | { readonly kind: 'member'; readonly participant?: CollaborationParticipant }
 ```
 
 ```ts type-equiv
@@ -119,7 +126,7 @@ interface MemoryDeleteRequest {
  */
 type MemoryWriteResult =
   | { readonly ok: true; readonly operation: 'create' | 'update' | 'delete'; readonly entry: MemoryEntry; readonly previous?: MemoryEntry }
-  | { readonly ok: false; readonly code: MemoryRefusalCode; readonly reason: MemoryInvalidReason | undefined }
+  | { readonly ok: false; readonly code: MemoryRefusalCode; readonly reason?: MemoryInvalidReason }
 ```
 
 ```ts type-equiv
