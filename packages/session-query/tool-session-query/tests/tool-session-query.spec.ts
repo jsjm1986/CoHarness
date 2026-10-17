@@ -2340,11 +2340,10 @@ describe('session handoff', () => {
         yield { type: 'finish', reason: { kind: 'stop' } }
       },
     } as never)
-    const agent = {
-      id: mounted.caller.id,
-      session: mounted.caller,
+    const agent: Agent = {
+      ...fakeAgent(mounted.caller),
       options: { provider: 'test-provider', model: 'test-model' },
-    } as unknown as Agent
+    }
 
     const output = text(await mounted.call('session_handoff', { session_id: 'capsule-target' }, { agent }))
     expect(output).toContain('Source: model capsule')
@@ -2365,11 +2364,10 @@ describe('session handoff', () => {
         throw new Error('provider down')
       },
     } as never)
-    const agent = {
-      id: mounted.caller.id,
-      session: mounted.caller,
+    const agent: Agent = {
+      ...fakeAgent(mounted.caller),
       options: { provider: 'test-provider', model: 'test-model' },
-    } as unknown as Agent
+    }
 
     const output = text(await mounted.call('session_handoff', { session_id: 'fallback-target' }, { agent }))
     expect(output).toContain('Source: local tail')
@@ -2503,11 +2501,10 @@ describe('session handoff', () => {
         requests.push(options)
       },
     } as never)
-    const unroutedAgent = {
-      id: unrouted.caller.id,
-      session: unrouted.caller,
+    const unroutedAgent: Agent = {
+      ...fakeAgent(unrouted.caller),
       options: {},
-    } as unknown as Agent
+    }
     const unroutedOutput = text(await unrouted.call('session_handoff', { session_id: 'unrouted-target' }, { agent: unroutedAgent }))
     expect(unroutedOutput).toContain('Source: local tail')
     expect(requests).toHaveLength(0)
@@ -2522,11 +2519,10 @@ describe('session handoff', () => {
         yield { type: 'finish', reason: { kind: 'stop' } }
       },
     } as never)
-    const emptyAgent = {
-      id: empty.caller.id,
-      session: empty.caller,
+    const emptyAgent: Agent = {
+      ...fakeAgent(empty.caller),
       options: { provider: 'p', model: 'm' },
-    } as unknown as Agent
+    }
     const emptyOutput = text(await empty.call('session_handoff', { session_id: 'empty-target' }, { agent: emptyAgent }))
     expect(emptyOutput).toContain('Source: local tail')
     expect(emptyOutput).toContain('empty capsule')

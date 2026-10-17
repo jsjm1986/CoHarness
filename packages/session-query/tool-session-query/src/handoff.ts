@@ -93,7 +93,13 @@ function projectConversation(snapshot: SessionSurfaceSnapshot): ProjectedConvers
   }
 }
 
-/** Render the local tail briefing: whole items from the end until the char budget. */
+/**
+ * Render the local tail briefing: whole items from the end until the char budget.
+ *
+ * @param projected - projected conversation items and serialized text.
+ * @param chars - inclusive character budget for picked items.
+ * @returns the rendered briefing, prefixed with an omitted-item count when truncated.
+ */
 export function formatLocalHandoff(projected: ProjectedConversation, chars: number): string {
   const picked: HandoffItem[] = []
   let used = 0
@@ -125,6 +131,13 @@ function extractionTarget(agent: Agent): { provider: string; model: string } | u
  * Run the auxiliary capsule extraction when configured, an llm service is
  * mounted, a target is resolvable, and the serialized surface fits the
  * extraction budget; `undefined` means the caller should render locally.
+ *
+ * @param ctx - plugin context used to reach the optional `llm` service and log failures.
+ * @param agent - calling agent; supplies the extraction provider/model fallback and session id.
+ * @param projected - projected conversation items and serialized text.
+ * @param config - resolved extraction switch and size budgets.
+ * @param signal - caller cancellation; an aborted signal propagates instead of falling back.
+ * @returns the capsule markdown, or `undefined` to render the local tail instead.
  */
 export async function extractHandoff(
   ctx: Context,
@@ -165,7 +178,12 @@ export async function extractHandoff(
   }
 }
 
-/** Project the handoff conversation for an authorized surface snapshot. */
+/**
+ * Project the handoff conversation for an authorized surface snapshot.
+ *
+ * @param snapshot - target session's surface snapshot after workspace authorization.
+ * @returns user/assistant items and their serialized transcript text.
+ */
 export function projectHandoff(snapshot: SessionSurfaceSnapshot): ProjectedConversation {
   return projectConversation(snapshot)
 }
