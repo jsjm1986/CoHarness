@@ -56,6 +56,8 @@ it('preserves stored values through built forms and keeps every mobile destinati
     }
     deps.backups = { list: async () => [], get: async () => { throw new Error('No backup selected') },
       record: async () => { throw new Error('This form scenario does not capture data') }, setVerified: async () => { throw new Error('No backup selected') } }
+    deps.memoryAccess = { get: async owner => ({ ...owner, enabled: false, revision: '0' }),
+      set: async (owner, enabled) => ({ ...owner, enabled: enabled === true, revision: '1' }) }
     const runtimeActions: unknown[] = []
     const stopInstance = deps.instances.stop.bind(deps.instances)
     deps.instances.stop = async (target, reason) => {

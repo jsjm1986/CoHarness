@@ -246,8 +246,13 @@ type ExecutionQuestionId = Branded<'rpc-id'>
 ```
 
 ```ts type-equiv
-/** Privilege checked against every current execution participant. */
-type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop'
+/**
+ * Privilege checked against every current execution participant. `memory`
+ * writes shared project memory; it is granted only when every participant
+ * holds the memory qualification, the project enables it, and the
+ * conversation is project-visible.
+ */
+type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop' | 'memory'
 ```
 
 ```ts type-equiv

@@ -671,6 +671,14 @@ export function setPluginPolicy(policy: AdminResourcePolicy): Promise<AdminResou
   return request('/admin/api/plugins/permissions', { method: 'POST', body: JSON.stringify(policy) })
 }
 
+export function getMemoryPolicy(kind: AdminResourcePolicy['kind'], id: number, signal?: AbortSignal): Promise<AdminResourcePolicy> {
+  return request(`/admin/api/memory/permissions?kind=${kind}&id=${String(id)}`, { signal })
+}
+
+export function setMemoryPolicy(policy: AdminResourcePolicy): Promise<AdminResourcePolicy> {
+  return request('/admin/api/memory/permissions', { method: 'POST', body: JSON.stringify(policy) })
+}
+
 export function getStewardPolicy(kind: AdminResourcePolicy['kind'], id: number, signal?: AbortSignal): Promise<AdminResourcePolicy> {
   return request(`/admin/api/steward/permissions?kind=${kind}&id=${String(id)}`, { signal })
 }

@@ -102,14 +102,14 @@
   en: be4fac1a112b9059
   zh: be4fac1a112b9059
 /session-persistence-event-catalog/events/gateway/gateway-continuation-log-only:
-  en: 8e13827b2d43db31
-  zh: e6dab05656118e6d
+  en: 25c3274934b919cf
+  zh: c54cc97d8320b76f
 /session-persistence-event-catalog/events/gateway/gateway-execution-log-only:
-  en: 3189aa9b0b8aff37
-  zh: 97b550e91dbfe75a
+  en: 608f8d4ebe5f1aff
+  zh: 750193d8a797fc47
 /session-persistence-event-catalog/events/gateway/gateway-scoped-execution-log-only:
-  en: d579b76916eeb7cc
-  zh: 2a53f7e35dc81a6e
+  en: a68d26315bc975ee
+  zh: 92baed5c5272870d
 /session-persistence-event-catalog/events/goal:
   en: d990c355971ee24c
   zh: d990c355971ee24c
@@ -1071,29 +1071,29 @@
   en: 2a2ad85619ea9955
   zh: 8621440169b0d45d
 /session-persistence-event-catalog/resolved-persistence-types/event-gateway-continuation-data:
-  en: 0af5eb1bdb094279
-  zh: 1045de5dd089d551
+  en: bb1f8353563ea399
+  zh: 5ad24c74dd0519e8
 /session-persistence-event-catalog/resolved-persistence-types/event-gateway-execution:
   en: 2ce23d157defb201
   zh: 31be964335b69710
 /session-persistence-event-catalog/resolved-persistence-types/event-gateway-execution-data-variant-0:
-  en: a18e8d54853b6f9b
-  zh: 9e4f258acd21fd16
+  en: 4026e37aa4dfffa3
+  zh: cf169f79bd61b943
 /session-persistence-event-catalog/resolved-persistence-types/event-gateway-execution-data-variant-1:
-  en: a19876685be478c1
-  zh: 069c40a2ca95666c
+  en: 785b5153bcf309ad
+  zh: bb2e1de51771bcbd
 /session-persistence-event-catalog/resolved-persistence-types/event-gateway-execution-data-variant-1-state-actors:
   en: e243c3fc42e1e18f
   zh: cc03722ba7c4ed9b
 /session-persistence-event-catalog/resolved-persistence-types/event-gateway-execution-data-variant-1-state-actors-item:
-  en: c6bebebbbf11904d
-  zh: bef63895be182c70
+  en: c196702795c999de
+  zh: 63039346ed5a651a
 /session-persistence-event-catalog/resolved-persistence-types/event-gateway-scoped-execution:
   en: 29e159a7a8fd2194
   zh: 3b2b57d0062f34bb
 /session-persistence-event-catalog/resolved-persistence-types/event-gateway-scoped-execution-data:
-  en: 7b012d7577c7bc91
-  zh: cf8bc0c5481e0ab9
+  en: bd9c4fc70c6532aa
+  zh: 6cd46c3968e84e86
 /session-persistence-event-catalog/resolved-persistence-types/event-goal-change:
   en: 57642333835b99aa
   zh: 1f49d2d9e087c47e
@@ -1602,14 +1602,14 @@
   en: e2707488cb6f74fd
   zh: d9baa2b20d40bf18
 /session-persistence-event-catalog/resolved-persistence-types/packages-context-execution-authority-src-types-ts-executionevent:
-  en: b782bd7c681b5226
-  zh: 44a0bdc8fb7245f1
+  en: f569cdb772f7121b
+  zh: fbc767a90375a85e
 /session-persistence-event-catalog/resolved-persistence-types/packages-context-execution-authority-src-types-ts-executioninheritance:
-  en: aef08cf6f876b5ee
-  zh: 81af7fdea780cfee
+  en: 520e01c6893b585a
+  zh: bb9503e3e5a3d223
 /session-persistence-event-catalog/resolved-persistence-types/packages-context-execution-authority-src-types-ts-executionstate:
-  en: 45af2dea13c930e4
-  zh: 3c51ec9e517d3c57
+  en: 280b0fdbf0838a78
+  zh: fd2cd018cb08bdaf
 /session-persistence-event-catalog/resolved-persistence-types/packages-context-session-reference-src-types-ts-sessionreferencesource:
   en: ead51d9d14f5bd93
   zh: 196f573004460369

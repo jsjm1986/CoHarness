@@ -23,6 +23,8 @@ vi.mock('../api.ts', () => ({
   setDesktopPolicy: vi.fn(),
   getPluginPolicy: vi.fn(),
   setPluginPolicy: vi.fn(),
+  getMemoryPolicy: vi.fn(),
+  setMemoryPolicy: vi.fn(),
   getStewardPolicy: vi.fn(),
   setStewardPolicy: vi.fn(),
   listModels: vi.fn(),
@@ -126,6 +128,7 @@ describe('UserDetailPage', () => {
     vi.mocked(api.getTerminalPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
     vi.mocked(api.getDesktopPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
     vi.mocked(api.getPluginPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
+    vi.mocked(api.getMemoryPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
     vi.mocked(api.getStewardPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
     vi.mocked(api.listModels).mockResolvedValue([model])
     vi.mocked(api.getModelAccess).mockResolvedValue({ effective: { version: 1, defaultAllowed: false, models: [{ provider: model.provider, model: model.model, allowed: false }] }, overrides: [] })
@@ -143,6 +146,7 @@ describe('UserDetailPage', () => {
     expect(api.getSshPolicy).toHaveBeenCalledWith('user', 1, expect.any(AbortSignal))
     expect(api.getTerminalPolicy).toHaveBeenCalledWith('user', 1, expect.any(AbortSignal))
     expect(api.getDesktopPolicy).toHaveBeenCalledWith('user', 1, expect.any(AbortSignal))
+    expect(api.getMemoryPolicy).toHaveBeenCalledWith('user', 1, expect.any(AbortSignal))
     expect((await screen.findAllByText('Shared')).length).toBeGreaterThan(0)
     expect(screen.getByRole('group', { name: 'Token 额度' })).toBeTruthy()
   })

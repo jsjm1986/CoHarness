@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
 import { DesktopPermissions } from './DesktopPermissions.tsx'
+import { MemoryPermissions } from './MemoryPermissions.tsx'
 import { TerminalPermissions } from './TerminalPermissions.tsx'
 
-vi.mock('../api.ts', () => ({ listUsers: vi.fn(), listProjects: vi.fn(), getDesktopPolicy: vi.fn(), setDesktopPolicy: vi.fn(), getTerminalPolicy: vi.fn(), setTerminalPolicy: vi.fn() }))
+vi.mock('../api.ts', () => ({ listUsers: vi.fn(), listProjects: vi.fn(), getDesktopPolicy: vi.fn(), setDesktopPolicy: vi.fn(), getTerminalPolicy: vi.fn(), setTerminalPolicy: vi.fn(), getMemoryPolicy: vi.fn(), setMemoryPolicy: vi.fn() }))
 afterEach(cleanup)
 describe.each([
   { name: '桌面', Component: DesktopPermissions, read: 'getDesktopPolicy', write: 'setDesktopPolicy', saved: '桌面授权已保存；用户仍需确认会话与桌面。' },
@@ -77,6 +78,43 @@ it('lets an administrator retry loading owners after a network failure', async (
   await user.click(screen.getByRole('button', { name: '重新加载授权对象' }))
   await waitFor(() => expect(screen.getByRole('option', { name: /Shared/ })).toBeTruthy())
   expect(screen.queryByText('network unavailable')).toBeNull()
+})
+
+})
+
+describe('记忆写入 permissions on a fixed project', () => {
+beforeEach(() => {
+  vi.resetAllMocks()
+  vi.mocked(api.getMemoryPolicy).mockImplementation(async (kind, id) => ({ kind, id, enabled: false, revision: '0' }))
+})
+
+it('reads the bound project without a picker and saves with its revision', async () => {
+  const user = userEvent.setup()
+  render(<MemoryPermissions projectId={7} />)
+  const checkbox = await screen.findByRole('checkbox', { name: '允许此项目使用记忆写入' })
+  expect(api.listProjects).not.toHaveBeenCalled()
+  expect(api.listUsers).not.toHaveBeenCalled()
+  expect(api.getMemoryPolicy).toHaveBeenCalledWith('project', 7, expect.any(AbortSignal))
+  expect(screen.queryByLabelText('记忆写入授权对象')).toBeNull()
+  expect((checkbox as HTMLInputElement).checked).toBe(false)
+  vi.mocked(api.setMemoryPolicy).mockResolvedValue({ kind: 'project', id: 7, enabled: true, revision: '1' })
+  await user.click(checkbox)
+  await user.click(screen.getByRole('button', { name: '保存记忆写入授权' }))
+  expect(api.setMemoryPolicy).toHaveBeenCalledWith({ kind: 'project', id: 7, enabled: true, revision: '0' })
+  expect(await screen.findByRole('status')).toHaveProperty('textContent', '记忆写入授权已保存；项目空间仍需同时具备用户资格与项目授权。')
+})
+
+it('rejects stale saves and rereads the bound project', async () => {
+  const user = userEvent.setup()
+  render(<MemoryPermissions projectId={7} />)
+  await user.click(await screen.findByRole('checkbox'))
+  vi.mocked(api.setMemoryPolicy).mockRejectedValue(new Error('policy changed'))
+  await user.click(screen.getByRole('button', { name: '保存记忆写入授权' }))
+  expect(await screen.findByText(/请重新读取当前授权/)).toBeTruthy()
+  vi.mocked(api.getMemoryPolicy).mockResolvedValue({ kind: 'project', id: 7, enabled: true, revision: '2' })
+  await user.click(screen.getByRole('button', { name: '重新读取授权' }))
+  expect((await screen.findByRole('checkbox') as HTMLInputElement).checked).toBe(true)
+  expect(screen.getByText(/版本 2/)).toBeTruthy()
 })
 
 })

@@ -74,6 +74,8 @@ export interface GatewayDeps {
   pluginAccess?: Pick<import('./plugin-access.ts').PluginAccess, 'get' | 'set'>
   /** Optional administrator-owned steward-space qualification store. */
   stewardAccess?: Pick<import('./steward-access.ts').StewardAccess, 'get' | 'set' | 'list'>
+  /** Optional administrator-owned shared-memory write qualification store. */
+  memoryAccess?: Pick<import('./memory-access.ts').MemoryAccess, 'get' | 'set'>
   pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke' | 'state' | 'saveState'>
   /** Optional durable plugin desired-state store backing spawn projection and runtime write-back. */
   pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'get' | 'set' | 'readForSubject' | 'publishForSubject' | 'projection' | 'markApplied' | 'applied' | 'observed' | 'project'>
