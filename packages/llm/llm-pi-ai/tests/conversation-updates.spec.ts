@@ -1,9 +1,8 @@
 /**
  * Capability-driven transcript updates through the real pi-ai serializers and shared
- * runtime. pi-ai 0.87.x encodes Anthropic tool changes as `tool_reference` blocks and
- * lifts the later declarations into the request tools with `defer_loading`; a pi-ai
- * upgrade may switch those blocks to inline `tool_definition`, so re-check the wire
- * assertions here on every version bump.
+ * runtime. pi-ai 1.x encodes Anthropic tool removals as `tool_reference` blocks and
+ * additions as inline `tool_definition` blocks, keeping added declarations out of the
+ * request tools; re-check the wire assertions here on every version bump.
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -120,13 +119,12 @@ describe('serialized conversation updates', () => {
         { role: 'system', content: [{ type: 'text', text: 'full updated prompt' }] },
         { role: 'system', content: [
           { type: 'text', text: 'Instruction one.\nInstruction two.' },
-          { type: 'tool_addition', tool: { type: 'tool_reference', name: 'search' } },
+          { type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) } },
         ] },
       ],
       tools: [
         expect.objectContaining({ name: 'read' }),
         expect.objectContaining({ name: '__pi_deferred_placeholder__', defer_loading: true }),
-        expect.objectContaining({ name: 'search', defer_loading: true }),
       ],
     })
   })
@@ -143,13 +141,13 @@ describe('serialized conversation updates', () => {
         { role: 'user', content: 'first' },
         { role: 'system', content: [
           { type: 'text', text: 'Instruction one.\nInstruction two.' },
-          { type: 'tool_addition', tool: { type: 'tool_reference', name: 'search' } },
+          { type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) } },
         ] },
       ],
     })
     const tools = (requests[0] as { tools: { name?: string; defer_loading?: boolean }[] }).tools
     expect(tools.map(tool => [tool.name, tool.defer_loading])).toEqual([
-      ['DeferredToolPlaceholder', undefined], ['__pi_deferred_placeholder__', true], ['search', true],
+      ['DeferredToolPlaceholder', undefined], ['__pi_deferred_placeholder__', true],
     ])
   })
 
@@ -242,7 +240,7 @@ describe('historical tool availability on the wire', () => {
     expect(requests[0]).toMatchObject({ messages: [
       { role: 'user', content: 'first' }, { role: 'user', content: 'restore' },
       { role: 'system', content: [{ type: 'tool_removal', tool: { type: 'tool_reference', name: 'search' } }] },
-      { role: 'system', content: [{ type: 'tool_addition', tool: { type: 'tool_reference', name: 'search' } }] },
+      { role: 'system', content: [{ type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) } }] },
     ] })
   })
 
