@@ -56,3 +56,18 @@ Session plugin 记录(#5677)、持久 PTC(#5035)、subagent Agent Presets(#4643)
 7. `ssh-helper-runtime`:**已裁决=全量移植**——`LaunchConfig` 改回上游 `kind:'node-script'|'embedded'` 判别联合 + pkg SEA 打包 + 两工作流适配 fork 管线(远端免 Node 为实质部署收窄)。
 8. rc.1 实验包:**已裁决=全部可移植项引入**(worktree、ui-secret-mask、cot-translation、claude-code-mods、DevTools inspector 组、webworker 对,分批落地);锁定产品包(deepseek-account 账号链、product-telemetry、config-editor)**维持排除**。
 9. rc.2(`dsh-v0.2.1-rc.2`,`687f282`,rc.1+9 提交)增量:web-deepseek-api 新包 + `web` seam search/fetchProvider Volatile 化 + ui-settings-web-search 卡 + `web-search-deepseek` locale + `web/deepseek-search-llm-request` 加 `thinking` + deepseek-fetch 快照场景——**全部直补**;`ui-deepseek-model-label-1017` 临时徽标**裁决=不引入,fork 用自有品牌**。
+
+## rc.2 升级指南回填裁决(E11)
+
+`docs/upgrade-guide/v0.2.0-rc.2/` 上游 6 篇:
+
+| 指南 | 裁决 | 依据 |
+|---|---|---|
+| `remove-runtime-invariants` | **已落地**(E9) | 三件套与上游逐字节一致 |
+| `account-sign-in-errors` | **不引入** | `deepseek-account*` 账号链维持排除(决策项 8 产品锁定);fork 无 `SignInErrorCode` 面 |
+| `schedule-bundle-retired` | **不适用+缺口登记** | fork 从未发布 `experimental-schedule-bundle`,套餐移除无对应面;preset 声明 `tool-schedule`/`time-context` 是真实代码缺口,记入待移植 |
+| `subpath-plugin-display-manifest` | **待核** | fork plugin-manager 在 `boot/plugin-manager`,display manifest 语义未核;与 ui-plugin-market 违规复查并轨 |
+| `primary-runtime-python-aliases` | **随代码延迟** | 上游 sibling-link 校验未移植;指南须随 `scripts/primary-runtime` 校验改动一并回填 |
+| `bundled-python-tests` | **随代码延迟** | runtime 打包剔除 numpy/pandas tests 未落地;同上随代码回填 |
+
+未写指南记录无对应行为的分歧,避免文档声称未承载的迁移。
