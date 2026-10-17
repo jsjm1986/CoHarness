@@ -249,6 +249,10 @@
     "client/ui-input-trigger": "conversation",
     "client/ui-jobs": "workbench",
     "client/ui-layout": "all",
+    "client/ui-memory": [
+      "settings",
+      "workbench"
+    ],
     "client/ui-message-feedback": "conversation",
     "client/ui-model-selection": [
       "conversation",
@@ -313,6 +317,10 @@
     "goal/goal": "conversation",
     "interaction/permission-presets": "settings",
     "llm/token-meter": "conversation",
+    "memory/memory": [
+      "settings",
+      "workbench"
+    ],
     "plan/plan-mode": "conversation",
     "schedule/schedule": "conversation",
     "session-query/session-log-export": "workbench",

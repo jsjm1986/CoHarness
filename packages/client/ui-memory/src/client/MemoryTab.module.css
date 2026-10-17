@@ -20,7 +20,7 @@
   align-items: center;
   gap: var(--dsw-space-2);
   padding: var(--dsw-space-3);
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 
 .toolbar .search { flex: 1; min-width: 0; }
@@ -28,7 +28,7 @@
 .scopeSelect {
   flex-shrink: 0;
   max-width: 40%;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-control);
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
@@ -51,7 +51,7 @@
 .notice {
   margin: var(--dsw-space-2) var(--dsw-space-3) 0;
   padding: 8px 12px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-control);
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-bg-raised);
@@ -70,7 +70,7 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* The timeline rail: dots sit on a continuous 1px line down the left edge. */
+/* The timeline rail: dots sit on a continuous hairline down the left edge. */
 .feed { position: relative; padding: var(--dsw-space-2) 0 var(--dsw-space-4); }
 
 .feed::before {
@@ -79,7 +79,7 @@
   left: 22px;
   top: 0;
   bottom: 0;
-  width: 1px;
+  width: 0.5px;
   background: var(--dsw-alias-border-l2);
 }
 
@@ -113,6 +113,7 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
+  corner-shape: round;
   border: 2px solid var(--dsw-alias-bg-base);
   box-shadow: 0 0 0 1.5px currentColor;
   background: currentColor;
@@ -238,7 +239,7 @@
   justify-content: space-between;
   gap: var(--dsw-space-2);
   padding: var(--dsw-space-2) var(--dsw-space-3);
-  border-top: 1px solid var(--dsw-alias-border-l1);
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
   font-size: 11px;
   color: var(--dsw-alias-label-tertiary);
 }
@@ -263,7 +264,7 @@
 .editorError { font-size: 13px; color: var(--dsw-alias-state-error-primary); }
 
 .editorField select {
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-control);
   background: var(--dsw-alias-bg-base);
   color: inherit;
@@ -283,7 +284,7 @@
 .contentArea {
   min-height: 140px;
   padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-control);
   background: var(--dsw-alias-bg-base);
   color: inherit;
