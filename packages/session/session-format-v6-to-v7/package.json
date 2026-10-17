@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-session-format-v6-to-v7",
   "description": "Producer-source and tool-role migration from Session V6 to V7 with native V7 framing",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },

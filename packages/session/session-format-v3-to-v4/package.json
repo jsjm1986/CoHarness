@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-session-format-v3-to-v4",
   "description": "CoHarness chunk-folding migration into V4 settled assistant events",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
