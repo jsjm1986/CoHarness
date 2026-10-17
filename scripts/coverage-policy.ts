@@ -160,6 +160,9 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       // tested client source stays under `src/client/` with the view files.
       // TODO(gui): cover and remove with the client test lane above.
       'packages/client/ui-memory/src/client/*',
+      // Browser-only plugin; the host entry is an empty `apply` marker like
+      // `ui-tool`'s exempted package shell.
+      'packages/client/ui-memory/src/index.ts',
       'packages/client/ui-tool/src/*',
       'packages/client/ui-slots/src/*',
       'packages/client/ui-layout/src/*',
