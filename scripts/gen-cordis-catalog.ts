@@ -89,6 +89,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   executionAuthority: 'collaboration.md',
   goals: 'goal.md',
   webServer: 'web-server.md',
+  webApp: 'web-server.md',
   invariants: 'invariants.md',
   llm: 'llm-streaming.md',
   deepseekLlmApiExtensions: 'llm-streaming.md',

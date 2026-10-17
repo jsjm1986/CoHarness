@@ -3421,7 +3421,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:256`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:260`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */
@@ -4284,7 +4284,7 @@ export interface WebRuntimeConfig {
 ## `@deepseek-ai/dsh-web-app`
 
 - `inject`: `webServer`
-- `source`: [`packages/bundle/web-app/src/index.ts:46`](../packages/bundle/web-app/src/index.ts)
+- `source`: [`packages/bundle/web-app/src/index.ts:55`](../packages/bundle/web-app/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: composed deployment settings plus per-invocation command-line values. */
@@ -4294,16 +4294,14 @@ export interface Config {
   /** Print the URL line on activation; a non-interactive layer can turn it off. */
   printUrl: boolean
   /**
-   * Register the model-visible surface context (the `app:web-surface` prompt
-   * section and the `DSH_WEB_URL` bash variable). A one-shot non-interactive
-   * layer can turn it off when its user is not in the GUI, so the
-   * orientation text would be false.
+   * Register the `DSH_WEB_URL` bash variable naming this GUI. A one-shot
+   * non-interactive layer can turn it off when its user is not in the GUI.
    */
   surfaceContext: boolean
   /**
    * Canonical HTTP(S) root to advertise in the printed and opened URL,
-   * `DSH_WEB_URL`, and the web-surface orientation, e.g.
-   * `https://app.example/ui/`, normalized to end in `/`. Configures no routing
+   * `DSH_WEB_URL`, and `webApp.getAdvertisedUrl()`, which supplies the Web GUI
+   * URL in agent runtime context, e.g. `https://app.example/ui/`, normalized to end in `/`. Configures no routing
    * or authentication; see [public deployments](../README.md#public-deployments).
    * Absent or YAML `null` advertises the bind-address URL.
    */
@@ -4615,6 +4613,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-fs-ssh` | `ssh` · `sandboxPolicy` | [`packages/ssh/fs-ssh/src/index.ts`](../packages/ssh/fs-ssh/src/index.ts) |
 | `@deepseek-ai/dsh-gateway-runtime` | `connection` | [`packages/context/gateway-runtime/src/index.ts`](../packages/context/gateway-runtime/src/index.ts) |
 | `@deepseek-ai/dsh-goal-round-driver` | `agents` · `goals` · `sessions` | [`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts) |
+| `@deepseek-ai/dsh-harness-dev-context` | `systemPrompt` · `sessionProjections` · `webApp` | [`packages/context/harness-dev-context/src/index.ts`](../packages/context/harness-dev-context/src/index.ts) |
 | `@deepseek-ai/dsh-host-directory-picker-auto` | `webServer` · `connection` · `loader` | [`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts) |
 | `@deepseek-ai/dsh-host-directory-picker-native` | — | [`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts) |
 | `@deepseek-ai/dsh-host-plugin-inventory` | `loader` | [`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts) |

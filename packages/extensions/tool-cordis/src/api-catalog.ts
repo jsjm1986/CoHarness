@@ -3762,6 +3762,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'webApp',
+    summary: 'The Web GUI this process serves, provided by the `web-runtime` row.',
+    description: 'The Web GUI this process serves, provided by the `web-runtime` row.',
+    methods: [
+      {
+        signature: 'getAdvertisedUrl(): string',
+        description: 'The URL this GUI advertises, also used for `DSH_WEB_URL` and the startup URL line.',
+        parameters: [],
+        returns: 'the configured `publicUrl`, otherwise the listener origin.',
+      },
+    ],
+  },
+  {
     key: 'webhookRuntime',
     summary: 'Fire-and-forget rule runtime.',
     description: 'Fire-and-forget rule runtime. Session creation is the only built-in action.',
@@ -3791,6 +3804,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'The browser HTTP carrier service.',
     description: 'The browser HTTP carrier service. Activation loads any configured TLS material, then listens immediately; a material or listen failure rejects initialization, and the boot process reports the failed fiber. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers.',
     methods: [
+      {
+        signature: 'getOrigin(): string',
+        description: 'The root URL local clients use to reach the bound listener: the protocol, the bindUrlHost form of the bind address, and the listening port.',
+        parameters: [],
+        returns: 'the origin, for example `http://127.0.0.1:3080`.',
+        throws: ['before `listen` binds a port, or when the bind address has no URL form.'],
+      },
       {
         signature: 'register(route: WebRoute): () => void',
         description: 'Register a named route. Duplicate (kind, path) throws — route patterns are a composition-level contract, so a collision is a misconfiguration.',

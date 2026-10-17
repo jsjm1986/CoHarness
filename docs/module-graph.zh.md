@@ -229,6 +229,7 @@ flowchart TD
     pkg_file_reference_local["file-reference-local"]
     pkg_gateway_execution["gateway-execution"]
     pkg_gateway_runtime["gateway-runtime"]
+    pkg_harness_dev_context["harness-dev-context"]
     pkg_session_reference["session-reference"]
     pkg_time_context["time-context"]
     pkg_tmux_context["tmux-context"]
@@ -640,6 +641,10 @@ flowchart TD
   pkg_collaboration_context --> pkg_session
   pkg_file_reference --> pkg_agent
   pkg_file_reference --> pkg_typert_protocol
+  pkg_harness_dev_context --> pkg_agent
+  pkg_harness_dev_context --> pkg_session
+  pkg_harness_dev_context --> pkg_session_projection
+  pkg_harness_dev_context --> pkg_system_prompt
   pkg_time_context --> pkg_agent
   pkg_time_context --> pkg_invariants
   pkg_time_context --> pkg_llm
@@ -1088,7 +1093,6 @@ flowchart TD
   pkg_plugin_market --> pkg_tools
   pkg_plugin_market --> pkg_typert_protocol
   pkg_web_app --> pkg_shell_env
-  pkg_web_app --> pkg_system_prompt
   pkg_compaction_basic --> pkg_agent
   pkg_compaction_basic --> pkg_commands
   pkg_compaction_basic --> pkg_compaction
@@ -2077,6 +2081,7 @@ flowchart TD
 | [`session-query`](../packages/session-query/session-query) | `session-query` | [`brand`](../packages/util/brand), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-title`](../packages/session/session-title) |
 | [`collaboration-context`](../packages/context/collaboration-context) | `context` | [`agent`](../packages/core/agent), [`collaboration`](../packages/context/collaboration), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
 | [`file-reference`](../packages/context/file-reference) | `context` | [`agent`](../packages/core/agent), [`typert-protocol`](../packages/typert/protocol) |
+| [`harness-dev-context`](../packages/context/harness-dev-context) | `context` | [`agent`](../packages/core/agent), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`system-prompt`](../packages/core/system-prompt) |
 | [`time-context`](../packages/context/time-context) | `context` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
 | [`tmux-context`](../packages/context/tmux-context) | `context` | [`agent`](../packages/core/agent), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`shell`](../packages/shell/shell) |
 | [`userdoc-context`](../packages/context/userdoc-context) | `context` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`userdoc`](../packages/attachment/userdoc) |
@@ -2164,7 +2169,7 @@ flowchart TD
 | [`subprocess-ssh`](../packages/ssh/subprocess-ssh) | `ssh` | [`ssh`](../packages/ssh/ssh), [`subprocess`](../packages/subprocess/subprocess), [`subprocess-local`](../packages/subprocess/subprocess-local) |
 | [`command-goal`](../packages/goal/command-goal) | `goal` | [`commands`](../packages/interaction/commands), [`execution-authority`](../packages/context/execution-authority), [`goal`](../packages/goal/goal), [`llm`](../packages/llm/llm) |
 | [`plugin-market`](../packages/boot/plugin-market) | `boot` | [`plugin-manager`](../packages/boot/plugin-manager), [`settings`](../packages/settings/settings), [`tools`](../packages/core/tools), [`typert-protocol`](../packages/typert/protocol) |
-| [`web-app`](../packages/bundle/web-app) | `bundle` | [`shell-env`](../packages/shell/shell-env), [`system-prompt`](../packages/core/system-prompt) |
+| [`web-app`](../packages/bundle/web-app) | `bundle` | [`shell-env`](../packages/shell/shell-env) |
 | [`compaction-basic`](../packages/compaction/compaction-basic) | `compaction` | [`agent`](../packages/core/agent), [`commands`](../packages/interaction/commands), [`compaction`](../packages/compaction/compaction), [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`token-meter`](../packages/llm/token-meter) |
 | [`computer-use`](../packages/computer-use/computer-use) | `computer-use` | [`agent`](../packages/core/agent), [`brand`](../packages/util/brand), [`execution-authority`](../packages/context/execution-authority), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
 | [`permission-presets`](../packages/interaction/permission-presets) | `interaction` | [`agent`](../packages/core/agent), [`commands`](../packages/interaction/commands), [`execution-authority`](../packages/context/execution-authority), [`invariants`](../packages/runtime-diagnostics/invariants), [`sandbox`](../packages/sandbox/sandbox), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`settings`](../packages/settings/settings), [`shell`](../packages/shell/shell), [`typert-protocol`](../packages/typert/protocol), [`user-approval`](../packages/interaction/user-approval) |

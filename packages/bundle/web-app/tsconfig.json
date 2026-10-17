@@ -18,9 +18,6 @@
       "path": "../../client/connection/tsconfig.host.json"
     },
     {
-      "path": "../../core/system-prompt"
-    },
-    {
       "path": "../../host/frontend-static"
     },
     {

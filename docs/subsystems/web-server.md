@@ -93,6 +93,22 @@ A request whose handling throws (a malformed %-escape hitting `decodeURIComponen
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxwebapp--webapp"></a>
+
+### `ctx.webApp` — `WebApp`
+
+The Web GUI this process serves, provided by the `web-runtime` row.
+
+```ts cordis-catalog
+/**
+ * The URL this GUI advertises, also used for `DSH_WEB_URL` and the startup URL line.
+ * @returns the configured `publicUrl`, otherwise the listener origin.
+ */
+getAdvertisedUrl(): string
+```
+
+Source: [`packages/bundle/web-app/src/index.ts`](../../packages/bundle/web-app/src/index.ts)
+
 <a id="ctxwebserver--webserver"></a>
 
 ### `ctx.webServer` — `WebServer`
@@ -100,6 +116,14 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 The browser HTTP carrier service. Activation loads any configured TLS material, then listens immediately; a material or listen failure rejects initialization, and the boot process reports the failed fiber. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers.
 
 ```ts cordis-catalog
+/**
+ * The root URL local clients use to reach the bound listener: the protocol,
+ * the {@link bindUrlHost} form of the bind address, and the listening port.
+ * @returns the origin, for example `http://127.0.0.1:3080`.
+ * @throws before `listen` binds a port, or when the bind address has no URL form.
+ */
+getOrigin(): string
+
 /**
  * Register a named route. Duplicate (kind, path) throws — route patterns are
  * a composition-level contract, so a collision is a misconfiguration.

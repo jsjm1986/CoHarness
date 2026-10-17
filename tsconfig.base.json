@@ -368,6 +368,7 @@
       "@deepseek-ai/dsh-goal/invariant": ["./packages/goal/goal/src/invariant.ts"],
       "@deepseek-ai/dsh-goal-round-driver": ["./packages/goal/goal-round-driver/src"],
       "@deepseek-ai/dsh-goal-round-driver/invariant": ["./packages/goal/goal-round-driver/src/invariant.ts"],
+      "@deepseek-ai/dsh-harness-dev-context": ["./packages/context/harness-dev-context/src"],
       "@deepseek-ai/dsh-headless": ["./packages/bundle/headless/src"],
       "@deepseek-ai/dsh-home-paths": ["./packages/util/home-paths/src"],
       "@deepseek-ai/dsh-hook-protocol": ["./packages/hooks/hook-protocol/src"],

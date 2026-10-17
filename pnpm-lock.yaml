@@ -2571,6 +2571,9 @@ importers:
       '@deepseek-ai/dsh-file-reference-local':
         specifier: workspace:*
         version: link:../../context/file-reference-local
+      '@deepseek-ai/dsh-harness-dev-context':
+        specifier: workspace:*
+        version: link:../../context/harness-dev-context
       '@deepseek-ai/dsh-host-apiproxy':
         specifier: workspace:*
         version: link:../../host/apiproxy
@@ -2674,9 +2677,6 @@ importers:
       '@deepseek-ai/dsh-shell-env':
         specifier: workspace:*
         version: link:../../shell/shell-env
-      '@deepseek-ai/dsh-system-prompt':
-        specifier: workspace:*
-        version: link:../../core/system-prompt
 
   packages/client/connection:
     dependencies:
@@ -5938,6 +5938,37 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
+
+  packages/context/harness-dev-context:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-loop-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/agent-loop-testkit
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-web-app':
+        specifier: workspace:*
+        version: link:../../bundle/web-app
 
   packages/context/session-reference:
     dependencies:

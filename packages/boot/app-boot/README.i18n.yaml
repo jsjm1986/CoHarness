@@ -36,11 +36,8 @@
   en: 98ef2935171952c0
   zh: 8c160bdeffd68b0f
 /deepseek-ai-dsh-app-boot/use-this-package/startup-and-reload-failures:
-  en: abe8b360f8796a45
-  zh: 31c769ae3de5d97d
-/deepseek-ai-dsh-app-boot/use-this-package/telling-the-agent-where-the-harness-lives:
-  en: 07c459f26f4f8517
-  zh: 210f1e4894731b1a
+  en: dc13dfa1f79292e4
+  zh: d51682ced7a18ac2
 /deepseek-ai-dsh-app-boot/understand-the-implementation:
   en: f4a2695cb4c8a570
   zh: 89837235d2f376cf
@@ -48,20 +45,20 @@
   en: ed279614d9fb510f
   zh: b766d10475a6e833
 /deepseek-ai-dsh-app-boot/understand-the-implementation/helper-behavior:
-  en: f7bc3a8dd4b00bdd
-  zh: 30098428aa769ad0
+  en: 6fa850d1bb000d0e
+  zh: aa83a40a9d3db295
 /deepseek-ai-dsh-app-boot/understand-the-implementation/source-map:
-  en: e7e47282e4889956
-  zh: 4bb6f96c14971538
+  en: a0c5045fc4cb059f
+  zh: 3c71dc412cc23595
 /deepseek-ai-dsh-app-boot/further-exploration:
   en: ffd10e94443a10ca
   zh: cd11495bae751bdd
 /deepseek-ai-dsh-app-boot/model-experience:
-  en: 769777f1cb1a9408
-  zh: f02b2834179df50d
+  en: d2d0a21502d88c50
+  zh: 82a60c7a490a6834
 /deepseek-ai-dsh-app-boot/model-experience/kv-cache-effect:
-  en: c4d49630b68ae896
-  zh: 6f450ec6ba39bb81
+  en: 5a1d9344c8fdc790
+  zh: 0b32579f658b2ca1
 /deepseek-ai-dsh-app-boot/known-limitations-and-deferred-work:
   en: 1400c4f22a79b59a
   zh: 269f6c91584aec3e
