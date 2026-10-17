@@ -749,6 +749,9 @@
     "memory/memory-context": {
       "sovereignty": "owned"
     },
+    "memory/memory-curation": {
+      "sovereignty": "owned"
+    },
     "memory/tool-memory": {
       "sovereignty": "owned"
     },
