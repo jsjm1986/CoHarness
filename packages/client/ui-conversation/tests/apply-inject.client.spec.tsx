@@ -344,8 +344,8 @@ describe('conversation slot inject API', () => {
     })
     expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openWorkspace', args: ['workspace-1'] })
     expect(state.getSnapshot().draft).toBe('carry me')
-    // Cross-session history entry: the draft remains in the old session unless
-    // the caller explicitly confirms the discard flow.
+    // Cross-session history entry: the draft moves to the opened session
+    // unless the caller explicitly confirms the discard flow.
     const OTHER = 'other-1' as SessionId
     await b.runtime.sessions.add({ id: OTHER }, { current: false })
     b.runtime.workspaces.stub('openWorkspace', () => Promise.resolve(OTHER))
@@ -353,8 +353,8 @@ describe('conversation slot inject API', () => {
     await vi.waitFor(() => {
       expect(b.runtime.sessions.calls).toContainEqual({ method: 'open', args: [OTHER] })
     })
-    expect(state.getSnapshot().draft).toBe('carry me')
-    expect(b.inputApi(OTHER).state.getSnapshot().draft).toBe('')
+    expect(state.getSnapshot().draft).toBe('')
+    expect(b.inputApi(OTHER).state.getSnapshot().draft).toBe('carry me')
     actions.setDraft('discard me')
     void resident.selectWorkspace('workspace-3' as never, { discardDraft: true })
     await vi.waitFor(() => {

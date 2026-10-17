@@ -203,14 +203,14 @@ describe('web e2e: settings modal and General preferences', () => {
         return {
           attr: document.body.hasAttribute('data-ds-dark-theme'),
           background: getComputedStyle(boot).backgroundColor,
-          colorScheme: document.documentElement.style.colorScheme,
+          colorScheme: getComputedStyle(document.documentElement).colorScheme,
         }
       })
       expect(state).toEqual({
         attr: true,
         // The alias-token sheet lives in the held plugin bundle, so the boot
-        // page resolves its own fallback chain to the dark-scheme Canvas.
-        background: 'rgb(18, 18, 18)',
+        // page resolves its own fallback chain to the dark-scheme canvas.
+        background: 'rgb(21, 21, 23)',
         colorScheme: 'dark',
       })
     } finally {

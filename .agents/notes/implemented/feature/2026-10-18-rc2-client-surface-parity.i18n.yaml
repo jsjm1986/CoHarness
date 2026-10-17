@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-rc2-client-surface-parity.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-rc2-client-surface-parity.md
+/agent-note-rc-2-client-surface-parity-for-conversation-workspace-and-settings:
+  en: 233893f3a5214597
+  zh: dd99c8b16b8ed2e1
+/agent-note-rc-2-client-surface-parity-for-conversation-workspace-and-settings/problem:
+  en: a01ca522996edbbe
+  zh: 7ba1af275bdfd383
+/agent-note-rc-2-client-surface-parity-for-conversation-workspace-and-settings/decision:
+  en: 2066cb12ad696411
+  zh: aaa9dd0c6e693ded
+/agent-note-rc-2-client-surface-parity-for-conversation-workspace-and-settings/alternatives-considered:
+  en: 1c86e8db174837c8
+  zh: d596e40d131255d8
+/agent-note-rc-2-client-surface-parity-for-conversation-workspace-and-settings/consequences:
+  en: c9c0602005936038
+  zh: c5a7a901e2da5809
+/agent-note-rc-2-client-surface-parity-for-conversation-workspace-and-settings/verification:
+  en: b4aa8b5d60ccd8d3
+  zh: 1aff47684a5c03e4

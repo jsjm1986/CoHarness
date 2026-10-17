@@ -269,6 +269,8 @@ export type SessionRowActionProps<Injected extends object = object> =
 export type RowToast =
   | { kind: 'archived'; sessionId: SessionId }
   | { kind: 'stoppedAndArchived'; sessionId: SessionId }
+  | { kind: 'sessionIdCopied' }
+  | { kind: 'sessionIdCopyFailed' }
   | { kind: 'pinFailed' }
   | { kind: 'unpinFailed' }
   | { kind: 'archivedNotOpenable' }
@@ -387,6 +389,12 @@ export interface SessionRenameDialogInjected {
   settleSessionRename: () => void
   /** Rename a Session (explicit user title; resolves on host acceptance). */
   renameSession: (sessionId: SessionId, title: string) => Promise<void>
+}
+
+/** Session ID action share; copying does not open the Session. */
+export interface SessionIdInjected {
+  /** Copy the complete id and report acceptance or failure through the global toast. */
+  copySessionId: (sessionId: SessionId) => Promise<void>
 }
 
 /** Row toast share: the notice on display, its dismissal, and the two actions the archived notice offers. */

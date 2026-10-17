@@ -119,13 +119,15 @@ function TurnErrorItem({ node, t }: {
   t: ChatViewSlotProps['t']
 }) {
   const persistenceFailure = isSessionPersistenceFailureMessage(node.message)
-  const message = persistenceFailure ? t('message.turnError.persistence') : node.message
+  const interrupted = node.code === 'INTERRUPTED'
+  const message = persistenceFailure ? t('message.turnError.persistence')
+    : interrupted ? t('message.failure.interrupted') : node.message
   const code = node.code === 'UNKNOWN' || persistenceFailure ? undefined : node.code
   return (
     <div className={css.turnErrorRow} role="status">
       <StateDot state="error" className={css.turnErrorDot} />
       <div className={css.turnErrorCopy}>
-        <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
+        <span className={css.turnErrorTitle}>{interrupted ? t('message.taskStopped') : t('message.turnError')}</span>
         <span className={css.turnErrorMessage}>{message}</span>
       </div>
       {code !== undefined && <code className={css.turnErrorCode}>{code}</code>}

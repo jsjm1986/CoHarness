@@ -44,6 +44,16 @@ export function RowActionToast({ useToast, useStore, dismissToast, undoArchive, 
       />
     )
   }
+  if (toast.kind === 'sessionIdCopied') {
+    return (
+      <Toast
+        key={`toast-${String(toast.seq)}`}
+        text={t('toast.sessionIdCopied')}
+        tone="success"
+        onDone={dismissToast}
+      />
+    )
+  }
   if (toast.kind === 'createFailed') {
     return (
       <Toast
@@ -67,10 +77,11 @@ export function RowActionToast({ useToast, useStore, dismissToast, undoArchive, 
 
 /** The copy of one plain warning, keyed by the notice kind the union closes over. */
 function plainNoticeText(
-  toast: Exclude<RowToastState, { kind: 'archived' | 'stoppedAndArchived' | 'createFailed' }>,
+  toast: Exclude<RowToastState, { kind: 'archived' | 'stoppedAndArchived' | 'sessionIdCopied' | 'createFailed' }>,
   t: RowToastProps['t'],
 ): string {
   switch (toast.kind) {
+    case 'sessionIdCopyFailed': return t('toast.sessionIdCopyFailed')
     case 'pinFailed': return t('toast.pinFailed')
     case 'unpinFailed': return t('toast.unpinFailed')
     case 'defaultWorkspaceFailed': return t('defaultWorkspace.failed')

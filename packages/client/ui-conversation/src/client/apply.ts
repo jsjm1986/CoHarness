@@ -24,7 +24,7 @@ import type {
   ConversationViewportInjected, ConversationSessionHeaderInjected, ConversationSessionInjected, MessageImageLoader,
   DetailsInjected, WorkspaceSelectionOptions,
 } from './contract/slots.ts'
-import type { InputNotice } from './input/contract.ts'
+import type { DraftDocumentId, InputNotice } from './input/contract.ts'
 import { createChatStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
 import type { IConversation } from './service.ts'
@@ -57,7 +57,9 @@ import { ConversationDisplaySettings } from './display-settings.ts'
 import { TranscriptViewPolicy } from './transcript-view.ts'
 import { PerformanceUsagePolicy } from './performance-usage.ts'
 import { LinkOpeningPolicy } from './link-opening.ts'
+import { CollapseTimingPolicy } from './collapse-timing.ts'
 import { derivePresentationPolicy } from './presentation-policy.ts'
+import { CollapseTimingRow, type CollapseTimingRowInjected } from './settings/CollapseTimingRow.tsx'
 import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
 import { PerformanceUsageRow, type PerformanceUsageRowInjected } from './settings/PerformanceUsageRow.tsx'
 import { LinkOpeningRow, type LinkOpeningRowInjected } from './settings/LinkOpeningRow.tsx'
@@ -204,13 +206,15 @@ export function apply(ctx: Context): void {
   const displaySettings = new ConversationDisplaySettings(conversationSettings)
   const transcriptView = new TranscriptViewPolicy(
     conversationSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
-  const presentation = derivePresentationPolicy(transcriptView.mode)
+  const collapseTiming = new CollapseTimingPolicy(conversationSettings)
+  const presentation = derivePresentationPolicy(transcriptView.mode, collapseTiming.timing)
   const performancePolicy = new PerformanceUsagePolicy(conversationSettings)
   const linkOpening = new LinkOpeningPolicy(conversationSettings)
   ctx.effect(() => () => {
     submissionPolicy.dispose()
     displaySettings.dispose()
     transcriptView.dispose()
+    collapseTiming.dispose()
     performancePolicy.dispose()
     linkOpening.dispose()
   }, 'ui-conversation: settings observers')
@@ -226,6 +230,17 @@ export function apply(ctx: Context): void {
       setTranscriptView: (mode) => { transcriptView.setMode(mode) },
     }),
   }, TranscriptViewRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'collapse-timing',
+    order: 13,
+    locale: NS,
+    inject: (): CollapseTimingRowInjected => ({
+      hooks: { collapseTiming: collapseTiming.timing, settings: collapseTiming.settings },
+      setCollapseTiming: (timing) => { collapseTiming.setTiming(timing) },
+    }),
+  }, CollapseTimingRow))
 
   // The destination choice only exists once ui-sidebar-right provides its
   // tab-type registry; assemblies without one keep the external default and no
@@ -488,8 +503,35 @@ export function apply(ctx: Context): void {
         await commitSessionNavigation(sessions, nextId, navigation, () => {
           if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
           sessions.open(nextId)
-          if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
-            inputHub.discardDraft(sessionId)
+          if (sessionId !== undefined && nextId !== sessionId) {
+            if (options.discardDraft === true) {
+              inputHub.discardDraft(sessionId)
+            } else {
+              // Carry the draft with its structured references and settled
+              // attachments into the opened session; an in-flight document
+              // upload cannot move without aborting it, so those stay behind.
+              const from = inputHub.shell(sessionId)
+              const to = inputHub.shell(nextId)
+              const draft = from.draftSnapshot()
+              const { imageIds, documentIds } = from.snapshot
+              if (imageIds.length === 0 || to.addImages(imageIds)) {
+                if (draft.text !== '' || draft.references.length > 0) {
+                  to.setDraft(draft)
+                  from.setDraft('')
+                }
+                for (const id of imageIds) from.removeImage(id)
+                const conversation = concreteConversation(ctx)
+                const moved: DraftDocumentId[] = []
+                for (const doc of conversation.documentStore(sessionId).getSnapshot()) {
+                  if (!documentIds.includes(doc.id) || doc.status !== 'ready' || doc.docId === undefined) continue
+                  const ref = { docId: doc.docId, name: doc.name, bytes: doc.bytes, mediaType: doc.mediaType }
+                  if (!conversation.attachDocument(nextId, ref)) continue
+                  from.removeDocument(doc.id)
+                  moved.push(doc.id)
+                }
+                conversation.releaseDraftDocuments(sessionId, moved)
+              }
+            }
           }
         })
       },

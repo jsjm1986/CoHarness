@@ -51,6 +51,10 @@
   - button "Detailed":
     - text: Detailed
     - img
+  - text: When to Collapse Work Details Choose when to automatically collapse work details
+  - button "On completion":
+    - text: On completion
+    - img
   - text: Show coding view Shows trajectory and this turn’s code diff, and enables switching among the full Agent presets
   - switch "Show coding view" [checked]
   - text: Open links in Choose where http(s) links in conversations open

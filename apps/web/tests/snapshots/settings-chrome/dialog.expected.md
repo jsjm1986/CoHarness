@@ -51,6 +51,10 @@
   - button "详细":
     - text: 详细
     - img
+  - text: 工作步骤收起时机 选择何时自动收起工作步骤
+  - button "回答结束后":
+    - text: 回答结束后
+    - img
   - text: 显示代码工作视图 开启后，显示轨迹、本轮代码差异，可选择完整的 Agent 预设切换
   - switch "显示代码工作视图" [checked]
   - text: 链接打开方式 选择对话中 http(s) 链接的打开位置

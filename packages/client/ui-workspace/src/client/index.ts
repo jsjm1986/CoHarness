@@ -18,6 +18,7 @@
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace/types'
 import {
   commitSessionNavigation, WorkspaceArchiveError,
@@ -31,7 +32,8 @@ import {
   menuOpenStateFactory,
   type ArchiveSessionInjected, type ForkSessionInjected, type PinSessionInjected,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState,
-  type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest, type SessionRenameDialogInjected,
+  type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest, type SessionIdInjected,
+  type SessionRenameDialogInjected,
   type WorkspaceBrowserInjected, type WorkspacePickerInjected,
 } from './contract/slots.ts'
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
@@ -43,6 +45,7 @@ import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/RenameSession.tsx'
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
+import { SessionIdMenuItem } from './session-actions/SessionId.tsx'
 import { WorkspaceBrowser } from './WorkspaceBrowser.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
 import { en, zh, type WorkspaceKey } from './locales.ts'
@@ -332,6 +335,12 @@ export function apply(ctx: ClientContext): void {
       })
     },
   })
+  const sessionIdInjected = (): SessionIdInjected => ({
+    copySessionId: async (sessionId) => {
+      const copied = await writeClipboard(sessionId)
+      notify({ kind: copied ? 'sessionIdCopied' : 'sessionIdCopyFailed' })
+    },
+  })
   const renameInjected = (): RenameSessionInjected => ({ requestSessionRename })
   const renameDialogInjected = (): SessionRenameDialogInjected => ({
     hooks: { renameRequest },
@@ -434,6 +443,13 @@ export function apply(ctx: ClientContext): void {
         inject: archiveInjected,
       },
       ArchiveSessionMenuItem,
+    )
+    yield ctx.slots.register(
+      {
+        name: 'sidebar.workspaces.session.menu.item', id: 'session-id', order: 450, locale: NS,
+        inject: sessionIdInjected,
+      },
+      SessionIdMenuItem,
     )
   })
   ctx.slots.inject('sidebar.workspaces.session.row.action', function* () {

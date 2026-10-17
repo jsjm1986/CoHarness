@@ -156,7 +156,7 @@ function turnProcessAlwaysOpen(node: ChatNode | undefined): boolean {
   const location = node?.location
   if (location === undefined || (location.kind !== 'turn' && location.kind !== 'step')) return false
   const reason = location.turn.end?.data.reason.kind
-  return location.turn.status === 'open' || reason === 'aborted' || reason === 'error'
+  return location.turn.status === 'open' || reason === 'aborted' || reason === 'interrupted' || reason === 'error'
 }
 
 /** Return submission ids already represented by durable nodes, plus the last input's Turn. */
@@ -398,6 +398,17 @@ export function ChatView({
     }
     return result
   }, [nodeStore, order])
+  /** Newest turn owning a process node; the next-input timing defers only it. */
+  const latestTurn = useMemo(() => {
+    let latest: number | undefined
+    for (const turn of processByTurn.keys()) latest = latest === undefined ? turn : Math.max(latest, turn)
+    return latest
+  }, [processByTurn])
+  // 'next-input' keeps the newest completed Turn's process open until another
+  // input lands below it — a transcript-placed pending submission already is
+  // that input's echo.
+  const deferCollapse = presentationPolicy.collapseTiming === 'next-input'
+    && !visibleSubmissions.some(item => item.placement === 'transcript')
   /**
    * Keys of nodes folded behind a closed turn's process toggle. Folded nodes
    * stay mounted — a late-arriving reply or in-flight stream mutates while
@@ -413,7 +424,8 @@ export function ChatView({
       const process = processByTurn.get(turn)
       if (process === undefined || node.kind === 'turn-process') continue
       const open = processOpen.get(turn)
-        ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn || turnProcessAlwaysOpen(node))
+        ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn
+          || (deferCollapse && turn === latestTurn) || turnProcessAlwaysOpen(node))
       if (open) continue
       if (TURN_PROCESS_INDEPENDENT.has(node.kind)) continue
       if (process.answerAnchorSeq !== null
@@ -424,7 +436,7 @@ export function ChatView({
         && (process.answerAnchorSeq === null || node.anchorSeq < process.answerAnchorSeq)) folded.add(key)
     }
     return folded
-  }, [nodeStore, order, processByTurn, processOpen, runningTurn, presentationPolicy])
+  }, [nodeStore, order, processByTurn, processOpen, runningTurn, presentationPolicy, deferCollapse, latestTurn])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -794,7 +806,8 @@ export function ChatView({
               const open = turn === undefined || process === undefined
                 ? true
                 : processOpen.get(turn)
-                  ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn || turnProcessAlwaysOpen(node))
+                  ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn
+                    || (deferCollapse && turn === latestTurn) || turnProcessAlwaysOpen(node))
               const folded = foldedKeys.has(nodeKey)
               const turnProcess = node?.kind === 'turn-process' && turn !== undefined
                 ? { open, setOpen: (value: boolean) => {

@@ -13,8 +13,8 @@ import type {
   ReferenceInsert, InputTriggerController, SubmitImageAttachment, SubmitOutcome, TokenSpan,
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {
-  DraftAttachmentId, DraftDocumentId, EditRange, EditSelection, InputActions, InputEffect, InputNotice, InputState,
-  PasteComponent, QueuedMessage, SessionInput, SubmitAttempt,
+  DraftAttachmentId, DraftDocumentId, DraftSnapshot, EditRange, EditSelection, InputActions, InputEffect, InputNotice,
+  InputState, PasteComponent, QueuedMessage, SessionInput, SubmitAttempt,
 } from './contract.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import { InputMachine, projectClipboard } from './machine.ts'
@@ -88,7 +88,7 @@ export class SessionInputShell implements SessionInput {
   readonly notices: SnapshotStore<InputNotice | null> = createSnapshotStore<InputNotice | null>(null)
   /** The public provide-channel action face (one stable identity per session). */
   readonly actions: InputActions = {
-    setDraft: (text) => { this.setDraft(text) },
+    setDraft: (input) => { this.setDraft(input) },
     captureInsertion: () => {
       const snapshot = this.snapshot
       const caret = this.lastCaret ?? snapshot.draft.length
@@ -134,13 +134,27 @@ export class SessionInputShell implements SessionInput {
 
   /**
    * Single draft write path (all mutation rides machine events).
-   * @param text - the full next draft.
+   * @param input - the full next draft, or a carried structured snapshot
+   * (reference spans re-mint; see the `draft-restored` machine event).
    * @param editRange - the DOM-observed edit shape, when the caller knows it
    * (narrows the machine's occurrence math; absent → diff scan).
    */
-  setDraft(text: string, editRange?: EditRange): void {
-    this.lastCaret = text.length
-    this.run(this.core.dispatch({ type: 'draft-changed', draft: text, ...(editRange !== undefined ? { editRange } : {}) }))
+  setDraft(input: string | DraftSnapshot, editRange?: EditRange): void {
+    if (typeof input !== 'string') {
+      this.run(this.core.dispatch({ type: 'draft-restored', snapshot: input }))
+      return
+    }
+    this.lastCaret = input.length
+    this.run(this.core.dispatch({ type: 'draft-changed', draft: input, ...(editRange !== undefined ? { editRange } : {}) }))
+  }
+
+  draftSnapshot(): DraftSnapshot {
+    const snapshot = this.snapshot
+    return {
+      text: snapshot.draft,
+      references: snapshot.occurrences.map(({ occurrenceId: _, ...reference }) => reference),
+      ...(snapshot.claim === undefined ? {} : { command: { token: snapshot.claim.token } }),
+    }
   }
 
   /** Append ordered image ids unless an admission transaction is locked. */

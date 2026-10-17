@@ -109,7 +109,7 @@ describe('apply wiring', () => {
       type: 'factory', name: 'conversation.content', scope: 'session-maybe',
     }])
     expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual([
-      'transcript-view', 'link-opening', 'composer-enter', 'conversation-display', 'performance-usage',
+      'transcript-view', 'collapse-timing', 'link-opening', 'composer-enter', 'conversation-display', 'performance-usage',
     ])
     await b.runtime.dispose()
   })

@@ -933,3 +933,56 @@ describe('input-machine: per-session isolation', () => {
     expect(b.state).toMatchObject({ phase: 'claimed', draft: '/model ' })
   })
 })
+
+
+describe('input-machine: draft-restored carry-over', () => {
+  const stored = (reference: ReferenceInsert, offset: number, length: number) => ({
+    source: reference.source, ref: reference.ref, offset, length,
+    label: reference.label, clipboardText: reference.clipboardText,
+  })
+
+  it('re-mints stored reference spans as fresh occurrences and stays undoable', () => {
+    const ref = refOf('worker-1', 'reference')
+    const display = referenceDraftText(ref)
+    const text = `see ${display} now`
+    const m = new InputMachine()
+    m.dispatch({ type: 'draft-changed', draft: 'previous draft' })
+    const fx = m.dispatch({
+      type: 'draft-restored',
+      snapshot: { text, references: [stored(ref, 4, display.length)] },
+    })
+    expect(fx).toEqual([])
+    expect(m.state.draft).toBe(text)
+    expect(m.state.occurrences).toEqual([{
+      occurrenceId: 1, source: 'reference', ref: 'worker-1', offset: 4,
+      length: display.length, label: 'worker-1', clipboardText: '/worker-1',
+    }])
+    m.dispatch({ type: 'undo' })
+    expect(m.state.draft).toBe('previous draft')
+    expect(m.state.occurrences).toEqual([])
+  })
+
+  it('degrades spans whose draft text no longer matches to plain text', () => {
+    const ref = refOf('worker-1')
+    const m = new InputMachine()
+    m.dispatch({
+      type: 'draft-restored',
+      snapshot: { text: 'see @other now', references: [stored(ref, 4, 6)] },
+    })
+    expect(m.state.draft).toBe('see @other now')
+    expect(m.state.occurrences).toEqual([])
+  })
+
+  it('refuses while a submission transaction owns the draft', () => {
+    const m = new InputMachine()
+    const { attempt } = enterSubmitting(m, 'goal', 'x')
+    m.dispatch({
+      type: 'draft-restored',
+      snapshot: { text: 'carried', references: [] },
+    })
+    expect(m.state.draft).toBe('/goal x')
+    m.dispatch({ type: 'submit-settled', attempt, ok: true })
+    m.dispatch({ type: 'draft-restored', snapshot: { text: 'carried', references: [] } })
+    expect(m.state.draft).toBe('carried')
+  })
+})

@@ -90,11 +90,11 @@ export interface IConversation {
    * Attach one already-stored user document to a session's composer without
    * uploading a second copy.
    * @param sessionId - target session id.
-   * @param ref - durable document reference returned by the user-document service.
+   * @param ref - durable document identity returned by the user-document service or a ready composer draft.
    * @returns true when the composer accepted the document; false when the
    * session is unavailable or its input is in a locked submission phase.
    */
-  attachDocument(sessionId: SessionId, ref: UserDocRef): boolean
+  attachDocument(sessionId: SessionId, ref: Pick<UserDocRef, 'docId' | 'name' | 'bytes' | 'mediaType'>): boolean
 }
 
 /** Create one browser-only draft descriptor; only its id enters input state. */
@@ -359,10 +359,10 @@ export class ConversationController extends Service implements IConversation {
    * Existing durable files are referenced by id and are never owned by the
    * browser draft lifecycle, so removing the composer chip cannot delete them.
    * @param sessionId - target session id.
-   * @param ref - durable document reference from the manager or user-document service.
+   * @param ref - durable document identity from the manager, user-document service, or a ready composer draft.
    * @returns true when the composer accepted the document.
    */
-  attachDocument(sessionId: SessionId, ref: UserDocRef): boolean {
+  attachDocument(sessionId: SessionId, ref: Pick<UserDocRef, 'docId' | 'name' | 'bytes' | 'mediaType'>): boolean {
     if (this.disposed) return false
     const sessions = this.ctx.get('sessions')
     if (sessions === undefined) return false

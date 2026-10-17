@@ -25,13 +25,14 @@ describe('ui-conversation host', () => {
       chatContentWidth: 748,
       chatFullWidth: false,
       chatFontSize: 14,
+      collapseTiming: 'completion',
       performanceUsage: 'detailed',
       linkOpening: 'sidebar',
     })
     await ctx.settings.update(ns, { busyEnter: 'steer' })
     expect(ctx.settings.get(ns)).toEqual({
       busyEnter: 'steer', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14,
-      performanceUsage: 'detailed', linkOpening: 'sidebar',
+      collapseTiming: 'completion', performanceUsage: 'detailed', linkOpening: 'sidebar',
     })
     await expect(ctx.settings.update(ns, { busyEnter: 'invalid' })).rejects.toThrow()
     await fiber.dispose()
