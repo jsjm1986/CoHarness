@@ -34,7 +34,7 @@ describe('gen-tool-catalog collectToolCatalog', () => {
       'plugin_manager', 'present', 'pwsh', 'pwsh', 'ralph',
       'read', 'read_image', 'read_mcp_resource', 'run_code', 'schedule_create', 'schedule_delete',
       'schedule_list', 'schedule_update', 'send_message', 'send_message', 'session_event_read', 'session_event_search',
-      'session_event_trace', 'session_search', 'session_trace', 'skill', 'spawn_teammate',
+      'session_event_trace', 'session_handoff', 'session_search', 'session_trace', 'skill', 'spawn_teammate',
       'stagehand_act', 'stagehand_extract', 'stagehand_navigate', 'stagehand_observe', 'stagehand_screenshot', 'stagehand_tabs',
       'str_replace_editor', 'subagent', 'team_task_create',
       'team_task_get', 'team_task_list', 'team_task_update', 'terminal_close', 'terminal_list',
