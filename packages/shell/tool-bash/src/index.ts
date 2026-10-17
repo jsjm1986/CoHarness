@@ -100,6 +100,7 @@ function bashDescription(backgroundEnabled: boolean, escalationModes: readonly S
     + `Current harness environment facts are exposed through managed \`$${DSH_ENV_PREFIX}*\` variables; inspect them when needed. `
     + 'Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. '
     + 'Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. '
+    + 'Provide `description` before `command` in the arguments. '
     + 'Before any delete or move, verify that the resolved absolute target path is the intended one; never run it against a computed path you have not checked. '
     + 'An unset variable expands to an empty string, so guard variables in such paths with `${VAR:?}`. '
     + background
@@ -390,7 +391,6 @@ export function apply(ctx: Context, config: Config = {}): void {
       name: 'bash',
       description: bashDescription(backgroundEnabled, escalationModes),
       parameters: {
-        command: { type: 'string', required: true, description: 'The bash command to execute.' },
         description: {
           type: 'string',
           required: true,
@@ -398,6 +398,7 @@ export function apply(ctx: Context, config: Config = {}): void {
             + '5-10 words (shown in the UI). Examples: "ls" → "List files in current directory"; '
             + '"git status" → "Show working tree status"; "npm install" → "Install package dependencies".',
         },
+        command: { type: 'string', required: true, description: 'The bash command to execute.' },
         timeoutMs: {
           type: 'number',
           description: promote
@@ -416,7 +417,8 @@ export function apply(ctx: Context, config: Config = {}): void {
           },
           justification: {
             type: 'string' as const,
-            description: 'Required with sandbox_permissions: one sentence for the user explaining why this exact command needs the wider access.',
+            description: 'Required with sandbox_permissions: one sentence for the user explaining why this exact command needs the wider access. '
+              + 'Use the language of the user’s current request.',
           },
         } : {},
       },

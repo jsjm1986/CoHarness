@@ -40,8 +40,8 @@ kind: "package-reference"
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
+| `description` | string（必填） | 用一行主动语态概述命令（5～10 个词），仅用于 UI／日志显示，不影响执行。schema 将它列在 `command` 前并要求模型先输出它；这用于引导流式展示，不强制 JSON 成员顺序。 |
 | `command` | string（必填） | 通过 `bash -c` 运行。调用之间不保留状态；请使用 `workdir`，不要使用 `cd`。 |
-| `description` | string（必填） | 用一行主动语态概述命令（5～10 个词），仅用于 UI／日志显示，不影响执行。 |
 | `timeoutMs` | number | 以毫秒为单位覆盖超时时间。执行器会应用其配置的默认值和上限。 |
 | `workdir` | string | 本次调用的工作目录。默认为 Session 的当前工作目录（`ctx.workingDirectory`），使每个会话都在自己的工作区中运行；相对 `workdir` 也以该目录为基准解析。 |
 | `run_in_background` | boolean | 立即返回 job id；不应用超时。 |

@@ -57,7 +57,7 @@ interface ToolArgsMap {
   } & Record<string, JsonValue>;
   /** Edit an existing UTF-8 text file by replacing literal text. */
   edit: {
-    /** Path to edit, resolved by the filesystem backend. */
+    /** Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments. */
     file_path: string;
     /** Literal text to replace. */
     old_string: string;
@@ -255,7 +255,7 @@ interface ToolArgsMap {
   } & Record<string, JsonValue>;
   /** Create or fully replace a UTF-8 text file. */
   write: {
-    /** Path to write, resolved by the filesystem backend. */
+    /** Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments. */
     file_path: string;
     /** Full UTF-8 text content to write. */
     content: string;

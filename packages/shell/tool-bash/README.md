@@ -40,8 +40,8 @@ The plugin also contributes the `tool:bash` prompt section (order 105): check th
 
 | Arg | Type | Notes |
 |---|---|---|
+| `description` | string (required) | One-line, active-voice summary of the command (5-10 words), for UI/log display only — no effect on execution. The schema lists it before `command` and asks the model to emit it first; this guides streaming presentation without enforcing JSON member order. |
 | `command` | string (required) | Run via `bash -c`. No state persists between calls — use `workdir`, not `cd`. |
-| `description` | string (required) | One-line, active-voice summary of the command (5-10 words), for UI/log display only — no effect on execution. |
 | `timeoutMs` | number | Timeout override in milliseconds. The executor applies its configured default and cap. |
 | `workdir` | string | Working directory for this call. Defaults to the Session's current working directory (`ctx.workingDirectory`) so each session runs in its own workspace; a relative `workdir` is resolved against that same directory. |
 | `run_in_background` | boolean | Return a job id immediately; no timeout applies. |

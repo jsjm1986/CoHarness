@@ -3,7 +3,7 @@
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
 {"type":"step/start","data":{"turn":1,"step":1}}
-{"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"{{system}}"}],"source":{"kind":"system-prompt"},"id":"b28c7d1f-adc3-4193-b3ee-04ebd5bc7a5b"}},"surfaceOp":"append"}
+{"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"{{system}}"}],"source":{"kind":"system-prompt"},"id":"d795daad-4213-4548-a226-7d0598aa95ec"}},"surfaceOp":"append"}
 {"type":"user/message","data":{"content":[{"type":"text","text":"Use the subagent tool exactly once with description 'echo probe' and prompt: Reply with exactly: child answer 42. Then reply with the subagent's final answer verbatim."}],"source":{"kind":"user"},"role":"user","id":"ce62572c-2af9-4162-aca6-82ae0c89bc48"},"surfaceOp":"append"}
 {"type":"session/title","data":{"title":"Use the subagent tool exactly","messageSeqs":[5],"source":{"kind":"fallback"}}}
 {"type":"user/message","data":{"content":[{"type":"text","text":"Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\"."}],"source":{"kind":"runtime-context","form":"snapshot","sections":[{"name":"working-directory:current","text":"Current working directory: \"{{cwd}}\"."}]},"role":"user","id":"5c50db04-2f8f-4bde-b37e-ad40733a3db7"},"surfaceOp":"append"}
