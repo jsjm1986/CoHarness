@@ -18,6 +18,9 @@
       "path": "../../core/tools"
     },
     {
+      "path": "../../context/collaboration"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

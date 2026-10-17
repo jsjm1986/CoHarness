@@ -1238,6 +1238,170 @@ describe('workspace authority and lineage redaction', () => {
   })
 })
 
+describe('collaboration participant readability', () => {
+  function installParticipantAcl(ctx: Context, readable: readonly SessionIdValue[]): void {
+    const allowed = new Set(readable)
+    ctx.provide('collaboration', {
+      capture: () => ({
+        readableSessionIds: (sessionIds: readonly SessionIdValue[]) => Promise.resolve(
+          new Set(sessionIds.filter(sessionId => allowed.has(sessionId))),
+        ),
+      }),
+    } as never)
+  }
+
+  it.each([
+    ['session_trace', {}],
+    ['session_event_search', { query: 'needle' }],
+    ['session_event_trace', { seq: 0 }],
+    ['session_event_read', { seq: 0 }],
+  ] as const)('denies a same-workspace %s target outside the participant-readable set', async (toolName, args) => {
+    const mounted = await mount()
+    const denied = createSession(mounted.ctx, 'member-private-secret', '/work')
+    installParticipantAcl(mounted.ctx, [mounted.caller.id])
+
+    const result = await mounted.call(toolName, { ...args, session_id: denied.id })
+
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+    expect(JSON.stringify(result)).not.toContain('member-private-secret')
+  })
+
+  it('authorizes a same-workspace target inside the participant-readable set', async () => {
+    const mounted = await mount()
+    const visible = createSession(mounted.ctx, 'shared-session', '/work')
+    installParticipantAcl(mounted.ctx, [mounted.caller.id, visible.id])
+
+    const result = await mounted.call('session_trace', { session_id: visible.id })
+
+    expect(result.isError).toBe(false)
+    expect(text(result)).toContain('Session shared-session')
+  })
+
+  it('filters search hits, requested parents, and hit parents through the readable set', async () => {
+    const mounted = await mount()
+    const hiddenParent = createSession(mounted.ctx, 'hidden-parent-secret', '/work')
+    const hiddenHit = createSession(mounted.ctx, 'hidden-hit-secret', '/work')
+    const visibleHit = createSession(mounted.ctx, 'visible-hit', '/work')
+    const visibleChild = createSession(mounted.ctx, 'visible-child', '/work', 40, hiddenParent.id)
+    installParticipantAcl(mounted.ctx, [mounted.caller.id, visibleHit.id, visibleChild.id])
+    FakeQuery.sessionSearch = () => Promise.resolve({
+      items: [
+        sessionHit(hiddenHit.id, '/work', 'hidden needle'),
+        sessionHit(visibleHit.id, '/work', 'visible needle'),
+        sessionHit(visibleChild.id, '/work', 'child needle', hiddenParent.id),
+      ],
+    })
+
+    const result = await mounted.call('session_search', {
+      query: 'needle',
+      parent_session_ids: [hiddenParent.id, visibleHit.id],
+    })
+
+    expect(FakeQuery.sessionRequests[0]?.sessionFilters).toContainEqual({
+      kind: 'parent',
+      values: [visibleHit.id],
+    })
+    const output = text(result)
+    expect(output).toContain('visible-hit')
+    expect(output).toContain('visible-child')
+    expect(output).toContain('Parent: [outside workspace]')
+    expect(output).not.toContain('hidden-hit-secret')
+    expect(output).not.toContain('hidden-parent-secret')
+  })
+
+  it('batches workspace readability into one authority request per search call', async () => {
+    const mounted = await mount()
+    const hit = createSession(mounted.ctx, 'batched-hit', '/work')
+    const batches: SessionIdValue[][] = []
+    mounted.ctx.provide('collaboration', {
+      capture: () => ({
+        readableSessionIds: (sessionIds: readonly SessionIdValue[]) => {
+          batches.push([...sessionIds])
+          return Promise.resolve(new Set(sessionIds))
+        },
+      }),
+    } as never)
+    FakeQuery.sessionSearch = () => Promise.resolve({ items: [sessionHit(hit.id, '/work')] })
+
+    const result = await mounted.call('session_search', {
+      query: 'needle',
+      parent_session_ids: [hit.id],
+    })
+
+    expect(result.isError).toBe(false)
+    expect(batches).toHaveLength(1)
+    expect(batches[0]).toEqual(expect.arrayContaining([hit.id, mounted.caller.id]))
+    expect(FakeQuery.sessionRequests[0]?.sessionFilters).toContainEqual({
+      kind: 'parent',
+      values: [hit.id],
+    })
+  })
+
+  it('redacts participant-unreadable ancestors and descendant subtrees in one lineage read', async () => {
+    const mounted = await mount()
+    const hiddenParent = createSession(mounted.ctx, 'hidden-lineage-parent-secret', '/work')
+    const target = createSession(mounted.ctx, 'shared-target', '/work', 20, hiddenParent.id)
+    const visibleChild = createSession(mounted.ctx, 'visible-lineage-child', '/work', 30, target.id)
+    const hiddenChild = createSession(mounted.ctx, 'hidden-lineage-child-secret', '/work', 40, target.id)
+    createSession(mounted.ctx, 'hidden-lineage-grandchild-secret', '/work', 50, hiddenChild.id)
+    installParticipantAcl(mounted.ctx, [mounted.caller.id, target.id, visibleChild.id])
+
+    const output = text(await mounted.call('session_trace', { session_id: target.id }))
+
+    expect(output).toContain('visible-lineage-child')
+    expect(output).toContain('[outside workspace boundary]')
+    expect(output).toContain('[outside workspace subtree]')
+    expect(output).not.toContain('hidden-lineage-parent-secret')
+    expect(output).not.toContain('hidden-lineage-child-secret')
+    expect(output).not.toContain('hidden-lineage-grandchild-secret')
+  })
+
+  it('fails closed for cross-session work when the composed capture has no bound principal', async () => {
+    const mounted = await mount()
+    const other = createSession(mounted.ctx, 'ambient-hidden-secret', '/work')
+    mounted.ctx.provide('collaboration', {
+      capture: () => {
+        throw new Error('no bound request principal')
+      },
+    } as never)
+
+    const own = await mounted.call('session_trace', {})
+    expect(own.isError).toBe(false)
+    expect(text(own)).toContain('Session caller')
+
+    expect(errorCode(await mounted.call('session_trace', { session_id: other.id })))
+      .toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+    expect(errorCode(await mounted.call('session_event_read', { session_id: other.id, seq: 0 })))
+      .toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+
+    FakeQuery.sessionSearch = () => Promise.resolve({
+      items: [sessionHit(other.id, '/work', 'ambient needle')],
+    })
+    const search = await mounted.call('session_search', { query: 'needle' })
+    expect(text(search)).toBe('No prior session matches found.')
+    expect(JSON.stringify(search)).not.toContain('ambient-hidden-secret')
+  })
+
+  it('surfaces a participant-readability failure as a sanitized operation failure', async () => {
+    const mounted = await mount()
+    const other = createSession(mounted.ctx, 'acl-failure-target', '/work')
+    const secret = 'participant ACL gateway unreachable secret'
+    mounted.ctx.provide('collaboration', {
+      capture: () => ({
+        readableSessionIds: () => Promise.reject(new Error(secret)),
+      }),
+    } as never)
+    const warn = vi.spyOn(mounted.ctx.logger, 'warn').mockImplementation(() => undefined)
+
+    const result = await mounted.call('session_trace', { session_id: other.id })
+
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_FAILED')
+    expect(text(result)).toBe('Error: session query operation failed')
+    expect(JSON.stringify(result)).not.toContain(secret)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(secret))
+  })
+})
+
 describe('search paging, prior-history bounds, titles, and cancellation', () => {
   it('drains hidden internal pages to the authorized non-self cap and masks an unauthorized parent id', async () => {
     const mounted = await mount({ maxSearchResults: 2 })
