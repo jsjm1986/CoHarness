@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-17-session-query-participant-acl.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/bug-fix/2026-10-17-session-query-participant-acl.md
+/agent-note-participant-readable-acl-for-session-query-tools:
+  en: 156875419d999691
+  zh: 684dd4b8bfc40cd1
+/agent-note-participant-readable-acl-for-session-query-tools/problem:
+  en: 878b36bdd8a4705e
+  zh: b9cf18506c817693
+/agent-note-participant-readable-acl-for-session-query-tools/proposal:
+  en: f2edbd74246eeb55
+  zh: 640f6f6b73460462
+/agent-note-participant-readable-acl-for-session-query-tools/alternatives-considered:
+  en: f945000cb092595f
+  zh: fcd4e846dd689bee
+/agent-note-participant-readable-acl-for-session-query-tools/acceptance-criteria:
+  en: df0b7a1f2eda8178
+  zh: 623498b0bb392eb9
+/agent-note-participant-readable-acl-for-session-query-tools/risks:
+  en: d57ca59584d6b783
+  zh: d93eefd0d3dfbd15

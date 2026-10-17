@@ -3808,7 +3808,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tool-session-query`
 
 - `inject`: `tools` · `systemPrompt` · `sessionQuery`
-- `source`: [`packages/session-query/tool-session-query/src/index.ts:29`](../packages/session-query/tool-session-query/src/index.ts)
+- `source`: [`packages/session-query/tool-session-query/src/index.ts:31`](../packages/session-query/tool-session-query/src/index.ts)
 
 ```ts config-catalog
 /** Deployment-owned search count and timeout bounds. */

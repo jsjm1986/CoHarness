@@ -10135,6 +10135,9 @@ importers:
       '@deepseek-ai/dsh-agent':
         specifier: workspace:*
         version: link:../../core/agent
+      '@deepseek-ai/dsh-collaboration':
+        specifier: workspace:*
+        version: link:../../context/collaboration
       '@deepseek-ai/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm
