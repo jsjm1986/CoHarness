@@ -134,6 +134,7 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       'packages/*/*/src/worker.ts',
       // The built Node entry invokes the independently covered process bootstrap through fd 7.
       'packages/ptc-runtime/ptc-runtime-node/src/process-entry.ts',
+      'packages/ptc-runtime/ptc-runtime-node/src/persistent-process-entry.ts',
       // A killed executable lint-contract test can leave a non-product source probe behind.
       COVERAGE_LINT_PROBE,
       // Client/web UI files whose remaining branches need a browser-grade

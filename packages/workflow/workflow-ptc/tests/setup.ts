@@ -15,7 +15,7 @@ import type { Config as NodeRuntimeConfig } from '@deepseek-ai/dsh-ptc-runtime-n
 import { onTestFinished } from 'vitest'
 
 /** Mount real Node execution services with a private working directory and awaited cleanup. */
-export async function mountPtcRuntime(ctx: Context, mode: SandboxMode = 'danger-full-access') {
+export async function mountPtcRuntime(ctx: Context, mode: SandboxMode = 'danger-full-access', executionMode: NodeRuntimeConfig['executionMode'] = 'per-call') {
   const root = await mkdtemp(join(homedir(), '.dsh-workflow-test-'))
   onTestFinished(async () => {
     await ctx.fiber.dispose()
@@ -23,7 +23,7 @@ export async function mountPtcRuntime(ctx: Context, mode: SandboxMode = 'danger-
   })
   const cwd = join(root, 'workspace')
   await mkdir(cwd)
-  await mountWorkflowRuntime(ctx, { cwd, mode, runtimeConfig: { graceMs: 50 } })
+  await mountWorkflowRuntime(ctx, { cwd, mode, runtimeConfig: { graceMs: 50, executionMode } })
   return { root, cwd }
 }
 

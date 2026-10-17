@@ -1877,7 +1877,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'ptcRuntime',
     summary: 'Registers one `ctx.ptcRuntime` implementation.',
-    description: 'Registers one `ctx.ptcRuntime` implementation. Program, budget, abort, and substrate failures resolve in PtcRunResult; only Service Definition contract misuse rejects. Implementations bridge structured-cloneable bindings, materialize each declared namespace rejection class, treat programs as hostile peers, isolate runs from one another, and terminate and await in-flight runs during disposal.',
+    description: 'Registers one `ctx.ptcRuntime` implementation. Program, budget, abort, and substrate failures resolve in PtcRunResult; only Service Definition contract misuse rejects. Implementations bridge structured-cloneable bindings, materialize each declared namespace rejection class, treat programs as hostile peers, isolate distinct state owners, and terminate and await in-flight runs during disposal.',
     methods: [
       {
         signature: 'abstract readonly language: string',
@@ -1888,6 +1888,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'abstract readonly isolation: string',
         description: 'The execution substrate, as a lowercase identifier. Informational, not gating — a descriptor so deployments and diagnostics can tell backends apart, not a security claim. Well-known values: `\'worker-thread\'`, `\'process\'`, `\'container\'`.',
         parameters: [],
+      },
+      {
+        signature: 'release(owner: object): Promise<void>',
+        description: 'Release an owner\'s retained environment and await its execution resources. Stateless providers have no retained resources to release.',
+        parameters: [{ name: 'owner', description: 'The exact object supplied as the request\'s state owner.' }],
+        returns: 'Completion after all owned execution resources have been released.',
+        throws: ['When managed resource cleanup fails.'],
       },
       {
         signature: 'abstract resolve(request: PtcRunRequest): PtcRunSpec',
@@ -6373,7 +6380,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PtcRunRequest',
-    declaration: 'export interface PtcRunRequest {\n    program: string;\n    bindings: PtcBindingNamespace[];\n    cwd?: string;\n    timeoutMs?: number | null;\n    sandboxPolicy?: SandboxExecutionPolicy;\n    signal?: AbortSignal;\n}',
+    declaration: 'export interface PtcRunRequest {\n    program: string;\n    stateOwner?: object;\n    bindings: PtcBindingNamespace[];\n    cwd?: string;\n    timeoutMs?: number | null;\n    sandboxPolicy?: SandboxExecutionPolicy;\n    signal?: AbortSignal;\n}',
   },
   {
     name: 'PtcRunResult',

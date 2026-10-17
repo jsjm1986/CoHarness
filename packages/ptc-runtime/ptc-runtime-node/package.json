@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-ptc-runtime-node",
-  "description": "Sandboxed Node process implementation of the DeepSeek Harness PTC execution capability",
+  "description": "Node PTC execution with per-call sandboxed processes or in-memory REPL state",
   "version": "0.1.5-alpha.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -27,6 +27,7 @@
   "files": [
     "lib/index.js",
     "lib/process.js",
+    "lib/persistent-process.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",

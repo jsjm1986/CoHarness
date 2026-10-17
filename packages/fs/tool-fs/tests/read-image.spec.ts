@@ -5,7 +5,7 @@
  * the regression that `read` keeps its text-only contract.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -105,6 +105,7 @@ interface SetupOptions {
 
 async function setup(options: SetupOptions = {}) {
   const ctx = new Context()
+  onTestFinished(async () => { await ctx.fiber.dispose() })
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime, { mode: options.toolMode ?? 'native' })
@@ -290,7 +291,7 @@ describe('read_image happy path', () => {
     const result = await call(ctx, RUN_CODE_NAME, {
       code: 'return await tools.read_image({ file_path: "red.png" })',
       description: 'Read the image through PTC',
-    }, agentOn('vision-model'))
+    }, { ...agentOn('vision-model'), ctx })
 
     expect(result.isError).toBe(false)
     expect(result.content.every(block => block.type === 'text')).toBe(true)
