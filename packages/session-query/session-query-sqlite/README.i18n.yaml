@@ -24,8 +24,8 @@
   en: 0bc114bbf1a862b4
   zh: ea2cbfe8978115bc
 /deepseek-ai-dsh-session-query-sqlite/tokenizer-and-limits:
-  en: 69dce5e246a4dc9c
-  zh: 93b3ad0dd919e1fd
+  en: 685117abb8749962
+  zh: a66f581b64d0cb6d
 /deepseek-ai-dsh-session-query-sqlite/invariants:
   en: bfde0a6a0c6b9a29
   zh: e317d58082c8653b
@@ -36,8 +36,8 @@
   en: ca75c51c89c2c9b0
   zh: ae5eece628147ab8
 /deepseek-ai-dsh-session-query-sqlite/known-limitations-and-deferred-work:
-  en: 63e3697a597a8e7a
-  zh: f9ee095fffdea64f
+  en: b3864493859f4789
+  zh: 2e1b4ab9ee7c1b06
 /deepseek-ai-dsh-session-query-sqlite/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

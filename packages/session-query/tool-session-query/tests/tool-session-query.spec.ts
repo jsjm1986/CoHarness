@@ -2243,3 +2243,105 @@ describe('trace and exact read rendering', () => {
     expect(errorCode(await mounted.call(name, args))).toBe(expected)
   })
 })
+
+describe('project collaboration readability', () => {
+  function installReadableSessionFilter(ctx: Context, readable: readonly SessionIdValue[]): void {
+    const allowed = new Set(readable)
+    ctx.provide('collaboration', {
+      capture: () => ({
+        readableSessionIds: (sessionIds: readonly SessionIdValue[]) => Promise.resolve(
+          new Set(sessionIds.filter(sessionId => allowed.has(sessionId))),
+        ),
+      }),
+    } as never)
+  }
+
+  it('masks same-workspace search hits the project ACL cannot read', async () => {
+    const mounted = await mount()
+    installReadableSessionFilter(mounted.ctx, [mounted.caller.id, SessionId('shared')])
+    FakeQuery.sessionSearch = () => Promise.resolve({
+      items: [
+        sessionHit('shared', '/work', 'shared hit'),
+        sessionHit('private-member', '/work', 'private hit'),
+      ],
+    })
+
+    const output = text(await mounted.call('session_search', { query: 'needle' }))
+    expect(output).toContain('Session shared')
+    expect(output).not.toContain('private-member')
+    expect(output).not.toContain('private hit')
+  })
+
+  it.each([
+    ['session_event_search', { query: 'needle' }],
+    ['session_trace', {}],
+    ['session_event_trace', { seq: 0 }],
+    ['session_event_read', { seq: 0 }],
+  ])('rejects an unreadable same-workspace target for %s', async (toolName, args) => {
+    const mounted = await mount()
+    createSession(mounted.ctx, 'member-private', '/work')
+    installReadableSessionFilter(mounted.ctx, [mounted.caller.id])
+
+    const result = await mounted.call(toolName, { session_id: 'member-private', ...args })
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+  })
+
+  it('masks unreadable trace subtrees and withholds their title reads', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'root-shared', '/work', 20)
+    const [targetRecord] = await mounted.ctx.sessionQuery.filterSessions([{
+      kind: 'id',
+      values: [target.id],
+    }])
+    if (targetRecord === undefined) throw new Error('expected target record')
+    const visibleId = SessionId('shared-child')
+    const hiddenId = SessionId('member-private-child')
+    installReadableSessionFilter(mounted.ctx, [mounted.caller.id, target.id, visibleId])
+    vi.spyOn(mounted.ctx.sessionQuery, 'traceSession').mockResolvedValue({
+      target: targetRecord,
+      ancestors: [],
+      descendants: [
+        {
+          session: { ...targetRecord, header: header(visibleId, '/work', 30) },
+          descendants: [],
+        },
+        {
+          session: { ...targetRecord, header: header(hiddenId, '/work', 40) },
+          descendants: [],
+        },
+      ],
+      complete: true,
+      root: targetRecord,
+    })
+    const titleReads: SessionIdValue[] = []
+    vi.spyOn(mounted.ctx.sessionQuery, 'readTitleSnapshots').mockImplementation((sessionIds) => {
+      titleReads.push(...sessionIds)
+      return Promise.resolve([...new Set(sessionIds)].map(sessionId => ({
+        sessionId,
+        status: 'fulfilled' as const,
+        value: { session: header(sessionId, '/work') },
+      })))
+    })
+
+    const output = text(await mounted.call('session_trace', { session_id: target.id }))
+    expect(output).toContain('shared-child')
+    expect(output).toContain('- [outside workspace subtree]')
+    expect(output).not.toContain('member-private-child')
+    expect(titleReads).not.toContain(hiddenId)
+  })
+
+  it('drops unreadable parent ids from the session-search parent filter', async () => {
+    const mounted = await mount()
+    const readable = createSession(mounted.ctx, 'parent-shared', '/work')
+    const hidden = createSession(mounted.ctx, 'parent-private', '/work')
+    installReadableSessionFilter(mounted.ctx, [mounted.caller.id, readable.id])
+
+    await mounted.call('session_search', {
+      query: 'needle',
+      parent_session_ids: [readable.id, hidden.id],
+    })
+    const parentFilter = FakeQuery.sessionRequests[0]?.sessionFilters
+      ?.find(filter => filter.kind === 'parent')
+    expect(parentFilter?.values).toEqual([readable.id])
+  })
+})
