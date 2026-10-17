@@ -4,7 +4,7 @@
     "@deepseek-ai/dsh-util-values": "workspace:*"
   },
   "description": "Event-sourced session store for the DeepSeek Harness",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },

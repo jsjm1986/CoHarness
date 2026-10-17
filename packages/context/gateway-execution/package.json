@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-gateway-execution",
   "description": "Gateway-verified execution participants and live authorization for managed agents",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
