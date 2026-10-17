@@ -2361,7 +2361,6 @@ describe('session handoff', () => {
     const target = createSession(mounted.ctx, 'fallback-target', '/work')
     appendExchange(target, 'keep the local tail', 'local tail text')
     mounted.ctx.provide('llm', {
-      // eslint-disable-next-line require-yield -- async iterable that only rejects
       async * stream(): AsyncIterable<StreamChunk> {
         throw new Error('provider down')
       },
@@ -2463,7 +2462,7 @@ describe('session handoff', () => {
     const target = createSession(mounted.ctx, 'routed-target', '/work')
     appendExchange(target, 'route me', 'routed reply')
     vi.spyOn(mounted.caller, 'requestHeader')
-      .mockReturnValue({ config: { provider: 'routed-provider', model: 'routed-model' } } as never)
+      .mockReturnValue({ config: { provider: 'routed-provider', model: 'routed-model' } })
     const requests: GenerateOptions[] = []
     mounted.ctx.provide('llm', {
       async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
