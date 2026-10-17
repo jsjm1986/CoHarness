@@ -36,13 +36,13 @@
 | E11 | upgrade-guide 裁决回填 | `cb4fc43d05b`;五篇不适用指南裁决登记 |
 | E12 | 台账收口 | rc.2 矩阵生成(395 行/9323 路径/30 replay 复审);`syncedTag` 推进;主权门禁与升级记录门禁全绿 |
 
-## 收尾缺口(defer 决策行,见清单)
+## 收尾缺口(收口结果)
 
-1. `schedule/tool-schedule` 声明入 preset(上游 rc.2 的 schedule 工具声明面)。
-2. python 主运行时 alias 校验。
-3. bundled NumPy/pandas 测试套件剔除。
-4. subpath plugin display-manifest 语义深度核对。
-5. `client/ui-secret-mask` 及其余 UI 缺口;`ui-plugin-market` policy/violation 复查——产品可见 GUI 变化 PR 前须按真实服务端+模型流录 GIF。
+1. `schedule/tool-schedule` 声明入 preset — **已落地** `3bd8b04bf09`:模型面四工具拆为 `dsh-tool-schedule` Consumer,standard/cordis/ptc preset 声明于 tool-jobs 后,schedule-bundle 仍为 Host 服务 opt-in。
+2. python 主运行时 alias 校验 — **已落地** `9f835754a02`:`primaryRuntimePythonAliases`/`copyPrimaryRuntime` + smoke 拒绝展开命令文件。
+3. bundled NumPy/pandas 测试套件剔除 — **已落地** `9f835754a02`:`prunePrimaryRuntimePythonTests` 在 wheel 解包后剔除 `tests/` 目录并重写 RECORD;payload digest format→7。
+4. subpath plugin display-manifest 语义深度核对 — **已承载**:`app-boot/package-meta.ts` 与上游逐字节一致(仅 package-root 读 package.json,subpath 仅靠 `<specifier>/icon`),spec 100 测覆盖;指南三件套已回填。
+5. `ui-plugin-market` policy/violation 复查 — **通过**:parse/index-url/types/search/tools/worker/parse-thread 与 `util/plugin-market-index` 全部与上游逐字节一致,后续上游修复(源码仓字段、Installed tab、generator commander)均已吸收;仅余刻意分歧——settings 命名空间 `SettingsScope`(fork settings 治理)、`bundle.optional`(fork optional-bundle 模型)、自有图标命名、`dsh-client-runtime` store 导入。`client/ui-secret-mask` **维持 defer**:依赖上游拆分版 `ui-conversation` 的 UserText rule lane,fork 刻意保留整合版 conversation(`removedUpstreamPaths` 已登记);本轮无 GUI 可见变更,GIF/PR 不触发。
 
 ## 范围和变更纪律
 

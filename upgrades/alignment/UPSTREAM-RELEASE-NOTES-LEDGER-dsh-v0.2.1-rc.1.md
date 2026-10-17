@@ -66,7 +66,7 @@ Session plugin 记录(#5677)、持久 PTC(#5035)、subagent Agent Presets(#4643)
 | `remove-runtime-invariants` | **已落地**(E9) | 三件套与上游逐字节一致 |
 | `account-sign-in-errors` | **不引入** | `deepseek-account*` 账号链维持排除(决策项 8 产品锁定);fork 无 `SignInErrorCode` 面 |
 | `schedule-bundle-retired` | **不适用+缺口已补** | fork 从未发布 `experimental-schedule-bundle`,套餐移除无对应面;preset 声明 `tool-schedule` 缺口已在 `3bd8b04bf09` 补齐 |
-| `subpath-plugin-display-manifest` | **待核** | fork plugin-manager 在 `boot/plugin-manager`,display manifest 语义未核;与 ui-plugin-market 违规复查并轨 |
+| `subpath-plugin-display-manifest` | **已承载** | `app-boot/package-meta.ts` 与上游一致:仅 package-root 读 package.json,subpath 只靠 `<specifier>/icon` 导出;`package-meta.spec.ts` 100 测覆盖;指南三件套已回填 |
 | `primary-runtime-python-aliases` | **已落地** | sibling-link 校验已移植 `primaryRuntimePythonAliases`/`copyPrimaryRuntime` + smoke 校验;指南三件套与上游逐字节一致 |
 | `bundled-python-tests` | **已落地** | `prunePrimaryRuntimePythonTests` 已移植并在 wheel 解包后调用,同步裁剪 RECORD;指南三件套与上游逐字节一致 |
 
