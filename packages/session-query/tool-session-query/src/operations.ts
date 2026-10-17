@@ -16,6 +16,7 @@ import {
   type SessionSearchCursor,
 } from '@deepseek-ai/dsh-session-query'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
+import { extractHandoff, formatLocalHandoff, projectHandoff, type HandoffConfig } from './handoff.ts'
 import { toolInput } from './input.ts'
 import { presentation } from './presentation.ts'
 import { serviceBoundary } from './service-boundary.ts'
@@ -224,6 +225,24 @@ async function executeEventTrace(
   return presentation.formatEventTrace(sessionId, title, trace)
 }
 
+async function executeSessionHandoff(
+  ctx: Context,
+  args: SessionTargetArgs,
+  exec: ToolRunContext,
+  config: HandoffConfig,
+): Promise<string> {
+  const caller = workspaceAccess.callerOf(exec)
+  const sessionId = workspaceAccess.targetId(args, caller)
+  const authorized = await workspaceAccess.authorizeTarget(ctx, caller, sessionId, exec.signal)
+  const snapshot = await serviceBoundary.call(ctx, exec.signal, 'session surface read', () =>
+    ctx.sessionQuery.readSurface(sessionId))
+  workspaceAccess.assertObservedTargetAuthorized(caller, sessionId, snapshot.session, authorized)
+  const title = await workspaceAccess.readTitle(ctx, caller, sessionId, exec.signal, authorized)
+  const projected = projectHandoff(snapshot)
+  const capsule = await extractHandoff(ctx, caller.agent, projected, config, exec.signal)
+  return presentation.formatSessionHandoff(sessionId, title, capsule ?? formatLocalHandoff(projected, config.chars), capsule !== undefined)
+}
+
 async function executeEventRead(
   ctx: Context,
   args: EventReadArgs,
@@ -285,6 +304,7 @@ async function collectPages<T>(
 
 /** Five model-facing session-query operation implementations. */
 export const operations = {
+  executeSessionHandoff,
   executeSessionSearch,
   executeEventSearch,
   executeSessionTrace,
