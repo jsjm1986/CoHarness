@@ -308,6 +308,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-memory` | yes | Host-plane durable per-scope memory service: scoped facts that survive sessions |
 | `@deepseek-ai/dsh-memory-context` | yes | Agent-plane saved-memory catalog publication as durable user messages |
+| `@deepseek-ai/dsh-memory-curation` | yes | Background memory curation: turn-end extraction passes and interval-gated whole-scope consolidation |
 | `@deepseek-ai/dsh-tool-memory` | no | Model-facing memory_search/read/save/delete tools plus saved-memory system-prompt guidance |
 
 ## plan

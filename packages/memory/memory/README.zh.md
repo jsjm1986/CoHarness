@@ -35,8 +35,11 @@ kind: "package-reference"
 | `summaryMaxChars` | 整数 | `150` | 20–500（Unicode 码点数） |
 | `maxEntriesPerScope` | 整数 | `200` | 1–10000 |
 | `searchMaxResults` | 整数 | `10` | 1–50 |
+| `extraction` | 布尔 | `false` | `memory` 设置 `extraction`——回合结束的提取遍 |
+| `consolidation` | 布尔 | `false` | `memory` 设置 `consolidation`——调度的合并遍 |
+| `recall` | 布尔 | `false` | `memory` 设置 `recall`——按问题召回注入 |
 
-解析后的值以只读形式暴露在 `service.space` 与 `service.limits`。Gateway 项目运行时补丁选择 `space: project`。
+解析后的值以只读形式暴露在 `service.space` 与 `service.limits`。Gateway 项目运行时补丁选择 `space: project`。三个开关字段为服务安装的 `memory` 设置节提供初始值（`settingsNamespace('memory')`，项目归属）：设置提供者可实时覆盖，`service.switches()` 在每个判定节点返回当前解析值，消费者不作记忆。
 
 <a id="scopes-and-spaces"></a>
 ## 作用域与空间
@@ -46,7 +49,9 @@ kind: "package-reference"
 - `personal` 空间 → `{ kind: 'personal' }`，外加会话头携带 `cwd` 时的 `{ kind: 'workspace', directory, sshTarget? }`（`SessionHeader.cwd` / `sshTarget`）；SSH 目标 id 参与工作区键，因此远程目录永远不会与同名主机路径混淆。
 - `project` 空间 → 仅 `{ kind: 'project' }`。
 
-`list(scope)` 返回目录行（不含正文的条目），按 kind（`guidance`、`profile`、`background`、`resource`）、`updated.at` 降序、key 升序排列。`read(scope, key)` 返回单个完整条目或 `undefined`。
+`list(scope)` 返回目录行（不含正文的条目），按 kind（`guidance`、`profile`、`background`、`resource`）、`updated.at` 降序、key 升序排列。`read(scope, key)` 返回单个完整条目或 `undefined`。`entries(scope)` 按同一目录顺序返回完整条目——合并遍的摘要与审查输入。
+
+`getCursor(key)` / `writeCursor(key, cursor)` 读取并提交域 `cursors` 表中的耐久整理游标——`extraction-{sessionId}`（`lastSeq`）与 `consolidation-{scopeId}`（`lastRunAt`、`lastDigest`、`changedSince`），键由导出的 `memoryExtractionCursorKey` / `memoryConsolidationCursorKey` 助手给出。游标写入与条目写入共用同一条串行链，每次已提交的 save/delete 都会在该链内递增其作用域的 `changedSince`。
 
 <a id="write-rules"></a>
 ## 写入规则
@@ -59,21 +64,21 @@ kind: "package-reference"
 4. project 作用域加代理写入者通过 `ctx.get('executionAuthority')` 鉴权：策略拒绝原样传播且不写入任何内容；获证的 `primaryActorUserId` 进入来源记录。
 5. 修订语义：不带 `expectedRevision` 的 save 只能创建（`memory_exists`）；带它则只能替换（`memory_not_found`、`memory_stale`）。带 `expectedRevision` 的 delete 必须匹配（`memory_stale`）；键不存在为 `memory_not_found`。
 6. 达到作用域上限（`maxEntriesPerScope`）的创建拒绝 `memory_full`；替换与删除永不受限。
-7. 写入铸造新的 `randomUUID()` 修订号，更新时保留 `created`，并把 `updated` 记为 `{ source: 'agent', sessionId, userId?, at }`。持久写入在服务返回前完成，`memory/changed` 在提交后发出。
+7. 写入铸造新的 `randomUUID()` 修订号，更新时保留 `created`，并把 `updated` 记为 `{ source, sessionId?, userId?, at }`——`source` 对代理写入者为 `writer.source ?? 'agent'`，对浏览器写入为 `member`，`sessionId` 仅代理写入者携带。持久写入在服务返回前完成，`memory/changed` 在提交后发出。
 
-来源记录的 `source` 是封闭联合（`agent`、`extraction`、`consolidation`、`member`）；当前存在 `agent` 与 `member` 写入——`member` 记录经下述 Remote 表面产生的浏览器编辑，`extraction`/`consolidation` 为策展 pass 预留持久模式。
+来源记录的 `source` 是封闭联合（`agent`、`extraction`、`consolidation`、`member`）；模型工具默认 `agent`，`dsh-memory-curation` 以 `extraction`/`consolidation` 写入，`member` 记录经下述 Remote 表面产生的浏览器编辑。
 
 <a id="member-remote"></a>
 ## 成员 Remote 表面
 
 `MemoryService` 是 `TypertRemoteService`；五个 `@Remote` 方法服务浏览器记忆页面。`memory/scopes` 返回作用域目录——个人 runtime 中是个人作用域加上有条目的工作区作用域，项目 runtime 中仅项目作用域——每个视图附带实时条目数与调用成员的 `writable` 标志，以及 `memory` 段的 `enabled` 标志。`memory/list` 与 `memory/read` 向全体成员提供读取；API proxy 经 `PROJECT_TYPERT_PROCESS_WIDE_READS` 放行这三个读端点。`memory/save` 与 `memory/delete` 以捕获的协作参与者身份经 `memberWriter()` 写入，经 `PROJECT_TYPERT_REGISTRY_AUTHORIZED` 放行：项目作用域写入要求 `mode: 'rw'` 的项目参与者；个人/工作区作用域要求 `personal` 参与者；缺失主体或只读成员身份以共享的 `collaboration-forbidden` 拒绝。没有协作 provider 的 runtime 保持所有者语义。
 
-服务注册 `memory` 设置命名空间（`installSettingsSection`，owner `project`，`projectWrite: 'manager'`），仅含 `enabled` 一个字段（默认 `true`）。置为 `false` 会使 `scopesFor` 返回空——agent 看不到目录且一切写入拒绝 `scope-unavailable`——成员读取与已存条目仍可查看。
+服务注册 `memory` 设置命名空间（`installSettingsSection`，owner `project`，`projectWrite: 'manager'`），含 `enabled` 字段（默认 `true`）与 `extraction`、`consolidation`、`recall` 三个开关（默认 `false`）。`enabled` 置为 `false` 会使 `scopesFor` 返回空——agent 看不到目录且一切写入拒绝 `scope-unavailable`——成员读取与已存条目仍可查看。
 
 <a id="storage"></a>
 ## 存储
 
-`memory` 域声明 `layout: 'per-record'` 与 `invalidRecords: 'backup-and-skip'`：每个条目一个 JSON 文档，位于 `<backend-root>/memory/entries/<recordKey>.json`，损坏的记录会被移到一边（`<key>.json.bak.<timestamp>`）而不会阻塞整个域。记录键为 `${scopeId}_${key}`：`_` 作为分隔符，因为作用域 id（`personal`、`project`、`workspace-<sha256(JSON.stringify([sshTarget ?? null, directory])) 前 16 位十六进制>`）和条目键 slug 都不含 `_`，且整体键满足 per-record 单元路径安全的 `[a-zA-Z0-9_-]+` 文法。记录模式是 `MemoryEntry` 的严格 zod 镜像；域在服务构造时打开一次（每次访问都要等待的就绪 promise），在处置时关闭。
+`memory` 域声明 `layout: 'per-record'` 与 `invalidRecords: 'backup-and-skip'`：每个条目一个 JSON 文档，位于 `<backend-root>/memory/entries/<recordKey>.json`，每条整理游标一个文档位于 `memory/cursors/`，损坏的记录会被移到一边（`<key>.json.bak.<timestamp>`）而不会阻塞整个域。记录键为 `${scopeId}_${key}`：`_` 作为分隔符，因为作用域 id（`personal`、`project`、`workspace-<sha256(JSON.stringify([sshTarget ?? null, directory])) 前 16 位十六进制>`）和条目键 slug 都不含 `_`，且整体键满足 per-record 单元路径安全的 `[a-zA-Z0-9_-]+` 文法。记录模式是 `MemoryEntry` 的严格 zod 镜像；域在服务构造时打开一次（每次访问都要等待的就绪 promise），在处置时关闭。
 
 该服务要求 `storageDomain`：目前存储族只在 Web 包中挂载，因此 `dsh-memory` 在 `web-app` 包中位于 `storage-domain` 之后挂载；在没有它的组合中，代理侧行保持惰性。
 
@@ -107,7 +112,7 @@ None directly: the service constructs no model input; its consumers' catalog and
 - **单 runtime 可见性** — 一个 runtime 中的写入只对该 runtime 的会话与 Remote 成员可见；跨 runtime 传播（联邦）延后。
 - **存储族仅在 Web 包中挂载** — `dsh-memory` 依赖 `storageDomain`，而它目前只在 `web-app` 包中挂载；personal 空间的 CLI/headless profile 在其主机组合挂载存储与本服务之前，代理侧行保持惰性。
 - **`danger-full-access` 可以编辑存储文件** — JSON 文档以明文存于 Harness home 之下；被授予不受限文件系统访问的会话可以绕过服务的写入规则读取或破坏它们。
-- **尚无策展或召回** — 来源联合保留了 `extraction`、`consolidation` 来源；回合后的策展 pass 与按问召回选择器延后到各自的行实现。
+
 
 <a id="dev-note"></a>
 ### 开发备注

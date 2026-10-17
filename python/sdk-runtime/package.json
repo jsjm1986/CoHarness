@@ -61,6 +61,7 @@
     "@deepseek-ai/dsh-mcp-client": "workspace:*",
     "@deepseek-ai/dsh-memory": "workspace:*",
     "@deepseek-ai/dsh-memory-context": "workspace:*",
+    "@deepseek-ai/dsh-memory-curation": "workspace:*",
     "@deepseek-ai/dsh-model-provider-config": "workspace:*",
     "@deepseek-ai/dsh-output-retention": "workspace:*",
     "@deepseek-ai/dsh-package-manifest": "workspace:*",

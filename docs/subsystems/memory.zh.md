@@ -87,12 +87,13 @@ interface MemorySearchHit {
  * Remote methods under the captured collaboration participant — an absent
  * participant means a runtime with no collaboration provider, which keeps
  * owner semantics. `signal` is the agent operation's cancellation carried
- * into the project authorization call. Host-only vocabulary: it names the
- * `Agent` runtime type, so it is exported from the service entry rather
- * than the client-safe `./types`.
+ * into the project authorization call; `source` stamps `extraction` or
+ * `consolidation` on curation writes and defaults to `agent`. Host-only
+ * vocabulary: it names the `Agent` runtime type, so it is exported from
+ * the service entry rather than the client-safe `./types`.
  */
 type MemoryWriter =
-  | { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal }
+  | { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal; readonly source?: 'extraction' | 'consolidation' }
   | { readonly kind: 'member'; readonly participant?: CollaborationParticipant }
 ```
 
@@ -139,6 +140,31 @@ type MemoryRefusalCode = 'memory_exists' | 'memory_not_found' | 'memory_stale' |
 type MemoryInvalidReason = 'key' | 'summary' | 'content' | 'query' | 'scope-unavailable' | 'workspace-mismatch'
 ```
 
+## 策展游标
+
+```ts type-equiv
+/**
+ * One durable curation cursor record in the `cursors` table. Cursors are
+ * keyed by their consumer (`extraction-<sessionId>` for the last reviewed
+ * session seq, `consolidation-<scopeId>` for the last consolidation run in
+ * that scope); each consumer reads only the fields it owns.
+ */
+interface MemoryCursor {
+  /** Extraction: sequence number of the newest log event the last pass reviewed. */
+  readonly lastSeq?: number | undefined
+  /** Consolidation: ISO-8601 instant of the last committed run in the scope. */
+  readonly lastRunAt?: string | undefined
+  /** Consolidation: content digest of the scope when the last run committed. */
+  readonly lastDigest?: string | undefined
+  /**
+   * Consolidation: writes committed to the scope since the last run. The
+   * service increments this inside the same serialized write as the entry
+   * mutation, so the count survives restarts and plugin reloads.
+   */
+  readonly changedSince?: number | undefined
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -156,6 +182,13 @@ Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`, `search`) are
 The `memory/*` Remote methods serve the browser surface: reads are member-wide inside a project runtime, while member writes capture the request's collaboration participant and require `rw` project membership — a runtime with no collaboration provider keeps owner semantics. The `memory` settings section switches the whole feature off: scopes vanish for agents and every write refuses `scope-unavailable`, while stored entries stay readable for the owner.
 
 ```ts cordis-catalog
+/**
+ * The resolved curation/recall switches. Consumers read this at each
+ * decision point so a live settings change takes effect on the next pass.
+ * @returns the active switch values.
+ */
+switches(): MemorySwitches
+
 /**
  * The scopes this space offers a session. `personal` space returns the
  * personal scope plus, when the session header carries `cwd`, the workspace
@@ -183,6 +216,15 @@ async read(scope: MemoryScope, key: string): Promise<MemoryEntry | undefined>
  * @returns the ordered catalog rows (entries without bodies).
  */
 async list(scope: MemoryScope): Promise<MemoryEntrySummary[]>
+
+/**
+ * Full entries of one scope in catalog order — the same order as
+ * {@link list}. Consolidation uses this for its content digest and the
+ * whole-scope review input.
+ * @param scope - The scope to list.
+ * @returns the ordered entries with bodies.
+ */
+async entries(scope: MemoryScope): Promise<MemoryEntry[]>
 
 /**
  * Bounded term search across scopes. Scores every entry (key ×3, summary
@@ -263,6 +305,23 @@ delete(request: MemoryDeleteRequest, writer: MemoryWriter): Promise<MemoryWriteR
  * @returns the removed entry, or a refusal.
  */
 @Remote('delete') async memberDelete(request: MemoryDeleteRequest): Promise<MemoryWriteResult>
+
+/**
+ * Read a durable curation cursor by its record key. Cursors live in the
+ * memory domain's `cursors` table so the service stays the sole write
+ * owner; the caller chooses the key via the exported helpers.
+ * @param key - Cursor record key (see {@link memoryExtractionCursorKey} / {@link memoryConsolidationCursorKey}).
+ * @returns the stored cursor, if any.
+ */
+async getCursor(key: string): Promise<MemoryCursor | undefined>
+
+/**
+ * Commit a curation cursor, serialized on the same write chain as entry
+ * writes so an interleaved save cannot lose the advancement.
+ * @param key - Cursor record key.
+ * @param cursor - The complete next cursor record.
+ */
+async writeCursor(key: string, cursor: MemoryCursor): Promise<void>
 ```
 
 Types: [Agent](core.zh.md)

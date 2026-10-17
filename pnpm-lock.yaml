@@ -330,6 +330,9 @@ importers:
       '@deepseek-ai/dsh-memory-context':
         specifier: workspace:*
         version: link:../../packages/memory/memory-context
+      '@deepseek-ai/dsh-memory-curation':
+        specifier: workspace:*
+        version: link:../../packages/memory/memory-curation
       '@deepseek-ai/dsh-persona':
         specifier: workspace:*
         version: link:../../packages/preset/persona
@@ -941,6 +944,9 @@ importers:
       '@deepseek-ai/dsh-memory-context':
         specifier: workspace:*
         version: link:../packages/memory/memory-context
+      '@deepseek-ai/dsh-memory-curation':
+        specifier: workspace:*
+        version: link:../packages/memory/memory-curation
       '@deepseek-ai/dsh-permission-presets':
         specifier: workspace:*
         version: link:../packages/interaction/permission-presets
@@ -9682,6 +9688,9 @@ importers:
       '@deepseek-ai/dsh-memory':
         specifier: workspace:*
         version: link:../memory
+      '@deepseek-ai/dsh-memory-curation':
+        specifier: workspace:*
+        version: link:../memory-curation
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
@@ -9703,6 +9712,49 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
+
+  packages/memory/memory-curation:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-execution-authority':
+        specifier: workspace:*
+        version: link:../../context/execution-authority
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-memory':
+        specifier: workspace:*
+        version: link:../memory
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-storage':
+        specifier: workspace:*
+        version: link:../../storage/storage
+      '@deepseek-ai/dsh-storage-domain':
+        specifier: workspace:*
+        version: link:../../storage/storage-domain
+      '@deepseek-ai/dsh-subagent':
+        specifier: workspace:*
+        version: link:../../subagent/subagent
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:*
+        version: link:../../typert/protocol
 
   packages/memory/tool-memory:
     dependencies:
@@ -14090,6 +14142,9 @@ importers:
       '@deepseek-ai/dsh-memory-context':
         specifier: workspace:*
         version: link:../../packages/memory/memory-context
+      '@deepseek-ai/dsh-memory-curation':
+        specifier: workspace:*
+        version: link:../../packages/memory/memory-curation
       '@deepseek-ai/dsh-model-provider-config':
         specifier: workspace:*
         version: link:../../packages/llm/model-provider-config

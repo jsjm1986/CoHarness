@@ -2,11 +2,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
-import type { Context } from '@deepseek-ai/cordis'
-import type { SettingsSectionHooks } from '@deepseek-ai/dsh-settings'
-import { agentFor, memoryHarness } from './harness.ts'
+import { agentFor, memoryHarness, settingsStub } from './harness.ts'
 import MemoryService, { type Config } from '../src/index.ts'
-import type { MemoryScope, MemorySettings } from '../src/index.ts'
+import type { MemoryScope } from '../src/index.ts'
 
 const projectScope: MemoryScope = { kind: 'project' }
 const personalScope: MemoryScope = { kind: 'personal' }
@@ -45,11 +43,12 @@ describe('memberScopes', () => {
     const agent = agentFor(test.ctx, 'ms', { cwd: '/tmp/work' })
     await test.service.save({ ...input, scope: personalScope, key: 'own' }, { kind: 'agent', agent })
     await test.service.save({ ...input, scope: workspaceScope, key: 'w' }, { kind: 'agent', agent })
+    await test.service.save({ ...input, scope: workspaceScope, key: 'w2' }, { kind: 'agent', agent })
     const catalog = await test.service.memberScopes()
     expect(catalog.enabled).toBe(true)
     expect(catalog.scopes.map(view => view.scope.kind)).toEqual(['personal', 'workspace'])
     expect(catalog.scopes.every(view => view.writable)).toBe(true)
-    expect(catalog.scopes.find(view => view.scope.kind === 'workspace')?.entries).toBe(1)
+    expect(catalog.scopes.find(view => view.scope.kind === 'workspace')?.entries).toBe(2)
   })
 
   it('lists only the project scope in a project runtime', async () => {
@@ -66,9 +65,39 @@ describe('memberScopes', () => {
     const catalog = await test.service.memberScopes()
     expect(catalog.scopes[0]?.writable).toBe(false)
   })
+
+  it('keeps stored scopes inspectable but read-only while the section is disabled', async () => {
+    const test = await memoryHarness({
+      beforeService: (ctx) => {
+        ctx.provide('settings', settingsStub({ enabled: false, extraction: false, consolidation: false, recall: false }) as never)
+      },
+    })
+    const catalog = await test.service.memberScopes()
+    expect(catalog.enabled).toBe(false)
+    expect(catalog.scopes.every(view => !view.writable)).toBe(true)
+  })
 })
 
 describe('member reads', () => {
+  it('orders list results by kind, then recency, then key', async () => {
+    const test = await memoryHarness()
+    const agent = agentFor(test.ctx, 'ml', { cwd: '/tmp/work' })
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime('2026-10-30T00:00:00.000Z')
+      await test.service.save({ ...input, scope: personalScope, key: 'b-guide' }, { kind: 'agent', agent })
+      await test.service.save({ ...input, scope: personalScope, key: 'a-guide' }, { kind: 'agent', agent })
+      vi.setSystemTime('2026-10-30T00:01:00.000Z')
+      await test.service.save({ ...input, scope: personalScope, key: 'z-back', kind: 'background' }, { kind: 'agent', agent })
+      vi.setSystemTime('2026-10-30T00:02:00.000Z')
+      await test.service.save({ ...input, scope: personalScope, key: 'c-guide' }, { kind: 'agent', agent })
+    } finally {
+      vi.useRealTimers()
+    }
+    expect((await test.service.memberList({ scope: personalScope })).map(entry => entry.key))
+      .toEqual(['c-guide', 'a-guide', 'b-guide', 'z-back'])
+  })
+
   it('serves entries to any member, including read-only', async () => {
     const test = await memoryHarness({
       config: { space: 'project' },
@@ -122,6 +151,7 @@ describe('member writes', () => {
     })
     await expect(test.service.memberSave({ ...input, scope: projectScope }))
       .rejects.toMatchObject({ code: 'collaboration-forbidden' })
+    expect((await test.service.memberScopes()).scopes[0]?.writable).toBe(false)
   })
 
   it('keeps owner semantics when the runtime has no collaboration provider', async () => {
@@ -165,18 +195,6 @@ describe('member writes', () => {
   })
 })
 
-/** A settings-service fake that exposes the installed section's hooks. */
-function fakeSettings(captured: { hooks?: SettingsSectionHooks<MemorySettings> }) {
-  return {
-    installSection: (_owner: Context, _ns: string, _schema: unknown, entry: MemorySettings,
-      hooks: SettingsSectionHooks<MemorySettings>) => {
-      hooks.setSource(() => entry)
-      hooks.onChange()
-      captured.hooks = hooks
-    },
-  }
-}
-
 describe('scope catalog edges', () => {
   it('counts every entry inside a repeated workspace scope', async () => {
     const test = await memoryHarness()
@@ -188,14 +206,11 @@ describe('scope catalog edges', () => {
   })
 
   it('offers nothing and reports unwritable while the memory section is disabled', async () => {
-    const captured: { hooks?: SettingsSectionHooks<MemorySettings> } = {}
     const test = await memoryHarness({
-      beforeService: (ctx) => { ctx.provide('settings', fakeSettings(captured)) },
+      beforeService: (ctx) => {
+        ctx.provide('settings', settingsStub({ enabled: false, extraction: false, consolidation: false, recall: false }) as never)
+      },
     })
-    const hooks = captured.hooks
-    if (hooks === undefined) throw new Error('settings section was not installed')
-    hooks.setSource(() => ({ enabled: false }))
-    hooks.onChange()
     const agent = agentFor(test.ctx, 'off', { cwd: '/tmp/work' })
     expect(test.service.scopesFor(agent)).toEqual([])
     const catalog = await test.service.memberScopes()

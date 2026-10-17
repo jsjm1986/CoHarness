@@ -24,5 +24,7 @@
             name: '@deepseek-ai/dsh-memory-context'
           - id: tool-memory
             name: '@deepseek-ai/dsh-tool-memory'
+          - id: memory-curation
+            name: '@deepseek-ai/dsh-memory-curation'
           - id: llm-replay
             name: '@deepseek-ai/dsh-llm-replay'

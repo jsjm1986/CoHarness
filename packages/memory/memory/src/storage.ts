@@ -48,6 +48,34 @@ export const memoryEntrySchema = z.object({
 /** Stored entry inferred from {@link memoryEntrySchema}. */
 export type MemoryRecord = z.infer<typeof memoryEntrySchema>
 
+const cursorSchema = z.object({
+  lastSeq: z.number().int().nonnegative().optional(),
+  lastRunAt: z.iso.datetime({ precision: 3 }).optional(),
+  lastDigest: z.string().optional(),
+  changedSince: z.number().int().nonnegative().optional(),
+}).strict()
+
+/** Stored curation cursor inferred from the cursor schema; see {@link MemoryCursor}. */
+export type MemoryCursorRecord = z.infer<typeof cursorSchema>
+
+/**
+ * Cursor key tracking extraction progress for one session.
+ * @param sessionId - The session whose last reviewed seq the cursor stores.
+ * @returns the `extraction-<sessionId>` cursor table key.
+ */
+export function memoryExtractionCursorKey(sessionId: string): string {
+  return `extraction-${sessionId}`
+}
+
+/**
+ * Cursor key tracking consolidation state for one scope.
+ * @param scope - The scope whose last run and change count the cursor stores.
+ * @returns the `consolidation-<scopeId>` cursor table key.
+ */
+export function memoryConsolidationCursorKey(scope: MemoryScope): string {
+  return `consolidation-${memoryScopeId(scope)}`
+}
+
 /**
  * Per-scope address prefix for one runtime's entries: `personal`, `project`,
  * or `workspace-<first 16 hex of sha256(JSON.stringify([sshTarget ?? null, directory]))>`.
@@ -91,14 +119,18 @@ export function memoryScopePrefix(scope: MemoryScope): string {
 }
 
 /**
- * The memory domain spec: one `entries` table keyed by record key. Records
- * are disposable-if-corrupt data owned only by this service, so a failed
- * schema parse backs the file up and opens without it.
+ * The memory domain spec: `entries` holds one record per memory entry and
+ * `cursors` one record per curation cursor. Records are disposable-if-corrupt
+ * data owned only by this service, so a failed schema parse backs the file up
+ * and opens without it.
  */
 export const memoryDomain = defineDomain({
   name: 'memory',
   version: 1,
   layout: 'per-record',
   invalidRecords: 'backup-and-skip',
-  tables: { entries: domainTable<string, MemoryRecord>(memoryEntrySchema) },
+  tables: {
+    entries: domainTable<string, MemoryRecord>(memoryEntrySchema),
+    cursors: domainTable<string, MemoryCursorRecord>(cursorSchema),
+  },
 })

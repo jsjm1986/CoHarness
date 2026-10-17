@@ -36,8 +36,11 @@ The host-plane durable memory service `ctx.memory`: scope resolution, validation
 | `summaryMaxChars` | integer | `150` | 20–500 (Unicode code points) |
 | `maxEntriesPerScope` | integer | `200` | 1–10000 |
 | `searchMaxResults` | integer | `10` | 1–50 |
+| `extraction` | boolean | `false` | `memory` settings `extraction` — turn-end extraction pass |
+| `consolidation` | boolean | `false` | `memory` settings `consolidation` — scheduled consolidation pass |
+| `recall` | boolean | `false` | `memory` settings `recall` — per-question recall injection |
 
-Resolved values are exposed read-only as `service.space` and `service.limits`. The Gateway project runtime patch selects `space: project`.
+Resolved values are exposed read-only as `service.space` and `service.limits`. The Gateway project runtime patch selects `space: project`. The three switch fields seed the `memory` settings section the service installs (`settingsNamespace('memory')`, project ownership): a settings provider overrides them live, and `service.switches()` returns the resolved value at each decision point so consumers never memoize.
 
 <a id="scopes-and-spaces"></a>
 ## Scopes and spaces
@@ -47,7 +50,9 @@ Resolved values are exposed read-only as `service.space` and `service.limits`. T
 - `personal` space → `{ kind: 'personal' }` plus `{ kind: 'workspace', directory, sshTarget? }` when the session header carries `cwd` (`SessionHeader.cwd` / `sshTarget`); the SSH target id keys the workspace so a remote directory never aliases the same host path.
 - `project` space → `{ kind: 'project' }` only.
 
-`list(scope)` returns catalog rows (entries without bodies) ordered by kind (`guidance`, `profile`, `background`, `resource`), then `updated.at` descending, then key ascending. `read(scope, key)` returns one full entry or `undefined`.
+`list(scope)` returns catalog rows (entries without bodies) ordered by kind (`guidance`, `profile`, `background`, `resource`), then `updated.at` descending, then key ascending. `read(scope, key)` returns one full entry or `undefined`. `entries(scope)` returns full entries in the same catalog order — the consolidation pass's digest and review input.
+
+`getCursor(key)` / `writeCursor(key, cursor)` read and commit durable curation cursors from the domain's `cursors` table — `extraction-{sessionId}` (`lastSeq`) and `consolidation-{scopeId}` (`lastRunAt`, `lastDigest`, `changedSince`) via the exported `memoryExtractionCursorKey` / `memoryConsolidationCursorKey` helpers. Cursor writes serialize on the same chain as entry writes, and every committed save/delete bumps `changedSince` for its scope inside that chain.
 
 <a id="write-rules"></a>
 ## Write rules
@@ -60,21 +65,21 @@ Resolved values are exposed read-only as `service.space` and `service.limits`. T
 4. Project scope plus agent writer authorizes through `ctx.get('executionAuthority')`: a policy denial propagates unchanged and nothing is written; the attested `primaryActorUserId` lands in the attribution record.
 5. Revision semantics: save without `expectedRevision` is create-only (`memory_exists`); with it, replace-only (`memory_not_found`, `memory_stale`). Delete with `expectedRevision` requires a match (`memory_stale`); a missing key is `memory_not_found`.
 6. A create at the scope cap (`maxEntriesPerScope`) refuses `memory_full`; replaces and deletes never do.
-7. The write mints a fresh `randomUUID()` revision, keeps `created` on update, and stamps `updated` `{ source: 'agent', sessionId, userId?, at }`. The durable write resolves before the service returns, and `memory/changed` emits after the commit.
+7. The write mints a fresh `randomUUID()` revision, keeps `created` on update, and stamps `updated` with `{ source, sessionId?, userId?, at }` — `source` is `writer.source ?? 'agent'` for agent writers and `member` for browser writes, and `sessionId` appears only for agent writers. The durable write resolves before the service returns, and `memory/changed` emits after the commit.
 
-Attribution `source` is a closed union (`agent`, `extraction`, `consolidation`, `member`); `agent` and `member` writes exist today — `member` records browser edits through the Remote surface below, while `extraction`/`consolidation` reserve the durable schema for the curation pass.
+Attribution `source` is a closed union (`agent`, `extraction`, `consolidation`, `member`); `agent` is the default for the model tools, `dsh-memory-curation` writes with `extraction`/`consolidation`, and `member` records browser edits through the Remote surface below.
 
 <a id="member-remote"></a>
 ## Member Remote surface
 
 `MemoryService` is a `TypertRemoteService`; five `@Remote` methods serve the browser Memory page. `memory/scopes` returns the scope catalog — personal plus non-empty workspace scopes in a personal runtime, the project scope alone in a project runtime — with each view's live entry count and the calling member's `writable` flag, plus the `memory` section's `enabled` flag. `memory/list` and `memory/read` serve entries member-wide; the API proxy admits the three reads through `PROJECT_TYPERT_PROCESS_WIDE_READS`. `memory/save` and `memory/delete` write as the captured collaboration participant through `memberWriter()` and are admitted through `PROJECT_TYPERT_REGISTRY_AUTHORIZED`: a project-scope write requires a `project` participant with `mode: 'rw'`; personal/workspace writes require a `personal` participant; a missing principal or a read-only membership rejects with the shared `collaboration-forbidden` refusal. A runtime without a collaboration provider keeps owner semantics.
 
-The service registers the `memory` settings namespace (`installSettingsSection`, owner `project`, `projectWrite: 'manager'`) with one field, `enabled` (default `true`). Setting it `false` removes every scope from `scopesFor` — agents see no catalog and every write refuses `scope-unavailable` — while member reads and the stored entries stay inspectable.
+The service registers the `memory` settings namespace (`installSettingsSection`, owner `project`, `projectWrite: 'manager'`) with the `enabled` field (default `true`) and the `extraction`, `consolidation`, and `recall` switches (default `false`). Setting `enabled` to `false` removes every scope from `scopesFor` — agents see no catalog and every write refuses `scope-unavailable` — while member reads and the stored entries stay inspectable.
 
 <a id="storage"></a>
 ## Storage
 
-The `memory` domain declares `layout: 'per-record'` with `invalidRecords: 'backup-and-skip'`: one JSON document per entry under `<backend-root>/memory/entries/<recordKey>.json`, so a corrupt record moves aside (`<key>.json.bak.<timestamp>`) instead of bricking the domain. Record keys are `${scopeId}_${key}`: `_` is the separator because neither the scope id (`personal`, `project`, `workspace-<first 16 hex of sha256(JSON.stringify([sshTarget ?? null, directory]))>`) nor the entry-key slug can contain it, and the whole key stays inside the per-record unit's path-safe `[a-zA-Z0-9_-]+` grammar. The record schema is a strict zod mirror of `MemoryEntry`; the domain opens once at service construction (a readiness promise every access awaits) and closes on dispose.
+The `memory` domain declares `layout: 'per-record'` with `invalidRecords: 'backup-and-skip'`: one JSON document per entry under `<backend-root>/memory/entries/<recordKey>.json` and one per curation cursor under `memory/cursors/`, so a corrupt record moves aside (`<key>.json.bak.<timestamp>`) instead of bricking the domain. Record keys are `${scopeId}_${key}`: `_` is the separator because neither the scope id (`personal`, `project`, `workspace-<first 16 hex of sha256(JSON.stringify([sshTarget ?? null, directory]))>`) nor the entry-key slug can contain it, and the whole key stays inside the per-record unit's path-safe `[a-zA-Z0-9_-]+` grammar. The record schema is a strict zod mirror of `MemoryEntry`; the domain opens once at service construction (a readiness promise every access awaits) and closes on dispose.
 
 The service requires `storageDomain`: the storage family is mounted only in the Web bundle today, so `dsh-memory` mounts in the `web-app` bundle after `storage-domain`; the agent-plane rows stay inert in compositions without it.
 
@@ -107,7 +112,7 @@ None directly: the service constructs no model input; its consumers' catalog and
 - **Single-runtime visibility** — writes in one runtime are visible to that runtime's sessions and Remote members; cross-runtime propagation (federation) is deferred.
 - **Storage family only in the Web bundle** — `dsh-memory` requires `storageDomain`, which only the `web-app` bundle mounts; personal-space CLI/headless profiles keep the agent-plane rows inert until their host composition mounts storage and this service.
 - **`danger-full-access` can edit storage files** — the JSON documents sit under the Harness home in plain text; a session granted unrestricted filesystem access can read or corrupt them outside the service's write rules.
-- **No curation or recall** — the attribution union reserves `extraction` and `consolidation` sources; the after-turn curation passes and the per-question recall selector are deferred to their own rows.
+
 
 <a id="dev-note"></a>
 ### Dev Note

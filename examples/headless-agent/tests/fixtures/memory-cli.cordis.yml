@@ -43,8 +43,11 @@
           - id: memory
             name: '@deepseek-ai/dsh-memory'
 
-          # Agent plane: the catalog listener plus the four model-facing tools.
+          # Agent plane: the catalog listener, the four model-facing tools,
+          # and the opt-in post-turn curation passes.
           - id: memory-context
             name: '@deepseek-ai/dsh-memory-context'
           - id: tool-memory
             name: '@deepseek-ai/dsh-tool-memory'
+          - id: memory-curation
+            name: '@deepseek-ai/dsh-memory-curation'

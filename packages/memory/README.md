@@ -1,5 +1,5 @@
 ---
-description: "Space-scoped durable agent memory: facts an agent saves today that later conversations still see, split into a host-plane service, a per-session catalog publisher, and the model-facing tools."
+description: "Space-scoped durable agent memory: facts an agent saves today that later conversations still see, split into a host-plane service, a per-session catalog publisher, model-facing tools, and opt-in curation passes."
 kind: "package-group"
 ---
 
@@ -13,14 +13,15 @@ The subsystem reference — scope spaces, entry schema, write rules, catalog and
 
 ## Summary
 
-Every session starts with an empty context window. The memory group lets the agent keep small facts across sessions, scoped by *who* they belong to: `personal` (about the user, applies in every workspace), `workspace` (one working directory on one execution target), or `project` (shared across a managed project). Entries are durable records in the `memory` storage domain; a per-session catalog message tells the model what exists, and four tools manage the entries.
+Every session starts with an empty context window. The memory group lets the agent keep small facts across sessions, scoped by *who* they belong to: `personal` (about the user, applies in every workspace), `workspace` (one working directory on one execution target), or `project` (shared across a managed project). Entries are durable records in the `memory` storage domain; a per-session catalog message tells the model what exists, four tools manage the entries, and opt-in passes extract memories from finished turns, consolidate each scope, and recall entries relevant to the latest question.
 
 ## Table of Contents
 
 | Package | ctx key | Role |
 |---|---|---|
 | [`memory`](memory/README.md) | `ctx.memory` | Host-plane `MemoryService`: scope resolution, validation, serialized writes, project authorization, bounded search |
-| [`memory-context`](memory-context/README.md) | — | `agent/pre-step` listener publishing the saved-memory catalog as a durable user message |
+| [`memory-context`](memory-context/README.md) | — | `agent/pre-step` listener publishing the saved-memory catalog and opt-in per-question recall |
+| [`memory-curation`](memory-curation/README.md) | — | Opt-in turn-end extraction and interval-gated whole-scope consolidation passes |
 | [`tool-memory`](tool-memory/README.md) | — | Model-facing `memory_search` / `memory_read` / `memory_save` / `memory_delete` + `tool:memory` prompt guidance |
 
 ## Scope spaces
