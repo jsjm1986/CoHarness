@@ -263,6 +263,7 @@
     "client/ui-plan": "conversation",
     "client/ui-plugin-manager": "settings",
     "client/ui-primitives": "all",
+    "client/ui-project-activity": "workbench",
     "client/ui-reference": "conversation",
     "client/ui-renderer": "all",
     "client/ui-schedule": "conversation",
