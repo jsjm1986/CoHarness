@@ -18,7 +18,7 @@ import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { BlockAssembler, createUserMessage, type GenerateOptions } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type { MemoryEntrySummary, MemoryKind, MemoryScope, MemoryScopeKind } from '@deepseek-ai/dsh-memory'
-import { memoryScopeId } from '@deepseek-ai/dsh-memory'
+import { memoryScopeId, memorySignalWordCount } from '@deepseek-ai/dsh-memory'
 import { delegationDepthOf } from '@deepseek-ai/dsh-subagent'
 
 export const name = 'memory-context'
@@ -117,6 +117,15 @@ export const RECALL_INSTRUCTION =
   '<saved_memory_catalog>\n{catalogBlock}\n</saved_memory_catalog>\n\n' +
   '<user_message>\n{userMessage}\n</user_message>\n\n' +
   'Reply with JSON only: {"keys": ["key", ...]} using keys exactly as listed.'
+
+/** Minimum signal words a human message needs before a selector request fires; single-word inputs never recall. */
+const RECALL_QUERY_MIN_WORDS = 2
+
+/** Output-token cap on the auxiliary selector request — the same 5,000 ceiling ZCode's auxiliary calls use. */
+const AUXILIARY_MAX_TOKENS = 5000
+
+/** Milliseconds per day for the recalled-entry staleness note. */
+const DAY_MS = 24 * 60 * 60 * 1000
 
 /** One flat catalog row: a source entry plus the scope it was listed under. */
 interface CatalogRow {
@@ -482,10 +491,12 @@ function startRecall(
   warnedNoLlm: WeakSet<object>,
 ): void {
   const human = latestHumanText(batch, config.recallInputMaxBytes)
-  if (human === undefined) return
+  // A single-word message cannot express what it needs; the selector never fires.
+  if (human === undefined || memorySignalWordCount(human) < RECALL_QUERY_MIN_WORDS) return
   const folded = recallState(agent)
   if (folded.bytes >= config.recallSessionMaxBytes) return
-  const candidates = rows.filter(row => !folded.keys.has(`${memoryScopeId(row.scope)}:${row.name}`))
+  const candidates = rows.filter(row =>
+    !folded.keys.has(`${memoryScopeId(row.scope)}:${row.name}`) && !folded.read.has(row.name))
   if (candidates.length === 0) return
   const llm = ctx.get('llm')
   if (llm === undefined) {
@@ -530,8 +541,13 @@ async function runRecall(
     messages: [{ role: 'user', content: [{ type: 'text', text: instruction }] }],
     sessionId: agent.session.id,
     purpose: 'memory',
+    maxTokens: AUXILIARY_MAX_TOKENS,
     signal,
   }
+  // Auxiliary calls ride the model's lowest reasoning effort; a failed
+  // metadata lookup only drops the effort hint, never the pass.
+  const effort = await lowestEffort(ctx, llm, target, signal)
+  if (effort !== undefined) options.reasoningEffort = effort
   const assembler = new BlockAssembler()
   for await (const chunk of llm.stream(options)) assembler.push(chunk)
   if (signal.aborted) return
@@ -590,17 +606,27 @@ function latestHumanText(batch: readonly UserMessage[], bound: number): string |
 }
 
 /**
- * Keys already recalled and bytes already spent. Keys fold every durable
- * `memory-recall` event so a key is never re-selected inside one session —
- * even after compaction shadowed the injection — while the byte budget
- * folds only recall messages still on the surface, so reclaimed context
- * restores spend.
+ * Keys already recalled, keys already read, and bytes already spent. Keys
+ * fold every durable `memory-recall` event so a key is never re-selected
+ * inside one session — even after compaction shadowed the injection —
+ * while the byte budget folds only recall messages still on the surface,
+ * so reclaimed context restores spend. `read` folds every `memory_read`
+ * call's requested key name: an entry the agent already fetched in full
+ * needs no summary re-injection. The fold keys by name, so a same-named
+ * entry in another scope is conservatively excluded too.
  */
-function recallState(agent: Agent): { keys: Set<string>; bytes: number } {
+function recallState(agent: Agent): { keys: Set<string>; read: Set<string>; bytes: number } {
   const visible = new Set(agent.session.surface.nodes)
   const keys = new Set<string>()
+  const read = new Set<string>()
   let bytes = 0
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of agent.session.snapshotEvents().toReversed()) {
+    if (event.type === 'tool/call' && event.data.name === 'memory_read') {
+      const key = readKeyOf(event.data.arguments)
+      if (key !== undefined) read.add(key)
+      continue
+    }
     if (event.type !== 'user/message' || event.data.source.kind !== 'memory-recall') continue
     const source = event.data.source
     if (Array.isArray(source.keys)) {
@@ -613,7 +639,35 @@ function recallState(agent: Agent): { keys: Set<string>; bytes: number } {
       if (block.type === 'text') bytes += Buffer.byteLength(block.text, 'utf8')
     }
   }
-  return { keys, bytes }
+  return { keys, read, bytes }
+}
+
+/** The `key` a `memory_read` call asked for, or `undefined` on malformed arguments. */
+function readKeyOf(args: string): string | undefined {
+  try {
+    const input: unknown = JSON.parse(args.length === 0 ? '{}' : args)
+    const key = (input as { key?: unknown }).key
+    return typeof key === 'string' ? key : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** The model's lowest advertised reasoning effort for an auxiliary call; `undefined` when unresolvable. */
+async function lowestEffort(
+  ctx: Context,
+  llm: NonNullable<Context['llm']>,
+  target: { provider: string; model: string },
+  signal: AbortSignal,
+): Promise<GenerateOptions['reasoningEffort']> {
+  try {
+    const info = await llm.resolveModelInfo(target.provider, target.model, signal)
+    return info.reasoning?.efforts[0]?.id
+  } catch (error: unknown) {
+    // Adapter metadata lookup failure: the pass proceeds without an effort hint.
+    ctx.logger.debug(`memory recall effort lookup failed: ${String(error)}`)
+    return undefined
+  }
 }
 
 /** The selector's provider/model: the session's last routed request, else the agent's own options. */
@@ -677,7 +731,12 @@ function fitRecall(
   return text
 }
 
-/** One `<saved_memory>` block; the `scope` attribute appears only in multi-scope spaces. */
+/**
+ * One `<saved_memory>` block; the `scope` attribute appears only in
+ * multi-scope spaces. Entries more than a day old carry the staleness
+ * caution a point-in-time note deserves — the same wording ZCode's recall
+ * content renderer uses.
+ */
 function renderRecallEntry(
   entry: { row: CatalogRow; content: string },
   multiScope: boolean,
@@ -685,7 +744,11 @@ function renderRecallEntry(
   const open = multiScope
     ? `<saved_memory key="${entry.row.name}" scope="${entry.row.scope.kind}">`
     : `<saved_memory key="${entry.row.name}">`
-  return `${open}\n${entry.content}\n</saved_memory>`
+  const daysOld = Math.max(0, Math.floor((Date.now() - Date.parse(entry.row.updated)) / DAY_MS))
+  const stale = daysOld > 1
+    ? `This memory is ${daysOld} days old. Memories are point-in-time observations, not live state — claims about code behavior or file:line citations may be outdated. Verify against current code before asserting as fact.\n\n`
+    : ''
+  return `${open}\n${stale}${entry.content}\n</saved_memory>`
 }
 
 /** UTF-8 byte-bounded truncation; a split tail loses only code units, not whole entries. */

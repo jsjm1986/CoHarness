@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
 import { agentFor, memoryHarness, settingsStub } from './harness.ts'
-import MemoryService, { type Config } from '../src/index.ts'
+import MemoryService, { memorySignalWordCount, type Config } from '../src/index.ts'
 import type { MemoryScope } from '../src/index.ts'
 
 const projectScope: MemoryScope = { kind: 'project' }
@@ -258,5 +258,18 @@ describe('catalog ordering and foreign scopes', () => {
     } finally {
       await fiber.dispose()
     }
+  })
+})
+
+describe('memorySignalWordCount', () => {
+  it('counts whitespace tokens plus one unit per Han ideograph', () => {
+    expect(memorySignalWordCount('how should the release be scheduled')).toBe(6)
+    expect(memorySignalWordCount('记忆')).toBe(2)
+    expect(memorySignalWordCount('改一下')).toBe(3)
+    expect(memorySignalWordCount('ok')).toBe(1)
+    expect(memorySignalWordCount('试A版')).toBe(3)
+    expect(memorySignalWordCount('fix 世界 now')).toBe(4)
+    expect(memorySignalWordCount('')).toBe(0)
+    expect(memorySignalWordCount('   ')).toBe(0)
   })
 })

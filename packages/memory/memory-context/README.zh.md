@@ -57,10 +57,10 @@ kind: "package-reference"
 
 仅当 `memory` 设置命名空间的 `recall` 开关打开时召回才生效。在一个回合的第一个获准步骤上，插件：
 
-1. 在该步骤已认领批次中定位最新的人类撰写文本（`source.kind === 'user'`），以 `recallInputMaxBytes` 为界；没有人类文本则该回合不召回。
-2. 用会话去重集合过滤目录行——本会话已注入过的 `scopeId:key` 不再成为候选——没有剩余候选、或表面上已有 `recallSessionMaxBytes` 召回文本时跳过该调用。
-3. 向选择器发起一次独立的 `purpose: 'memory'` 请求，使用会话最近路由的 provider/model（代理自身 options 作为回退）：逐字指令、候选行与有界的人类消息；应答仅为 JSON，`{"keys": [...]}`。
-4. 将至多 `recallMaxSelections` 个挑选（≤5）还原为完整条目——未知键与目录读取后已删除的条目被丢弃——每条内容截断至 `recallEntryMaxBytes`，把完整提醒装进 `recallMaxBytes`（受会话剩余预算约束），再经 `agent.inject()` 入队，作为普通的下一步上下文落在工具批次之间。
+1. 在该步骤已认领批次中定位最新的人类撰写文本（`source.kind === 'user'`），以 `recallInputMaxBytes` 为界；没有人类文本——或文本不足两个信号词（空白分隔词元加每个汉字各计一个单位，短中文提问同样计入）——该回合不召回。
+2. 用会话去重集合过滤目录行——本会话已注入过的 `scopeId:key` 不再成为候选，代理已用 `memory_read` 取过的键也不再是候选——没有剩余候选、或表面上已有 `recallSessionMaxBytes` 召回文本时跳过该调用。
+3. 向选择器发起一次独立的 `purpose: 'memory'` 请求，使用会话最近路由的 provider/model（代理自身 options 作为回退），按模型公开的最低推理档位并封顶 5,000 输出 token：逐字指令、候选行与有界的人类消息；应答仅为 JSON，`{"keys": [...]}`。
+4. 将至多 `recallMaxSelections` 个挑选（≤5）还原为完整条目——未知键与目录读取后已删除的条目被丢弃——每条内容截断至 `recallEntryMaxBytes`，更新超过一天的条目前置"N 天前"陈旧提示，把完整提醒装进 `recallMaxBytes`（受会话剩余预算约束），再经 `agent.inject()` 入队，作为普通的下一步上下文落在工具批次之间。
 
 只有 `ctx.memory.scopesFor(agent)` 提供的作用域可选——与目录将发布的行相同，绝不做更宽搜索。回合结束时仍在途的选择器被中止、其挑选被丢弃。不涉及嵌入或向量检索：选择就是一次对已发布目录的小型模型调用。
 

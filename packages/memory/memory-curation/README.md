@@ -43,7 +43,7 @@ Feature switches live in the `memory` settings namespace (`extraction`, `consoli
 On a `turn/end` observed with `reason.kind === 'completed'`, the pass skips when:
 
 - the `extraction` switch is off, the session is delegated (`delegationDepthOf(agent) > 0`), or the session cannot reach an agent;
-- the turn's fold saw no human-authored `user/message`, or saw a `memory_save`/`memory_delete` `tool/call` — a turn that already curated itself needs no review;
+- the turn's fold saw no human-authored `user/message` carrying at least three signal words (whitespace tokens plus one unit per Han ideograph — a one-word acknowledgement never reviews), or saw a `memory_save`/`memory_delete` `tool/call` — a turn that already curated itself needs no review;
 - `ctx.memory.scopesFor(agent)` offers no writable scope, or — in `project` space — `authorize('memory')` denies, checked **before** the first model call;
 - no `llm` service is present or no provider/model resolves (one warning per session);
 - the session's durable extraction cursor already reached this `turn/end`'s seq — interrupted passes review the same slice again.
@@ -58,7 +58,7 @@ Each pass also evaluates every scope `scopesFor(agent)` offers against three gat
 <a id="the-restricted-tool-loop"></a>
 ## The restricted tool loop
 
-Both passes share one bounded loop: stream a request, execute `tool-call` blocks, feed results back, repeat until the model stops calling tools or `maxToolRounds` trips. Only `memory_search`, `memory_read`, `memory_save`, and `memory_delete` are executable — a call to anything else returns an error result to the model — and each save/delete counts against the pass's write budget. Writes go through `ctx.memory.save`/`delete` with `{ kind: 'agent', agent, source }`, so the service's validation, scope admission, project authorization, and serialized write chain all still apply; an `execution/forbidden` denial surfaces to the model as an error result rather than a thrown `RemoteError`. Cancellation aborts the stream, and the pass publishes no cursor after its signal fires.
+Both passes share one bounded loop: stream a request, execute `tool-call` blocks, feed results back, repeat until the model stops calling tools or `maxToolRounds` trips. Every request rides the model's lowest advertised reasoning effort and a 5,000-token output cap — the auxiliary-call posture, never the conversation's tuned settings. Only `memory_search`, `memory_read`, `memory_save`, and `memory_delete` are executable — a call to anything else returns an error result to the model — and each save/delete counts against the pass's write budget. Writes go through `ctx.memory.save`/`delete` with `{ kind: 'agent', agent, source }`, so the service's validation, scope admission, project authorization, and serialized write chain all still apply; an `execution/forbidden` denial surfaces to the model as an error result rather than a thrown `RemoteError`. Cancellation aborts the stream, and the pass publishes no cursor after its signal fires.
 
 <a id="cursors-and-attribution"></a>
 ## Cursors and attribution

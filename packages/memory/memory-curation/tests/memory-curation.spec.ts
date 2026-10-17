@@ -198,6 +198,54 @@ describe('memory-curation extraction', () => {
     await ctx.fiber.dispose()
   })
 
+  it('skips a turn whose human messages stay below the signal-word bar', async () => {
+    const { ctx, agent } = await harness({ memory: { extraction: true } })
+    const calls = fakeLlm(ctx, [textTurn('done')])
+    appendHeader(agent.session)
+    const session = agent.session
+    session.append('turn/start', { turn: 1 })
+    // One signal word, an all-whitespace text, and a non-text block count nothing.
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'ok' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: '   ' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'tool-result', callId: 'x', content: [] } as never],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(calls).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
+
+  it('still extracts once when several substantial human messages land in one turn', async () => {
+    const { ctx, agent } = await harness({ memory: { extraction: true } })
+    const calls = fakeLlm(ctx, [textTurn('no memories saved')])
+    const service = ctx.get('llm') as { resolveModelInfo?: unknown }
+    service.resolveModelInfo = async () => ({ reasoning: { efforts: [{ id: 'low' }, { id: 'high' }] } })
+    appendHeader(agent.session)
+    const session = agent.session
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'remember this preference' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'and this other fact' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await vi.waitFor(() => { expect(calls).toHaveLength(1) })
+    expect(calls[0]!.reasoningEffort).toBe('low')
+    expect(calls[0]!.maxTokens).toBe(5000)
+    await ctx.fiber.dispose()
+  })
+
   it('skips a turn that already invoked memory_save or memory_delete', async () => {
     const { ctx, agent } = await harness({ memory: { extraction: true } })
     const calls = fakeLlm(ctx, [textTurn('done')])
@@ -205,7 +253,7 @@ describe('memory-curation extraction', () => {
     const session = agent.session
     session.append('turn/start', { turn: 1 })
     session.append('user/message', createUserMessage({
-      content: [{ type: 'text', text: 'remember this' }],
+      content: [{ type: 'text', text: 'remember this preference' }],
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('w-1'), name: 'memory_save', arguments: '{}' })
@@ -222,7 +270,7 @@ describe('memory-curation extraction', () => {
     const session = agent.session
     session.append('turn/start', { turn: 1 })
     session.append('user/message', createUserMessage({
-      content: [{ type: 'text', text: 'a question' }],
+      content: [{ type: 'text', text: 'a real question' }],
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'boom', code: 'UNKNOWN' } } })
@@ -375,7 +423,7 @@ describe('memory-curation consolidation', () => {
     await service.writeCursor(cursorKey, {
       lastRunAt: '2020-01-01T00:00:00.000Z', lastDigest: cursor.lastDigest!, changedSince: 99,
     })
-    humanTurn(agent, 'again', 2)
+    humanTurn(agent, 'ask again please', 2)
     await new Promise(resolve => setTimeout(resolve, 30))
     expect(calls).toHaveLength(1)
 
@@ -385,7 +433,7 @@ describe('memory-curation consolidation', () => {
       summary: 'release freeze on fridays', content: 'No deploys on Fridays or Mondays.',
       expectedRevision: (await service.read({ kind: 'personal' }, 'release-window'))!.revision,
     }, writer(agent))
-    humanTurn(agent, 'third', 3)
+    humanTurn(agent, 'third real question', 3)
     await vi.waitFor(() => { expect(calls).toHaveLength(2) })
     await ctx.fiber.dispose()
   })
@@ -623,7 +671,7 @@ describe('memory-curation tool dispatch', () => {
     })
     // The cursor never committed, so the next completed turn retries.
     saveSpy.mockRestore()
-    humanTurn(agent, 'retry', 2)
+    humanTurn(agent, 'retry this question', 2)
     await vi.waitFor(() => { expect(calls).toHaveLength(2) })
     await ctx.fiber.dispose()
   })
@@ -665,9 +713,9 @@ describe('memory-curation lanes and gating', () => {
       textTurn('second'),
     ])
     appendHeader(agent.session)
-    humanTurn(agent, 'first question', 1)
+    humanTurn(agent, 'first real question', 1)
     await vi.waitFor(() => { expect(calls).toHaveLength(1) })
-    humanTurn(agent, 'second question', 2)
+    humanTurn(agent, 'second real question', 2)
     releaseFirst()
     await vi.waitFor(() => { expect(calls).toHaveLength(2) })
     await vi.waitFor(async () => {
@@ -685,9 +733,9 @@ describe('memory-curation lanes and gating', () => {
       () => (async function* (): AsyncIterable<StreamChunk> { await gate; yield* textTurn('late') })(),
     ])
     appendHeader(agent.session)
-    humanTurn(agent, 'first question', 1)
+    humanTurn(agent, 'first real question', 1)
     await vi.waitFor(() => { expect(calls).toHaveLength(1) })
-    humanTurn(agent, 'queued question', 2)
+    humanTurn(agent, 'queued real question', 2)
     ctx.emit('session/disposed', agent.session)
     releaseFirst()
     await new Promise(resolve => setTimeout(resolve, 30))
@@ -730,9 +778,9 @@ describe('memory-curation lanes and gating', () => {
     const { ctx, agent } = await harness({ memory: { extraction: true } })
     const warn = vi.spyOn(ctx.logger, 'warn')
     appendHeader(agent.session)
-    humanTurn(agent, 'first', 1)
+    humanTurn(agent, 'first real question', 1)
     await new Promise(resolve => setTimeout(resolve, 20))
-    humanTurn(agent, 'second', 2)
+    humanTurn(agent, 'second real question', 2)
     await new Promise(resolve => setTimeout(resolve, 30))
     const warns = warn.mock.calls.filter(call => String(call[0]).includes('no llm service'))
     expect(warns).toHaveLength(1)
@@ -743,9 +791,9 @@ describe('memory-curation lanes and gating', () => {
     const { ctx, agent } = await harness({ memory: { extraction: true }, noRoute: true })
     const calls = fakeLlm(ctx, [textTurn('done')])
     const warn = vi.spyOn(ctx.logger, 'warn')
-    humanTurn(agent, 'first', 1)
+    humanTurn(agent, 'first real question', 1)
     await new Promise(resolve => setTimeout(resolve, 20))
-    humanTurn(agent, 'second', 2)
+    humanTurn(agent, 'second real question', 2)
     await new Promise(resolve => setTimeout(resolve, 30))
     expect(calls).toHaveLength(0)
     const warns = warn.mock.calls.filter(call => String(call[0]).includes('no provider/model'))
@@ -776,7 +824,7 @@ describe('memory-curation lanes and gating', () => {
     await vi.waitFor(() => { expect(calls).toHaveLength(1) })
     await new Promise(resolve => setTimeout(resolve, 30))
     expect(await service.getCursor(memoryExtractionCursorKey(agent.session.id))).toBeUndefined()
-    humanTurn(agent, 'again', 2)
+    humanTurn(agent, 'ask again please', 2)
     await vi.waitFor(() => { expect(calls).toHaveLength(2) })
     await ctx.fiber.dispose()
   })
@@ -840,9 +888,9 @@ describe('memory-curation consolidation gates', () => {
     const calls = fakeLlm(ctx, [textTurn('no changes')])
     const warn = vi.spyOn(ctx.logger, 'warn')
     appendHeader(agent.session)
-    humanTurn(agent, 'first', 1)
+    humanTurn(agent, 'first real question', 1)
     await new Promise(resolve => setTimeout(resolve, 30))
-    humanTurn(agent, 'second', 2)
+    humanTurn(agent, 'second real question', 2)
     await new Promise(resolve => setTimeout(resolve, 30))
     expect(calls).toHaveLength(0)
     const warns = warn.mock.calls.filter(call => String(call[0]).includes('no tools service'))
@@ -945,9 +993,9 @@ describe('memory-curation teardown and remaining gates', () => {
     }, writer(agent))
     const warn = vi.spyOn(ctx.logger, 'warn')
     appendHeader(agent.session)
-    humanTurn(agent, 'first', 1)
+    humanTurn(agent, 'first real question', 1)
     await new Promise(resolve => setTimeout(resolve, 30))
-    humanTurn(agent, 'second', 2)
+    humanTurn(agent, 'second real question', 2)
     await new Promise(resolve => setTimeout(resolve, 30))
     const warns = warn.mock.calls.filter(call => String(call[0]).includes('no llm service'))
     expect(warns).toHaveLength(1)

@@ -154,6 +154,18 @@ export function MemoryRevision(value: string): MemoryRevision {
 }
 
 /**
+ * The recall/extraction word proxy: whitespace-separated tokens plus each
+ * Han ideograph as one unit, so CJK prose measures by characters the same
+ * way Latin prose measures by words. Extraction and recall thresholds
+ * consume this count, not raw length.
+ * @param text - The prose to measure.
+ * @returns the signal-word count.
+ */
+export function memorySignalWordCount(text: string): number {
+  return text.match(/[^\s\p{Script=Han}]+|\p{Script=Han}/gu)?.length ?? 0
+}
+
+/**
  * Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`,
  * `search`) are lock-free; writes serialize on a single chain inside the
  * service so create/duplicate, revision, and full checks stay atomic.

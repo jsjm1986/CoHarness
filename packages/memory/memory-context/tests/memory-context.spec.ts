@@ -4,7 +4,7 @@ import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
-import { createUserMessage, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { MemoryWriter } from '@deepseek-ai/dsh-memory'
 import { agentFor, memoryHarness } from '../../memory/tests/harness.ts'
 import * as MemoryContext from '../src/index.ts'
@@ -690,6 +690,86 @@ describe('memory recall', () => {
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(calls).toHaveLength(0)
     expect(h.inject).not.toHaveBeenCalled()
+    await h.ctx.fiber.dispose()
+  })
+
+  it('never fires the selector for a single-word question', async () => {
+    const h = await recallHarness()
+    const calls = fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
+    await save(h, h.agent, 'release-freeze')
+    await step1(h, [human('ok')])
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(calls).toHaveLength(0)
+    expect(h.inject).not.toHaveBeenCalled()
+    // Two Han characters count as two signal words, so a CJK question recalls.
+    await step1(h, [human('记忆')], 2)
+    await vi.waitFor(() => { expect(calls).toHaveLength(1) })
+    await h.ctx.fiber.dispose()
+  })
+
+  it('excludes keys the agent already read this session', async () => {
+    const h = await recallHarness()
+    const calls = fakeLlm(h.ctx, ['{"keys": ["deploy-window"]}'])
+    await save(h, h.agent, 'release-freeze')
+    await save(h, h.agent, 'deploy-window')
+    // Durable memory_read calls; the malformed arguments string is ignored.
+    h.agent.session.append('turn/start', { turn: 1 })
+    h.agent.session.append('step/start', { turn: 1, step: 1 })
+    h.agent.session.append('tool/call', {
+      turn: 1, step: 1, callId: ToolCallId('c-1'), name: 'memory_read', arguments: 'not json',
+    })
+    h.agent.session.append('tool/call', {
+      turn: 1, step: 1, callId: ToolCallId('c-2'), name: 'memory_read', arguments: '',
+    })
+    h.agent.session.append('tool/call', {
+      turn: 1, step: 1, callId: ToolCallId('c-3'), name: 'memory_read', arguments: '{"key": 7}',
+    })
+    h.agent.session.append('tool/call', {
+      turn: 1, step: 1, callId: ToolCallId('c-4'), name: 'memory_read', arguments: JSON.stringify({ key: 'release-freeze' }),
+    })
+    h.agent.session.append('step/end', { turn: 1, step: 1 })
+    await step1(h, [human('what changed lately?')])
+    await vi.waitFor(() => { expect(calls).toHaveLength(1) })
+    const text = calls[0]!.messages[0]!.content
+      .flatMap(block => (block.type === 'text' ? [block.text] : []))
+      .join('\n')
+    expect(text).toContain('deploy-window')
+    expect(text).not.toContain('release-freeze')
+    await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(1) })
+    await h.ctx.fiber.dispose()
+  })
+
+  it('rides the lowest advertised reasoning effort and a capped output budget', async () => {
+    const h = await recallHarness()
+    const calls = fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
+    const service = h.ctx.get('llm') as { resolveModelInfo?: unknown }
+    service.resolveModelInfo = async () => ({ reasoning: { efforts: [{ id: 'low' }, { id: 'high' }] } })
+    await save(h, h.agent, 'release-freeze')
+    await step1(h, [human('when is the deploy frozen?')])
+    await vi.waitFor(() => { expect(calls).toHaveLength(1) })
+    expect(calls[0]!.reasoningEffort).toBe('low')
+    expect(calls[0]!.maxTokens).toBe(5000)
+    await h.ctx.fiber.dispose()
+  })
+
+  it('marks a recalled entry older than a day with a staleness note', async () => {
+    const h = await recallHarness()
+    fakeLlm(h.ctx, ['{"keys": ["release-freeze"]}'])
+    const realNow = Date.now()
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(realNow - 10 * 24 * 60 * 60 * 1000)
+      await save(h, h.agent, 'release-freeze')
+      vi.setSystemTime(realNow)
+      await step1(h, [human('when is the deploy frozen?')])
+    } finally {
+      vi.useRealTimers()
+    }
+    await vi.waitFor(() => { expect(h.inject).toHaveBeenCalledTimes(1) })
+    const text = h.inject.mock.calls[0]![0].content[0]?.type === 'text'
+      ? h.inject.mock.calls[0]![0].content[0].text
+      : ''
+    expect(text).toContain('This memory is 10 days old')
     await h.ctx.fiber.dispose()
   })
 

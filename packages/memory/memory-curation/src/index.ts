@@ -29,6 +29,7 @@ import {
   MemoryRevision,
   memoryConsolidationCursorKey,
   memoryExtractionCursorKey,
+  memorySignalWordCount,
   type MemoryEntry,
   type MemoryScope,
   type MemoryWriteResult,
@@ -42,6 +43,12 @@ export const inject = ['memory']
 
 /** The four model-facing memory tools — the complete executable universe of a curation request. */
 const MEMORY_TOOL_NAMES = new Set(['memory_search', 'memory_read', 'memory_save', 'memory_delete'])
+
+/** Minimum signal words one human message needs before a turn qualifies for extraction — ZCode's `MINIMUM_USER_WORDS`. */
+const EXTRACTION_MIN_WORDS = 3
+
+/** Output-token cap on each curation request — the same 5,000 ceiling ZCode's auxiliary calls use. */
+const AUXILIARY_MAX_TOKENS = 5000
 
 /** Curation scheduling and write budgets. Feature switches live in the `memory` settings namespace. */
 export interface Config {
@@ -115,7 +122,7 @@ export const CONSOLIDATION_INSTRUCTION =
 interface TurnFold {
   /** The open turn number. */
   readonly turn: number
-  /** A human-authored message committed inside this turn. */
+  /** A human-authored message carrying at least {@link EXTRACTION_MIN_WORDS} signal words committed inside this turn. */
   sawHuman: boolean
   /** A `memory_save`/`memory_delete` call already ran inside this turn. */
   sawMemoryWrite: boolean
@@ -184,7 +191,11 @@ export function apply(ctx: Context, config: Config): void {
         return
       case 'user/message': {
         const fold = folds.get(session.id)
-        if (fold !== undefined && event.data.source.kind === 'user') fold.sawHuman = true
+        if (fold === undefined || fold.sawHuman || event.data.source.kind !== 'user') return
+        const text = event.data.content
+          .flatMap(block => (block.type === 'text' ? [block.text] : []))
+          .join('\n')
+        if (memorySignalWordCount(text) >= EXTRACTION_MIN_WORDS) fold.sawHuman = true
         return
       }
       case 'tool/call': {
@@ -503,6 +514,14 @@ async function runMemoryLoop(
 ): Promise<{ writes: number; text: string }> {
   const writer: MemoryWriter = { kind: 'agent', agent, signal: options.signal, source: options.writerSource }
   const messages: RequestMessage[] = [...options.messages]
+  // Auxiliary passes ride the model's lowest advertised reasoning effort and
+  // a capped output budget; a failed metadata lookup only drops the hint.
+  let reasoningEffort: GenerateOptions['reasoningEffort']
+  try {
+    reasoningEffort = (await llm.resolveModelInfo(options.provider, options.model, options.signal)).reasoning?.efforts[0]?.id
+  } catch (error: unknown) {
+    ctx.logger.debug(`memory curation effort lookup failed: ${String(error)}`)
+  }
   let writes = 0
   for (let round = 0; round < options.maxRounds; round += 1) {
     options.signal.throwIfAborted()
@@ -516,6 +535,8 @@ async function runMemoryLoop(
       sessionId: options.sessionId,
       signal: options.signal,
       purpose: 'memory',
+      maxTokens: AUXILIARY_MAX_TOKENS,
+      ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
       ...(options.executionIdentity === undefined ? {} : { executionIdentity: options.executionIdentity }),
     }
     for await (const chunk of llm.stream(request)) assembler.push(chunk)

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-19-zcode-aligned-memory-signal-gates.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-19-zcode-aligned-memory-signal-gates.md
+/agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture:
+  en: 8ee4daa62e204fe4
+  zh: 4e3a6e74616408a9
+/agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture/problem:
+  en: c1f37a06de1c74a0
+  zh: e7504f45d49f986e
+/agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture/decision:
+  en: 8f195fa531d4fe46
+  zh: 674b66ffbf9f2539
+/agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture/consequences:
+  en: ab87ea0fc3b09431
+  zh: 7c45b8f6185e100f
+/agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture/testing:
+  en: 8ef9243bb08f1412
+  zh: bff8e3c6339d057f

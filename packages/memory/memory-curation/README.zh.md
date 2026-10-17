@@ -43,7 +43,7 @@ kind: "package-reference"
 在以 `reason.kind === 'completed'` 观察到的 `turn/end` 上，满足以下任一条件即跳过：
 
 - `extraction` 开关关闭、会话是委派的（`delegationDepthOf(agent) > 0`）、或无法找到会话的 agent；
-- 该回合的折叠中没有人类撰写的 `user/message`，或已出现 `memory_save`/`memory_delete` 的 `tool/call`——已经自我整理过的回合无需再审；
+- 该回合的折叠中没有携带至少三个信号词的人类撰写 `user/message`（空白分隔词元加每个汉字各计一个单位——一个词的回答永不触发复审），或已出现 `memory_save`/`memory_delete` 的 `tool/call`——已经自我整理过的回合无需再审；
 - `ctx.memory.scopesFor(agent)` 不提供任何可写作用域，或——`project` 空间下——`authorize('memory')` 拒绝，该检查发生在**首次模型调用之前**；
 - 没有 `llm` 服务或无法解析 provider/model（每会话警告一次）；
 - 会话的耐久提取游标已经到达该 `turn/end` 的 seq——被中断的遍会在下次重审同一片段。
@@ -58,7 +58,7 @@ kind: "package-reference"
 <a id="the-restricted-tool-loop"></a>
 ## 受限工具循环
 
-两个遍共享同一个有界循环：流式发出一次请求、执行 `tool-call` 块、把结果回喂、重复，直至模型停止调用工具或 `maxToolRounds` 触发。只有 `memory_search`、`memory_read`、`memory_save`、`memory_delete` 可执行——对其他工具的调用以错误结果回给模型——每次保存/删除都计入该遍的写入预算。写入经 `ctx.memory.save`/`delete`、以 `{ kind: 'agent', agent, source }` 写者完成，因此服务的校验、作用域准入、project 授权与串行写链全部依旧生效；`execution/forbidden` 拒绝以错误结果呈现给模型而不是抛出 `RemoteError`。取消会中止流，且遍在其信号触发后不发布任何游标。
+两个遍共享同一个有界循环：流式发出一次请求、执行 `tool-call` 块、把结果回喂、重复，直至模型停止调用工具或 `maxToolRounds` 触发。每次请求都按模型公开的最低推理档位并封顶 5,000 输出 token——辅助调用姿态，而非会话调好的设置。只有 `memory_search`、`memory_read`、`memory_save`、`memory_delete` 可执行——对其他工具的调用以错误结果回给模型——每次保存/删除都计入该遍的写入预算。写入经 `ctx.memory.save`/`delete`、以 `{ kind: 'agent', agent, source }` 写者完成，因此服务的校验、作用域准入、project 授权与串行写链全部依旧生效；`execution/forbidden` 拒绝以错误结果呈现给模型而不是抛出 `RemoteError`。取消会中止流，且遍在其信号触发后不发布任何游标。
 
 <a id="cursors-and-attribution"></a>
 ## 游标与归属
