@@ -2024,7 +2024,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-memory-context`
 
 - `inject`: `memory` · `tools`
-- `source`: [`packages/memory/memory-context/src/index.ts:53`](../packages/memory/memory-context/src/index.ts)
+- `source`: [`packages/memory/memory-context/src/index.ts:58`](../packages/memory/memory-context/src/index.ts)
 
 ```ts config-catalog
 /** Model-facing saved-memory catalog configuration. */
