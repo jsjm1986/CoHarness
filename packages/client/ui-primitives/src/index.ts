@@ -94,6 +94,8 @@ export {
 export { ReferenceIcon } from './ReferenceIcon.tsx'
 export type { ReferenceIconKind, ReferenceIconProps } from './ReferenceIcon.tsx'
 export { projectUserText } from './user-text.tsx'
+export { SecretText } from './SecretText.tsx'
+export type { SecretTextLabels, SecretTextProps } from './SecretText.tsx'
 export { LinkIcon, classifyLinkPath } from './LinkIcon.tsx'
 export type { LinkIconKind, LinkIconProps } from './LinkIcon.tsx'
 export { FileTypeIcon, classifyFileType, fileExtension } from './FileTypeIcon.tsx'

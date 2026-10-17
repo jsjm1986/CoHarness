@@ -16,12 +16,26 @@
  */
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
+import { CredentialScanner, type SecretRange } from './credential-scanner.ts'
+import { formatTables } from './format-tables.ts'
 import { ReferenceIcon } from './ReferenceIcon.tsx'
+import { SecretText, type SecretTextLabels } from './SecretText.tsx'
 import css from './user-text.module.css'
 import markdownCss from './markdown/MarkdownText.module.css'
 
 /** The wire form a session chip serializes to; label is the display text. */
 const SESSION_WIRE_RE = /@\[([^\]\n]+)\]\(dsh-session:[^)\s]+\)/gu
+
+/** Shared credential scanner; `match` reuses its memo only while the same text is queried. */
+const SECRET_SCANNER = new CredentialScanner(formatTables())
+
+/** Display form of one recognized credential; the original characters never render. */
+interface SecretDecoration {
+  readonly start: number
+  readonly end: number
+  readonly raw: string
+  readonly masked: string
+}
 
 /** Sentence punctuation a bare `@name` token may carry without being part of the reference. */
 const TRAILING_PUNCTUATION_RE = /[.,;:!?，。；：！？]+$/u
@@ -31,7 +45,7 @@ interface DecorationRange {
   readonly end: number
   /** Matched source text (hover title). */
   readonly label: string
-  readonly kind: 'session' | 'plain'
+  readonly kind: 'session' | 'plain' | 'secret'
   /** Pre-resolved display text (wire folds); derived from label when absent. */
   readonly display?: string
 }
@@ -53,6 +67,7 @@ export interface UserTextReferences {
  * (unsent queue rows pass none).
  * @param slashKind - the chip kind those tokens render as.
  * @param references - optional file and skill preview actions; session and command tokens stay labels.
+ * @param secretLabels - accessible names of the reveal control; without them credentials still mask but carry no toggle.
  * @returns inline nodes covering the whole text.
  */
 export function projectUserText(
@@ -61,7 +76,15 @@ export function projectUserText(
   slashNames: readonly string[] = [],
   slashKind: 'skill' | 'command' = 'skill',
   references?: UserTextReferences,
+  secretLabels?: SecretTextLabels,
 ): ReactNode {
+  const secrets: SecretDecoration[] = []
+  let secretFrom = 0
+  let secret: SecretRange | undefined
+  while ((secret = SECRET_SCANNER.match(text, secretFrom)) !== undefined) {
+    secrets.push({ start: secret.start, end: secret.end, raw: text.slice(secret.start, secret.end), masked: secret.data.masked })
+    secretFrom = secret.end
+  }
   const ranges: DecorationRange[] = []
   SESSION_WIRE_RE.lastIndex = 0
   let wire: RegExpExecArray | null
@@ -96,7 +119,12 @@ export function projectUserText(
     if (label.startsWith('/') && !slashNames.includes(label.slice(1))) continue
     ranges.push({ start: tokenStart, end: tokenStart + label.length, label, kind: 'plain' })
   }
-  const rankOf = (range: DecorationRange): number => range.kind === 'session' ? 0 : 1
+  for (const s of secrets) {
+    ranges.push({ start: s.start, end: s.end, label: s.raw, kind: 'secret', display: s.masked })
+  }
+  // A credential outranks every other decoration at the same start, so no
+  // token inside a secret range survives to draw the original characters.
+  const rankOf = (range: DecorationRange): number => range.kind === 'secret' ? -1 : range.kind === 'session' ? 0 : 1
   ranges.sort((a, b) => a.start - b.start || rankOf(a) - rankOf(b) || b.end - a.end)
   const parts: ReactNode[] = []
   let cursor = 0
@@ -107,6 +135,19 @@ export function projectUserText(
     if (range.start < cursor) continue
     const { start: tokenStart, end, label, kind } = range
     if (tokenStart > cursor) pushPlain(cursor, tokenStart)
+    if (kind === 'secret') {
+      parts.push(
+        <SecretText
+          key={tokenStart}
+          raw={label}
+          masked={range.display ?? label}
+          interactive={secretLabels !== undefined}
+          labels={secretLabels ?? { reveal: '', hide: '' }}
+        />,
+      )
+      cursor = end
+      continue
+    }
     const referenceKind = kind === 'session'
       ? 'session'
       : label.startsWith('@')

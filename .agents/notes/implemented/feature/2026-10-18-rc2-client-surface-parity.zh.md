@@ -17,6 +17,7 @@ fork 的会话栈是 `ui-conversation` 加纯文本输入机，不是上游 `ui-
 - `turn-error` 把 `turn/end` 的 `reason.kind === 'interrupted'` 映射为 `INTERRUPTED` 失败，该行显示"任务已停止"标题与说明未完成工具调用结果未知的本地化文案；`turnProcessAlwaysOpen` 将中断与中止、错误同等对待。
 - `ui-settings-models` 的凭据草稿经 `ApiKeyInput` 渲染——只写密码框，眼睛开关仅在草稿非空时揭示，值一旦修改即重新遮蔽。
 - `conversation/input` 新增 `DraftSnapshot`（文本 + 与编辑器无关的引用区间 + 前导命令 token）。不带 `discardDraft` 的 Workspace 切换把快照迁入被打开会话的 shell：新 `draft-restored` 机器事件对显示文本仍吻合的区间重新铸造引用，失配的退化为普通文本。已就绪文档草稿经 `attachDocument` 重新挂载；上传中的文档留在原会话。claim token 只作为前导文本恢复——其 submit 闭包归属来源方——触发观察器在下一次 track 时重新认领。
+- `ui-primitives` 承载凭据脱敏文本节点：`ui-secret-mask` 的扫描器/掩码/格式表与 `SecretText` 移植进 `user-text.tsx` 的 `projectUserText`——对每个识别到的凭据区间输出 `SecretText`（调用方提供标签时带逐值揭示开关）。脱敏仅作用于呈现：日志原文、复制载荷与模型输入均保留原字符。
 - `ui-conversation.collapseTiming`（默认 `completion`，另为 `next-input`）以 `CollapseTimingPolicy` 落在设置 scope 上，配 `settings.collapseTiming` 设置行与 `ChatPresentationPolicy.collapseTiming` 字段。`next-input` 下最新已完成轮次的过程保持展开，直到 transcript 位置的待提交回显或更新轮次出现；已存的手动折叠仍然生效。
 
 ## Alternatives considered

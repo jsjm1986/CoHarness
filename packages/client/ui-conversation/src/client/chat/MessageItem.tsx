@@ -185,7 +185,7 @@ function UserStyleBubble({
         )}
         {renderMessageImages({ images, align: 'end' })}
         {showBubble && <div className={css.bubble}>
-          {projectUserText(text, referenceLabels, skillNames)}
+          {projectUserText(text, referenceLabels, skillNames, 'skill', undefined, { reveal: t('secret.reveal'), hide: t('secret.hide') })}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
         {referenceLabels.length > 0 && (
