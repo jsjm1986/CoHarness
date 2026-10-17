@@ -783,6 +783,48 @@ interface TurnEndReasonMap {
 
 hook 桥的 `hook/invoked` / `hook/result` 配对（来自 `@deepseek-ai/dsh-hook-protocol`）按 `handlerId` 关联。`UserPromptSubmit`、`PreToolUse`、`PostToolUse` 与 `Stop` 在循环打开的轮次内触发，因此它们的 `hook/*` 记录天然被轮次包围。`SessionStart` 没有 `hook/*` 记录，因为它在轮次 1 之前运行；其上下文留在 inbox 中处于待决，直到一次唤醒投递打开轮次（见 [hook 桥 Agent Note](../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.zh.md)）。
 
+### 插件记录
+
+实验性包在 `PluginRecordMap` 中声明插件自有的状态：`appendPluginRecord()` 根据每项声明约束名称与 payload 类型，并在 `plugin:` 命名空间中追加一条带 `ignorable: true` 标记的事件。`pluginRecordOf()` 读取已存记录，其 payload 为未知类型，不受当前声明约束。[实验性持久化目录](../experimental-persistence-catalog.zh.md)列出当前声明。调用方限制、保留方式与读取路径见[包 README](../../packages/core/session/README.zh.md#write-experimental-plugin-records)。
+
+```ts type-equiv
+/**
+ * Event type of an experimental plugin record: `plugin:` followed by
+ * slash-separated segments of lowercase letters, digits, `.`, `_`, and `-`,
+ * each starting with a letter or digit. A record type is never a
+ * {@link SessionEventMap} member.
+ */
+type PluginRecordType = `plugin:${string}`
+```
+
+```ts type-equiv
+/**
+ * Payloads written by experimental packages, keyed by their `plugin:` record
+ * names. Packages augment this map to type writes and enter the current plugin
+ * record catalog; these declarations do not enter {@link SessionEventMap} or
+ * released persistence schemas. Stored records still require owner validation.
+ */
+interface PluginRecordMap {}
+```
+
+```ts type-equiv
+/**
+ * One committed experimental plugin record, read from the log by
+ * `pluginRecordOf`. The record's owner validates `data` before use, because a
+ * restored record carries whatever JSON an earlier build of its owner wrote.
+ */
+interface PluginRecord {
+  /** The record type, chosen by the owning plugin. */
+  readonly type: PluginRecordType
+  /** The record's position in the Session log. */
+  readonly seq: SessionSeq
+  /** Unix epoch milliseconds at append. */
+  readonly time: number
+  /** The JSON payload as committed. */
+  readonly data: unknown
+}
+```
+
 ## 持久化约定
 
 持久化后端依赖的事实：持久日志无损持久每条事件，**包括** `assistant/chunk`——`seq` 必须保持连续，因此 chunk 不能从规范日志中过滤。后端可以为事件批次选择自己的存储编码，只要 `load` 返回逐字追加以的事件（JSONL 后端默认的打包 chunk 行就是这样一种编码——见 [persistence.md](persistence.zh.md)）。所有 `event.data` 必须可 JSON 序列化；`Session.append` 在源头强制执行（对不可序列化数据抛错），因此坏事件永不进入日志，`session.snapshotEvents()` 始终等于后端可持久的内容。新增携带不可序列化数据、破坏 core 执行嵌套或违反其持有方声明关系的事件类型，是对磁盘格式的破坏性变更。

@@ -84,6 +84,18 @@ kind: "package-reference"
 
 会话事件导入将所有权与消息校验分开处理。`snapshotSessionEvent(event)` 会先克隆借用的事件，再校验并冻结其中带标识的消息。`adoptSessionEvent(event)` 原地执行相同的消息处理并返回原事件；调用方只有在移交独占的对象图，且该对象图没有与其他事件共享可变子对象时，才可以使用此函数。两条路径与 `append` 应用相同的规范化载荷与事件本地 surface 元数据校验；不检查历史关联。
 
+<a id="write-experimental-plugin-records"></a>
+
+### 写入实验性插件记录
+
+`appendPluginRecord(session, type, data)` 为 `packages/experimental/` 下的包追加一条插件记录；`verify-plugin-record-callers` 检查会拒绝本仓库中任何其他生产调用方。仓库外的插件也不得调用它，尽管没有任何仓库检查能触及它们。
+
+在 `PluginRecordMap` 中通过 `@deepseek-ai/dsh-session/types` 声明每条记录，在持有方实验包的 `src/` 中给出描述与显式 payload 类型注解。名称使用 `plugin:<owner>/<record>`，其中 `owner` 是包名 `@deepseek-ai/dsh-experimental-<owner>` 的后缀，例如 `plugin:pi-extensions/entry`。TypeScript 按声明校验名称与 payload；写入方的运行时 JSON 快照拒绝无法无损保留的值。扩展定义或其他动态名称放在已声明记录的 payload 内。
+
+[实验性持久化目录](../../../docs/experimental-persistence-catalog.zh.md)列出当前插件记录声明及其持有方、描述、payload 类型注解与源文件。这些声明与 `SessionEventMap`、展开的持久化 schema、已发布的类型历史以及 `KNOWN_SESSION_EVENT_TYPES` 保持分离。记录携带 `ignorable: true`：不识别它的构建在读取时保留并跳过它。记录永不进入模型可见 surface。恢复与派生随日志其余部分一起携带它们；Session 格式迁移以尽力而为方式保留它们。
+
+`pluginRecordOf(event)` 将事件作为记录返回，其他事件返回 `undefined`；把每条事件传给它的 `ctx.sessionProjections` 单元可在恢复时重建插件状态。即使当前 map 声明了名称，其 `data` 仍是 `unknown`。持有方在使用前校验它，因为早期构建可能写入不同的 payload，格式迁移边也可能把未知 ignorable 事件带进同一个 `plugin:` 命名空间。移除或重命名声明不会丢弃已存记录。[ignorable 事件决策](../../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.zh.md)持有兼容策略。
+
 ### 分片行存储编解码器（`chunk-rows.ts`）
 
 共享的[存储编解码器](src/chunk-rows.ts)在事件序列与紧凑行之间无损转换。它会逐字保留无法识别的事件，并拒绝形态错误的编码行；是否启用打包写入由持久化后端决定。

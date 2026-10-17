@@ -185,6 +185,7 @@
     "verify-mermaid": "tsx scripts/verify-mermaid.ts",
     "verify-module-graph": "tsx scripts/gen-module-graph.ts --check",
     "verify-no-bare-dispatcher": "tsx scripts/verify-no-bare-dispatcher.ts",
+    "verify-plugin-record-callers": "tsx scripts/verify-plugin-record-callers.ts",
     "verify-no-unknown-casts": "tsx scripts/verify-no-unknown-casts.ts",
     "verify-node-next-types": "tsx scripts/verify-node-next-types.ts",
     "verify-npm-install-layout": "tsx scripts/verify-npm-install-layout.ts",

@@ -33,8 +33,11 @@
   en: 20cd567e87e1cb2a
   zh: 3363ef7ade51d214
 /dsh-session/service-sessionstore-ctx-key-sessions/lossless-json-utilities:
-  en: 3d86d574b5c0cc37
-  zh: 42d879f69c079f9e
+  en: b62d0d1407f3b529
+  zh: d350721e3c5fe10a
+/dsh-session/service-sessionstore-ctx-key-sessions/write-experimental-plugin-records:
+  en: 1f1b0cf86e455a80
+  zh: e4b69f106f0ea4ad
 /dsh-session/service-sessionstore-ctx-key-sessions/chunk-row-storage-codec-chunk-rows-ts:
   en: 1cf935768c7ceeac
   zh: c39b5fc377a48aed
