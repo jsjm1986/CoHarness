@@ -109,16 +109,14 @@ export function formatLocalHandoff(projected: ProjectedConversation, chars: numb
   return lines.join('\n')
 }
 
-/** The extraction request's provider/model: last routed request, else the agent's own options. */
+/** The extraction request's provider/model: the routed request header wins, else the agent's own options. */
 function extractionTarget(agent: Agent): { provider: string; model: string } | undefined {
-  const latest = agent.session.requestHeader()?.config
-  if (latest !== undefined && latest.provider.length > 0 && latest.model.length > 0) {
-    return { provider: latest.provider, model: latest.model }
-  }
-  const options = agent.options
-  if (options.provider !== undefined && options.provider.length > 0
-    && options.model !== undefined && options.model.length > 0) {
-    return { provider: options.provider, model: options.model }
+  for (const target of [agent.session.requestHeader()?.config, agent.options]) {
+    const provider = target?.provider
+    const model = target?.model
+    if (provider !== undefined && provider.length > 0 && model !== undefined && model.length > 0) {
+      return { provider, model }
+    }
   }
   return undefined
 }
