@@ -478,6 +478,19 @@
       }
     },
     {
+      "name": "session_handoff",
+      "description": "Read a compact continue-here brief from the end of an authorized session: decisions, files, state, and the next step.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "Target session id. Omit for the current session."
+          }
+        }
+      }
+    },
+    {
       "name": "session_search",
       "description": "Search prior sessions in the caller workspace and return the strongest matching event from each session.",
       "parameters": {

@@ -3895,7 +3895,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tool-session-query`
 
 - `inject`: `tools` · `systemPrompt` · `sessionQuery`
-- `source`: [`packages/session-query/tool-session-query/src/index.ts:31`](../packages/session-query/tool-session-query/src/index.ts)
+- `source`: [`packages/session-query/tool-session-query/src/index.ts:41`](../packages/session-query/tool-session-query/src/index.ts)
 
 ```ts config-catalog
 /** Deployment-owned search count and timeout bounds. */
@@ -3904,6 +3904,14 @@ export interface Config {
   maxSearchResults?: number
   /** Cooperative full-text search deadline in milliseconds. Defaults to 30000. */
   searchTimeoutMs?: number
+  /** Character budget for a handoff briefing's local tail. Defaults to 24000. */
+  handoffChars?: number
+  /** Whether an auxiliary model may compress the surface into a capsule. Defaults to true. */
+  handoffExtraction?: boolean
+  /** Serialized-conversation cap beyond which extraction is skipped. Defaults to 60000. */
+  handoffExtractChars?: number
+  /** Cooperative deadline for one handoff call in milliseconds. Defaults to 120000. */
+  handoffTimeoutMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-session-query -->

@@ -216,6 +216,29 @@ function presentEventSearchCall(args: EventSearchCallArgs): GenericCallView {
   return { card: 'generic', kind: 'search', title: 'Search session events', rawInput: args.query }
 }
 
+function formatSessionHandoff(
+  sessionId: SessionId,
+  title: TitleView,
+  body: string,
+  extracted: boolean,
+): string {
+  return [
+    `Session handoff ${sessionId} — ${workspaceAccess.titleText(title)}`,
+    `Source: ${extracted ? 'model capsule' : 'local tail'}`,
+    '',
+    body === '' ? '(no conversation on the current surface)' : body,
+  ].join('\n')
+}
+
+function presentSessionHandoffCall(args: SessionTargetCallArgs): GenericCallView {
+  return {
+    card: 'generic',
+    kind: 'read',
+    title: args.session_id === undefined ? 'Handoff current session' : `Handoff session ${args.session_id}`,
+    ...args.session_id === undefined ? {} : { rawInput: args.session_id },
+  }
+}
+
 function presentSessionTraceCall(args: SessionTargetCallArgs): GenericCallView {
   return {
     card: 'generic',
@@ -242,6 +265,7 @@ function presentEventTargetCall(
 
 /** Text output and call-card presentation for every session-query tool. */
 export const presentation = {
+  formatSessionHandoff,
   formatSessionSearch,
   formatEmptySessionSearch,
   formatEventSearch,
@@ -250,6 +274,7 @@ export const presentation = {
   formatEventRead,
   presentSessionSearchCall,
   presentEventSearchCall,
+  presentSessionHandoffCall,
   presentSessionTraceCall,
   presentEventTargetCall,
 }

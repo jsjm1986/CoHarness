@@ -57,6 +57,7 @@ const EXPECTED_TOOLS = [
   'session_event_read',
   'session_event_search',
   'session_event_trace',
+  'session_handoff',
   'session_search',
   'session_trace',
   'skill',
