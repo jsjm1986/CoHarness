@@ -59,6 +59,8 @@ import * as ToolGoal from '@deepseek-ai/dsh-tool-goal'
 import * as ToolSchedule from '@deepseek-ai/dsh-schedule'
 import Lsp from '@deepseek-ai/dsh-lsp'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
+import type MemoryService from '@deepseek-ai/dsh-memory'
+import * as ToolMemory from '@deepseek-ai/dsh-tool-memory'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
 import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
@@ -505,6 +507,24 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-memory',
+    dir: 'tool-memory',
+    source: 'packages/memory/tool-memory/src/index.ts',
+    requires: ['ctx.memory', 'ctx.tools', 'ctx.systemPrompt'],
+    writes: ['tool/call', 'tool/result', 'memory/changed'],
+    async mount(ctx) {
+      // Schema harvest reads space/limits/scopesFor only; writes never execute.
+      ctx.provide('memory', {
+        space: 'personal',
+        limits: { entryMaxBytes: 8192, summaryMaxChars: 150, maxEntriesPerScope: 200, searchMaxResults: 10 },
+        scopesFor: () => [{ kind: 'personal' }, { kind: 'workspace', directory: '/repo' }],
+      } as Pick<MemoryService, 'space' | 'limits' | 'scopesFor'> as MemoryService)
+      await ctx.plugin(ToolMemory)
+    },
+    note:
+      'In a project-space runtime (Gateway-managed sessions) the scope parameter is omitted from every schema and each tool addresses the shared project scope; the catalog above shows the personal-space variant shipped by the CLI presets.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',

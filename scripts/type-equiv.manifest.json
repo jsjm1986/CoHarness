@@ -2521,6 +2521,66 @@
       "doc": "docs/subsystems/boot.md",
       "symbol": "PendingModule",
       "source": "packages/boot/hmr/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryScope",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryKind",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryAttribution",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryEntry",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryEntrySummary",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemorySearchHit",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryWriter",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemorySaveRequest",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryDeleteRequest",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryWriteResult",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryRefusalCode",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryInvalidReason",
+      "source": "packages/memory/memory/src/types.ts"
     }
   ]
 }

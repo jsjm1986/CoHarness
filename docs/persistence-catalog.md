@@ -21,7 +21,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `JsonlHeaderLine` | header | `9136dd6271b5aba11b4748a03cb05bdb0cc9b05f17be5af3d87a86406177033c` | [`packages/session/session-persistence-jsonl/src/format.ts#HeaderLine`](#persistence-type-packagessessionsession-persistence-jsonlsrcformattsheaderline) |
 | `SessionEventEnvelope` | envelope | `5776e5553ff2dfe3f5bc202dbb1e7c9f93e35a531aebb7764c23b2b6153b2ccc` | [`SessionEventEnvelope`](#persistence-type-sessioneventenvelope) |
 | `event:agent-preset/selected` | event | `a10c17474eaf2ddab7095a099e0fe3d046fc18e56c3e344fc8894c05ff9ef97b` | [`event:agent-preset/selected`](#persistence-type-eventagent-presetselected) |
-| `event:agent/inbox/spliced` | event | `d3d3ece359c924faaaa00445c170550729b09b83517903dd33991a04d3e5ebdd` | [`event:agent/inbox/spliced`](#persistence-type-eventagentinboxspliced) |
+| `event:agent/inbox/spliced` | event | `f366c1c849a0c13f00be016f35b77765a56876ec79d9da91afbd900ba0f4e00b` | [`event:agent/inbox/spliced`](#persistence-type-eventagentinboxspliced) |
 | `event:approval/asked` | event | `3bfeb47b58606f4661904bc723da612782214c463d01e6d61cd6d6193d7374e1` | [`event:approval/asked`](#persistence-type-eventapprovalasked) |
 | `event:approval/decided` | event | `bb1ab3d08f49a9f3b265f844cd78d5c49813062a7b34b54904b426f85d0ff6e3` | [`event:approval/decided`](#persistence-type-eventapprovaldecided) |
 | `event:approval/policy` | event | `26718e15e7e395bce9642dba5bbe09b3b1a4ce2213d20d566cd9207d7fc5fb78` | [`event:approval/policy`](#persistence-type-eventapprovalpolicy) |
@@ -34,7 +34,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:compaction/start` | event | `db874d463b0fdec77e9da1c4568f37cb70bd6596781eb93800db44fb8a116965` | [`event:compaction/start`](#persistence-type-eventcompactionstart) |
 | `event:compaction/summary` | event | `e2f9a41e0989f54ed8cee80f8db2bcf9d60a5c810dc9d45b83fa050b9dce7602` | [`event:compaction/summary`](#persistence-type-eventcompactionsummary) |
 | `event:deliverables/presented` | event | `13d3d180f977bf78081d487ffa0ecb75857349bcab29a5a3fb48189fca2a6176` | [`event:deliverables/presented`](#persistence-type-eventdeliverablespresented) |
-| `event:developer/message` | event | `9c8372b22163d4db606bc76654a01fff0583456f25ec761ee03cec458fd43913` | [`event:developer/message`](#persistence-type-eventdevelopermessage) |
+| `event:developer/message` | event | `7e65d362e391b74fac891650ef83a8617e34bc4eab2081af6cfdc1e1f4b0d1af` | [`event:developer/message`](#persistence-type-eventdevelopermessage) |
 | `event:feedback/message-delete` | event | `7641b74a731237003b2cff1e72e21ea4b9c1b23e59f1c83a337dab25b2932d2f` | [`event:feedback/message-delete`](#persistence-type-eventfeedbackmessage-delete) |
 | `event:feedback/message-put` | event | `b5086d249e8502e9ead1d39156bb8d559bde7951cac0f14ce150345b4e42a2bf` | [`event:feedback/message-put`](#persistence-type-eventfeedbackmessage-put) |
 | `event:feedback/record` | event | `b54940ff095c17e874c5be03815f4c2145a256cf3a1d34dae4ab2f7769dfffe8` | [`event:feedback/record`](#persistence-type-eventfeedbackrecord) |
@@ -57,7 +57,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:session-log-deepseek/delivery-accepted` | event | `d63b8b8ffad9c02fd80c43a17df4f240c1fe8118ecca9de34f9d5871838ab5b9` | [`event:session-log-deepseek/delivery-accepted`](#persistence-type-eventsession-log-deepseekdelivery-accepted) |
 | `event:session/end-seed` | event | `5e6db6e24948d4a853c71cb9fabd252ad051ce93d4672c1266cf837c1c17b84e` | [`event:session/end-seed`](#persistence-type-eventsessionend-seed) |
 | `event:session/title` | event | `1b912703e2d64f91c99c675b8f805b01076c8325b905c1218ad81ef0b24909d5` | [`event:session/title`](#persistence-type-eventsessiontitle) |
-| `event:session/title-llm-request` | event | `ef6c23a2eaefc0e77b0b298a4a4a64453ffb3bda4ed0d452836caad37e9a8633` | [`event:session/title-llm-request`](#persistence-type-eventsessiontitle-llm-request) |
+| `event:session/title-llm-request` | event | `662cecc47bae19290333afe2dcb7a9c07b7ac61cc7390e8d13ea08c7c35cbcff` | [`event:session/title-llm-request`](#persistence-type-eventsessiontitle-llm-request) |
 | `event:step/end` | event | `e0a787e6ec76c7c94fecbc501b489164ab0293db05bc947914077ad01e674f05` | [`event:step/end`](#persistence-type-eventstepend) |
 | `event:step/start` | event | `4513e088d43e6c68425be30451b9f961cc264fe7318ca62681c41d4d78615986` | [`event:step/start`](#persistence-type-eventstepstart) |
 | `event:subagent/catalog` | event | `ae1f7110feeec697b8cab42b68f7709aa7b3279764099dfb53c25890d2e5c871` | [`event:subagent/catalog`](#persistence-type-eventsubagentcatalog) |
@@ -79,7 +79,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:tool/result` | event | `7c9f44e90a0058f4cc532ae20dad0c10afa6eba22e70a6c79fc79490bad64397` | [`event:tool/result`](#persistence-type-eventtoolresult) |
 | `event:turn/end` | event | `0f8512903d94f57a4748fa1a2092e64342856796684e6b8343db685b192745ce` | [`event:turn/end`](#persistence-type-eventturnend) |
 | `event:turn/start` | event | `aa0957eca50aeb28bcd2e6930b95809926edacb550c8c340ba526ba6b861b3d8` | [`event:turn/start`](#persistence-type-eventturnstart) |
-| `event:user/message` | event | `1ff5d27bf6fa121a02328d9748bafc6a7cfa44f30dd336062ea6468a368a8751` | [`event:user/message`](#persistence-type-eventusermessage) |
+| `event:user/message` | event | `ed58c1350fc91e330ea6613286e93bbc6bbb0cd83239c6e4439c7598287c323a` | [`event:user/message`](#persistence-type-eventusermessage) |
 | `event:userdoc/attached` | event | `4e53f6719003dd537e20c4d02ea7a64c729a8e313536392fbaecf94e19e7de71` | [`event:userdoc/attached`](#persistence-type-eventuserdocattached) |
 | `event:web/deepseek-search-llm-request` | event | `cf6e3aaf1e2de6480aa0157730a41b9a492108a55304100b0f7e112711dd4331` | [`event:web/deepseek-search-llm-request`](#persistence-type-eventwebdeepseek-search-llm-request) |
 | `event:working-directory/change` | event | `124aa62078ca3311353b39cc3bf6c75da281338be6bbf672f8b361d828cddca3` | [`event:working-directory/change`](#persistence-type-eventworking-directorychange) |
@@ -1550,6 +1550,14 @@ SHA-256: `17aae616ef020b8b9f011ec398ec935450fb06d3e2a0722c456f63aeaf5ff728`
 
 `"at"`
 
+<a id="persistence-type-background"></a>
+
+### `"background"`
+
+SHA-256: `23b156095b5d984280b49b961d550b5d192ca828e3cf0ab225a4b894832d8727`
+
+`"background"`
+
 <a id="persistence-type-block"></a>
 
 ### `"block"`
@@ -1900,7 +1908,7 @@ Sources: [`packages/preset/agent-presets/src/session.ts:28`](../packages/preset/
 
 ### `event:agent/inbox/spliced`
 
-SHA-256: `d3d3ece359c924faaaa00445c170550729b09b83517903dd33991a04d3e5ebdd`
+SHA-256: `f366c1c849a0c13f00be016f35b77765a56876ec79d9da91afbd900ba0f4e00b`
 
 | Property | Presence | Type |
 |---|---|---|
@@ -1914,7 +1922,7 @@ SHA-256: `d3d3ece359c924faaaa00445c170550729b09b83517903dd33991a04d3e5ebdd`
 
 ### `event:agent/inbox/spliced.data`
 
-SHA-256: `68d69ac7934fb50df8cc36b566a2b13ac6ff581a64ce5459f5661165f0aafc55`
+SHA-256: `03c90fe75b6c430f6a1ce4ad2b96014a01df92bd7838c2427327c05160afe32a`
 
 Sources: [`packages/core/agent/src/types.ts:87`](../packages/core/agent/src/types.ts)
 
@@ -1930,7 +1938,7 @@ Sources: [`packages/core/agent/src/types.ts:87`](../packages/core/agent/src/type
 
 ### `event:agent/inbox/spliced.data.inserted`
 
-SHA-256: `3b707945d67d85ff02882a10c07ae6c9ed7b3877ae8e0403e0e5db64b417c97f`
+SHA-256: `8502da93ebdd4b1fcb1fc5eff76ec7196298de7023f506060fad0e80c54e9688`
 
 Array of [`packages/llm/llm/src/message.ts#UserMessage`](#persistence-type-packagesllmllmsrcmessagetsusermessage).
 
@@ -1942,9 +1950,9 @@ SHA-256: `b52f215a6cd691058a3413c12f161fa3b563a2f4895adb3df6f744ec4b0a6ef1`
 
 Array of [`packages/llm/llm/src/types.ts#ContentBlock`](#persistence-type-packagesllmllmsrctypestscontentblock).
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemcontentitemvariant-5attachmentoriginaldimensions"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemcontentitemvariant-1attachmentoriginaldimensions"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.content.item.variant-5.attachment.originalDimensions`
+### `event:agent/inbox/spliced.data.inserted.item.content.item.variant-1.attachment.originalDimensions`
 
 SHA-256: `0f46153645c297846a3fad3911636659ca4717a5e7d71c9f50bffacd312115ef`
 
@@ -1955,61 +1963,68 @@ Sources: [`packages/attachment/attachment/src/types.ts:28`](../packages/attachme
 | `height` | required | `number` |
 | `width` | required | `number` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-0"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-0references"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-0`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-0.references`
 
-SHA-256: `a88baeb50f7e9485fbdc6d4dfaf26d04210be3c699bca84b97a0e2abafc9bd25`
+SHA-256: `df843efd87c78cf8de98f8e0d0216956cd568d0d0e56a22c853663e274aa1a18`
 
-Sources: [`packages/interaction/user-questions/src/types.ts:120`](../packages/interaction/user-questions/src/types.ts)
+Array of [`event:agent/inbox/spliced.data.inserted.item.source.variant-0.references.item`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-0referencesitem).
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-0referencesitem"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-0.references.item`
+
+SHA-256: `4f91f187baeabef5c7950c4780d31bbe39f3345dff591a6cf26ac7e135ac1cf4`
+
+Sources: [`packages/context/session-reference/src/types.ts:18`](../packages/context/session-reference/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
-| `callId` | required | `string` |
-| `kind` | required | `"user-question-reply"` |
-| `outcome` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-0.outcome`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-0outcome) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-0outcome"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-0.outcome`
-
-SHA-256: `3e8ed906c20694e13769d14e7f510ea650bc1977d318ad3375eb5e25d75a8dc3`
-
-One of:
-
-- `"answered"`
-- `"dismissed"`
+| `capturedFormatVersion` | optional | `number` |
+| `capturedThroughSeq` | required | [`packages/core/session/src/types.ts#OptionalSessionSeq`](#persistence-type-packagescoresessionsrctypestsoptionalsessionseq) |
+| `compacted` | required | `boolean` |
+| `inputIndex` | required | `number` |
+| `label` | required | `string` |
+| `omittedBytes` | required | `number` |
+| `omittedMessages` | required | `number` |
+| `originalMessages` | required | `number` |
+| `retainedMessages` | required | `number` |
+| `sessionId` | required | `string` |
+| `truncated` | required | `boolean` |
 
 <a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-1"></a>
 
 ### `event:agent/inbox/spliced.data.inserted.item.source.variant-1`
 
-SHA-256: `9f65c43e340bba31cdc0fc37bd93ccb68d5e9b36f47a68c207e95a8e68620a5d`
+SHA-256: `02b2c23f2d94b028c9588a8faace3fce1217405db346da3389368b495457bf79`
+
+Sources: [`packages/extensions/cordis-host-runner/src/index.ts:20`](../packages/extensions/cordis-host-runner/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"tmux-context"` |
+| `kind` | required | `"cordis-host-runner"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-10"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-10`
+
+SHA-256: `b4ec0af39fd52ed971990e42f04e5be3204882e555c409eb330f8238eec21569`
+
+| Property | Presence | Type |
+|---|---|---|
+| `kind` | required | `"hooks-codex"` |
 
 <a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-100"></a>
 
 ### `event:agent/inbox/spliced.data.inserted.item.source.variant-100`
 
-SHA-256: `0203243b72fc867afc81aff5f4cf2167e564ed342534eb612fc92f295cf07789`
+SHA-256: `825ca23416b1ea9d81442afead5cf9229a6fa05842f042135cc3aa9710a6a2d8`
 
 | Property | Presence | Type |
 |---|---|---|
-| `kind` | required | `"runtime-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-101"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-101`
-
-SHA-256: `f29d63336e8266d80dd7baeab219436db86341304f6be1cd0edb36f5134c4a47`
-
-| Property | Presence | Type |
-|---|---|---|
-| `kind` | required | `"schedule"` |
+| `form` | required | `"catalog"` |
+| `kind` | required | `"user-approval"` |
 
 <a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-103"></a>
 
@@ -2055,6 +2070,17 @@ SHA-256: `a2066bd52f61218ba15b758def2641cc6a8bd3d4a594a488ee4c65be356d7e39`
 
 ### `event:agent/inbox/spliced.data.inserted.item.source.variant-107`
 
+SHA-256: `0ed5872ccc7f7cec45789d5121ccdc1ecfd241da369865bfe206a9358efb08f4`
+
+| Property | Presence | Type |
+|---|---|---|
+| `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
+| `kind` | required | `"tool-jobs"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-108"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-108`
+
 SHA-256: `8fcb0b44a575e998665c053643d1ab04c82f39253ebd190ac0c975b78e40b543`
 
 Sources: [`packages/core/tools/src/index.ts:35`](../packages/core/tools/src/index.ts)
@@ -2063,9 +2089,23 @@ Sources: [`packages/core/tools/src/index.ts:35`](../packages/core/tools/src/inde
 |---|---|---|
 | `kind` | required | `"tool-registry"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-109"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-11"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-109`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-11`
+
+SHA-256: `a88baeb50f7e9485fbdc6d4dfaf26d04210be3c699bca84b97a0e2abafc9bd25`
+
+Sources: [`packages/interaction/user-questions/src/types.ts:120`](../packages/interaction/user-questions/src/types.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `callId` | required | `string` |
+| `kind` | required | `"user-question-reply"` |
+| `outcome` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-11.outcome`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-11outcome) |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-110"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-110`
 
 SHA-256: `6292bcbedaa97feaec5b48a03bb8144b581b93309d9d6c905f26da7a6a7a0a4f`
 
@@ -2073,22 +2113,9 @@ SHA-256: `6292bcbedaa97feaec5b48a03bb8144b581b93309d9d6c905f26da7a6a7a0a4f`
 |---|---|---|
 | `kind` | required | `"user-approval"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-11"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-111"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-11`
-
-SHA-256: `2c174fcf7d5a01c6191e4c237b867df6b9593e2922df6f476b6b52c11478f93f`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
-| `kind` | required | `"tool-jobs"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-110"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-110`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-111`
 
 SHA-256: `2235d957bf4b7c6cf959231d480f0ba1f3a6d72d82981493fb6c7c963021d3d5`
 
@@ -2098,106 +2125,9 @@ Sources: [`packages/session/working-directory/src/index.ts:30`](../packages/sess
 |---|---|---|
 | `kind` | required | `"working-directory"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-111"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-111`
-
-SHA-256: `b6f94c17dd9bbd7cd57015198b7c7c88407f0e3b89faab176ca3c11c3d864d3e`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"hooks-codex"` |
-
 <a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-112"></a>
 
 ### `event:agent/inbox/spliced.data.inserted.item.source.variant-112`
-
-SHA-256: `f6605d6c57933aeaaf10911b5fbd6c61e655baa181af7192d3240f49d255b90d`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"model-selection"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-113"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-113`
-
-SHA-256: `408927267422a7b2beb6df354ff7c1406d929a5646554f48adf85eb8372f811c`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"plan-mode"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-114"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-114`
-
-SHA-256: `6f44f32be9bcd9a8bf075c3b575b06c8ed63446386e5b0995c7b73762e68ddae`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"repeat-tool-reminder"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-115"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-115`
-
-SHA-256: `0eeb17e1df89b1ebc2902116fe7145e0d321ef0db26e6bdebc802cb8513a01c1`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"runtime-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-116"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-116`
-
-SHA-256: `1938c8c20f1cba7c82dbedcfa4f14c3ee191cd77ed3314ee1fc676d44cadf3be`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"schedule"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-117"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-117`
-
-SHA-256: `f6afe41e3926f422fe849debe90819fddd739f0f59e20be9c71018b9554a7f09`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"time-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-118changes"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-118.changes`
-
-SHA-256: `2ab12a0e345658f9342816d773fe610f049982bcad82631f43b9205abe43e5ee`
-
-Array of [`packages/context/agent-instructions/src/render.ts#AgentInstructionChange`](#persistence-type-packagescontextagent-instructionssrcrendertsagentinstructionchange).
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-118changesitemaction"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-118.changes.item.action`
-
-SHA-256: `904bf499d98be4a3a5f836fcac533b6c4899569b018071e6604e1d32657d00fd`
-
-One of:
-
-- `"remove"`
-- `"replace"`
-- `"set"`
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-12"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-12`
 
 SHA-256: `d7967f9b3dd300812652b6e0e2ff28add81b17fa0f8590e137c1c5ac60e51346`
 
@@ -2207,9 +2137,9 @@ SHA-256: `d7967f9b3dd300812652b6e0e2ff28add81b17fa0f8590e137c1c5ac60e51346`
 | `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
 | `kind` | required | `"tool-jobs"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-114"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-13`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-114`
 
 SHA-256: `d17429fb588ddbf3d0ee7dae402323b6254e90de7dd720d73110653ecc2d74c3`
 
@@ -2219,9 +2149,9 @@ SHA-256: `d17429fb588ddbf3d0ee7dae402323b6254e90de7dd720d73110653ecc2d74c3`
 | `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
 | `kind` | required | `"tool-jobs"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-14"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-115"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-14`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-115`
 
 SHA-256: `645d4be2a9954efaf02fa0fc170bb6171e73a20b20e4b8f9e11dde5184e2d328`
 
@@ -2231,20 +2161,9 @@ SHA-256: `645d4be2a9954efaf02fa0fc170bb6171e73a20b20e4b8f9e11dde5184e2d328`
 | `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
 | `kind` | required | `"tool-jobs"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-15"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-116"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-15`
-
-SHA-256: `6085488d223aeffdef51d7ae17655fc26ab22ee13cbed82a50e62e2b6fb5b918`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"tool-goal"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-16"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-16`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-116`
 
 SHA-256: `872a312838a4973feda2d1b43841a526aa071b3a48969c5430deea0d75d82175`
 
@@ -2254,20 +2173,20 @@ SHA-256: `872a312838a4973feda2d1b43841a526aa071b3a48969c5430deea0d75d82175`
 | `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
 | `kind` | required | `"tool-jobs"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-18participantscope"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-119participantscope"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-18.participant.scope`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-119.participant.scope`
 
 SHA-256: `de1bc3abfe92a4025b621154d9b64e83c73b8a07db65aec65a8689393deb34b1`
 
 One of:
 
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-18.participant.scope.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-18participantscopevariant-1)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscopevariant-1)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-119.participant.scope.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-119participantscopevariant-1)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope.variant-0`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscopevariant-0)
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-18participantscopevariant-1"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-119participantscopevariant-1"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-18.participant.scope.variant-1`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-119.participant.scope.variant-1`
 
 SHA-256: `27af04d7b3345f7d45a7ac9a217e3e0e5b485c9b23f6b8d0ced24eeeaa442a93`
 
@@ -2277,161 +2196,24 @@ Sources: [`packages/context/collaboration/src/types.ts:26`](../packages/context/
 |---|---|---|
 | `canManage` | optional | `boolean` |
 | `kind` | required | `"project"` |
-| `mode` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope.variant-0.mode`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscopevariant-0mode) |
+| `mode` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope.variant-1.mode`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscopevariant-1mode) |
 | `projectId` | required | `number` |
 | `projectName` | required | `string` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-19references"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-11outcome"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-19.references`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-11.outcome`
 
-SHA-256: `df843efd87c78cf8de98f8e0d0216956cd568d0d0e56a22c853663e274aa1a18`
+SHA-256: `3e8ed906c20694e13769d14e7f510ea650bc1977d318ad3375eb5e25d75a8dc3`
 
-Array of [`event:agent/inbox/spliced.data.inserted.item.source.variant-19.references.item`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-19referencesitem).
+One of:
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-19referencesitem"></a>
+- `"answered"`
+- `"dismissed"`
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-19.references.item`
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13"></a>
 
-SHA-256: `4f91f187baeabef5c7950c4780d31bbe39f3345dff591a6cf26ac7e135ac1cf4`
-
-Sources: [`packages/context/session-reference/src/types.ts:18`](../packages/context/session-reference/src/types.ts)
-
-| Property | Presence | Type |
-|---|---|---|
-| `capturedFormatVersion` | optional | `number` |
-| `capturedThroughSeq` | required | [`packages/core/session/src/types.ts#OptionalSessionSeq`](#persistence-type-packagescoresessionsrctypestsoptionalsessionseq) |
-| `compacted` | required | `boolean` |
-| `inputIndex` | required | `number` |
-| `label` | required | `string` |
-| `omittedBytes` | required | `number` |
-| `omittedMessages` | required | `number` |
-| `originalMessages` | required | `number` |
-| `retainedMessages` | required | `number` |
-| `sessionId` | required | `string` |
-| `truncated` | required | `boolean` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-20"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-20`
-
-SHA-256: `b70f3e81fe11b7a5f2504fb47a4502fb8d9c8f0731fdfe8ddcaf9b41f5a6e196`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"hooks-claude-code"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-21"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-21`
-
-SHA-256: `ba4c40b4381e0dcdfab8fc9fc75b5c9b3e8f09ef56deeb1bec8e703b0ef8cd6d`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"dsh-session-title-llm"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-22"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-22`
-
-SHA-256: `3bdb8dc6989655b0d4ec361edafb8e2629bc263e1ea591819414fdafc1a413b3`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"hooks-claude-code"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-23"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-23`
-
-SHA-256: `88841202942c7683b3b7e5ea6a796047ec326b6701ac23e58cc236d85613b9fa`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"hooks-codex"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-24"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-24`
-
-SHA-256: `52c6113cb0e53f345324bf84f01928bea5d5df57ee80bc0dd65407b8bc5a3734`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"model-selection"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-25"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-25`
-
-SHA-256: `8c1c4f72755a78ea163523a46565316e36e9b644382eb48e6635c71a6f412dd2`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"plan-mode"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-26"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-26`
-
-SHA-256: `db06ef35b27a38425046b2228fa6bce9582abe140d781d363137eb2f4d233a1c`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"repeat-tool-reminder"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-27"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-27`
-
-SHA-256: `aa2bf9e82b9fdeb94a42af20031fffa30e4e23f01f4ac39757427d4c64c407f0`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"user-approval"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-28"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-28`
-
-SHA-256: `2aad1179f957631477b582e57cd8f538cb82618fc3fb816bde1171154235b065`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"runtime-context"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-29"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-29`
-
-SHA-256: `28936c614bd4e7e2774806edcbb3cbfd3ee643ac1cbf0bbdff43d915505a8fe3`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"schedule"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13`
 
 SHA-256: `9d5839ac5cff9ebb3a772051321d8e0706c6d52b3e0f3387b5407ca988fa8d32`
 
@@ -2440,141 +2222,22 @@ Sources: [`packages/host/apiproxy/src/api/sessions.ts:97`](../packages/host/apip
 | Property | Presence | Type |
 |---|---|---|
 | `clientTimeZone` | optional | `string` |
-| `documents` | optional | [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.documents`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3documents) |
+| `documents` | optional | [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.documents`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13documents) |
 | `kind` | required | `"user"` |
 | `participant` | optional | [`packages/host/apiproxy/src/api/sessions.ts#AuthenticatedParticipant`](#persistence-type-packageshostapiproxysrcapisessionstsauthenticatedparticipant) |
 | `rpcId` | required | `string` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-30"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13documents"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-30`
-
-SHA-256: `f230c0b583e23b25ee0a61dbe4c05e95c1e2ae44b27939501eb9e03696f0c278`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"time-context"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-31"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-31`
-
-SHA-256: `49dab019d00e8c26f27ad2ccff7b604d69e323ae4d17e0d2a7b6b8a830b1ade2`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"tmux-context"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-32"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-32`
-
-SHA-256: `a6e5322211a56915923b0ba5651d40c9e04aab9a34a94adef76f63a771b001a5`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"tool-cordis"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-33"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-33`
-
-SHA-256: `11638dc58a31496fb6706ced3e23e3a2db1f3b2a8845968c810827a72b5fc811`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"tool-goal"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-34"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-34`
-
-SHA-256: `5654685d7557ec747e74887237065e626a5bdfa426ca43f7fbb0b6fee9b0916c`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"snapshot"` |
-| `kind` | required | `"user-approval"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-35"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-35`
-
-SHA-256: `8338ee303e2bd448e9e6144069942f63e3cfd5868962bddc9347d7009e8919d6`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"dsh-session-title-llm"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-36"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-36`
-
-SHA-256: `edbbfff1128099fda7b792c56330d2cb04debc9790988e66d1c3f4026e813e0e`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"hooks-claude-code"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-37"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-37`
-
-SHA-256: `854db3efdfb0cd39d30953b28703e519c121f1115cebfffc40369fe86c406dd1`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"hooks-codex"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-38"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-38`
-
-SHA-256: `b2a5c8c008a31e3dc6c3013502f2356aca13894b31c8e70601fa92f2d40d1dba`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"dsh-session-title-llm"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-39"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-39`
-
-SHA-256: `a3c6f1ea38e9a61d7a9706057ba65aabe02dfe6d9dd90d4736aa62325d874531`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"model-selection"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3documents"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3.documents`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13.documents`
 
 SHA-256: `01ecfecb406c406964c21245c86de9ac7ca4f99134fa7911ce8f545ef5be04fc`
 
 Array of [`packages/attachment/userdoc/src/types.ts#UserDocPromptAttachment`](#persistence-type-packagesattachmentuserdocsrctypestsuserdocpromptattachment).
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3documentsitemrepresentationvariant-0"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13documentsitemrepresentationvariant-0"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3.documents.item.representation.variant-0`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13.documents.item.representation.variant-0`
 
 SHA-256: `1e788d9e90f320b51cba113f9dbed35cae28a903fec07a9cd4c52605d2a0c0dd`
 
@@ -2585,9 +2248,9 @@ Sources: [`packages/attachment/userdoc/src/types.ts:415`](../packages/attachment
 | `kind` | required | `"inline"` |
 | `text` | required | `string` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3documentsitemrepresentationvariant-1"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13documentsitemrepresentationvariant-1"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3.documents.item.representation.variant-1`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13.documents.item.representation.variant-1`
 
 SHA-256: `275a4fcdb1adac21ee846fc5b6dcd16c6808a3969c53ca22008c6b076f729dfe`
 
@@ -2597,9 +2260,9 @@ Sources: [`packages/attachment/userdoc/src/types.ts:416`](../packages/attachment
 |---|---|---|
 | `kind` | required | `"path"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantrole"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantrole"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.role`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.role`
 
 SHA-256: `36f8d9ef1c34851845307f0580382c14307b35ecb8fb85fb41b60cfa5a18a67c`
 
@@ -2608,46 +2271,20 @@ One of:
 - `"admin"`
 - `"user"`
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscope"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscope"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope`
 
 SHA-256: `de4d0da9d9b46f42f9c05e72d6a469a83ac00d89aed6d1a1a0311206cd9666ba`
 
 One of:
 
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope.variant-0`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscopevariant-0)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscopevariant-1)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscopevariant-1)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope.variant-0`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscopevariant-0)
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscopevariant-0"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscopevariant-0"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope.variant-0`
-
-SHA-256: `11e15542af87e45e8f0f1e133f03e1e0effb99b719a8c2a1cea677a18325f083`
-
-Sources: [`packages/host/apiproxy/src/api/sessions.ts:29`](../packages/host/apiproxy/src/api/sessions.ts)
-
-| Property | Presence | Type |
-|---|---|---|
-| `kind` | required | `"project"` |
-| `mode` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope.variant-0.mode`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscopevariant-0mode) |
-| `projectId` | required | `number` |
-| `projectName` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscopevariant-0mode"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope.variant-0.mode`
-
-SHA-256: `efb42e4ced4fa4e9deea742f9f29b0f190e7adcf0bca003d53e09196b3d3cae1`
-
-One of:
-
-- `"ro"`
-- `"rw"`
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscopevariant-1"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope.variant-1`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope.variant-0`
 
 SHA-256: `c04ca7d7d5b7733834cbc49bf8c396c7d07dd9ec5f4537e45cefd44f8d2df965`
 
@@ -2657,128 +2294,57 @@ Sources: [`packages/context/collaboration/src/types.ts:25`](../packages/context/
 |---|---|---|
 | `kind` | required | `"personal"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-40"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscopevariant-1"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-40`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope.variant-1`
 
-SHA-256: `baccc97ec34be6c4c78e95aa88c85c29820269479445e5b13f956cd64c5e286f`
+SHA-256: `11e15542af87e45e8f0f1e133f03e1e0effb99b719a8c2a1cea677a18325f083`
+
+Sources: [`packages/host/apiproxy/src/api/sessions.ts:29`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"notice"` |
+| `kind` | required | `"project"` |
+| `mode` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope.variant-1.mode`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscopevariant-1mode) |
+| `projectId` | required | `number` |
+| `projectName` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscopevariant-1mode"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope.variant-1.mode`
+
+SHA-256: `efb42e4ced4fa4e9deea742f9f29b0f190e7adcf0bca003d53e09196b3d3cae1`
+
+One of:
+
+- `"ro"`
+- `"rw"`
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-15"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-15`
+
+SHA-256: `8c1c4f72755a78ea163523a46565316e36e9b644382eb48e6635c71a6f412dd2`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"snapshot"` |
 | `kind` | required | `"plan-mode"` |
-| `summary` | required | `string` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-41"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-16"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-41`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-16`
 
-SHA-256: `fe1a7acdeed4d0f5ab483396eaa5b3dc97263b7c10eb4da2f0028cb01728bfc9`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"repeat-tool-reminder"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-42"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-42`
-
-SHA-256: `cda2345a9be9d139df49ccbd16dcba716f3440178bf20ff8b801fda1f5eb77dc`
+SHA-256: `f7283223aacdc39b0adca728c8cbd4c090a20006a6fecec74421c30e943b489c`
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"runtime-context"` |
-| `summary` | required | `string` |
+| `kind` | required | `"model-selection"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-43"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-17"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-43`
-
-SHA-256: `312aee2f0c42aabbae6cc60d92d596d8453c0aeb061c5868d1755a69ef49e69a`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"schedule"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-44"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-44`
-
-SHA-256: `ee577a0cc18664c9daee50e9455153321155604f8f1817362f8f4a4b6fb9e1ad`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"time-context"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-45"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-45`
-
-SHA-256: `b3681c026a0b98e98b103f057dfd217fbe904129c090efd668253ec9aea7fece`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"tmux-context"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-46"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-46`
-
-SHA-256: `3ab41be964c31024fd4a2acaf5dba7ef6e5f9ae2dfa1698e16a4effe2cda1ece`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"tool-cordis"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-47"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-47`
-
-SHA-256: `8c627d7a45fa406cea879a3922105e27ed4c3c7966e264afaf11ea7a330f2dd1`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"tool-goal"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-48"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-48`
-
-SHA-256: `6ccb6bc423fb3952458abf9c1b1c3284208b7e660344b612cc55da773d61afe4`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"notice"` |
-| `kind` | required | `"user-approval"` |
-| `summary` | required | `string` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-49"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-49`
-
-SHA-256: `87b1a33564b9a4d63b00988a524c12259243953aebb9c9a05127d87b27464df9`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"hooks-claude-code"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-5`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-17`
 
 SHA-256: `9edc162949abf93bd5ff049191b345454ba104f583937ce5580fb50f067d2b94`
 
@@ -2794,358 +2360,41 @@ Sources: [`packages/webhook/webhook/src/types.ts:74`](../packages/webhook/webhoo
 | `source` | required | `string` |
 | `summary` | required | `string` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-50"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-18entries"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-50`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-18.entries`
 
-SHA-256: `3b4f2c9ef2c1217eac596c7b070173cb7896e2fae09e729bc7c56c801e56bb29`
+SHA-256: `53b7a5fcb9e6b5acefb95ec333c87e35ffdee4b7fb2575793e46cbf7fa8390e8`
 
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"hooks-codex"` |
+Array of [`event:agent/inbox/spliced.data.inserted.item.source.variant-18.entries.item`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-18entriesitem).
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-51"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-18entriesitem"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-51`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-18.entries.item`
 
-SHA-256: `aae343bc3d663c83f2e8b5e1c7eea5d509dc7a5361bc8bd8b5ac3bb8d3b1ed56`
+SHA-256: `b8a0f67e1fcd302c74c4bdaf8c12b9e98b2f22441699ddaa14037752027bcdb9`
 
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"model-selection"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-52"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-52`
-
-SHA-256: `f6329fb30c7ea8013e8975ca5e78284fb7685cc6bd620e8aa4e9a99bc81d45eb`
+Sources: [`packages/memory/memory-context/src/index.ts:35`](../packages/memory/memory-context/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"plan-mode"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-53"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-53`
-
-SHA-256: `8620189c8e33582708ece48fd2d20dc4d57912486a17bdbb9aea4c44f7018062`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"repeat-tool-reminder"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-54"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-54`
-
-SHA-256: `96bfb916a727cd4445a594df264c523fc039749a31bfed924b8cc7bb308a5bb0`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"runtime-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-55"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-55`
-
-SHA-256: `a16e567c8cd2c55cf1e911aed3c200c4e1f6febb1459ff2a9e7adf159afb68cb`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"schedule"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-56"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-56`
-
-SHA-256: `756b5e23a5cb2c7f486f366a828f7461c88902af21125bd6810881f4ccbff6cc`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"time-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-57"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-57`
-
-SHA-256: `fcf81d3c58c13593bf2594e342e31734f4ab2d24938dc610875194c6079749c7`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"tmux-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-58"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-58`
-
-SHA-256: `af776091d1ec0b076b3b20946bce950e228ca1a692410d207b8d3c80ddb2a927`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"tool-cordis"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-59"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-59`
-
-SHA-256: `7554565be416b0342053ee6a46256c9dab07c487349b4a5f10bab1edc151c619`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"tool-goal"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-6"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-6`
-
-SHA-256: `7d82e01910244b844eb931a6ca3af13ec30f63c17026dc02555947e23ebaf220`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"instructions"` |
-| `kind` | required | `"tool-cordis"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-60"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-60`
-
-SHA-256: `022623b9ef98ec47ec3c3bae0c51027c70d2601141c5e92e26a0d83d1b4cef06`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"recall"` |
-| `kind` | required | `"user-approval"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-61"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-61`
-
-SHA-256: `7eaef7a763ba5b949b8464bc8add8980a3a5ab566014b69787aeba71e5dfe07b`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"dsh-session-title-llm"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-62"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-62`
-
-SHA-256: `6ea608bdc8a7a63d3d23b84c49721325094db88d136482e43a820945295eee3e`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"hooks-claude-code"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-63"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-63`
-
-SHA-256: `1fdad624334d354820dfb3a26e28d0bc9fc1b62a33f87bab63f715b3f4391bfd`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"hooks-codex"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-64"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-64`
-
-SHA-256: `a15a19ef63cf5d1b711db1d249821dab0cedcd3a9ad09137b47352c93841fd20`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"model-selection"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-65"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-65`
-
-SHA-256: `deaae5cd30987d4f49398e8f9d994c125907e7f928300745fb1dbf15f145d0e7`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"plan-mode"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-66"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-66`
-
-SHA-256: `4991dfc415c9efebc36fa6969e1798c7d2e42396cc1e6e0ac7d7c89c5c5c4aea`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"repeat-tool-reminder"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-67"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-67`
-
-SHA-256: `cb1c8959e1726f82f9a3d2ef2bc90bf8c451a98fd56175e956022124c770c818`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"runtime-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-68"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-68`
-
-SHA-256: `5bc66269cfaf614c0ecda8ecb469f23101a7609793fc2b693ac23c4aecdb575e`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"schedule"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-69"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-69`
-
-SHA-256: `5d7a64ed6aac5551ebf998dc25e1e7b48a144769913f89702840180e61dc3995`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"time-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-70"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-70`
-
-SHA-256: `f97f47b0eb87905ed77cc27c5e4ed75ef805cb372c98905253709de1aab9b63c`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"tmux-context"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-71"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-71`
-
-SHA-256: `0ddadf0cf6bf21d7103c6460908cc92b63b333972f5d692d4db1021871f6a238`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"tool-cordis"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-72"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-72`
-
-SHA-256: `8f324cea3916c0517261e88167def8efb3a9994c1135e23d40ed9fd48f8c7bd4`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"tool-goal"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-73"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-73`
-
-SHA-256: `5cdbf342b7748d152bc987b68f58e565e5bba4b227e076e2d2120d87662e45cd`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"relay"` |
-| `kind` | required | `"user-approval"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-74"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-74`
-
-SHA-256: `80677c8c8b804189a0fde8aa70dd4ad7af8bb12dfd03027e8e023c8592c838bc`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"catalog"` |
-| `kind` | required | `"dsh-session-title-llm"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-75"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-75`
-
-SHA-256: `297fbd8067d7815adae02b89790ec6ff5fb7c2cb0d0eb026e1746c24ec857761`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"catalog"` |
-| `kind` | required | `"hooks-claude-code"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-76"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-76`
-
-SHA-256: `99f0e98184709ad10f27bfdeaafb4457d9d2b413f402331764798cdb7d3cbe4d`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"catalog"` |
-| `kind` | required | `"hooks-codex"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-77"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-77`
-
-SHA-256: `99135d8a3937977955eaac5f8f04f930dcd1562f8450a54a51cde9b921dd59a6`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"catalog"` |
-| `kind` | required | `"model-selection"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-78"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-78`
-
-SHA-256: `3b04790e08b35241ffa0d38f6d7e4f8788aa921341f6c0d7574a329397c59408`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"catalog"` |
-| `kind` | required | `"plan-mode"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-79"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-79`
-
-SHA-256: `d85590a5675c6e2fd8164e5792a6cceac714605b8ac228adae5ee668facb1490`
-
-| Property | Presence | Type |
-|---|---|---|
-| `form` | required | `"catalog"` |
-| `kind` | required | `"repeat-tool-reminder"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-7entries"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-7.entries`
+| `description` | required | `string` |
+| `memoryKind` | required | [`packages/memory/memory/src/types.ts#MemoryKind`](#persistence-type-packagesmemorymemorysrctypestsmemorykind) |
+| `name` | required | `string` |
+| `scope` | required | [`packages/memory/memory/src/types.ts#MemoryScopeKind`](#persistence-type-packagesmemorymemorysrctypestsmemoryscopekind) |
+| `updated` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-19entries"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-19.entries`
 
 SHA-256: `aba175fb20ffc71112c55efe70458ff5d7dbfb83501892b4ba8d077f0ea5d7ba`
 
-Array of [`event:agent/inbox/spliced.data.inserted.item.source.variant-7.entries.item`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-7entriesitem).
+Array of [`event:agent/inbox/spliced.data.inserted.item.source.variant-19.entries.item`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-19entriesitem).
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-7entriesitem"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-19entriesitem"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-7.entries.item`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-19.entries.item`
 
 SHA-256: `83079c8a3f733ac3fa603eefa0fbb4737ca4d8b69e7e2e7298b60f9ac4098693`
 
@@ -3156,9 +2405,21 @@ Sources: [`packages/skill/tool-skill/src/index.ts:41`](../packages/skill/tool-sk
 | `description` | required | `string` |
 | `name` | required | `string` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-8`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-2`
+
+SHA-256: `ba4c40b4381e0dcdfab8fc9fc75b5c9b3e8f09ef56deeb1bec8e703b0ef8cd6d`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"snapshot"` |
+| `kind` | required | `"dsh-session-title-llm"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-20"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-20`
 
 SHA-256: `92b4768e966fddc0b7cdc0b776bd74fd7894a0bba374b20f03be566ae9581943`
 
@@ -3167,88 +2428,303 @@ SHA-256: `92b4768e966fddc0b7cdc0b776bd74fd7894a0bba374b20f03be566ae9581943`
 | `form` | required | `"snapshot"` |
 | `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
 | `kind` | required | `"tool-jobs"` |
-| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections) |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-80"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-21"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-80`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-21`
 
-SHA-256: `58015da1c1950a66daf66ae24913d6a1fc6d1d9ac441b155f8847f7f8584ba8e`
+SHA-256: `db06ef35b27a38425046b2228fa6bce9582abe140d781d363137eb2f4d233a1c`
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"catalog"` |
+| `form` | required | `"snapshot"` |
+| `kind` | required | `"repeat-tool-reminder"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-23"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-23`
+
+SHA-256: `2aad1179f957631477b582e57cd8f538cb82618fc3fb816bde1171154235b065`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"snapshot"` |
 | `kind` | required | `"runtime-context"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-81"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-24"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-81`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-24`
 
-SHA-256: `1e709346005826eb81809eeb76a3f713cf13ad6c5cec75146d07020ab9adc938`
+SHA-256: `28936c614bd4e7e2774806edcbb3cbfd3ee643ac1cbf0bbdff43d915505a8fe3`
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"catalog"` |
+| `form` | required | `"snapshot"` |
 | `kind` | required | `"schedule"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-82"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-25"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-82`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-25`
 
-SHA-256: `85fe96bf15d5c7559eec3bae4d6cf1a76fda9f5be05a29c2830cff560cab0c0d`
+SHA-256: `f230c0b583e23b25ee0a61dbe4c05e95c1e2ae44b27939501eb9e03696f0c278`
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"catalog"` |
+| `form` | required | `"snapshot"` |
 | `kind` | required | `"time-context"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-83"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-26"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-83`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-26`
 
-SHA-256: `7df62978a2b7de8540e714152297743e0a622209a46a5ac9513fc0fad73ca23b`
+SHA-256: `49dab019d00e8c26f27ad2ccff7b604d69e323ae4d17e0d2a7b6b8a830b1ade2`
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"catalog"` |
+| `form` | required | `"snapshot"` |
 | `kind` | required | `"tmux-context"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-84"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-27"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-84`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-27`
 
-SHA-256: `9ce58cdb66082e7bf058031a2de72c6df0f1197727671cf82523403c5517625a`
+SHA-256: `a6e5322211a56915923b0ba5651d40c9e04aab9a34a94adef76f63a771b001a5`
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"catalog"` |
+| `form` | required | `"snapshot"` |
 | `kind` | required | `"tool-cordis"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-85"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-28"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-85`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-28`
 
-SHA-256: `260523b412c19ad8c2bb00093b07f64245ff8ba6b2f76c5b545303772ac9704c`
+SHA-256: `11638dc58a31496fb6706ced3e23e3a2db1f3b2a8845968c810827a72b5fc811`
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"catalog"` |
+| `form` | required | `"snapshot"` |
 | `kind` | required | `"tool-goal"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-86"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-29"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-86`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-29`
 
-SHA-256: `825ca23416b1ea9d81442afead5cf9229a6fa05842f042135cc3aa9710a6a2d8`
+SHA-256: `5654685d7557ec747e74887237065e626a5bdfa426ca43f7fbb0b6fee9b0916c`
 
 | Property | Presence | Type |
 |---|---|---|
-| `form` | required | `"catalog"` |
+| `form` | required | `"snapshot"` |
 | `kind` | required | `"user-approval"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-87"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-87`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`
+
+SHA-256: `c748fb42c80a120038a8c587af80ec39924803c401364db11c8974d5bf6d0262`
+
+Array of [`packages/llm/llm/src/message.ts#ContextSnapshotSection`](#persistence-type-packagesllmllmsrcmessagetscontextsnapshotsection).
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-3`
+
+SHA-256: `290f32bfd81ff85a8095886a8066fae06e885942b63a8bcd6a8d66d328445808`
+
+| Property | Presence | Type |
+|---|---|---|
+| `kind` | required | `"dsh-session-title-llm"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-30"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-30`
+
+SHA-256: `8338ee303e2bd448e9e6144069942f63e3cfd5868962bddc9347d7009e8919d6`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"dsh-session-title-llm"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-31"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-31`
+
+SHA-256: `edbbfff1128099fda7b792c56330d2cb04debc9790988e66d1c3f4026e813e0e`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"hooks-claude-code"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-32"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-32`
+
+SHA-256: `854db3efdfb0cd39d30953b28703e519c121f1115cebfffc40369fe86c406dd1`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"hooks-codex"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-33"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-33`
+
+SHA-256: `a3c6f1ea38e9a61d7a9706057ba65aabe02dfe6d9dd90d4736aa62325d874531`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"model-selection"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-34"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-34`
+
+SHA-256: `baccc97ec34be6c4c78e95aa88c85c29820269479445e5b13f956cd64c5e286f`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"plan-mode"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-35"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-35`
+
+SHA-256: `fe1a7acdeed4d0f5ab483396eaa5b3dc97263b7c10eb4da2f0028cb01728bfc9`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"repeat-tool-reminder"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-36"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-36`
+
+SHA-256: `cda2345a9be9d139df49ccbd16dcba716f3440178bf20ff8b801fda1f5eb77dc`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"runtime-context"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-37"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-37`
+
+SHA-256: `312aee2f0c42aabbae6cc60d92d596d8453c0aeb061c5868d1755a69ef49e69a`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"schedule"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-38"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-38`
+
+SHA-256: `ee577a0cc18664c9daee50e9455153321155604f8f1817362f8f4a4b6fb9e1ad`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"time-context"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-39"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-39`
+
+SHA-256: `b3681c026a0b98e98b103f057dfd217fbe904129c090efd668253ec9aea7fece`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"tmux-context"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-4"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-4`
+
+SHA-256: `3bdb8dc6989655b0d4ec361edafb8e2629bc263e1ea591819414fdafc1a413b3`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"snapshot"` |
+| `kind` | required | `"hooks-claude-code"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-40"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-40`
+
+SHA-256: `f4a66f654996c093aae700ea4c434ff2ee3569fea9c0e5813ccf6afdccabd163`
+
+| Property | Presence | Type |
+|---|---|---|
+| `kind` | required | `"plan-mode"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-41"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-41`
+
+SHA-256: `3ab41be964c31024fd4a2acaf5dba7ef6e5f9ae2dfa1698e16a4effe2cda1ece`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"tool-cordis"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-42"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-42`
+
+SHA-256: `8c627d7a45fa406cea879a3922105e27ed4c3c7966e264afaf11ea7a330f2dd1`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"tool-goal"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-43"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-43`
+
+SHA-256: `6ccb6bc423fb3952458abf9c1b1c3284208b7e660344b612cc55da773d61afe4`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `kind` | required | `"user-approval"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-44"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-44`
 
 SHA-256: `224aa11d4d5f88c450822d01b99e6ca5e3a9c7f26a5ede10bae33384a09ef4dc`
 
@@ -3257,98 +2733,64 @@ SHA-256: `224aa11d4d5f88c450822d01b99e6ca5e3a9c7f26a5ede10bae33384a09ef4dc`
 | `form` | required | `"instructions"` |
 | `kind` | required | `"dsh-session-title-llm"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-89"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-45"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-89`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-45`
 
-SHA-256: `0ed5872ccc7f7cec45789d5121ccdc1ecfd241da369865bfe206a9358efb08f4`
-
-| Property | Presence | Type |
-|---|---|---|
-| `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
-| `kind` | required | `"tool-jobs"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`
-
-SHA-256: `93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2`
-
-Array of `string`.
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8sections"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-8.sections`
-
-SHA-256: `c748fb42c80a120038a8c587af80ec39924803c401364db11c8974d5bf6d0262`
-
-Array of [`packages/llm/llm/src/message.ts#ContextSnapshotSection`](#persistence-type-packagesllmllmsrcmessagetscontextsnapshotsection).
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-92"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-92`
-
-SHA-256: `02b2c23f2d94b028c9588a8faace3fce1217405db346da3389368b495457bf79`
-
-Sources: [`packages/extensions/cordis-host-runner/src/index.ts:20`](../packages/extensions/cordis-host-runner/src/index.ts)
+SHA-256: `b70f3e81fe11b7a5f2504fb47a4502fb8d9c8f0731fdfe8ddcaf9b41f5a6e196`
 
 | Property | Presence | Type |
 |---|---|---|
-| `kind` | required | `"cordis-host-runner"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-93"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-93`
-
-SHA-256: `290f32bfd81ff85a8095886a8066fae06e885942b63a8bcd6a8d66d328445808`
-
-| Property | Presence | Type |
-|---|---|---|
-| `kind` | required | `"dsh-session-title-llm"` |
-
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-94"></a>
-
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-94`
-
-SHA-256: `0ed8d1108fe7a5e1c3078ef1faea12199a56b6b1216ccaceb0f6103b0c9a7691`
-
-| Property | Presence | Type |
-|---|---|---|
+| `form` | required | `"instructions"` |
 | `kind` | required | `"hooks-claude-code"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-95"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-46"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-95`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-46`
 
-SHA-256: `b4ec0af39fd52ed971990e42f04e5be3204882e555c409eb330f8238eec21569`
+SHA-256: `b6f94c17dd9bbd7cd57015198b7c7c88407f0e3b89faab176ca3c11c3d864d3e`
 
 | Property | Presence | Type |
 |---|---|---|
+| `form` | required | `"instructions"` |
 | `kind` | required | `"hooks-codex"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-96"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-47"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-96`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-47`
 
-SHA-256: `f7283223aacdc39b0adca728c8cbd4c090a20006a6fecec74421c30e943b489c`
+SHA-256: `f6605d6c57933aeaaf10911b5fbd6c61e655baa181af7192d3240f49d255b90d`
 
 | Property | Presence | Type |
 |---|---|---|
+| `form` | required | `"instructions"` |
 | `kind` | required | `"model-selection"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-97"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-48"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-97`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-48`
 
-SHA-256: `f4a66f654996c093aae700ea4c434ff2ee3569fea9c0e5813ccf6afdccabd163`
+SHA-256: `408927267422a7b2beb6df354ff7c1406d929a5646554f48adf85eb8372f811c`
 
 | Property | Presence | Type |
 |---|---|---|
+| `form` | required | `"instructions"` |
 | `kind` | required | `"plan-mode"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-98"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-49"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-98`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-49`
+
+SHA-256: `6f44f32be9bcd9a8bf075c3b575b06c8ed63446386e5b0995c7b73762e68ddae`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"instructions"` |
+| `kind` | required | `"repeat-tool-reminder"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-50"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-50`
 
 SHA-256: `dba54c09c6e7aafc9acbed7792ecc920d99f92d0784aeeed10af55f7fe0bc8cd`
 
@@ -3358,15 +2800,605 @@ Sources: [`packages/core/tools/src/ptc.ts:14`](../packages/core/tools/src/ptc.ts
 |---|---|---|
 | `kind` | required | `"ptc-mode"` |
 
-<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-99"></a>
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-51"></a>
 
-### `event:agent/inbox/spliced.data.inserted.item.source.variant-99`
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-51`
+
+SHA-256: `0eeb17e1df89b1ebc2902116fe7145e0d321ef0db26e6bdebc802cb8513a01c1`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"instructions"` |
+| `kind` | required | `"runtime-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-52"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-52`
+
+SHA-256: `1938c8c20f1cba7c82dbedcfa4f14c3ee191cd77ed3314ee1fc676d44cadf3be`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"instructions"` |
+| `kind` | required | `"schedule"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-53"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-53`
+
+SHA-256: `f6afe41e3926f422fe849debe90819fddd739f0f59e20be9c71018b9554a7f09`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"instructions"` |
+| `kind` | required | `"time-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-54"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-54`
+
+SHA-256: `9f65c43e340bba31cdc0fc37bd93ccb68d5e9b36f47a68c207e95a8e68620a5d`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"instructions"` |
+| `kind` | required | `"tmux-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-55"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-55`
+
+SHA-256: `7d82e01910244b844eb931a6ca3af13ec30f63c17026dc02555947e23ebaf220`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"instructions"` |
+| `kind` | required | `"tool-cordis"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-56"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-56`
+
+SHA-256: `6085488d223aeffdef51d7ae17655fc26ab22ee13cbed82a50e62e2b6fb5b918`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"instructions"` |
+| `kind` | required | `"tool-goal"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-57"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-57`
+
+SHA-256: `aa2bf9e82b9fdeb94a42af20031fffa30e4e23f01f4ac39757427d4c64c407f0`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"instructions"` |
+| `kind` | required | `"user-approval"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-58"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-58`
+
+SHA-256: `b2a5c8c008a31e3dc6c3013502f2356aca13894b31c8e70601fa92f2d40d1dba`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"dsh-session-title-llm"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-59"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-59`
+
+SHA-256: `87b1a33564b9a4d63b00988a524c12259243953aebb9c9a05127d87b27464df9`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"hooks-claude-code"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`
+
+SHA-256: `93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2`
+
+Array of `string`.
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-6"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-6`
+
+SHA-256: `88841202942c7683b3b7e5ea6a796047ec326b6701ac23e58cc236d85613b9fa`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"snapshot"` |
+| `kind` | required | `"hooks-codex"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-60"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-60`
 
 SHA-256: `b062078e899958f99ae464514578b8c093924dfe34bd9a835932b420ff2150b1`
 
 | Property | Presence | Type |
 |---|---|---|
 | `kind` | required | `"repeat-tool-reminder"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-61"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-61`
+
+SHA-256: `3b4f2c9ef2c1217eac596c7b070173cb7896e2fae09e729bc7c56c801e56bb29`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"hooks-codex"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-62"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-62`
+
+SHA-256: `aae343bc3d663c83f2e8b5e1c7eea5d509dc7a5361bc8bd8b5ac3bb8d3b1ed56`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"model-selection"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-63"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-63`
+
+SHA-256: `f6329fb30c7ea8013e8975ca5e78284fb7685cc6bd620e8aa4e9a99bc81d45eb`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"plan-mode"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-64"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-64`
+
+SHA-256: `8620189c8e33582708ece48fd2d20dc4d57912486a17bdbb9aea4c44f7018062`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"repeat-tool-reminder"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-65"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-65`
+
+SHA-256: `96bfb916a727cd4445a594df264c523fc039749a31bfed924b8cc7bb308a5bb0`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"runtime-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-66"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-66`
+
+SHA-256: `a16e567c8cd2c55cf1e911aed3c200c4e1f6febb1459ff2a9e7adf159afb68cb`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"schedule"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-67"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-67`
+
+SHA-256: `756b5e23a5cb2c7f486f366a828f7461c88902af21125bd6810881f4ccbff6cc`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"time-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-68"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-68`
+
+SHA-256: `fcf81d3c58c13593bf2594e342e31734f4ab2d24938dc610875194c6079749c7`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"tmux-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-69"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-69`
+
+SHA-256: `af776091d1ec0b076b3b20946bce950e228ca1a692410d207b8d3c80ddb2a927`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"tool-cordis"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-7"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-7`
+
+SHA-256: `0ed8d1108fe7a5e1c3078ef1faea12199a56b6b1216ccaceb0f6103b0c9a7691`
+
+| Property | Presence | Type |
+|---|---|---|
+| `kind` | required | `"hooks-claude-code"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-70"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-70`
+
+SHA-256: `0203243b72fc867afc81aff5f4cf2167e564ed342534eb612fc92f295cf07789`
+
+| Property | Presence | Type |
+|---|---|---|
+| `kind` | required | `"runtime-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-71"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-71`
+
+SHA-256: `7554565be416b0342053ee6a46256c9dab07c487349b4a5f10bab1edc151c619`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"tool-goal"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-72"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-72`
+
+SHA-256: `022623b9ef98ec47ec3c3bae0c51027c70d2601141c5e92e26a0d83d1b4cef06`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"recall"` |
+| `kind` | required | `"user-approval"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-73"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-73`
+
+SHA-256: `7eaef7a763ba5b949b8464bc8add8980a3a5ab566014b69787aeba71e5dfe07b`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"dsh-session-title-llm"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-74"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-74`
+
+SHA-256: `6ea608bdc8a7a63d3d23b84c49721325094db88d136482e43a820945295eee3e`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"hooks-claude-code"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-75"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-75`
+
+SHA-256: `1fdad624334d354820dfb3a26e28d0bc9fc1b62a33f87bab63f715b3f4391bfd`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"hooks-codex"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-76"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-76`
+
+SHA-256: `a15a19ef63cf5d1b711db1d249821dab0cedcd3a9ad09137b47352c93841fd20`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"model-selection"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-77"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-77`
+
+SHA-256: `deaae5cd30987d4f49398e8f9d994c125907e7f928300745fb1dbf15f145d0e7`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"plan-mode"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-78"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-78`
+
+SHA-256: `4991dfc415c9efebc36fa6969e1798c7d2e42396cc1e6e0ac7d7c89c5c5c4aea`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"repeat-tool-reminder"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-79"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-79`
+
+SHA-256: `cb1c8959e1726f82f9a3d2ef2bc90bf8c451a98fd56175e956022124c770c818`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"runtime-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-8`
+
+SHA-256: `52c6113cb0e53f345324bf84f01928bea5d5df57ee80bc0dd65407b8bc5a3734`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"snapshot"` |
+| `kind` | required | `"model-selection"` |
+| `sections` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-2.sections`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2sections) |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-80"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-80`
+
+SHA-256: `5bc66269cfaf614c0ecda8ecb469f23101a7609793fc2b693ac23c4aecdb575e`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"schedule"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-81"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-81`
+
+SHA-256: `f29d63336e8266d80dd7baeab219436db86341304f6be1cd0edb36f5134c4a47`
+
+| Property | Presence | Type |
+|---|---|---|
+| `kind` | required | `"schedule"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-82"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-82`
+
+SHA-256: `5d7a64ed6aac5551ebf998dc25e1e7b48a144769913f89702840180e61dc3995`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"time-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-83"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-83`
+
+SHA-256: `f97f47b0eb87905ed77cc27c5e4ed75ef805cb372c98905253709de1aab9b63c`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"tmux-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-84"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-84`
+
+SHA-256: `0ddadf0cf6bf21d7103c6460908cc92b63b333972f5d692d4db1021871f6a238`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"tool-cordis"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-85"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-85`
+
+SHA-256: `8f324cea3916c0517261e88167def8efb3a9994c1135e23d40ed9fd48f8c7bd4`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"tool-goal"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-86"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-86`
+
+SHA-256: `5cdbf342b7748d152bc987b68f58e565e5bba4b227e076e2d2120d87662e45cd`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"relay"` |
+| `kind` | required | `"user-approval"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-87"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-87`
+
+SHA-256: `80677c8c8b804189a0fde8aa70dd4ad7af8bb12dfd03027e8e023c8592c838bc`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"dsh-session-title-llm"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-88"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-88`
+
+SHA-256: `297fbd8067d7815adae02b89790ec6ff5fb7c2cb0d0eb026e1746c24ec857761`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"hooks-claude-code"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-89"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-89`
+
+SHA-256: `99f0e98184709ad10f27bfdeaafb4457d9d2b413f402331764798cdb7d3cbe4d`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"hooks-codex"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-90"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-90`
+
+SHA-256: `99135d8a3937977955eaac5f8f04f930dcd1562f8450a54a51cde9b921dd59a6`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"model-selection"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-91"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-91`
+
+SHA-256: `2c174fcf7d5a01c6191e4c237b867df6b9593e2922df6f476b6b52c11478f93f`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"notice"` |
+| `gatewayExecutionScope` | optional | [`packages/context/execution-authority/src/types.ts#ExecutionInheritance`](#persistence-type-packagescontextexecution-authoritysrctypestsexecutioninheritance) |
+| `kind` | required | `"tool-jobs"` |
+| `summary` | required | `string` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-92"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-92`
+
+SHA-256: `3b04790e08b35241ffa0d38f6d7e4f8788aa921341f6c0d7574a329397c59408`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"plan-mode"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-93"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-93`
+
+SHA-256: `d85590a5675c6e2fd8164e5792a6cceac714605b8ac228adae5ee668facb1490`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"repeat-tool-reminder"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-94"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-94`
+
+SHA-256: `58015da1c1950a66daf66ae24913d6a1fc6d1d9ac441b155f8847f7f8584ba8e`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"runtime-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-95"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-95`
+
+SHA-256: `1e709346005826eb81809eeb76a3f713cf13ad6c5cec75146d07020ab9adc938`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"schedule"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-96"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-96`
+
+SHA-256: `85fe96bf15d5c7559eec3bae4d6cf1a76fda9f5be05a29c2830cff560cab0c0d`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"time-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-97"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-97`
+
+SHA-256: `7df62978a2b7de8540e714152297743e0a622209a46a5ac9513fc0fad73ca23b`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"tmux-context"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-98"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-98`
+
+SHA-256: `9ce58cdb66082e7bf058031a2de72c6df0f1197727671cf82523403c5517625a`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"tool-cordis"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-99"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-99`
+
+SHA-256: `260523b412c19ad8c2bb00093b07f64245ff8ba6b2f76c5b545303772ac9704c`
+
+| Property | Presence | Type |
+|---|---|---|
+| `form` | required | `"catalog"` |
+| `kind` | required | `"tool-goal"` |
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-9changes"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-9.changes`
+
+SHA-256: `2ab12a0e345658f9342816d773fe610f049982bcad82631f43b9205abe43e5ee`
+
+Array of [`packages/context/agent-instructions/src/render.ts#AgentInstructionChange`](#persistence-type-packagescontextagent-instructionssrcrendertsagentinstructionchange).
+
+<a id="persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-9changesitemaction"></a>
+
+### `event:agent/inbox/spliced.data.inserted.item.source.variant-9.changes.item.action`
+
+SHA-256: `904bf499d98be4a3a5f836fcac533b6c4899569b018071e6604e1d32657d00fd`
+
+One of:
+
+- `"remove"`
+- `"replace"`
+- `"set"`
 
 <a id="persistence-type-eventapprovalasked"></a>
 
@@ -3497,7 +3529,7 @@ Sources: [`packages/llm/llm/src/assistant-stream.ts:35`](../packages/llm/llm/src
 
 | Property | Presence | Type |
 |---|---|---|
-| `args` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `args` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 | `dt` | required | [`SessionEventEnvelope.variant-0.sourceEventSeqs`](#persistence-type-sessioneventenvelopevariant-0sourceeventseqs) |
 | `id` | required | `string` |
 | `index` | required | `number` |
@@ -3701,7 +3733,7 @@ Sources: [`packages/llm/llm/src/assistant-stream.ts:28`](../packages/llm/llm/src
 |---|---|---|
 | `dt` | required | [`SessionEventEnvelope.variant-0.sourceEventSeqs`](#persistence-type-sessioneventenvelopevariant-0sourceeventseqs) |
 | `index` | required | `number` |
-| `texts` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `texts` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 | `time0` | required | `number` |
 | `type` | required | `"reasoning-chunks"` |
 
@@ -3717,7 +3749,7 @@ Sources: [`packages/llm/llm/src/assistant-stream.ts:21`](../packages/llm/llm/src
 |---|---|---|
 | `dt` | required | [`SessionEventEnvelope.variant-0.sourceEventSeqs`](#persistence-type-sessioneventenvelopevariant-0sourceeventseqs) |
 | `index` | required | `number` |
-| `texts` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `texts` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 | `time0` | required | `number` |
 | `type` | required | `"text-chunks"` |
 
@@ -4026,7 +4058,7 @@ Array of [`packages/deliverables/tool-present/src/types.ts#PresentedFile`](#pers
 
 ### `event:developer/message`
 
-SHA-256: `9c8372b22163d4db606bc76654a01fff0583456f25ec761ee03cec458fd43913`
+SHA-256: `7e65d362e391b74fac891650ef83a8617e34bc4eab2081af6cfdc1e1f4b0d1af`
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4042,7 +4074,7 @@ SHA-256: `9c8372b22163d4db606bc76654a01fff0583456f25ec761ee03cec458fd43913`
 
 ### `event:developer/message.data`
 
-SHA-256: `6ac7712a8a6c227e0e59db1844da723f5d53a0d89837e6ab9254f7d65e2afa8d`
+SHA-256: `6af62601403c63ff843bf5f185b3758fbd940eaa15bd4e1f544bc204668fd999`
 
 Sources: [`packages/core/session/src/types.ts:359`](../packages/core/session/src/types.ts)
 
@@ -4697,7 +4729,7 @@ SHA-256: `1b912703e2d64f91c99c675b8f805b01076c8325b905c1218ad81ef0b24909d5`
 
 ### `event:session/title-llm-request`
 
-SHA-256: `ef6c23a2eaefc0e77b0b298a4a4a64453ffb3bda4ed0d452836caad37e9a8633`
+SHA-256: `662cecc47bae19290333afe2dcb7a9c07b7ac61cc7390e8d13ea08c7c35cbcff`
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4711,7 +4743,7 @@ SHA-256: `ef6c23a2eaefc0e77b0b298a4a4a64453ffb3bda4ed0d452836caad37e9a8633`
 
 ### `event:session/title-llm-request.data.messages`
 
-SHA-256: `929773436d5242b4731a437c4f5702ea0eb958ed8b0ad06275307dfc7a362dc1`
+SHA-256: `f518bca961ece6024b84ccf67b5130e2fa76c3e895ae41e0d655994995f424c5`
 
 Array of [`packages/llm/llm/src/message.ts#Message`](#persistence-type-packagesllmllmsrcmessagetsmessage).
 
@@ -5457,7 +5489,7 @@ SHA-256: `4e53f6719003dd537e20c4d02ea7a64c729a8e313536392fbaecf94e19e7de71`
 
 ### `event:user/message`
 
-SHA-256: `1ff5d27bf6fa121a02328d9748bafc6a7cfa44f30dd336062ea6468a368a8751`
+SHA-256: `ed58c1350fc91e330ea6613286e93bbc6bbb0cd83239c6e4439c7598287c323a`
 
 | Property | Presence | Type |
 |---|---|---|
@@ -5746,6 +5778,14 @@ SHA-256: `237c004c73b6b288246816e0d7fde16e09c63a47aa3b1227383d7afe58666163`
 
 `"goal/change"`
 
+<a id="persistence-type-guidance"></a>
+
+### `"guidance"`
+
+SHA-256: `425f81853b677220e91dff16bdf65ed9e74494d13fc511a378428301edb2d438`
+
+`"guidance"`
+
 <a id="persistence-type-hook"></a>
 
 ### `"hook"`
@@ -5940,6 +5980,14 @@ SHA-256: `68141cbe3994a5ffcd064c07c75996538437fd9dbf77ce8a2927e89ec577fabe`
 
 `"max-tokens"`
 
+<a id="persistence-type-memory-catalog"></a>
+
+### `"memory-catalog"`
+
+SHA-256: `923a6b1b42a993e1a5498460f235f18f520f938524f63c8d17f2b9731075dbf9`
+
+`"memory-catalog"`
+
 <a id="persistence-type-model"></a>
 
 ### `"model"`
@@ -6083,7 +6131,7 @@ Sources: [`packages/attachment/attachment/src/types.ts:11`](../packages/attachme
 | `height` | required | `number` |
 | `mediaType` | required | [`packages/attachment/attachment/src/types.ts#ImageMediaType`](#persistence-type-packagesattachmentattachmentsrctypestsimagemediatype) |
 | `name` | optional | `string` |
-| `originalDimensions` | optional | [`event:agent/inbox/spliced.data.inserted.item.content.item.variant-5.attachment.originalDimensions`](#persistence-type-eventagentinboxspliceddatainserteditemcontentitemvariant-5attachmentoriginaldimensions) |
+| `originalDimensions` | optional | [`event:agent/inbox/spliced.data.inserted.item.content.item.variant-1.attachment.originalDimensions`](#persistence-type-eventagentinboxspliceddatainserteditemcontentitemvariant-1attachmentoriginaldimensions) |
 | `width` | required | `number` |
 
 <a id="persistence-type-packagesattachmentattachmentsrctypestsimagemediatype"></a>
@@ -6124,8 +6172,8 @@ Sources: [`packages/attachment/userdoc/src/types.ts:414`](../packages/attachment
 
 One of:
 
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.documents.item.representation.variant-0`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3documentsitemrepresentationvariant-0)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.documents.item.representation.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3documentsitemrepresentationvariant-1)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.documents.item.representation.variant-0`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13documentsitemrepresentationvariant-0)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.documents.item.representation.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13documentsitemrepresentationvariant-1)
 
 <a id="persistence-type-packagesattachmentuserdocsrctypestsuserdocref"></a>
 
@@ -6181,7 +6229,7 @@ Sources: [`packages/context/agent-instructions/src/render.ts:47`](../packages/co
 
 | Property | Presence | Type |
 |---|---|---|
-| `action` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-118.changes.item.action`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-118changesitemaction) |
+| `action` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-9.changes.item.action`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-9changesitemaction) |
 | `digest` | optional | `string` |
 | `path` | required | `string` |
 | `scope` | required | `string` |
@@ -6198,7 +6246,7 @@ Sources: [`packages/context/agent-instructions/src/state.ts:38`](../packages/con
 |---|---|---|
 | `baseline` | optional | `true` |
 | `baselineIdentity` | optional | `string` |
-| `changes` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-118.changes`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-118changes) |
+| `changes` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-9.changes`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-9changes) |
 | `form` | required | `"instructions"` |
 | `kind` | required | `"agent-instructions"` |
 
@@ -6229,8 +6277,8 @@ Sources: [`packages/context/collaboration/src/types.ts:19`](../packages/context/
 | Property | Presence | Type |
 |---|---|---|
 | `displayName` | required | `string` |
-| `role` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.role`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantrole) |
-| `scope` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-18.participant.scope`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-18participantscope) |
+| `role` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.role`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantrole) |
+| `scope` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-119.participant.scope`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-119participantscope) |
 | `userId` | required | `number` |
 | `username` | required | `string` |
 
@@ -6257,7 +6305,7 @@ Sources: [`packages/context/execution-authority/src/types.ts:33`](../packages/co
 
 | Property | Presence | Type |
 |---|---|---|
-| `inputs` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `inputs` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 | `parentSessionId` | required | `string` |
 | `primaryActorUserId` | optional | `number` |
 | `scopeId` | optional | `string` |
@@ -6274,7 +6322,7 @@ Sources: [`packages/context/execution-authority/src/types.ts:23`](../packages/co
 | Property | Presence | Type |
 |---|---|---|
 | `actors` | required | [`event:gateway/execution.data.variant-1.state.actors`](#persistence-type-eventgatewayexecutiondatavariant-1stateactors) |
-| `inputs` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `inputs` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 | `primaryActorUserId` | optional | `number` |
 | `revision` | required | `string` |
 | `scopeId` | optional | `string` |
@@ -6292,7 +6340,7 @@ Sources: [`packages/context/session-reference/src/types.ts:13`](../packages/cont
 |---|---|---|
 | `form` | required | `"recall"` |
 | `kind` | required | `"session-reference"` |
-| `references` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-19.references`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-19references) |
+| `references` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-0.references`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-0references) |
 | `version` | required | `1` |
 
 <a id="persistence-type-packagescontextuserdoc-contextsrcindextsuserdocattachedeventdata"></a>
@@ -6491,8 +6539,8 @@ Sources: [`packages/core/tools/src/index.ts:703`](../packages/core/tools/src/ind
 
 | Property | Presence | Type |
 |---|---|---|
-| `allow` | optional | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
-| `deny` | optional | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `allow` | optional | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
+| `deny` | optional | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 
 <a id="persistence-type-packagescoretoolssrctypestsptcdispatcheventdata"></a>
 
@@ -6620,14 +6668,14 @@ Sources: [`packages/experimental/agent-team/src/types.ts:87`](../packages/experi
 
 | Property | Presence | Type |
 |---|---|---|
-| `blockedBy` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `blockedBy` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 | `description` | required | `string` |
 | `id` | required | `string` |
 | `ownerId` | optional | `string` |
 | `revision` | required | `number` |
 | `status` | required | [`packages/experimental/agent-team/src/types.ts#TeamTaskStatus`](#persistence-type-packagesexperimentalagent-teamsrctypeststeamtaskstatus) |
 | `subject` | required | `string` |
-| `writeScopes` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `writeScopes` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 
 <a id="persistence-type-packagesexperimentalagent-teamsrctypeststeamtaskstatus"></a>
 
@@ -6832,8 +6880,8 @@ Sources: [`packages/host/apiproxy/src/api/sessions.ts:22`](../packages/host/apip
 | Property | Presence | Type |
 |---|---|---|
 | `displayName` | required | `string` |
-| `role` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.role`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantrole) |
-| `scope` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-3.participant.scope`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3participantscope) |
+| `role` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.role`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantrole) |
+| `scope` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-13.participant.scope`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13participantscope) |
 | `userId` | required | `number` |
 | `username` | required | `string` |
 
@@ -6948,7 +6996,7 @@ Sources: [`packages/llm/llm/src/call-config.ts:23`](../packages/llm/llm/src/call
 | `model` | required | `string` |
 | `provider` | required | `string` |
 | `reasoningEffort` | optional | `string` |
-| `stop` | optional | [`event:agent/inbox/spliced.data.inserted.item.source.variant-8.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8gatewayexecutionscopeinputs) |
+| `stop` | optional | [`event:agent/inbox/spliced.data.inserted.item.source.variant-5.gatewayExecutionScope.inputs`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5gatewayexecutionscopeinputs) |
 | `temperature` | optional | `number` |
 
 <a id="persistence-type-packagesllmllmsrccall-configtsllmcallconfigadapterdefaults"></a>
@@ -6996,7 +7044,7 @@ Sources: [`packages/llm/llm/src/message.ts:70`](../packages/llm/llm/src/message.
 
 ### `packages/llm/llm/src/message.ts#DeveloperMessage`
 
-SHA-256: `280d6867251733a9e16eb12d404c7c558fec85ce34991868ec4947a6d09880fd`
+SHA-256: `bf6bcce547f51e224581154c1b39186b13147cf5284809fd952796320d2f3de3`
 
 Sources: [`packages/llm/llm/src/message.ts:157`](../packages/llm/llm/src/message.ts)
 
@@ -7011,7 +7059,7 @@ Sources: [`packages/llm/llm/src/message.ts:157`](../packages/llm/llm/src/message
 
 ### `packages/llm/llm/src/message.ts#Message`
 
-SHA-256: `843ca93b0adc880e3ae267fc7d866c502b98f96fb5f0afe9ba33247cda1b07a5`
+SHA-256: `48353a5d620ac2aae2613cdfdd4951bdf687101c30546ad5b457ed9ec78058ae`
 
 Sources: [`packages/llm/llm/src/message.ts:196`](../packages/llm/llm/src/message.ts)
 
@@ -7020,138 +7068,139 @@ One of:
 - [`packages/llm/llm/src/message.ts#ToolResultMessage`](#persistence-type-packagesllmllmsrcmessagetstoolresultmessage)
 - [`packages/llm/llm/src/message.ts#DeveloperMessage`](#persistence-type-packagesllmllmsrcmessagetsdevelopermessage)
 - [`packages/llm/llm/src/message.ts#UserMessage`](#persistence-type-packagesllmllmsrcmessagetsusermessage)
-- [`packages/llm/llm/src/message.ts#SystemMessage`](#persistence-type-packagesllmllmsrcmessagetssystemmessage)
 - [`packages/llm/llm/src/message.ts#AssistantMessage`](#persistence-type-packagesllmllmsrcmessagetsassistantmessage)
+- [`packages/llm/llm/src/message.ts#SystemMessage`](#persistence-type-packagesllmllmsrcmessagetssystemmessage)
 
 <a id="persistence-type-packagesllmllmsrcmessagetsmessagesource"></a>
 
 ### `packages/llm/llm/src/message.ts#MessageSource`
 
-SHA-256: `0e38bbfe77d22e1a6daeb9885defcfded30a25b480c7da6c594efa5569cf5a00`
+SHA-256: `1f0356e08cfda5dd89714918b8faba8b8ac9a7ee00cc4b15a31883a2ec1bb2a0`
 
 Sources: [`packages/llm/llm/src/message.ts:136`](../packages/llm/llm/src/message.ts)
 
 One of:
 
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-48`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-48)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-87`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-87)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-20`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-20)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-111`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-111)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-112`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-112)
-- [`packages/context/agent-instructions/src/state.ts#AgentInstructionSource`](#persistence-type-packagescontextagent-instructionssrcstatetsagentinstructionsource)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-113`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-113)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-0`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-0)
-- [`packages/llm/llm/src/message.ts#ToolMessageSource`](#persistence-type-packagesllmllmsrcmessagetstoolmessagesource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-6`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-6)
+- [`packages/llm/llm/src/message.ts#ModelMessageSource`](#persistence-type-packagesllmllmsrcmessagetsmodelmessagesource)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-3`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-3)
-- [`packages/compaction/compaction/src/checkpoint.ts#CompactionCheckpointSource`](#persistence-type-packagescompactioncompactionsrccheckpointtscompactioncheckpointsource)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-5`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-5)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-114`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-114)
-- [`packages/skill/tool-skill/src/index.ts#SkillCatalogSource`](#persistence-type-packagesskilltool-skillsrcindextsskillcatalogsource)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-8`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8)
-- [`packages/subagent/subagent/src/continuation-messages.ts#SubagentSettledMessageSource`](#persistence-type-packagessubagentsubagentsrccontinuation-messagestssubagentsettledmessagesource)
-- [`packages/subagent/subagent/src/continuation-messages.ts#AgentMessageSource`](#persistence-type-packagessubagentsubagentsrccontinuation-messagestsagentmessagesource)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-11`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-11)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-115`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-115)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-12`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-12)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-13`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-14`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-14)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-7`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-7)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-10`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-10)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-16`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-16)
-- [`packages/skill/skill/src/index.ts#SkillInvocationSource`](#persistence-type-packagesskillskillsrcindextsskillinvocationsource)
-- [`packages/context/collaboration-context/src/index.ts#CollaborationNoticeSource`](#persistence-type-packagescontextcollaboration-contextsrcindextscollaborationnoticesource)
-- [`packages/context/session-reference/src/types.ts#SessionReferenceSource`](#persistence-type-packagescontextsession-referencesrctypestssessionreferencesource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-40`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-40)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-8`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-8)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-50`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-50)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-60`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-60)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-70`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-70)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-81`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-81)
+- [`packages/llm/llm/src/message.ts#SystemPromptMessageSource`](#persistence-type-packagesllmllmsrcmessagetssystempromptmessagesource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-103`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-103)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-104`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-104)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-105`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-105)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-15`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-15)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-106`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-106)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-108`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-108)
+- [`packages/interaction/commands/src/types.ts#CommandSource`](#persistence-type-packagesinteractioncommandssrctypestscommandsource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-110`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-110)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-111`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-111)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-1)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-21`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-21)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-22`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-22)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-116`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-116)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-23`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-23)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-24`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-24)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-25`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-25)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-26`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-26)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-27`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-27)
+- [`packages/context/agent-instructions/src/state.ts#AgentInstructionSource`](#persistence-type-packagescontextagent-instructionssrcstatetsagentinstructionsource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-11`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-11)
+- [`packages/llm/llm/src/message.ts#ToolMessageSource`](#persistence-type-packagesllmllmsrcmessagetstoolmessagesource)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-28`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-28)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-13`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-13)
+- [`packages/compaction/compaction/src/checkpoint.ts#CompactionCheckpointSource`](#persistence-type-packagescompactioncompactionsrccheckpointtscompactioncheckpointsource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-17`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-17)
+- [`packages/memory/memory-context/src/index.ts#MemoryCatalogSource`](#persistence-type-packagesmemorymemory-contextsrcindextsmemorycatalogsource)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-29`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-29)
+- [`packages/skill/tool-skill/src/index.ts#SkillCatalogSource`](#persistence-type-packagesskilltool-skillsrcindextsskillcatalogsource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-20`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-20)
+- [`packages/subagent/subagent/src/continuation-messages.ts#SubagentSettledMessageSource`](#persistence-type-packagessubagentsubagentsrccontinuation-messagestssubagentsettledmessagesource)
+- [`packages/subagent/subagent/src/continuation-messages.ts#AgentMessageSource`](#persistence-type-packagessubagentsubagentsrccontinuation-messagestsagentmessagesource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-91`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-91)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-112`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-112)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-114`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-114)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-30`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-30)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-31`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-31)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-32`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-32)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-117`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-117)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-33`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-33)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-34`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-34)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-35`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-35)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-36`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-36)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-115`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-115)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-37`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-37)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-39`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-39)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-40`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-40)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-1`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-1)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-6`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-6)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-15`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-15)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-27`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-27)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-38`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-38)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-49`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-49)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-50`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-50)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-51`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-51)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-39`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-39)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-41`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-41)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-42`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-42)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-43`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-43)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-44`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-44)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-45`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-45)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-46`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-46)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-116`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-116)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-47`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-47)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-48`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-48)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-49`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-49)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-51`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-51)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-52`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-52)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-53`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-53)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-54`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-54)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-55`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-55)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-56`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-56)
+- [`packages/skill/skill/src/index.ts#SkillInvocationSource`](#persistence-type-packagesskillskillsrcindextsskillinvocationsource)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-57`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-57)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-58`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-58)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-59`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-59)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-60`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-60)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-42`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-42)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-61`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-61)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-62`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-62)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-63`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-63)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-64`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-64)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-65`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-65)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-66`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-66)
+- [`packages/context/collaboration-context/src/index.ts#CollaborationNoticeSource`](#persistence-type-packagescontextcollaboration-contextsrcindextscollaborationnoticesource)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-67`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-67)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-68`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-68)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-69`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-69)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-43`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-43)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-70`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-70)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-71`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-71)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-72`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-72)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-73`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-73)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-74`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-74)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-75`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-75)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-76`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-76)
+- [`packages/context/session-reference/src/types.ts#SessionReferenceSource`](#persistence-type-packagescontextsession-referencesrctypestssessionreferencesource)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-77`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-77)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-78`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-78)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-44`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-44)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-79`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-79)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-80`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-80)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-81`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-81)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-82`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-82)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-83`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-83)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-84`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-84)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-85`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-85)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-86`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-86)
-- [`packages/experimental/agent-team/src/types.ts#TeamMessageSource`](#persistence-type-packagesexperimentalagent-teamsrctypeststeammessagesource)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-45`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-45)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-2`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-2)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-87`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-87)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-88`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-88)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-89`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-89)
-- [`packages/goal/goal/src/domain.ts#GoalMessageSource`](#persistence-type-packagesgoalgoalsrcdomaintsgoalmessagesource)
-- [`packages/llm/llm/src/message.ts#ModelMessageSource`](#persistence-type-packagesllmllmsrcmessagetsmodelmessagesource)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-90`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-90)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-92`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-92)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-93`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-93)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-94`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-94)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-46`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-46)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-95`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-95)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-96`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-96)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-97`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-97)
+- [`event:agent/inbox/spliced.data.inserted.item.source.variant-4`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-4)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-98`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-98)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-99`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-99)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-100`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-100)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-101`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-101)
-- [`packages/llm/llm/src/message.ts#SystemPromptMessageSource`](#persistence-type-packagesllmllmsrcmessagetssystempromptmessagesource)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-47`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-47)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-103`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-103)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-104`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-104)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-105`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-105)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-106`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-106)
+- [`packages/experimental/agent-team/src/types.ts#TeamMessageSource`](#persistence-type-packagesexperimentalagent-teamsrctypeststeammessagesource)
 - [`event:agent/inbox/spliced.data.inserted.item.source.variant-107`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-107)
-- [`packages/interaction/commands/src/types.ts#CommandSource`](#persistence-type-packagesinteractioncommandssrctypestscommandsource)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-109`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-109)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-110`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-110)
-- [`event:agent/inbox/spliced.data.inserted.item.source.variant-92`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-92)
+- [`packages/goal/goal/src/domain.ts#GoalMessageSource`](#persistence-type-packagesgoalgoalsrcdomaintsgoalmessagesource)
 
 <a id="persistence-type-packagesllmllmsrcmessagetsmodelmessagesource"></a>
 
@@ -7229,7 +7278,7 @@ Sources: [`packages/llm/llm/src/message.ts:173`](../packages/llm/llm/src/message
 
 ### `packages/llm/llm/src/message.ts#UserMessage`
 
-SHA-256: `9fa1e72d9ea673e9dc1d465cc32213be2720fb6510477fb9eb2f8b10440947ed`
+SHA-256: `e33e2ccf18b1cb9847c5d4dbfe87e5ff407c203492dad73f4bf3818b15b35ec3`
 
 Sources: [`packages/llm/llm/src/message.ts:162`](../packages/llm/llm/src/message.ts)
 
@@ -7467,6 +7516,51 @@ Sources: [`packages/llm/llm/src/types.ts:485`](../packages/llm/llm/src/types.ts)
 | `name` | required | `string` |
 | `parameters` | required | [`event:request/header.data.header.tools.item.parameters`](#persistence-type-eventrequestheaderdataheadertoolsitemparameters) |
 
+<a id="persistence-type-packagesmemorymemory-contextsrcindextsmemorycatalogsource"></a>
+
+### `packages/memory/memory-context/src/index.ts#MemoryCatalogSource`
+
+SHA-256: `db7040128684f54c7c6cb2bd529e623f49f345d07786017a8f9bb5cbe253f422`
+
+Sources: [`packages/memory/memory-context/src/index.ts:29`](../packages/memory/memory-context/src/index.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `entries` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-18.entries`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-18entries) |
+| `form` | required | `"catalog"` |
+| `kind` | required | `"memory-catalog"` |
+| `omitted` | optional | `number` |
+| `update` | optional | `true` |
+
+<a id="persistence-type-packagesmemorymemorysrctypestsmemorykind"></a>
+
+### `packages/memory/memory/src/types.ts#MemoryKind`
+
+SHA-256: `2e33b9307a72edc572a8eb86ae9720c7c2e2c415e61830cca1faa39e8fab354e`
+
+Sources: [`packages/memory/memory/src/types.ts:37`](../packages/memory/memory/src/types.ts)
+
+One of:
+
+- `"background"`
+- `"guidance"`
+- `"profile"`
+- `"resource"`
+
+<a id="persistence-type-packagesmemorymemorysrctypestsmemoryscopekind"></a>
+
+### `packages/memory/memory/src/types.ts#MemoryScopeKind`
+
+SHA-256: `d21a48b908a626ca2315cd5c391ffc047e1fac90f5954e3e3b6a0d73cfe98980`
+
+Sources: [`packages/memory/memory/src/types.ts:16`](../packages/memory/memory/src/types.ts)
+
+One of:
+
+- `"personal"`
+- `"project"`
+- `"workspace"`
+
 <a id="persistence-type-packagessandboxsandboxsrcindextssandboxmode"></a>
 
 ### `packages/sandbox/sandbox/src/index.ts#SandboxMode`
@@ -7644,7 +7738,7 @@ Sources: [`packages/session/session-persistence-jsonl/src/format.ts:83`](../pack
 
 ### `packages/session/session-title-llm/src/index.ts#SessionTitleLlmRequestEventData`
 
-SHA-256: `50aa31f0c0f28323f1a6df081c7f4c2e6063df70c26b9405f3f0492472673170`
+SHA-256: `313e196968c389b96f246655d001b83b447ea30c2ed0b8457e3b0fd2005e09ff`
 
 Sources: [`packages/session/session-title-llm/src/index.ts:32`](../packages/session/session-title-llm/src/index.ts)
 
@@ -7722,7 +7816,7 @@ Sources: [`packages/skill/tool-skill/src/index.ts:35`](../packages/skill/tool-sk
 
 | Property | Presence | Type |
 |---|---|---|
-| `entries` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-7.entries`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-7entries) |
+| `entries` | required | [`event:agent/inbox/spliced.data.inserted.item.source.variant-19.entries`](#persistence-type-eventagentinboxspliceddatainserteditemsourcevariant-19entries) |
 | `form` | required | `"catalog"` |
 | `kind` | required | `"skill-catalog"` |
 | `update` | optional | `true` |
@@ -8005,6 +8099,14 @@ SHA-256: `0341d4c3dfcd53253cdc1e789d9130d3cd848b6f8b0706bf92f313a68b39ff23`
 
 `"product-interaction"`
 
+<a id="persistence-type-profile"></a>
+
+### `"profile"`
+
+SHA-256: `1526cddd746aecb3d0d37eef5c792e80b9813b118e91a8bfc4bfdcb5d01af659`
+
+`"profile"`
+
 <a id="persistence-type-project"></a>
 
 ### `"project"`
@@ -8140,6 +8242,14 @@ SHA-256: `70b082fe78991edf13cf66e1b4d06cd2dcff9cacfd76f8cfb996bfb61939e7b2`
 SHA-256: `3e0eff5946255ff05d88a10839c60305135801f97794ea48d409f8503303317e`
 
 `"request/header"`
+
+<a id="persistence-type-resource"></a>
+
+### `"resource"`
+
+SHA-256: `177e45413584b60f87982cebb99c72a699eb874254c0b85b67f0e6c1a11b4675`
+
+`"resource"`
 
 <a id="persistence-type-resource-cost"></a>
 
@@ -8890,6 +9000,14 @@ SHA-256: `7b1ce60193fa8b69292e5843858d9cee7dc565dcb40d33c136e5d7e8b8d4296a`
 SHA-256: `d4c799e3d51cae1040362ba4968efc484739e14416c9c1df20c2f108b4ef2eb5`
 
 `"working-directory/change"`
+
+<a id="persistence-type-workspace"></a>
+
+### `"workspace"`
+
+SHA-256: `93a3bf7dbca6fa6905cf6c7fb7da411444561bd9135489d9b6ea6af129007c3a`
+
+`"workspace"`
 
 <a id="persistence-type-workspace-write"></a>
 

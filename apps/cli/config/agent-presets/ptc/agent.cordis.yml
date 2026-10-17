@@ -39,6 +39,17 @@
   config:
     maxBytes: 65536
 
+# ── memory ──────────────────────────────────────────────────────────────────
+
+# Agent plane only: the durable `memory` service lives in the host composition
+# (the web bundle mounts it after `storage-domain`). The catalog listener
+# publishes this session's saved-memory catalog; the tools manage the entries.
+- id: memory-context
+  name: '@deepseek-ai/dsh-memory-context'
+
+- id: tool-memory
+  name: '@deepseek-ai/dsh-tool-memory'
+
 # ── shell ───────────────────────────────────────────────────────────────────
 
 # `shell-env` stays in the HOST composition: `apps/cli/src/web.ts` injects it to

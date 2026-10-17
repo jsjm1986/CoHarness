@@ -57,6 +57,11 @@
       config:
         backend: json
 
+    # Host plane: every session's agent-plane rows read this service, and the
+    # Gateway project runtime patch selects `space: project`.
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+
     - id: message-feedback
       name: '@deepseek-ai/dsh-message-feedback'
       config:

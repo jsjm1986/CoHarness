@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/memory/memory-context/README.md
+/:
+  en: 486acae44a51e17d
+  zh: 51b9928dfb867677
+/deepseek-ai-dsh-memory-context:
+  en: dcef28be93d67ac2
+  zh: 81cc94461b467c3e
+/deepseek-ai-dsh-memory-context/summary:
+  en: 0bc1d609c679e600
+  zh: 3d092f990d17de40
+/deepseek-ai-dsh-memory-context/table-of-contents:
+  en: d7b17cd2c8d27b5b
+  zh: 3c1c7e19646530db
+/deepseek-ai-dsh-memory-context/configuration:
+  en: e9141dbbccf76c0f
+  zh: 0261bb14ff5053aa
+/deepseek-ai-dsh-memory-context/publication-semantics:
+  en: 4f4e486529600da3
+  zh: aab35225da470c28
+/deepseek-ai-dsh-memory-context/catalog-frame:
+  en: 19b1f390ac25d1ae
+  zh: e087511294f9bc31
+/deepseek-ai-dsh-memory-context/byte-budget:
+  en: 18d4b2fa134104b5
+  zh: 584586fa987ab869
+/deepseek-ai-dsh-memory-context/invariants:
+  en: a995ae0700deea02
+  zh: a2ae47bc11b44444
+/deepseek-ai-dsh-memory-context/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-memory-context/model-experience/saved-memory-catalog-message:
+  en: 268591b584be8627
+  zh: 268591b584be8627
+/deepseek-ai-dsh-memory-context/model-experience/saved-memory-catalog-message/what-the-model-sees:
+  en: 34759123fe8feb9b
+  zh: 56110b3af6cb2103
+/deepseek-ai-dsh-memory-context/model-experience/saved-memory-catalog-message/token-effect:
+  en: 56378d949df5943e
+  zh: 0789c8b16e65d1ce
+/deepseek-ai-dsh-memory-context/model-experience/saved-memory-catalog-message/kv-cache-effect:
+  en: 631d54d39f6d05e5
+  zh: 8a2c47c03a21a504
+/deepseek-ai-dsh-memory-context/known-limitations-and-deferred-work:
+  en: fda9f6693655b74b
+  zh: cc5a454c4585e0b7
+/deepseek-ai-dsh-memory-context/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

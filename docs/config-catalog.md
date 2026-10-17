@@ -1993,6 +1993,50 @@ export interface ReconnectConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-mcp-client -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-memory -->
+<a id="deepseek-aidsh-memory"></a>
+
+## `@deepseek-ai/dsh-memory`
+
+- `inject`: `storageDomain`
+- `source`: [`packages/memory/memory/src/index.ts:60`](../packages/memory/memory/src/index.ts)
+
+```ts config-catalog
+/** Validated service configuration; field docs are the model-facing meaning. */
+export interface Config {
+  /** `personal` offers personal+workspace scopes, `project` one shared scope. */
+  space: 'personal' | 'project'
+  /** Content bound in UTF-8 bytes, inclusive. */
+  entryMaxBytes: number
+  /** Summary bound in Unicode code points, inclusive. */
+  summaryMaxChars: number
+  /** Entry cap per scope; creates refuse at the limit, replaces and deletes never do. */
+  maxEntriesPerScope: number
+  /** Search result cap. */
+  searchMaxResults: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-memory-context -->
+<a id="deepseek-aidsh-memory-context"></a>
+
+## `@deepseek-ai/dsh-memory-context`
+
+- `inject`: `memory` · `tools`
+- `source`: [`packages/memory/memory-context/src/index.ts:53`](../packages/memory/memory-context/src/index.ts)
+
+```ts config-catalog
+/** Model-facing saved-memory catalog configuration. */
+export interface Config {
+  /** UTF-8 byte bound of the complete catalog message text, inclusive. */
+  catalogMaxBytes: number
+  /** Publish the catalog inside delegated sessions too. */
+  delegatedSessions: boolean
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory-context -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-message-feedback -->
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -3365,7 +3409,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:256`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:257`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */
@@ -4581,6 +4625,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-terminal` | — | [`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts) |
 | `@deepseek-ai/dsh-tool-call-timeout-policy` | `tools` | [`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts) |
 | `@deepseek-ai/dsh-tool-cordis` | `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` | [`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts) |
+| `@deepseek-ai/dsh-tool-memory` | `memory` · `tools` · `systemPrompt` | [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts) |
 | `@deepseek-ai/dsh-tool-subagent-control` | `tools` · `subagents` | [`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts) |
 | `@deepseek-ai/dsh-tool-working-directory` | `tools` · `workingDirectory` | [`packages/session/tool-working-directory/src/index.ts`](../packages/session/tool-working-directory/src/index.ts) |
 | `@deepseek-ai/dsh-user-questions` | — | [`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts) |
