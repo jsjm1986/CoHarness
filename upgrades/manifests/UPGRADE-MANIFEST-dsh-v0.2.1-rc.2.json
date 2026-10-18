@@ -79,8 +79,9 @@
       "id": "plugin-compatibility-engines-dsh",
       "status": "adapt",
       "localOwner": "boot/app-boot owner",
-      "reviewState": "pending-cumulative-source-review",
-      "commitScope": ["packages/boot/app-boot/src/plugin-compatibility.ts"]
+      "reviewState": "implemented-local-tests-passing",
+      "commitScope": ["packages/boot/app-boot/src/plugin-compatibility.ts"],
+      "evidence": "engines.dsh adjudicates alone over peers; peers→requirements rename propagated through plugin-manager types/operations/failure, ui-plugin-manager and gateway admin-ui presentation+locales, cli/manager specs, and the regenerated api catalog. 382 package tests + 422 admin-ui tests + host-face build pass."
     },
     {
       "id": "plugin-market-lane",

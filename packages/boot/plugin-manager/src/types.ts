@@ -84,13 +84,13 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 /** Reasons a profile control cannot modify its target. */
 export type ReadOnlyReason = 'management-required' | 'unaddressable'
 
-/** A package whose declared DSH peers reject the running DSH version, without an exemption for the exact pair. */
+/** A package whose declared DSH requirements reject the running DSH version, without an exemption for the exact pair. */
 export interface IncompatiblePlugin {
   name: string
   version: string
   runtimeVersion: string
-  /** Only the DSH peer ranges the running version does not satisfy. */
-  peers: Record<string, string>
+  /** Only the requirements the running version does not satisfy, keyed `engines.dsh` or by DSH peer package name. */
+  requirements: Record<string, string>
 }
 
 /** Localizable management failure and optional external diagnostic. */
