@@ -70,7 +70,8 @@ import type {
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { PiAiAdapter } from './adapter.ts'
-import { catalogProviderIds, SUPPORTED_THINKING_FORMATS } from './catalog.ts'
+import { authContextFrom, credentialStoreFrom } from './auth.ts'
+import { catalogProvider, catalogProviderIds, SUPPORTED_THINKING_FORMATS } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
 import type {
   PiAiCompatProfile,
@@ -82,6 +83,7 @@ import type {
 import { discoverModels } from './discovery.ts'
 import type { StoredModelDiscoveryProfile } from './discovery.ts'
 import { registerPiAiFlows } from './login.ts'
+import { providerDefaultsOf } from './provider-data.ts'
 
 export { PiAiAdapter } from './adapter.ts'
 export type { PiAiAdapterOptions } from './adapter.ts'
@@ -211,11 +213,13 @@ function registrationFacts(profiles: ReadonlyMap<string, ResolvedPiAiProviderPro
 }
 
 /**
- * The configurable-provider directory: every installed catalog route this
- * adapter can authenticate, plus every route the current profiles declare. A
- * hand-declared route has no catalog entry, so without this union it would
- * have no settings address and configuration surfaces could neither show nor
- * edit it.
+ * The configurable-provider directory: every installed catalog route, plus
+ * every route the current profiles declare. A hand-declared route has no
+ * catalog entry, so without this union it would have no settings address and
+ * configuration surfaces could neither show nor edit it. A catalog route also
+ * carries its catalog endpoint and native authentication, which a settings
+ * editor shows while the profile leaves the endpoint or the credential
+ * reference unset.
  *
  * The profile half is unconditional, which is what keeps a route already
  * stored against a withheld provider editable and deletable rather than
@@ -227,11 +231,11 @@ function directoryEntries(
   profiles: ReadonlyMap<string, ResolvedPiAiProviderProfile>,
   managed: ModelProviderConfigSnapshot | undefined,
 ): LlmConfigurableProvider[] {
-  const catalog = new Set(catalogProviderIds())
   const entries = new Map<string, LlmConfigurableProvider>()
   const managedMeta = managedProviderMeta(managed)
   const declare = (provider: string, displayName: string, error?: string): void => {
     const metadata = managedMeta.get(provider)
+    const installed = catalogProvider(provider)
     entries.set(provider, {
       provider,
       displayName,
@@ -240,7 +244,8 @@ function directoryEntries(
       // Membership of the installed catalog, not of the settings document:
       // narrowing a shipped provider's models stores a profile too, and that
       // route is still one pi-ai knows.
-      declared: !catalog.has(provider),
+      declared: installed === undefined,
+      ...installed === undefined ? {} : providerDefaultsOf(installed),
       ...metadata === undefined ? {} : {
         management: metadata.management,
         ...metadata.projectId === undefined ? {} : { projectId: metadata.projectId },

@@ -7,14 +7,14 @@ import { environmentForAgent } from '@deepseek-ai/dsh-agent-presets'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-working-directory'
-import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { Remote, RemoteError, TypertRemoteService, type RemoteStream } from '@deepseek-ai/dsh-typert-protocol'
 import { discoverShells, resolveShell } from './shells.ts'
 import { BrowserTerminal } from './terminal.ts'
 import { TerminalRetention } from './retention.ts'
 import { TerminalAccess, type TerminalAuthority, type TerminalCreatorId } from './authorization.ts'
 export type { TerminalAuthority, TerminalCreatorId, UserTerminalAuthorization, UserTerminalAdministration } from './authorization.ts'
 import type {
-  TerminalShell, TerminalAttachmentId, TerminalCreateRequest, TerminalEnvironment, TerminalFrame, TerminalRetentionFrame,
+  TerminalShell, TerminalAttachmentId, TerminalCreateRequest, TerminalEnvironment, TerminalFrame, TerminalInput, TerminalRetentionFrame,
   WebTerminalId, WebTerminalInfo, TerminalOwnerId, TerminalAdminInfo,
 } from './types.ts'
 
@@ -106,6 +106,8 @@ export class TerminalController extends TypertRemoteService {
   private readonly lifetime = new AbortController()
   private readonly access: TerminalAccess
   private readonly cleanupTasks = new Set<Promise<void>>()
+  /** Per-attachment input channels bridging the endpoint API onto the terminal's attach stream. */
+  private readonly attachments = new Map<string, { push(item: TerminalInput): void; end(): void; sequence: number }>()
 
   /**
    * @param ctx - Host context carrying typed Remote and execution providers.
@@ -153,7 +155,7 @@ export class TerminalController extends TypertRemoteService {
   private environmentOf(agent: Agent): TerminalEnvironment {
     this.execution(agent)
     return { cwd: this.ctx.workingDirectory.get(agent.session),
-      maxInputBytes: this.config.maxInputBytes, maxCols: this.config.maxCols,
+      maxInputBytes: this.config.maxInputBytes, maxBufferedBytes: this.config.maxBufferedBytes, maxCols: this.config.maxCols,
       maxRows: this.config.maxRows, scrollback: this.config.scrollback }
   }
 
@@ -271,10 +273,58 @@ export class TerminalController extends TypertRemoteService {
     using authority = await this.access.authorize(agent.id, signal)
     const { owner, terminal } = this.ownedTerminal(agent, id, authority.creator)
     const combined = AbortSignal.any([signal, authority.signal, owner.lifetime.signal])
-    for await (const frame of terminal.follow(attachmentId, combined)) {
-      combined.throwIfAborted()
-      yield frame
+    const key = `${this.ownerKey(agent.id, authority.creator)}${id}${attachmentId}`
+    const channel = this.attachmentChannel(key)
+    combined.addEventListener('abort', () => channel.end(), { once: true })
+    try {
+      for await (const frame of terminal.attach(channel.iterable, this.config, combined)) {
+        combined.throwIfAborted()
+        yield frame
+      }
+    } finally {
+      this.attachments.delete(key)
     }
+  }
+
+  /**
+   * Retain an existing terminal for a window without activating its Agent or taking input control.
+   * @param sessionId - owning Session identity, including an inactive saved layout.
+   * @param id - retained Host terminal identity.
+   * @param signal - physical Remote stream cancellation.
+   * @returns a hold acknowledgement followed by an open lifetime stream.
+   */
+  @Remote({ mode: 'stream' })
+  retain(sessionId: SessionId, id: WebTerminalId, signal: AbortSignal): AsyncIterable<TerminalRetentionFrame> {
+    for (const owner of this.owners.values()) {
+      if (owner.sessionId !== sessionId) continue
+      const terminal = owner.terminals.get(id)
+      if (terminal !== undefined && owner.closedIds.has(id) !== true && owner.lifetime.signal.aborted !== true) {
+        return terminal.retain(signal)
+      }
+    }
+    throw new RemoteError('terminal/unavailable', 'Terminal is closing or unavailable', {})
+  }
+
+  /**
+   * Attach terminal input and output to one physical Remote stream.
+   * @param agent - Session owner supplied by the Gateway.
+   * @param id - terminal identity.
+   * @param signal - attachment cancellation; the process remains alive and input is never replayed.
+   * @returns screen recovery, output, writable state and provider-acceptance acknowledgements.
+   */
+  @Remote({ mode: 'stream' })
+  attach(agent: Agent, id: WebTerminalId, signal: AbortSignal): RemoteStream<TerminalFrame, TerminalInput> {
+    const invocation = this.ctx.invocation
+    if (invocation === undefined) throw new Error('Terminal attachment requires a Remote invocation')
+    for (const owner of this.owners.values()) {
+      if (owner.sessionId !== agent.id) continue
+      const terminal = owner.terminals.get(id)
+      if (terminal !== undefined) {
+        this.requireOpen(owner, id)
+        return terminal.attach(invocation.uplink<TerminalInput>(), this.config, signal, invocation.uplinkWindow)
+      }
+    }
+    throw new RemoteError('terminal/unavailable', 'Terminal no longer exists in this Session', {})
   }
 
   /**
@@ -289,7 +339,10 @@ export class TerminalController extends TypertRemoteService {
   async write(agent: Agent, id: WebTerminalId, attachmentId: TerminalAttachmentId, data: string): Promise<void> {
     if (Buffer.byteLength(data, 'utf8') > this.config.maxInputBytes) throw new Error('Terminal input exceeds the configured limit')
     using authority = await this.access.authorize(agent.id, this.lifetime.signal)
-    await this.ownedTerminal(agent, id, authority.creator).terminal.write(attachmentId, data)
+    const { owner } = this.ownedTerminal(agent, id, authority.creator)
+    const channel = this.attachments.get(`${this.ownerKey(agent.id, authority.creator)}${id}${attachmentId}`)
+    if (channel === undefined || owner.lifetime.signal.aborted) throw new RemoteError('terminal/unavailable', 'Terminal attachment is not following', {})
+    channel.push({ type: 'write', sequence: ++channel.sequence, data })
     authority.signal.throwIfAborted()
   }
 
@@ -306,7 +359,10 @@ export class TerminalController extends TypertRemoteService {
   async resize(agent: Agent, id: WebTerminalId, attachmentId: TerminalAttachmentId, cols: number, rows: number): Promise<void> {
     this.dimensions(cols, rows)
     using authority = await this.access.authorize(agent.id, this.lifetime.signal)
-    await this.ownedTerminal(agent, id, authority.creator).terminal.resize(attachmentId, cols, rows)
+    const { owner } = this.ownedTerminal(agent, id, authority.creator)
+    const channel = this.attachments.get(`${this.ownerKey(agent.id, authority.creator)}${id}${attachmentId}`)
+    if (channel === undefined || owner.lifetime.signal.aborted) throw new RemoteError('terminal/unavailable', 'Terminal attachment is not following', {})
+    channel.push({ type: 'resize', sequence: ++channel.sequence, cols, rows })
     authority.signal.throwIfAborted()
   }
 
@@ -454,19 +510,43 @@ export class TerminalController extends TypertRemoteService {
       || !Number.isSafeInteger(rows) || rows < 1 || rows > this.config.maxRows) throw new Error('Terminal dimensions exceed the configured limits')
   }
 
-  private execution(agent: Agent): { subprocess: Context['subprocess']; sandboxPolicy: Context['sandboxPolicy'] } {
+  /** Per-attachment ordered input channel feeding one attach stream. */
+  private attachmentChannel(key: string): { iterable: AsyncIterable<TerminalInput>; push(item: TerminalInput): void; end(): void; sequence: number } {
+    const queue: TerminalInput[] = []
+    let notify: (() => void) | undefined
+    let done = false
+    const bridge = {
+      sequence: 0,
+      iterable: (async function* (): AsyncIterable<TerminalInput> {
+        for (;;) {
+          while (queue.length === 0 && !done) await new Promise<void>(resolve => { notify = resolve })
+          if (queue.length === 0) return
+          yield queue.shift() as TerminalInput
+        }
+      })(),
+      push(item: TerminalInput) { queue.push(item); notify?.(); notify = undefined },
+      end() { done = true; notify?.() },
+    }
+    this.attachments.set(key, bridge)
+    return bridge
+  }
+
+  private execution(agent: Agent): { subprocess: Context['subprocess']; sandboxPolicy: Context['sandboxPolicy']; workingDirectory: Context['workingDirectory'] } {
     // SSH providers belong to the standing realm, outside the Agent's Cordis ancestry.
     const subprocess = agent.session.header.sshTarget === undefined
       ? agent.ctx.get('subprocess')
       : environmentForAgent(this.ctx, agent, 'subprocess')
     const sandboxPolicy = agent.ctx.get('sandboxPolicy')
     if (subprocess === undefined || sandboxPolicy === undefined) throw new Error('The Session execution environment requires subprocess and sandbox policy providers')
-    return { subprocess, sandboxPolicy }
+    const workingDirectory = agent.ctx.get('workingDirectory')
+    if (workingDirectory === undefined) throw new Error('The Session execution environment requires a working-directory provider')
+    return { subprocess, sandboxPolicy, workingDirectory }
   }
 
   private async spawn(agent: Agent, owner: OwnedSession, request: TerminalCreateRequest, signal: AbortSignal): Promise<BrowserTerminal> {
-    const environment = this.environmentOf(agent)
-    const { subprocess } = this.execution(agent)
+    const { subprocess, workingDirectory } = this.execution(agent)
+    const cwd = await workingDirectory.ensure(agent, signal)
+    const environment = { ...this.environmentOf(agent), cwd }
     const shell = request.shellPath === undefined
       ? await resolveShell(subprocess, this.config.shell, signal)
       : (await discoverShells(subprocess, this.config.shell, this.config.shellCandidates, signal))

@@ -35,7 +35,7 @@ The shipped row creates sessions with `deepseek-official` and `deepseek-v4-flash
 
 An ACP v1 SDK client initializes `dsh --profile acp`, creates a session with an absolute `cwd` and optional standard stdio/HTTP MCP declarations, chooses an advertised `model` or `reasoning_effort`, prompts while observing standard semantic updates, then calls `session/close`. Another process can use `session/list` and `session/resume` against the same profile persistence root; resume reconnects the MCP declarations supplied by that request and does not replay history.
 
-The complete supported method matrix, MCP trust model, update mapping, and stop reasons live in the [`dsh-acp` protocol contract](../../acp/acp/README.md#protocol-contract). This profile adds no private method, capability, `_meta`, environment variable, or transport field. The keyless control-surface conformance test drives the real profile through the public ACP SDK.
+The complete supported method matrix, MCP trust model, update mapping, and stop reasons live in the [`dsh-acp` protocol contract](../../acp/acp/README.md#standard-acp-v1-surface). This profile adds no private method, capability, `_meta`, environment variable, or transport field. The keyless control-surface conformance test drives the real profile through the public ACP SDK.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -44,7 +44,7 @@ The complete supported method matrix, MCP trust model, update mapping, and stop 
 
 #### What the model sees
 
-The profile supplies `You are a coding agent powered by the {{model}} model.` before first-party guidance, and the current working directory reaches the model through the working-directory runtime context.
+The profile supplies `You are a coding agent powered by the {{model}} model.` before first-party guidance; the ACP route resolves `{{model}}`. Each Session receives its current directory in required user-role context from [`dsh-working-directory`](../../session/working-directory/README.md).
 
 #### Token effect
 
@@ -72,5 +72,3 @@ Stable for a fixed profile, provider, model, and tool roster. Profile changes ta
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. The bundle adds a process transport and startup latch; source/built stdio tests own frame purity, help exclusion, and shutdown.

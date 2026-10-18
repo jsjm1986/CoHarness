@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-util-crypto",
-  "description": "Browser-safe UUID and byte-encoding helpers",
-  "version": "0.2.1-rc.1.coharness.1",
+  "description": "Zero-dependency browser-safe UUID and byte-encoding helpers",
+  "version": "0.2.1-rc.2.coharness.1",
   "publishConfig": {
     "access": "public"
   },

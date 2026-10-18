@@ -56,9 +56,26 @@ export default defineConfig([
       '@deepseek-ai/dsh-client-runtime/client': new URL('./conversation-fold/runtime-client-shim.ts', import.meta.url).pathname,
     },
     entry: {
+      'session-corpus.worker': 'session-corpus/session-corpus.worker.ts',
+      'projection-list.worker': 'session-corpus/projection-list.worker.ts',
+    },
+    outDir: '.dsh-build/session-corpus',
+    clean: true,
+    tsconfig: 'tsconfig.host.json',
+  },
+  {
+    ...shared,
+    entry: {
       'conversation-fold.worker': 'conversation-fold/conversation-fold.worker.client.ts',
     },
     outDir: '.dsh-build/conversation-fold',
+    clean: true,
+    tsconfig: 'tsconfig.client.json',
+  },
+  {
+    ...shared,
+    entry: { 'user-text.worker': 'user-text/user-text.worker.client.ts' },
+    outDir: '.dsh-build/user-text',
     clean: true,
     tsconfig: 'tsconfig.client.json',
   },

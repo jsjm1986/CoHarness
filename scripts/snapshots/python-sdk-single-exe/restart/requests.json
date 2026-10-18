@@ -20,13 +20,9 @@
     "toolNames": [
       "cordis_inspect_list",
       "cordis_inspect_query",
-      "cordis_inspect_self",
       "job_kill",
       "job_list",
       "job_output",
-      "load_workspace_dependencies",
-      "present",
-      "run_code",
       "subagent",
       "workflow",
       "working_directory"
@@ -53,13 +49,9 @@
     "toolNames": [
       "cordis_inspect_list",
       "cordis_inspect_query",
-      "cordis_inspect_self",
       "job_kill",
       "job_list",
       "job_output",
-      "load_workspace_dependencies",
-      "present",
-      "run_code",
       "subagent",
       "workflow",
       "working_directory"

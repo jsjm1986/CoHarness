@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-voice-input-bundle",
   "description": "Experimental voice input with local SenseVoice; downloads its runtime on first use",
-  "version": "0.2.1-rc.1.coharness.1",
+  "version": "0.2.1-rc.2.coharness.1",
   "icon": "./icon.svg",
   "publishConfig": {
     "access": "public"
@@ -42,7 +42,9 @@
     "@deepseek-ai/cordis": "workspace:~"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "workspace:~"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/cordis-plugin-include": "workspace:~",
+    "js-yaml": "^4.3.2"
   },
   "dsh": {
     "bundle": {

@@ -1,73 +1,72 @@
 import { describe, expect, it } from 'vitest'
-import { EVENT_API, queryEventApi, queryServiceApi, SERVICE_API } from '../src/client/api-catalog.ts'
+import { EVENT_API, queryServiceApi, SERVICE_API } from '../src/client/api-catalog.ts'
 
 describe('Client Cordis inspect catalog', () => {
-  it('serves a compact catalog directory for every catalogued service', () => {
-    const result = queryServiceApi() as {
-      mode: string
-      services: { key: string; description: string; methods: { signature: string }[] }[]
-    }
-    expect(result.mode).toBe('catalog')
-    expect(result.services.map(service => service.key)).toEqual(SERVICE_API.map(service => service.key))
-    for (const service of result.services) {
-      expect(service.methods.length).toBeGreaterThan(0)
-      for (const method of service.methods) expect(method.signature.length).toBeGreaterThan(0)
-    }
+  it('publishes the split Workspace Controller and UI navigation services', () => {
+    expect(SERVICE_API.find(service => service.key === 'layout')?.methods.map(method => method.signature))
+      .toEqual([
+        'selectPanel(panelId: MainPanelId | null): void',
+        'beginNavigation(): AbortSignal',
+        'toggleSidebar(): void',
+        'openRightbar(track: boolean, fullscreen: boolean): void',
+        'closeRightbar(): void',
+      ])
+    expect(SERVICE_API.find(service => service.key === 'workspaces')?.methods.map(method => method.signature))
+      .toEqual([
+        'create(input: { path: string }): Promise<WorkspaceView>',
+        'rename(workspaceId: WorkspaceId, title: string): Promise<WorkspaceView>',
+        'delete(workspaceId: WorkspaceId): Promise<void>',
+        'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
+        'unarchiveSession(sessionId: SessionId): Promise<void>',
+        'insertSessionBefore( workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId, ): Promise<WorkspaceView>',
+      ])
+    expect(SERVICE_API.find(service => service.key === 'uiWorkspace')?.methods.map(method => method.signature))
+      .toEqual([
+        'openSession(target: SessionTarget): void',
+        'openWorkspace( workspaceId: WorkspaceId, beforeOpen?: (sessionId: SessionId) => void, options?: Pick<StartSessionOptions, \'agentPreset\'>, ): Promise<void>',
+        'forkSession( sessionId: SessionId, onCreated?: (childId: SessionId) => void, options?: Pick<Parameters<ISessions[\'fork\']>[0], \'allowMigration\'>, ): Promise<SessionId>',
+        'connectWorkspace(workspaceId: WorkspaceId, options?: Pick<StartSessionOptions, \'agentPreset\'>): Promise<SessionId>',
+        'startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void',
+        'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
+        'unarchiveSession(sessionId: SessionId): Promise<void>',
+        'pickDirectory(): Promise<string | null>',
+        'listDirectory(path?: string, signal?: AbortSignal): Promise<DirectoryListing>',
+        'createDirectory(path: string, name: string): Promise<string>',
+      ])
   })
 
-  it('serves one exact service contract with access recipes and its referenced-type closure', () => {
-    const key = SERVICE_API[0]!.key
-    const result = queryServiceApi(key) as {
-      mode: string
-      service: {
-        key: string
-        access: {
-          optional: { expression: string; requiresUndefinedCheck: boolean }
-          hardDependency: { inject: string[]; expression: string }
-        }
-        methods: unknown[]
-      }
-      referencedTypes: { name: string; declaration: string }[]
-    }
-    expect(result.mode).toBe('service')
-    expect(result.service.key).toBe(key)
-    expect(result.service.access.optional).toEqual({
-      expression: `ctx.get(${JSON.stringify(key)})`,
-      requiresUndefinedCheck: true,
-    })
-    expect(result.service.access.hardDependency.inject).toEqual([key])
-    expect(Array.isArray(result.referencedTypes)).toBe(true)
-  })
-
-  it('rejects unknown service keys', () => {
-    expect(() => queryServiceApi('definitely-not-a-service')).toThrow('no catalogued Service')
-  })
-
-  it('serves a compact catalog directory for every catalogued event', () => {
-    const result = queryEventApi() as {
-      mode: string
-      events: { name: string; mode: string; signature: string }[]
-    }
-    expect(result.mode).toBe('catalog')
-    expect(result.events.map(event => event.name)).toEqual(EVENT_API.map(event => event.name))
+  it('contains one entry per visible Client event', () => {
     const names = EVENT_API.map(event => event.name)
     expect(new Set(names).size).toBe(names.length)
   })
 
-  it('serves one exact event contract with parameters and referenced types', () => {
-    const name = EVENT_API[0]!.name
-    const result = queryEventApi(name) as {
-      mode: string
-      event: { name: string; parameters: unknown[] }
-      referencedTypes: { name: string }[]
+  it('describes text-only draft initialization in Workspace navigation', () => {
+    const result = queryServiceApi('uiWorkspace') as {
+      referencedTypes: readonly { name: string; declaration: string }[]
     }
-    expect(result.mode).toBe('event')
-    expect(result.event.name).toBe(name)
-    expect(Array.isArray(result.event.parameters)).toBe(true)
-    expect(Array.isArray(result.referencedTypes)).toBe(true)
+    expect(result.referencedTypes.find(type => type.name === 'StartSessionOptions')?.declaration)
+      .toContain('DraftInitializationOptions')
+    expect(result.referencedTypes.find(type => type.name === 'DraftInitializationOptions')?.declaration)
+      .toContain('readonly prompt?: string')
+    expect(result.referencedTypes.find(type => type.name === 'DraftInitializationOptions')?.declaration)
+      .toContain('readonly clearPreviousDraft?: boolean')
+    expect(result.referencedTypes.map(type => type.name)).not.toEqual(expect.arrayContaining([
+      'DraftInput', 'DraftSnapshot', 'DraftReference',
+    ]))
   })
 
-  it('rejects unknown event names', () => {
-    expect(() => queryEventApi('definitely/not-an-event')).toThrow('no catalogued Event')
+  it('includes the current referenced type closure for the Sessions service', () => {
+    const result = queryServiceApi('sessions') as {
+      referencedTypes: readonly { name: string; declaration: string }[]
+    }
+    expect(result.referencedTypes.length).toBeGreaterThan(0)
+    const promptContentPart = result.referencedTypes.find(type => type.name === 'PromptContentPart')
+    expect(promptContentPart?.declaration).toContain("readonly type: 'image'")
+    expect(result.referencedTypes.map(type => type.name)).not.toEqual(expect.arrayContaining([
+      'ConversationSnapshot',
+      'PendingInteraction',
+      'PendingPayloads',
+      'PendingWait',
+    ]))
   })
 })

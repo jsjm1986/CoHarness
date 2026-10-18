@@ -49,7 +49,6 @@
       config:
         provider: dsh-sdk
         toolName: subagent
-        enableRunInBackground: false
         agentOptions:
           maxTokens: 777
         maxDepth: 'provider-managed'
@@ -64,3 +63,7 @@
 - id: session-log-deepseek
   config:
     enabled: false
+
+- insert:
+    - id: await-external-subagents
+      name: '../../../packages/test-support/session-snapshot/tests/fixtures/subagent-settlement-barrier.ts'

@@ -83,30 +83,42 @@ export interface TypeApiEntry {
 export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'layout',
-    summary: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply.',
-    description: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply. The attachPanels wiring hook stays on the concrete class (root-entry assembly only).',
+    summary: 'Panel navigation and geometry actions exposed through ctx.layout.',
+    description: 'Panel navigation and geometry actions exposed through ctx.layout.',
     methods: [
+      {
+        signature: 'selectPanel(panelId: MainPanelId | null): void',
+        description: 'Select a global central panel without changing the current Session.',
+        parameters: [{ name: 'panelId', description: 'registered main key, or null to show the Conversation.' }],
+        throws: ['if the selected main key is not registered; preserves the current selection.'],
+      },
+      {
+        signature: 'beginNavigation(): AbortSignal',
+        description: 'Start an asynchronous navigation, superseding any earlier pending navigation.',
+        parameters: [],
+        returns: 'a signal aborted by the next navigation or layout disposal; check it before committing UI state.',
+      },
       {
         signature: 'toggleSidebar(): void',
         description: 'Toggle the sidebar panel (closed ⟷ contract default width).',
         parameters: [],
       },
       {
-        signature: 'openDetails(sessionId?: SessionId, target?: DetailsOwnerProps): void',
-        description: 'Open details, optionally pinned to an explicit Session.',
-        parameters: [{ name: 'sessionId', description: 'fixed target; omission follows current selection.' }, { name: 'target', description: 'exact Tool address and optional close action for the auxiliary tab.' }],
+        signature: 'openRightbar(track: boolean, fullscreen: boolean): void',
+        description: 'Report the right panel\'s presentation without changing its expanded state.',
+        parameters: [{ name: 'track', description: 'whether the normal panel width reserves a grid track, including beneath a fullscreen overlay.' }, { name: 'fullscreen', description: 'whether the panel covers the frame and hides its outer resize handle; independent of the underlying grid track.' }],
       },
       {
-        signature: 'closeDetails(sessionId?: SessionId): void',
-        description: 'Close details, optionally only when pinned to a given Session.',
-        parameters: [{ name: 'sessionId', description: 'target to release; omission closes unconditionally.' }],
+        signature: 'closeRightbar(): void',
+        description: 'Report the right panel as hidden: no track, no handle.',
+        parameters: [],
       },
     ],
   },
   {
     key: 'locale',
     summary: 'Dictionary registry plus locale preference.',
-    description: 'Dictionary registry plus locale preference. Lookup chain per key: the entry\'s namespace in the active locale -> that namespace\'s en fallback -> the shared common namespace (active, then en) -> the key itself (missing text stays visible, fail loud in the UI rather than blank). Reads go through getLocale; writes only through setLocale; continuous sync through the `locale/change` event, or through the LocaleFace getSnapshot/subscribe pair the render machinery consumes (installed via `ctx.slots.installLocale`).',
+    description: 'Dictionary registry plus locale preference. Lookup walks the active language\'s declared fallback chain in the entry namespace, then repeats it in the shared common namespace before showing the key itself. Reads go through getLocale; preferences change only through setLocale, while language packs extend the catalog through addLanguage. Continuous sync uses the `locale/change` event or the LocaleFace getSnapshot/subscribe pair installed through `ctx.slots.installLocale`.',
     methods: [
       {
         signature: 'getLocale(): LocaleSnapshot',
@@ -122,7 +134,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'subscribe(fn: () => void): () => void',
-        description: 'LocaleFace subscribe: notified on every snapshot change (locale switch or dictionary registration — registrations bump the revision so already rendered outlets pick up late-arriving dictionaries).',
+        description: 'LocaleFace subscribe: notified on every snapshot change (locale switch or dictionary registration — registrations bump the revision so already rendered outlets pick up late-arriving dictionaries and locale definitions).',
         parameters: [{ name: 'fn', description: 'change callback.' }],
         returns: 'unsubscribe.',
       },
@@ -132,20 +144,27 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'id', description: 'a registered locale id; unknown ids throw.' }],
       },
       {
-        signature: 'register<N extends keyof LocaleNamespaceMap & string>(ns: N, dicts: Record<BuiltInLocaleId, LocaleDictOf<N>>): () => void',
+        signature: 'addLanguage(input: LanguageRegistration): () => void',
+        description: 'Add one selectable language to the shared catalog. Its fallback must already be registered, and following fallback definitions must terminate at English. Dictionaries may register before or after this definition. Registration rechecks an unresolved Host preference and the browser\'s ordered language list. The caller owns the returned disposer; removing an active language falls back without clearing the stored id.',
+        parameters: [{ name: 'input', description: 'stable id, self-described label, and fallback language id.' }],
+        returns: 'idempotent disposer removing this exact definition.',
+        throws: ['when fields are malformed, the id is occupied, or the fallback target is unknown or creates a cycle.'],
+      },
+      {
+        signature: 'register<N extends Extract<keyof LocaleNamespaceMap, string>>(ns: N, dicts: Record<BuiltInLocaleId, LocaleDictOf<N>>): () => void',
         description: 'Register a declared namespace\'s dictionaries, all locales in one call — the typed form: each dictionary is checked against the namespace\'s LocaleNamespaceMap key union (a missing or extra key is a compile error), and every shipped locale is required (bilingual balance enforced at registration). Duplicate (ns, locale) throws (single occupant; a namespace\'s texts have one owner). Registration bumps the revision so mounted outlets pick up late-arriving dictionaries.',
         parameters: [{ name: 'ns', description: 'a namespace merged into LocaleNamespaceMap.' }, { name: 'dicts', description: 'complete dictionaries keyed by built-in locale id.' }],
         returns: 'disposer removing every locale registered by this call (idempotent).',
       },
       {
         signature: 'register(ns: string, locale: string, dict: LocaleDict): () => void',
-        description: 'Single-locale untyped form for namespaces outside the merge table (dynamic composition, tests).',
+        description: 'Single-locale untyped form for language-pack contributions and namespaces outside the merge table.',
         parameters: [{ name: 'ns', description: 'namespace.' }, { name: 'locale', description: 'locale tag.' }, { name: 'dict', description: 'dictionary.' }],
         returns: 'disposer (idempotent).',
-        throws: ['when the locale id is not a BCP 47-style tag.'],
+        throws: ['when locale is not a BCP 47-style tag.'],
       },
       {
-        signature: 'bind<N extends keyof LocaleNamespaceMap & string>(ns: N): TranslateNS<N>',
+        signature: 'bind<N extends Extract<keyof LocaleNamespaceMap, string>>(ns: N): TranslateNS<N>',
         description: 'Bind a declared namespace to a translate function typed to its dictionary key union (plus the shared common vocabulary) — the same key domain the framework-injected `t` seat carries. The returned reference is stable per namespace (repeat binds return the same function), so it can ride inject surfaces without breaking memoization.',
         parameters: [{ name: 'ns', description: 'a namespace merged into LocaleNamespaceMap.' }],
         returns: 'the typed translate function (reads the active locale at call time).',
@@ -164,44 +183,47 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'The sessions-service face injected as `ctx.sessions`.',
     methods: [
       {
-        signature: 'open(id: SessionId): void',
-        description: 'Select a session as current.',
-        parameters: [{ name: 'id', description: 'session id (must exist in the list; unknown ids fail loud).' }],
+        signature: 'retain(target: SessionTarget, options: SessionRetainOptions): SessionReference',
+        description: 'Retain an exact Client generation and start its shared initial history opening.',
+        parameters: [{ name: 'target', description: 'known identity or durable direct-parent address.' }, { name: 'options', description: 'required consumer source and optional independent waiter cancellation.' }],
+        returns: 'an owned reference immediately; await `reference.ready` when the initial open attempt must settle first.',
       },
       {
-        signature: 'openSubagent(address: SubagentAddress): void',
-        description: 'Open a healthy catalog child through its exact direct-parent address.',
-        parameters: [{ name: 'address', description: 'catalog-derived parent and child ids.' }],
+        signature: 'using<T>(target: SessionTarget, options: SessionRetainOptions, operation: (reference: SessionReference) => T | Promise<T>): Promise<T>',
+        description: 'Hold one reference through callback settlement, including synchronous and asynchronous failures.',
+        parameters: [{ name: 'target', description: 'Session to acquire.' }, { name: 'options', description: 'source and acquisition cancellation.' }, { name: 'operation', description: 'callback using the reference only until its returned value or Promise settles.' }],
+        returns: 'the callback result after release; acquisition and callback failures propagate unchanged.',
       },
       {
-        signature: 'setSubagentCatalogOpen(parentSessionId: SessionId, open: boolean): void',
-        description: 'Mark whether a catalog menu is consuming live membership updates.',
-        parameters: [{ name: 'parentSessionId', description: 'catalog owner.' }, { name: 'open', description: 'current menu state.' }],
+        signature: 'retainInfo(id: SessionId): ObservableSnapshot<SessionRetainInfo>',
+        description: 'Observe local reference counts without retaining, creating a scope, or opening history. The returned source keeps stable identity across same-id generations and remains allocated until the Client root is disposed, even after its final subscriber leaves.',
+        parameters: [{ name: 'id', description: 'explicit Session identity; Host existence is not implied.' }],
+        returns: 'a stable read-only source across same-id generations, with zero counts when none is live.',
       },
       {
-        signature: 'refreshSubagents(parentSessionId: SessionId): Promise<void>',
-        description: 'Refresh one direct-child catalog.',
-        parameters: [{ name: 'parentSessionId', description: 'catalog owner.' }],
+        signature: 'refreshProjections(sessionId: SessionId): Promise<void>',
+        description: 'Read projections without starting migration; retry failed or migration-deferred reads.',
+        parameters: [{ name: 'sessionId', description: 'Session to inspect without opening its conversation.' }],
         returns: 'completion of the current or newly started refresh.',
       },
       {
-        signature: 'search( query: string, signal: AbortSignal, ): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>>',
+        signature: 'search( query: string, signal: AbortSignal, ): Promise<RemoteResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>>',
         description: 'Search the Host\'s visible message-content index. Results stay request-local; the list snapshot remains the metadata authority.',
         parameters: [{ name: 'query', description: 'non-blank literal phrase.' }, { name: 'signal', description: 'cancellation for a superseded search.' }],
         returns: 'bounded results, or a business/transport error.',
       },
       {
-        signature: 'fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId>',
-        description: 'Fork a session from a completed-turn prefix of the source; on resolution the child is in the list store and `open()` can target it.',
-        parameters: [{ name: 'opts', description: 'source session id, the optional event seq anchoring the cut (the boundary is the first turn/end at or after it; an in-log anchor in an open turn is unavailable rather than clipped backward), and whether to increment an inherited durable title before resolving.' }],
+        signature: 'fork(opts: { sessionId: SessionId atSeq?: number increaseTitle?: boolean onCreated?: (childId: SessionId) => void /** False refuses source migration; omission preserves the Host default. */ allowMigration?: boolean }): Promise<SessionId>',
+        description: 'Fork a session from an exact inclusive prefix of the source; on resolution the child is catalogued and can be explicitly retained.',
+        parameters: [{ name: 'opts', description: 'source session id, the optional exact inclusive boundary seq (a real event seq the caller already knows; a cut inside an open turn is balanced Host-side with synthetic closers, and omission selects the latest completed-turn prefix), and whether to increment an inherited durable title before resolving. `onCreated` observes the catalogued child before that optional rename.' }],
         returns: 'the child session id.',
         throws: ['when the fork fails, or when a requested child-title rename fails after creation.'],
       },
       {
         signature: 'scope(id: SessionId): AgentContext | undefined',
-        description: 'Borrow an already-retained Agent-scoped context without extending its lifetime.',
+        description: 'Borrow an already-retained Agent-scoped Context without extending its lifetime.',
         parameters: [{ name: 'id', description: 'session id.' }],
-        returns: 'the live context, or undefined without a retained generation.',
+        returns: 'the live scoped Context, or undefined without a retained generation.',
       },
       {
         signature: 'binding(id: SessionId): SessionBinding | undefined',
@@ -218,8 +240,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'declare readonly register: SlotCore[\'register\']',
-        description: 'The single registration API. The typed face IS the core\'s register (both overloads reused verbatim — one authority, no structural copy; see SlotCore.register for children declaration, store seat, inject face, load-time validation, and the unload cascade). This layer adds: disposal through the caller\'s ctx.effect (fiber unload = cascade), exclusive-factory minting (`store: createXxxStore` becomes a per-entry handle), the registrant diagnostics stamp, and store-instance lifecycle on the entry axis.\n\nDeclared here, implemented by prototype assignment below the class: it MUST stay a prototype method (never an instance arrow) — the cordis service proxy binds `this.ctx` to the CALLER\'s context at call time, which is what routes the effect (and the unload cascade) into the caller\'s fiber. An arrow property would freeze `this` to the service\'s own root ctx and silently break per-plugin disposal.',
+        description: 'The ordinary Slot registration API. The typed face IS the core\'s register (both overloads reused verbatim — one authority, no structural copy; see SlotCore.register for children declaration, store seat, inject face, load-time validation, and the unload cascade). This layer adds: disposal through the caller\'s ctx.effect (fiber unload = cascade), exclusive-factory minting (`store: createXxxStore` becomes a per-entry handle), the registrant diagnostics stamp, and store-instance lifecycle on the entry axis.\n\nDeclared here, implemented by prototype assignment below the class: it MUST stay a prototype method (never an instance arrow) — the cordis service proxy binds `this.ctx` to the CALLER\'s context at call time, which is what routes the effect (and the unload cascade) into the caller\'s fiber. An arrow property would freeze `this` to the service\'s own root ctx and silently break per-plugin disposal.',
         parameters: [],
+      },
+      {
+        signature: 'declare readonly registerFactory: RegisterFactory',
+        description: 'Register one reusable Component Factory under the caller\'s effect lifetime. A Store factory mints one handle per rendered occurrence rather than per definition. Like SlotRegistry.register, this remains a prototype method so the Cordis proxy binds `this.ctx` to the caller\'s Context.',
+        parameters: [{ name: 'options', description: 'runtime definition checked against `SlotFactoryMap`.' }, { name: 'component', description: 'reusable Factory Component.' }],
+        returns: 'the idempotent definition disposer.',
       },
       {
         signature: 'inject(key: keyof SlotMap & string, callback: () => SlotInjectionEffect): () => void',
@@ -247,6 +275,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'id', description: 'a registered theme id or `system`; unknown ids throw.' }],
       },
       {
+        signature: 'setFontSize(role: FontRole, px: number): void',
+        description: 'Change one role\'s font size. Accepted values are written through the settings scope and emit `theme/change`.',
+        parameters: [{ name: 'role', description: 'font role.' }, { name: 'px', description: 'integer px within the role\'s `FONT_SIZE_SPECS` range; out-of-range or fractional values throw.' }],
+      },
+      {
         signature: 'register(definition: ThemeDefinition): () => void',
         description: 'Register a theme. Duplicate id throws (single occupant per id; the built-in pair counts; `system` is a preference, not a registrable id).',
         parameters: [{ name: 'definition', description: 'theme id, colorScheme, and alias-token overrides.' }],
@@ -262,119 +295,143 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'timer',
-    summary: 'Browser timer Service with the same public API as the Host Cordis TimerService.',
-    description: 'Browser timer Service with the same public API as the Host Cordis TimerService.',
+    summary: 'Disposable timer helpers mixed into Cordis contexts.',
+    description: 'Disposable timer helpers mixed into Cordis contexts.',
     methods: [
       {
         signature: 'timeout(callback: () => void, delay: number): () => void',
-        description: 'Run a callback once after a delay.',
-        parameters: [{ name: 'callback', description: 'work to run.' }, { name: 'delay', description: 'delay in milliseconds.' }],
-        returns: 'disposer that cancels the callback.',
+        description: 'Run a callback once and return its disposer.',
+        parameters: [],
       },
       {
         signature: 'timeout(delay: number): Promise<void>',
-        description: 'Wait for a delay.',
-        parameters: [{ name: 'delay', description: 'delay in milliseconds.' }],
-        returns: 'promise resolved after the delay.',
+        description: 'Resolve after a delay; disposal rejects the pending promise.',
+        parameters: [],
       },
       {
         signature: 'interval(callback: () => void, delay: number): () => void',
-        description: 'Run a callback repeatedly.',
-        parameters: [{ name: 'callback', description: 'work to run on each tick.' }, { name: 'delay', description: 'interval in milliseconds.' }],
-        returns: 'disposer that stops the interval.',
+        description: 'Run a callback repeatedly and return its disposer.',
+        parameters: [],
       },
       {
         signature: 'interval<R = any>(delay: number): AsyncIterableIterator<void, R, void>',
-        description: 'Iterate over timer ticks.',
-        parameters: [{ name: 'delay', description: 'interval in milliseconds.' }],
-        returns: 'async iterator of ticks.',
+        description: 'Return an async iterator of timer ticks.',
+        parameters: [],
       },
       {
-        signature: 'throttle<F extends (...args: any[]) => void>(callback: F, delay: number, noTrailing?: boolean): WithDispose<F>',
-        description: 'Return a throttled function whose timer is disposed with the calling Fiber.',
-        parameters: [{ name: 'callback', description: 'Function to throttle.' }, { name: 'delay', description: 'Minimum interval between calls in milliseconds.' }, { name: 'noTrailing', description: 'Whether to suppress a delayed trailing call.' }],
-        returns: 'Throttled function with an early disposer.',
+        signature: 'throttle<F extends (...args: any[]) => void>(callback: F, delay: number, noTrailing?: boolean): F & { dispose: () => void }',
+        description: 'Return a throttled function whose timer is disposed with the current fiber.',
+        parameters: [],
       },
       {
-        signature: 'debounce<F extends (...args: any[]) => void>(callback: F, delay: number): WithDispose<F>',
-        description: 'Return a debounced function whose timer is disposed with the calling Fiber.',
-        parameters: [{ name: 'callback', description: 'Function to debounce.' }, { name: 'delay', description: 'Quiet period in milliseconds.' }],
-        returns: 'Debounced function with an early disposer.',
+        signature: 'debounce<F extends (...args: any[]) => void>(callback: F, delay: number): F & { dispose: () => void }',
+        description: 'Return a debounced function whose timer is disposed with the current fiber.',
+        parameters: [],
+      },
+    ],
+  },
+  {
+    key: 'uiWorkspace',
+    summary: 'Workspace archive and directory operations consumed by Client UI domains.',
+    description: 'Workspace archive and directory operations consumed by Client UI domains.',
+    methods: [
+      {
+        signature: 'openSession(target: SessionTarget): void',
+        description: 'Select a Session and show its Conversation as one UI navigation action.',
+        parameters: [{ name: 'target', description: 'known Session identity or durable direct-parent subagent address to display.' }],
+      },
+      {
+        signature: 'openWorkspace( workspaceId: WorkspaceId, beforeOpen?: (sessionId: SessionId) => void, options?: Pick<StartSessionOptions, \'agentPreset\'>, ): Promise<void>',
+        description: 'Connect a Workspace and open its Session unless a later navigation supersedes it.',
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'beforeOpen', description: 'optional synchronous preparation for the selected Session, skipped after supersession; a throw aborts the open and releases the retained reference.' }, { name: 'options', description: 'choices for the Session the connection creates or reuses.' }],
+        returns: 'completion; a superseded request may create a Session but does not open it.',
+        throws: ['on failure; a refused creation is also shown through the Workspace notice unless a later navigation or disposal superseded the request.'],
+      },
+      {
+        signature: 'forkSession( sessionId: SessionId, onCreated?: (childId: SessionId) => void, options?: Pick<Parameters<ISessions[\'fork\']>[0], \'allowMigration\'>, ): Promise<SessionId>',
+        description: 'Fork a Session without changing the current selection.',
+        parameters: [{ name: 'sessionId', description: 'source Session.' }, { name: 'onCreated', description: 'observer before the optional child-title update.' }, { name: 'options', description: 'optional permission to start source migration; omission preserves the Host default.' }],
+        returns: 'the child SessionId after creation and inherited-title increment.',
+      },
+      {
+        signature: 'connectWorkspace(workspaceId: WorkspaceId, options?: Pick<StartSessionOptions, \'agentPreset\'>): Promise<SessionId>',
+        description: 'Resolve the Session for a new conversation in a Workspace: the Host reuses the first listed blank member while it is reusable and otherwise creates one, under the requested preset or the Host default.',
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'options', description: 'choices for the created or reused Session.' }],
+        returns: 'a Session already addressable through the Session Controller.',
+      },
+      {
+        signature: 'startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void',
+        description: 'Create a fresh Session, or reuse a blank when preparing an explicit draft. A creation the Host refuses is shown through the Workspace notice and leaves the selection as it was.',
+        parameters: [{ name: 'workspaceId', description: 'explicit target; absent inherits the current or most recent Workspace.' }, { name: 'options', description: 'initial content and the reused blank\'s preset; existing text or attachments are preserved unless clearPreviousDraft is true.' }],
+      },
+      {
+        signature: 'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
+        description: 'Archive a Session and clear it when it is the current selection.',
+        parameters: [{ name: 'sessionId', description: 'Session to archive.' }, { name: 'options', description: '`stopActivity` asks the Host to stop the Session\'s running work instead of refusing.' }],
+      },
+      {
+        signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
+        description: 'Unarchive a Session, restoring it to its recorded Workspace position.',
+        parameters: [{ name: 'sessionId', description: 'Session to unarchive.' }],
+      },
+      {
+        signature: 'pickDirectory(): Promise<string | null>',
+        description: 'Open the Host-native directory picker.',
+        parameters: [],
+        returns: 'the selected directory, or null when cancelled.',
+      },
+      {
+        signature: 'listDirectory(path?: string, signal?: AbortSignal): Promise<DirectoryListing>',
+        description: 'List one Host directory level.',
+        parameters: [{ name: 'path', description: 'directory path; absent selects the Host home.' }, { name: 'signal', description: 'cancellation for a superseded scan.' }],
+        returns: 'directory entries and breadcrumb ancestry.',
+      },
+      {
+        signature: 'createDirectory(path: string, name: string): Promise<string>',
+        description: 'Create a child directory.',
+        parameters: [{ name: 'path', description: 'existing parent directory.' }, { name: 'name', description: 'child directory name.' }],
+        returns: 'created absolute path.',
       },
     ],
   },
   {
     key: 'workspaces',
-    summary: 'The workspaces-service face injected as `ctx.workspaces`.',
-    description: 'The workspaces-service face injected as `ctx.workspaces`.',
+    summary: 'Workspace Controller\'s Client service face.',
+    description: 'Workspace Controller\'s Client service face.',
     methods: [
-      {
-        signature: 'connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId>',
-        description: 'Connect a Workspace to its reusable or freshly created blank session.',
-        parameters: [{ name: 'workspaceId', description: 'target workspace.' }],
-        returns: 'the connected session id.',
-      },
-      {
-        signature: 'openWorkspace(workspaceId: WorkspaceId): Promise<SessionId>',
-        description: 'Open the most recent historical conversation in a Workspace.',
-        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }],
-        returns: 'the selected historical or fallback blank Session id.',
-      },
-      {
-        signature: 'startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void',
-        description: 'The New Session flow: connect the explicit, current-Session, or recent Workspace and open the resulting session. Connect and navigation failures are non-fatal — they log and reach `onFailure` when supplied; the current view stays usable.',
-        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }, { name: 'onFailure', description: 'observer for the rejected connect/open, for surfaces that turn an explicit New Session click into a notice.' }],
-      },
       {
         signature: 'create(input: { path: string }): Promise<WorkspaceView>',
         description: 'Register an existing path as a Workspace.',
-        parameters: [{ name: 'input', description: 'the Host create payload.' }],
+        parameters: [{ name: 'input', description: 'Host create payload.' }],
         returns: 'the created or idempotently resolved Workspace.',
-      },
-      {
-        signature: 'pickDirectory(): Promise<string | null>',
-        description: 'Open the Host\'s native directory picker.',
-        parameters: [],
-        returns: 'the selected path, or null when the user cancelled.',
-      },
-      {
-        signature: 'listDirectory(path?: string, signal?: AbortSignal): Promise<DirectoryListing>',
-        description: 'List one directory level through the Host\'s `browse` capability.',
-        parameters: [{ name: 'path', description: 'absolute directory to list; absent lists the Host home directory.' }, { name: 'signal', description: 'aborts the wire request (and the Host\'s scan) when the caller supersedes it.' }],
-        returns: 'the level\'s listing with breadcrumb ancestry.',
-      },
-      {
-        signature: 'createDirectory(path: string, name: string): Promise<string>',
-        description: 'Create one child directory through the Host\'s `browse` capability.',
-        parameters: [{ name: 'path', description: 'absolute existing parent directory.' }, { name: 'name', description: 'single non-blank path segment.' }],
-        returns: 'the created directory\'s absolute path.',
-      },
-      {
-        signature: 'openPath(path: string): Promise<void>',
-        description: 'Open a filesystem path with the Host operating system\'s default application.',
-        parameters: [{ name: 'path', description: 'absolute or host-resolvable path.' }],
       },
       {
         signature: 'rename(workspaceId: WorkspaceId, title: string): Promise<WorkspaceView>',
         description: 'Rename a Workspace.',
-        parameters: [{ name: 'workspaceId', description: 'target workspace.' }, { name: 'title', description: 'the new display title.' }],
-        returns: 'the updated Workspace view.',
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'title', description: 'new display title.' }],
+        returns: 'the renamed Workspace.',
       },
       {
         signature: 'delete(workspaceId: WorkspaceId): Promise<void>',
-        description: 'Delete a Workspace (its sessions fall back to the unaccounted group).',
-        parameters: [{ name: 'workspaceId', description: 'target workspace.' }],
-      },
-      {
-        signature: 'insertSessionBefore(workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId): Promise<WorkspaceView>',
-        description: 'Move an accounted session within/into a Workspace\'s ordered list.',
-        parameters: [{ name: 'workspaceId', description: 'target workspace.' }, { name: 'sessionId', description: 'accounted session to move.' }, { name: 'beforeSessionId', description: 'accounted anchor to insert before; omitted appends.' }],
-        returns: 'the updated Workspace view.',
+        description: 'Delete a Workspace registration without deleting Sessions or files.',
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }],
       },
       {
         signature: 'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
-        description: 'Archive a session into the registry-global set (hidden from grouping surfaces; session log and accounting slot remain). Archiving the current session clears the selection into the New Session view state.',
-        parameters: [{ name: 'sessionId', description: 'session to archive.' }, { name: 'options', description: '`stopActivity` asks the Host to stop the session\'s running work instead of refusing; without it a session with running work rejects with a `session-active` error whose details name that activity.' }],
+        description: 'Archive a Session from Workspace grouping surfaces.',
+        parameters: [{ name: 'sessionId', description: 'Session to archive.' }, { name: 'options', description: '`stopActivity` asks the Host to stop the Session\'s running work instead of refusing.' }],
+        throws: ['{WorkspaceArchiveError} when the Host refuses; without `stopActivity` a Session with running work fails as `workspace/session-active`, its details naming what runs.'],
+      },
+      {
+        signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
+        description: 'Unarchive a Session from the archived Session list.',
+        parameters: [{ name: 'sessionId', description: 'Session to unarchive.' }],
+      },
+      {
+        signature: 'insertSessionBefore( workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId, ): Promise<WorkspaceView>',
+        description: 'Move a Session within one Workspace account.',
+        parameters: [{ name: 'workspaceId', description: 'owning Workspace.' }, { name: 'sessionId', description: 'Session to move.' }, { name: 'beforeSessionId', description: 'anchor Session; omitted appends.' }],
+        returns: 'the changed Workspace.',
       },
     ],
   },
@@ -386,8 +443,8 @@ export const EVENT_API: readonly EventApiEntry[] = [
     name: 'connection/reset',
     mode: 'emit',
     signature: '\'connection/reset\'(): void',
-    summary: 'A connection generation was (re-)established.',
-    description: 'A connection generation was (re-)established. Wire-derived caches must treat their state as stale and repull (commands directory; the queue mirrors reset themselves through the session resync path).',
+    summary: 'A connection generation was established.',
+    description: 'A connection generation was established. Wire-derived caches must repull; long-lived streams own their own resume and baseline lifecycle.',
     parameters: [],
   },
   {
@@ -402,9 +459,9 @@ export const EVENT_API: readonly EventApiEntry[] = [
     name: 'slots/changed',
     mode: 'emit',
     signature: '\'slots/changed\'(key: string): void',
-    summary: 'A slot\'s definition or registration set changed.',
-    description: 'A slot\'s definition or registration set changed.',
-    parameters: [{ name: 'key', description: 'the mutated SlotMap key.' }],
+    summary: 'An ordinary Slot declaration or entry registration set changed.',
+    description: 'An ordinary Slot declaration or entry registration set changed. Factory definitions publish through `subscribeFactory()` instead.',
+    parameters: [{ name: 'key', description: 'mutated SlotMap key.' }],
   },
   {
     name: 'theme/change',
@@ -427,24 +484,8 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type AgentContext = Omit<Context, \'remote\'> & {\n    readonly remote: ClientRemote & TypertRemoteScopeApi<\'agent\'>;\n};',
   },
   {
-    name: 'AssistantBlock',
-    declaration: 'export type AssistantBlock = {\n    kind: \'text\';\n    text: string;\n} | {\n    kind: \'reasoning\';\n    text: string;\n} | {\n    kind: \'image\';\n    attachment: ImageAttachmentRef;\n} | {\n    kind: \'tool-call\';\n    callId: string;\n    name: string;\n    argsRaw: string;\n} | {\n    kind: \'other\';\n    block: unknown;\n};',
-  },
-  {
-    name: 'AssistantMessageNode',
-    declaration: 'export interface AssistantMessageNode {\n    kind: \'assistant\';\n    seq: number;\n    messageId?: MessageId;\n    time: number;\n    turn: number;\n    step: number;\n    blocks: readonly AssistantBlock[];\n    usage?: unknown;\n    providerMetadata?: AssistantProviderMetadataView;\n    requestConfig?: AssistantRequestConfig;\n    timing?: AssistantTiming;\n    interrupted?: true;\n}',
-  },
-  {
-    name: 'AssistantProviderMetadataView',
-    declaration: 'export interface AssistantProviderMetadataView {\n    provider: string;\n    model: string;\n}',
-  },
-  {
-    name: 'AssistantRequestConfig',
-    declaration: 'export interface AssistantRequestConfig {\n    provider: string;\n    model: string;\n    purpose?: string;\n    thinking?: string;\n    reasoningEffort?: string;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: readonly string[];\n}',
-  },
-  {
-    name: 'AssistantTiming',
-    declaration: 'export interface AssistantTiming {\n    stepStartTime: number | null;\n    firstTokenTime: number | null;\n    completedTime: number;\n}',
+    name: 'AssistantLiveChunkEvent',
+    declaration: 'export interface AssistantLiveChunkEvent {\n    readonly type: \'assistant/live-chunk\';\n    readonly seq: number;\n    readonly time: number;\n    readonly data: {\n        readonly attemptId: LlmAttemptId;\n        readonly turn: number;\n        readonly step: number;\n        readonly chunk: StreamChunk;\n    };\n}',
   },
   {
     name: 'BakedActions',
@@ -452,7 +493,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'BeginSubmissionInput',
-    declaration: 'export interface BeginSubmissionInput {\n    readonly mode: \'queue\' | \'steer\';\n    readonly text: string;\n    readonly images: readonly PendingSubmissionImage[];\n    readonly onRetire?: (retirement: PendingSubmissionRetirement) => void;\n}',
+    declaration: 'export interface BeginSubmissionInput {\n    readonly mode: \'queue\' | \'steer\';\n    readonly text: string;\n    readonly attachments: readonly PendingSubmissionAttachment[];\n    readonly onRetire?: (retirement: PendingSubmissionRetirement) => void;\n}',
   },
   {
     name: 'BoundActions',
@@ -468,119 +509,127 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ChainRenderOpts',
-    declaration: 'export interface ChainRenderOpts {\n    fallback?: ReactNode;\n    overlay?: boolean;\n}',
-  },
-  {
-    name: 'ChatConversationViewNode',
-    declaration: 'export interface ChatConversationViewNode extends ConversationViewNode {\n    readonly target: \'chat\';\n    readonly anchorSeq: number;\n    readonly location: ConversationLocation;\n    readonly visibility: \'visible\' | \'hidden\';\n}',
-  },
-  {
-    name: 'ChatLocationNodeIndex',
-    declaration: 'export interface ChatLocationNodeIndex {\n    getTurn(turn: number): readonly string[];\n    getStep(turn: number, step: number): readonly string[];\n}',
-  },
-  {
-    name: 'ChatNodeStore',
-    declaration: 'export interface ChatNodeStore {\n    get(key: string): ChatConversationViewNode | undefined;\n    values(): readonly ChatConversationViewNode[];\n}',
-  },
-  {
-    name: 'ChatSnapshot',
-    declaration: 'export interface ChatSnapshot {\n    readonly order: readonly string[];\n    readonly nodes: ChatNodeStore;\n    readonly locations: ChatLocationNodeIndex;\n    readonly navigation: ChatTurnNavigationIndex;\n    readonly timeline: ConversationTimelineSnapshot;\n    readonly legacy: LegacyConversationSlice;\n}',
-  },
-  {
-    name: 'ChatTurnNavigationIndex',
-    declaration: 'export interface ChatTurnNavigationIndex {\n    items(): readonly TurnNavigationItem[];\n}',
+    declaration: 'export interface ChainRenderOpts {\n    fallback?: ReactNode;\n    fallbackOnly?: boolean;\n    overlay?: boolean;\n}',
   },
   {
     name: 'ChildrenDecl',
     declaration: 'export type ChildrenDecl = {\n    [P in keyof SlotMap & string]?: SlotSpec<SlotMap[P]>;\n};',
   },
   {
-    name: 'ClientRemote',
-    declaration: 'export interface ClientRemote extends TypertClientRemote {\n    $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item>;\n}',
+    name: 'ClientConnectionRpc',
+    declaration: 'export interface ClientConnectionRpc {\n    call(channel: string, endpoint: string, payload: unknown, signal?: AbortSignal): Promise<ConnectionRpcResult<unknown>>;\n    readonly open?: (channel: string, endpoint: string, payload: unknown, signal: AbortSignal, uplink?: AsyncIterable<unknown>) => AsyncIterable<unknown>;\n}',
   },
   {
-    name: 'CommandNode',
-    declaration: 'export interface CommandNode {\n    kind: \'command\';\n    seq: number;\n    time: number;\n    commandId: CommandId;\n    name: string | null;\n    args: string | null;\n    outcome: {\n        kind: \'success\' | \'error\';\n        text?: string;\n        sourceEventSeq?: number;\n    } | null;\n}',
+    name: 'ClientRemote',
+    declaration: 'export interface ClientRemote extends TypertClientRemote {\n    $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item>;\n    readonly $host: RemoteHostFacts;\n}',
   },
   {
     name: 'CommonKeyOf',
     declaration: 'export type CommonKeyOf = LocaleNamespaceMap extends {\n    common: infer C;\n} ? C & string : never;',
   },
   {
-    name: 'CompactionSummaryNode',
-    declaration: 'export interface CompactionSummaryNode {\n    kind: \'compaction\';\n    seq: number;\n    time: number;\n    summary: string | null;\n    summaryEventSeq: number | null;\n    shadowedItemCount: number | null;\n    shadowedTokenCount: number | null;\n}',
-  },
-  {
     name: 'ComposedProps',
-    declaration: 'export type ComposedProps<K extends keyof SlotMap & string, EntryKey extends EntryKeyOf<K>, S extends keyof SlotMap & string, H, I extends object, M = never, N = undefined> = PropsRuntime<K, EntryKey> & PropsRenderSlots<S> & PropsStore<H> & InjectFace<I> & MatchedShare<SlotMap[K], M> & PropsLocale<N>;',
+    declaration: 'export type ComposedProps<K extends keyof SlotMap & string, EntryKey extends EntryKeyOf<K>, S extends keyof SlotMap & string, H, I extends object, M = never, N = undefined> = PropsRuntime<K, EntryKey> & PropsRenderSlots<S> & PropsRenderFactories & PropsStore<H> & InjectFace<I> & MatchedShare<SlotMap[K], M> & PropsLocale<N>;',
   },
   {
-    name: 'ComposerPhase',
-    declaration: 'export type ComposerPhase = \'blank\' | \'engaging\' | \'active\';',
+    name: 'ConnectionGeneration',
+    declaration: 'export interface ConnectionGeneration {\n    readonly id: number;\n    readonly host: ConnectionHostInfo;\n}',
   },
   {
-    name: 'ContextMessageNode',
-    declaration: 'export interface ContextMessageNode {\n    kind: \'context\';\n    seq: number;\n    time: number;\n    content: readonly ContentBlock[];\n    source: unknown;\n    producer: ContextProducerView;\n    form: KnownContextForm | null;\n}',
+    name: 'ConnectionGenerationSource',
+    declaration: 'export type ConnectionGenerationSource = (signal: AbortSignal, ready: (host: ConnectionHostInfo) => void) => Promise<void>;',
   },
   {
-    name: 'ContextProducerView',
-    declaration: 'export interface ContextProducerView {\n    role: ContextRole;\n    label: string | null;\n}',
+    name: 'ConnectionGenerationState',
+    declaration: 'export interface ConnectionGenerationState {\n    getSnapshot(): ConnectionGeneration | undefined;\n    subscribe(listener: () => void): () => void;\n}',
   },
   {
-    name: 'ContextRole',
-    declaration: 'export type ContextRole = \'inject\' | \'recall\';',
+    name: 'ConnectionHandle',
+    declaration: 'export interface ConnectionHandle {\n    readonly interactions: ConnectionInteractions;\n    readonly isLoopback: boolean;\n    readonly generation: ConnectionGenerationState;\n    readonly state: ConnectionStateSource;\n    readonly rpc: ClientConnectionRpc;\n    openWebSocket(path: string): ConnectionWebSocket;\n    reconnect(): void;\n    registerGenerationSource(source: ConnectionGenerationSource): () => void;\n    start(sinks: ConnectionSinks, config?: ConnectionRecoveryConfig): ConnectionLoop;\n}',
   },
   {
-    name: 'ConversationLocation',
-    declaration: 'export type ConversationLocation = {\n    readonly kind: \'session\';\n} | {\n    readonly kind: \'turn\';\n    readonly turn: TurnLocation;\n} | {\n    readonly kind: \'step\';\n    readonly turn: TurnLocation;\n    readonly step: StepLocation;\n} | {\n    readonly kind: \'unresolved\';\n};',
+    name: 'ConnectionHostInfo',
+    declaration: 'export interface ConnectionHostInfo {\n    readonly home: string;\n}',
   },
   {
-    name: 'ConversationLocationDataSource',
-    declaration: 'export interface ConversationLocationDataSource<Value> {\n    getSnapshot(): Value;\n    subscribe(listener: () => void): () => void;\n}',
+    name: 'ConnectionInteractions',
+    declaration: 'export type ConnectionInteractions = \'answer\' | \'none\';',
   },
   {
-    name: 'ConversationLocationDataStore',
-    declaration: 'export interface ConversationLocationDataStore<DataMap extends object> {\n    get<Key extends keyof DataMap & string>(key: Key): Readonly<DataMap[Key]> | undefined;\n    source<Key extends keyof DataMap & string>(key: Key): ConversationLocationDataSource<Readonly<DataMap[Key]> | undefined>;\n}',
+    name: 'ConnectionLoop',
+    declaration: 'export interface ConnectionLoop {\n    stop(): void;\n}',
   },
   {
-    name: 'ConversationNode',
-    declaration: 'export type ConversationNode = UserMessageNode | AssistantMessageNode | SteeringMessageNode | ContextMessageNode | ModelRetryNode | TurnErrorNode | TurnMaxTokensNode | ToolResultNode | CommandNode | CompactionSummaryNode | UnknownSurfaceNode;',
+    name: 'ConnectionRecoveryConfig',
+    declaration: 'export interface ConnectionRecoveryConfig {\n    backoffBaseMs?: number;\n    backoffFactor?: number;\n    backoffMaxMs?: number;\n    generationReadyWarnMs?: number;\n    generationReadyTimeoutMs?: number;\n}',
   },
   {
-    name: 'ConversationSnapshot',
-    declaration: 'export interface ConversationSnapshot {\n    sessionId: SessionId;\n    views: ConversationViewSnapshotStore;\n    chat: ChatSnapshot;\n    nodes: readonly ConversationNode[];\n    turnTimings: ReadonlyMap<number, {\n        readonly startTime: number;\n        readonly endTime?: number;\n    }>;\n    turnEnds: ReadonlyMap<number, number>;\n    openTurn: number | undefined;\n    partial: PartialAssistant | null;\n    runningCalls: readonly RunningToolCall[];\n    pending: readonly SessionPendingEntry[];\n    pendingSubmissions?: readonly PendingSubmission[];\n    queue: readonly QueuedMessage[];\n    running: boolean;\n    subagent: {\n        address: SubagentAddress;\n        parentAvailable: boolean;\n    } | null;\n    composerPhase: ComposerPhase;\n    removed: boolean;\n    openState: OpenState;\n    openError: RpcError | null;\n    hasMore: boolean;\n    loadingOlder: boolean;\n    historyWindowMode: HistoryWindowMode;\n    historyDetail: HistoryDetailState;\n    historyNavigation?: HistoryNavigationSnapshot;\n    promptError: PromptError | null;\n    blank: boolean;\n    lastAgentError: string | null;\n}',
+    name: 'ConnectionRpcFailure',
+    declaration: 'export interface ConnectionRpcFailure {\n    readonly code: string;\n    readonly message: string;\n    readonly details: object;\n}',
   },
   {
-    name: 'ConversationStepDataMap',
-    declaration: 'export interface ConversationStepDataMap {\n}',
+    name: 'ConnectionRpcResult',
+    declaration: 'export type ConnectionRpcResult<T> = {\n    readonly ok: true;\n    readonly value: T;\n} | {\n    readonly ok: false;\n    readonly error: ConnectionRpcFailure;\n};',
   },
   {
-    name: 'ConversationTimelineSnapshot',
-    declaration: 'export interface ConversationTimelineSnapshot {\n    readonly turnOrder: readonly number[];\n    readonly turns: ReadonlyMap<number, TurnLocation>;\n}',
+    name: 'ConnectionSinks',
+    declaration: 'export interface ConnectionSinks {\n    onConnected?: (host: ConnectionHostInfo) => void;\n    onStateChange?: (state: ConnectionState) => void;\n    onReconnectRequested?: () => void;\n}',
   },
   {
-    name: 'ConversationTurnDataMap',
-    declaration: 'export interface ConversationTurnDataMap {\n}',
+    name: 'ConnectionState',
+    declaration: 'export type ConnectionState = \'connected\' | \'disconnected\' | \'connecting\';',
   },
   {
-    name: 'ConversationViewNode',
-    declaration: 'export interface ConversationViewNode {\n    readonly key: string;\n    readonly kind: string;\n    readonly id: string;\n    readonly target: string;\n    readonly data: unknown;\n}',
+    name: 'ConnectionStateSource',
+    declaration: 'export interface ConnectionStateSource {\n    getSnapshot(): ConnectionState | undefined;\n    subscribe(listener: () => void): () => void;\n}',
   },
   {
-    name: 'ConversationViewSnapshotMap',
-    declaration: 'export interface ConversationViewSnapshotMap {\n}',
+    name: 'ConnectionWebSocket',
+    declaration: 'export interface ConnectionWebSocket {\n    readonly readyState: number;\n    send(data: string): void;\n    close(code?: number, reason?: string): void;\n    addEventListener<Event extends keyof ConnectionWebSocketEventMap>(event: Event, listener: (event: ConnectionWebSocketEventMap[Event]) => void, options?: {\n        readonly once?: boolean;\n    }): void;\n    removeEventListener<Event extends keyof ConnectionWebSocketEventMap>(event: Event, listener: (event: ConnectionWebSocketEventMap[Event]) => void): void;\n}',
   },
   {
-    name: 'ConversationViewSnapshotStore',
-    declaration: 'export interface ConversationViewSnapshotStore {\n    get<Target extends Extract<keyof ConversationViewSnapshotMap, string>>(target: Target): ConversationViewSnapshotMap[Target] | undefined;\n}',
+    name: 'ConnectionWebSocketEventMap',
+    declaration: 'export interface ConnectionWebSocketEventMap {\n    readonly open: object;\n    readonly error: object;\n    readonly close: object;\n    readonly message: {\n        readonly data: unknown;\n    };\n}',
   },
   {
-    name: 'DetailsOwnerProps',
-    declaration: 'export interface DetailsOwnerProps {\n    readEnabled?: boolean;\n    callId?: string;\n    toolName?: string;\n    close?: () => void;\n}',
+    name: 'DraftInitializationOptions',
+    declaration: 'export interface DraftInitializationOptions {\n    readonly prompt?: string;\n    readonly clearPreviousDraft?: boolean;\n}',
   },
   {
     name: 'EntryKeyOf',
     declaration: 'export type EntryKeyOf<K extends keyof SlotMap & string> = SlotMap[K] extends {\n    kind: \'keyed\';\n    keyProps: infer P extends object;\n} ? keyof P & string : string;',
+  },
+  {
+    name: 'FactoryComponentPropsOf',
+    declaration: 'export type FactoryComponentPropsOf<F extends keyof SlotFactoryMap & string> = FactoryInputPropsOf<F> & FactoryRegistrationPropsOf<F> & ScopeStandardProps<FactoryDefOf<F>[\'scope\']> & {\n    useFactorySlot: UseFactorySlot<F>;\n};',
+  },
+  {
+    name: 'FactoryInjectParams',
+    declaration: 'export type FactoryInjectParams<F extends keyof SlotFactoryMap & string> = FactoryDefOf<F>[\'scope\'] extends \'session\' ? ([\n    FactoryStoreOf<F>\n] extends [\n    StoreDecl\n] ? [\n    sessionId: SessionIdOf,\n    actions: BoundActions<FactoryStoreOf<F>>\n] : [\n    sessionId: SessionIdOf\n]) : FactoryDefOf<F>[\'scope\'] extends \'session-maybe\' ? ([\n    FactoryStoreOf<F>\n] extends [\n    StoreDecl\n] ? [\n    sessionId: SessionIdOf | undefined,\n    actions: BoundActions<FactoryStoreOf<F>> | undefined\n] : [\n    sessionId: SessionIdOf | undefined\n]) : ([\n    FactoryStoreOf<F>\n] extends [\n    StoreDecl\n] ? [\n    actions: BoundActions<FactoryStoreOf<F>>\n] : [\n]);',
+  },
+  {
+    name: 'FactoryLocalComponent',
+    declaration: 'export type FactoryLocalComponent<F extends keyof SlotFactoryMap & string, N extends FactoryLocalNameOf<F>> = SlotComponent<FactoryLocalComponentPropsOf<F, N>>;',
+  },
+  {
+    name: 'FactoryLocalComponentPropsOf',
+    declaration: 'export type FactoryLocalComponentPropsOf<F extends keyof SlotFactoryMap & string, N extends FactoryLocalNameOf<F>> = FactoryLocalInputPropsOf<F, N> & FactoryRegistrationPropsOf<F> & ScopeStandardProps<FactoryLocalDefOf<F, N>[\'scope\']>;',
+  },
+  {
+    name: 'FactoryRegistrationPropsOf',
+    declaration: 'export type FactoryRegistrationPropsOf<F extends keyof SlotFactoryMap & string> = FactoryRenderPropsOf<F> & PropsStore<FactoryStoreOf<F>> & InjectFace<FactoryInjectOf<F>> & PropsLocale<FactoryLocaleOf<F>> & PropsRenderFactories;',
+  },
+  {
+    name: 'FontFamilies',
+    declaration: 'export type FontFamilies = Readonly<Record<FontRole, string>>;',
+  },
+  {
+    name: 'FontRole',
+    declaration: 'export type FontRole = typeof FONT_ROLES[number];',
+  },
+  {
+    name: 'FontSizes',
+    declaration: 'export type FontSizes = Readonly<Record<FontRole, number>>;',
   },
   {
     name: 'GlobalStandardProps',
@@ -591,40 +640,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HandleOf<H> = H extends () => infer R ? R : H;',
   },
   {
-    name: 'HistoryDetailState',
-    declaration: 'export type HistoryDetailState = \'conversation\' | \'filling\' | \'full\';',
-  },
-  {
-    name: 'HistoryNavigationItem',
-    declaration: 'export interface HistoryNavigationItem {\n    readonly turn: number;\n    readonly startSeq: number;\n    readonly endSeq: number;\n    readonly prompt?: string;\n    readonly response?: string;\n}',
-  },
-  {
-    name: 'HistoryNavigationSnapshot',
-    declaration: 'export interface HistoryNavigationSnapshot {\n    readonly state: HistoryNavigationState;\n    readonly asOfSeq: number;\n    readonly totalTurns: number;\n    readonly items: readonly HistoryNavigationItem[];\n    readonly truncated: boolean;\n    readonly error: RpcError | null;\n}',
-  },
-  {
-    name: 'HistoryNavigationState',
-    declaration: 'export type HistoryNavigationState = \'idle\' | \'loading\' | \'ready\' | \'error\';',
-  },
-  {
-    name: 'HistoryWindowMode',
-    declaration: 'export type HistoryWindowMode = \'tail\' | \'expanding\' | \'live\';',
-  },
-  {
     name: 'HooksSources',
     declaration: 'export type HooksSources = Record<string, HostObservable<unknown>>;',
   },
   {
-    name: 'HostDescription',
-    declaration: 'export type HostDescription = import(\'@deepseek-ai/dsh-host-apiproxy/api\').ResponseValue<\'host.describe\'>;',
-  },
-  {
-    name: 'HostDescriptionSource',
-    declaration: 'export interface HostDescriptionSource {\n    getSnapshot(): HostDescription | undefined;\n    subscribe(listener: () => void): () => void;\n}',
-  },
-  {
     name: 'HostObservable',
-    declaration: 'export interface HostObservable<T> {\n    getSnapshot(): T;\n    subscribe(fn: () => void): () => void;\n}',
+    declaration: 'export type HostObservable<T> = ObservableSnapshot<T>;',
   },
   {
     name: 'InjectFace',
@@ -636,7 +657,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ISession',
-    declaration: 'export interface ISession {\n    publishInteraction(entry: SessionPublishedInteraction): () => void;\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    beginSubmission(input: BeginSubmissionInput): SubmissionHandle;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: SessionRequestId): Promise<RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RemoteResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RemoteResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RemoteResult<{\n        title: string;\n        seq: SessionSeq;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadThrough(seq: SessionSeq): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+  },
+  {
+    name: 'ISessions',
+    declaration: 'export interface ISessions {\n    readonly list: ObservableSnapshot<SessionListState>;\n    retain(target: SessionTarget, options: SessionRetainOptions): SessionReference;\n    using<T>(target: SessionTarget, options: SessionRetainOptions, operation: (reference: SessionReference) => T | Promise<T>): Promise<T>;\n    retainInfo(id: SessionId): ObservableSnapshot<SessionRetainInfo>;\n    readonly searchResultLimit: number;\n    create(opts?: {\n        workspaceId?: WorkspaceId;\n        cwd?: string;\n        sessionId?: SessionId;\n        agentPreset?: string;\n    }): Promise<SessionId>;\n    subagentAddress(id: SessionId): SubagentAddress | undefined;\n    refreshProjections(sessionId: SessionId): Promise<void>;\n    refresh(): Promise<void>;\n    search(query: string, signal: AbortSignal): Promise<RemoteResult<{\n        items: SessionSearchResultItem[];\n        hasMore: boolean;\n    }>>;\n    fork(opts: {\n        sessionId: SessionId;\n        atSeq?: number;\n        increaseTitle?: boolean;\n        onCreated?: (childId: SessionId) => void;\n        allowMigration?: boolean;\n    }): Promise<SessionId>;\n    scope(id: SessionId): AgentContext | undefined;\n    scopeOf(ctx: Context): SessionId | undefined;\n    sessionOf(ctx: Context): SessionFace | undefined;\n    binding(id: SessionId): SessionBinding | undefined;\n}',
   },
   {
     name: 'KeyedHooksSources',
@@ -648,23 +673,27 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'KeyedStandardSource',
-    declaration: 'export type KeyedStandardSource = (key: string) => HostObservable<unknown> | undefined;',
+    declaration: 'export type KeyedStandardSource = (key: string, member?: string) => HostObservable<unknown> | undefined;',
   },
   {
     name: 'KeyPropsOf',
     declaration: 'export type KeyPropsOf<K extends keyof SlotMap & string, EntryKey extends EntryKeyOf<K>> = SlotMap[K] extends {\n    kind: \'keyed\';\n    keyProps: infer P extends object;\n} ? EntryKey extends keyof P ? P[EntryKey] extends object ? P[EntryKey] : never : never : object;',
   },
   {
-    name: 'KnownContextForm',
-    declaration: 'export type KnownContextForm = typeof KNOWN_FORMS[number];',
+    name: 'LanguageRegistration',
+    declaration: 'export interface LanguageRegistration {\n    id: LocaleId;\n    label: string;\n    fallback: LocaleId;\n}',
   },
   {
-    name: 'LegacyConversationSlice',
-    declaration: 'export interface LegacyConversationSlice {\n    readonly nodes: readonly ConversationNode[];\n    readonly turnTimings: ReadonlyMap<number, {\n        readonly startTime: number;\n        readonly endTime?: number;\n    }>;\n    readonly turnEnds: ReadonlyMap<number, number>;\n    readonly partial: PartialAssistant | null;\n    readonly runningCalls: readonly RunningToolCall[];\n}',
+    name: 'LiveCompositionNode',
+    declaration: 'export type LiveCompositionNode = LiveSlotNode | LiveFactoryNode;',
+  },
+  {
+    name: 'LiveFactoryNode',
+    declaration: 'export interface LiveFactoryNode {\n    type: \'factory\';\n    name: string;\n    scope: SlotScope;\n    registrant?: string;\n    children: LiveSlotNode[];\n}',
   },
   {
     name: 'LiveSlotNode',
-    declaration: 'export interface LiveSlotNode {\n    name: string;\n    kind: SlotKind;\n    scope: SlotScope;\n    declaredBy?: string;\n    occupants: LiveSlotOccupant[];\n    children: LiveSlotNode[];\n}',
+    declaration: 'export interface LiveSlotNode {\n    type: \'slot\';\n    name: string;\n    kind: SlotKind;\n    scope: SlotScope;\n    declaredBy?: string;\n    occupants: LiveSlotOccupant[];\n    children: LiveSlotNode[];\n}',
   },
   {
     name: 'LiveSlotOccupant',
@@ -699,12 +728,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface LocaleSnapshot {\n    active: LocaleId;\n    locales: readonly LocaleDefinition[];\n    revision: number;\n}',
   },
   {
-    name: 'MatchedShare',
-    declaration: 'export type MatchedShare<E extends SlotEntryDef, M> = E[\'kind\'] extends \'chain\' ? {\n    matched: M;\n} : object;',
+    name: 'MainPanelId',
+    declaration: 'export type MainPanelId = Branded<\'MainPanelId\'>;',
   },
   {
-    name: 'ModelRetryNode',
-    declaration: 'export type ModelRetryNode = LlmRetryEventData & {\n    kind: \'model-retry\';\n    seq: number;\n    time: number;\n    retryState: \'scheduled\' | \'started\' | \'cancelled\';\n};',
+    name: 'MatchedShare',
+    declaration: 'export type MatchedShare<E extends SlotEntryDef, M> = E[\'kind\'] extends \'chain\' ? {\n    matched: M;\n} : object;',
   },
   {
     name: 'ObservableSnapshot',
@@ -719,28 +748,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type OwnerOf<K extends keyof SlotMap & string> = SlotMap[K] extends {\n    owner: infer O extends object;\n} ? O : object;',
   },
   {
-    name: 'PartialAssistant',
-    declaration: 'export interface PartialAssistant {\n    turn: number;\n    step: number;\n    blocks: readonly AssistantBlock[];\n}',
-  },
-  {
-    name: 'PendingInteraction',
-    declaration: 'export type PendingInteraction = {\n    [K in PendingKind]: PendingWait<K>;\n}[PendingKind];',
-  },
-  {
-    name: 'PendingKind',
-    declaration: 'export type PendingKind = keyof PendingPayloads;',
-  },
-  {
-    name: 'PendingPayloads',
-    declaration: 'export interface PendingPayloads {\n    approval: Omit<Extract<MuxFrame, {\n        type: \'approval/requested\';\n    }>, \'type\' | \'sessionId\'>;\n    question: Omit<Extract<MuxFrame, {\n        type: \'question/requested\';\n    }>, \'type\' | \'sessionId\'>;\n}',
-  },
-  {
     name: 'PendingSubmission',
-    declaration: 'export interface PendingSubmission {\n    readonly requestId: RpcId;\n    readonly placement: PendingSubmissionPlacement;\n    readonly time: number;\n    readonly text: string;\n    readonly images: readonly PendingSubmissionImage[];\n}',
+    declaration: 'export interface PendingSubmission {\n    readonly requestId: SessionRequestId;\n    readonly placement: PendingSubmissionPlacement;\n    readonly time: number;\n    readonly text: string;\n    readonly attachments: readonly PendingSubmissionAttachment[];\n}',
+  },
+  {
+    name: 'PendingSubmissionAttachment',
+    declaration: 'export type PendingSubmissionAttachment = PendingSubmissionImageAttachment | PendingSubmissionFileAttachment;',
+  },
+  {
+    name: 'PendingSubmissionFileAttachment',
+    declaration: 'export interface PendingSubmissionFileAttachment {\n    readonly type: \'file\';\n    readonly value: FileAttachmentRef;\n}',
   },
   {
     name: 'PendingSubmissionImage',
     declaration: 'export interface PendingSubmissionImage {\n    readonly previewUrl: string;\n    readonly name?: string;\n    readonly width?: number;\n    readonly height?: number;\n}',
+  },
+  {
+    name: 'PendingSubmissionImageAttachment',
+    declaration: 'export interface PendingSubmissionImageAttachment {\n    readonly type: \'image\';\n    readonly value: PendingSubmissionImage;\n}',
   },
   {
     name: 'PendingSubmissionPlacement',
@@ -748,23 +773,19 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PendingSubmissionRetirement',
-    declaration: 'export type PendingSubmissionRetirement = {\n    readonly reason: \'observed\';\n    readonly attachments: readonly ImageAttachmentRef[];\n} | {\n    readonly reason: \'failed\';\n};',
-  },
-  {
-    name: 'PendingWait',
-    declaration: 'export class PendingWait<K extends PendingKind = PendingKind> {\n    readonly kind: K;\n    readonly key: string;\n    readonly sessionId: SessionId;\n    readonly payload: PendingPayloads[K];\n    constructor(kind: K, rpcId: RpcId, sessionId: SessionId, payload: PendingPayloads[K], respond: (message: ClientResponse) => Promise<RpcReceipt>);\n    respond(result: ClientResponse[\'result\']): Promise<RpcReceipt>;\n    markSettled(): void;\n}',
-  },
-  {
-    name: 'PreparingToolCall',
-    declaration: 'export interface PreparingToolCall extends ToolCallHead {\n    readonly phase: \'preparing\';\n}',
+    declaration: 'export type PendingSubmissionRetirement = {\n    readonly reason: \'observed\';\n    readonly attachments: readonly (ImageAttachmentRef | FileAttachmentRef)[];\n} | {\n    readonly reason: \'failed\';\n};',
   },
   {
     name: 'ProjectionsFace',
     declaration: 'export interface ProjectionsFace {\n    faceOf(key: string): ObservableSnapshot<unknown>;\n}',
   },
   {
+    name: 'PromptContentPart',
+    declaration: 'export type PromptContentPart = {\n    readonly type: \'text\';\n    readonly text: string;\n} | {\n    readonly type: \'image\';\n    readonly mediaType: ImageMediaType;\n    readonly data: string;\n    readonly name?: string;\n} | {\n    readonly type: \'file\';\n    readonly receiptId: Branded<\'file-upload-receipt-id\'>;\n};',
+  },
+  {
     name: 'PromptError',
-    declaration: 'export interface PromptError {\n    op: \'send\' | \'stop\';\n    error: RpcError | RemoteFailure;\n}',
+    declaration: 'export interface PromptError {\n    readonly op: \'send\' | \'stop\';\n    readonly error: RemoteFailure;\n}',
   },
   {
     name: 'PropsHooks',
@@ -779,12 +800,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type PropsLocale<N> = N extends keyof LocaleNamespaceMap & string ? {\n    t: TranslateNS<N>;\n} : object;',
   },
   {
+    name: 'PropsRenderFactories',
+    declaration: 'export interface PropsRenderFactories {\n    renderFactorySlot: RenderFactorySlot;\n}',
+  },
+  {
     name: 'PropsRenderSlots',
-    declaration: 'export type PropsRenderSlots<S extends keyof SlotMap & string> = {\n    renderSlot: RenderSlotFn<Exclude<S, ChainKeysOf<S>>>;\n    readonly __renders?: ((key: S) => void) | undefined;\n} & ([\n    ChainKeysOf<S>\n] extends [\n    never\n] ? object : {\n    renderSlotChain: <K extends ChainKeysOf<S>>(key: K, owner: OwnerOf<K>, opts?: ChainRenderOpts) => ReactNode;\n}) & (\'session\' extends ScopeOf<S> ? {\n    SessionProvider: SessionProviderComponent;\n} : object);',
+    declaration: 'export type PropsRenderSlots<S extends keyof SlotMap & string> = {\n    renderSlot: RenderSlotFn<Exclude<S, ChainKeysOf<S>>>;\n    readonly __renders?: ((key: S) => void) | undefined;\n} & ([\n    ChainKeysOf<S>\n] extends [\n    never\n] ? object : {\n    renderSlotChain: <K extends ChainKeysOf<S>>(key: K, owner: OwnerOf<K>, opts?: ChainRenderOpts) => ReactNode;\n}) & ([\n    Extract<ScopeOf<S>, \'session\' | \'session-maybe\'>\n] extends [\n    never\n] ? object : {\n    SessionProvider: SessionProviderComponent;\n});',
   },
   {
     name: 'PropsRuntime',
-    declaration: 'export type PropsRuntime<K extends keyof SlotMap & string, EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>> = OwnerOf<K> & KeyPropsOf<K, EntryKey> & SlotInjectFace<SlotInjectOf<K>> & (ScopeOf<K> extends \'session\' ? SessionStandardProps : ScopeOf<K> extends \'session-maybe\' ? SessionMaybeStandardProps : object) & GlobalStandardProps;',
+    declaration: 'export type PropsRuntime<K extends keyof SlotMap & string, EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>> = OwnerOf<K> & KeyPropsOf<K, EntryKey> & SlotInjectFace<SlotInjectOf<K>> & ScopeStandardProps<ScopeOf<K>>;',
   },
   {
     name: 'PropsSlotHooks',
@@ -796,19 +821,27 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'QueueAction',
-    declaration: 'export type QueueAction = Parameters<SessionFace[\'updateQueue\']>[1];',
+    declaration: 'export type QueueAction = {\n    readonly kind: \'edit\';\n    readonly content: readonly TextBlock[];\n} | {\n    readonly kind: \'remove\';\n} | {\n    readonly kind: \'steer\';\n};',
+  },
+  {
+    name: 'RegisterFactory',
+    declaration: 'export interface RegisterFactory {\n    <F extends keyof SlotFactoryMap & string>(options: RegisterFactoryOptions<F>, component: SlotComponent<FactoryComponentPropsOf<F>>): () => void;\n}',
+  },
+  {
+    name: 'RegisterFactoryOptions',
+    declaration: 'export type RegisterFactoryOptions<F extends keyof SlotFactoryMap & string> = {\n    name: F;\n    scope: FactoryDefOf<F>[\'scope\'];\n} & FactoryField<F, \'children\', FactoryChildrenOf<F>> & FactoryField<F, \'store\', FactoryStoreOf<F> | (() => FactoryStoreOf<F>)> & FactoryField<F, \'inject\', (...args: FactoryInjectParams<F>) => FactoryInjectOf<F>> & FactoryField<F, \'locale\', FactoryLocaleOf<F>> & FactoryField<F, \'slots\', RuntimeFactorySlots<F>> & FactoryCollisionCheck<F> & FactoryChildrenCheck<F>;',
+  },
+  {
+    name: 'RemoteHostFacts',
+    declaration: 'export interface RemoteHostFacts {\n    readonly home: string | undefined;\n    readonly isLoopback: boolean;\n}',
   },
   {
     name: 'RemoteStream',
-    declaration: 'export class RemoteStream<Item> implements AsyncIterable<RemoteStreamItem<Item>> {\n    constructor(private readonly connection: RemoteStreamConnection, private readonly options: RemoteStreamOptions<Item>);\n    get signal(): AbortSignal;\n    restart(): void;\n    dispose(): Promise<void>;\n    [Symbol.asyncIterator](): AsyncIterator<RemoteStreamItem<Item>>;\n}',
+    declaration: 'export class RemoteStream<Item> implements AsyncIterable<RemoteStreamItem<Item>> {\n    constructor(private readonly connection: Pick<ConnectionHandle, \'generation\'>, private readonly options: RemoteStreamOptions<Item>);\n    get signal(): AbortSignal;\n    restart(): void;\n    dispose(): Promise<void>;\n    [Symbol.asyncIterator](): AsyncIterator<RemoteStreamItem<Item>>;\n}',
   },
   {
     name: 'RemoteStreamCarrierError',
     declaration: 'export class RemoteStreamCarrierError extends Error {\n    constructor(message: string, options?: ErrorOptions);\n}',
-  },
-  {
-    name: 'RemoteStreamConnection',
-    declaration: 'export interface RemoteStreamConnection {\n    readonly generation: {\n        getSnapshot(): unknown;\n        subscribe(listener: () => void): () => void;\n    };\n}',
   },
   {
     name: 'RemoteStreamItem',
@@ -816,55 +849,115 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'RemoteStreamOptions',
-    declaration: 'export interface RemoteStreamOptions<Item> {\n    readonly sessionId?: SessionId;\n    readonly name: string;\n    readonly open: (signal: AbortSignal) => AsyncIterable<Item>;\n    readonly ended: (accepted: boolean) => Error;\n    readonly carrierFailed?: (error: RemoteStreamCarrierError) => void;\n}',
+    declaration: 'export interface RemoteStreamOptions<Item> {\n    readonly name: string;\n    readonly open: (signal: AbortSignal) => AsyncIterable<Item>;\n    readonly ended: (accepted: boolean) => Error;\n    readonly carrierFailed?: (error: RemoteStreamCarrierError) => void;\n}',
   },
   {
-    name: 'RunningToolCall',
-    declaration: 'export type RunningToolCall = PreparingToolCall | StartedToolCall;',
+    name: 'RenderFactorySlot',
+    declaration: 'export type RenderFactorySlot = <F extends keyof SlotFactoryMap & string>(name: F, props: FactoryInputPropsOf<F>, options?: {\n    slots?: Partial<{\n        [N in FactoryLocalNameOf<F>]: FactoryLocalComponent<F, N>;\n    }>;\n    fallback?: ReactNode;\n}) => ReactNode;',
   },
   {
     name: 'ScopeOf',
     declaration: 'export type ScopeOf<K extends keyof SlotMap & string> = SlotMap[K][\'scope\'];',
   },
   {
+    name: 'ScopeStandardProps',
+    declaration: 'export type ScopeStandardProps<S extends SlotScope> = (S extends \'session\' ? SessionStandardProps : S extends \'session-maybe\' ? SessionMaybeStandardProps : object) & GlobalStandardProps;',
+  },
+  {
     name: 'SessionAreaProps',
-    declaration: 'export interface SessionAreaProps {\n    empty?: (() => ReactNode) | undefined;\n    sessionId?: SessionIdOf;\n    children: (sessionId: SessionIdOf) => ReactNode;\n}',
+    declaration: 'export interface SessionAreaProps {\n    readonly session?: SlotScopeTargetMap[keyof SlotScopeTargetMap & \'session\'] | undefined;\n    empty?: (() => ReactNode) | undefined;\n    children: ReactNode;\n}',
+  },
+  {
+    name: 'SessionAssistantSettlementEntry',
+    declaration: 'export interface SessionAssistantSettlementEntry {\n    readonly type: \'event\';\n    readonly event: SessionEvent<\'assistant/message\'> | SessionEvent<\'assistant/attempt\'>;\n}',
   },
   {
     name: 'SessionBinding',
-    declaration: 'export interface SessionBinding {\n    readonly sessionId: SessionId;\n    readonly session: SessionFace;\n    readonly ctx: AgentContext;\n    readonly hostDescription?: HostDescriptionSource;\n}',
+    declaration: 'export interface SessionBinding {\n    readonly sessionId: SessionId;\n    readonly session: SessionFace;\n    readonly eventSource: SessionEventSource;\n    readonly ctx: AgentContext;\n}',
+  },
+  {
+    name: 'SessionEventChange',
+    declaration: 'export type SessionEventChange = {\n    readonly kind: \'replace\';\n    readonly entries: readonly SessionEventLikeEntry[];\n} | {\n    readonly kind: \'prepend\';\n    readonly entries: readonly SessionEventLikeEntry[];\n} | {\n    readonly kind: \'append\';\n    readonly entries: readonly SessionEventLikeEntry[];\n} | {\n    readonly kind: \'settle-assistant\';\n    readonly attemptId: LlmAttemptId;\n    readonly entry?: SessionAssistantSettlementEntry;\n};',
+  },
+  {
+    name: 'SessionEventLikeEntry',
+    declaration: 'export type SessionEventLikeEntry = {\n    readonly type: \'event\';\n    readonly event: SessionEvent;\n} | {\n    readonly type: \'transient\';\n    readonly event: AssistantLiveChunkEvent;\n};',
+  },
+  {
+    name: 'SessionEventSource',
+    declaration: 'export type SessionEventSource = ObservableSnapshot<SessionEventWindow>;',
+  },
+  {
+    name: 'SessionEventWindow',
+    declaration: 'export interface SessionEventWindow {\n    readonly entries: readonly SessionEventLikeEntry[];\n    readonly hasMore: boolean;\n    readonly revision: number;\n    readonly change: SessionEventChange;\n}',
   },
   {
     name: 'SessionFace',
-    declaration: 'export type SessionFace = ISession & ObservableSnapshot<ConversationSnapshot>;',
+    declaration: 'export type SessionFace = ISession & ObservableSnapshot<SessionSnapshot>;',
   },
   {
     name: 'SessionIdOf',
     declaration: 'export type SessionIdOf = SessionStandardProps extends {\n    sessionId: infer S;\n} ? S : string;',
   },
   {
+    name: 'SessionListPhase',
+    declaration: 'export type SessionListPhase = \'pending\' | \'ready\';',
+  },
+  {
+    name: 'SessionListState',
+    declaration: 'export interface SessionListState {\n    ids: SessionId[];\n    byId: Record<SessionId, SessionSummary>;\n    phase: SessionListPhase;\n    projectionsBySession: Readonly<Record<SessionId, SessionProjectionSnapshot>>;\n}',
+  },
+  {
     name: 'SessionMaybeStandardProps',
     declaration: 'export interface SessionMaybeStandardProps {\n}',
   },
   {
-    name: 'SessionPendingEntry',
-    declaration: 'export type SessionPendingEntry = PendingInteraction | SessionPublishedInteraction;',
+    name: 'SessionProjectionSnapshot',
+    declaration: 'export interface SessionProjectionSnapshot {\n    readonly values: Readonly<Partial<SessionProjectionMap>>;\n    readonly state: \'idle\' | \'loading\' | \'ready\' | \'migration-required\' | \'error\';\n    readonly error: RemoteFailure | null;\n}',
   },
   {
     name: 'SessionProviderComponent',
     declaration: 'export type SessionProviderComponent = (props: SessionAreaProps) => ReactNode;',
   },
   {
-    name: 'SessionPublishedInteraction',
-    declaration: 'export interface SessionPublishedInteraction {\n    readonly kind: string;\n    readonly key: string;\n    readonly sessionId: SessionId;\n}',
+    name: 'SessionReference',
+    declaration: 'export interface SessionReference extends Disposable {\n    readonly sessionId: SessionId;\n    readonly binding: SessionBinding;\n    readonly ready: Promise<SessionBinding>;\n    release(): void;\n}',
+  },
+  {
+    name: 'SessionReferenceSource',
+    declaration: 'export type SessionReferenceSource = Extract<keyof SessionReferenceSourceMap, string>;',
+  },
+  {
+    name: 'SessionReferenceSourceMap',
+    declaration: 'export interface SessionReferenceSourceMap {\n    controllerOperation: unknown;\n    gateway: unknown;\n}',
+  },
+  {
+    name: 'SessionRequestId',
+    declaration: 'export type SessionRequestId = Branded<\'session-request-id\'>;',
+  },
+  {
+    name: 'SessionRetainInfo',
+    declaration: 'export interface SessionRetainInfo {\n    readonly referenceCount: number;\n    readonly retainedBy: Readonly<Partial<Record<SessionReferenceSource, number>>>;\n}',
+  },
+  {
+    name: 'SessionRetainOptions',
+    declaration: 'export interface SessionRetainOptions {\n    readonly source: SessionReferenceSource;\n    readonly signal?: AbortSignal | undefined;\n}',
   },
   {
     name: 'SessionSearchResultItem',
     declaration: 'export interface SessionSearchResultItem {\n    sessionId: SessionId;\n    snippet: string;\n}',
   },
   {
+    name: 'SessionSnapshot',
+    declaration: 'export interface SessionSnapshot {\n    readonly sessionId: SessionId;\n    readonly pendingSubmissions: readonly PendingSubmission[];\n    readonly running: boolean;\n    readonly subagent: {\n        readonly address: SubagentAddress;\n        readonly parentAvailable?: boolean;\n    } | null;\n    readonly removed: boolean;\n    readonly openState: OpenState;\n    readonly openError: RemoteFailure | null;\n    readonly hasMore: boolean;\n    readonly loadingOlder: boolean;\n    readonly promptError: PromptError | null;\n    readonly blank: boolean;\n    readonly lastAgentError: string | null;\n    readonly promptAttempted: boolean;\n    readonly awaitingFirstTurn: boolean;\n}',
+  },
+  {
     name: 'SessionStandardProps',
     declaration: 'export interface SessionStandardProps {\n}',
+  },
+  {
+    name: 'SessionTarget',
+    declaration: 'export type SessionTarget = SessionId | SubagentAddress;',
   },
   {
     name: 'SlotComponent',
@@ -872,11 +965,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SlotCore',
-    declaration: 'export class SlotCore {\n    constructor();\n    register<K extends keyof SlotMap & string, const EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>, const D extends ChildrenDecl = Record<never, never>, H extends StoreDecl | undefined = undefined, M = never, N extends (keyof LocaleNamespaceMap & string) | undefined = undefined, C extends SlotComponent<never> = SlotComponent<never>>(options: BaseOptions<K, EntryKey, D, H, M, N> & {\n        inject?: undefined;\n    }, component: C & SlotComponent<ComposedProps<K, NoInfer<EntryKey>, keyof NoInfer<D> & keyof SlotMap & string, HandleOf<NoInfer<H>>, object, NoInfer<M>, NoInfer<N>>> & RendersCheck<C, D>): () => void;\n    register<K extends keyof SlotMap & string, I extends object, const EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>, const D extends ChildrenDecl = Record<never, never>, H extends StoreDecl | undefined = undefined, M = never, N extends (keyof LocaleNamespaceMap & string) | undefined = undefined, C extends SlotComponent<never> = SlotComponent<never>>(options: BaseOptions<K, EntryKey, D, H, M, N> & {\n        inject: (...args: InjectParams<K, H>) => I;\n    }, component: C & SlotComponent<ComposedProps<K, NoInfer<EntryKey>, keyof NoInfer<D> & keyof SlotMap & string, HandleOf<NoInfer<H>>, I, NoInfer<M>, NoInfer<N>>> & RendersCheck<C, D>): () => void;\n    register(options: ErasedOptions, component: unknown): () => void;\n    isLive(entry: StoredEntry): boolean;\n    entries(key: string): readonly StoredEntry[];\n    entriesOfSlot(key: string): readonly StoredEntry[];\n    spec<K extends keyof SlotMap & string>(key: K): SlotSpec<SlotMap[K]> | undefined;\n    specDynamic(key: string): SlotSpec<SlotEntryDef> | undefined;\n    snapshot(root?: string): LiveSlotNode[];\n    declarationEpoch(key: string): number;\n    subscribe(key: string, fn: () => void): () => void;\n    subscribeDeclaration(key: string, fn: () => void): () => void;\n    getVersion(key: string): number;\n    onMutate(fn: (key: string) => void): () => void;\n    reportEntryError(key: string, entry: StoredEntry, error: unknown, info: {\n        abdicate: boolean;\n    }): void;\n    onEntryError(fn: (key: string, entry: StoredEntry, error: unknown, info: {\n        abdicated: boolean;\n    }) => void): () => void;\n}',
+    declaration: 'export class SlotCore {\n    constructor();\n    readonly registerFactory: RegisterFactory;\n    factory(name: string): StoredFactory | undefined;\n    factoryVersion(name: string): number;\n    subscribeFactory(name: string, listener: () => void): () => void;\n    isFactoryLive(definition: StoredFactory): boolean;\n    register<K extends keyof SlotMap & string, const EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>, const D extends ChildrenDecl = Record<never, never>, H extends StoreDecl | undefined = undefined, M = never, N extends (keyof LocaleNamespaceMap & string) | undefined = undefined, C extends SlotComponent<never> = SlotComponent<never>>(options: BaseOptions<K, EntryKey, D, H, M, N> & {\n        inject?: undefined;\n    }, component: C & SlotComponent<ComposedProps<K, NoInfer<EntryKey>, keyof NoInfer<D> & keyof SlotMap & string, HandleOf<NoInfer<H>>, object, NoInfer<M>, NoInfer<N>>> & RendersCheck<C, D>): () => void;\n    register<K extends keyof SlotMap & string, I extends object, const EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>, const D extends ChildrenDecl = Record<never, never>, H extends StoreDecl | undefined = undefined, M = never, N extends (keyof LocaleNamespaceMap & string) | undefined = undefined, C extends SlotComponent<never> = SlotComponent<never>>(options: BaseOptions<K, EntryKey, D, H, M, N> & {\n        inject: (...args: InjectParams<K, H>) => I;\n    }, component: C & SlotComponent<ComposedProps<K, NoInfer<EntryKey>, keyof NoInfer<D> & keyof SlotMap & string, HandleOf<NoInfer<H>>, I, NoInfer<M>, NoInfer<N>>> & RendersCheck<C, D>): () => void;\n    register(options: ErasedOptions, component: unknown): () => void;\n    isLive(entry: StoredEntry): boolean;\n    entries(key: string): readonly StoredEntry[];\n    entriesOfSlot(key: string): readonly StoredEntry[];\n    spec<K extends keyof SlotMap & string>(key: K): SlotSpec<SlotMap[K]> | undefined;\n    specDynamic(key: string): SlotSpec<SlotEntryDef> | undefined;\n    snapshot(root?: string): LiveCompositionNode[];\n    declarationEpoch(key: string): number;\n    subscribe(key: string, fn: () => void): () => void;\n    subscribeDeclaration(key: string, fn: () => void): () => void;\n    getVersion(key: string): number;\n    onMutate(fn: (key: string) => void): () => void;\n    reportEntryError(key: string, entry: StoredEntry, error: unknown, info: {\n        abdicate: boolean;\n    }): void;\n    reportFactoryError(name: string, registration: StoredEntry | StoredFactory, error: unknown): void;\n    onEntryError(fn: (key: string, registration: StoredEntry | StoredFactory, error: unknown, info: {\n        abdicated: boolean;\n    }) => void): () => void;\n}',
   },
   {
     name: 'SlotEntryDef',
-    declaration: 'export interface SlotEntryDef {\n    kind: SlotKind;\n    scope: SlotScope;\n    owner?: object;\n    keyProps?: Record<string, object>;\n    hookContext?: unknown;\n    inject?: object;\n}',
+    declaration: 'export interface SlotEntryDef {\n    kind: SlotKind;\n    scope: SlotScope;\n    inline?: true;\n    owner?: object;\n    keyProps?: Record<string, object>;\n    hookContext?: unknown;\n    inject?: object;\n}',
+  },
+  {
+    name: 'SlotFactoryMap',
+    declaration: 'export interface SlotFactoryMap {\n}',
   },
   {
     name: 'SlotInjectFace',
@@ -903,24 +1000,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type SlotScope = \'root\' | \'session-maybe\' | \'session\';',
   },
   {
+    name: 'SlotScopeTargetMap',
+    declaration: 'export interface SlotScopeTargetMap {\n}',
+  },
+  {
     name: 'SlotSpec',
-    declaration: 'export type SlotSpec<E extends SlotEntryDef> = {\n    kind: E[\'kind\'];\n    scope: E[\'scope\'];\n} & (\'inject\' extends keyof E ? E extends {\n    inject: infer Injected extends object;\n} ? {\n    inject: Injected;\n} : {\n    inject?: object;\n} : {\n    inject?: never;\n});',
+    declaration: 'export type SlotSpec<E extends SlotEntryDef> = {\n    kind: E[\'kind\'];\n    scope: E[\'scope\'];\n    inline?: true;\n} & (\'inject\' extends keyof E ? E extends {\n    inject: infer Injected extends object;\n} ? {\n    inject: Injected;\n} : {\n    inject?: object;\n} : {\n    inject?: never;\n});',
   },
   {
     name: 'SnapshotSelectorHook',
     declaration: 'export type SnapshotSelectorHook<T> = <S>(sel: (s: T) => S, eq?: (a: S, b: S) => boolean) => S;',
   },
   {
-    name: 'StartedToolCall',
-    declaration: 'export interface StartedToolCall extends ToolCallHead {\n    readonly phase: \'start\';\n    readonly argsRaw: string;\n}',
-  },
-  {
-    name: 'SteeringMessageNode',
-    declaration: 'export interface SteeringMessageNode {\n    kind: \'steering\';\n    messageId: MessageId;\n    seq: number;\n    time: number;\n    content: readonly ContentBlock[];\n    source: unknown;\n}',
-  },
-  {
-    name: 'StepLocation',
-    declaration: 'export interface StepLocation {\n    readonly turn: number;\n    readonly step: number;\n    readonly start: SessionEvent<\'step/start\'> | undefined;\n    readonly end: SessionEvent<\'step/end\'> | undefined;\n    readonly status: \'open\' | \'closed\' | \'unknown\';\n    readonly data: ConversationLocationDataStore<ConversationStepDataMap>;\n}',
+    name: 'StartSessionOptions',
+    declaration: 'export interface StartSessionOptions extends DraftInitializationOptions {\n    readonly agentPreset?: string;\n}',
   },
   {
     name: 'StoreDecl',
@@ -929,6 +1022,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'StoredEntry',
     declaration: 'export interface StoredEntry {\n    component: unknown;\n    options: {\n        key?: string;\n        id?: string;\n        order?: number;\n        label?: SlotLabel;\n        priority?: number;\n    };\n    select?: ((owner: never) => unknown) | undefined;\n    inject?: ((...args: never[]) => Record<string, unknown>) | undefined;\n    children?: Readonly<Record<string, SlotSpec<SlotEntryDef>>> | undefined;\n    store?: StoreDecl | undefined;\n    locale?: string | undefined;\n    registrant?: string | undefined;\n}',
+  },
+  {
+    name: 'StoredFactory',
+    declaration: 'export interface StoredFactory {\n    readonly name: string;\n    readonly component: unknown;\n    readonly scope: SlotScope;\n    readonly children?: Readonly<Record<string, SlotSpec<SlotEntryDef>>> | undefined;\n    readonly store?: StoreDecl | undefined;\n    readonly inject?: ((...args: never[]) => Record<string, unknown>) | undefined;\n    readonly locale?: string | undefined;\n    readonly slots?: Readonly<Record<string, {\n        scope: SlotScope;\n    }>> | undefined;\n    readonly registrant?: string | undefined;\n}',
   },
   {
     name: 'StoreFactory',
@@ -948,7 +1045,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubmissionHandle',
-    declaration: 'export interface SubmissionHandle {\n    readonly requestId: RpcId;\n    abandon(): void;\n}',
+    declaration: 'export interface SubmissionHandle {\n    readonly requestId: SessionRequestId;\n    abandon(): void;\n}',
   },
   {
     name: 'ThemeDefinition',
@@ -960,7 +1057,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ThemeSnapshot',
-    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n    projectOverride?: \'light\' | \'dark\';\n}',
+    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    fontSizes: FontSizes;\n    fontFamilies: FontFamilies;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n}',
   },
   {
     name: 'ThemeTokenModes',
@@ -975,44 +1072,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ThemeTokens = Record<string, string>;',
   },
   {
-    name: 'ToolCallBlock',
-    declaration: 'export type ToolCallBlock = RunningToolCall | ToolResultNode;',
-  },
-  {
-    name: 'ToolCallId',
-    declaration: 'export type ToolCallId = string;',
-  },
-  {
-    name: 'ToolResultNode',
-    declaration: 'export interface ToolResultNode {\n    kind: \'tool-result\';\n    seq: number;\n    time: number;\n    callId: string;\n    parentCallId?: string;\n    call: {\n        name: string;\n        argsRaw: string;\n    } | null;\n    callTime: number | null;\n    content: readonly ContentBlock[];\n    isError: boolean;\n    error?: {\n        name: string;\n        code: string;\n        reason?: string;\n    };\n    meta?: unknown;\n    callView: ToolCallView | null;\n    resultView: ToolResultView | null;\n    subCalls: readonly ToolCallBlock[];\n}',
-  },
-  {
     name: 'TranslateNS',
     declaration: 'export type TranslateNS<N extends keyof LocaleNamespaceMap & string> = Translate<LocaleKeysOf<N>>;',
   },
   {
-    name: 'TurnErrorNode',
-    declaration: 'export interface TurnErrorNode {\n    kind: \'turn-error\';\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n    message: string;\n    code?: string;\n}',
+    name: 'UseFactorySlot',
+    declaration: 'export type UseFactorySlot<F extends keyof SlotFactoryMap & string> = <N extends FactoryLocalNameOf<F>>(name: N, fallback: FactoryLocalComponent<F, N>) => SlotComponent<FactoryLocalInputPropsOf<F, N>>;',
   },
   {
-    name: 'TurnLocation',
-    declaration: 'export interface TurnLocation {\n    readonly turn: number;\n    readonly start: SessionEvent<\'turn/start\'> | undefined;\n    readonly end: SessionEvent<\'turn/end\'> | undefined;\n    readonly status: \'open\' | \'closed\' | \'unknown\';\n    readonly steps: readonly StepLocation[];\n    readonly data: ConversationLocationDataStore<ConversationTurnDataMap>;\n}',
-  },
-  {
-    name: 'TurnMaxTokensNode',
-    declaration: 'export interface TurnMaxTokensNode {\n    kind: \'turn-max-tokens\';\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n}',
-  },
-  {
-    name: 'TurnNavigationItem',
-    declaration: 'export interface TurnNavigationItem {\n    readonly turn: number;\n    readonly anchorKey: string;\n    readonly startSeq?: number;\n    readonly endSeq?: number;\n    readonly loaded?: boolean;\n    readonly prompt: string;\n    readonly response: string;\n}',
-  },
-  {
-    name: 'UnknownSurfaceNode',
-    declaration: 'export interface UnknownSurfaceNode {\n    kind: \'unknown\';\n    seq: number;\n    time: number;\n    type: string;\n    data: unknown;\n}',
-  },
-  {
-    name: 'UserMessageNode',
-    declaration: 'export interface UserMessageNode {\n    kind: \'user\';\n    seq: number;\n    time: number;\n    content: readonly ContentBlock[];\n    source: unknown;\n}',
+    name: 'WorkspaceView',
+    declaration: 'export interface WorkspaceView {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n    readonly title: string;\n    readonly sessionIds: readonly SessionId[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
   },
 ]
 
@@ -1024,10 +1093,9 @@ export const INHERITED_CTX_API: readonly InheritedApiEntry[] = [
   { name: 'ctx.effect', summary: 'Register a disposable side effect tied to the fiber.' },
   { name: 'ctx.get / ctx.set / ctx.provide / ctx.accessor / ctx.mixin', summary: 'Low-level service-store access and binding.' },
   { name: 'ctx.extend / ctx.isolate / ctx.intercept', summary: 'Derive a child context (scoped services / isolation / interception).' },
-  { name: 'ctx.root / ctx.scope / ctx.fiber / ctx.registry / ctx.reflect / ctx.events / ctx.logger', summary: 'Ambient handles onto the running context graph.' },
+  { name: 'ctx.root / ctx.fiber / ctx.registry / ctx.reflect / ctx.events / ctx.logger', summary: 'Ambient handles onto the running context graph.' },
   { name: 'ctx.timer (+ interval / timeout / throttle / debounce)', summary: 'Disposable timer helpers. The `timer` key is provided at runtime; the four supported helpers are mixed onto ctx directly (declared via Pick).' },
   { name: 'ctx.loader', summary: 'The config Loader that booted the app (present under the loader).' },
-  { name: 'ctx.hmr', summary: 'The hot-module-reload watcher (present under the hmr plugin).' },
 ]
 
 function referencedTypeClosure(seeds: readonly string[]): TypeApiEntry[] {

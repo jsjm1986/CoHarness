@@ -37,7 +37,7 @@ Providers advertise preparation origins through `downloadSources`. `prepare(id, 
 <details>
 <summary>Maintainer details — click to expand</summary>
 
-`resolve()` captures the provider instance, recording and language. `transcribe()` rejects a withdrawn or replaced registration. A registration disposer closes admission, aborts accepted requests and joins provider settlement; providers must honor cancellation. No fallback selects a different recognizer or uploads audio. No runtime invariant companion is published because the registry is the sole source of provider and preparation observations.
+`resolve()` captures the provider instance, recording and language. `transcribe()` rejects a withdrawn or replaced registration. A registration disposer closes admission, aborts accepted requests and joins provider settlement; providers must honor cancellation. No fallback selects a different recognizer or uploads audio.
 
 `defaultProvider` and `language` are volatile Config fields acting as composition defaults: `configure()` merges the supplied fields into the `speech-to-text` section through the `settings` service, and the running instance reads the registered scope's resolved values without remounting. `configure()` fails without `settings`, and rejects a language unsupported by the selected provider before saving. Providers advertise accepted language hints through `languages`; `resolve()` validates the selected hint before transcription. Provider-owned preparation is observed through complete `SpeechSnapshot` values; closing an observer never cancels preparation.
 

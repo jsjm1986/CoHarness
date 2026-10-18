@@ -3,7 +3,7 @@ import { provideWorkingDirectoryFixture, mountAgentLoopTestDependencies } from '
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -23,6 +23,7 @@ let ctx: Context | undefined
 let workdir: string | undefined
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await ctx?.fiber.dispose()
   ctx = undefined
   if (workdir !== undefined) await rm(workdir, { recursive: true, force: true })
@@ -40,6 +41,9 @@ async function harness(): Promise<{ ctx: Context; agent: Agent }> {
   })
   await ctx.plugin(LocalFileSystem, { cwd: '/' })
   await ctx.plugin(ToolFs)
+  // Keep the developer's real ~/.dsh and ~/.agents out of the model-visible baseline.
+  vi.stubEnv('DSH_HOME', join(workdir, 'absent-dsh'))
+  vi.stubEnv('DSH_AGENTS_HOME', join(workdir, 'absent-agents'))
   await ctx.plugin(AgentInstructions, { maxBytes: 65536 })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-v4-flash' }] })

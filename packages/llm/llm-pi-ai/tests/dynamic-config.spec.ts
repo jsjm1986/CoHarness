@@ -50,6 +50,72 @@ async function boot(dir: string, config: LlmPiAi.Config): Promise<Context> {
 }
 
 describe('request-level dynamic profiles', () => {
+  it('keeps stored catalog failures editable while isolating requests and validating changed providers', async () => {
+    vi.stubEnv('PI_DYNAMIC_KEY', '')
+    const dir = await home()
+    const server = await mockServer([{ events: textEvents }, { events: textEvents }])
+    const known = getBuiltinModels('openrouter').find(model => model.api === 'openai-completions')!
+    const stored = { providers: { openrouter: {
+      apiKeyEnv: 'PI_DYNAMIC_KEY', baseURL: server.url,
+      models: [{ id: known.id }, { id: '111' }],
+    } } }
+    await writeFile(join(dir, '.credentials.yaml'), 'version: 1\nrefs:\n  PI_DYNAMIC_KEY: fake-key\n', { mode: 0o600 })
+    const ctx = await boot(dir, stored)
+    const failure = 'llm-pi-ai: provider "openrouter" model "111" needs an api; '
+      + 'the installed catalog does not describe it, so set the route\'s api to the wire protocol its endpoint speaks'
+
+    expect(ctx.llm.listProviders()).toEqual([{ id: 'openrouter', name: 'openrouter' }])
+    expect(ctx.llm.listConfigurableProviders()).toContainEqual({
+      provider: 'openrouter', displayName: 'openrouter', settingsNs: 'llm-pi-ai',
+      settingsPath: ['providers', 'openrouter'], declared: false,
+      defaultBaseURL: 'https://openrouter.ai/api/v1', nativeAuth: { env: ['OPENROUTER_API_KEY'], oauth: true },
+      error: failure,
+    })
+    expect((await ctx.llm.listModels('openrouter')).map(model => model.id)).toEqual([known.id])
+    const bad = await assemble(ctx, { provider: 'openrouter', model: '111', messages: [] })
+    expect(bad.finish).toMatchObject({ kind: 'error', failure: { code: 'INVALID_CONFIG', message: failure } })
+    expect(server.requests).toHaveLength(0)
+    const good = await assemble(ctx, { provider: 'openrouter', model: known.id, messages: [] })
+    expect(good.message.content).toEqual([{ type: 'text', text: 'hello' }])
+
+    await configurations.get(ctx)!.update({ providers: { deepseek: { apiKeyEnv: 'PI_DYNAMIC_KEY', baseURL: server.url } } })
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['openrouter', 'deepseek'])
+    const beforeRejected: unknown = configurations.get(ctx)!.entry.options.config
+    await expect(configurations.get(ctx)!.update({ providers: { openrouter: { displayName: 'Edited' } } })).rejects.toThrow(failure)
+    expect(configurations.get(ctx)!.entry.options.config).toEqual(beforeRejected)
+
+    const diagnostics: Array<string | undefined> = []
+    ctx.on('llm/adapters-updated', () => {
+      diagnostics.push(ctx.llm.listConfigurableProviders().find(entry => entry.provider === 'openrouter')?.error)
+    })
+    await configurations.get(ctx)!.update({ providers: { openrouter: { api: 'openai-completions' } } })
+    expect(diagnostics).toEqual([undefined])
+    expect(ctx.llm.listProviders()[0]).toEqual({ id: 'openrouter', name: 'openrouter' })
+    const repaired = await assemble(ctx, { provider: 'openrouter', model: '111', messages: [] })
+    expect(repaired.message.content).toEqual([{ type: 'text', text: 'hello' }])
+    expect(server.requests).toHaveLength(2)
+  })
+
+  it('allows removing an obsolete override and deleting a route whose catalog cannot be built', async () => {
+    const dir = await home()
+    const stored = { providers: {
+      anthropic: { modelOverrides: { 'removed-model': { maxTokens: 4096 } } },
+      'retired-route': {},
+    } }
+    const ctx = await boot(dir, stored)
+    expect(ctx.llm.listConfigurableProviders().find(entry => entry.provider === 'anthropic')?.error)
+      .toContain('modelOverrides names "removed-model"')
+    expect(ctx.llm.listConfigurableProviders().find(entry => entry.provider === 'retired-route')?.error)
+      .toContain('resolves no models')
+    expect((await ctx.llm.listModels('anthropic')).length).toBeGreaterThan(0)
+    await expect(ctx.llm.resolveModelInfo('anthropic', 'removed-model')).rejects.toThrow('modelOverrides names "removed-model"')
+    await expect(ctx.llm.resolveModelInfo('retired-route', 'anything')).rejects.toThrow('resolves no models')
+    await configurations.get(ctx)!.replace({ providers: { anthropic: {} } })
+    expect(ctx.llm.listProviders()).toEqual([{ id: 'anthropic', name: 'anthropic' }])
+    expect(ctx.llm.listConfigurableProviders().find(entry => entry.provider === 'retired-route')).toBeUndefined()
+    expect(ctx.llm.listConfigurableProviders().find(entry => entry.provider === 'anthropic')?.error).toBeUndefined()
+  })
+
   it('mounts bare and dormant, then registers routes the moment settings supply providers', async () => {
     vi.stubEnv('PI_DYNAMIC_KEY', '')
     const dir = await home()
@@ -64,7 +130,8 @@ describe('request-level dynamic profiles', () => {
 
     expect(ctx.llm.listProviders()).toEqual([])
     // Dormant ≠ invisible: every installed catalog provider is configurable
-    // before any route exists, each addressed inside the providers dict.
+    // before any route exists, each addressed inside the providers dict and
+    // described by the endpoint and environment variables it uses unconfigured.
     const directory = ctx.llm.listConfigurableProviders()
     expect(directory.length).toBeGreaterThan(30)
     expect(directory).toContainEqual({
@@ -73,6 +140,8 @@ describe('request-level dynamic profiles', () => {
       settingsNs: 'llm-pi-ai',
       settingsPath: ['providers', 'openai'],
       declared: false,
+      defaultBaseURL: 'https://api.openai.com/v1',
+      nativeAuth: { env: ['OPENAI_API_KEY'], oauth: true },
     })
     await ctx.settings.update(NS, {
       providers: { deepseek: { apiKeyEnv: 'PI_DYNAMIC_KEY', baseURL: server.url } },

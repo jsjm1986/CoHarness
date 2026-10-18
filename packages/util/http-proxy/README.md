@@ -9,13 +9,14 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Node's built-in `fetch` ignores `HTTP_PROXY`/`HTTPS_PROXY`. This package resolves one proxy policy from the launcher's environment snapshot and installs it as undici's global dispatcher — which is what `fetch` resolves — so ordinary call sites are proxied with no change. Four functions cover what the global dispatcher cannot reach: install the policy, ask where one request goes, hand the policy to a spawned child, and strip it for a replay.
+Use this package to apply one outbound HTTP proxy policy to Harness requests that use Node's built-in `fetch`, including LLM, web-search, and HTTP MCP traffic. The launcher reads standard proxy environment variables once, and ordinary `fetch` callers require no extra imports or changes. Local loopback traffic stays direct, while unsupported proxy URLs are reported and skipped for the affected scheme. Public helpers let callers route transports with their own proxy settings, prepare child-process environments, or clear proxy variables for isolated replays.
 
 ## Table of Contents
 
 - [Use this package](#use-this-package)
 - [Understand the implementation](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
+- [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
@@ -28,7 +29,7 @@ Nothing to mount, and nothing to configure. The `dsh` launcher resolves and inst
 
 ### Writing a new outbound call
 
-Plain `fetch()` is proxied, and so is any SDK that reaches `globalThis.fetch` — the MCP HTTP transport and the pi-ai provider stack both do. An SDK that builds its own transport does **not**, and two of the ones this repository ships turned out to: the OTLP exporter posts through `node:http`, and the E2B SDK constructs its own undici dispatcher. Assume nothing about an SDK; check it.
+Plain `fetch()` is proxied, and so is any SDK that reaches `globalThis.fetch` — the MCP HTTP transport and the pi-ai provider stack both do. Verify each SDK's actual transport; exceptions belong under [Known Limitations and Deferred Work](#known-limitations-and-deferred-work).
 
 | You are writing | Use |
 |---|---|
@@ -40,11 +41,9 @@ Plain `fetch()` is proxied, and so is any SDK that reaches `globalThis.fetch` �
 
 `proxyRouteFor` answers with the transport that answer assumed, not just the answer: its proxied arm carries the dispatcher already routing by this policy. A caller that read the policy and then built its own transport could have an unmount land between the two and send the request somewhere its branch never cleared.
 
-An SDK that builds its own transport reaches none of this, and two of the ones this repository ships do. E2B takes a proxy URL of its own and is handed `route.proxy`. The OTLP telemetry exporter posts through `node:http`, and is deliberately left direct — see the limitation below.
-
 Constructing `new Agent(...)` and passing it as `dispatcher` overrides the global one and silently bypasses the proxy. `verify-no-bare-dispatcher` rejects that outside this package. One call site legitimately owns its transport — `web-fetch-http` pins a request to addresses it validated, which is per-request state a process-wide dispatcher cannot hold — and says so with a `proxy-exempt:` comment on the line.
 
-That gate cannot see inside an SDK, so every outbound call site in the repository also carries an `egress.spec.ts` that drives its real code path through a fake proxy and asserts the proxy saw the request — or, for telemetry, that it did not. A new call site adds one. It is the only thing that catches an SDK changing transports underneath us, in either direction: it is how the OTLP and E2B gaps were found, and it is what would catch an upgrade that started routing telemetry silently.
+That gate cannot see inside an SDK, so each outbound call site carries an `egress.spec.ts` that drives its actual transport through a fake proxy and checks the observed route. Every new outbound call site must include that transport test. Telemetry asserts its direct-route exception. These tests detect dependency changes that alter routing without changing the call site.
 
 ### What the policy reads
 
@@ -85,14 +84,19 @@ An entry names a host and matches it together with every subdomain under it: `NO
 ## Further Exploration
 
 - [Network proxy guide](../../../docs/user/guide/network-proxy.md) — what to export, and why a browser is proxied when a terminal is not.
-- [Proxy policy and upstream audit](../../../upgrades/plans/UPGRADE-PLAN-dsh-v0.1.3-alpha.1.md) — the policy decisions and integration scope.
 - [`dsh-web-fetch-http`](../../web/web-fetch-http/README.md) — the one consumer whose safety rules change under a proxy.
 
 -----
 
-**Runtime invariant:** No companion is published. The one piece of mutable state here — the active policy — is asserted against the dispatcher it installs by unit tests that dispose the registration and observe a real loopback proxy.
+<a id="model-experience"></a>
+## Model Experience
 
-<a id="known-limitations-and-deferred-work"></a>
+None, as transport policy only: it changes how bytes reach the network and registers no prompt, schema, or result text.
+
+#### KV Cache effect
+
+No direct invalidation: the package contributes no request tokens and never mutates a request prefix, so provider cache reuse is unaffected.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -104,7 +108,7 @@ These limits define when the package is a poor fit. They are current package con
 - **No custom certificate authority** — a TLS-intercepting corporate proxy needs `NODE_EXTRA_CA_CERTS` set on the process before launch, which this package neither sets nor validates.
 - **A spawned child honors the policy only on a new enough runtime, and only when every value it inherits is one Node accepts** — it reads the published environment through Node's `NODE_USE_ENV_PROXY` (22.21+, 24+), and the engines range admits 22.19 and 22.20, where such a child stays direct. A user whose environment also names a SOCKS or otherwise refused proxy leaves every child Node direct: the flag is withheld so the child can start at all. A child also matches bypass entries with Node's own `NO_PROXY` rules, which differ from this package's in their separators and IPv4-range support. Nothing in this process depends on a Node version: every in-process request reaches the global dispatcher.
 - **Telemetry is direct by design** — the OTLP exporter posts through `node:http`, which no global dispatcher reaches. Routing it would need either an `http.Agent` whose `proxyEnv` option post-dates the lowest supported Node, or the SDK's `fetch` transport, which has no compression while the shipped profile enables gzip. Telemetry is the one channel whose loss costs the user nothing, so it stays where it was; `DSH_TELEMETRY_MODE=DISABLED` turns it off.
-- **A worker that executes model-authored code gets no proxy at all** — neither the `ptc-runtime` worker nor the `workflow` worker receives proxy configuration, so their own requests go direct. A proxy URL may carry `user:password`, and both run scripts the model wrote.
+- **Model-authored programs receive no proxy settings** — the Node ptc-runtime process and workflow worker do not inherit a proxy URL that may contain `user:password`. Their direct requests need their own configuration and remain subject to the execution sandbox.
 - **The regression gate sees source, not dependencies** — `verify-no-bare-dispatcher` parses `packages/*/*/src` and `apps/*/src`; tests, scripts, and the internals of a third-party SDK are outside it. That is why every outbound call site also carries an `egress.spec.ts`.
 
 <a id="dev-note"></a>
@@ -116,5 +120,3 @@ These limits define when the package is a poor fit. They are current package con
 Reaching Node's built-in `fetch` from a userland undici relies on both writing the legacy `Symbol.for('undici.globalDispatcher.1')` slot. That is an implicit cross-version coupling, not a contract — see [corepack#834](https://github.com/nodejs/corepack/issues/834) for it breaking. `tests/install.spec.ts` asserts a real request reaches a loopback proxy, so a version bump that breaks the coupling fails there rather than in the field.
 
 </details>
-
-**Runtime invariant:** The package companion registers no runtime check. This startup library exposes no Cordis event stream or owner-scoped mutable data; egress tests assert the active policy against the dispatcher it installs.

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-anonymous-user-id",
   "description": "Shared anonymous user identity for DeepSeek Harness telemetry and feedback correlation",
-  "version": "0.2.1-rc.1.coharness.1",
+  "version": "0.2.1-rc.2.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -27,15 +27,13 @@
   ],
   "license": "Apache-2.0",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
-    "@deepseek-ai/dsh-managed-data": "workspace:*"
+    "@deepseek-ai/cordis": "workspace:~"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
-    "@deepseek-ai/dsh-managed-data": "workspace:*"
+    "@deepseek-ai/cordis": "workspace:~"
   }
 }

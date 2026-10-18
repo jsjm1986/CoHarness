@@ -26,8 +26,6 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import { DISABLE_BYPASS_PRIVILEGES_PWSH } from './bypass-privileges.ts'
-
 const isWin32 = process.platform === 'win32'
 
 function pwshAvailable(): boolean {
@@ -97,91 +95,12 @@ function runPowerShell(args: readonly string[], env?: NodeJS.ProcessEnv): Script
   }
 }
 
-/**
- * The wrapper the script children run instead of `-File` on the script
- * itself. Two jobs: disable the bypass privileges an elevated runner token
- * holds (the script's effective-rights probes open with
- * FILE_FLAG_BACKUP_SEMANTICS, under which enabled Backup/Restore/
- * TakeOwnership rights answer true regardless of the DACL the fixture just
- * wrote), and forward the script's exit status — an `&`-invoked script's
- * `exit N` only ends that script and lands in `$LASTEXITCODE`, so a
- * `-Command` wrapper would report every verdict as process exit 1. A script
- * that dies in parameter binding never reaches `exit`, leaving
- * `$LASTEXITCODE` null; the wrapper falls back to `$?` — captured before the
- * exit-code read, since the assignment itself would reset it — so binding
- * rejections still surface as nonzero. Written once per suite run under the
- * system temp root.
- */
-let scriptWrapper = ''
-
 function runScript(args: readonly string[], env?: NodeJS.ProcessEnv): ScriptRun {
-  return runPowerShell(['-File', scriptWrapper, ...args], env)
+  return runPowerShell(['-File', script, ...args], env)
 }
 
 function icacls(path: string, ...args: readonly string[]): string {
   return execFileSync('icacls', [path, ...args], { encoding: 'utf8', timeout, windowsHide: true })
-}
-
-/**
- * Build the "stripped DACL plus one grant" fixture state the repair cases
- * start from. The strip goes through .NET ACL edits, not icacls:
- * `/inheritance:r` on the hosted Windows image copies the inherited ACEs
- * into explicit entries instead of removing them, and the copied set keeps
- * every verdict the fixtures intend to produce unreachable.
- * SetAccessRuleProtection(false) drops inherited entries without copying.
- * The post-write scan fails the setup loudly unless the surviving DACL is
- * exactly the requested grant: the fixtures' purpose is a directory the
- * caller cannot write, so a fuller grant would keep every verdict the case
- * intends to produce unreachable. The read goes through Get-Acl — it needs
- * only READ_CONTROL, which the object owner always holds — because icacls
- * opens the object for data read and is refused by the very DACLs the
- * fixtures install (the grant may name no usable trustee for the caller).
- * @param path - the directory whose DACL is replaced.
- * @param sid - the trustee SID the single surviving grant names.
- * @param rights - FileSystemRights enum member for the surviving grant.
- * @param inheritance - InheritanceFlags for the surviving grant.
- */
-function replaceAcl(path: string, sid: string, rights: string, inheritance = 'None'): void {
-  pwsh([
-    `$acl = Get-Acl -LiteralPath ${quote(path)}`,
-    '$acl.SetAccessRuleProtection($true, $false)',
-    'foreach ($ace in @($acl.Access)) { [void]$acl.RemoveAccessRule($ace) }',
-    '$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new(' +
-      `[System.Security.Principal.SecurityIdentifier]::new('${sid}'), ` +
-      `[System.Security.AccessControl.FileSystemRights]'${rights}', ` +
-      `[System.Security.AccessControl.InheritanceFlags]'${inheritance}', ` +
-      '[System.Security.AccessControl.PropagationFlags]::None, ' +
-      '[System.Security.AccessControl.AccessControlType]::Allow))',
-    `Set-Acl -LiteralPath ${quote(path)} -AclObject $acl`,
-  ].join('\n'))
-  const rows = aceRows(path)
-  const valid = rows.length === 1 && rows[0]!.sid === sid && rows[0]!.type === 'Allow' &&
-    !/FullControl|GenericAll/u.test(rows[0]!.rights)
-  if (!valid) {
-    throw new Error(`replaceAcl(${path}) left ${JSON.stringify(rows)} instead of the single ${sid} ${rights} allow`)
-  }
-}
-
-/**
- * DACL rows read through Get-Acl, which needs only READ_CONTROL — a right
- * the object owner always holds even when the DACL names no usable grant.
- * Use this for objects whose fixture or repair left the caller without
- * data-read access, where icacls' open is refused. Trustees are translated
- * back to SIDs: Get-Acl presents resolvable trustees as NT account names.
- * @param path - the file or directory whose DACL is read.
- * @returns one entry per ACE: trustee SID, FileSystemRights text, Allow/Deny.
- */
-function aceRows(path: string): Array<{ sid: string; rights: string; type: string }> {
-  return pwsh(
-    `(Get-Acl -LiteralPath ${quote(path)}).Access | ForEach-Object { ` +
-    '$ref = $_.IdentityReference; ' +
-    '$sid = if ($ref -is [System.Security.Principal.SecurityIdentifier]) { $ref.Value } ' +
-    'else { $ref.Translate([System.Security.Principal.SecurityIdentifier]).Value }; ' +
-    '"$($sid)|$($_.FileSystemRights)|$($_.AccessControlType)" }',
-  ).split(/\r?\n/u).map(line => line.trim()).filter(line => line !== '').map((line) => {
-    const [sid, rights, type] = line.split('|')
-    return { sid: sid!, rights: rights!, type: type! }
-  })
 }
 
 function quote(value: string): string {
@@ -241,8 +160,6 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
 
   beforeAll(() => {
     meSid = pwsh('[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value').trim()
-    scriptWrapper = join(newScratch(), 'invoke-diagnose.ps1')
-    writeFileSync(scriptWrapper, `${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} @args\n$__dshOk = $?\n$__dshCode = $LASTEXITCODE\nif ($null -eq $__dshCode) { $__dshCode = ($__dshOk ? 0 : 1) }\nexit $__dshCode\n`)
     const probe = newScratch()
     try {
       // The script inspects the real ancestor chain, including paths above our owned root.
@@ -331,7 +248,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       icacls(target, '/setintegritylevel', 'L')
       const labelsBefore = integrityLines(target)
       expect(labelsBefore.length).toBeGreaterThan(0)
-      replaceAcl(target, meSid, 'Modify')
+      icacls(target, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
       const ownerBefore = ownerOf(target)
 
       const run = runScript(['-Path', target, '-AllowRoot', scratch, '-Out', join(scratch, 'out')])
@@ -355,7 +272,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
     const scratch = newScratch()
     try {
       const target = makeDir(scratch, 'both')
-      replaceAcl(target, meSid, 'Modify')
+      icacls(target, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
       stamp(target, PACKAGE_SID)
       const ownerBefore = ownerOf(target)
 
@@ -424,23 +341,11 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       // The sandbox reports its provisioning failure on the workspace root while the
       // conflicting entry sits deeper, so one approved call must clear both.
       const root = makeDir(scratch, 'workspace')
-      replaceAcl(root, 'S-1-5-11', 'Modify')
+      icacls(root, '/inheritance:r', '/grant:r', '*S-1-5-11:(M)')
       const deep = makeDir(root, 'deep')
       const leaf = makeDir(deep, 'leaf')
-      // Lock the leaf before its parent: replaceAcl's post-write Get-Acl
-      // resolves the object path through the parent's DACL, and once deep
-      // holds only the package ACE the caller can no longer resolve leaf
-      // for the verification read.
-      replaceAcl(leaf, OTHER_PACKAGE_SID, 'ReadAndExecute', 'ContainerInherit,ObjectInherit')
-      replaceAcl(deep, PACKAGE_SID, 'ReadAndExecute', 'ContainerInherit,ObjectInherit')
-      // The script only repairs objects the caller can already administer:
-      // it needs effective WRITE_DAC on each source and LIST traversal
-      // through deep to find leaf. An exclusive package ACE makes both
-      // checks fail and earns a REFUSED verdict, so each fixture keeps the
-      // package conflict alongside a caller-usable grant — the entries a
-      // real foreign-package ACL inherits from the tree it was applied to.
-      icacls(deep, '/grant', `*${meSid}:(F)`)
-      icacls(leaf, '/grant', `*${meSid}:(F)`)
+      icacls(deep, '/inheritance:r', '/grant:r', `*${PACKAGE_SID}:(OI)(CI)(RX)`)
+      icacls(leaf, '/inheritance:r', '/grant:r', `*${OTHER_PACKAGE_SID}:(OI)(CI)(RX)`)
 
       const run = runScript(['-Path', root, '-AllowRoot', root, '-Out', join(scratch, 'out')])
       expect(run.code, run.output).toBe(0)
@@ -463,8 +368,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
         details: containingObject({ scanTruncated: false, nextAction: 'verify_original_confined_operation' }),
       })
       expect(aclLines(root).join('\n')).toMatch(/\(F\)/u)
-      expect(aceRows(deep).filter(row => row.sid.startsWith('S-1-15-2-'))).toEqual([])
-      expect(aceRows(leaf).filter(row => row.sid.startsWith('S-1-15-2-'))).toEqual([])
+      for (const path of [deep, leaf]) expect(aclLines(path).join('\n')).not.toMatch(/S-1-15-2-/u)
     } finally {
       dispose(scratch)
     }
@@ -474,7 +378,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
     const scratch = newScratch()
     try {
       const target = makeDir(scratch, 'inherit-only')
-      replaceAcl(target, 'S-1-5-11', 'Modify')
+      icacls(target, '/inheritance:r', '/grant:r', '*S-1-5-11:(M)')
       icacls(target, '/grant', '*S-1-5-32-545:(OI)(CI)(IO)(F)')
       const inheritOnlyBefore = aclLines(target).filter(line => line.includes('(IO)'))
       expect(inheritOnlyBefore).toHaveLength(1)
@@ -618,7 +522,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       const key = directory === 'Packages' ? 'LOCALAPPDATA' : 'ProgramFiles'
       // PowerShell re-derives ProgramFiles while starting, so assign the override inside the child session.
       const run = runPowerShell(['-Command',
-        `$env:${key} = ${quote(root)}; ${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} -Path ${quote(child)} -AllowRoot ${quote(root)} -Out ${quote(join(scratch, 'out'))}; exit $LASTEXITCODE`])
+        `$env:${key} = ${quote(root)}; & ${quote(script)} -Path ${quote(child)} -AllowRoot ${quote(root)} -Out ${quote(join(scratch, 'out'))}; exit $LASTEXITCODE`])
       expect(run.code, run.output).toBe(2)
       expect(run.output).toContain('managed application directory')
       expect(run.output).toContain('SUMMARY FIXED=0 GRANTED=0 REFUSED=1 RESTORED=0')
@@ -662,13 +566,13 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
     try {
       const out = join(scratch, 'out')
       const first = makeDir(scratch, 'multi-first')
-      replaceAcl(first, meSid, 'Modify')
+      icacls(first, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
       const second = makeDir(scratch, 'multi-second')
       stamp(second, PACKAGE_SID)
       icacls(second, '/deny', `*${meSid}:(WO)`)
       const before = [sddlOf(first), sddlOf(second)]
 
-      const run = runPowerShell(['-Command', `${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} -Path @(${quote(first)}, ${quote(second)}) -AllowRoot ${quote(scratch)} -Out ${quote(out)}; exit $LASTEXITCODE`])
+      const run = runPowerShell(['-Command', `& ${quote(script)} -Path @(${quote(first)}, ${quote(second)}) -AllowRoot ${quote(scratch)} -Out ${quote(out)}; exit $LASTEXITCODE`])
       expect(run.code, run.output).toBe(2)
       expect(reports(run).filter(entry => entry.kind === 'verification' && entry.operation === 'restore').map(entry => entry.path))
         .toEqual([second, first])
@@ -684,13 +588,12 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
     try {
       const out = join(scratch, 'out')
       const first = makeDir(scratch, 'pending-first')
-      replaceAcl(first, meSid, 'Modify')
+      icacls(first, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
       const second = makeDir(scratch, 'pending-second')
       stamp(second, PACKAGE_SID)
       icacls(second, '/deny', `*${meSid}:(WO)`)
       const wrapper = join(scratch, 'fail-rollback.ps1')
       writeFileSync(wrapper, `
-${DISABLE_BYPASS_PRIVILEGES_PWSH}
 $global:firstReads = 0
 function Get-Acl {
   param([string]$LiteralPath)
@@ -769,7 +672,7 @@ exit $LASTEXITCODE
         kind: 'error', status: 'stopped', details: containingObject({ error: containingString('requires -Out') }),
       }))
 
-      const twoPaths = runPowerShell(['-Command', `${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} -Path @(${quote(target)}, ${quote(other)}) -AllowRoot ${quote(scratch)} -Restore 'anything.json'; exit $LASTEXITCODE`])
+      const twoPaths = runPowerShell(['-Command', `& ${quote(script)} -Path @(${quote(target)}, ${quote(other)}) -AllowRoot ${quote(scratch)} -Restore 'anything.json'; exit $LASTEXITCODE`])
       expect(twoPaths.code).toBe(2)
       expect(reports(twoPaths)).toContainEqual(containingObject({
         kind: 'error', status: 'stopped', details: containingObject({ error: containingString('exactly one -Path') }),
@@ -811,7 +714,7 @@ exit $LASTEXITCODE
     const scratch = newScratch()
     try {
       const target = makeDir(scratch, 'backup-failure')
-      replaceAcl(target, meSid, 'Modify')
+      icacls(target, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
       const outputFile = join(scratch, 'not-a-directory')
       writeFileSync(outputFile, 'Existing contents')
       const before = sddlOf(target)
@@ -834,7 +737,6 @@ exit $LASTEXITCODE
       const target = makeDir(scratch, 'unreadable-observation')
       const before = sddlOf(target)
       const run = runPowerShell(['-Command', `
-${DISABLE_BYPASS_PRIVILEGES_PWSH}
 function Get-Acl { param([string]$LiteralPath); throw [System.IO.IOException]::new('ACL observation unavailable') }
 & ${quote(script)} -Path ${quote(target)} -AllowRoot ${quote(scratch)} -Out ${quote(join(scratch, 'out'))}; exit $LASTEXITCODE
 `])
@@ -859,7 +761,6 @@ function Get-Acl { param([string]$LiteralPath); throw [System.IO.IOException]::n
       const target = makeDir(scratch, 'incomplete-observation')
       const before = sddlOf(target)
       const run = runPowerShell(['-Command', `
-${DISABLE_BYPASS_PRIVILEGES_PWSH}
 function icacls { throw [System.IO.IOException]::new('icacls unavailable') }
 & ${quote(script)} -Path ${quote(target)} -AllowRoot ${quote(scratch)} -Out ${quote(join(scratch, 'out'))}; exit $LASTEXITCODE
 `])
@@ -905,7 +806,7 @@ function icacls { throw [System.IO.IOException]::new('icacls unavailable') }
     try {
       const out = join(scratch, 'out')
       const grantRoot = makeDir(scratch, 'self-grant')
-      replaceAcl(grantRoot, meSid, 'Modify')
+      icacls(grantRoot, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
       const grantRun = runScript(['-Path', grantRoot, '-AllowRoot', grantRoot, '-Out', out])
       expect(grantRun.code, grantRun.output).toBe(0)
       expect(grantRun.output).toContain(`GRANTED ${grantRoot} SID=${meSid}`)
@@ -926,7 +827,7 @@ function icacls { throw [System.IO.IOException]::new('icacls unavailable') }
     const scratch = newScratch()
     try {
       const target = makeDir(scratch, 'idempotent')
-      replaceAcl(target, meSid, 'Modify')
+      icacls(target, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
       stamp(target, PACKAGE_SID)
       const out = join(scratch, 'out')
 

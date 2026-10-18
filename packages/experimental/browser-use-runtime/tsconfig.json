@@ -9,31 +9,31 @@
   ],
   "references": [
     {
-      "path": "../../browser-use/browser-use"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     },
     {
       "path": "../../core/agent"
     },
     {
-      "path": "../../core/scope"
-    },
-    {
-      "path": "../../core/system-prompt"
-    },
-    {
       "path": "../../core/tools"
+    },
+    {
+      "path": "../../core/scope"
     },
     {
       "path": "../../mcp/mcp-client"
     },
     {
+      "path": "../../browser-use/browser-use"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
       "path": "../../session/working-directory"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

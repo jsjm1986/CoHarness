@@ -19,7 +19,7 @@
   zh: 69d09cabc4d49185
 /deepseek-ai-dsh-win32-process/header-verification:
   en: 2b60a9001b480546
-  zh: 3eef258a4c7a19b9
+  zh: 12a621e421c7d789
 /deepseek-ai-dsh-win32-process/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -34,10 +34,10 @@
   zh: 3c0d20a82023c891
 /deepseek-ai-dsh-win32-process/model-experience/process-primitives/kv-cache-effect:
   en: c5961328f1ae01cf
-  zh: 58d2b06ed20e27b8
+  zh: 890142bc50091faf
 /deepseek-ai-dsh-win32-process/known-limitations-and-deferred-work:
   en: e97c61be17a1db4f
   zh: 11dbf9721db63877
 /deepseek-ai-dsh-win32-process/known-limitations-and-deferred-work/dev-note:
-  en: b395f1375ae2d653
+  en: e67f633dc6fe7773
   zh: e88aeb617ffb74ea

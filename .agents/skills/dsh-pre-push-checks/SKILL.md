@@ -32,6 +32,7 @@ There is no universal local baseline beyond the hooks. Every behavior change nee
 - **Documentation, Agent Notes, catalogs, or doc-linked comments:** run `pnpm run test:docs` for the 19-leaf documentation quick pass; reserve `pnpm run doc-sync` for the full acceptance lane CI already runs.
 - **Model-, editor-, CLI-, or terminal-visible output:** run the focused keyless snapshot or real runnable-example scenario that owns the output.
 - **Package manifests, public exports, build configuration, worker/bin entries, or built runtime paths:** run `pnpm run build`, the relevant hygiene checks, and the owning built-artifact smoke.
+- **Repository test and script types:** `pnpm run build:artifacts` checks package projects only. Before claiming completion of TypeScript changes, run `pnpm run build:check` after the latest `build:artifacts`, or run `pnpm run build`; `build:check` reads the existing `build:artifacts` output and never rebuilds it.
 - **Real provider or agent behavior:** run the relevant `pnpm run test:e2e` target when credentials are available; never print secrets.
 
 Do not manually repeat a passing check merely because commit or push follows. In particular, do not run typecheck immediately before pushing solely to duplicate the pre-push hook.

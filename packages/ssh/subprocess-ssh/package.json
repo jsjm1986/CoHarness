@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-subprocess-ssh",
   "description": "Subprocess and terminal provider over the shared POSIX SSH helper",
-  "version": "0.2.1-rc.1.coharness.1",
+  "version": "0.2.1-rc.2.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -33,7 +33,8 @@
     "@deepseek-ai/dsh-subprocess-local": "workspace:*"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "@deepseek-ai/schemastery": "workspace:~",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

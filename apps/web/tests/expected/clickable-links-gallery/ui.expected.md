@@ -1,92 +1,60 @@
 - banner:
-  - navigation "Session hierarchy":
-    - button "Clickable links gallery" [disabled]
+  - navigation "Session hierarchy": Clickable links gallery
+  - button "More actions"
+  - button "Open right sidebar"
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Open right sidebar":
-    - img
-- button "16 tool calls · 2 intermediate messages" [expanded]:
-  - text: 16 tool calls · 2 intermediate messages
-  - img
-- text: "Assemble the link gallery: write the report and styles, inspect the sources, and summarize."
-- group "Message time and speed": "{{clock}}"
-- button "Copy":
-  - img
-- button "Write site/report.html +1 -0":
-  - img
-  - img
+- text: "Assemble the link gallery: write the report and styles, inspect the sources, and summarize. {{clock}}"
+- button "Copy"
+- status: Completed
+- button "Completed in {{duration}}" [expanded]
+- button "Wrote files, ran commands, called tools, etc." [expanded]
+- button "Write site/report.html 1KB +1 -0":
   - text: Write
   - button "site/report.html"
-  - text: +1 -0
-- button "Write a/style.css +1 -0":
-  - img
-  - img
+  - text: 1KB +1 -0
+- button "Write a/style.css 1KB +1 -0":
   - text: Write
   - button "a/style.css"
-  - text: +1 -0
-- button "Write b/style.css +1 -0":
-  - img
-  - img
+  - text: 1KB +1 -0
+- button "Write b/style.css 1KB +1 -0":
   - text: Write
   - button "b/style.css"
-  - text: +1 -0
-- button "Write site/index.html +1 -0":
-  - img
-  - img
+  - text: 1KB +1 -0
+- button "Write site/index.html 1KB +1 -0":
   - text: Write
   - button "site/index.html"
-  - text: +1 -0
-- button "Write site/app.js +1 -0":
-  - img
-  - img
+  - text: 1KB +1 -0
+- button "Write site/app.js 1KB +1 -0":
   - text: Write
   - button "site/app.js"
-  - text: +1 -0
-- button "Edit src/tokens.css +1 -1" [expanded]:
-  - img
+  - text: 1KB +1 -0
+- button "Edit src/tokens.css 1KB +1 -1" [expanded]:
   - text: Edit
   - button "src/tokens.css"
-  - text: +1 -1
+  - text: 1KB +1 -1
 - text: css
 - button "Wrap lines"
-- button "Copy":
-  - img
-- text: "src/tokens.css - --inline-code: #EBEEF2; + --inline-code: #F5F5F5; └ +1 -1 · 1 file"
-- button "Open details in sidebar"
-- button "Inspect":
-  - img
-  - text: Inspect
-- button "Tool call str_replace_editor · create" [expanded]:
-  - img
-  - text: Tool call str_replace_editor · create
+- button "Copy"
+- text: "src/tokens.css - --inline-code: #EBEEF2; + --inline-code: #F5F5F5;"
+- button "Inspect"
+- button "Tool call str_replace_editor · create" [expanded]
 - text: "IN { \"command\": \"create\", \"path\": \"docs/press.md\", \"file_text\": \"# Press kit\\n\" } OUT Created docs/press.md"
-- button "Open details in sidebar"
-- button "Inspect":
-  - img
-  - text: Inspect
+- button "Inspect"
 - text: Failed
-- 'button "Write permission denied: c/broken.css"':
-  - img
-  - text: "Write permission denied: c/broken.css"
+- 'button "Write permission denied: c/broken.css"'
 - button "Read docs/guide.md" [expanded]:
-  - img
   - text: Read
   - button "docs/guide.md"
 - text: Code block docs/guide.md
 - button "Wrap lines"
-- button "Copy":
-  - img
+- button "Copy"
 - text: "# Link style guide guide line 2 guide line 3 guide line 4"
 - button "Expand 4 more lines": … 4 more lines
 - text: guide line 9 guide line 10 guide line 11 guide line 12
-- button "Open details in sidebar"
-- button "Inspect":
-  - img
-  - text: Inspect
-- button "Grep linkColor" [expanded]:
-  - img
-  - text: Grep linkColor
+- button "Inspect"
+- button "Grep linkColor" [expanded]
 - text: 9 matches · 3 files
 - button "Copy"
 - button "a/style.css 3" [expanded]
@@ -94,31 +62,21 @@
 - button "Expand 4 more result lines": … 4 more lines
 - button "src/tokens.css 3" [expanded]
 - text: "3: color: var(--linkColor); 7: color: var(--linkColor); 11: color: var(--linkColor);"
-- button "Open details in sidebar"
-- button "Inspect":
-  - img
-  - text: Inspect
-- button "Glob **/*.css":
-  - img
-  - img
-  - text: Glob **/*.css
-- button "Bash List the built site":
-  - img
-  - img
-  - text: Bash List the built site
-- button "Failed Bash Run the lint gate" [expanded]:
-  - img
-  - text: Failed Bash Run the lint gate
+- button "Inspect"
+- button "Glob **/*.css"
+- button "Bash List the built site"
+- button "Failed Bash Run the lint gate exit code 1" [expanded]
 - text: Failed site pnpm run lint exit code 1
 - button "Copy"
 - text: "style.css: unexpected hex literal"
-- button "Open details in sidebar"
-- button "Inspect":
-  - img
-  - text: Inspect
-- button "Web search clickable link styles, produced files ui" [expanded]:
-  - img
-  - text: Web search clickable link styles, produced files ui
+- button "Inspect"
+- button "Failed Bash Check every generated stylesheet and component theme against the shared design tokens, inspect the application pages for inconsistent colors, and report all remaining lint failures before publishing the production build exit code 1"
+- button "Failed Bash Build the site no exit code" [expanded]
+- text: Failed site pnpm run build no exit code
+- button "Copy"
+- text: (no output) [timed out after {{duration}}]
+- button "Inspect"
+- button "Search clickable link styles, produced files ui" [expanded]
 - paragraph:
   - text: Unify links per
   - link "the guide":
@@ -130,30 +88,18 @@
       - /url: https://docs.example.test/links
     - text: One cursor token, one focus ring.
   - listitem: Mirror spec (non-http) A non-http source renders inert.
-- button "Open details in sidebar"
-- button "Inspect":
-  - img
-  - text: Inspect
-- button "Web fetch https://docs.example.test/tokens" [expanded]:
-  - img
-  - text: Web fetch
+- button "Inspect"
+- button "Fetch https://docs.example.test/tokens" [expanded]:
+  - text: Fetch
   - link "https://docs.example.test/tokens":
     - /url: https://docs.example.test/tokens
 - link "https://docs.example.test/tokens":
   - /url: https://docs.example.test/tokens
 - text: HTTP 200
-- button "Open details in sidebar"
-- button "Inspect":
-  - img
-  - text: Inspect
-- button "Tool call design_tokens_sync · design-platform.css" [expanded]:
-  - img
-  - text: Tool call design_tokens_sync · design-platform.css
+- button "Inspect"
+- button "Tool call design_tokens_sync · design-platform.css" [expanded]
 - text: "IN { \"source\": \"design-platform.css\", \"dryRun\": false } OUT {\"synced\":true,\"tokens\":12}"
-- button "Open details in sidebar"
-- button "Inspect":
-  - img
-  - text: Inspect
+- button "Inspect"
 - heading "Link gallery" [level=2]
 - paragraph:
   - text: "Docs:"
@@ -178,6 +124,11 @@
     - /url: http://docs.example.test/plain
   - text: .
 - paragraph:
+  - text: "Upstream:"
+  - link "the repository":
+    - /url: https://github.com/example/link-gallery
+  - text: .
+- paragraph:
   - text: "Inert contrasts:"
   - code: curl https://docs.example.test/api
   - text: ","
@@ -188,7 +139,7 @@
 - paragraph:
   - text: Wrote
   - code:
-    - button "Open site/report.html": report.html
+    - button "Open site/report.html in sidebar": report.html
   - text: plus two
   - code: style.css
   - text: copies;
@@ -199,52 +150,22 @@
     - img "Token preview"
 - text: css
 - button "Wrap lines" [pressed]
-- button "Copy":
-  - img
+- button "Copy"
 - code: "--inline-code: #F5F5F5;"
 - paragraph: LINK_GALLERY_DONE
 - heading "Footnotes" [level=2]
 - list:
   - listitem:
     - paragraph: Footnote references stay inert superscripts. ↩
-- text: Produced
-- button "Open site/report.html": report.html
-- button "Open a/style.css": style.css
-- button "Open b/style.css": style.css
-- button "Open site/index.html": index.html
-- button "Open site/app.js": app.js
-- text: + 1 file
-- button "Show in folder"
-- button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
-  - img
-- button "Branch into a new conversation":
-  - img
-- group "Turn time and speed":
-  - "button \"Ran for {{duration}}\"":
-    - img
-    - text: "Ran for {{duration}}"
-- group "Message time and speed": "{{clock}}"
-- button "Back to bottom":
-  - img
-- textbox "Message COHARNESS"
-- button "Add images or documents":
-  - img
-- button "Choose from Documents":
-  - img
-- button "Commands":
-  - img
-- 'button "Access mode, current: Workspace write"': Workspace write
-- button "Select model, current DeepSeek-V4-Flash":
-  - text: DeepSeek-V4-Flash
-  - img
+- button "Copy"
+- button "Good response"
+- button "Bad response"
+- button "Branch into a new conversation"
+- text: {{clock}}
+- button "Back to bottom"
+- textbox "Message or run a task, / commands, @ files or sessions"
+- button "Add files or run commands"
+- 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
 - button "Send message" [disabled]
-- group "Session statistics":
-  - button "1 turns · 2 steps":
-    - img
-    - text: 1 turns · 2 steps
-- separator "Adjust transcript content width"
-- separator "Adjust transcript content width"
+- button "1 turns 2 steps"

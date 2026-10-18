@@ -163,6 +163,7 @@ seam 先把确定性工作区 SID 的 ACE 常驻物化（每个工作区每服�
 
 -----
 
+<a id="model-experience"></a>
 ## 模型体验
 
 间接地通过 [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md)、[`dsh-pwsh-sandbox`](../../shell/pwsh-sandbox/README.zh.md) 及其工具呈现；它们渲染此后端的部分强制执行与拒绝事实（工具层通过 `denialSignatures` 分类的受限 stderr），而 [`dsh-sandbox`](../sandbox/README.zh.md) seam 拥有 `SANDBOX_UNAVAILABLE` 文本、`sandbox-local` 拥有 runner 选择。在 Windows 上本包还贡献一个目录条目——随包发布的 `diagnose-windows-sandbox-acl` 技能，模型正是从它学会诊断工具层只能上报的拒绝。
@@ -171,7 +172,6 @@ seam 先把确定性工作区 SID 的 ACE 常驻物化（每个工作区每服�
 
 Windows 上多一个目录条目：技能描述随目录进入上下文，正文只在调用时进入。资源在注册时提取，不会把脚本内容加入模型上下文。拒绝面本身仍属于工具层。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **诊断保留完整性标签**——它无法修复 Low 标签的可执行文件影响用户在 DSH 外启动程序的问题，也无法修复调用者缺少 `WRITE_DAC` 的情况；提取的脚本和恢复脚本均可由用户写入，不支持作为提权入口。非正常退出后可能残留资源目录。
@@ -206,7 +206,3 @@ Windows 上多一个目录条目：技能描述随目录进入上下文，正文
 对异常宽的目录与 FAT 类卷的仅警告立场已记录在上方限制中但尚未实现，回收改名工作区常驻 ACE 的清理命令也尚未决定。两者都是开放方向，不是已交付行为。
 
 </details>
-
-**运行时不变式：** 不发布伴生入口。本包没有独立事件序列或可变数据关系；fail-closed 约定在每个 Win32 调用处强制。
-
-<a id="model-experience"></a>

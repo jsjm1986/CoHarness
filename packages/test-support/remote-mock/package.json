@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-remote-mock",
-  "description": "Endpoint-named mock for the Client's wire traffic: unary answers and stream scripts per endpoint, live stream control, a log, and the Connection api/rpc carrier faces whole-client specs install",
-  "version": "0.2.1-rc.1.coharness.1",
+  "description": "Endpoint-named mock for Typert Remote traffic: unary answers and stream scripts per <namespace>/<method>, live stream control, a log, and the Connection carrier face whole-client specs install",
+  "version": "0.2.1-rc.2.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -31,9 +31,8 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-api-settings-controller": "workspace:*",
     "@deepseek-ai/dsh-client-connection": "workspace:*",
-    "@deepseek-ai/dsh-commands": "workspace:*",
-    "@deepseek-ai/dsh-host-apiproxy": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "typescript": "^6.0.3"
   },
