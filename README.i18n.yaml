@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write README.md
 /:
-  en: 6f0402352d696fcc
-  zh: 6f0402352d696fcc
+  en: 634fb8e1b79aea56
+  zh: 634fb8e1b79aea56
 /coharness:
-  en: 6ec8d5e05ed84e04
-  zh: 6e31de68db791e4d
+  en: 3dc4b4cec473ef73
+  zh: 19f5017da7af3668
 /coharness/collaboration-philosophy:
   en: c78aaabd5b8124a7
   zh: f96a4b358896eabc

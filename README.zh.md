@@ -1,8 +1,20 @@
-<p align="center"><img src="apps/web/public/favicon-coharness.svg" alt="CoHarness" width="72"></p>
+<p align="center"><img src="apps/web/public/favicon-coharness.svg" alt="CoHarness" width="88"></p>
 
 # CoHarness
 
 [English](README.md) | 中文
+
+<p align="center">
+  <a href="https://github.com/jsjm1986/CoHarness/actions/workflows/ci.yml"><img src="https://github.com/jsjm1986/CoHarness/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+  <a href="https://jsjm1986.github.io/CoHarness/"><img src="https://img.shields.io/badge/official%20site-jsjm1986.github.io%2FCoHarness-f59e0b.svg" alt="官方网站"></a>
+</p>
+
+<p align="center">
+  <a href="https://jsjm1986.github.io/CoHarness/">官方网站</a> · <a href="docs/user/guide/index.zh.md">使用指南</a> · <a href="SAFETY.zh.md">安全须知</a>
+</p>
+
+<p align="center"><img src="https://jsjm1986.github.io/CoHarness/assets/demo-conversation.gif" alt="真实会话中的 CoHarness 工作台" width="860"></p>
 
 **CoHarness 是一个面向团队共同构建、验证和强化人与 Agent 协作范式的全插件化 Harness。**
 

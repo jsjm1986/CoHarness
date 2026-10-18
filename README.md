@@ -1,8 +1,20 @@
-<p align="center"><img src="apps/web/public/favicon-coharness.svg" alt="CoHarness" width="72"></p>
+<p align="center"><img src="apps/web/public/favicon-coharness.svg" alt="CoHarness" width="88"></p>
 
 # CoHarness
 
 English | [中文](README.zh.md)
+
+<p align="center">
+  <a href="https://github.com/jsjm1986/CoHarness/actions/workflows/ci.yml"><img src="https://github.com/jsjm1986/CoHarness/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+  <a href="https://jsjm1986.github.io/CoHarness/"><img src="https://img.shields.io/badge/official%20site-jsjm1986.github.io%2FCoHarness-f59e0b.svg" alt="Official site"></a>
+</p>
+
+<p align="center">
+  <a href="https://jsjm1986.github.io/CoHarness/">Official site</a> · <a href="docs/user/guide/index.md">User guide</a> · <a href="SAFETY.md">Safety notice</a>
+</p>
+
+<p align="center"><img src="https://jsjm1986.github.io/CoHarness/assets/demo-conversation.gif" alt="The CoHarness workbench in a live session" width="860"></p>
 
 **CoHarness is a fully pluginized harness for teams to build, validate, and strengthen their own patterns for people-and-agent work.**
 
