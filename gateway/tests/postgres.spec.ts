@@ -196,7 +196,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 57 })
+      .toEqual({ applied: [], current: 58 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
