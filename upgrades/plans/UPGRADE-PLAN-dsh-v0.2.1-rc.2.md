@@ -69,3 +69,28 @@
 
 - `experimental/` 迁位:上游 rc.2 将 10 个包移入 `experimental/`(hook-protocol、hooks-claude-code、hooks-codex、tool-terminal、tool-ralph、tool-session-query、session-title-all-prompts-llm、skill-badge、webhook、webhook-github);fork 保留自身分组路径,经 `upstreamOnly.replacedBy` 反向映射,不追随路径改名——下次同步须复核映射无漂移。
 - 主权翻转:8 个原记 `owned` 的包经核证为上游同源移植(plugin-market 四件、harness-dev-context、web-deepseek-api、working-directory 两件),已改 `adapted`;`session-format-v3-to-v4` 维持 owned+`upstreamShadowed`。
+- 上游同键包扩散：除已遮蔽两包外，新增包再撞 fork-owned 名时需同样走 upstreamShadowed 流程。
+- CI 演进与本地门禁脚本交互（parallelism/coverage 改造影响 run-gates.spec 断言面），P1 需重跑受影响 spec。
+- hooks/webhook 降级若不跟随，需保持原位包持续通过主权门；若跟随，bundle/文档双侧同步改名。
+
+## P0 执行记录
+
+- 2026-10-19：清单 1,622 commit / 矩阵 395 行 / 30 gate replay（23 条变更逐条复核登记）/ 审计与 manifest 落地 / `verify-upgrade-records` 通过（21 份记录）。
+
+## P1 执行记录
+
+已完成（cherry-pick 至 `feat/upstream-sync-batch2`）：
+
+- `a6d2a03`：`engines.dsh` 兼容性检查（上游 `plugin-compatibility.ts` 直取）+ `peers`→`requirements` 改名传遍 plugin-manager 类型/操作/失败映射、web 与 gateway admin-ui 渲染及双语文案、api-catalog 重生成。
+- `1ff3fb8`：cordis publish 版本 4.0.4→4.0.5（rc.2 窗口内 vendor 唯一变更，src 零差）。
+- `334feeb`：`scripts/parallelism.ts` 直取（LOCAL_PARALLELISM_CAP=12 / TEST=48，CI 用全核）+ run-oxlint 归并（cpus 参数、本地预算绑定、调用方 `--threads` 透传；保留我方 CI=1 拼写与 fix/unused-disable 道）+ `actions/cache`→v6.1.0 批量 pin + benchmark timeout 15→20m。
+- `81484f4`：`release/publish.ts`、`publish-npm-baseline.ts` 直取（dist-tag 校验 + 通道核验；我方 `packFilters` 死代码冲突块按上游删除，静态目录 glob 覆盖同一集合）；根 devDeps 加 `semver@^7.8.5`/`@types/semver@^7.8.0`，pnpm→11.28.5、smol-toml→^1.9.0；pyproject 吸收 Pillow==12.3.0 + core-metadata 2.4（ruff 保留——我方 ci.yml 仍跑 quality 组；license 保 Apache-2.0 不回退 MIT）。
+
+P1 剩余（互锁三角，下一轮整体归并，勿拆半）：
+
+- `coverage-partitions.ts`：上游把 timeout 从 CLI 参数改为 `coverageTestTimeoutOptions`/`parseCoverageTestTimeout`（config 内联注入，因 CLI 不转发 hookTimeout/poll 到 projects）、`vitest list` 改 JSON 清单、新增 `.coverage-times.json` 时长史 reporter（FILE_TIMES_REPORTER）。我方 `coverageTestTimeoutArgs` 的调用方在 run-gates.ts，需同步换。
+- `vitest.config.ts`：两侧结构反向演进——我方把排除清单抽进 `coverage-policy.ts`/`coverage-scoped.ts`（上游无此文件，其内联展开），上游删了 `test-invariants.ts` 并改名 `sourcePlaneAliases`→`claudeCodeTestingAliases`、接入 `localWorkerBudget`/`laneTestBudget` 与 `resolvePwshPath`。归并=保我方抽象层+吸收语义增量（worker 预算、timeout options 挂载）；上游排除清单里 `experimental/inspector`、`remote-access` 等未携带路径勿照抄。
+- `run-gates.ts`/`.spec`：加 `ci-unit` 模式、`ConcurrencyDefault` 导出、parallelism default 接入、sharedHygieneGates；我方 +191 行 CoHarness 车道需逐车道保留。
+- `ci.yml`：`.coverage-times.json` restore/save 缓存（依赖 partitions 的 file-times reporter）；`sandbox.yml`：check:ci:unit 道 + `DSH_COVERAGE_TEST_TIMEOUT_MS`。
+- `package.json` scripts / `tsconfig.base.json`：上游 ±200 行别名面改动多数挂在未携带包上，随各包携带相位吸收。
+- `gen-third-party-notices.ts`：inspector devtools 披露 import 依赖 P8 的 inspector 携带决策；examples//yao-pkg/ruff 条目上游删除均不适用于我方现状。
