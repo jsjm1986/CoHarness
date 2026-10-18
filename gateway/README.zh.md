@@ -39,6 +39,9 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | 用于加密组织和项目 Provider API Key 的仅所有者可读 AES-GCM 密钥 |
 | `HGW_WEBHOOK_SECRET_KEY_FILE` | `~/.harness-gateway/webhook-secrets.key` | 用于加密 Webhook 端点签名密钥的仅所有者可读 AES-GCM 密钥 |
+| `HGW_TUNNEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/tunnel-credentials.key` | 加密管理端隧道 Cloudflare API 与运行令牌的仅所有者可读 AES-GCM 密钥 |
+| `HGW_TUNNEL_STATE_DIR` | `~/.harness-gateway/tunnel` | 隧道工作目录；承载受管 `cloudflared` 安装 |
+| `HGW_CLOUDFLARED` | (unset) | `cloudflared` 二进制绝对路径覆盖；未设置时先解析受管安装，再查 PATH 与常见路径 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
 | `HGW_ARCHIVE_RETENTION_DAYS` | 30 | 归档进入回收站后自动清理前的可恢复天数 |
 | `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 秒 | PostgreSQL 启动连接暂时失败时的初始重试间隔，最大 2,147,483,647 毫秒 |
