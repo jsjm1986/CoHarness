@@ -93,6 +93,28 @@ validate_release() {
     for required in "${native_paths[@]}"; do
       [[ -s "$release/$required" ]] || fail "release payload is missing or empty: $release/$required"
     done
+    # The compiled ESM graph resolves workspace packages through release-local
+    # links that `build:production` creates under gateway/node_modules. A
+    # release assembled without them boots into an unresolved-import crash, so
+    # require every scoped link here; the names mirror GATEWAY_RUNTIME_PACKAGES
+    # in scripts/build-production.ts.
+    local -a runtime_links=(
+      cordis
+      schemastery
+      dsh-managed-data
+      dsh-atomic-write
+      dsh-llm
+      dsh-session-format
+      dsh-session-format-catalog
+      dsh-home-paths
+      dsh-userdoc
+      dsh-userdoc-local
+      dsh-host-userdoc-http
+    )
+    for required in "${runtime_links[@]}"; do
+      [[ -s "$release/gateway/node_modules/@deepseek-ai/$required/package.json" ]] \
+        || fail "release Gateway runtime link is missing or broken: $release/gateway/node_modules/@deepseek-ai/$required"
+    done
     return 0
   fi
   if [[ "$allow_legacy" == true \
