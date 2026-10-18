@@ -14,8 +14,6 @@ import { CLIENT_BUILD_PROFILE_SELECTOR } from './client-build-environment.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './coverage-exempt.ts'
 import {
   COVERAGE_PARTITIONS_ENV,
-  COVERAGE_TEST_TIMEOUT_ENV,
-  coverageTestTimeoutArgs,
   parseCoveragePartitionCount,
 } from './coverage-partitions.ts'
 import { COVERAGE_SCOPED_MODE_ENV, SCOPED_BASE_ENV, SCOPED_PACKAGES_ENV, scopedPackageTestDirs } from './coverage-scoped.ts'
@@ -771,7 +769,6 @@ function coverageWorkerArgs(): { instrumented: string[]; exempt: string[] } {
 
 function coverageGates(): Gate[] {
   const workers = coverageWorkerArgs()
-  const timeouts = coverageTestTimeoutArgs(process.env[COVERAGE_TEST_TIMEOUT_ENV])
   const partitions = parseCoveragePartitionCount(process.env[COVERAGE_PARTITIONS_ENV])
   const instrumented = partitions === undefined
     ? pnpmExec('coverage', [
@@ -779,7 +776,6 @@ function coverageGates(): Gate[] {
       'run',
       '--coverage',
       ...workers.instrumented,
-      ...timeouts,
     ], {
       label: 'test:coverage',
       env: { [COVERAGE_EXEMPT_ENV]: '1' },
@@ -798,7 +794,6 @@ function coverageGates(): Gate[] {
       'run',
       ...coverageExemptHeavySuites.map(suite => suite.filter),
       ...workers.exempt,
-      ...timeouts,
     ], {
       label: 'test:coverage-exempt-heavy',
       needs: ['native-system'],
@@ -833,7 +828,6 @@ function expectedOutputGate(needs: string[] = ['build']): Gate {
 // repository-wide authoritative run and is unchanged.
 function ciCoverageScopedGates(): Gate[] {
   const workers = coverageWorkerArgs()
-  const timeouts = coverageTestTimeoutArgs(process.env[COVERAGE_TEST_TIMEOUT_ENV])
   const scopedBase = process.env[SCOPED_BASE_ENV]
   const testDirs = scopedPackageTestDirs(process.env[SCOPED_PACKAGES_ENV])
   if (scopedBase === undefined || scopedBase === '') {
@@ -846,7 +840,6 @@ function ciCoverageScopedGates(): Gate[] {
     '--coverage.reporter=json',
     ...testDirs,
     ...workers.instrumented,
-    ...timeouts,
   ], {
     label: 'test:coverage (scoped)',
     displayCommand: `${COVERAGE_SCOPED_MODE_ENV}=1 pnpm exec vitest run --coverage --coverage.reporter=json ${testDirs.join(' ')}`,
