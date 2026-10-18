@@ -33,7 +33,7 @@ def test_wheel_verification_uses_distribution_metadata_not_nested_libraries(tmp_
         archive.writestr("nested/library.dist-info/METADATA", "Name: library\nVersion: 0.0.1\n")
         archive.writestr("deepseek_harness_sdk-1.2.3.dist-info/WHEEL", "Tag: py3-none-any\n")
         archive.writestr("deepseek_harness_sdk-1.2.3.dist-info/METADATA",
-                         "Name: deepseek-harness-sdk\nVersion: 1.2.3\nLicense-Expression: MIT\n"
+                         "Name: deepseek-harness-sdk\nVersion: 1.2.3\nLicense-Expression: Apache-2.0\n"
                          "License-File: LICENSE\nRequires-Dist: deepseek-harness-runtime-bin==1.2.3\n")
     build_python_release.verify_wheel(wheel, "sdk", "1.2.3", None)
 
@@ -105,7 +105,7 @@ def test_stage_sdk_keeps_distribution_module_and_runtime_pin_distinct(tmp_path: 
     pyproject = (destination / "pyproject.toml").read_text()
     assert 'name = "deepseek-harness-sdk"' in pyproject
     assert 'version = "1.2.3"' in pyproject
-    assert 'license = "MIT"' in pyproject
+    assert 'license = "Apache-2.0"' in pyproject
     assert '"deepseek-harness-runtime-bin==1.2.3"' in pyproject
     assert 'license-files = ["LICENSE"]' in pyproject
     assert (destination / "LICENSE").read_bytes() == (ROOT / "LICENSE").read_bytes()
@@ -170,7 +170,7 @@ def test_stage_runtime_copies_platform_payload(
     assert (runtime_dir / office.name / office_asset.relative_to(office)).read_bytes() == b"office data"
     assert (runtime_dir / resources.name / resource.relative_to(resources)).read_text() == "checker"
     pyproject = (destination / "pyproject.toml").read_text()
-    assert 'license = "MIT"' in pyproject
+    assert 'license = "Apache-2.0"' in pyproject
     assert 'license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]' in pyproject
     assert 'dsh = "deepseek_harness_runtime:main"' in pyproject
     assert (destination / "platforms.json").read_bytes() == (
