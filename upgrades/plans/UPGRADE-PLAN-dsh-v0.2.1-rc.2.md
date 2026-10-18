@@ -53,12 +53,13 @@
 - `1ff3fb8`：cordis publish 版本 4.0.4→4.0.5（rc.2 窗口内 vendor 唯一变更，src 零差）。
 - `334feeb`：`scripts/parallelism.ts` 直取（LOCAL_PARALLELISM_CAP=12 / TEST=48，CI 用全核）+ run-oxlint 归并（cpus 参数、本地预算绑定、调用方 `--threads` 透传；保留我方 CI=1 拼写与 fix/unused-disable 道）+ `actions/cache`→v6.1.0 批量 pin + benchmark timeout 15→20m。
 - `81484f4`：`release/publish.ts`、`publish-npm-baseline.ts` 直取（dist-tag 校验 + 通道核验）；根 devDeps 加 `semver@^7.8.5`/`@types/semver@^7.8.0`，pnpm→11.28.5、smol-toml→^1.9.0；pyproject 吸收 Pillow==12.3.0 + core-metadata 2.4（ruff 保留——我方 ci.yml 仍跑 quality 组；license 保 Apache-2.0 不回退 MIT）。
+- `651c4da`：timeout 注入路径切换为上游语义——`coverageTestTimeoutOptions`/`parseCoverageTestTimeout` 进 config 内联 project（CLI 不转发 hookTimeout/poll），`coverageTestTimeoutArgs` 及其三个调用点（run-gates 双道、run-coverage-partitions）移除；vitest 根道挂 `localWorkerBudget`（本地 maxWorkers≤48，CI 保 Vitest 默认）。我方 `coverage-policy.ts`/`coverage-scoped.ts`/`test-invariants.ts` 抽象层保留——上游内联重构不覆盖。
 
-P1 剩余（互锁三角，下一轮整体归并，勿拆半）：
+P1 剩余：
 
-- `coverage-partitions.ts`：上游把 timeout 从 CLI 参数改为 `coverageTestTimeoutOptions`/`parseCoverageTestTimeout`（config 内联注入，因 CLI 不转发 hookTimeout/poll 到 projects）、`vitest list` 改 JSON 清单、新增 `.coverage-times.json` 时长史 reporter（FILE_TIMES_REPORTER）。我方 `coverageTestTimeoutArgs` 的调用方在 run-gates.ts，需同步换。
-- `vitest.config.ts`：两侧结构反向演进——我方把排除清单抽进 `coverage-policy.ts`/`coverage-scoped.ts`（上游无此文件，其内联展开），上游删了 `test-invariants.ts` 并改名 `sourcePlaneAliases`→`claudeCodeTestingAliases`、接入 `localWorkerBudget`/`laneTestBudget` 与 `resolvePwshPath`。归并=保我方抽象层+吸收语义增量（worker 预算、timeout options 挂载）；上游排除清单里 `experimental/inspector`、`remote-access` 等未携带路径勿照抄。
-- `run-gates.ts`/`.spec`：加 `ci-unit` 模式、`ConcurrencyDefault` 导出、parallelism default 接入、sharedHygieneGates；我方 +191 行 CoHarness 车道需逐车道保留。
-- `ci.yml`：`.coverage-times.json` restore/save 缓存（依赖 partitions 的 file-times reporter）；`sandbox.yml`：check:ci:unit 道 + `DSH_COVERAGE_TEST_TIMEOUT_MS`。
+- `coverage-partitions.ts` 剩余：`vitest list` 改 JSON 清单（我方 parseListOutput 仍解析文本行）、`.coverage-times.json` 时长史 reporter——我方已有自有 `COVERAGE_TIMINGS_FILE`/`coverageTimingCacheKey`/`readFileDurations` 实现，需对账是否等价或上游新增独有逻辑。
+- `vitest.config.ts` 剩余：`resolvePwshPath` 探测接入（上游用其实现 pwshCoverageExclusions）；`test-invariants.ts` 上游已删但我方有 +14 行自有不变量——保留决策；`sourcePlaneAliases`→`claudeCodeTestingAliases` 改名跟随与否。
+- `run-gates.ts`/`.spec`：加 `ci-unit` 模式、`ConcurrencyDefault` 导出（带诊断来源）、parallelism default 接入 `defaultConcurrency`、sharedHygieneGates；我方 +191 行 CoHarness 车道逐条保留。
+- `ci.yml`：`.coverage-times.json` restore/save 缓存步骤（先核对——我方时长史系统已存在，ci.yml 可能已有等价缓存）；`sandbox.yml`：check:ci:unit 道（依赖 run-gates ci-unit）。
 - `package.json` scripts / `tsconfig.base.json`：上游 ±200 行别名面改动多数挂在未携带包上，随各包携带相位吸收。
 - `gen-third-party-notices.ts`：inspector devtools 披露 import 依赖 P8 的 inspector 携带决策；examples//yao-pkg/ruff 条目上游删除均不适用于我方现状。
