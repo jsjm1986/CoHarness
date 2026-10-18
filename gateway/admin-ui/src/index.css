@@ -781,6 +781,76 @@ a {
   grid-column: 1 / -1;
 }
 
+.tunnelAccess {
+  display: grid;
+  gap: 14px;
+}
+
+.tunnelChoices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+}
+
+.tunnelChoice {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.tunnelChoice h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+}
+
+.tunnelChoice h3 svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.tunnelChoice p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.tunnelUrl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tunnelUrl a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tunnelUrl a svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tunnelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tunnelAccess .errorText {
+  margin: 0;
+  color: var(--danger);
+}
+
 .formActions {
   justify-content: flex-end;
   margin-top: 20px;

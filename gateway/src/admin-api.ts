@@ -43,6 +43,7 @@ import { NodeConfigurationError } from './node-config-store.ts'
 import { MaintenanceError } from './postgres/maintenance-service.ts'
 import { BackupError } from './postgres/backup-service.ts'
 import { DeploymentCommandError } from './deployment-commands.ts'
+import { TunnelAccessError } from './tunnel-access.ts'
 import { ResourceAccessError, resourcePolicyOwner } from './resource-access.ts'
 import { stewardPolicyOwner } from './steward-access.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
@@ -114,6 +115,7 @@ function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof MaintenanceError) return { status: error.status, error: error.message }
   if (error instanceof BackupError) return { status: error.status, error: error.message }
   if (error instanceof DeploymentCommandError) return { status: 500, error: 'deployment-command-failed' }
+  if (error instanceof TunnelAccessError) return { status: error.status, error: error.message }
   if (error instanceof PluginManagementError) return { status: error.status, error: error.message }
   if (error instanceof PluginStateError) return { status: error.status === 500 ? 500 : error.status, error: error.message }
   if (error instanceof TerminalManagementError) return { status: error.status, error: error.message }
@@ -281,6 +283,37 @@ async function dispatch(
     sendJson(res, 200, { ...state, migrations: plan ?? null, operations })
     return true
   }
+  if (pathname === '/admin/api/tunnel' && method === 'GET') {
+    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
+    sendJson(res, 200, await deps.tunnelAccess.view())
+    return true
+  }
+  if (pathname === '/admin/api/tunnel/install' && method === 'POST') {
+    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
+    const view = await deps.tunnelAccess.install()
+    await deps.audit.write({ userId: admin.id, action: 'admin.tunnel.install',
+      detail: JSON.stringify({ binary: view.binary?.path ?? null }), ip })
+    sendJson(res, 200, view)
+    return true
+  }
+  if (pathname === '/admin/api/tunnel/actions' && method === 'POST') {
+    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
+    const input = parseObject(body)
+    const action = input.action
+    let view
+    if (action === 'start-quick') view = await deps.tunnelAccess.startQuick()
+    else if (action === 'start-named') view = await deps.tunnelAccess.startNamed({
+      hostname: input.hostname, domain: input.domain, apiToken: input.apiToken,
+    })
+    else if (action === 'stop') view = await deps.tunnelAccess.stop()
+    else if (action === 'clear') view = await deps.tunnelAccess.clear()
+    else throw new TunnelAccessError(400, 'invalid-tunnel-action')
+    await deps.audit.write({ userId: admin.id, action: `admin.tunnel.${String(action)}`,
+      detail: JSON.stringify({ mode: view.mode, publicUrl: view.publicUrl, hostname: view.hostname }), ip })
+    sendJson(res, 200, view)
+    return true
+  }
+
   if (pathname === '/admin/api/deployment/maintenance' && method === 'POST') {
     if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
     const input = parseObject(body)

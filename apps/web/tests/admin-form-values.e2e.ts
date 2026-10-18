@@ -161,7 +161,11 @@ it('preserves stored values through built forms and keeps every mobile destinati
                 ? { month: '2026-09', timeZone: 'Asia/Shanghai', projectId: project.id, rows: [], unattributed: zero }
                 : path === '/admin/api/project-model-access'
                   ? { projectDefaultAllowed: false, effective: { version: 1, defaultAllowed: false, models: [] }, overrides: [] }
-                  : undefined
+                  : path === '/admin/api/tunnel'
+                    ? { supported: true, binary: null, mode: 'off', desired: 'stopped', state: 'stopped',
+                      publicUrl: null, hostname: null, domain: null, apiTokenConfigured: false,
+                      lastError: null, revision: 0, startedAt: null, updatedAt: '2026-10-01T00:00:00.000Z' }
+                    : undefined
         if (value !== undefined) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(value)); return true }
         return adminHandler(req, res, user, path, body)
       },

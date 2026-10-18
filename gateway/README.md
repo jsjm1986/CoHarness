@@ -39,6 +39,9 @@ Fixtures that create users, projects, runtime files or deployment state use `tes
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | Host-private credential files loaded into systemd user/project runtimes |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | Owner-only AES-GCM key used for organization and project Provider API keys |
 | `HGW_WEBHOOK_SECRET_KEY_FILE` | `~/.harness-gateway/webhook-secrets.key` | Owner-only AES-GCM key used for webhook endpoint signing secrets |
+| `HGW_TUNNEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/tunnel-credentials.key` | Owner-only AES-GCM key encrypting the admin-managed tunnel's Cloudflare API and run tokens |
+| `HGW_TUNNEL_STATE_DIR` | `~/.harness-gateway/tunnel` | Tunnel working directory; hosts the managed `cloudflared` install |
+| `HGW_CLOUDFLARED` | (unset) | Absolute `cloudflared` binary override; unset resolves the managed install, then PATH and well-known paths |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | Maximum body size accepted by one authenticated private runtime API request |
 | `HGW_ARCHIVE_RETENTION_DAYS` | 30 | Recoverable trash-window length for archived conversations before automatic purge |
 | `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 s | Initial delay before retrying a transient PostgreSQL startup connection failure; at most 2,147,483,647 ms |

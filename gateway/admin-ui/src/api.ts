@@ -1346,3 +1346,32 @@ export function createBackup(): Promise<DeploymentBackup> {
 export function verifyBackup(id: string): Promise<DeploymentBackup> {
   return request('/admin/api/backups/verify', { method: 'POST', body: JSON.stringify({ id }) })
 }
+
+export type TunnelAccessView = {
+  supported: boolean
+  binary: { path: string; version: string | null; source: string } | null
+  mode: 'off' | 'quick' | 'named'
+  desired: 'stopped' | 'running'
+  state: 'stopped' | 'starting' | 'running' | 'error'
+  publicUrl: string | null
+  hostname: string | null
+  domain: string | null
+  apiTokenConfigured: boolean
+  lastError: string | null
+  revision: number
+  startedAt: string | null
+  updatedAt: string
+}
+
+export function getTunnelAccess(): Promise<TunnelAccessView> {
+  return request('/admin/api/tunnel')
+}
+export function installTunnelBinary(): Promise<TunnelAccessView> {
+  return request('/admin/api/tunnel/install', { method: 'POST', body: '{}' })
+}
+export function tunnelAccessAction(
+  body: { action: 'start-quick' | 'stop' | 'clear' }
+    | { action: 'start-named'; hostname: string; domain?: string; apiToken?: string },
+): Promise<TunnelAccessView> {
+  return request('/admin/api/tunnel/actions', { method: 'POST', body: JSON.stringify(body) })
+}
