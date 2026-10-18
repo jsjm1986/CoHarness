@@ -26,4 +26,4 @@ The administrator list now queries `recordKind='all'` and the zero-message exclu
 
 ## Consequences
 
-Administrators can close permanently stuck archive records from the detail dialog or the batch bar; the 24-hour-stale pending badge and the settle confirmation explain what is happening to data on each side. Runtime-local copies of a settled purge are not deleted by the settle itself — they are removed by the re-queued purge at the runtime's next snapshot, and a runtime that never returns keeps its residue, which the record no longer tracks.
+Administrators can close permanently stuck archive records from a stale row, the detail dialog, or the batch bar; the 24-hour-stale pending label and the settle confirmation explain what is happening to data on each side. Runtime-local copies of a settled purge are not deleted by the settle itself — they are removed by the re-queued purge at the runtime's next snapshot, and a runtime that never returns keeps its residue, which the record no longer tracks.

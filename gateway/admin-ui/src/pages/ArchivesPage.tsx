@@ -3,9 +3,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Eraser,
   Filter,
-  SearchCheck,
+  OctagonX,
   RotateCcw,
+  SearchCheck,
+  StopCircle,
   Trash2,
   Undo2,
 } from 'lucide-react'
@@ -38,21 +41,32 @@ import {
 } from '../components/ui.tsx'
 import { ArchiveConversation } from '../components/ArchiveConversation.tsx'
 import { adminLanguage, translateCopy } from '../language.ts'
-import { zh as archivesZh, en as archivesEn } from './archives.copy.ts'
+import { zh as archivesZh, en as archivesEn, type ArchivesCopyKey } from './archives.copy.ts'
 
 const PAGE_SIZE = 50
 const STALE_PENDING_MS = 24 * 60 * 60 * 1_000
 
 type ArchiveAction = 'restore' | 'trash' | 'purge' | 'settle'
+type ArchiveTab = 'archived' | 'trash' | 'purged'
 
-type Draft = { state: ConversationArchiveState | 'all'; query: string; userId: string; projectId: string }
-const EMPTY_DRAFT: Draft = { state: 'archived', query: '', userId: '', projectId: '' }
+type Active = { tab: ArchiveTab; query: string; userId: string; projectId: string }
+type FilterDraft = Omit<Active, 'tab'>
+const EMPTY_DRAFT: FilterDraft = { query: '', userId: '', projectId: '' }
+const EMPTY_ACTIVE: Active = { tab: 'archived', ...EMPTY_DRAFT }
+
+type RecordAction = Exclude<ArchiveAction, 'settle'>
+const TABS: ArchiveTab[] = ['archived', 'trash', 'purged']
+const TAB_ACTIONS: Record<ArchiveTab, readonly RecordAction[]> = {
+  archived: ['restore', 'trash'],
+  trash: ['restore', 'purge'],
+  purged: [],
+}
 
 export function ArchivesPage() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
   const [rows, setRows] = useState<ConversationArchiveRow[]>([])
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
-  const [active, setActive] = useState<Draft>(EMPTY_DRAFT)
+  const [draft, setDraft] = useState<FilterDraft>(EMPTY_DRAFT)
+  const [active, setActive] = useState<Active>(EMPTY_ACTIVE)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -60,8 +74,9 @@ export function ArchivesPage() {
   const [detail, setDetail] = useState<ConversationArchiveDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [pendingAction, setPendingAction] = useState<ArchiveAction | null>(null)
-  const [confirmAction, setConfirmAction] = useState<ArchiveAction | null>(null)
+  const [confirmIntent, setConfirmIntent] = useState<{ action: ArchiveAction; ids: string[] } | null>(null)
   const [actionError, setActionError] = useState('')
+  const [emptyDialogOpen, setEmptyDialogOpen] = useState(false)
   const [emptyCandidates, setEmptyCandidates] = useState<EmptyDraftCandidate[]>([])
   const [emptyScanned, setEmptyScanned] = useState(false)
   const [emptySelected, setEmptySelected] = useState<Set<string>>(new Set())
@@ -70,13 +85,12 @@ export function ArchivesPage() {
   const [emptyResult, setEmptyResult] = useState('')
   const [emptyLoading, setEmptyLoading] = useState(false)
   const [emptyError, setEmptyError] = useState('')
-  const [emptyOpen, setEmptyOpen] = useState(false)
   const rowsGeneration = useRef(0)
   const detailGeneration = useRef(0)
-  const viewKey = useRef(JSON.stringify([EMPTY_DRAFT, 0]))
+  const viewKey = useRef(JSON.stringify([EMPTY_ACTIVE, 0]))
   useEffect(() => () => { rowsGeneration.current++; detailGeneration.current++ }, [])
 
-  const fetchRows = useCallback(async (filter: Draft, nextOffset: number, showLoading = true) => {
+  const fetchRows = useCallback(async (filter: Active, nextOffset: number, showLoading = true) => {
     const userId = filter.userId === '' ? undefined : Number(filter.userId)
     const projectId = filter.projectId === '' ? undefined : Number(filter.projectId)
     if ((userId !== undefined && (!Number.isSafeInteger(userId) || userId <= 0))
@@ -91,7 +105,7 @@ export function ArchivesPage() {
     if (showLoading) setLoading(true)
     try {
       const current = await listArchives({
-        state: filter.state,
+        state: filter.tab,
         recordKind: 'all',
         query: filter.query,
         userId,
@@ -112,7 +126,7 @@ export function ArchivesPage() {
     }
   }, [t])
 
-  useEffect(() => { void fetchRows(EMPTY_DRAFT, 0) }, [fetchRows])
+  useEffect(() => { void fetchRows(EMPTY_ACTIVE, 0) }, [fetchRows])
 
   useEffect(() => {
     const pending = rows.filter(row => row.syncState === 'pending' && row.rootSessionId !== detail?.record.rootSessionId)
@@ -124,7 +138,7 @@ export function ArchivesPage() {
       try {
         const statuses = await Promise.all(pending.map(row => getArchiveStatus(row.rootSessionId)))
         if (cancelled || generation !== rowsGeneration.current) return
-        if (statuses.some(row => active.state !== 'all' && row.state !== active.state)) {
+        if (statuses.some(row => row.state !== active.tab)) {
           await fetchRows(active, offset, false)
         } else {
           const byId = new Map(statuses.map(row => [row.rootSessionId, row]))
@@ -164,8 +178,16 @@ export function ArchivesPage() {
 
   function onFilter(event: FormEvent) {
     event.preventDefault()
-    setActive(draft)
-    void fetchRows(draft, 0)
+    const next = { ...active, ...draft }
+    setActive(next)
+    void fetchRows(next, 0)
+  }
+
+  function onTab(nextTab: ArchiveTab) {
+    if (nextTab === active.tab) return
+    const next = { ...active, tab: nextTab }
+    setActive(next)
+    void fetchRows(next, 0)
   }
 
   async function scanEmptyDrafts() {
@@ -183,6 +205,11 @@ export function ArchivesPage() {
     } finally {
       setEmptyLoading(false)
     }
+  }
+
+  function openEmptyDrafts() {
+    setEmptyDialogOpen(true)
+    if (!emptyScanned) void scanEmptyDrafts()
   }
 
   function requestEmptyTrash() {
@@ -210,8 +237,9 @@ export function ArchivesPage() {
 
   function resetFilters() {
     setDraft(EMPTY_DRAFT)
-    setActive(EMPTY_DRAFT)
-    void fetchRows(EMPTY_DRAFT, 0)
+    const next = { ...active, ...EMPTY_DRAFT }
+    setActive(next)
+    void fetchRows(next, 0)
   }
 
   async function openDetail(row: ConversationArchiveRow) {
@@ -228,8 +256,7 @@ export function ArchivesPage() {
     }
   }
 
-  async function runAction(action: ArchiveAction) {
-    const ids = detail === null ? [...selected] : [detail.record.rootSessionId]
+  async function runAction(action: ArchiveAction, ids: string[]) {
     if (ids.length === 0) return
     setPendingAction(action)
     setActionError('')
@@ -237,7 +264,7 @@ export function ArchivesPage() {
       const result = await applyArchiveAction(action, ids)
       const failed = result.results.filter(item => !item.ok)
       if (failed.length > 0) setActionError(t('actionPartialFailure', { count: String(failed.length), details: failed.map(item => item.error ?? item.rootSessionId).join(t('detailSeparator')) }))
-      else if (detail !== null) {
+      else if (detail !== null && ids.includes(detail.record.rootSessionId)) {
         const generation = detailGeneration.current
         const record = await getArchiveStatus(detail.record.rootSessionId)
         if (generation === detailGeneration.current) setDetail(current => current?.record.rootSessionId !== record.rootSessionId ? current : {
@@ -252,7 +279,8 @@ export function ArchivesPage() {
     }
   }
 
-  const hasFilters = Object.entries(active).some(([key, value]) => key !== 'state' ? value !== '' : value !== 'archived')
+  const hasFilters = draft.query !== '' || draft.userId !== '' || draft.projectId !== ''
+    || active.query !== '' || active.userId !== '' || active.projectId !== ''
   const page = Math.floor(offset / PAGE_SIZE) + 1
   const selectedRows = useMemo(() => rows.filter(row => selected.has(row.rootSessionId)), [rows, selected])
   const allSelected = rows.length > 0 && selectedRows.length === rows.length
@@ -265,35 +293,99 @@ export function ArchivesPage() {
     setSelected(checked ? new Set(rows.map(row => row.rootSessionId)) : new Set())
   }
 
+  const tabLabels: Record<ArchiveTab, string> = { archived: t('tab_archived'), trash: t('tab_trash'), purged: t('tab_purged') }
+  const batchLabels: Record<RecordAction, string> = { restore: t('batch_restore'), trash: t('batch_trash'), purge: t('batch_purge') }
+  const emptyDetails: Record<ArchiveTab, string> = { archived: t('emptyDetail_archived'), trash: t('emptyDetail_trash'), purged: t('emptyDetail_purged') }
+  const tabActions = TAB_ACTIONS[active.tab]
+  const batchSettle = selectedRows.some(row => isStalePending(row))
+  const confirmCopy: Record<ArchiveAction, { title: string; description: string; label: string }> = {
+    restore: { title: t('confirmRestoreTitle'), description: t('confirmRestoreDescription'), label: t('restore') },
+    trash: { title: t('confirmTrashTitle'), description: t('confirmTrashDescription'), label: t('trashAction') },
+    purge: { title: t('confirmPurgeTitle'), description: t('confirmPurgeDescription'), label: t('purge') },
+    settle: { title: t('confirmSettleTitle'), description: t('confirmSettleDescription'), label: t('settle') },
+  }
+
   return (
     <div className="page">
       <PageHeader
         title={t('pageTitle')}
         description={t('pageDescription')}
         meta={loading ? undefined : t('recordCount', { count: String(rows.length) })}
-        actions={selectedRows.length === 0 ? undefined : (
-          <div className="pageActionGroup">
-            {selectedRows.some(row => row.syncState === 'pending') ? <Button variant="secondary" onClick={() => setConfirmAction('settle')}>{t('settleSelected')}</Button> : null}
-            <Button icon={Undo2} onClick={() => setConfirmAction('restore')}>{t('restoreSelected')}</Button>
-            <Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')}>{t('moveToTrash')}</Button>
-            <Button variant="danger" onClick={() => setConfirmAction('purge')}>{t('purgeSelected')}</Button>
-          </div>
-        )}
+        actions={<Button icon={Eraser} variant="secondary" onClick={openEmptyDrafts}>{t('emptyToolButton')}</Button>}
       />
       <ErrorBanner message={error} />
-      <Section flush title={t('emptySectionTitle')} meta={emptyScanned ? t('emptyMetaScanned') : t('emptyMetaAdminOnly')}
-        actions={<Button variant="secondary" onClick={() => setEmptyOpen(open => !open)}>{emptyOpen ? t('emptyCollapse') : t('emptyExpand')}</Button>}>
-        {!emptyOpen ? <div className="archiveBulkBar"><span>{t('emptyCollapsedHint')}</span></div> : <>
-        <div className="archiveBulkBar">
-          <span>{t('emptyHint')}</span>
-          <div className="pageActionGroup">
-            <Button icon={SearchCheck} onClick={() => { void scanEmptyDrafts() }} loading={emptyLoading}>{t('scan')}</Button>
-            {emptySelected.size > 0 ? <Button icon={Trash2} variant="danger" disabled={emptyLoading} onClick={requestEmptyTrash}>{t('trashSelectedEmpty')}</Button> : null}
-          </div>
+      <div className="archiveToolbar">
+        <div className="segmented archiveTabs" role="group" aria-label={t('tabsAria')}>
+          {TABS.map(tab => <button key={tab} type="button" aria-pressed={active.tab === tab} onClick={() => onTab(tab)}>{tabLabels[tab]}</button>)}
         </div>
+      </div>
+      <Section flush title={t('filterTitle')}>
+        <form className="filterPanel" onSubmit={onFilter}>
+          <div className="filterGrid">
+            <Field label={t('filterKeyword')}>
+              <input className="input" value={draft.query} onChange={event => setDraft({ ...draft, query: event.target.value })} placeholder={t('filterKeywordPlaceholder')} />
+            </Field>
+            <Field label={t('filterUserId')}>
+              <input className="input" value={draft.userId} onChange={event => setDraft({ ...draft, userId: event.target.value })} placeholder={t('filterUserIdAll')} inputMode="numeric" />
+            </Field>
+            <Field label={t('filterProjectId')}>
+              <input className="input" value={draft.projectId} onChange={event => setDraft({ ...draft, projectId: event.target.value })} placeholder={t('filterProjectIdAll')} inputMode="numeric" />
+            </Field>
+          </div>
+          <div className="filterActions">
+            <Button type="button" icon={RotateCcw} onClick={resetFilters} disabled={!hasFilters}>{t('filterReset')}</Button>
+            <Button type="submit" variant="primary" icon={Filter}>{t('filterApply')}</Button>
+          </div>
+        </form>
+      </Section>
+      <Section flush className="responsiveSection" title={t('recordsTitle')} meta={loading ? undefined : t('pageIndicator', { page: String(page) })}>
+        {loading ? <LoadingState label={t('loadingRecords')} /> : rows.length === 0 ? (
+          <EmptyState icon={Archive} title={t('emptyTitle')} detail={hasFilters ? t('emptyDetailFiltered') : emptyDetails[active.tab]} />
+        ) : (
+          <>
+            <div className="archiveBulkBar archiveSelectionSummary">
+              <span>{selectedRows.length > 0 ? t('selectedCount', { count: String(selectedRows.length) }) : t('selectHint')}</span>
+              {selectedRows.length === 0 ? null : (
+                <div className="pageActionGroup">
+                  {tabActions.map(action => <Button key={action} icon={action === 'restore' ? Undo2 : action === 'trash' ? Trash2 : OctagonX} variant={action === 'restore' ? 'secondary' : 'danger'} onClick={() => setConfirmIntent({ action, ids: [...selected] })}>{batchLabels[action]}</Button>)}
+                  {batchSettle ? <Button variant="secondary" icon={StopCircle} onClick={() => setConfirmIntent({ action: 'settle', ids: selectedRows.filter(row => isStalePending(row)).map(row => row.rootSessionId) })}>{t('settle')}</Button> : null}
+                </div>
+              )}
+            </div>
+            <div className="tableWrap desktopOnly">
+              <table className="dataTable archiveTable">
+                <thead><tr><th aria-label={t('colSelect')}><label className="checkLabel archiveSelectAll"><input ref={selectAllRef} type="checkbox" checked={allSelected} aria-checked={indeterminate ? 'mixed' : allSelected} onChange={event => toggleAll(event.target.checked)} /><span>{t('selectAllPage')}</span></label></th><th>{t('colConversation')}</th><th>{t('colOwner')}</th><th>{t('colArchivedAt')}</th><th>{t('syncStateLabel')}</th><th>{t('colMessages')}</th><th aria-label={t('colActions')} /></tr></thead>
+                <tbody>{rows.map(row => <ArchiveTableRow key={row.rootSessionId} row={row} tab={active.tab} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} onAction={action => setConfirmIntent({ action, ids: [row.rootSessionId] })} />)}</tbody>
+              </table>
+            </div>
+            <div className="mobileList">{rows.map(row => <ArchiveMobileRow key={row.rootSessionId} row={row} tab={active.tab} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} onAction={action => setConfirmIntent({ action, ids: [row.rootSessionId] })} />)}</div>
+          </>
+        )}
+        {loading || (rows.length === 0 && offset === 0) ? null : <div className="pagination"><span>{t('pageIndicator', { page: String(page) })}</span><IconButton label={t('prevPage')} icon={ChevronLeft} variant="secondary" disabled={offset === 0} onClick={() => void fetchRows(active, Math.max(0, offset - PAGE_SIZE))} /><IconButton label={t('nextPage')} icon={ChevronRight} variant="secondary" disabled={rows.length < PAGE_SIZE} onClick={() => void fetchRows(active, offset + PAGE_SIZE)} /></div>}
+      </Section>
+      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? t('dialogTitleFallback')} description={detail === null ? t('dialogLoading') : `${detail.record.workspace?.title ?? t('ungrouped')} · ${detail.record.project?.name ?? t('personalConversation')}`} onClose={() => { if (!detailLoading) { detailGeneration.current++; setDetail(null) } }} wide footer={detail === null ? undefined : <DetailFooter detail={detail} pendingAction={pendingAction} onAction={action => setConfirmIntent({ action, ids: [detail.record.rootSessionId] })} />}>
+        {detailLoading ? <LoadingState label={t('loadingConversation')} /> : detail === null ? null : <ArchiveDetail detail={detail} error={actionError} />}
+      </Dialog>
+      <ConfirmDialog
+        open={confirmIntent !== null}
+        title={confirmIntent === null ? '' : confirmCopy[confirmIntent.action].title}
+        description={confirmIntent === null ? '' : confirmCopy[confirmIntent.action].description}
+        confirmLabel={confirmIntent === null ? '' : confirmCopy[confirmIntent.action].label}
+        pending={pendingAction !== null}
+        onClose={() => { if (pendingAction === null) setConfirmIntent(null) }}
+        onConfirm={() => { if (confirmIntent !== null) { const intent = confirmIntent; setConfirmIntent(null); void runAction(intent.action, intent.ids) } }}
+      />
+      <Dialog
+        open={emptyDialogOpen}
+        title={t('emptyToolTitle')}
+        description={t('emptyToolDescription')}
+        onClose={() => { if (!emptyLoading) setEmptyDialogOpen(false) }}
+        wide
+        footer={<div className="dialogActionRow"><Button icon={SearchCheck} onClick={() => { void scanEmptyDrafts() }} loading={emptyLoading}>{t('scan')}</Button>{emptySelected.size > 0 ? <Button icon={Trash2} variant="danger" disabled={emptyLoading} onClick={requestEmptyTrash}>{t('trashSelectedEmpty', { count: String(emptySelected.size) })}</Button> : null}</div>}
+      >
         <ErrorBanner message={emptyError} />
         {emptyResult === '' ? null : <p className="emptyTrashResult">{emptyResult}</p>}
-        {emptyCandidates.length === 0 ? <div className="emptyDraftState">
+        {emptyLoading && !emptyScanned ? <LoadingState label={t('scan')} /> : emptyCandidates.length === 0 ? <div className="emptyDraftState">
           <span className="emptyDraftStateIcon" aria-hidden="true"><Archive /></span>
           <strong>{emptyScanned ? t('emptyScannedTitle') : t('emptyNotScannedTitle')}</strong>
           <p>{emptyScanned ? t('emptyScannedDetail') : t('emptyNotScannedDetail')}</p>
@@ -322,71 +414,12 @@ export function ArchivesPage() {
             ))}</div>
           </>
         )}
-        </>}
-      </Section>
-      <Section flush title={t('filterTitle')}>
-        <form className="filterPanel" onSubmit={onFilter}>
-          <div className="filterGrid">
-            <Field label={t('stateLabel')}>
-              <select className="input" value={draft.state} onChange={event => setDraft({ ...draft, state: event.target.value as Draft['state'] })}>
-                <option value="archived">{t('stateArchived')}</option>
-                <option value="trash">{t('stateTrash')}</option>
-                <option value="purged">{t('statePurged')}</option>
-                <option value="all">{t('stateAll')}</option>
-              </select>
-            </Field>
-            <Field label={t('filterKeyword')}>
-              <input className="input" value={draft.query} onChange={event => setDraft({ ...draft, query: event.target.value })} placeholder={t('filterKeywordPlaceholder')} />
-            </Field>
-            <Field label={t('filterUserId')}>
-              <input className="input" value={draft.userId} onChange={event => setDraft({ ...draft, userId: event.target.value })} placeholder={t('filterUserIdAll')} inputMode="numeric" />
-            </Field>
-            <Field label={t('filterProjectId')}>
-              <input className="input" value={draft.projectId} onChange={event => setDraft({ ...draft, projectId: event.target.value })} placeholder={t('filterProjectIdAll')} inputMode="numeric" />
-            </Field>
-          </div>
-          <div className="filterActions">
-            <Button type="button" icon={RotateCcw} onClick={resetFilters} disabled={!hasFilters && draft.query === '' && draft.userId === '' && draft.projectId === ''}>{t('filterReset')}</Button>
-            <Button type="submit" variant="primary" icon={Filter}>{t('filterApply')}</Button>
-          </div>
-        </form>
-      </Section>
-      <Section flush className="responsiveSection" title={t('recordsTitle')} meta={loading ? undefined : t('pageIndicator', { page: String(page) })}>
-        {loading ? <LoadingState label={t('loadingRecords')} /> : rows.length === 0 ? (
-          <EmptyState icon={Archive} title={t('emptyTitle')} detail={hasFilters ? t('emptyDetailFiltered') : t('emptyDetailNone')} />
-        ) : (
-          <>
-            <div className="archiveBulkBar archiveSelectionSummary">
-              <span>{selectedRows.length > 0 ? t('selectedCount', { count: String(selectedRows.length) }) : t('selectHint')}</span>
-            </div>
-            <div className="tableWrap desktopOnly">
-              <table className="dataTable archiveTable">
-                <thead><tr><th aria-label={t('colSelect')}><label className="checkLabel archiveSelectAll"><input ref={selectAllRef} type="checkbox" checked={allSelected} aria-checked={indeterminate ? 'mixed' : allSelected} onChange={event => toggleAll(event.target.checked)} /><span>{t('selectAllPage')}</span></label></th><th>{t('colConversation')}</th><th>{t('colOwner')}</th><th>{t('colArchivedAt')}</th><th>{t('stateLabel')}</th><th>{t('colMessages')}</th><th aria-label={t('colView')} /></tr></thead>
-                <tbody>{rows.map(row => <ArchiveTableRow key={row.rootSessionId} row={row} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} />)}</tbody>
-              </table>
-            </div>
-            <div className="mobileList">{rows.map(row => <ArchiveMobileRow key={row.rootSessionId} row={row} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} />)}</div>
-          </>
-        )}
-        {loading || (rows.length === 0 && offset === 0) ? null : <div className="pagination"><span>{t('pageIndicator', { page: String(page) })}</span><IconButton label={t('prevPage')} icon={ChevronLeft} variant="secondary" disabled={offset === 0} onClick={() => void fetchRows(active, Math.max(0, offset - PAGE_SIZE))} /><IconButton label={t('nextPage')} icon={ChevronRight} variant="secondary" disabled={rows.length < PAGE_SIZE} onClick={() => void fetchRows(active, offset + PAGE_SIZE)} /></div>}
-      </Section>
-      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? t('dialogTitleFallback')} description={detail === null ? t('dialogLoading') : `${detail.record.workspace?.title ?? t('ungrouped')} · ${detail.record.project?.name ?? t('personalConversation')}`} onClose={() => { if (!detailLoading) { detailGeneration.current++; setDetail(null) } }} wide footer={detail === null ? undefined : <div className="dialogActionRow">{detail.record.state === 'purged' ? <Button variant="secondary" disabled>{t('exportAction')}</Button> : <a className="button button-secondary" href={exportArchive(detail.record.rootSessionId)}>{t('exportAction')}</a>}<Button icon={Undo2} onClick={() => setConfirmAction('restore')} loading={pendingAction === 'restore'} disabled={detail.record.syncState === 'pending' || detail.record.state === 'purged'}>{t('restore')}</Button><Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')} loading={pendingAction === 'trash'} disabled={detail.record.syncState === 'pending' || detail.record.state === 'purged'}>{t('moveToTrash')}</Button><Button variant="danger" onClick={() => setConfirmAction('purge')} loading={pendingAction === 'purge'} disabled={detail.record.syncState === 'pending' || (detail.record.state === 'purged' && detail.record.syncState === 'synced')}>{t('purge')}</Button>{detail.record.syncState === 'pending' ? <Button variant="secondary" onClick={() => setConfirmAction('settle')} loading={pendingAction === 'settle'}>{t('settle')}</Button> : null}</div>}>
-        {detailLoading ? <LoadingState label={t('loadingConversation')} /> : detail === null ? null : <ArchiveDetail detail={detail} error={actionError} />}
       </Dialog>
-      <ConfirmDialog
-        open={confirmAction !== null}
-        title={confirmAction === 'purge' ? t('confirmPurgeTitle') : confirmAction === 'trash' ? t('confirmTrashTitle') : confirmAction === 'settle' ? t('confirmSettleTitle') : t('confirmRestoreTitle')}
-        description={confirmAction === 'purge' ? t('confirmPurgeDescription') : confirmAction === 'trash' ? t('confirmTrashDescription') : confirmAction === 'settle' ? t('confirmSettleDescription') : t('confirmRestoreDescription')}
-        confirmLabel={confirmAction === 'purge' ? t('purge') : confirmAction === 'trash' ? t('moveToTrash') : confirmAction === 'settle' ? t('settle') : t('restore')}
-        pending={pendingAction !== null}
-        onClose={() => { if (pendingAction === null) setConfirmAction(null) }}
-        onConfirm={() => { if (confirmAction !== null) { const action = confirmAction; setConfirmAction(null); void runAction(action) } }}
-      />
       <ConfirmDialog
         open={emptyConfirm !== null}
         title={t('emptyConfirmTitle')}
         description={t('emptyConfirmBody', { count: String(emptyConfirm?.ids.length ?? 0) })}
-        confirmLabel={t('trashSelectedEmpty')}
+        confirmLabel={t('trashAction')}
         pending={emptyLoading}
         onClose={() => { if (!emptyLoading) setEmptyConfirm(null) }}
         onConfirm={() => { void confirmEmptyTrash() }}
@@ -395,33 +428,70 @@ export function ArchivesPage() {
   )
 }
 
-function ArchiveTableRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
-  return <tr><td><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">{t('noPreview')}</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? t('unknownUser')}<small>{row.project?.name ?? t('personalConversation')}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td>{row.recordKind === 'empty-draft' ? <StatusBadge tone="neutral">{t('emptyDraftBadge')}</StatusBadge> : null}<ArchiveStateBadge state={row.state} /><ArchiveSyncState row={row} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={t('viewItem', { name: row.title })} icon={Eye} onClick={onOpen} /></td></tr>
+function isStalePending(row: Pick<ConversationArchiveRow, 'syncState' | 'updatedAt'>): boolean {
+  return row.syncState === 'pending' && Date.now() - row.updatedAt > STALE_PENDING_MS
 }
 
-function ArchiveMobileRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
+function archiveActionMeta(action: ArchiveAction): { icon: typeof Undo2; variant: 'secondary' | 'danger' | 'ghost' } {
+  return action === 'restore' ? { icon: Undo2, variant: 'ghost' }
+    : action === 'trash' ? { icon: Trash2, variant: 'danger' }
+    : action === 'purge' ? { icon: OctagonX, variant: 'danger' }
+    : { icon: StopCircle, variant: 'ghost' }
+}
+
+function archiveActionLabels(t: (key: ArchivesCopyKey, parameters?: Record<string, string>) => string): Record<RecordAction, string> {
+  return { restore: t('row_restore'), trash: t('row_trash'), purge: t('row_purge') }
+}
+
+function RowActionButtons({ row, tab, onAction }: { row: ConversationArchiveRow; tab: ArchiveTab; onAction: (action: ArchiveAction) => void }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
-  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? t('noPreview')}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><div>{row.recordKind === 'empty-draft' ? <StatusBadge tone="neutral">{t('emptyDraftBadge')}</StatusBadge> : null}<ArchiveStateBadge state={row.state} /><ArchiveSyncState row={row} /></div></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? t('unknownUser')} · {row.project?.name ?? t('personalConversation')}</span><span>{formatTime(row.archivedAt)} · {t('messageCount', { count: String(row.messageCount) })}</span></button></article>
+  if (isStalePending(row)) {
+    return <div className="rowActions"><IconButton label={t('settle')} icon={StopCircle} variant="danger" onClick={() => onAction('settle')} /></div>
+  }
+  if (row.syncState !== 'synced') return <div className="rowActions" />
+  const labels = archiveActionLabels(t)
+  return <div className="rowActions">{TAB_ACTIONS[tab].map(action => { const meta = archiveActionMeta(action); return <IconButton key={action} label={labels[action]} icon={meta.icon} variant={meta.variant === 'ghost' ? 'ghost' : 'danger'} onClick={() => onAction(action)} /> })}</div>
+}
+
+function ArchiveTableRow({ row, tab, checked, onCheck, onOpen, onAction }: { row: ConversationArchiveRow; tab: ArchiveTab; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void; onAction: (action: ArchiveAction) => void }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
+  return <tr><td><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">{t('noPreview')}</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? t('unknownUser')}<small>{row.project?.name ?? t('personalConversation')}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td>{row.recordKind === 'empty-draft' ? <StatusBadge tone="neutral">{t('emptyDraftBadge')}</StatusBadge> : null}<ArchiveSyncState row={row} /></td><td>{row.messageCount}</td><td className="alignRight"><div className="rowActions"><IconButton label={t('viewItem', { name: row.title })} icon={Eye} onClick={onOpen} /><RowActionButtons row={row} tab={tab} onAction={onAction} /></div></td></tr>
+}
+
+function ArchiveMobileRow({ row, tab, checked, onCheck, onOpen, onAction }: { row: ConversationArchiveRow; tab: ArchiveTab; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void; onAction: (action: ArchiveAction) => void }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
+  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? t('noPreview')}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><div>{row.recordKind === 'empty-draft' ? <StatusBadge tone="neutral">{t('emptyDraftBadge')}</StatusBadge> : null}<ArchiveSyncState row={row} /></div></div><div className="archiveMobileFooter"><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? t('unknownUser')} · {row.project?.name ?? t('personalConversation')}</span><span>{formatTime(row.archivedAt)} · {t('messageCount', { count: String(row.messageCount) })}</span></button><RowActionButtons row={row} tab={tab} onAction={onAction} /></div></article>
 }
 
 function ArchiveSyncState({ row }: { row: ConversationArchiveRow }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
-  if (row.syncState === 'synced') return null
-  const stalePending = row.syncState === 'pending' && Date.now() - row.updatedAt > STALE_PENDING_MS
+  if (row.syncState === 'synced') return <span className="archiveSyncOk">{t('syncOk')}</span>
+  const stalePending = isStalePending(row)
   const label = row.syncState === 'pending'
     ? (stalePending ? t('syncPendingStale') : t('syncPending'))
     : row.syncState === 'conflict' ? t('syncConflict') : t('syncUnavailable')
-  return <small className="archiveSyncState" title={row.lastSyncError}>{label}</small>
+  return <small className={`archiveSyncState${stalePending ? ' archiveSyncStale' : ''}`} title={row.lastSyncError}>{label}</small>
+}
+
+function DetailFooter({ detail, pendingAction, onAction }: { detail: ConversationArchiveDetail; pendingAction: ArchiveAction | null; onAction: (action: ArchiveAction) => void }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
+  const record = detail.record
+  const pending = record.syncState === 'pending'
+  const labels = archiveActionLabels(t)
+  return <div className="dialogActionRow">
+    {record.state === 'purged' ? <Button variant="secondary" disabled>{t('exportAction')}</Button> : <a className="button button-secondary" href={exportArchive(record.rootSessionId)}>{t('exportAction')}</a>}
+    {record.state === 'purged' ? null : TAB_ACTIONS[record.state === 'trash' ? 'trash' : 'archived'].map(action => { const meta = archiveActionMeta(action); return <Button key={action} icon={meta.icon} variant={action === 'restore' ? 'secondary' : 'danger'} onClick={() => onAction(action)} loading={pendingAction === action} disabled={pending}>{labels[action]}</Button> })}
+    {pending ? <Button variant="secondary" icon={StopCircle} onClick={() => onAction('settle')} loading={pendingAction === 'settle'}>{t('settle')}</Button> : null}
+  </div>
 }
 
 function ArchiveDetail({ detail, error }: { detail: ConversationArchiveDetail; error: string }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
   const syncLabels: Record<ConversationArchiveDetail['record']['syncState'], string> = {
     pending: t('syncPending'),
-    synced: t('syncSynced'),
+    synced: t('syncOk'),
     conflict: t('syncConflict'),
-    unavailable: t('syncUnavailableDetail'),
+    unavailable: t('syncUnavailable'),
   }
   return <div className="archiveDetail"><ErrorBanner message={error || detail.record.lastSyncError || ''} />{detail.record.syncState === 'pending' ? <p className="archivePendingHint">{t('settlePendingHint')}</p> : null}<dl className="definitionGrid"><div className="definitionRow"><dt>{t('creatorLabel')}</dt><dd>{detail.record.creator?.displayName ?? t('unknownUser')}</dd></div><div className="definitionRow"><dt>{t('detailWorkspace')}</dt><dd>{detail.record.workspace?.title ?? t('ungrouped')}</dd></div><div className="definitionRow"><dt>{t('detailProject')}</dt><dd>{detail.record.project?.name ?? t('personalConversation')}</dd></div><div className="definitionRow"><dt>{t('colArchivedAt')}</dt><dd><time dateTime={new Date(detail.record.archivedAt).toISOString()}>{formatTime(detail.record.archivedAt)}</time></dd></div><div className="definitionRow"><dt>{t('recordStateLabel')}</dt><dd><ArchiveStateBadge state={detail.record.state} /></dd></div><div className="definitionRow"><dt>{t('syncStateLabel')}</dt><dd>{syncLabels[detail.record.syncState]}</dd></div></dl><ArchiveConversationOrRemoval detail={detail} /></div>
 }
@@ -435,7 +505,7 @@ function ArchiveConversationOrRemoval({ detail }: { detail: ConversationArchiveD
 
 function ArchiveStateBadge({ state }: { state: ConversationArchiveState }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
-  const labels: Record<ConversationArchiveState, string> = { archived: t('stateArchived'), trash: t('stateTrash'), purged: t('statePurged') }
+  const labels: Record<ConversationArchiveState, string> = { archived: t('tab_archived'), trash: t('tab_trash'), purged: t('tab_purged') }
   const tones: Record<ConversationArchiveState, 'info' | 'warning' | 'danger'> = { archived: 'info', trash: 'warning', purged: 'danger' }
   return <StatusBadge tone={tones[state]}>{labels[state]}</StatusBadge>
 }
