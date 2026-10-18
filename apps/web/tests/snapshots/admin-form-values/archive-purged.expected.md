@@ -1,6 +1,6 @@
 - term: 创建者
 - definition: Admin fixture
-- term: Workspace
+- term: 工作区
 - definition: 未分组
 - term: 项目
 - definition: 个人会话
@@ -8,8 +8,8 @@
 - definition:
   - time: 2026/09/27 08:00
 - term: 记录状态
-- definition: 已清理
-- term: 同步状态
-- definition: 已同步
-- strong: 对话已永久清理
-- paragraph: 正文和历史 Review 已清理，不能恢复。
+- definition: 已彻底删除
+- term: 同步
+- definition: 已就绪
+- strong: 对话已彻底删除
+- paragraph: 正文和历史 Review 已删除，不能恢复。

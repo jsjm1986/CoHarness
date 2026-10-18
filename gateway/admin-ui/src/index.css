@@ -3563,6 +3563,51 @@ a {
 
 .archiveSyncState { display: block; margin-top: 0.25rem; font-size: 0.75rem; }
 
+.archiveToolbar {
+  margin-bottom: 12px;
+}
+
+.archiveTabs button {
+  min-width: 96px;
+}
+
+.archiveSyncOk {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+
+.archiveSyncStale {
+  color: var(--warning);
+}
+
+.archiveMobileFooter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.archiveMobileFooter .archiveMobileOpen {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.archivePendingHint {
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
 /* User detail page */
 
 .backLink {

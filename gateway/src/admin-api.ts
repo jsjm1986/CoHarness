@@ -540,7 +540,7 @@ async function dispatch(
     const action = input.action
     const ids = input.ids
     const idempotencyKey = input.idempotencyKey
-    if ((action !== 'restore' && action !== 'trash' && action !== 'purge')
+    if ((action !== 'restore' && action !== 'trash' && action !== 'purge' && action !== 'settle')
       || !Array.isArray(ids) || ids.length === 0 || ids.length > 50
       || !ids.every(id => typeof id === 'string' && id !== '')
       || (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey === ''))) {
@@ -552,6 +552,9 @@ async function dispatch(
         if (action === 'purge') {
           const accepted = await deps.archives.purge(rootSessionId, admin.id, idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
           if (!accepted) throw new Error('archive not found')
+        } else if (action === 'settle') {
+          const settled = await deps.archives.settle(rootSessionId, admin.id)
+          if (settled === null) throw new Error('archive not found')
         } else {
           const value = await deps.archives.setState(rootSessionId, action === 'restore' ? 'archived' : 'trash', admin.id,
             idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)

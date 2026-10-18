@@ -484,7 +484,7 @@ export function exportArchive(rootSessionId: string): string {
   return `/admin/api/archives/${encodeURIComponent(rootSessionId)}/export`
 }
 
-export function applyArchiveAction(action: 'restore' | 'trash' | 'purge', ids: string[]): Promise<{
+export function applyArchiveAction(action: 'restore' | 'trash' | 'purge' | 'settle', ids: string[]): Promise<{
   action: string
   results: Array<{ rootSessionId: string; ok: boolean; error?: string }>
 }> {
