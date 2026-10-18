@@ -2,7 +2,7 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, globSync, readFileSync, writeFileSync } from 'node:fs'
-import { lstat, mkdir, readdir, rm, unlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readFile, rm, unlink, writeFile } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import type { TestUserConfig } from 'vitest/config'
@@ -211,23 +211,27 @@ export interface InstrumentedInventory {
 }
 
 /**
- * Parse `vitest list --filesOnly` output into the instrumented inventory:
- * one `[pool] path` line per file, deduplicated, minus the exempt heavy
- * suites that `vitest list` itself does not exclude.
+ * Parse Vitest's JSON file inventory, excluding uninstrumented heavy suites.
+ * @param output - JSON written by `vitest list --filesOnly --json=<file>`.
+ * @param root - repository root used to make file paths relative.
+ * @returns sorted test files and their owning Vitest projects.
+ * @throws when a record is malformed or a file has multiple project assignments.
  */
-export function parseListOutput(output: string, root: string): InstrumentedInventory {
+export function parseFileInventory(output: string, root: string): InstrumentedInventory {
+  const entries: unknown = JSON.parse(output)
+  if (!Array.isArray(entries)) throw new Error('coverage inventory must be a JSON array')
   const files = new Set<string>()
   const projectOf = new Map<string, string>()
-  for (const line of output.split(/\r?\n/)) {
-    const match = /^\[([^\]]+)\]\s+(\S+\.spec\.(?:ts|tsx))$/.exec(line)
-    if (match !== null && match[1] !== undefined && match[2] !== undefined) {
-      const previous = projectOf.get(match[2])
-      if (previous !== undefined && previous !== match[1]) {
-        throw new Error(`coverage partitions: ${match[2]} belongs to both ${previous} and ${match[1]}`)
-      }
-      files.add(match[2])
-      projectOf.set(match[2], match[1])
+  for (const value of entries) {
+    const entry: unknown = value
+    if (entry === null || typeof entry !== 'object' || !('file' in entry) || typeof entry.file !== 'string'
+      || !('projectName' in entry) || (entry.projectName !== 'thread-safe' && entry.projectName !== 'process-bound')) {
+      throw new Error('coverage inventory requires a file and its thread-safe or process-bound project')
     }
+    const file = relative(root, entry.file).split(sep).join('/')
+    if (files.has(file)) throw new Error(`coverage inventory lists ${file} more than once`)
+    files.add(file)
+    projectOf.set(file, entry.projectName)
   }
   for (const suite of coverageExemptHeavySuites) {
     for (const file of globSync(suite.exclude, { cwd: root })) {
@@ -251,26 +255,24 @@ export function parseListOutput(output: string, root: string): InstrumentedInven
 async function collectInstrumentedFiles(
   root: string,
   pnpmEntrypoint: string,
+  inventoryPath: string,
   filters: readonly string[] = [],
 ): Promise<InstrumentedInventory> {
-  const invocation = pnpmInvocation(['exec', 'vitest', 'list', '--filesOnly', ...filters], { npm_execpath: pnpmEntrypoint })
-  const output = await runListCommand(invocation.command, invocation.args, root)
-  return parseListOutput(output, root)
+  const invocation = pnpmInvocation(['exec', 'vitest', 'list', '--filesOnly', `--json=${inventoryPath}`, ...filters], { npm_execpath: pnpmEntrypoint })
+  await runListCommand(invocation.command, invocation.args, root)
+  return parseFileInventory(await readFile(inventoryPath, 'utf8'), root)
 }
 
-/** Run `vitest list` and return its stdout, or throw with exit code and stderr. */
-function runListCommand(command: string, args: string[], root: string): Promise<string> {
+/** Wait for `vitest list` to write its JSON file, or throw with exit code and stderr. */
+function runListCommand(command: string, args: string[], root: string): Promise<void> {
   return new Promise((resolveList, rejectList) => {
-    const child = spawn(command, args, { cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] })
-    let output = ''
+    const child = spawn(command, args, { cwd: root, env: process.env, stdio: ['ignore', 'ignore', 'pipe'] })
     let errorOutput = ''
-    child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
-    child.stdout.on('data', (chunk: string) => { output += chunk })
     child.stderr.on('data', (chunk: string) => { errorOutput += chunk })
     child.once('error', (error: Error) => { rejectList(error) })
     child.once('close', (code) => {
-      if (code === 0) resolveList(output)
+      if (code === 0) resolveList()
       else rejectList(new Error(`vitest list exited with ${String(code ?? 'signal')}${errorOutput === '' ? '' : `: ${errorOutput.trim().slice(0, 300)}`}`))
     })
   })
@@ -598,7 +600,7 @@ export class CoveragePartitionCoordinator {
       // values (`--testTimeout 5000`) must never be mistaken for filters.
       const separator = this.vitestArgs.indexOf('--')
       const filters = separator >= 0 ? this.vitestArgs.slice(separator + 1) : []
-      const inventory = await collectInstrumentedFiles(this.root, this.pnpmEntrypoint, filters)
+      const inventory = await collectInstrumentedFiles(this.root, this.pnpmEntrypoint, join(this.temporaryRoot, 'inventory.json'), filters)
       files = inventory.files
       this.projectOf = inventory.projectOf
       weights = readFileDurations(this.root)
