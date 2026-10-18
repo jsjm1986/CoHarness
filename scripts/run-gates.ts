@@ -16,6 +16,7 @@ import {
   COVERAGE_PARTITIONS_ENV,
   parseCoveragePartitionCount,
 } from './coverage-partitions.ts'
+import { LOCAL_TEST_PARALLELISM_CAP, defaultParallelism, describeDefaultParallelism } from './parallelism.ts'
 import { COVERAGE_SCOPED_MODE_ENV, SCOPED_BASE_ENV, SCOPED_PACKAGES_ENV, scopedPackageTestDirs } from './coverage-scoped.ts'
 import { pnpmInvocation } from './pnpm-invocation.ts'
 import { writeGateEvidence } from './gate-evidence.ts'
@@ -30,6 +31,7 @@ export type Mode =
   | 'ci-lint-contracts-ready'
   | 'ci-coverage'
   | 'ci-coverage-scoped'
+  | 'ci-unit'
   | 'ci-bench'
   | 'ci-snapshot'
   | 'ci-artifacts'
@@ -93,10 +95,14 @@ interface RunningGate {
   promise: Promise<GateResult>
 }
 
-interface ConcurrencyDefault {
+/** The worker count an aggregate uses when `DSH_GATE_CONCURRENCY` is unset, with its diagnostic source. */
+export interface ConcurrencyDefault {
   workers: number
   source: string
 }
+
+/** Worker cap of the documentation and hygiene aggregates, locally and in CI, whose leaves each build a full ts.Program. */
+const PROGRAM_MODE_CAP = 8
 
 type GateExecutor = (gate: Gate, signal?: AbortSignal) => Promise<GateResult>
 type ResultObserver = (result: GateResult) => void
@@ -112,7 +118,20 @@ async function main(args: string[]): Promise<number> {
   Object.assign(process.env, workerEnv)
   if (Object.keys(workerEnv).length > 0) console.log(`run-gates: worker settings ${JSON.stringify(workerEnv)}`)
   const gates = gatesForMode(mode)
-  const concurrencyDefault = defaultConcurrency(mode, gates.length)
+  return runAggregate(mode, gates, defaultConcurrency(mode, gates.length))
+}
+
+/**
+ * Run one aggregate through the real child-process executor with the CLI's
+ * environment-selected scheduling and reporting: `DSH_GATE_CONCURRENCY`
+ * overrides the worker default, `DSH_GATE_FAIL_FAST=1` stops at the first
+ * blocking failure, and every settled gate plus a final summary is printed.
+ * @param name - aggregate name printed in the start line and evidence record.
+ * @param gates - complete aggregate to execute.
+ * @param concurrencyDefault - worker count used when `DSH_GATE_CONCURRENCY` is unset.
+ * @returns 1 when a blocking gate failed or was skipped, otherwise 0.
+ */
+export async function runAggregate(name: string, gates: Gate[], concurrencyDefault: ConcurrencyDefault): Promise<number> {
   const concurrencyOverride = process.env.DSH_GATE_CONCURRENCY
   const maxConcurrency = concurrencyFromEnv('DSH_GATE_CONCURRENCY', concurrencyDefault.workers)
   const concurrencySource = concurrencyOverride === undefined || concurrencyOverride === ''
@@ -120,10 +139,10 @@ async function main(args: string[]): Promise<number> {
     : '$DSH_GATE_CONCURRENCY'
   const failFast = flagEnabled('DSH_GATE_FAIL_FAST')
   const startedAt = performance.now()
-  console.log(`run-gates: ${mode} running ${gates.length} gate(s) with ${maxConcurrency} worker(s) from ${concurrencySource}${failFast ? ', fail-fast after first blocking failure' : ''}.`)
+  console.log(`run-gates: ${name} running ${gates.length} gate(s) with ${maxConcurrency} worker(s) from ${concurrencySource}${failFast ? ', fail-fast after first blocking failure' : ''}.`)
 
   const results = await runGates(gates, maxConcurrency, runGate, printResult, cliGateOptions(failFast))
-  writeGateEvidence(root, mode, results, performance.now() - startedAt, process.env)
+  writeGateEvidence(root, name, results, performance.now() - startedAt, process.env)
   printSummary(results, performance.now() - startedAt)
   return results.some(result => result.gate.allowFailure !== true && (result.status === 'failed' || result.status === 'skipped'))
     ? 1
@@ -149,6 +168,7 @@ function parseMode(raw: string | undefined): Mode {
     case 'ci-lint-contracts-ready':
     case 'ci-coverage':
     case 'ci-coverage-scoped':
+    case 'ci-unit':
     case 'ci-bench':
     case 'ci-snapshot':
     case 'ci-artifacts':
@@ -167,7 +187,7 @@ function parseMode(raw: string | undefined): Mode {
       return raw
     default:
       throw new Error(
-        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-coverage-scoped | ci-bench | ci-snapshot | ci-artifacts | ci-consumers | ci-consumers-scoped | ci-web-focused | ci-web-full | ci-windows-blocking | ci-windows-complete | ci-windows-observational-ready | node-compat | check-all | hygiene | doc-sync | doc-quick, got ${JSON.stringify(raw)}.`,
+        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-coverage-scoped | ci-unit | ci-bench | ci-snapshot | ci-artifacts | ci-consumers | ci-consumers-scoped | ci-web-focused | ci-web-full | ci-windows-blocking | ci-windows-complete | ci-windows-observational-ready | node-compat | check-all | hygiene | doc-sync | doc-quick, got ${JSON.stringify(raw)}.`,
       )
   }
 }
@@ -176,27 +196,29 @@ function parseMode(raw: string | undefined): Mode {
  * Resolve the default worker count for one aggregate.
  * @param selectedMode - aggregate whose resource posture applies.
  * @param total - number of gates in the aggregate.
- * @param available - host CPU availability for ordinary modes.
+ * @param cpus - host CPU availability for ordinary modes.
+ * @param env - environment whose `CI` value selects the CI or local [worker budget](./parallelism.ts).
  * @returns the default worker count and its diagnostic source.
  */
 export function defaultConcurrency(
   selectedMode: Mode,
   total: number,
-  available = availableParallelism(),
+  cpus = availableParallelism(),
+  env: NodeJS.ProcessEnv = process.env,
 ): ConcurrencyDefault {
   if (selectedMode === 'ci-consumers') return { workers: total, source: 'ci-consumers gate count' }
-  // Local modes cap workers: several doc gates each build a full ts.Program,
+  const budget = defaultParallelism(env, cpus)
+  const budgetSource = describeDefaultParallelism(env, cpus)
+  // These modes cap workers: several doc gates each build a full ts.Program,
   // so an uncapped default on a large host trades wall clock for memory blowups.
   const localCap = selectedMode === 'check-all'
     || selectedMode === 'hygiene'
     || selectedMode === 'doc-sync'
     || selectedMode === 'doc-quick'
-  const modeLimit = localCap ? Math.min(4, available) : available
+  const modeLimit = localCap ? Math.min(PROGRAM_MODE_CAP, budget) : budget
   return {
     workers: Math.min(total, modeLimit),
-    source: localCap
-      ? `${available} available CPU(s), ${selectedMode} cap 4`
-      : `${available} available CPU(s)`,
+    source: localCap ? `${budgetSource}, ${selectedMode} cap ${String(PROGRAM_MODE_CAP)}` : budgetSource,
   }
 }
 
@@ -205,27 +227,34 @@ export function defaultConcurrency(
  * Coverage shares one budget; artifact readers share CPUs with sibling commands.
  * @param mode - aggregate selected by the caller.
  * @param env - inherited worker overrides, including serial reference settings.
- * @param available - CPUs available to this runner process.
+ * @param cpus - CPUs available to this runner process.
  * @returns environment additions for this aggregate and its children.
  */
 export function ciWorkerEnvironment(
   mode: Mode,
   env: NodeJS.ProcessEnv,
-  available = availableParallelism(),
+  cpus = availableParallelism(),
 ): Record<string, string> {
-  if (!mode.startsWith('ci-')) return {}
+  // ci-unit's gates read none of these settings, while the inventory it runs
+  // reads the same variables (run-gates.spec.ts builds coverage gates from
+  // DSH_COVERAGE_PARTITIONS; the oxlint contract spawns run-oxlint, which
+  // reads DSH_OXLINT_THREADS), so the aggregate leaves the environment as
+  // `pnpm run test` finds it.
+  if (!mode.startsWith('ci-') || mode === 'ci-unit') return {}
+  const budget = defaultParallelism(env, cpus)
+  const testBudget = defaultParallelism(env, cpus, LOCAL_TEST_PARALLELISM_CAP)
   const additions: Record<string, string> = {}
   const setDefault = (name: string, value: number): void => {
     if (env[name] === undefined || env[name] === '') additions[name] = String(value)
   }
-  const shared = Math.max(1, Math.floor(available / 2))
+  const shared = Math.max(1, Math.floor(budget / 2))
   setDefault('DSH_OXLINT_THREADS', shared)
   setDefault('DSH_PUBLINT_CONCURRENCY', shared)
   setDefault('DSH_SNAPSHOT_MAX_WORKERS', 1)
   setDefault('DSH_SNAPSHOT_MAX_CONCURRENCY', shared)
-  setDefault('DSH_WEB_SNAPSHOT_WORKERS', env.DSH_GATE_CONCURRENCY === '1' ? 1 : available)
-  setDefault('DSH_COVERAGE_MAX_WORKERS', available)
-  const coverageBudget = env.DSH_COVERAGE_MAX_WORKERS || String(available)
+  setDefault('DSH_WEB_SNAPSHOT_WORKERS', env.DSH_GATE_CONCURRENCY === '1' ? 1 : budget)
+  setDefault('DSH_COVERAGE_MAX_WORKERS', testBudget)
+  const coverageBudget = env.DSH_COVERAGE_MAX_WORKERS || String(testBudget)
   const total = Number(coverageBudget)
   if (!Number.isSafeInteger(total) || total < 1) {
     throw new Error(`run-gates: DSH_COVERAGE_MAX_WORKERS must be a positive integer, got ${JSON.stringify(coverageBudget)}.`)
@@ -303,6 +332,8 @@ export function gatesForMode(selected: Mode): Gate[] {
       return coverageGates()
     case 'ci-coverage-scoped':
       return ciCoverageScopedGates()
+    case 'ci-unit':
+      return ciUnitGates()
     case 'ci-bench':
       return [pnpmScript('bench', 'test:bench', { label: 'performance benchmarks' })]
     case 'ci-snapshot':
@@ -765,6 +796,20 @@ function coverageWorkerArgs(): { instrumented: string[]; exempt: string[] } {
     instrumented: [`--maxWorkers=${String(instrumented)}`],
     exempt: [`--maxWorkers=${String(exempt)}`],
   }
+}
+
+// The plain unit lane: the shared 3-vCPU sandbox runner needs the raised
+// budget that DSH_COVERAGE_TEST_TIMEOUT_MS carries through vitest.config into
+// every inline project — CLI flags never reach them.
+function ciUnitGates(): Gate[] {
+  return [
+    pnpmScript('native-system', 'build:native-system'),
+    pnpmExec('unit', ['vitest', 'run'], {
+      label: 'test',
+      needs: ['native-system'],
+      streamOutput: true,
+    }),
+  ]
 }
 
 function coverageGates(): Gate[] {
