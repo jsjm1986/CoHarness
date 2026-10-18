@@ -80,6 +80,8 @@ A team can let one person start an investigation, another add context, a special
 
 Administrators manage users, projects, invitations, model-route authorization, quotas, usage summaries, audit records, and runtime health. Organization-managed model routes can be authorized per role, user, and project. Personal users may use their own BYOK routes; shared project runtimes remain catalog-controlled. Usage records attribute activity without storing API keys, prompts, or responses in the ledger. Linux deployments add systemd and mount-namespace confinement; macOS deployments do not provide that kernel boundary and should be treated accordingly.
 
+<p align="center"><img src="https://jsjm1986.github.io/CoHarness/assets/admin-users.jpg" alt="CoHarness admin center: users and runtime instances" width="860"></p>
+
 Read the [Gateway reference](gateway/README.md) for the control-plane behavior and the [deployment runbook](gateway/deploy/README.md) for PostgreSQL, releases, isolation, TLS, backups, upgrades, and rollback.
 
 ## What it provides

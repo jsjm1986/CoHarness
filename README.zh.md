@@ -80,6 +80,8 @@ Gateway 把协同哲学落实为经过认证的项目边界。每个账户拥有
 
 管理员可以管理用户、项目、邀请、模型路由授权、额度、用量汇总、审计记录和运行时健康状态。组织管理的模型路由可以按角色、用户和项目授权。个人用户可以使用自己的 BYOK 路由；共享项目 runtime 仍由目录控制。用量记录会在不把 API 密钥、提示词或回复写入账本的情况下归属活动。Linux 部署增加 systemd 和 mount namespace 隔离；macOS 不提供这一内核边界，应按相应限制使用。
 
+<p align="center"><img src="https://jsjm1986.github.io/CoHarness/assets/admin-users.jpg" alt="CoHarness 管理中心：用户与运行时实例" width="860"></p>
+
 请阅读 [Gateway 参考](gateway/README.zh.md)了解控制面的行为，阅读[部署手册](gateway/deploy/README.zh.md)了解 PostgreSQL、release、隔离、TLS、备份、升级和回滚。
 
 ## 当前能力
