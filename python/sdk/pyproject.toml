@@ -25,7 +25,7 @@ Source = "https://github.com/deepseek-ai/deepseek-harness"
 quality = [
     "ruff==0.16.8",
 ]
-test = ["pytest>=8.0"]
+test = ["pytest>=8.0", "Pillow==12.3.0"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
@@ -39,6 +39,8 @@ select = ["E9", "F63", "F7", "F82"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/deepseek_harness"]
+# The release job uses Twine 6.2.0, which accepts core metadata through 2.4.
+core-metadata-version = "2.4"
 
 # Editable installs see runtime executables injected after installation instead
 # of freezing a wheel snapshot.
