@@ -111,7 +111,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     let archive: ConversationArchiveRow = {
       rootSessionId: 'archive-fixture', title: '归档清理示例', contentPreview: '需要保留的对话内容',
       creator: { id: admin.id, displayName: 'Admin fixture' }, project: null, runtime: { kind: 'user', id: admin.id },
-      workspace: null, state: 'archived', archivedAt: Date.UTC(2026, 8, 27), restoredAt: null, trashedAt: null,
+      workspace: null, state: 'trash', archivedAt: Date.UTC(2026, 8, 27), restoredAt: null, trashedAt: Date.UTC(2026, 8, 28),
       purgeAfter: null, syncState: 'synced', childCount: 0, messageCount: 1, updatedAt: Date.UTC(2026, 8, 27),
     }
     let archiveReads = 0, archivePurges = 0
@@ -389,12 +389,12 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await page.getByRole('button', { name: '查看 归档清理示例', exact: true }).click()
     const archiveDialog = page.getByRole('dialog', { name: '归档清理示例', exact: true })
     const purge = async () => {
-      await archiveDialog.getByRole('button', { name: '永久清理', exact: true }).click()
-      await page.getByRole('dialog', { name: '永久清理归档对话？', exact: true })
-        .getByRole('button', { name: '永久清理', exact: true }).click()
+      await archiveDialog.getByRole('button', { name: '彻底删除', exact: true }).click()
+      await page.getByRole('dialog', { name: '彻底删除所选对话？', exact: true })
+        .getByRole('button', { name: '彻底删除', exact: true }).click()
     }
     await purge()
-    await archiveDialog.getByText('等待实例确认', { exact: true }).waitFor()
+    await archiveDialog.getByText('处理中·等待实例', { exact: true }).waitFor()
     await compareOrRefreshGolden(join(DIRECTORY, 'archive-pending.expected.md'), await archiveDialog.locator('.archiveDetail').ariaSnapshot(), webSnapshotMode())
     expect(archiveReads).toBe(1)
     expect(archivePurges).toBe(1)
@@ -403,9 +403,9 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await compareOrRefreshGolden(join(DIRECTORY, 'archive-refused.expected.md'), await archiveDialog.locator('.archiveDetail').ariaSnapshot(), webSnapshotMode())
     expect(archiveReads).toBe(1)
     await purge()
-    await archiveDialog.getByText('等待实例确认', { exact: true }).waitFor()
+    await archiveDialog.getByText('处理中·等待实例', { exact: true }).waitFor()
     archive = { ...archive, syncState: 'synced', state: 'purged' }
-    await archiveDialog.getByText('已清理', { exact: true }).waitFor()
+    await archiveDialog.getByText('已彻底删除', { exact: true }).waitFor()
     expect(await archiveDialog.getByText('需要保留的对话内容', { exact: true }).count()).toBe(0)
     expect(archivePurges).toBe(2)
     expect(archiveReads).toBe(1)

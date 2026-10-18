@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, stat, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import type { Pool } from 'pg'
+import { Pool } from 'pg'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConversationArchiveService } from '../src/postgres/conversation-archive-service.ts'
 
@@ -350,7 +350,7 @@ describe('ConversationArchiveService', () => {
       }),
       release: vi.fn(),
     }
-    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const pool = Object.assign(new Pool(), { connect: vi.fn(async () => client), query: client.query })
     const service = new ConversationArchiveService({ ...context, pool })
     await service.syncSnapshot({ rootSessionId: 'session-1', runtime: { kind: 'user', id: 2 }, syncRevision: 8 })
     const insert = calls.find(([text]) => text.includes('INSERT INTO harness.conversation_archive_commands'))
@@ -383,7 +383,7 @@ describe('ConversationArchiveService', () => {
       }),
       release: vi.fn(),
     }
-    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const pool = Object.assign(new Pool(), { connect: vi.fn(async () => client), query: client.query })
     const service = new ConversationArchiveService({ ...context, pool })
     await expect(service.purge('session-1')).resolves.toBe(true)
     await expect(stat(file)).resolves.toBeDefined()
@@ -407,7 +407,7 @@ describe('ConversationArchiveService', () => {
       }),
       release: vi.fn(),
     }
-    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const pool = Object.assign(new Pool(), { connect: vi.fn(async () => client), query: client.query })
     const service = new ConversationArchiveService({ ...context, pool })
     await expect(service.purge('session-1')).resolves.toBe(true)
     await expect(stat(file)).resolves.toBeDefined()
@@ -425,7 +425,7 @@ describe('ConversationArchiveService', () => {
       }),
       release: vi.fn(),
     }
-    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const pool = Object.assign(new Pool(), { connect: vi.fn(async () => client), query: client.query })
     const service = new ConversationArchiveService({ ...context, pool })
     await expect(service.cleanupDue()).resolves.toBe(0)
     expect(client.query.mock.calls.some(([text]) => String(text).includes('SET lease_until=NULL,last_error'))).toBe(true)
