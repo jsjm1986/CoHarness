@@ -273,26 +273,26 @@
   <div class="wrap">
     <div class="center">
       <span class="kicker" data-i18n="rt.kicker">运行机制</span>
-      <h2 data-i18n="rt.title">项目空间怎么分：一成员一运行时，项目按目录授权</h2>
-      <p class="sec-sub" data-i18n="rt.sub">Gateway 不按"项目"开进程——它为每位成员拉起一个独立运行时，再把项目目录的读写授权精确投影进去。</p>
+      <h2 data-i18n="rt.title">运行时怎么分：成员有独立个人运行时，项目有共享运行时</h2>
+      <p class="sec-sub" data-i18n="rt.sub">Gateway 管理两类实例：每位用户一个个人运行时承载个人空间，每个项目一个共享运行时承载协作——两种实例都按需拉起、空闲回收。</p>
     </div>
     <div class="rt-grid">
       <ul class="rt-list">
-        <li><svg class="ico"><use href="#i-server"/></svg><div><b data-i18n="rt.1t">一成员一个运行时实例</b><span data-i18n="rt.1p">每位用户分配独立的 dsh web 进程、专属端口与独立 home 目录（进程的 cwd 与 $HOME）——会话、记忆、文档落在成员自己的目录下。</span></div></li>
-        <li><svg class="ico"><use href="#i-refresh"/></svg><div><b data-i18n="rt.2t">按需拉起，空闲自动回收</b><span data-i18n="rt.2p">实例带 starting / ready / stopping / stopped 生命周期：空闲自动停止、有操作时拉起；手动停止不会被隐式拉起；steward 维护空间常驻。</span></div></li>
-        <li><svg class="ico"><use href="#i-folder"/></svg><div><b data-i18n="rt.3t">项目 = 目录授权边界</b><span data-i18n="rt.3p">项目把一个目录路径与成员表（ro/rw）绑定；授权经 directory grants 投影进每个成员的运行时——成员在各自运行时里读写同一个项目目录，会话、项目记忆与文档随项目共享。</span></div></li>
-        <li><svg class="ico"><use href="#i-shield"/></svg><div><b data-i18n="rt.4t">三档权限预设 + 路径级授权</b><span data-i18n="rt.4p">每个运行时挂载 read-only / workspace-write / danger-full-access 预设；会话按 cwd 精确授权并过滤参与者可读范围；管理员运行时获得文件系统根读写，普通成员只见自己的主目录与所属项目——项目路径还不允许与任何用户目录重叠。</span></div></li>
-        <li><svg class="ico"><use href="#i-cpu"/></svg><div><b data-i18n="rt.5t">平台后端可替换</b><span data-i18n="rt.5p">开发环境本机 spawn；Linux 生产用 systemd 用户单元 + TemporaryFileSystem 隔离，实例家目录只对本运行时可见。</span></div></li>
+        <li><svg class="ico"><use href="#i-server"/></svg><div><b data-i18n="rt.1t">一成员一个个人运行时</b><span data-i18n="rt.1p">每位用户分配独立的 dsh web 进程、专属端口与独立 home 目录（进程的 cwd 与 $HOME）——个人空间的会话、记忆、文档落在成员自己的目录下；目录授权还投影进成员可读写的所属项目目录（ro/rw 按成员表）。</span></div></li>
+        <li><svg class="ico"><use href="#i-users"/></svg><div><b data-i18n="rt.2t">一项目一个共享运行时</b><span data-i18n="rt.2p">项目运行时以项目目录本身为 cwd 与 home，启动时挂载协作套件与项目作用域记忆——成员在同一个共享环境里接力：会话、项目记忆与文档属于项目，而不是成员各自的副本。</span></div></li>
+        <li><svg class="ico"><use href="#i-refresh"/></svg><div><b data-i18n="rt.3t">按需拉起，空闲自动回收</b><span data-i18n="rt.3p">两类实例都带 starting / ready / stopping / stopped 生命周期：空闲自动停止、有操作时拉起；手动停止不会被隐式拉起；steward 维护空间常驻。</span></div></li>
+        <li><svg class="ico"><use href="#i-shield"/></svg><div><b data-i18n="rt.4t">三档权限预设 + 路径级授权</b><span data-i18n="rt.4p">运行时挂载 read-only / workspace-write / danger-full-access 预设；会话按 cwd 精确授权并过滤参与者可读范围，会话可见性可选项目共享或创建者私有；项目路径不允许与任何用户目录重叠。</span></div></li>
+        <li><svg class="ico"><use href="#i-cpu"/></svg><div><b data-i18n="rt.5t">平台后端可替换</b><span data-i18n="rt.5p">开发环境本机 spawn；Linux 生产用 systemd 用户单元 + 独立系统账号（成员 harness-&lt;user&gt;、项目独立运行时账号）+ TemporaryFileSystem 隔离——普通项目运行时只看得见自己的项目目录。</span></div></li>
       </ul>
       <div class="topo reveal">
         <div class="t-node t-gw"><b>Gateway · :8899</b><span data-i18n="rt.d1">认证 · 路由 · 账本 · 审计</span></div>
-        <div class="t-link"><i></i><em data-i18n="rt.d2">为每位成员拉起独立运行时</em><i></i></div>
+        <div class="t-link"><i></i><em data-i18n="rt.d2">拉起两类运行时</em><i></i></div>
         <div class="t-branch">
-          <div class="t-node"><b data-i18n="rt.d3a">成员 A 运行时</b><span data-i18n="rt.d3s">dsh web · :42000 · 独立 home</span></div>
-          <div class="t-node"><b data-i18n="rt.d3b">成员 B 运行时</b><span data-i18n="rt.d3t">dsh web · :42004 · 独立 home</span></div>
+          <div class="t-node"><b data-i18n="rt.d3a">成员个人运行时</b><span data-i18n="rt.d3s">每成员一个 · :42000 · 独立 home · 授权=主目录rw+项目ro/rw</span></div>
+          <div class="t-node"><b data-i18n="rt.d3b">项目共享运行时</b><span data-i18n="rt.d3t">每项目一个 · :42010 · cwd=项目目录 · 协作套件+项目记忆</span></div>
         </div>
-        <div class="t-link"><i></i><em data-i18n="rt.d4">目录授权投影 ro / rw</em><i></i></div>
-        <div class="t-node t-proj"><b data-i18n="rt.d5">项目空间 = 一个目录</b><span data-i18n="rt.d6">成员 ro/rw · 共享会话 · 项目记忆 · 文档</span></div>
+        <div class="t-link"><i></i><em data-i18n="rt.d4">同一个项目目录，两种到达方式</em><i></i></div>
+        <div class="t-node t-proj"><b data-i18n="rt.d5">项目空间 = 一个目录 + 一张成员表</b><span data-i18n="rt.d6">ro/rw 成员 · 会话可见性 · 项目记忆 · 文档</span></div>
       </div>
     </div>
   </div>
@@ -457,16 +457,16 @@ const dict = {
     'ad.5t': 'Audit & operations', 'ad.5p': 'Audit records, deployment state, terminals, SSH, webhooks, desktops, and archives — the operational surface lives in the same admin.',
     'ad.s2': 'Projects: admin/member-created workspaces with member counts', 'ad.s3': 'Model governance: org Providers, permissions & pricing',
     'ad.s4': 'Usage: tokens, cost, quota alerts, and quota config', 'ad.s5': 'Audit: every administrative action on record',
-    'rt.kicker': 'RUNTIME MODEL', 'rt.title': 'How project spaces map: one runtime per member, projects granted by directory',
-    'rt.sub': 'The Gateway does not spawn a process per project — it launches one dedicated runtime per member, then projects each project’s directory grants into it.',
-    'rt.1t': 'One runtime instance per member', 'rt.1p': 'Each user gets a dedicated dsh web process, its own port, and its own home directory (the process cwd and $HOME) — sessions, memory, and documents land under that member’s own directory.',
-    'rt.2t': 'On-demand start, idle reaping', 'rt.2p': 'Instances carry a starting / ready / stopping / stopped lifecycle: idle runtimes stop automatically and relaunch on activity; a manual stop is never implicitly revived; the steward space stays resident.',
-    'rt.3t': 'A project is a directory boundary', 'rt.3p': 'A project binds one directory path to its member list (ro/rw); grants project into each member’s runtime via directory grants — members read and write the same project directory from their own runtime, sharing sessions, project memory, and documents.',
-    'rt.4t': 'Three permission presets + path-level authorization', 'rt.4p': 'Every runtime mounts read-only / workspace-write / danger-full-access presets; sessions authorize by exact cwd plus participant-readable filtering; admin runtimes receive a filesystem-root grant, regular members only see their home and their projects — and a project path may not overlap any user directory.',
-    'rt.5t': 'Pluggable platform backend', 'rt.5p': 'Local spawn in development; Linux production runs systemd user units with TemporaryFileSystem masking, so an instance home is visible only to that runtime.',
-    'rt.d1': 'auth · routing · ledger · audit', 'rt.d2': 'one runtime launched per member',
-    'rt.d3a': 'Member A runtime', 'rt.d3b': 'Member B runtime', 'rt.d3s': 'dsh web · :42000 · dedicated home', 'rt.d3t': 'dsh web · :42004 · dedicated home', 'rt.d4': 'directory grants projected ro / rw',
-    'rt.d5': 'A project space is one directory', 'rt.d6': 'ro/rw members · shared sessions · project memory · documents',
+    'rt.kicker': 'RUNTIME MODEL', 'rt.title': 'How runtimes map: a personal runtime per member, a shared runtime per project',
+    'rt.sub': 'The Gateway manages two kinds of instances: one personal runtime per user for their private space, and one shared runtime per project for collaboration — both launched on demand and reaped when idle.',
+    'rt.1t': 'One personal runtime per member', 'rt.1p': 'Each user gets a dedicated dsh web process, its own port, and its own home directory (the process cwd and $HOME) — personal sessions, memory, and documents land under that member’s own directory; directory grants also project the member’s project directories in with their ro/rw mode.',
+    'rt.2t': 'One shared runtime per project', 'rt.2p': 'A project runtime uses the project directory itself as cwd and home, and mounts the collaboration suite plus project-scoped memory at launch — members continue in one shared environment: sessions, project memory, and documents belong to the project, not to per-member copies.',
+    'rt.3t': 'On-demand start, idle reaping', 'rt.3p': 'Both kinds carry a starting / ready / stopping / stopped lifecycle: idle runtimes stop automatically and relaunch on activity; a manual stop is never implicitly revived; the steward space stays resident.',
+    'rt.4t': 'Three permission presets + path-level authorization', 'rt.4p': 'Runtimes mount read-only / workspace-write / danger-full-access presets; sessions authorize by exact cwd plus participant-readable filtering, and conversation visibility is project-shared or creator-private; a project path may not overlap any user directory.',
+    'rt.5t': 'Pluggable platform backend', 'rt.5p': 'Local spawn in development; Linux production runs systemd user units with dedicated system accounts (harness-&lt;user&gt; for members, a separate account for project runtimes) and TemporaryFileSystem masking — an ordinary project runtime sees only its project directory.',
+    'rt.d1': 'auth · routing · ledger · audit', 'rt.d2': 'two kinds of runtimes launched',
+    'rt.d3a': 'Personal runtime', 'rt.d3b': 'Project shared runtime', 'rt.d3s': 'one per member · :42000 · own home · grants = home rw + projects ro/rw', 'rt.d3t': 'one per project · :42010 · cwd = project dir · collaboration + project memory', 'rt.d4': 'one project directory, two paths in',
+    'rt.d5': 'A project space = one directory + one member list', 'rt.d6': 'ro/rw members · conversation visibility · project memory · documents',
     'pr.kicker': 'PHILOSOPHY', 'pr.title': 'The unit of collaboration is shared work, not a shared chat link',
     'pr.sub': 'A project holds a continuing agent environment, participant contributions, delegation relationships, pending decisions, and recoverable progress — the work survives a closed browser or a stopped agent.',
     'pr.1t': 'Assembled, not prescribed', 'pr.1p': 'Models, tools, roles, context, permissions, delegation paths, and workflows compose through plugins, profiles, and bundles — fitted to how the team actually works.',
