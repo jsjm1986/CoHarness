@@ -49,7 +49,7 @@ Build the shell against the deployed Web UI with a Java/Android SDK toolchain. F
 
 ## TLS entry and cutover
 
-Point the public domain at the gateway and close the direct instance port. Nginx server block essentials:
+Point the public domain at the gateway and close the direct instance port. The `/admin` deployment page can manage Cloudflare Tunnel directly — a zero-account quick link or a fixed hostname on your own Cloudflare zone — instead of the manual Nginx path below; tunnel mode also works without a domain you control. Nginx server block essentials:
 
 ```nginx
 server {

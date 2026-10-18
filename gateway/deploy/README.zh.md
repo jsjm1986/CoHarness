@@ -49,7 +49,7 @@ Gateway 发送端需要把 JPush Master Secret 和 Firebase service-account JSON
 
 ## TLS 入口与切流
 
-把公网域名指向网关，并关闭实例直连端口。Nginx server 块要点：
+把公网域名指向网关，并关闭实例直连端口。`/admin` 部署页可以直接管理 Cloudflare Tunnel——无需账号的临时链接，或自有 Cloudflare zone 上的固定域名——替代下面的手工 Nginx 路径；隧道模式也不要求你持有域名。Nginx server 块要点：
 
 ```nginx
 server {

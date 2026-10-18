@@ -86,6 +86,8 @@ export interface GatewayDeps {
   webhookDeliveries?: Pick<import('./postgres/webhook-delivery-service.ts').PostgresWebhookDeliveryService, 'list'>
   /** Optional administrator-registered webhook endpoint service. */
   webhookEndpoints?: Pick<import('./postgres/webhook-endpoint-service.ts').PostgresWebhookEndpointService, 'list' | 'create' | 'update' | 'mutate'>
+  /** Optional public-access tunnel (cloudflared) orchestration for this node. */
+  tunnelAccess?: Pick<import('./tunnel-access.ts').GatewayTunnelAccess, 'view' | 'install' | 'startQuick' | 'startNamed' | 'stop' | 'clear'>
   /** Optional public provider ingress and administrator redispatch orchestrator. */
   webhookIntake?: Pick<import('./webhook-intake.ts').GatewayWebhookIntake, 'handle' | 'redispatch'>
   /** Maintenance windows, writer convergence, and restore fencing for shared PostgreSQL. */
