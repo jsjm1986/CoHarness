@@ -160,6 +160,7 @@
       <a href="#admin" data-i18n="nav.admin">管理中心</a>
       <a href="#principles" data-i18n="nav.principles">协作理念</a>
       <a href="#capabilities" data-i18n="nav.capabilities">能力</a>
+      <a href="#scenes" data-i18n="nav.scenes">场景</a>
       <a href="#screens" data-i18n="nav.screens">界面</a>
       <a href="#mobile" data-i18n="nav.mobile">移动端</a>
       <a href="#start" data-i18n="nav.start">快速开始</a>
@@ -246,11 +247,29 @@
       <div class="card reveal"><div class="ic">🤖</div><h3 data-i18n="cap.6t">子智能体团队</h3><p data-i18n="cap.6p">持久的子智能体会话、明确的委托关系、可恢复可继续的协作伙伴，报告选择性回流主任务。</p></div>
       <div class="card reveal"><div class="ic">⏰</div><h3 data-i18n="cap.7t">自动化任务</h3><p data-i18n="cap.7p">定时与触发器驱动的自动化：任务计划、目标管理与后台执行，工作离开浏览器也能继续。</p></div>
       <div class="card reveal"><div class="ic">🖥️</div><h3 data-i18n="cap.8t">Web 界面</h3><p data-i18n="cap.8p">响应式浏览器应用：会话与实时历史、模型选择、命令与 @ 建议、附件、权限、目标、任务、设置、中英双语与主题。</p></div>
+      <div class="card reveal"><div class="ic">🔌</div><h3 data-i18n="cap.9t">MCP 与扩展生态</h3><p data-i18n="cap.9p">MCP 客户端接入外部工具服务，Claude Code / Codex hook 桥接既有工作流，插件目录与 bundle 持续扩展能力面。</p></div>
+      <div class="card reveal"><div class="ic">🔐</div><h3 data-i18n="cap.10t">安全与凭证</h3><p data-i18n="cap.10p">凭证引用让密钥不进日志；沙箱策略、目录授权、审批与权限预设，把"能做什么"钉在每次执行上。</p></div>
+      <div class="card reveal"><div class="ic">🌐</div><h3 data-i18n="cap.11t">多入口接入</h3><p data-i18n="cap.11p">Headless、JSON-RPC、ACP 自动化协议、TypeScript / Python SDK、SSH 远程执行目标、Webhook 出站集成。</p></div>
+      <div class="card reveal"><div class="ic">🎙️</div><h3 data-i18n="cap.12t">语音与附件</h3><p data-i18n="cap.12p">语音输入转写、图片读取与结构化附件、用户文档附加到会话——输入面不只有键盘。</p></div>
     </div>
   </div>
 </section>
 
-<section id="screens">
+<section id="scenes">
+  <div class="wrap center">
+    <span class="kicker" data-i18n="sc2.kicker">适用场景</span>
+    <h2 data-i18n="sc2.title">从日常业务到研发协作，一个平台装下</h2>
+    <p class="sec-sub" data-i18n="sc2.sub">下面这些是我们自己部署上正在跑的真实项目形态。</p>
+    <div class="scn">
+      <div class="card reveal"><div class="ic">✍️</div><h3 data-i18n="sc2.1t">内容生产与自媒体运营</h3><p data-i18n="sc2.1p">选题、文案生成、素材整理到发布复盘的流水线——记忆让智能体记住品牌口径与风格约定。</p></div>
+      <div class="card reveal"><div class="ic">💬</div><h3 data-i18n="sc2.2t">客服与私信协同</h3><p data-i18n="sc2.2p">客服类项目共享一个运行时：知识文档入库、会话留痕，成员和智能体在同一历史里接力。</p></div>
+      <div class="card reveal"><div class="ic">📡</div><h3 data-i18n="sc2.3t">监控与巡检助手</h3><p data-i18n="sc2.3p">定时任务驱动的监控巡检：异常摘要、留痕报告，Webhook 把结果送出到团队的既有系统。</p></div>
+      <div class="card reveal"><div class="ic">🧪</div><h3 data-i18n="sc2.4t">研发与内部工具</h3><p data-i18n="sc2.4p">插件开发、提示词组合工具、图像生成——团队的 AI 项目在同一个边界里被管理、计量与审计。</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="screens" style="background:var(--panel); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
   <div class="wrap center">
     <span class="kicker" data-i18n="sc.kicker">成员端界面</span>
     <h2 data-i18n="sc.title">成员看到的工作台</h2>
@@ -325,6 +344,7 @@ release-control.sh activate &lt;release-dir&gt;</pre>
       <li data-i18n="os.3">中英双语文档与界面，VitePress 文档站随仓库投影</li>
       <li data-i18n="os.4">TypeScript / Python SDK、JSON-RPC、ACP 自动化接入</li>
       <li data-i18n="os.5">Android（Capacitor）壳可访问已部署的 Gateway</li>
+      <li data-i18n="os.6">数据主权：全部数据在自有基础设施上——BYOK 模型路由、账本不存密钥与对话内容</li>
     </ul>
   </div>
 </section>
@@ -344,7 +364,7 @@ release-control.sh activate &lt;release-dir&gt;</pre>
 const dict = {
   en: {
     'nav.admin': 'Admin center', 'nav.principles': 'Philosophy', 'nav.capabilities': 'Capabilities',
-    'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source',
+    'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source',
     'hero.badge': '<b>Pre-release</b> · An independent derivative of DeepSeek Harness',
     'hero.title': 'Run your AI team like a team',
     'hero.sub': 'CoHarness is a fully pluginized collaboration platform for small and mid-sized teams: admins govern users, projects, models, and cost from one admin center, while members share real work with agents on a single workbench — durable sessions, cross-session memory, documents, approvals, and delegation.',
@@ -374,6 +394,16 @@ const dict = {
     'cap.6t': 'Subagent teams', 'cap.6p': 'Durable child-agent sessions with explicit delegation relationships — resumable collaborators whose selected reports flow back to the parent task.',
     'cap.7t': 'Automation', 'cap.7p': 'Timer- and trigger-driven automation: scheduled tasks, goals, and background execution keep work moving after the browser closes.',
     'cap.8t': 'Web UI', 'cap.8p': 'Responsive browser app: sessions and live history, model selection, command and @ suggestions, attachments, permissions, goals, jobs, settings, zh/en localization, themes.',
+    'cap.9t': 'MCP & extensions', 'cap.9p': 'An MCP client brings external tool services in; Claude Code / Codex hook bridges connect existing workflows; plugin catalogs and bundles keep extending the surface.',
+    'cap.10t': 'Security & credentials', 'cap.10p': 'Credential references keep secrets out of logs; sandbox policies, directory grants, approvals, and permission presets pin down what may happen on every execution.',
+    'cap.11t': 'Many entry points', 'cap.11p': 'Headless runs, JSON-RPC, the ACP automation protocol, TypeScript / Python SDKs, SSH execution targets, and outbound webhooks.',
+    'cap.12t': 'Voice & attachments', 'cap.12p': 'Voice-input transcription, image reading, structured attachments, and user documents attached to sessions — input is more than a keyboard.',
+    'sc2.kicker': 'SCENARIOS', 'sc2.title': 'One platform, from daily operations to engineering',
+    'sc2.sub': 'These are the real project shapes running on our own deployment.',
+    'sc2.1t': 'Content & social-media operations', 'sc2.1p': 'Topic, copy, asset, and post-mortem pipelines — memory keeps the agent on the brand voice and style rules.',
+    'sc2.2t': 'Customer service & DMs', 'sc2.2p': 'Support projects share one runtime: knowledge documents on file, conversations on record, members and agents handing off in the same history.',
+    'sc2.3t': 'Monitoring & patrol assistants', 'sc2.3p': 'Scheduled monitoring rounds produce anomaly digests and recorded reports; webhooks push results into the team’s existing systems.',
+    'sc2.4t': 'Engineering & internal tools', 'sc2.4p': 'Plugin development, prompt-combination tools, image generation — the team’s AI projects get managed, metered, and audited inside one boundary.',
     'sc.kicker': 'MEMBER INTERFACE', 'sc.title': 'The workbench members see',
     'sc.sub': 'Every capture below is from a live CoHarness instance — not a mockup.',
     'sc.0': 'Conversation: model replies, tool-call summaries, token stats, and model selection',
@@ -401,6 +431,7 @@ const dict = {
     'os.3': 'Bilingual zh/en docs and UI; a VitePress documentation site projects from the repository',
     'os.4': 'TypeScript / Python SDKs, JSON-RPC, and ACP automation entry points',
     'os.5': 'An Android (Capacitor) shell reaches an already-deployed Gateway',
+    'os.6': 'Data sovereignty: everything lives on your own infrastructure — BYOK model routes, and the ledger stores no keys or conversation content',
     'ft.based': 'built on', 'ft.docs': 'Docs', 'ft.safety': 'Safety notice',
   }
 }
