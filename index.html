@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CoHarness — 人与智能体的协作工作台 | People-and-Agent Work Harness</title>
-<meta name="description" content="CoHarness 是一个全插件化的人与智能体协作工作台：共享项目、持久会话、跨会话记忆、文档管理与 Gateway 团队管理。A fully pluginized harness for teams to build their own patterns for people-and-agent work.">
+<title>CoHarness — 面向中小团队的人与智能体协作平台 | People-and-Agent Workbench for Teams</title>
+<meta name="description" content="CoHarness 是面向中小团队的全插件化协作平台：一个管理中心管住用户、项目、模型治理、用量与审计；成员在同一个工作台与智能体共享工作——持久会话、跨会话记忆、文档与委派。">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <style>
   :root {
     --bg: #fafbfe; --panel: #ffffff; --ink: #101828; --sub: #475467; --faint: #98a2b3;
     --line: #e4e7ee; --accent: #4d5dfb; --accent-2: #7a5af8; --accent-soft: #eef0ff;
-    --radius: 16px; --maxw: 1120px;
-    --shadow: 0 24px 64px -24px rgba(35, 48, 120, .28), 0 4px 16px -6px rgba(35, 48, 120, .12);
+    --radius: 16px; --maxw: 1140px;
+    --shadow: 0 24px 64px -24px rgba(35,48,120,.28), 0 4px 16px -6px rgba(35,48,120,.12);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -24,101 +24,107 @@
   .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
   a { color: inherit; text-decoration: none; }
 
-  /* nav */
-  nav {
-    position: sticky; top: 0; z-index: 50; backdrop-filter: blur(14px);
-    background: rgba(250, 251, 254, .78); border-bottom: 1px solid var(--line);
-  }
-  .nav-in { display: flex; align-items: center; gap: 28px; height: 60px; }
+  /* firefly mascot (from CoHarnessMascot) */
+  .mascot { width: 34px; height: 34px; }
+  .mascot .coh-mascot-accent { fill: #2563eb; }
+  .mascot .coh-mascot-wing-l { transform-box: fill-box; transform-origin: 85% 75%; animation: mfl .5s ease-in-out infinite; }
+  .mascot .coh-mascot-wing-r { transform-box: fill-box; transform-origin: 18% 90%; animation: mfr .5s ease-in-out infinite; }
+  .mascot .coh-mascot-lamp { animation: mlm 1.6s ease-in-out infinite; }
+  .mascot { animation: mbb 1.6s ease-in-out infinite; }
+  @keyframes mfl { 0%,100%{transform:rotate(0)} 50%{transform:rotate(-13deg)} }
+  @keyframes mfr { 0%,100%{transform:rotate(0)} 50%{transform:rotate(13deg)} }
+  @keyframes mbb { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2.6px)} }
+  @keyframes mlm { 0%,100%{opacity:1} 50%{opacity:.4} }
+  @media (prefers-reduced-motion:reduce) { .mascot, .mascot * { animation: none !important } }
+  .hero .mascot { width: 76px; height: 76px; }
+
+  nav { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(14px); background: rgba(250,251,254,.8); border-bottom: 1px solid var(--line); }
+  .nav-in { display: flex; align-items: center; gap: 26px; height: 62px; }
   .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: .02em; font-size: 16px; }
-  .brand img { width: 26px; height: 26px; }
-  .nav-links { display: flex; gap: 22px; margin-left: auto; font-size: 14px; color: var(--sub); }
+  .nav-links { display: flex; gap: 20px; margin-left: auto; font-size: 14px; color: var(--sub); }
   .nav-links a:hover { color: var(--ink); }
-  .lang-btn, .gh-btn {
-    font-size: 13px; border: 1px solid var(--line); border-radius: 999px;
-    padding: 6px 14px; background: var(--panel); cursor: pointer; color: var(--sub);
-    font-family: inherit; transition: .15s;
-  }
+  .lang-btn, .gh-btn { font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; background: var(--panel); cursor: pointer; color: var(--sub); font-family: inherit; transition: .15s; }
   .lang-btn:hover, .gh-btn:hover { border-color: var(--accent); color: var(--accent); }
   .gh-btn { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
 
-  /* hero */
-  .hero { text-align: center; padding: 96px 0 56px; position: relative; overflow: hidden; }
-  .hero::before {
-    content: ""; position: absolute; inset: -40% -10% auto; height: 640px; z-index: -1;
-    background: radial-gradient(42% 55% at 50% 38%, rgba(77, 93, 251, .14), transparent 70%),
-                radial-gradient(30% 40% at 78% 20%, rgba(122, 90, 248, .10), transparent 70%);
-  }
-  .badge {
-    display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--sub);
-    border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 5px 14px;
-  }
+  .hero { text-align: center; padding: 88px 0 56px; position: relative; overflow: hidden; }
+  .hero::before { content: ""; position: absolute; inset: -40% -10% auto; height: 680px; z-index: -1;
+    background: radial-gradient(42% 55% at 50% 38%, rgba(77,93,251,.15), transparent 70%), radial-gradient(30% 40% at 80% 18%, rgba(122,90,248,.1), transparent 70%); }
+  .badge { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--sub); border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 5px 14px; }
   .badge b { color: var(--accent); font-weight: 600; }
-  .hero h1 {
-    font-size: clamp(38px, 6vw, 64px); font-weight: 800; letter-spacing: -.03em;
-    line-height: 1.12; margin: 26px 0 18px;
-    background: linear-gradient(120deg, #101828 30%, #4d5dfb 90%);
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-  }
-  .hero p.sub { font-size: clamp(16px, 2vw, 19px); color: var(--sub); max-width: 720px; margin: 0 auto 34px; }
+  .hero h1 { font-size: clamp(36px, 5.6vw, 62px); font-weight: 800; letter-spacing: -.03em; line-height: 1.12; margin: 24px 0 18px;
+    background: linear-gradient(120deg, #101828 30%, #4d5dfb 90%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.sub { font-size: clamp(16px, 2vw, 19px); color: var(--sub); max-width: 760px; margin: 0 auto 32px; }
   .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .btn {
-    border-radius: 12px; padding: 13px 26px; font-size: 15px; font-weight: 600;
-    border: 1px solid transparent; transition: .18s; display: inline-flex; align-items: center; gap: 8px;
-  }
-  .btn-pri { background: var(--accent); color: #fff; box-shadow: 0 10px 24px -8px rgba(77, 93, 251, .5); }
+  .btn { border-radius: 12px; padding: 13px 26px; font-size: 15px; font-weight: 600; border: 1px solid transparent; transition: .18s; display: inline-flex; align-items: center; gap: 8px; }
+  .btn-pri { background: var(--accent); color: #fff; box-shadow: 0 10px 24px -8px rgba(77,93,251,.5); }
   .btn-pri:hover { background: #3d4ded; transform: translateY(-1px); }
   .btn-sec { background: var(--panel); border-color: var(--line); color: var(--ink); }
   .btn-sec:hover { border-color: var(--accent); color: var(--accent); }
 
-  .shot-frame {
-    margin: 64px auto 0; max-width: 980px; border-radius: var(--radius);
-    border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow);
-    overflow: hidden;
-  }
+  .shot-frame { margin: 60px auto 0; max-width: 1000px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
   .shot-frame .bar { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 14px; border-bottom: 1px solid var(--line); }
-  .shot-frame .bar i { width: 10px; height: 10px; border-radius: 50%; background: #e7e9f0; }
-  .shot-frame .bar i:nth-child(1) { background: #ff5f57; } .shot-frame .bar i:nth-child(2) { background: #febc2e; } .shot-frame .bar i:nth-child(3) { background: #28c840; }
-  .shot-frame img, .shot-frame video { display: block; width: 100%; }
+  .shot-frame .bar i { width: 10px; height: 10px; border-radius: 50%; }
+  .shot-frame .bar i:nth-child(1){background:#ff5f57} .shot-frame .bar i:nth-child(2){background:#febc2e} .shot-frame .bar i:nth-child(3){background:#28c840}
+  .shot-frame img { display: block; width: 100%; }
 
-  /* sections */
-  section { padding: 88px 0; }
+  section { padding: 84px 0; }
   .kicker { color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
   h2 { font-size: clamp(26px, 3.6vw, 38px); font-weight: 750; letter-spacing: -.02em; margin: 12px 0 14px; }
-  .sec-sub { color: var(--sub); max-width: 660px; font-size: 16px; }
+  .sec-sub { color: var(--sub); max-width: 680px; font-size: 16px; }
   .center { text-align: center; } .center .sec-sub { margin: 0 auto; }
 
-  .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; margin-top: 44px; }
+  .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-top: 44px; }
   .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 44px; }
-  .card {
-    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 26px 24px; transition: .2s;
-  }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px 24px; transition: .2s; text-align: left; }
   .card:hover { border-color: #c9d0ff; box-shadow: 0 14px 34px -18px rgba(35,48,120,.25); transform: translateY(-2px); }
   .card .ic { width: 40px; height: 40px; border-radius: 11px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; font-size: 19px; margin-bottom: 16px; }
   .card h3 { font-size: 16.5px; font-weight: 700; margin-bottom: 8px; }
   .card p { font-size: 14px; color: var(--sub); }
 
-  /* gallery */
+  /* admin — the core section, dark */
+  .admin { background: #0d1226; color: #e8ebf5; }
+  .admin .kicker { color: #8fa2ff; }
+  .admin .sec-sub { color: #a6b0d0; }
+  .admin-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 48px; align-items: start; margin-top: 44px; }
+  .feat-list { list-style: none; }
+  .feat-list li { padding: 16px 0 16px 4px; border-bottom: 1px solid rgba(255,255,255,.09); }
+  .feat-list b { display: block; font-size: 15.5px; color: #fff; margin-bottom: 4px; }
+  .feat-list span { font-size: 13.5px; color: #98a2c8; }
+  .feat-list .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 10px; vertical-align: 2px; }
+  .admin-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .admin-shots figure { border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,.14); background: #141a33; }
+  .admin-shots img { width: 100%; display: block; }
+  .admin-shots figcaption { padding: 10px 14px; font-size: 12.5px; color: #9aa4c7; }
+  .page-map { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .page-map span { font-size: 12.5px; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; padding: 4px 12px; color: #aab3d4; }
+
   .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; margin-top: 44px; }
   .g-item { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 14px 34px -20px rgba(35,48,120,.22); }
   .g-item img { width: 100%; display: block; }
   .g-item figcaption { padding: 13px 16px; font-size: 13.5px; color: var(--sub); border-top: 1px solid var(--line); }
 
-  /* quickstart */
+  /* scenario band */
+  .scn { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; margin-top: 44px; }
+  .scn .card { background: linear-gradient(160deg, #fff, #f6f7ff); }
+
+  /* mobile */
+  .mob { display: grid; grid-template-columns: 1fr auto; gap: 56px; align-items: center; }
+  .phones { display: flex; gap: 18px; }
+  .phone { width: 230px; border-radius: 30px; border: 8px solid #101828; box-shadow: var(--shadow); overflow: hidden; background: #000; }
+  .phone img { width: 100%; display: block; }
+  .mob ul { list-style: none; margin-top: 22px; }
+  .mob li { padding: 9px 0 9px 26px; position: relative; font-size: 14.5px; color: var(--sub); border-bottom: 1px dashed var(--line); }
+  .mob li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+
   .qs { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; margin-top: 44px; }
-  .qs-card { background: #101828; color: #e6e9f2; border-radius: var(--radius); padding: 28px; }
+  .qs-card { background: #101828; color: #e6e9f2; border-radius: var(--radius); padding: 28px; text-align: left; }
   .qs-card h3 { font-size: 16px; margin-bottom: 6px; color: #fff; }
   .qs-card p { font-size: 13.5px; color: #98a2b3; margin-bottom: 18px; }
-  .qs-card pre {
-    background: #1c2437; border: 1px solid #2b3550; border-radius: 10px;
-    padding: 14px 16px; font-size: 13px; overflow-x: auto; line-height: 1.7;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #c9d4f2;
-  }
+  .qs-card pre { background: #1c2437; border: 1px solid #2b3550; border-radius: 10px; padding: 14px 16px; font-size: 13px; overflow-x: auto; line-height: 1.7; font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #c9d4f2; }
   .qs-card .step { font-size: 12.5px; color: #7c89b0; margin-top: 12px; }
 
-  /* oss */
-  .oss { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel); }
+  .oss { border-top: 1px solid var(--line); background: var(--panel); }
   .oss-in { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: start; }
   .oss ul { list-style: none; margin-top: 20px; }
   .oss li { padding: 10px 0 10px 28px; position: relative; font-size: 14.5px; color: var(--sub); border-bottom: 1px dashed var(--line); }
@@ -133,11 +139,12 @@
   .reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s ease, transform .6s ease; }
   .reveal.on { opacity: 1; transform: none; }
 
-  @media (max-width: 760px) {
+  @media (max-width: 860px) {
     .nav-links { display: none; }
-    .oss-in { grid-template-columns: 1fr; gap: 28px; }
+    .admin-grid, .oss-in, .mob { grid-template-columns: 1fr; }
+    .phones { justify-content: center; }
     section { padding: 60px 0; }
-    .hero { padding-top: 64px; }
+    .hero { padding-top: 60px; }
   }
 </style>
 </head>
@@ -145,11 +152,16 @@
 
 <nav>
   <div class="wrap nav-in">
-    <a class="brand" href="#"><img src="assets/favicon.svg" alt="CoHarness">COHARNESS</a>
+    <a class="brand" href="#">
+      <svg class="mascot" viewBox="0 0 64 64" fill="none" aria-hidden="true"><ellipse cx="20" cy="26" rx="10.5" ry="5.5" style="fill:#fff;stroke:#101828" stroke-width="2.6" transform="rotate(-28 20 26)"/><ellipse cx="44" cy="20" rx="10.5" ry="5.5" style="fill:#fff;stroke:#101828" stroke-width="2.6" transform="rotate(-36 44 20)"/><path d="M26 14 q-3.5-6-9.5-7.5 M30.5 12.5 q-.5-7-4.5-11" stroke="#101828" stroke-width="1.9" stroke-linecap="round"/><circle cx="41" cy="44.5" r="13" class="coh-mascot-accent" opacity=".14"/><circle cx="29" cy="19" r="6.8" fill="#101828"/><ellipse cx="33.5" cy="30.5" rx="7" ry="10" fill="#101828" transform="rotate(16 33.5 30.5)"/><ellipse cx="40" cy="44" rx="6.4" ry="7.2" class="coh-mascot-accent" transform="rotate(16 40 44)"/><circle cx="38.5" cy="42.5" r="1.8" fill="#fff" opacity=".8"/><circle cx="52" cy="38.5" r="1.7" class="coh-mascot-accent"/><circle cx="53.5" cy="47" r="1.3" class="coh-mascot-accent"/><circle cx="47" cy="53.5" r="1.5" class="coh-mascot-accent"/><circle cx="26.6" cy="18.5" r="1.5" fill="#fff"/></svg>
+      COHARNESS
+    </a>
     <div class="nav-links">
+      <a href="#admin" data-i18n="nav.admin">管理中心</a>
       <a href="#principles" data-i18n="nav.principles">协作理念</a>
       <a href="#capabilities" data-i18n="nav.capabilities">能力</a>
       <a href="#screens" data-i18n="nav.screens">界面</a>
+      <a href="#mobile" data-i18n="nav.mobile">移动端</a>
       <a href="#start" data-i18n="nav.start">快速开始</a>
       <a href="#opensource" data-i18n="nav.oss">开源</a>
     </div>
@@ -163,19 +175,48 @@
 
 <header class="hero">
   <div class="wrap">
-    <span class="badge" data-i18n="hero.badge"><b>预发布</b> · 基于 DeepSeek Harness 的独立衍生项目</span>
-    <h1 data-i18n="hero.title">人与智能体的协作工作台</h1>
-    <p class="sub" data-i18n="hero.sub">CoHarness 是一个全插件化的 Harness：团队用它在真实项目里装配、验证并沉淀自己的“人 + 智能体”协作方式——共享会话、跨会话记忆、文档、审批、委派与治理，都由插件组合而成。</p>
+    <svg class="mascot" viewBox="0 0 64 64" fill="none" aria-hidden="true"><ellipse cx="20" cy="26" rx="10.5" ry="5.5" style="fill:#fff;stroke:#101828" stroke-width="2.6" transform="rotate(-28 20 26)"/><ellipse cx="44" cy="20" rx="10.5" ry="5.5" style="fill:#fff;stroke:#101828" stroke-width="2.6" transform="rotate(-36 44 20)"/><path d="M26 14 q-3.5-6-9.5-7.5 M30.5 12.5 q-.5-7-4.5-11" stroke="#101828" stroke-width="1.9" stroke-linecap="round"/><circle cx="41" cy="44.5" r="13" class="coh-mascot-accent" opacity=".14"/><circle cx="29" cy="19" r="6.8" fill="#101828"/><ellipse cx="33.5" cy="30.5" rx="7" ry="10" fill="#101828" transform="rotate(16 33.5 30.5)"/><ellipse cx="40" cy="44" rx="6.4" ry="7.2" class="coh-mascot-accent" transform="rotate(16 40 44)"/><circle cx="38.5" cy="42.5" r="1.8" fill="#fff" opacity=".8"/><circle cx="52" cy="38.5" r="1.7" class="coh-mascot-accent"/><circle cx="53.5" cy="47" r="1.3" class="coh-mascot-accent"/><circle cx="47" cy="53.5" r="1.5" class="coh-mascot-accent"/><circle cx="26.6" cy="18.5" r="1.5" fill="#fff"/></svg>
+    <div style="margin-top:18px"><span class="badge" data-i18n="hero.badge"><b>预发布</b> · 基于 DeepSeek Harness 的独立衍生项目</span></div>
+    <h1 data-i18n="hero.title">把 AI 团队，管成一个团队</h1>
+    <p class="sub" data-i18n="hero.sub">CoHarness 是面向中小团队的全插件化协作平台：管理员在一个管理中心里管住用户、项目、模型与成本；成员在同一个工作台里与智能体共享真实的工作——持久会话、跨会话记忆、文档、审批与委派。</p>
     <div class="cta-row">
       <a class="btn btn-pri" href="https://github.com/jsjm1986/CoHarness" target="_blank" rel="noopener" data-i18n="hero.cta1">在 GitHub 查看</a>
-      <a class="btn btn-sec" href="#start" data-i18n="hero.cta2">快速开始</a>
+      <a class="btn btn-sec" href="#admin" data-i18n="hero.cta2">看看管理中心</a>
     </div>
     <div class="shot-frame reveal">
       <div class="bar"><i></i><i></i><i></i></div>
-      <img src="assets/conversation.jpg" alt="CoHarness 工作台：真实会话视图" loading="lazy">
+      <img src="assets/admin-users.jpg" alt="CoHarness 管理中心：用户与实例" loading="lazy">
     </div>
   </div>
 </header>
+
+<section id="admin" class="admin">
+  <div class="wrap">
+    <span class="kicker" data-i18n="ad.kicker">核心 · 管理中心</span>
+    <h2 data-i18n="ad.title" style="color:#fff">一个 /admin，管住团队的全部 AI 资产</h2>
+    <p class="sec-sub" data-i18n="ad.sub">Gateway 自带完整管理端：从账号与实例生命周期，到模型治理、用量成本、审计与部署——中小团队不需要再拼一套运维后台。</p>
+    <div class="admin-grid">
+      <div>
+        <ul class="feat-list">
+          <li><span class="dot"></span><b data-i18n="ad.1t">用户与实例</b><span data-i18n="ad.1p">账号、角色、登录状态与每位用户独立的 Harness 运行时实例——启动、停止、重启一手掌控。</span></li>
+          <li><span class="dot"></span><b data-i18n="ad.2t">项目与成员权限</b><span data-i18n="ad.2p">管理员发起与用户发起的工作区统一管理；ro/rw 成员、邀请、项目可见或创建者私有会话。</span></li>
+          <li><span class="dot"></span><b data-i18n="ad.3t">模型治理</b><span data-i18n="ad.3p">组织统一的 Provider 与模型目录，按角色、用户、项目授权；计价规则与个人 BYOK 登记分离。</span></li>
+          <li><span class="dot"></span><b data-i18n="ad.4t">用量与成本</b><span data-i18n="ad.4p">按用户/项目的 Token 用量、成本估算、额度告警与配额配置——账本不存 API 密钥与对话内容。</span></li>
+          <li><span class="dot"></span><b data-i18n="ad.5t">审计与运维</b><span data-i18n="ad.5p">审计记录、部署状态、终端、SSH、Webhook、桌面与归档——运维面在同一个管理端里。</span></li>
+        </ul>
+        <div class="page-map">
+          <span>用户</span><span>项目</span><span>插件</span><span>模型</span><span>用量</span><span>文档</span><span>归档</span><span>终端</span><span>SSH</span><span>部署</span><span>维护空间</span><span>Webhook</span><span>桌面</span><span>审计</span>
+        </div>
+      </div>
+      <div class="admin-shots">
+        <figure class="reveal"><img src="assets/admin-projects.jpg" alt="项目目录" loading="lazy"><figcaption data-i18n="ad.s2">项目目录：管理员/用户发起的工作区与成员数</figcaption></figure>
+        <figure class="reveal"><img src="assets/admin-models.jpg" alt="模型治理" loading="lazy"><figcaption data-i18n="ad.s3">模型治理：组织 Provider 与权限计价</figcaption></figure>
+        <figure class="reveal"><img src="assets/admin-usage.jpg" alt="用量" loading="lazy"><figcaption data-i18n="ad.s4">用量：Token、成本、额度告警与配额</figcaption></figure>
+        <figure class="reveal"><img src="assets/admin-audit.jpg" alt="审计" loading="lazy"><figcaption data-i18n="ad.s5">审计：管理操作留痕可查</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
 
 <section id="principles">
   <div class="wrap center">
@@ -194,42 +235,63 @@
 <section id="capabilities" style="background:var(--panel); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
   <div class="wrap center">
     <span class="kicker" data-i18n="cap.kicker">能力矩阵</span>
-    <h2 data-i18n="cap.title">一个工作台，覆盖人机协作的完整链路</h2>
+    <h2 data-i18n="cap.title">覆盖人机协作的完整链路</h2>
     <p class="sec-sub" data-i18n="cap.sub">以下均为当前代码库中已实现的能力。</p>
     <div class="grid4">
       <div class="card reveal"><div class="ic">⚙️</div><h3 data-i18n="cap.1t">Agent 运行时</h3><p data-i18n="cap.1p">Cordis 插件运行时 + 事件溯源会话：持久恢复/分叉、模型请求、审批、提问、计划、目标、待办、任务、工作流、压缩与遥测。</p></div>
       <div class="card reveal"><div class="ic">🛠️</div><h3 data-i18n="cap.2t">工具与执行</h3><p data-i18n="cap.2p">工作区文件工具、图片读取、Shell 与持久终端、LSP、网页搜索/抓取、技能、结构化附件、沙箱与目录策略。</p></div>
-      <div class="card reveal"><div class="ic">🧠</div><h3 data-i18n="cap.3t">跨会话记忆</h3><p data-i18n="cap.3p">个人 / 工作区 / 项目三级作用域的记忆目录：画像、指引、背景、资源四类条目，随每次会话自动注入有界清单，支持搜索与修订。</p></div>
-      <div class="card reveal"><div class="ic">📄</div><h3 data-i18n="cap.4t">文档管理</h3><p data-i18n="cap.4p">命名用户文档：上传下载、附加到会话、作用域感知浏览、跨作用域复制、快照谱系与操作历史；字节存于运行时自有目录。</p></div>
-      <div class="card reveal"><div class="ic">👥</div><h3 data-i18n="cap.5t">项目与协作</h3><p data-i18n="cap.5p">个人与共享项目作用域、每项目一个共享运行时、ro/rw 成员、邀请、项目可见或创建者私有会话、参与者归属与目录授权。</p></div>
-      <div class="card reveal"><div class="ic">🔍</div><h3 data-i18n="cap.6t">会话历史检索</h3><p data-i18n="cap.6p">模型可搜索、追踪、精读同工作区及协作可读的既有会话，并在新会话中生成接续交接摘要——把过去的工作变成可用的上下文。</p></div>
-      <div class="card reveal"><div class="ic">🖥️</div><h3 data-i18n="cap.7t">Web 界面</h3><p data-i18n="cap.7p">响应式浏览器应用：会话与实时历史、模型选择、命令与 @ 建议、附件、文档管理、工作区选择、权限、目标、子智能体、任务、设置、中英双语与主题。</p></div>
-      <div class="card reveal"><div class="ic">🛡️</div><h3 data-i18n="cap.8t">Gateway 治理</h3><p data-i18n="cap.8p">认证边界：用户、个人空间、共享项目、权限、组织管理的模型路由、按角色/用户/项目授权、配额、用量与审计记录。</p></div>
+      <div class="card reveal"><div class="ic">🧠</div><h3 data-i18n="cap.3t">跨会话记忆</h3><p data-i18n="cap.3p">个人 / 工作区 / 项目三级作用域：画像、指引、背景、资源四类条目随会话注入有界清单，支持搜索与修订。</p></div>
+      <div class="card reveal"><div class="ic">🔍</div><h3 data-i18n="cap.4t">会话历史检索</h3><p data-i18n="cap.4p">模型可搜索、追踪、精读有权限的既有会话，并生成接续交接摘要——过去的工作成为可用的上下文。</p></div>
+      <div class="card reveal"><div class="ic">📄</div><h3 data-i18n="cap.5t">文档管理</h3><p data-i18n="cap.5p">命名用户文档：上传下载、附加到会话、作用域感知浏览、跨作用域复制、快照谱系与操作历史。</p></div>
+      <div class="card reveal"><div class="ic">🤖</div><h3 data-i18n="cap.6t">子智能体团队</h3><p data-i18n="cap.6p">持久的子智能体会话、明确的委托关系、可恢复可继续的协作伙伴，报告选择性回流主任务。</p></div>
+      <div class="card reveal"><div class="ic">⏰</div><h3 data-i18n="cap.7t">自动化任务</h3><p data-i18n="cap.7p">定时与触发器驱动的自动化：任务计划、目标管理与后台执行，工作离开浏览器也能继续。</p></div>
+      <div class="card reveal"><div class="ic">🖥️</div><h3 data-i18n="cap.8t">Web 界面</h3><p data-i18n="cap.8p">响应式浏览器应用：会话与实时历史、模型选择、命令与 @ 建议、附件、权限、目标、任务、设置、中英双语与主题。</p></div>
     </div>
   </div>
 </section>
 
 <section id="screens">
   <div class="wrap center">
-    <span class="kicker" data-i18n="sc.kicker">界面</span>
-    <h2 data-i18n="sc.title">来自真实部署的界面</h2>
+    <span class="kicker" data-i18n="sc.kicker">成员端界面</span>
+    <h2 data-i18n="sc.title">成员看到的工作台</h2>
     <p class="sec-sub" data-i18n="sc.sub">以下截图与演示均来自真实运行的 CoHarness 实例，非渲染示意。</p>
     <div class="gallery">
-      <figure class="g-item reveal"><img src="assets/demo.gif" alt="记忆能力演示" loading="lazy"><figcaption data-i18n="sc.1">记忆演示：模型调用 memory_search / memory_save，条目实时进入记忆时间线</figcaption></figure>
-      <figure class="g-item reveal"><img src="assets/memory.jpg" alt="记忆面板" loading="lazy"><figcaption data-i18n="sc.2">记忆侧栏：个人 / 工作区 / 项目作用域、搜索、按天分组的时间线</figcaption></figure>
-      <figure class="g-item reveal"><img src="assets/plugins.jpg" alt="插件页" loading="lazy"><figcaption data-i18n="sc.3">插件页：官方插件与插件配置项的统一管理</figcaption></figure>
-      <figure class="g-item reveal"><img src="assets/documents.jpg" alt="文档管理" loading="lazy"><figcaption data-i18n="sc.4">文档管理：按作用域浏览、回收站、跨作用域浏览、上传与文件夹</figcaption></figure>
+      <figure class="g-item reveal"><img src="assets/conversation.jpg" alt="会话视图" loading="lazy"><figcaption data-i18n="sc.0">会话视图：模型回复、工具调用摘要、Token 统计与模型选择</figcaption></figure>
+      <figure class="g-item reveal"><img src="assets/demo.gif" alt="记忆能力演示" loading="lazy"><figcaption data-i18n="sc.1">记忆演示：模型调用 memory_search / memory_save，条目实时进入时间线</figcaption></figure>
+      <figure class="g-item reveal"><img src="assets/memory.jpg" alt="记忆面板" loading="lazy"><figcaption data-i18n="sc.2">记忆侧栏：个人 / 工作区 / 项目作用域、搜索、按天分组</figcaption></figure>
+      <figure class="g-item reveal"><img src="assets/plugins.jpg" alt="插件页" loading="lazy"><figcaption data-i18n="sc.3">插件页：官方插件与插件配置项统一管理</figcaption></figure>
+      <figure class="g-item reveal"><img src="assets/documents.jpg" alt="文档管理" loading="lazy"><figcaption data-i18n="sc.4">文档管理：按作用域浏览、回收站、上传与文件夹</figcaption></figure>
+      <figure class="g-item reveal"><img src="assets/automation.jpg" alt="自动化任务" loading="lazy"><figcaption data-i18n="sc.5">自动化任务：定时与触发器驱动的后台工作</figcaption></figure>
+      <figure class="g-item reveal"><img src="assets/models.jpg" alt="模型设置" loading="lazy"><figcaption data-i18n="sc.6">模型设置：成员可用的模型目录与提供方</figcaption></figure>
     </div>
   </div>
 </section>
 
-<section id="start" style="background:var(--panel); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+<section id="mobile" style="background:var(--panel); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+  <div class="wrap mob">
+    <div>
+      <span class="kicker" data-i18n="mb.kicker">移动端</span>
+      <h2 data-i18n="mb.title">手机上也是完整的工作台</h2>
+      <p class="sec-sub" data-i18n="mb.sub">同一套 Web 应用自适应到手机：浏览器直接访问已部署的 Gateway，另有 Android（Capacitor）壳可选。</p>
+      <ul>
+        <li data-i18n="mb.1">响应式工作台：会话、附件、模型选择在窄屏同样可用</li>
+        <li data-i18n="mb.2">可选推送通知：自动化与待决事项及时到达</li>
+        <li data-i18n="mb.3">Android 壳（Capacitor）接入已部署 Gateway，无需另起服务</li>
+      </ul>
+    </div>
+    <div class="phones">
+      <div class="phone reveal"><img src="assets/mobile.jpg" alt="手机端工作台" loading="lazy"></div>
+    </div>
+  </div>
+</section>
+
+<section id="start">
   <div class="wrap center">
     <span class="kicker" data-i18n="st.kicker">快速开始</span>
     <h2 data-i18n="st.title">两条路：本机个人用，或 Gateway 团队用</h2>
     <div class="qs">
       <div class="qs-card reveal">
-        <h3 data-i18n="st.1t">个人 / 单</h3>
+        <h3 data-i18n="st.1t">个人 / 单机</h3>
         <p data-i18n="st.1p">无需 Gateway 与 PostgreSQL，浏览器工作区 + 本地会话存储。</p>
         <pre>git clone https://github.com/jsjm1986/CoHarness.git
 cd CoHarness && pnpm install && pnpm run build
@@ -281,37 +343,54 @@ release-control.sh activate &lt;release-dir&gt;</pre>
 <script>
 const dict = {
   en: {
-    'nav.principles': 'Philosophy', 'nav.capabilities': 'Capabilities', 'nav.screens': 'Interface',
-    'nav.start': 'Quick start', 'nav.oss': 'Open source',
+    'nav.admin': 'Admin center', 'nav.principles': 'Philosophy', 'nav.capabilities': 'Capabilities',
+    'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source',
     'hero.badge': '<b>Pre-release</b> · An independent derivative of DeepSeek Harness',
-    'hero.title': 'A workbench where people and agents work together',
-    'hero.sub': 'CoHarness is a fully pluginized harness: teams assemble, validate, and carry forward their own patterns for people-and-agent work — shared sessions, cross-session memory, documents, approvals, delegation, and governance, all composed from plugins.',
-    'hero.cta1': 'View on GitHub', 'hero.cta2': 'Quick start',
+    'hero.title': 'Run your AI team like a team',
+    'hero.sub': 'CoHarness is a fully pluginized collaboration platform for small and mid-sized teams: admins govern users, projects, models, and cost from one admin center, while members share real work with agents on a single workbench — durable sessions, cross-session memory, documents, approvals, and delegation.',
+    'hero.cta1': 'View on GitHub', 'hero.cta2': 'See the admin center',
+    'ad.kicker': 'CORE · ADMIN CENTER', 'ad.title': 'One /admin for every AI asset the team owns',
+    'ad.sub': 'The Gateway ships a complete admin surface: accounts and runtime lifecycles, model governance, usage and cost, audit and deployment — a small team does not need to assemble an ops back office.',
+    'ad.1t': 'Users & runtimes', 'ad.1p': 'Accounts, roles, sign-in state, and a dedicated Harness runtime per user — start, stop, and restart under your control.',
+    'ad.2t': 'Projects & membership', 'ad.2p': 'Admin- and member-created workspaces in one directory; ro/rw members, invitations, project-visible or creator-private conversations.',
+    'ad.3t': 'Model governance', 'ad.3p': 'One organization-wide Provider and model catalog, authorized per role, user, and project — pricing rules kept separate from personal BYOK registration.',
+    'ad.4t': 'Usage & cost', 'ad.4p': 'Token usage by user and project, cost estimates, quota alerts, and quota configuration — the ledger stores no API keys or conversation content.',
+    'ad.5t': 'Audit & operations', 'ad.5p': 'Audit records, deployment state, terminals, SSH, webhooks, desktops, and archives — the operational surface lives in the same admin.',
+    'ad.s2': 'Projects: admin/member-created workspaces with member counts', 'ad.s3': 'Model governance: org Providers, permissions & pricing',
+    'ad.s4': 'Usage: tokens, cost, quota alerts, and quota config', 'ad.s5': 'Audit: every administrative action on record',
     'pr.kicker': 'PHILOSOPHY', 'pr.title': 'The unit of collaboration is shared work, not a shared chat link',
     'pr.sub': 'A project holds a continuing agent environment, participant contributions, delegation relationships, pending decisions, and recoverable progress — the work survives a closed browser or a stopped agent.',
     'pr.1t': 'Assembled, not prescribed', 'pr.1p': 'Models, tools, roles, context, permissions, delegation paths, and workflows compose through plugins, profiles, and bundles — fitted to how the team actually works.',
     'pr.2t': 'Delegation with boundaries', 'pr.2p': 'A primary agent delegates part of the work to a specialist with a clear relationship, scope, and responsibility — children never silently inherit every capability or permission.',
     'pr.3t': 'Human judgment is first-class', 'pr.3p': 'An approval authorizes a controlled action; a question supplies business judgment. One valid participant claims a pending decision, and the result joins the common history.',
     'pr.4t': 'Practices that compound', 'pr.4p': 'A proven delegation pattern, review step, context source, or tool policy becomes the team’s next plugin, skill, profile, bundle, or workflow.',
-    'cap.kicker': 'CAPABILITIES', 'cap.title': 'One workbench for the full people-and-agent loop',
+    'cap.kicker': 'CAPABILITIES', 'cap.title': 'The full people-and-agent loop, covered',
     'cap.sub': 'Everything below is implemented in the current codebase.',
     'cap.1t': 'Agent runtime', 'cap.1p': 'Cordis plugin runtime with event-sourced sessions: durable resume/fork, model requests, approvals, questions, plans, goals, todos, jobs, workflows, compaction, telemetry.',
     'cap.2t': 'Tools & execution', 'cap.2p': 'Workspace filesystem tools, image reading, shell and persistent terminal sessions, LSP, web search/fetch, skills, structured attachments, sandbox and directory policies.',
-    'cap.3t': 'Cross-session memory', 'cap.3p': 'Personal, workspace, and project-scoped memory catalogs: profile, guidance, background, and resource entries injected as a bounded catalog every session, searchable and revisioned.',
-    'cap.4t': 'Documents', 'cap.4p': 'Named user documents: upload/download, attach-to-conversation, scope-aware browsing, cross-scope copies, snapshot lineage, and operation history.',
-    'cap.5t': 'Projects & collaboration', 'cap.5p': 'Personal and shared project scopes, one shared runtime per project, ro/rw membership, invitations, project-visible or creator-private conversations, directory grants.',
-    'cap.6t': 'Session history recall', 'cap.6p': 'The model can search, trace, and read earlier sessions it is authorized to see, and produce a continue-here handoff brief — past work becomes usable context.',
-    'cap.7t': 'Web UI', 'cap.7p': 'Responsive browser app: sessions and live history, model selection, command and @ suggestions, attachments, document management, permissions, goals, subagents, jobs, settings, zh/en localization, themes.',
-    'cap.8t': 'Gateway governance', 'cap.8p': 'An authenticated boundary: users, personal spaces, shared projects, organization-managed model routes authorized per role, user, and project, quotas, usage, and audit records.',
-    'sc.kicker': 'INTERFACE', 'sc.title': 'Screens from a real deployment',
+    'cap.3t': 'Cross-session memory', 'cap.3p': 'Personal, workspace, and project scopes: profile, guidance, background, and resource entries injected as a bounded catalog each session — searchable and revisioned.',
+    'cap.4t': 'Session history recall', 'cap.4p': 'The model can search, trace, and read earlier sessions it is authorized to see, and produce a continue-here handoff brief — past work becomes usable context.',
+    'cap.5t': 'Documents', 'cap.5p': 'Named user documents: upload/download, attach-to-conversation, scope-aware browsing, cross-scope copies, snapshot lineage, and operation history.',
+    'cap.6t': 'Subagent teams', 'cap.6p': 'Durable child-agent sessions with explicit delegation relationships — resumable collaborators whose selected reports flow back to the parent task.',
+    'cap.7t': 'Automation', 'cap.7p': 'Timer- and trigger-driven automation: scheduled tasks, goals, and background execution keep work moving after the browser closes.',
+    'cap.8t': 'Web UI', 'cap.8p': 'Responsive browser app: sessions and live history, model selection, command and @ suggestions, attachments, permissions, goals, jobs, settings, zh/en localization, themes.',
+    'sc.kicker': 'MEMBER INTERFACE', 'sc.title': 'The workbench members see',
     'sc.sub': 'Every capture below is from a live CoHarness instance — not a mockup.',
-    'sc.1': 'Memory demo: the model calls memory_search / memory_save; entries land on the memory timeline in real time',
+    'sc.0': 'Conversation: model replies, tool-call summaries, token stats, and model selection',
+    'sc.1': 'Memory demo: the model calls memory_search / memory_save; entries land on the timeline in real time',
     'sc.2': 'Memory sidebar: personal / workspace / project scopes, search, a day-grouped timeline',
-    'sc.3': 'Plugins page: official plugins and plugin configuration in one place',
-    'sc.4': 'Document management: scope-aware browsing, recycle bin, cross-scope browsing, uploads and folders',
+    'sc.3': 'Plugins: official plugins and plugin configuration in one place',
+    'sc.4': 'Documents: scope-aware browsing, recycle bin, uploads and folders',
+    'sc.5': 'Automation: timer- and trigger-driven background work',
+    'sc.6': 'Model settings: the model catalog and providers available to members',
+    'mb.kicker': 'MOBILE', 'mb.title': 'A complete workbench on the phone',
+    'mb.sub': 'The same web application adapts to phones: reach a deployed Gateway from any browser, or use the optional Android (Capacitor) shell.',
+    'mb.1': 'Responsive workbench: sessions, attachments, and model selection stay usable on narrow screens',
+    'mb.2': 'Optional push notifications keep automation and pending decisions arriving on time',
+    'mb.3': 'The Android (Capacitor) shell connects to an already-deployed Gateway — no extra service needed',
     'st.kicker': 'QUICK START', 'st.title': 'Two paths: local personal use, or a Gateway for the team',
     'st.1t': 'Personal / single machine', 'st.1p': 'No Gateway or PostgreSQL — a browser workspace with local session storage.',
-    'st.1s': '→ Open the workbench in a browser, configure a DeepSeek or other provider key under Settings → Models, pick a workspace directory, and start.',
+    'st.1s': '→ Open the workbench, configure a DeepSeek or other provider key under Settings → Models, pick a workspace directory, and start.',
     'st.2t': 'Team / Gateway', 'st.2p': 'An authenticated project boundary: accounts, personal spaces, shared projects, model governance, quotas, and audit.',
     'st.2s': '→ Treat production deployment as an evaluated self-hosting responsibility; Linux systemd provides stronger isolation, macOS suits trusted teams.',
     'os.kicker': 'OPEN SOURCE', 'os.title': 'Built on DeepSeek Harness, evolved independently',
@@ -327,7 +406,6 @@ const dict = {
 }
 const zh = {}
 for (const k in dict.en) zh[k] = document.querySelector(`[data-i18n="${k}"]`)?.innerHTML ?? ''
-
 const btn = document.getElementById('langBtn')
 let lang = localStorage.getItem('ch-lang') || 'zh'
 function apply(l) {
@@ -338,15 +416,11 @@ function apply(l) {
     const el = document.querySelector(`[data-i18n="${k}"]`)
     if (el) el.innerHTML = l === 'en' ? dict.en[k] : zh[k]
   }
-  document.title = l === 'zh'
-    ? 'CoHarness — 人与智能体的协作工作台'
-    : 'CoHarness — A people-and-agent work harness'
+  document.title = l === 'zh' ? 'CoHarness — 面向中小团队的人与智能体协作平台' : 'CoHarness — A people-and-agent workbench for teams'
   localStorage.setItem('ch-lang', l)
 }
 btn.addEventListener('click', () => apply(lang === 'zh' ? 'en' : 'zh'))
 if (lang === 'en') apply('en')
-
-// reveal on scroll
 const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('on')), { threshold: .12 })
 document.querySelectorAll('.reveal').forEach(el => io.observe(el))
 </script>
