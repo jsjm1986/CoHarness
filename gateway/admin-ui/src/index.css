@@ -3493,6 +3493,17 @@ a {
 
 .archiveSyncState { display: block; margin-top: 0.25rem; font-size: 0.75rem; }
 
+.archivePendingHint {
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
 /* User detail page */
 
 .backLink {

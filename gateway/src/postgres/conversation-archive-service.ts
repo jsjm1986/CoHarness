@@ -578,7 +578,9 @@ export class ConversationArchiveService {
     if (filter.fromMs !== undefined) add('a.archived_at >= to_timestamp(?/1000.0)', filter.fromMs)
     if (filter.toMs !== undefined) add('a.archived_at <= to_timestamp(?/1000.0)', filter.toMs)
     if (filter.recordKind !== 'empty-draft' && filter.state !== 'purged' && filter.state !== 'all') {
-      clauses.push('(a.message_count > 0)')
+      // Maintenance rows carry no message count by construction; hiding them
+      // would make a trashed empty draft unreachable from every archive view.
+      clauses.push("(a.message_count > 0 OR a.record_kind='empty-draft')")
     }
     if (filter.query !== undefined && filter.query.trim() !== '') {
       const needle = literalLikePattern(filter.query.trim())
@@ -861,7 +863,21 @@ export class ConversationArchiveService {
         FROM harness.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2 FOR UPDATE`,
       [this.context.organizationId, snapshot.rootSessionId])
       const existing = prior.rows[0]
-      if (existing?.state === 'purged') return
+      if (existing?.state === 'purged') {
+        // A purged record stays purged, but the runtime can still hold a local
+        // copy — for example after a settle finished the record while the
+        // runtime was unreachable. Re-queueing purge lets the next owning
+        // sync release that residue instead of leaving it orphaned forever.
+        const revision = safeNumber(existing.sync_revision, 'archive sync revision')!
+        await client.query(`INSERT INTO harness.conversation_archive_commands(
+          organization_id,root_session_id,action,desired_revision
+        ) SELECT $1,$2,'purge',$3
+          WHERE NOT EXISTS(SELECT 1 FROM harness.conversation_archive_commands c
+            WHERE c.organization_id=$1 AND c.root_session_id=$2 AND c.status='pending')`, [
+          this.context.organizationId, snapshot.rootSessionId, revision,
+        ])
+        return
+      }
       if (existing !== undefined
         && (existing.runtime_kind !== snapshot.runtime.kind
           || publicNumber(existing.runtime_public_id, 'runtime') !== snapshot.runtime.id)) {
@@ -1153,6 +1169,60 @@ export class ConversationArchiveService {
         organization_id,root_session_id,action,requested_by_user_id,desired_revision,idempotency_key
       ) VALUES($1,$2,'purge',$3,$4,$5)`, [this.context.organizationId, rootSessionId, actor, nextRevision, idempotencyKey ?? null])
       return true
+    })
+  }
+
+  /**
+   * Finish a record whose commands can no longer reach their runtime.  A
+   * pending purge executes against Gateway-stored data immediately; pending
+   * restore/trash requests are retired as unconfirmed so the row stops
+   * waiting on an acknowledgement that may never arrive.
+   */
+  async settle(rootSessionId: string, actorUserId?: number): Promise<ConversationArchiveRow | null> {
+    return transaction(this.context.pool, async client => {
+      if (actorUserId !== undefined && await this.internalUserId(client, actorUserId) === null) {
+        throw new Error('archive actor not found')
+      }
+      const row = await client.query<{ state: ConversationArchiveState; sync_revision: string; sync_state: string }>(
+        `SELECT state,sync_revision::text,sync_state FROM harness.conversation_archive_records
+        WHERE organization_id=$1 AND root_session_id=$2 FOR UPDATE`,
+      [this.context.organizationId, rootSessionId])
+      const current = row.rows[0]
+      if (current === undefined) return null
+      const pending = await client.query<{ id: string; action: 'restore' | 'trash' | 'purge' }>(
+        `SELECT id::text,action FROM harness.conversation_archive_commands
+        WHERE organization_id=$1 AND root_session_id=$2 AND status='pending'
+        ORDER BY requested_at,id FOR UPDATE`, [this.context.organizationId, rootSessionId])
+      const purgePending = pending.rows.some(command => command.action === 'purge')
+      if (purgePending) {
+        await this.purgeStoredTree(client, rootSessionId)
+      }
+      if (pending.rows.length > 0) {
+        // A settled purge is marked applied because purgeStoredTree is the
+        // Gateway-owned half of it; any surviving runtime residue is removed
+        // by the purge command re-queued on the next snapshot announcement.
+        await client.query(`UPDATE harness.conversation_archive_commands
+          SET status=CASE WHEN action='purge' AND $3::boolean THEN 'applied' ELSE 'failed' END,
+              error=CASE WHEN action='purge' AND $3::boolean THEN NULL ELSE 'settled by administrator without runtime confirmation' END,
+              applied_at=CASE WHEN action='purge' AND $3::boolean THEN now() ELSE NULL END
+          WHERE organization_id=$1 AND root_session_id=$2 AND status='pending'`,
+        [this.context.organizationId, rootSessionId, purgePending])
+      }
+      if (purgePending) {
+        await client.query(`UPDATE harness.conversation_archive_records
+          SET sync_state='synced',last_sync_error=NULL,updated_at=now()
+          WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId])
+      } else if (pending.rows.length > 0 || (current.state === 'purged' && current.sync_state !== 'synced')) {
+        // Retired restore/trash commands mean the runtime never applied the
+        // requested state; keep that divergence visible instead of claiming
+        // a synchronized archive.
+        await client.query(`UPDATE harness.conversation_archive_records
+          SET sync_state=CASE WHEN state='purged' THEN 'synced' ELSE 'conflict' END,
+              last_sync_error=CASE WHEN state='purged' THEN NULL ELSE 'settled by administrator without runtime confirmation' END,
+              updated_at=now()
+          WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId])
+      }
+      return await this.detailForClient(client, rootSessionId)
     })
   }
 

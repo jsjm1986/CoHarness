@@ -76,8 +76,10 @@ export const zh = {
   viewItem: '查看 {name}',
   messageCount: '{count} 条消息',
   syncPending: '等待实例确认',
+  syncPendingStale: '实例长时间未响应',
   syncConflict: '操作未完成',
   syncUnavailable: '实例暂不可用',
+  emptyDraftBadge: '空白草稿',
 
   // Detail dialog
   dialogTitleFallback: '归档对话',
@@ -92,8 +94,17 @@ export const zh = {
   detailProject: '项目',
   recordStateLabel: '记录状态',
   syncStateLabel: '同步状态',
+  detailWorkspace: '工作区',
   purgedTitle: '对话已永久清理',
   purgedDetail: '正文和历史 Review 已清理，不能恢复。',
+  settle: '强制完成',
+  settleSelected: '强制完成所选',
+  settlePendingHint: '该操作正在等待实例确认。实例长时间不可达时，可以强制在服务端收尾。',
+  confirmSettleTitle: '强制完成归档操作？',
+  confirmSettleDescription: '在服务端直接收尾，不再等待实例确认：待清理记录会立即删除服务端数据；待恢复或回收站请求会标记为实例未确认。实例恢复运行后仍持有的本地副本会在下次同步时清理。',
+  emptyExpand: '展开维护工具',
+  emptyCollapse: '收起维护工具',
+  emptyCollapsedHint: '用于扫描并回收超过一小时无可见内容的空白会话。',
 
   // Action confirmation dialog
   confirmPurgeTitle: '永久清理归档对话？',
@@ -184,8 +195,10 @@ export const en = {
   viewItem: 'View {name}',
   messageCount: '{count} messages',
   syncPending: 'Waiting for instance confirmation',
+  syncPendingStale: 'Instance not responding for a long time',
   syncConflict: 'Action incomplete',
   syncUnavailable: 'Instance temporarily unavailable',
+  emptyDraftBadge: 'Empty draft',
 
   // Detail dialog
   dialogTitleFallback: 'Archived conversation',
@@ -200,8 +213,17 @@ export const en = {
   detailProject: 'Project',
   recordStateLabel: 'Record state',
   syncStateLabel: 'Sync state',
+  detailWorkspace: 'Workspace',
   purgedTitle: 'Conversation permanently purged',
   purgedDetail: 'The content and historical reviews have been purged and cannot be recovered.',
+  settle: 'Force settle',
+  settleSelected: 'Settle selected',
+  settlePendingHint: 'This request is waiting for instance confirmation. If the instance stays unreachable, you can settle it server-side.',
+  confirmSettleTitle: 'Settle archive requests?',
+  confirmSettleDescription: 'Finish the request server-side without waiting for instance confirmation: pending purges delete server-side data immediately, while pending restore or trash requests are marked as unconfirmed by the instance. Local copies a returning instance still holds are removed at its next synchronization.',
+  emptyExpand: 'Show maintenance tools',
+  emptyCollapse: 'Hide maintenance tools',
+  emptyCollapsedHint: 'Scans for conversations with no visible content for over an hour and moves them to trash.',
 
   // Action confirmation dialog
   confirmPurgeTitle: 'Purge archived conversations?',

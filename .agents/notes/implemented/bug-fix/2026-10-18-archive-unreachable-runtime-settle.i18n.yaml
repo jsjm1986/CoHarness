@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-18-archive-unreachable-runtime-settle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-archive-unreachable-runtime-settle.md
+/agent-note-admin-archives-can-settle-records-whose-runtime-cannot-confirm:
+  en: 3cdbccf8e7f8a9e4
+  zh: 71d1432cebda473d
+/agent-note-admin-archives-can-settle-records-whose-runtime-cannot-confirm/problem:
+  en: ce0fef149ee81cd9
+  zh: c0611e127e8ca628
+/agent-note-admin-archives-can-settle-records-whose-runtime-cannot-confirm/decision:
+  en: f72362aa7f81bd4b
+  zh: 28e25df817c3180d
+/agent-note-admin-archives-can-settle-records-whose-runtime-cannot-confirm/alternatives-considered:
+  en: 7c709cde9595fd32
+  zh: 5caafb6343fc225f
+/agent-note-admin-archives-can-settle-records-whose-runtime-cannot-confirm/consequences:
+  en: fa02e7d575874fda
+  zh: 396a577cb43da91e

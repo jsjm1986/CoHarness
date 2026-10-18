@@ -53,6 +53,8 @@ describe('ArchivesPage', () => {
   it('scans empty drafts and shows project or personal ownership without exposing paths', async () => {
     vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: Date.now() - 3_600_000, candidates: emptyCandidates })
     render(<ArchivesPage />)
+    expect(screen.queryByRole('button', { name: '扫描' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: '展开维护工具' }))
     expect(screen.getByText('还没有扫描结果')).toBeTruthy()
     expect(screen.getByText('点击“扫描”查找超过一小时且没有可见内容的会话。')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: '扫描' }))
@@ -73,6 +75,7 @@ describe('ArchivesPage', () => {
       .mockResolvedValueOnce({ cutoff: 2, candidates: [] })
     vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: ['draft-project'] })
     render(<ArchivesPage />)
+    await userEvent.click(screen.getByRole('button', { name: '展开维护工具' }))
     await userEvent.click(screen.getByRole('button', { name: '扫描' }))
     expect(screen.queryByRole('button', { name: '清理选中空草稿' })).toBeNull()
     await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
@@ -91,6 +94,7 @@ describe('ArchivesPage', () => {
   it('cancels the empty-draft confirmation without posting', async () => {
     vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: 1, candidates: emptyCandidates })
     render(<ArchivesPage />)
+    await userEvent.click(screen.getByRole('button', { name: '展开维护工具' }))
     await userEvent.click(screen.getByRole('button', { name: '扫描' }))
     await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
     await userEvent.click(screen.getByRole('button', { name: '清理选中空草稿' }))
@@ -103,6 +107,7 @@ describe('ArchivesPage', () => {
   it('shows scan and cleanup errors', async () => {
     vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: 1, candidates: [] })
     render(<ArchivesPage />)
+    await userEvent.click(screen.getByRole('button', { name: '展开维护工具' }))
     await screen.findByText('还没有扫描结果')
     vi.mocked(api.previewEmptyDrafts).mockRejectedValue(new Error('扫描失败'))
     await userEvent.click(screen.getByRole('button', { name: '扫描' }))
@@ -173,6 +178,31 @@ describe('ArchivesPage', () => {
     await userEvent.click(within(screen.getAllByRole('dialog').at(-1)!).getByRole('button', { name: /^移入回收站$/ }))
     expect(api.applyArchiveAction).toHaveBeenCalledWith('trash', ['session-1'])
   })
+  it('settles a pending archive request from the detail dialog', async () => {
+    vi.mocked(api.getArchive).mockResolvedValue({ record: { ...row, syncState: 'pending' }, descendants: [], events: [], hasMore: false })
+    vi.mocked(api.getArchiveStatus).mockResolvedValue({ ...row, syncState: 'pending' })
+    vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'settle', results: [{ rootSessionId: row.rootSessionId, ok: true }] })
+    render(<ArchivesPage />)
+    await userEvent.click(within(await screen.findByRole('table')).getByRole('button', { name: '查看 产品讨论' }))
+    expect(await screen.findByText('该操作正在等待实例确认。实例长时间不可达时，可以强制在服务端收尾。')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '强制完成' }))
+    const confirm = screen.getAllByRole('dialog').at(-1)!
+    expect(within(confirm).getByText('强制完成归档操作？')).toBeTruthy()
+    await userEvent.click(within(confirm).getByRole('button', { name: '强制完成' }))
+    expect(api.applyArchiveAction).toHaveBeenCalledWith('settle', ['session-1'])
+  })
+
+  it('shows empty-draft records returned by the records query with a badge', async () => {
+    const draftRow: api.ConversationArchiveRow = {
+      ...row, rootSessionId: 'draft-1', title: '未命名对话', state: 'trash', recordKind: 'empty-draft', messageCount: 0, contentPreview: null,
+    }
+    vi.mocked(api.listArchives).mockResolvedValue([draftRow])
+    render(<ArchivesPage />)
+    await screen.findAllByText('未命名对话')
+    expect(api.listArchives).toHaveBeenCalledWith(expect.objectContaining({ recordKind: 'all' }))
+    expect(screen.getAllByText('空白草稿').length).toBeGreaterThan(0)
+  })
+
   it('shows pending confirmation in the open dialog and then the recorded refusal without reloading history', async () => {
     vi.useFakeTimers()
     vi.mocked(api.getArchive).mockResolvedValue({ record: { ...row, syncState: 'pending' }, descendants: [], events: [], hasMore: false })

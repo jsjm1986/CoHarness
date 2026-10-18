@@ -275,6 +275,91 @@ describe('ConversationArchiveService', () => {
     expect(insert?.[1]).toEqual(expect.arrayContaining(['local-only', 'user', 2]))
   })
 
+  it('settles a pending purge by removing stored data and applying the command', async () => {
+    const calls: Array<[string, unknown[] | undefined]> = []
+    const client = {
+      query: vi.fn(async (text: string, values?: unknown[]) => {
+        calls.push([text, values])
+        if (text.includes('SELECT state,sync_revision::text,sync_state FROM harness.conversation_archive_records')) {
+          return { rows: [{ state: 'trash', sync_revision: '5', sync_state: 'pending' }], rowCount: 1 }
+        }
+        if (text.includes("FROM harness.conversation_archive_commands") && text.includes("status='pending'")) {
+          return { rows: [{ id: 'command-1', action: 'purge' }], rowCount: 1 }
+        }
+        if (text.includes('SELECT DISTINCT f.local_path')) return { rows: [], rowCount: 0 }
+        if (text.includes('SELECT a.root_session_id,')) return { rows: [archiveRow], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      }),
+      release: vi.fn(),
+    }
+    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const service = new ConversationArchiveService({ ...context, pool })
+    await expect(service.settle('session-1')).resolves.not.toBeNull()
+    expect(calls.some(([text]) => text.includes('DELETE FROM harness.conversation_sessions'))).toBe(true)
+    const commandUpdate = calls.find(([text]) => text.includes('UPDATE harness.conversation_archive_commands'))
+    expect(commandUpdate?.[0]).toContain("WHEN action='purge' AND $3::boolean THEN 'applied'")
+    expect(commandUpdate?.[1]?.[2]).toBe(true)
+    const recordUpdate = calls.find(([text]) => text.includes("SET sync_state='synced'"))
+    expect(recordUpdate).toBeDefined()
+  })
+
+  it('settles a pending restore as unconfirmed instead of deleting data', async () => {
+    const calls: Array<[string, unknown[] | undefined]> = []
+    const client = {
+      query: vi.fn(async (text: string, values?: unknown[]) => {
+        calls.push([text, values])
+        if (text.includes('SELECT state,sync_revision::text,sync_state FROM harness.conversation_archive_records')) {
+          return { rows: [{ state: 'archived', sync_revision: '5', sync_state: 'pending' }], rowCount: 1 }
+        }
+        if (text.includes("FROM harness.conversation_archive_commands") && text.includes("status='pending'")) {
+          return { rows: [{ id: 'command-1', action: 'restore' }], rowCount: 1 }
+        }
+        if (text.includes('SELECT a.root_session_id,')) return { rows: [archiveRow], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      }),
+      release: vi.fn(),
+    }
+    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const service = new ConversationArchiveService({ ...context, pool })
+    await expect(service.settle('session-1')).resolves.not.toBeNull()
+    expect(calls.some(([text]) => text.includes('DELETE FROM harness.conversation_sessions'))).toBe(false)
+    const recordUpdate = calls.find(([text]) => text.includes("sync_state=CASE WHEN state='purged'"))
+    expect(recordUpdate).toBeDefined()
+  })
+
+  it('returns null when settling a record that does not exist', async () => {
+    const client = {
+      query: vi.fn(async (_text: string) => ({ rows: [], rowCount: 0 })),
+      release: vi.fn(),
+    }
+    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const service = new ConversationArchiveService({ ...context, pool })
+    await expect(service.settle('session-missing')).resolves.toBeNull()
+    expect(client.query.mock.calls.some(([text]) => String(text).includes('conversation_archive_commands'))).toBe(false)
+  })
+
+  it('re-queues a purge command when a purged root is announced again', async () => {
+    const calls: Array<[string, unknown[] | undefined]> = []
+    const client = {
+      query: vi.fn(async (text: string, values?: unknown[]) => {
+        calls.push([text, values])
+        if (text.includes('SELECT state,runtime_kind')) {
+          return { rows: [{ state: 'purged', runtime_kind: 'user', runtime_public_id: '2', sync_revision: '7' }], rowCount: 1 }
+        }
+        return { rows: [], rowCount: 0 }
+      }),
+      release: vi.fn(),
+    }
+    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const service = new ConversationArchiveService({ ...context, pool })
+    await service.syncSnapshot({ rootSessionId: 'session-1', runtime: { kind: 'user', id: 2 }, syncRevision: 8 })
+    const insert = calls.find(([text]) => text.includes('INSERT INTO harness.conversation_archive_commands'))
+    expect(insert?.[0]).toContain("'purge'")
+    expect(insert?.[0]).toContain("status='pending'")
+    expect(insert?.[1]).toEqual(['org-1', 'session-1', 7])
+    expect(calls.some(([text]) => text.includes('INSERT INTO harness.conversation_archive_records'))).toBe(false)
+  })
+
   it('does not recursively remove a directory recorded as a content path', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-archive-purge-'))
     temporaryRoots.push(root)
