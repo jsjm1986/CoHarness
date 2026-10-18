@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 3,
+  "reviewDate": "2026-10-19",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "previousTag": "dsh-v0.2.0-rc.1",
+    "previousCommit": "4878cdabd87d4041bdaff61d04c966883b9fd07a",
+    "targetTags": [
+      { "tag": "dsh-v0.2.0-rc.2", "commit": "639ed015397290b3745d163aafe02ffee4aa3f84" },
+      { "tag": "dsh-v0.2.1-alpha.1", "commit": "5badb15009ae1756c3afe0ae0cef1faafc290ccc" },
+      { "tag": "dsh-v0.2.1-alpha.2", "commit": "6851e496285b2c9670066fdd142e7e46da586649" },
+      { "tag": "dsh-v0.2.1-alpha.3", "commit": "2fbf4359b82fb94c03dcce0b831660d87f12ea5c" },
+      { "tag": "dsh-v0.2.1-alpha.4", "commit": "86a402200d95fecef4529d969836f1fe13c6cb0d" },
+      { "tag": "dsh-v0.2.1-alpha.5", "commit": "1517a4dbca0a2789ff1d41ba439600f8547d23fa" },
+      { "tag": "dsh-v0.2.1-rc.1", "commit": "1600d8a1e140dcde43a1a0941940a0480712c011" },
+      { "tag": "dsh-v0.2.1-rc.2", "commit": "687f282e8625c6b8d11ff58211a90524be2e4317" }
+    ]
+  },
+  "baseline": {
+    "commit": "06614fcfd3300b2f628f58319f65c143c62feb63",
+    "branch": "upgrade/dsh-v0.2.1-rc.2"
+  },
+  "targetVersion": "0.2.1-rc.2.coharness.1",
+  "versionStatus": "proposed-release-families-unverified",
+  "status": "ledger-generated",
+  "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
+  "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json",
+  "auditEvidence": [
+    "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md",
+    "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-alpha.2.md",
+    "upgrades/alignment/UPSTREAM-RELEASE-NOTES-LEDGER-dsh-v0.2.1-alpha.4.md",
+    "upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-dsh-v0.2.1-rc.2.json"
+  ],
+  "verification": [
+    {
+      "phase": "P0",
+      "command": "pnpm run gen-upstream-commit-inventory -- --tag dsh-v0.2.1-rc.2",
+      "exitCode": 0,
+      "note": "1622 non-merge commits inventoried; 848 touch carried packages"
+    },
+    {
+      "phase": "P0",
+      "command": "pnpm run gen-upstream-alignment-matrix -- --tag dsh-v0.2.1-rc.2",
+      "exitCode": 0,
+      "note": "395 rows, 9323 cumulative files, 30 gate replays; 23 upstream-changed gate inputs re-reviewed and recorded"
+    },
+    {
+      "phase": "P0",
+      "command": "pnpm run verify-upgrade-records",
+      "exitCode": 0,
+      "note": "21 record files conform; every row carries commit coverage or an explicit reason"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "foundation",
+      "status": "adapt",
+      "localOwner": "CI, vendor, build and gate owners",
+      "reviewState": "pending-cumulative-source-review",
+      "commitScope": [
+        "vendor/",
+        "patches/",
+        ".github/workflows",
+        "scripts/parallelism.ts",
+        "scripts/coverage-partitions.ts",
+        "scripts/run-gates.ts",
+        "scripts/run-oxlint.ts",
+        "scripts/publish-npm-baseline.ts",
+        "scripts/gen-third-party-notices.ts",
+        "scripts/release/publish.ts",
+        "tsconfig.base.json",
+        "vitest.config.ts",
+        "package.json",
+        "pnpm-lock.yaml",
+        "python/sdk"
+      ]
+    },
+    {
+      "id": "plugin-compatibility-engines-dsh",
+      "status": "adapt",
+      "localOwner": "boot/app-boot owner",
+      "reviewState": "pending-cumulative-source-review",
+      "commitScope": ["packages/boot/app-boot/src/plugin-compatibility.ts"]
+    },
+    {
+      "id": "plugin-market-lane",
+      "status": "defer",
+      "localOwner": "plugin-manager owner",
+      "reviewState": "pending-cumulative-source-review",
+      "commitScope": [
+        "packages/boot/plugin-market",
+        "packages/util/plugin-market-index",
+        "packages/client/ui-plugin-market",
+        "packages/experimental/plugin-market-bundle",
+        "packages/boot/plugin-manager"
+      ],
+      "noUpstreamCommitReason": "Owner decision pending: upstream plugin distribution lane is new capability with no fork counterpart; carry-or-exclude per package in the plugin-manager phase."
+    },
+    {
+      "id": "experimental-demotions",
+      "status": "defer",
+      "localOwner": "hooks, webhook, terminal, workflow, session owners",
+      "reviewState": "pending-cumulative-source-review",
+      "commitScope": [
+        "packages/hooks",
+        "packages/webhook",
+        "packages/terminal/tool-terminal",
+        "packages/workflow/tool-ralph",
+        "packages/skill/skill-badge",
+        "packages/session/session-title-all-prompts-llm",
+        "packages/subagent/subagent-in-process-driver",
+        "packages/session-query/tool-session-query",
+        "packages/runtime-diagnostics/invariants"
+      ]
+    },
+    {
+      "id": "shadow-tool-working-directory",
+      "status": "reject",
+      "localOwner": "session owner",
+      "reviewState": "implemented-local-tests-passing",
+      "commitScope": ["packages/session/tool-working-directory"],
+      "evidence": "Same-key upstream rc.2 package drops the 'Directories must stay inside the project' tool-contract constraint; fork-owned row retains project-boundary admission. upstreamShadowed in scripts/upstream-sync.json; matrix row status=reject targetAssessment=fork-owned. Never file-merge with the upstream counterpart."
+    },
+    {
+      "id": "shadow-working-directory",
+      "status": "reject",
+      "localOwner": "session owner",
+      "reviewState": "implemented-local-tests-passing",
+      "commitScope": ["packages/session/working-directory"],
+      "evidence": "Upstream rc.2 same-key service validates absolute path and existence only; fork-owned service retains admission policy, canonical resolution, durable changes, and model context. upstreamShadowed in scripts/upstream-sync.json; matrix row status=reject targetAssessment=fork-owned. Never file-merge with the upstream counterpart."
+    }
+  ]
+}

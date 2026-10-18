@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "syncedTag": "dsh-v0.2.0-rc.1",
-  "syncedCommit": "4878cdabd87d4041bdaff61d04c966883b9fd07a",
+  "syncedTag": "dsh-v0.2.1-rc.2",
+  "syncedCommit": "687f282e8625c6b8d11ff58211a90524be2e4317",
   "packages": {
     "acp/acp": {
       "sovereignty": "adapted"
@@ -150,7 +150,6 @@
         "packages/client/ui-conversation/src/client/input/editor/ReferenceChip.module.css",
         "packages/client/ui-conversation/src/client/input/editor/ReferenceChip.tsx",
         "packages/client/ui-conversation/src/client/input/editor/chip-node.tsx",
-        "packages/client/ui-conversation/src/client/input/editor/claim-decor.ts",
         "packages/client/ui-conversation/src/client/input/editor/composer-editor.module.css",
         "packages/client/ui-conversation/src/client/input/editor/keymap.ts",
         "packages/client/ui-conversation/src/client/input/editor/projection.ts",
@@ -396,7 +395,8 @@
       "sovereignty": "tracked"
     },
     "compaction/compaction-image-offload": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "compaction/compaction-tool-result-pruner": {
       "sovereignty": "tracked"
@@ -514,20 +514,22 @@
       "sovereignty": "tracked"
     },
     "experimental/api-speech-to-text": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "experimental/auto-review": {
       "sovereignty": "adapted"
     },
     "experimental/browser-use-chrome-devtools-mcp": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "experimental/browser-use-playwright-mcp": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "experimental/browser-use-runtime": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-10-15-session-working-directory.md"
     },
     "experimental/browser-use-stagehand-native": {
@@ -550,7 +552,7 @@
       "sovereignty": "adapted"
     },
     "experimental/schedule-bundle": {
-      "sovereignty": "adapted",
+      "sovereignty": "owned",
       "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
     },
     "experimental/speech-to-text": {
@@ -565,7 +567,7 @@
       "sovereignty": "adapted"
     },
     "experimental/voice-input-bundle": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "extensions/cordis-client-runner": {
@@ -626,13 +628,16 @@
       "sovereignty": "adapted"
     },
     "hooks/hook-protocol": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "hooks/hooks-claude-code": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "hooks/hooks-codex": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "host/apiproxy": {
       "sovereignty": "owned"
@@ -672,7 +677,8 @@
       "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "interaction/commands": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "interaction/permission-presets": {
       "sovereignty": "adapted"
@@ -681,7 +687,8 @@
       "sovereignty": "adapted"
     },
     "interaction/user-approval": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "interaction/user-questions": {
       "sovereignty": "adapted",
@@ -767,25 +774,28 @@
       "sovereignty": "tracked"
     },
     "ptc-runtime/ptc-runtime": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "ptc-runtime/ptc-runtime-node": {
       "sovereignty": "adapted"
     },
     "runtime-diagnostics/invariants": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "sandbox/sandbox": {
       "sovereignty": "tracked"
     },
     "sandbox/sandbox-local": {
-      "sovereignty": "adapted"
-    },
-    "sandbox/sandbox-policy": {
       "sovereignty": "tracked"
     },
+    "sandbox/sandbox-policy": {
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
+    },
     "sandbox/sandbox-windows-acl": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "schedule/schedule": {
       "sovereignty": "adapted"
@@ -812,7 +822,8 @@
       "sovereignty": "adapted"
     },
     "session-query/tool-session-query": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "session/session-checkpoint-policy": {
       "sovereignty": "tracked"
@@ -884,10 +895,12 @@
       "sovereignty": "adapted"
     },
     "session/session-title-all-prompts-llm": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "session/session-title-first-prompt-llm": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "session/session-title-llm": {
       "sovereignty": "adapted"
@@ -896,11 +909,14 @@
       "sovereignty": "tracked"
     },
     "session/tool-working-directory": {
-      "sovereignty": "owned"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md",
+      "upstreamShadowed": true
     },
     "session/working-directory": {
       "sovereignty": "owned",
-      "note": "packages/session/working-directory/README.md"
+      "note": "packages/session/working-directory/README.md",
+      "upstreamShadowed": true
     },
     "settings/settings": {
       "sovereignty": "adapted"
@@ -913,13 +929,13 @@
       "sovereignty": "adapted"
     },
     "shell/bash-sandbox": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "shell/pwsh-local": {
       "sovereignty": "adapted"
     },
     "shell/pwsh-sandbox": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "shell/shell": {
       "sovereignty": "adapted"
@@ -943,19 +959,22 @@
       "sovereignty": "adapted"
     },
     "skill/skill-badge": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "skill/skill-filesystem": {
       "sovereignty": "adapted"
     },
     "skill/skill-office": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "skill/tool-skill": {
       "sovereignty": "adapted"
     },
     "skill/tool-workspace-dependencies": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "spill/spill": {
       "sovereignty": "tracked"
@@ -976,13 +995,14 @@
       "sovereignty": "adapted"
     },
     "ssh/subprocess-ssh": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "storage/storage": {
       "sovereignty": "tracked"
     },
     "storage/storage-domain": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "storage/storage-json": {
       "sovereignty": "adapted"
@@ -1011,7 +1031,8 @@
       "sovereignty": "adapted"
     },
     "subagent/subagent-in-process-driver": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "subagent/subagent-spawn-in-process": {
       "sovereignty": "adapted"
@@ -1038,7 +1059,8 @@
       "sovereignty": "adapted"
     },
     "terminal/tool-terminal": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "test-support/agent-loop-testkit": {
       "sovereignty": "adapted",
@@ -1049,7 +1071,8 @@
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "test-support/llm-mock-server": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "test-support/llm-replay": {
       "sovereignty": "adapted"
@@ -1097,7 +1120,8 @@
       "sovereignty": "tracked"
     },
     "util/home-paths": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "util/http-proxy": {
       "sovereignty": "tracked"
@@ -1126,7 +1150,7 @@
       "sovereignty": "tracked"
     },
     "util/timeout": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md"
     },
     "util/values": {
@@ -1154,19 +1178,23 @@
       "sovereignty": "adapted"
     },
     "webhook/webhook": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "webhook/webhook-github": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "workflow/tool-ralph": {
-      "sovereignty": "adapted"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "workflow/tool-workflow": {
       "sovereignty": "adapted"
     },
     "workflow/workflow": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "workflow/workflow-ptc": {
       "sovereignty": "adapted"
@@ -1329,7 +1357,166 @@
       "package": "telemetry/otel",
       "reason": "excluded; session telemetry stays on the self-contained session-telemetry-otel",
       "replacedBy": "session/session-telemetry-otel"
+    },
+    {
+      "package": "experimental/hook-protocol",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "hooks/hook-protocol"
+    },
+    {
+      "package": "experimental/hooks-claude-code",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "hooks/hooks-claude-code"
+    },
+    {
+      "package": "experimental/hooks-codex",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "hooks/hooks-codex"
+    },
+    {
+      "package": "experimental/skill-badge",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "skill/skill-badge"
+    },
+    {
+      "package": "experimental/tool-ralph",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "workflow/tool-ralph"
+    },
+    {
+      "package": "experimental/tool-terminal",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "terminal/tool-terminal"
+    },
+    {
+      "package": "experimental/tool-session-query",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "session-query/tool-session-query"
+    },
+    {
+      "package": "experimental/session-title-all-prompts-llm",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "session/session-title-all-prompts-llm"
+    },
+    {
+      "package": "experimental/webhook",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "webhook/webhook"
+    },
+    {
+      "package": "experimental/webhook-github",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "webhook/webhook-github"
+    },
+    {
+      "package": "schedule/tool-schedule",
+      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
+      "replacedBy": "experimental/schedule-bundle"
+    },
+    {
+      "package": "api/remote-access",
+      "reason": "new upstream lane; carry decision deferred to api phase"
+    },
+    {
+      "package": "boot/plugin-market",
+      "reason": "upstream plugin distribution lane; carry decision deferred per UPGRADE-MANIFEST plugin-market-lane row"
+    },
+    {
+      "package": "util/plugin-market-index",
+      "reason": "upstream plugin distribution lane; carry decision deferred per UPGRADE-MANIFEST plugin-market-lane row"
+    },
+    {
+      "package": "client/ui-plugin-market",
+      "reason": "upstream plugin distribution lane; carry decision deferred per UPGRADE-MANIFEST plugin-market-lane row"
+    },
+    {
+      "package": "experimental/plugin-market-bundle",
+      "reason": "upstream plugin distribution lane; carry decision deferred per UPGRADE-MANIFEST plugin-market-lane row"
+    },
+    {
+      "package": "experimental/badge-skill-bundle",
+      "reason": "bundle wrapper for the skill-badge demotion lane; pending demotion decision"
+    },
+    {
+      "package": "experimental/ralph-bundle",
+      "reason": "bundle wrapper for the tool-ralph demotion lane; pending demotion decision"
+    },
+    {
+      "package": "experimental/terminal-bundle",
+      "reason": "bundle wrapper for the tool-terminal demotion lane; pending demotion decision"
+    },
+    {
+      "package": "experimental/session-titles-bundle",
+      "reason": "bundle wrapper for the session-title demotion lane; pending demotion decision"
+    },
+    {
+      "package": "client/ui-deepseek-model-label-1017",
+      "reason": "new upstream client surface; carry decision deferred to client phase"
+    },
+    {
+      "package": "client/ui-secret-mask",
+      "reason": "new upstream client surface; carry decision deferred to client phase"
+    },
+    {
+      "package": "context/harness-dev-context",
+      "reason": "new upstream context lane; carry decision deferred"
+    },
+    {
+      "package": "experimental/claude-code-mods",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/client-ui-claude-code-mods",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/client-ui-cot-translation",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/cot-translation-bundle",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/cua",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/cua-macos",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/inspector-profile",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/session-inspector",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/session-search",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/tool-worktree",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/translator",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "experimental/worktree",
+      "reason": "new experimental lane; carry decision deferred to experimental phase"
+    },
+    {
+      "package": "ssh/ssh-helper-runtime",
+      "reason": "new upstream lane; carry decision deferred to ssh phase"
+    },
+    {
+      "package": "web/web-deepseek-api",
+      "reason": "new upstream lane; carry decision deferred to web phase"
     }
   ],
-  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json"
+  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json"
 }
