@@ -22,7 +22,7 @@
     "py/**/*.py",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-ptc-runtime": "workspace:*",

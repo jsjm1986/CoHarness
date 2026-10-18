@@ -26,7 +26,7 @@
     "dev": "vite",
     "watch": "vite build --watch --no-emptyOutDir"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@capacitor/core": "8.5.1",
     "@capacitor/push-notifications": "8.1.2"
