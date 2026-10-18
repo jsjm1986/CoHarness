@@ -139,8 +139,8 @@ describe('GatewayTunnelAccess', () => {
 
   it('provisions a named tunnel through the Cloudflare API on first start', async () => {
     const calls: Array<{ method: string; url: string; body?: unknown }> = []
-    const fetchImpl = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      const path = String(url)
+    const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+      const path = String(input)
       calls.push({ method: init?.method ?? 'GET', url: path, body: init?.body === undefined ? undefined : JSON.parse(String(init.body)) })
       if (path.endsWith('/accounts')) return cfResponse([{ id: 'acct-1', name: 'Org' }])
       if (path.includes('/zones?')) return cfResponse([{ id: 'zone-1', name: 'example.com' }])
@@ -149,7 +149,7 @@ describe('GatewayTunnelAccess', () => {
       if (path.includes('/dns_records?')) return cfResponse([])
       if (path.endsWith('/dns_records')) return cfResponse({ id: 'rec-1' })
       throw new Error(`unexpected fetch ${init?.method ?? 'GET'} ${path}`)
-    }) as unknown as typeof fetch
+    })
     const proc = fakeProc()
     const spawnNamed = vi.fn(() => proc)
     const { deps, store } = makeDeps({ fetchImpl, spawnNamed })
@@ -174,7 +174,7 @@ describe('GatewayTunnelAccess', () => {
       mode: 'named', hostname: 'team.example.com', zoneId: 'zone-1', accountId: 'acct-1', tunnelId: 'tun-1',
       apiTokenCipher: Buffer.from('enc:CF-TOKEN'), runTokenCipher: Buffer.from('enc:RUNTOKEN'),
     })
-    const fetchImpl = vi.fn() as unknown as typeof fetch
+    const fetchImpl = vi.fn<typeof fetch>()
     const proc = fakeProc()
     const spawnNamed = vi.fn(() => proc)
     const access = new GatewayTunnelAccess({
@@ -207,11 +207,11 @@ describe('GatewayTunnelAccess', () => {
       apiTokenCipher: Buffer.from('enc:CF-TOKEN'), runTokenCipher: Buffer.from('enc:RUNTOKEN'),
     })
     const calls: string[] = []
-    const fetchImpl = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      calls.push(`${init?.method ?? 'GET'} ${String(url)}`)
-      if (String(url).includes('/dns_records?')) return cfResponse([{ id: 'rec-1', content: 'tun-1.cfargotunnel.com' }])
+    const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+      calls.push(`${init?.method ?? 'GET'} ${String(input)}`)
+      if (String(input).includes('/dns_records?')) return cfResponse([{ id: 'rec-1', content: 'tun-1.cfargotunnel.com' }])
       return cfResponse({})
-    }) as unknown as typeof fetch
+    })
     const access = new GatewayTunnelAccess({
       store, cipher, organizationId: 'org-1', nodeId: 'node-1',
       target: 'http://127.0.0.1:8899', stateDir: '/state/tunnel',
