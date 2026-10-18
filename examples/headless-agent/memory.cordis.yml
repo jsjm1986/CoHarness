@@ -1,0 +1,31 @@
+# Add the durable memory stack and its model-facing tools to the real one-shot app.
+- id: base
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - insert:
+          # Host plane: the JSON per-record backend and domain that dsh-memory
+          # requires; the store lives under the scenario workspace so tests can
+          # inspect it after the run.
+          - id: storage
+            name: '@deepseek-ai/dsh-storage'
+          - id: storage-json
+            name: '@deepseek-ai/dsh-storage-json'
+            config:
+              root: !!js process.cwd() + '/.memory-store'
+          - id: storage-domain
+            name: '@deepseek-ai/dsh-storage-domain'
+            config:
+              backend: json
+          - id: memory
+            name: '@deepseek-ai/dsh-memory'
+
+          # Agent plane: the catalog listener, the four model-facing tools,
+          # and the opt-in post-turn curation passes.
+          - id: memory-context
+            name: '@deepseek-ai/dsh-memory-context'
+          - id: tool-memory
+            name: '@deepseek-ai/dsh-tool-memory'
+          - id: memory-curation
+            name: '@deepseek-ai/dsh-memory-curation'

@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../../compaction/compaction"
+    },
+    {
+      "path": "../../context/collaboration"
+    },
+    {
       "path": "../../core/session"
     },
     {
@@ -28,6 +34,9 @@
     },
     {
       "path": "../../util/timeout"
+    },
+    {
+      "path": "../../util/values"
     },
     {
       "path": "../../../vendor/cordis"

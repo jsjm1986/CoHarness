@@ -39,9 +39,10 @@
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`、`get_goal`、`update_goal` | `ctx.tools`、`ctx.agents`、`ctx.goals`、`ctx.systemPrompt`、`a calling Agent in an authorized open turn` | `tool/call`、`goal/change for mutations`、`tool/result` | - | create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。 |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`、`schedule_delete`、`schedule_list`、`schedule_update` | `ctx.tools`、`ctx.schedule`、live 根 Agent | `tool/call`、Schedule storage domain 创建、更新或删除、`tool/result` | - | Schedule 服务加载期间，在 live 根 Agent scope 内注册。接受 after_seconds、显式绝对 at、有界固定速率 every_seconds、带显式 IANA 时区的每日与每周本地时间，以及作为五字段表达式的 cron。管理使用宿主 storage domain；到期消息会恢复原 Session。 |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`、`ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
+| `@deepseek-ai/dsh-tool-memory` | `memory_delete`、`memory_read`、`memory_save`、`memory_search` | `ctx.memory`、`ctx.tools`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`memory/changed` | - | 在项目空间（space）运行时（Gateway 托管会话）中，每个 schema 都省略 scope 参数，各工具寻址共享的 project 作用域；上面的目录展示的是 CLI 预设发布的 personal 空间变体。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.workingDirectory`、`ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
-| `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
+| `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_handoff`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 6 个只读工具会隐藏提供方游标，根据不可变的调用 agent 会话为每个结果授权，并在协作服务挂载时于工作区相等规则之上叠加项目可读性。standard 预设会挂载该包；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
 | `@deepseek-ai/dsh-tool-subagent` | `subagent` | `ctx.tools`、`ctx.subagents`、`ctx.systemPrompt`、`ctx.sessionProjections` | `tool/call`、`tool/result`、`child session events through the chosen provider` | `subagent`、`subagent_fork` | 注册的委派工具名称取决于加载时 `toolName` 配置（默认为 `subagent`）；上述 schema 即该默认配置。随产品发布的组合为每个 subagent 后端各加载一次本包，因此模型还会看到绑定到 fork 后端的 `subagent_fork`。每个实例的描述、`run_in_background` 参数和系统提示词策略遵循各自的 `backgroundMode` 与 `enableRunInBackground`，因此两份发布的 schema 并不相同：`subagent` 是 `continuable`，省略参数的调用默认后台运行并自动投递结果；`subagent_fork` 保持 `one-shot` 并默认前台运行——见 `packages/bundle/base/cordis.patch.yml` 与 `examples/acp-agent/cordis.yml`。 |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message` | `ctx.tools`、`ctx.subagents`、`ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 这些是控制可继续后台 subagent 的全局命名工具：绑定提供方的 `tool-subagent` 实例注册不同的委派工具；本包注册一次 `send_message` 和 `interrupt_agent`，另由 `list_agents` 通过单独加载的 `/list-agents` 插件提供，其目录行使用 sessionProjections 和实时 Agent 注册表。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
@@ -1813,6 +1814,160 @@ Schedule 服务加载期间，在 live 根 Agent scope 内注册。接受 after_
 
 lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。
 
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+### `memory_delete`
+
+删除一条错误或不再有用的已保存记忆。持有 memory_read 返回的 revision 时传入它，以免误删更新的改动。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string",
+      "description": "personal: facts about the user that apply in every workspace. workspace: facts specific to this conversation's working directory.",
+      "enum": [
+        "personal",
+        "workspace"
+      ]
+    },
+    "key": {
+      "type": "string",
+      "description": "Key of the memory to delete."
+    },
+    "revision": {
+      "type": "string",
+      "description": "Revision returned by memory_read; when given, the memory is deleted only if it has not changed since."
+    }
+  },
+  "required": [
+    "scope",
+    "key"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_read`
+
+完整读取一条已保存记忆，包括 memory_save 和 memory_delete 用于修改它的 revision。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string",
+      "description": "personal: facts about the user that apply in every workspace. workspace: facts specific to this conversation's working directory.",
+      "enum": [
+        "personal",
+        "workspace"
+      ]
+    },
+    "key": {
+      "type": "string",
+      "description": "Key of the memory, as listed in the saved-memory catalog or by memory_search."
+    }
+  },
+  "required": [
+    "scope",
+    "key"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_save`
+
+保存一条记忆，后续会话会在其 saved-memory catalog 中看到它。不带 revision 时创建新记忆，key 已被占用则失败。要修改已有记忆，先用 memory_read 读取并传入其 revision；发送的 content 会整体替换旧内容。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string",
+      "description": "personal: facts about the user that apply in every workspace. workspace: facts specific to this conversation's working directory.",
+      "enum": [
+        "personal",
+        "workspace"
+      ]
+    },
+    "key": {
+      "type": "string",
+      "description": "Stable identifier made of lowercase letters, digits, and single hyphens, at most 64 characters, for example \"release-freeze\"."
+    },
+    "kind": {
+      "type": "string",
+      "description": "profile: who the user or team is — role, expertise, preferences. guidance: how you should work — a correction or a confirmed approach, with the reason. background: goals, constraints, decisions, or deadlines that the code and its history do not show. resource: where to find information outside the workspace, such as a dashboard, tracker, or document.",
+      "enum": [
+        "profile",
+        "guidance",
+        "background",
+        "resource"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "description": "One line of at most 150 characters, specific enough to judge from the catalog alone whether this memory is relevant."
+    },
+    "content": {
+      "type": "string",
+      "description": "The memory in Markdown. For guidance and background, state the rule or fact, then a \"Why:\" line and a \"How to apply:\" line. Write dates as absolute dates."
+    },
+    "revision": {
+      "type": "string",
+      "description": "Revision returned by memory_read; required to replace an existing memory."
+    }
+  },
+  "required": [
+    "scope",
+    "key",
+    "kind",
+    "summary",
+    "content"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_search`
+
+按记忆 key、summary 或 content 中的词语搜索已保存记忆。按相关度排序返回匹配项，每条附带一小段摘录。依赖其细节之前先用 memory_read 读取该记忆。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Words to look for; matching ignores case."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Search only this scope; omit to search every scope. personal: facts about the user that apply in every workspace. workspace: facts specific to this conversation's working directory.",
+      "enum": [
+        "personal",
+        "workspace"
+      ]
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+在项目空间（space）运行时（Gateway 托管会话）中，每个 schema 都省略 scope 参数，各工具寻址共享的 project 作用域；上面的目录展示的是 CLI 预设发布的 personal 空间变体。
+
 <a id="deepseek-aidsh-tool-ralph"></a>
 
 ## `@deepseek-ai/dsh-tool-ralph`
@@ -1991,6 +2146,24 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/session-query/tool-session-query/src/index.ts`](../packages/session-query/tool-session-query/src/index.ts)
 
+### `session_handoff`
+
+读取一个已获授权会话末尾的紧凑“续接要点”简报：决策、文件、状态和下一步。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Target session id. Omit for the current session."
+    }
+  }
+}
+```
+
+来源：[`packages/session-query/tool-session-query/src/index.ts`](../packages/session-query/tool-session-query/src/index.ts)
+
 ### `session_search`
 
 搜索调用方工作区中的先前会话，并从每个会话返回匹配度最高的事件。
@@ -2102,7 +2275,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/session-query/tool-session-query/src/index.ts`](../packages/session-query/tool-session-query/src/index.ts)
 
-这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。
+这 6 个只读工具会隐藏提供方游标，根据不可变的调用 agent 会话为每个结果授权，并在协作服务挂载时于工作区相等规则之上叠加项目可读性。standard 预设会挂载该包；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。
 
 <a id="deepseek-aidsh-tool-subagent"></a>
 

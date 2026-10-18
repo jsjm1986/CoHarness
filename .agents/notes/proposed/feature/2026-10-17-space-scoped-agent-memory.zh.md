@@ -79,13 +79,13 @@ kind 闭集为 `profile`（用户或团队是谁：角色、专长、偏好）�
 `dsh-memory-curation` 是一个带两个可选 pass 的 agent 平面行。两者都在触发回合捕获的执行身份下运行，在第一次模型调用之前完成授权，携带该身份发送 `purpose: 'memory'` 以把用量归到发起成员，并且只通过 `ctx.memory` 以各自的写入来源写入。
 
 - **提取（extraction）** 在回合以 `completed` 原因结束后运行。已调用 `memory_save` 或 `memory_delete` 的回合、没有人类正文的回合以及委派会话都跳过。请求按会话合并（一个运行、一个挂起），记忆域中持久的每会话游标限定转录切片。请求重放会话上一次请求的前缀——system 头、surface 消息和请求头中的工具，与 compaction 在 [`buildSummarizationInput`](../../../../packages/compaction/compaction-basic/src/region.ts) 中复用 provider 前缀缓存的做法相同——并追加列出当前目录的提取指令。随后一个有界工具循环只执行记忆操作，其他工具调用一律作为错误结果返回。
-- **整理（consolidation）** 在一次提取 pass 之后运行，前提是距上次已过配置的间隔且该作用域积累了足够的条目变更。它审视整个作用域，合并近似重复、删除被推翻或过期的条目、转换相对日期，并使用更大的轮次上限。
+- **整理（consolidation）** 在一次回合结束 pass 后运行，前提是该作用域的闸门合格：`lastRunAt` 早于配置的间隔，`changedSince` 已提交变更数达到配置阈值（服务在其串行写链内递增该计数），且作用域 `[key, summary, content]` 元组的 sha256 内容摘要与上次运行不同。它审视整个作用域，合并近似重复、删除被推翻或过期的条目、转换相对日期，并使用更大的轮次上限。`consolidation-{scopeId}` 游标——`lastRunAt`、`lastDigest`、`changedSince: 0`——仅在该运行的写入落地后提交，因此对未变化内容的重复运行不发起模型调用，被中断的运行会自行重新武装。
 
-`memory` 设置命名空间在插件页提供 `extraction`、`consolidation` 与 `recall` 三个开关，默认全部关闭。关闭时，记忆只会因 agent 主动保存或有人编辑而改变。
+`memory` 设置命名空间在插件页提供一个 `enabled` 总开关，以及 `extraction`、`consolidation` 与 `recall` 三个整理开关；整理开关默认全部关闭。关闭时，记忆只会因 agent 主动保存或有人编辑而改变。
 
 ## Per-question recall
 
-`recall` 开关开启时，`dsh-memory-context` 在回合第一步发起一次辅助选择请求。该请求接收目录字段与最近一条人类消息，返回至多配置数量的 key。监听器把选中条目的正文（各自截断）作为 `memory-recall` 上下文通过 `agent.inject()` 注入，使其加入下一次被接纳的请求；回合结束时仍挂起的注入会被丢弃。从 surface 折叠得到的每会话字节预算以及已召回条目的集合限制重复。整个过程不涉及 embedding 服务。
+`recall` 开关开启时，`dsh-memory-context` 在回合第一步发起一次辅助选择请求。该请求接收目录字段与最近一条人类消息——以 `recallInputMaxBytes` 为界——返回至多 `recallMaxSelections` 个 key（五条封顶），为 JSON `{"keys": [...]}`。监听器把选中条目的正文（各自截断至 `recallEntryMaxBytes`，并按每条消息 `recallMaxBytes` 装入）作为 `memory-recall` 上下文通过 `agent.inject()` 注入，使其加入下一次被接纳的请求；回合结束时仍挂起的注入会被丢弃。从 surface 折叠得到的每会话字节预算（`recallSessionMaxBytes`）与从持久 `memory-recall` 事件折叠的 `scopeId:key` 地址集合限制重复——即使 compaction 回收了字节，一个键在同一会话内也不会被再次选中。整个过程不涉及 embedding 服务。
 
 ## Earlier-session lookup
 

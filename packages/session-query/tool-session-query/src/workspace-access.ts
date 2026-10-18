@@ -21,11 +21,13 @@ import type {
   SessionLineageTrace,
   SessionRecord,
 } from '@deepseek-ai/dsh-session-query'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { serviceBoundary } from './service-boundary.ts'
 
 interface Caller {
   readonly id: SessionIdValue
+  readonly agent: Agent
   readonly header: SessionHeader
   readonly events: readonly SessionEvent[]
 }
@@ -66,6 +68,7 @@ function callerOf(exec: ToolRunContext): Caller {
   }
   return {
     id: agent.session.id,
+    agent,
     header: agent.session.header,
     // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     events: agent.session.snapshotEvents(),

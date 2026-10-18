@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Search your saved memories for the deploy rule and read it back."
+    }
+  ]
+}

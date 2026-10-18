@@ -154,6 +154,8 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 // Side-effect type import: resolves the `approval/request` waterfall and
 // `ctx.get('approval')` without a value dependency on the seam (optional composition).
 import type {} from '@deepseek-ai/dsh-user-approval'
+// Type-only: resolves the `memory/changed` forward event and `ctx.get('memory')`.
+import type {} from '@deepseek-ai/dsh-memory/client'
 // Type-only: resolves the `schedule/changed` forward event and `ctx.get('schedule')`.
 import type {} from '@deepseek-ai/dsh-schedule/client'
 // Type-only: resolves the `goal/activation-changed` forward event.
@@ -220,6 +222,11 @@ export const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
   // Host-wide read whose payload the invoke seam narrows back to the
   // participant's readable Sessions — the task store is global, visibility is not.
   'schedule/catalog',
+  // Project memory is member-wide readable; the scope catalog's `writable`
+  // flag is computed per captured participant inside the service.
+  'memory/scopes',
+  'memory/list',
+  'memory/read',
   'pluginInventory/list',
   'dynamicCordisRunner/inventory',
   'llm/listProviders',
@@ -256,6 +263,10 @@ const TERMINAL_REQUEST_SIGNAL = new AbortController().signal
 
 /** Registry-inspection endpoints every project participant may call (read-only plugin/preset introspection). */
 export const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
+  // The set admits the call after principal capture; the memory service
+  // captures the participant itself and requires `rw` project membership.
+  'memory/save',
+  'memory/delete',
   'dynamicCordisRunner/resolveRequestRun',
   'dynamicCordisRunner/invoke',
   'dynamicCordisRunner/syncInspectManifest',

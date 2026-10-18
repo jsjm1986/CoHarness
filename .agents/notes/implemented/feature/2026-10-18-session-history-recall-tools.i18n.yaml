@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-session-history-recall-tools.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-session-history-recall-tools.md
+/agent-note-session-history-recall-tools-cjk-full-text-search-and-project-readable-acl:
+  en: 472fe1518066247e
+  zh: 9b14f14eccf6321b
+/agent-note-session-history-recall-tools-cjk-full-text-search-and-project-readable-acl/problem:
+  en: 1c803031aed9dd5d
+  zh: 88afa183b511aad6
+/agent-note-session-history-recall-tools-cjk-full-text-search-and-project-readable-acl/decision:
+  en: 9dd5de2baa695938
+  zh: 506292bd58d01a2d
+/agent-note-session-history-recall-tools-cjk-full-text-search-and-project-readable-acl/consequences:
+  en: 0f792c31a08cfab6
+  zh: f51dff777e5fb548
+/agent-note-session-history-recall-tools-cjk-full-text-search-and-project-readable-acl/alternatives-considered:
+  en: d9d5eaed1fb3fbbd
+  zh: 0c00c6f053fac854
+/agent-note-session-history-recall-tools-cjk-full-text-search-and-project-readable-acl/verification:
+  en: b5d1326df0083482
+  zh: c8dd609f99ced12f

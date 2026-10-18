@@ -59,6 +59,8 @@ import * as ToolGoal from '@deepseek-ai/dsh-tool-goal'
 import * as ToolSchedule from '@deepseek-ai/dsh-schedule'
 import Lsp from '@deepseek-ai/dsh-lsp'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
+import type MemoryService from '@deepseek-ai/dsh-memory'
+import * as ToolMemory from '@deepseek-ai/dsh-tool-memory'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
 import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
@@ -507,6 +509,24 @@ const TOOL_PACKAGES: ToolPackage[] = [
       'The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.',
   },
   {
+    pkg: '@deepseek-ai/dsh-tool-memory',
+    dir: 'tool-memory',
+    source: 'packages/memory/tool-memory/src/index.ts',
+    requires: ['ctx.memory', 'ctx.tools', 'ctx.systemPrompt'],
+    writes: ['tool/call', 'tool/result', 'memory/changed'],
+    async mount(ctx) {
+      // Schema harvest reads space/limits/scopesFor only; writes never execute.
+      ctx.provide('memory', {
+        space: 'personal',
+        limits: { entryMaxBytes: 8192, summaryMaxChars: 150, maxEntriesPerScope: 200, searchMaxResults: 10 },
+        scopesFor: () => [{ kind: 'personal' }, { kind: 'workspace', directory: '/repo' }],
+      } as Pick<MemoryService, 'space' | 'limits' | 'scopesFor'> as MemoryService)
+      await ctx.plugin(ToolMemory)
+    },
+    note:
+      'In a project-space runtime (Gateway-managed sessions) the scope parameter is omitted from every schema and each tool addresses the shared project scope; the catalog above shows the personal-space variant shipped by the CLI presets.',
+  },
+  {
     pkg: '@deepseek-ai/dsh-tool-ralph',
     dir: 'tool-ralph',
     source: 'packages/workflow/tool-ralph/src/index.ts',
@@ -549,7 +569,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolSessionQuery)
     },
     note:
-      'The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.',
+      'The six read-only tools hide provider cursors, authorize every result from the immutable calling agent session, and layer project readability over workspace equality when collaboration is mounted. The standard preset mounts the package; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-subagent',

@@ -7,6 +7,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { HandoffConfig } from './handoff.ts'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -27,23 +28,46 @@ export const DEFAULT_MAX_SEARCH_RESULTS = 100
 /** Default cooperative deadline for either full-text search tool. */
 export const DEFAULT_SEARCH_TIMEOUT_MS = 30_000
 
+/** Default character budget for one handoff briefing's local tail. */
+export const DEFAULT_HANDOFF_CHARS = 24_000
+
+/** Default serialized-conversation cap for auxiliary-model capsule extraction. */
+export const DEFAULT_HANDOFF_EXTRACT_CHARS = 60_000
+
+/** Default cooperative deadline for one handoff call, extraction included. */
+export const DEFAULT_HANDOFF_TIMEOUT_MS = 120_000
+
 /** Deployment-owned search count and timeout bounds. */
 export interface Config {
   /** Maximum authorized hits returned by one search call. Defaults to 100. */
   maxSearchResults?: number
   /** Cooperative full-text search deadline in milliseconds. Defaults to 30000. */
   searchTimeoutMs?: number
+  /** Character budget for a handoff briefing's local tail. Defaults to 24000. */
+  handoffChars?: number
+  /** Whether an auxiliary model may compress the surface into a capsule. Defaults to true. */
+  handoffExtraction?: boolean
+  /** Serialized-conversation cap beyond which extraction is skipped. Defaults to 60000. */
+  handoffExtractChars?: number
+  /** Cooperative deadline for one handoff call in milliseconds. Defaults to 120000. */
+  handoffTimeoutMs?: number
 }
 
 /** Schemastery config for Loader defaults and generated configuration docs. */
 export const Config: z<Config> = z.object({
   maxSearchResults: z.number().step(1).min(1).default(DEFAULT_MAX_SEARCH_RESULTS),
   searchTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_SEARCH_TIMEOUT_MS),
+  handoffChars: z.number().step(1).min(1).default(DEFAULT_HANDOFF_CHARS),
+  handoffExtraction: z.boolean().default(true),
+  handoffExtractChars: z.number().step(1).min(1).default(DEFAULT_HANDOFF_EXTRACT_CHARS),
+  handoffTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_HANDOFF_TIMEOUT_MS),
 })
 
 interface ResolvedConfig {
   readonly maxSearchResults: number
   readonly searchTimeoutMs: number
+  readonly handoff: HandoffConfig
+  readonly handoffTimeoutMs: number
 }
 
 const TEXT_OUTPUT = {
@@ -54,7 +78,8 @@ const TEXT_OUTPUT = {
 const PROMPT_TEXT =
   'Use session_search to find relevant work from prior sessions, or session_event_search to search earlier '
   + 'events in one session. Search results are cursor-free and workspace-scoped. Follow a useful hit with '
-  + 'session_trace, session_event_trace, or session_event_read when you need lineage, relationships, or exact data.'
+  + 'session_trace, session_event_trace, or session_event_read when you need lineage, relationships, or exact data. '
+  + 'Use session_handoff for a compact continue-here brief from the end of one session.'
 
 /** Register all five tools and their shared model guidance. */
 export function apply(ctx: Context, config: Config): void {
@@ -109,6 +134,17 @@ export function apply(ctx: Context, config: Config): void {
   }))
 
   ctx.tools.register(defineTool({
+    name: 'session_handoff',
+    description: 'Read a compact continue-here brief from the end of an authorized session: decisions, files, state, and the next step.',
+    parameters: toolInput.targetSessionParameter,
+    output: TEXT_OUTPUT,
+    timeoutMs: resolved.handoffTimeoutMs,
+    isConcurrencySafe: () => true,
+    execute: (args, exec) => operations.executeSessionHandoff(ctx, args, exec, resolved.handoff),
+    presentCall: presentation.presentSessionHandoffCall,
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'session_event_read',
     description: 'Read one full unabridged event and optional neighboring raw-event summaries from an authorized session.',
     parameters: {
@@ -135,5 +171,28 @@ function resolveConfig(config: Config): ResolvedConfig {
       `tool-session-query: searchTimeoutMs must be a positive integer no greater than ${MAX_TIMER_DELAY_MS}`,
     )
   }
-  return { maxSearchResults, searchTimeoutMs }
+  const handoffChars = config.handoffChars ?? DEFAULT_HANDOFF_CHARS
+  const handoffExtractChars = config.handoffExtractChars ?? DEFAULT_HANDOFF_EXTRACT_CHARS
+  const handoffTimeoutMs = config.handoffTimeoutMs ?? DEFAULT_HANDOFF_TIMEOUT_MS
+  if (!Number.isSafeInteger(handoffChars) || handoffChars < 1) {
+    throw new TypeError('tool-session-query: handoffChars must be a positive safe integer')
+  }
+  if (!Number.isSafeInteger(handoffExtractChars) || handoffExtractChars < 1) {
+    throw new TypeError('tool-session-query: handoffExtractChars must be a positive safe integer')
+  }
+  if (!Number.isInteger(handoffTimeoutMs) || handoffTimeoutMs < 1 || handoffTimeoutMs > MAX_TIMER_DELAY_MS) {
+    throw new TypeError(
+      `tool-session-query: handoffTimeoutMs must be a positive integer no greater than ${MAX_TIMER_DELAY_MS}`,
+    )
+  }
+  return {
+    maxSearchResults,
+    searchTimeoutMs,
+    handoff: {
+      chars: handoffChars,
+      extraction: config.handoffExtraction ?? true,
+      extractChars: handoffExtractChars,
+    },
+    handoffTimeoutMs,
+  }
 }
