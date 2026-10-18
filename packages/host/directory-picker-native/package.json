@@ -30,7 +30,7 @@
     "lib/worker.cjs",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@deepseek-ai/dsh-host-directory-picker": "workspace:*",
     "@deepseek-ai/dsh-native-command": "workspace:*"

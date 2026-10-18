@@ -54,7 +54,7 @@
     "bundle": "tsdown",
     "watch": "tsdown --watch"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:~",
     "@xterm/addon-serialize": "^0.14.0",

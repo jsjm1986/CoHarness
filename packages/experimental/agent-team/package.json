@@ -53,7 +53,7 @@
     "lib/typert.remote-client.js",
     "lib/typert.remote-client.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:~",
     "zod": "^4.4.3"

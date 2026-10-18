@@ -34,7 +34,7 @@ function fixture(options: {
     name: '@deepseek-ai/dsh-probe',
     version: '0.0.1',
     type: 'module',
-    license: 'MIT',
+    license: 'Apache-2.0',
     engines: { node: '>=22.19' },
     sideEffects: false,
     files: ['lib'],
