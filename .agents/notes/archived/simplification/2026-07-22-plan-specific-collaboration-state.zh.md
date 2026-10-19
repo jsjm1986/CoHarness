@@ -1,6 +1,7 @@
 # Agent Note: plan 专用协作状态
 
 Status: implemented
+Archived: 2026-09-30
 
 [English](2026-07-22-plan-specific-collaboration-state.md) | 中文
 

@@ -1,16 +1,13 @@
-# Bilingual-pair consistency record for 2026-08-08-windows-acl-restricted-token-sandbox.md (docs/i18n/README.md): the document
-# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# Bilingual-pair consistency record for 2026-08-08-windows-acl-restricted-token-sandbox.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md
-document:
-  en: 6ae8913309ffa460ae27ebdc75664f6b54b5c26b
-  zh: 5a05568cbe664746c37525ccb64d0e2edd49a1a3
 /agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer:
   en: cfc871213b6d8360
   zh: 18ff96c2272fee09
 /agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/problem:
-  en: 86e01a1c009ac595
-  zh: 91844972d41dd6f9
+  en: 1262d6cef1b646be
+  zh: 8bd105fca6c8ad6e
 /agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/decision:
   en: 125dea7427047966
   zh: 920847efae9e6bee

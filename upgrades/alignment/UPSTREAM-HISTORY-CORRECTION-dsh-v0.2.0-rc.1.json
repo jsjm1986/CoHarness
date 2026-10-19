@@ -3323,7 +3323,7 @@
       "changedPaths": [
         ".agents/notes/archived/feature/2026-08-25-unified-task-list.i18n.yaml",
         ".agents/notes/archived/feature/2026-08-25-unified-task-list.md",
-        ".agents/notes/archived/feature/2026-08-25-unified-task-list.zh.md",
+        ".agents/notes/archived/feature/2026-08-25-unified-task-list.md",
         ".agents/notes/archived/manifest.json",
         ".agents/notes/implemented/architecture/2026-09-01-jobs-absorb-activity-record.i18n.yaml",
         ".agents/notes/implemented/architecture/2026-09-01-jobs-absorb-activity-record.md",

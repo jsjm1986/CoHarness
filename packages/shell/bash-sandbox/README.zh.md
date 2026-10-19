@@ -111,7 +111,7 @@ kind: "package-reference"
 - [sandbox-policy](../../sandbox/sandbox-policy/README.zh.md) —— 本执行器遵守的每会话模式与工作区根目录。
 - [sandbox-local](../../sandbox/sandbox-local/README.zh.md) —— 随附的 runner 后端：bwrap、Landlock 与 Seatbelt。
 - [tool-bash](../tool-bash/README.zh.md) —— 面向模型的 `bash` 工具及其升权面。
-- [沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md) —— 沙箱设计、升权与切换约定。
+- [沙箱 Agent Note](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) —— 沙箱设计、升权与切换约定。
 
 -----
 

@@ -1,10 +1,7 @@
-# Bilingual-pair consistency record for 2026-06-24-web-capability-seam.md (docs/i18n/README.md): the document
-# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# Bilingual-pair consistency record for 2026-06-24-web-capability-seam.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md
-document:
-  en: 6df93fafbe03af73a994992f09bd6d033314bf4d
-  zh: 0b0318fd4cf8a097eadb518e021e8374d0e7ef3b
 /agent-note-web-capability-seam-stable-tools-over-multiple-providers:
   en: ca120635fc40431c
   zh: 6be7c5ae3c86cdcc
@@ -63,8 +60,8 @@ document:
   en: a9ae4f8a459789ce
   zh: f44a184156bef30e
 /agent-note-web-capability-seam-stable-tools-over-multiple-providers/deferred-work:
-  en: fbefd756aadfd9c9
-  zh: 19a28ce48fae225d
+  en: 3e84d0daae1c7ce3
+  zh: 5484259b17e80654
 /agent-note-web-capability-seam-stable-tools-over-multiple-providers/open-questions:
-  en: f3507703314d73cd
-  zh: 39ad727740573121
+  en: c51438586e41052a
+  zh: 24fd9dcc4a5a5738

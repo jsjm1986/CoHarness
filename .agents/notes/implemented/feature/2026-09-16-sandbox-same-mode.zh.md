@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-当请求模式与生效模式相同时，`approveEscalation` 立即返回生效模式。bash 工具在该路径上保留一项成对校验豁免：精确重复可以省略 `justification`，但显式传入的空白或仅含空白的 `justification` 一律被拒绝（`invalid justification: expected a non-empty sentence`）。[文件系统家族](2026-07-14-cross-family-fs-sandbox.zh.md)在所有请求上仍要求参数成对出现。更宽模式仍需审批；更窄和不支持的目标仍然失败。这部分取代了[沙箱决策](2026-07-06-sandbox.zh.md)中的非放宽请求拒绝规则；其约束与逐调用审批决策仍然有效。
+当请求模式与生效模式相同时，`approveEscalation` 立即返回生效模式。bash 工具在该路径上保留一项成对校验豁免：精确重复可以省略 `justification`，但显式传入的空白或仅含空白的 `justification` 一律被拒绝（`invalid justification: expected a non-empty sentence`）。[文件系统家族](2026-07-14-cross-family-fs-sandbox.zh.md)在所有请求上仍要求参数成对出现。更宽模式仍需审批；更窄和不支持的目标仍然失败。这部分取代了[沙箱决策](../../archived/feature/2026-07-06-sandbox.md)中的非放宽请求拒绝规则；其约束与逐调用审批决策仍然有效。
 
 ## 考虑过的替代方案
 

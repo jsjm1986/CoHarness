@@ -27,6 +27,8 @@ kind: "package-library"
 
 本包为 AgentLoop 测试提供可用的服务拓扑，并要求测试明确选择生产 Inbox 行为或结构化桩。
 
+使用结构性 Agent 桩的纯消费方测试可以使用 `provideWorkingDirectoryFixture(ctx, defaultDirectory?)`。它只提供目录值，不校验路径、不切换目录、也不记录事件。覆盖目录行为的测试使用 `mountAgentLoopTestDependencies(ctx, { workingDirectory: true })` 与真实临时目录。
+
 ### 驱动生产 Agent
 
 当测试覆盖持久 Inbox 事件、投影恢复或校验、实时 Inbox 通知，或 loop 驱动的认领策略时，使用 `mountAgentLoopTestHarness()`。应在挂载先决依赖后、创建 Agent 前挂载所有对加载顺序敏感的消费方。上下文拥有 loop 以及该 harness 返回的每个 Agent。

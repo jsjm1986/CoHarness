@@ -1,13 +1,10 @@
-# Bilingual-pair consistency record for permission-presets.md (docs/i18n/README.md): the document
-# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# Bilingual-pair consistency record for permission-presets.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/permission-presets.md
-document:
-  en: 832ec677956125bfc45ad195fb56052f7740b819
-  zh: a35a9b1b2238e89d2216977dba0f2ae92d436f3c
 /permission-presets:
-  en: 254a9bceb7e7d307
-  zh: 8c57c57b79ad2a97
+  en: b7ed3bfd662ed2b8
+  zh: 878ac070a12e1fdb
 /permission-presets/the-preset-table:
   en: b5f7230d3bc1b14b
   zh: f0ce6c2c7e049a70

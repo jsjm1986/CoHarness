@@ -1,16 +1,13 @@
-# Bilingual-pair consistency record for 2026-07-06-approval-seam.md (docs/i18n/README.md): the document
-# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# Bilingual-pair consistency record for 2026-07-06-approval-seam.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-06-approval-seam.md
-document:
-  en: ace41ebbb94cc24c2fdd3e7ae2d3a69b28b169af
-  zh: 63b7478b0903c149fc87fd944c95e94cc8de2359
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers:
   en: 5a500ddf8910f3b2
   zh: 0461f97e3c905d72
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers/problem:
-  en: 0903931cf3fd2d9b
-  zh: ae39e774ffa66c36
+  en: 5971718fb4a55caa
+  zh: 971541e4311873a1
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers/decision:
   en: 058d4bd95d3c55d3
   zh: a861c6a59340b121
@@ -27,8 +24,8 @@ document:
   en: 1d4478059f608fd2
   zh: 4a1d12e4ccb766b5
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers/decision/design-detail/the-per-session-policy-tier:
-  en: 4eaf3ae10290dc6a
-  zh: 0cb65c79a5e9effc
+  en: 7fc6e885581c3a51
+  zh: 8f30f5d625f69d9e
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers/decision/design-detail/the-acp-answerer:
   en: 5a37f59b83828de7
   zh: 16a528726d317bbf
@@ -42,8 +39,8 @@ document:
   en: 01356985c175fcda
   zh: b1bb3b68f619e698
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers/deferred:
-  en: 3a9a1ddf86364f14
-  zh: ec8413e23f171bd2
+  en: 67ddc865e032d4c2
+  zh: e8e2ff4127b30417
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers/alternatives-considered:
   en: ae974b0f43a29b4e
   zh: bbc4662c0c63b6c1

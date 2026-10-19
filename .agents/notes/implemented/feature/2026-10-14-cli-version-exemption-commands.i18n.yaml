@@ -1,10 +1,7 @@
-# Bilingual-pair consistency record for 2026-10-14-cli-version-exemption-commands.md (docs/i18n/README.md): the document
-# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# Bilingual-pair consistency record for 2026-10-14-cli-version-exemption-commands.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-14-cli-version-exemption-commands.md
-document:
-  en: 3485fce64d99d69729d5fc7245787ed2dc4bd4d3
-  zh: a9fe12c98b4d41878c4741d443d898464c7860e1
 /agent-note-cli-version-exemption-commands:
   en: 58f9e3dbbdfa18f2
   zh: 0ceb489c48997fde
@@ -24,5 +21,5 @@ document:
   en: 5be40c29e4098408
   zh: 5227872b42dcc1c3
 /agent-note-cli-version-exemption-commands/related:
-  en: 194b1a79b0d399de
-  zh: 6b7280d1e64e39b1
+  en: b8f57f17782a243e
+  zh: 2093f3b6e5d545f8

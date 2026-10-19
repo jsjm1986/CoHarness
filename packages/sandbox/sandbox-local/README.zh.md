@@ -108,7 +108,7 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 - [沙箱 seam 包](../sandbox/README.zh.md)——本提供方实现的服务约定。
 - [Bash 沙箱执行器](../../shell/bash-sandbox/README.zh.md)——受限的 bash 消费方。
 - [Windows ACL 受限令牌档](../sandbox-windows-acl/README.zh.md)——本提供方挂载的 win32 后端。
-- [子进程沙箱决策](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)——能力边界与 runner 选择语义。
+- [子进程沙箱决策](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md)——能力边界与 runner 选择语义。
 
 -----
 
@@ -143,7 +143,7 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 
 #### 未来：环境一致的能力组
 
-[沙箱决策](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)把环境一致的能力组示例（例如 bash 加 fs 针对同一个容器）列为延期阶段；该方向尚未决定。
+[沙箱决策](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md)把环境一致的能力组示例（例如 bash 加 fs 针对同一个容器）列为延期阶段；该方向尚未决定。
 
 </details>
 

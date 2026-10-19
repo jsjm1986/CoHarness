@@ -1,10 +1,7 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
-# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subprocess/subprocess-local/README.md
-document:
-  en: b6345e6d53a6d14c98b0cd9d222f604585c89026
-  zh: 16eaadfea94ebb4f2cc7eb5687c1918fd352e9c0
 /:
   en: 6569fcd132144a11
   zh: 2f632189747feb07
@@ -45,8 +42,8 @@ document:
   en: 531a48766c666ea0
   zh: b40df533a2fd7244
 /deepseek-ai-dsh-subprocess-local/understand-the-implementation/design-concept:
-  en: c1f9a5ee756547b9
-  zh: d47d9f6175f5cbc9
+  en: e4958ac8e71de757
+  zh: 713114f106717f9a
 /deepseek-ai-dsh-subprocess-local/understand-the-implementation/source-map:
   en: 3d5fd99e4ad1f7af
   zh: 241490c1052f415c
@@ -66,8 +63,8 @@ document:
   en: e290ccc9b3c92c08
   zh: e7633834bd22a05d
 /deepseek-ai-dsh-subprocess-local/known-limitations-and-deferred-work:
-  en: 8c32701df6418b62
-  zh: 3d8da68737d2f500
+  en: 91fe5a10b6b7b7b4
+  zh: 7a3f1c1db6c42ae9
 /deepseek-ai-dsh-subprocess-local/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98
