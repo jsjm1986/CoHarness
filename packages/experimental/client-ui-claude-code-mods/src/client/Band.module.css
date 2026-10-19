@@ -6,7 +6,7 @@
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1, transparent);
   color: var(--dsw-alias-label-primary);
-  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--ds-font-family-code);
   font-size: 12px;
   line-height: 18px;
   white-space: pre-wrap;

@@ -31,7 +31,7 @@ export async function git(cwd: string, ...args: string[]): Promise<string> {
 }
 
 /** Unconfined fixtures must never accidentally exercise the confined branch. */
-export class UnusedSandbox extends SandboxProvider {
+class UnusedSandbox extends SandboxProvider {
   async confine(_argv: readonly string[], _policy: SandboxPolicy): Promise<ConfinedArgv> {
     throw new Error('unexpected confinement in a danger-full-access fixture')
   }

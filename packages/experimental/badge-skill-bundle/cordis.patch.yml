@@ -1,0 +1,7 @@
+# Experimental DSH badge skill over the shipped composition, which already
+# declares `skill-badge` parked disabled so the graph resolves it; the bundle
+# only switches the parked row on. Deselecting restores the shipped disabled
+# state — no second provider row is inserted.
+
+- id: skill-badge
+  disabled: false

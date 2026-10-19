@@ -1,0 +1,20 @@
+# Experimental session search over the shipped composition, which mounts a
+# Host `session-query-sqlite` metadata service with `openAt: never`. The bundle
+# leaves that row alone and inserts its own isolated group: a private
+# `sessionQuery` provider on a lazy in-memory index plus the read-only Agent
+# tools, released when the bundle is switched off.
+
+- insert:
+    - id: optional-session-search
+      name: cordis:group
+      group: true
+      isolate:
+        sessionQuery: true
+      config:
+        - id: optional-session-query-sqlite
+          name: '@deepseek-ai/dsh-session-query-sqlite'
+          config:
+            path: ':memory:'
+            openAt: first-search
+        - id: optional-tool-session-query
+          name: '@deepseek-ai/dsh-tool-session-query'
