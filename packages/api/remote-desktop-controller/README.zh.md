@@ -41,6 +41,11 @@ kind: "package-reference"
 
 `RemoteDesktopAccess` 沿用终端控制器的模式：托管部署（存在 execution-authority）把身份委托给 `userTerminalAuthorization`、管理员角色委托给 `userTerminalAdministration`，策略缺失时失败关闭；独立部署回退到具备管理员权限的 `local-operator` 身份。服务端仍独立执行——即使部署错误接线策略，管理方法也拒绝非 admin actor。
 
+<a id="client-half"></a>
+## Client 半边
+
+`@deepseek-ai/dsh-api-remote-desktop-controller/client` 安装 `ctx.remoteDesktops`（`ClientRemoteDesktops`）：自挂载生成的 `remoteDesktop` Remote 贡献（`./remote`），把每个 `{ ok }` 线侧结果转为抛出的错误，并把 `attach` 返回的 `{ path, token }` 解析为相对 `location` 的绝对 `ws(s)://` URL。UI 插件（`ui-remote-desktop`、`ui-remote-desktop-admin`）消费该服务而非直接使用线侧命名空间。
+
 <a id="model-experience"></a>
 ## 模型体验
 

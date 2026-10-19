@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-19-novnc-mpl-distribution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-19-novnc-mpl-distribution.md
+/agent-note-novnc-mpl-2-0-distribution-for-the-remote-desktop-client:
+  en: 6f39311bbea8f008
+  zh: ada825bcf2826ebd
+/agent-note-novnc-mpl-2-0-distribution-for-the-remote-desktop-client/problem:
+  en: 28a7aef4934e91b8
+  zh: 975429dae3bf131f
+/agent-note-novnc-mpl-2-0-distribution-for-the-remote-desktop-client/decision:
+  en: 3716b34ccbf8c3b8
+  zh: 918aa3c1d1ef7de0
+/agent-note-novnc-mpl-2-0-distribution-for-the-remote-desktop-client/alternatives-considered:
+  en: 45f009ae8b7edc8f
+  zh: 8fc860cf22ba33fe
+/agent-note-novnc-mpl-2-0-distribution-for-the-remote-desktop-client/consequences:
+  en: 0080ef9eace2b417
+  zh: 4f1a3230ea691190

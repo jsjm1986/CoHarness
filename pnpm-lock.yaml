@@ -1286,6 +1286,10 @@ importers:
         version: 4.4.3
 
   packages/api/remote-desktop-controller:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~
@@ -1293,6 +1297,9 @@ importers:
       '@deepseek-ai/dsh-agent':
         specifier: workspace:*
         version: link:../../core/agent
+      '@deepseek-ai/dsh-api-gateway':
+        specifier: workspace:*
+        version: link:../gateway
       '@deepseek-ai/dsh-api-terminal-controller':
         specifier: workspace:*
         version: link:../terminal-controller
@@ -2311,6 +2318,9 @@ importers:
       '@deepseek-ai/dsh-agent-presets':
         specifier: workspace:*
         version: link:../../preset/agent-presets
+      '@deepseek-ai/dsh-api-remote-desktop-controller':
+        specifier: workspace:*
+        version: link:../../api/remote-desktop-controller
       '@deepseek-ai/dsh-api-remotes':
         specifier: workspace:*
         version: link:../../api/remotes
@@ -2401,6 +2411,12 @@ importers:
       '@deepseek-ai/dsh-client-ui-reference':
         specifier: workspace:*
         version: link:../../client/ui-reference
+      '@deepseek-ai/dsh-client-ui-remote-desktop':
+        specifier: workspace:*
+        version: link:../../client/ui-remote-desktop
+      '@deepseek-ai/dsh-client-ui-remote-desktop-admin':
+        specifier: workspace:*
+        version: link:../../client/ui-remote-desktop-admin
       '@deepseek-ai/dsh-client-ui-renderer':
         specifier: workspace:*
         version: link:../../client/ui-renderer
@@ -2515,6 +2531,12 @@ importers:
       '@deepseek-ai/dsh-office-to-pdf':
         specifier: workspace:*
         version: link:../../document/office-to-pdf
+      '@deepseek-ai/dsh-remote-desktop-stream':
+        specifier: workspace:*
+        version: link:../../remote-desktop/remote-desktop-stream
+      '@deepseek-ai/dsh-remote-desktop-vnc':
+        specifier: workspace:*
+        version: link:../../remote-desktop/remote-desktop-vnc
       '@deepseek-ai/dsh-session-projection-cache':
         specifier: workspace:*
         version: link:../../session/session-projection-cache
@@ -3931,6 +3953,96 @@ importers:
       '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:*
         version: link:../../typert/protocol
+
+  packages/client/ui-remote-desktop:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-api-remote-desktop-controller':
+        specifier: workspace:*
+        version: link:../../api/remote-desktop-controller
+      '@deepseek-ai/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../locale
+      '@deepseek-ai/dsh-client-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../ui-renderer
+      '@deepseek-ai/dsh-client-ui-sidebar-right':
+        specifier: workspace:*
+        version: link:../ui-sidebar-right
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../ui-slots
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:*
+        version: link:../../typert/protocol
+      '@novnc/novnc':
+        specifier: 1.7.0
+        version: 1.7.0
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@types/react':
+        specifier: ~19.2.7
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ~19.2.4
+        version: 19.2.4(@types/react@19.2.18)
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+
+  packages/client/ui-remote-desktop-admin:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-api-remote-desktop-controller':
+        specifier: workspace:*
+        version: link:../../api/remote-desktop-controller
+      '@deepseek-ai/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../locale
+      '@deepseek-ai/dsh-client-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../ui-renderer
+      '@deepseek-ai/dsh-client-ui-settings':
+        specifier: workspace:*
+        version: link:../ui-settings
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../ui-slots
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@types/react':
+        specifier: ~19.2.7
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ~19.2.4
+        version: 19.2.4(@types/react@19.2.18)
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
 
   packages/client/ui-renderer:
     devDependencies:
@@ -15907,6 +16019,9 @@ packages:
   '@nodable/entities@3.1.0':
     resolution: {integrity: sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ==}
 
+  '@novnc/novnc@1.7.0':
+    resolution: {integrity: sha512-ucEJOx4T2avIRCleodk7YobZj5O2Ga2AeLfQ69A/yjG9HHba2+PDgwSkN3FttrmG+70ZGx21sElNFouK13RzyA==}
+
   '@octokit/openapi-types@29.0.1':
     resolution: {integrity: sha512-9qWOMFNxxLokERcms42rU0PTLqQmVs7g5E41TI4mCOxmpFayD1rfC7XxOL55cG9MBZLFlC31BrR37myMKardwg==}
 
@@ -22943,6 +23058,8 @@ snapshots:
   '@noble/hashes@2.3.0': {}
 
   '@nodable/entities@3.1.0': {}
+
+  '@novnc/novnc@1.7.0': {}
 
   '@octokit/openapi-types@29.0.1': {}
 

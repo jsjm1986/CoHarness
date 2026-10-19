@@ -192,6 +192,20 @@
     - id: terminal-controller
       name: '@deepseek-ai/dsh-api-terminal-controller'
 
+    # Human remote desktop: the VNC provider enforces grants/consent inside the
+    # RFB stream, the stream row mounts its WebSocket endpoint on webServer,
+    # and the controller exposes the remoteDesktop/* Remote namespace.
+    # Deployments list VNC endpoints and switch the volatile ':memory:' stores
+    # to files in an overlay.
+    - id: remote-desktop-vnc
+      name: '@deepseek-ai/dsh-remote-desktop-vnc'
+
+    - id: remote-desktop-stream
+      name: '@deepseek-ai/dsh-remote-desktop-stream'
+
+    - id: remote-desktop-controller
+      name: '@deepseek-ai/dsh-api-remote-desktop-controller'
+
     - id: api-remotes
       name: '@deepseek-ai/dsh-api-remotes'
 
@@ -250,6 +264,14 @@
       name: '@deepseek-ai/dsh-client-ui-sidebar-browser'
     - id: ui-sidebar-terminal
       name: '@deepseek-ai/dsh-client-ui-sidebar-terminal'
+
+    # Human remote desktop: 'remoteDesktop' sidebar tabs render the consent
+    # card and RFB screen; the settings section administers grants and audit.
+    - id: ui-remote-desktop
+      name: '@deepseek-ai/dsh-client-ui-remote-desktop'
+
+    - id: ui-remote-desktop-admin
+      name: '@deepseek-ai/dsh-client-ui-remote-desktop-admin'
 
 
     # Gateway project scope, shared-conversation visibility, read-only role UI,

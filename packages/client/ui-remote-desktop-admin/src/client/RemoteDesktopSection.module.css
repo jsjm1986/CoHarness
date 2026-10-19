@@ -1,0 +1,104 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.subheading {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.field {
+  padding: 6px 8px;
+  border: 1px solid var(--border, #d0d5dd);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.action {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent, #155eef);
+  color: #fff;
+  cursor: pointer;
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 13px;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border, #eaecf0);
+}
+
+.revoked td {
+  color: var(--text-secondary, #98a2b3);
+  text-decoration: line-through;
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent, #155eef);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.note {
+  color: var(--text-secondary, #667085);
+  font-size: 13px;
+}
+
+.error {
+  color: var(--danger, #d92d20);
+  font-size: 13px;
+}

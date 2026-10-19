@@ -1,0 +1,65 @@
+.notice {
+  padding: 24px;
+  color: var(--text-secondary, #667085);
+}
+
+.consent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  max-width: 420px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.recording {
+  color: var(--warning, #b54708);
+}
+
+.detail {
+  color: var(--text-secondary, #667085);
+  font-size: 13px;
+}
+
+.action {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent, #155eef);
+  color: #fff;
+  cursor: pointer;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.chrome {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  align-items: center;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-alt, #f2f4f7);
+}
+
+.canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}

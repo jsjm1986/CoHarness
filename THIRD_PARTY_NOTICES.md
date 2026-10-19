@@ -50,6 +50,7 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`@modelcontextprotocol/client`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@noble/hashes`](https://github.com/paulmillr/noble-hashes) | MIT |
+| [`@novnc/novnc`](https://github.com/novnc/noVNC) | MPL-2.0 |
 | [`@octokit/webhooks`](https://github.com/octokit/webhooks.js) | MIT |
 | [`@openai/codex`](https://github.com/openai/codex) | Apache-2.0 |
 | [`@opentelemetry/api`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
@@ -162,6 +163,13 @@ The installed SDK 0.3.263 declares the following optional platform packages. Eac
 `@deepseek-ai/libreoffice-kit`, `@deepseek-ai/libreoffice-kit-wasm`, `@deepseek-ai/libreoffice-kit-darwin-arm64`, `@deepseek-ai/libreoffice-kit-darwin-x64`, `@deepseek-ai/libreoffice-kit-win32-arm64`, `@deepseek-ai/libreoffice-kit-win32-x64` declare MPL-2.0, which remains outside the permissive-license allowlist; the notices check accepts only these package identities at those terms. The [distribution decision](.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md) records the source obligations.
 
 The [kit repository](https://github.com/deepseek-harness/libreoffice-kit) supplies the corresponding LibreOffice source pin, modifications, build instructions, Node API, and artifact validation. Its engine packages retain their license and third-party notices; the Node API retains its MPL-2.0 declaration and NOTICE. Recipients must have access to those corresponding sources and notices.
+
+
+## noVNC remote desktop client
+
+`@novnc/novnc` declares MPL-2.0, which remains outside the permissive-license allowlist; the notices check accepts only this package identity at those terms. The [distribution decision](.agents/notes/implemented/architecture/2026-10-19-novnc-mpl-distribution.md) records the source obligations.
+
+The [upstream repository](https://github.com/novnc/noVNC) supplies the corresponding source for the bundled RFB client; the shipped copy is the published npm package, and bundler minification does not author covered files. The file-scoped copyleft applies to noVNC's own files.
 
 
 ## Development-only npm dependencies

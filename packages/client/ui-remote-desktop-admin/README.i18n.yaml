@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-remote-desktop-admin/README.md
+/:
+  en: 72b4a2de5b98b835
+  zh: 663bc9da8b393bb2
+/deepseek-ai-dsh-client-ui-remote-desktop-admin:
+  en: 373c18eb2bb240c3
+  zh: 2a5c1b85b62c3626
+/deepseek-ai-dsh-client-ui-remote-desktop-admin/summary:
+  en: 0f2f2bf6cd44e3dc
+  zh: bd9490f23f681f37
+/deepseek-ai-dsh-client-ui-remote-desktop-admin/table-of-contents:
+  en: b563e4ec4727d0de
+  zh: 41b93a8ba88154f5
+/deepseek-ai-dsh-client-ui-remote-desktop-admin/use-this-package:
+  en: 3ec8860825cf994e
+  zh: 532a6e7c9e2063d7
+/deepseek-ai-dsh-client-ui-remote-desktop-admin/understand-the-implementation:
+  en: 81181dd02384d95f
+  zh: 2c15a2a207277fa2
+/deepseek-ai-dsh-client-ui-remote-desktop-admin/further-exploration:
+  en: 913c037cb02828e8
+  zh: e8caa01e898a4d63
+/deepseek-ai-dsh-client-ui-remote-desktop-admin/model-experience:
+  en: 4ecca77088de0bb9
+  zh: 1e5f656c5a86840e
+/deepseek-ai-dsh-client-ui-remote-desktop-admin/known-limitations-and-deferred-work:
+  en: f2f976a7050b80d6
+  zh: 3ff56bbd9e488c45

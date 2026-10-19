@@ -41,6 +41,11 @@ The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `r
 
 `RemoteDesktopAccess` mirrors the terminal controller's pattern: managed deployments (execution-authority present) delegate identity to `userTerminalAuthorization` and the admin role to `userTerminalAdministration`, failing closed when a policy is absent; standalone deployments fall back to a `local-operator` authority with administrator rights. Service-side enforcement still applies — admin methods reject non-admin actors even if a deployment miswires the policies.
 
+<a id="client-half"></a>
+## Client half
+
+`@deepseek-ai/dsh-api-remote-desktop-controller/client` installs `ctx.remoteDesktops` (`ClientRemoteDesktops`): it self-mounts the generated `remoteDesktop` Remote contribution (`./remote`), converts each `{ ok }` wire result into thrown errors, and resolves `attach`'s `{ path, token }` to an absolute `ws(s)://` URL against `location`. UI plugins (`ui-remote-desktop`, `ui-remote-desktop-admin`) consume this service rather than the wire namespace directly.
+
 <a id="model-experience"></a>
 ## Model Experience
 
