@@ -5,7 +5,7 @@
  * rebuilding it differently would replay tool calls the new agent cannot make.
  */
 
-import { mkdtempSync, realpathSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -18,12 +18,13 @@ import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import { RpcId, type RpcRequest } from '../src/api/rpc.ts'
 import type { WorkspaceId } from '../src/api/workspace.ts'
 import { brandString } from '@deepseek-ai/dsh-brand'
+import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import {
   InvalidPresetIdError, PresetExistsError, UnknownPresetError,
 } from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import { createApiProxy } from '../src/api-proxy.ts'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 
 let nextRpc = 0
 function request<P>(payload: P): RpcRequest<P> {
@@ -117,6 +118,10 @@ async function harness(
 ) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-apiproxy-preset-')))
   const ctx = new Context()
+  onTestFinished(async () => {
+    await ctx.fiber.dispose()
+    rmSync(cwd, { recursive: true, force: true })
+  })
   await ctx.plugin(SessionStore)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(UserQuestionService)
@@ -355,6 +360,125 @@ describe('opening a preset directory', () => {
 })
 
 describe('skills over the layered host registry', () => {
+  it('previews current instructions in a cold session scope without activating an Agent or exposing provider paths', async () => {
+    const { api, ctx } = await harness(['standard', 'minimal'])
+    const id = SessionId('preview-cold')
+    const session = ctx.sessions.create(id, { meta: { cwd: '/workspace/original', agentPreset: 'minimal' } })
+    ctx.provide('workingDirectory', { get: () => '/workspace/current' } as never)
+    const definition = {
+      name: 'user-only', description: 'Current instructions',
+      invocation: { userInvocable: true, modelInvocable: false },
+      content: '# Current minimal instructions\n\n$ARGUMENTS\n',
+      path: '/global/skills/user-only/SKILL.md',
+    }
+    ctx.provide('skills', {
+      list: async () => [definition],
+      get: async (_name: string, options: { cwd?: string; scope?: unknown }) =>
+        options.cwd === '/workspace/current' && options.scope === standingKeys.get('minimal')
+          ? definition : undefined,
+    } as never)
+    const events = session.snapshotEvents()
+    const response = await api.skills.get(request({ sessionId: id, name: 'user-only' }))
+    expect(response.result).toEqual({ ok: true, value: { skill: {
+      name: 'user-only', description: 'Current instructions',
+      contentMarkdown: '# Current minimal instructions\n\n$ARGUMENTS\n',
+    } } })
+    expect(ctx.agents.get(id)).toBeUndefined()
+    expect(session.snapshotEvents()).toEqual(events)
+  })
+
+  it('reads the live session registry ahead of the Host registry', async () => {
+    const { api, ctx } = await harness(['standard'])
+    const id = SessionId('preview-live')
+    await api.sessions.create(request({ sessionId: id, agentPreset: 'standard' }))
+    const definition = {
+      name: 'local', description: 'Preset instructions', content: 'Use the session preset.',
+      invocation: { userInvocable: true, modelInvocable: true },
+    }
+    const fallback = vi.fn()
+    ctx.provide('skills', { list: fallback, get: fallback } as never)
+    services.set(id, { skills: {
+      list: async () => [definition],
+      get: async (_name: string, options: { scope?: unknown }) =>
+        options.scope === ctx.agents.get(id) ? definition : undefined,
+    } })
+    onTestFinished(() => { services.delete(id) })
+    expect((await api.skills.get(request({ sessionId: id, name: 'local' }))).result).toMatchObject({
+      ok: true, value: { skill: { contentMarkdown: 'Use the session preset.' } },
+    })
+    expect(fallback).not.toHaveBeenCalled()
+  })
+
+  it('withholds hidden, missing, and newly hidden definitions', async () => {
+    const { api, ctx } = await harness(['standard'])
+    const id = SessionId('preview-hidden')
+    ctx.sessions.create(id, { meta: { cwd: '/workspace', agentPreset: 'standard' } })
+    const hidden = {
+      name: 'hidden', description: '', content: 'private instructions',
+      invocation: { userInvocable: false, modelInvocable: true },
+    }
+    const get = vi.fn(async () => hidden)
+    let userInvocable = false
+    ctx.provide('skills', {
+      list: async () => [{ ...hidden, invocation: { userInvocable, modelInvocable: true } }],
+      get,
+    } as never)
+    for (const name of ['hidden', 'missing', '../private']) {
+      expect((await api.skills.get(request({ sessionId: id, name }))).result).toEqual({ ok: true, value: {} })
+    }
+    expect(get).not.toHaveBeenCalled()
+    userInvocable = true
+    expect((await api.skills.get(request({ sessionId: id, name: 'hidden' }))).result)
+      .toEqual({ ok: true, value: {} })
+  })
+
+  it('authorizes preview reads before accessing the skill catalog', async () => {
+    const { api, ctx } = await harness(['standard'])
+    const read = vi.fn()
+    ctx.provide('skills', { list: read, get: read } as never)
+    ctx.provide('collaboration', {
+      capture: () => { throw new CollaborationError('forbidden') },
+    } as never)
+    const response = await api.skills.get(request({ sessionId: SessionId('denied'), name: 'private' }))
+    expect(response.result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it.each(['list', 'get'] as const)('forwards cancellation to a pending skill %s', async (method) => {
+    const { api, ctx } = await harness(['standard'])
+    const id = SessionId('preview-cancelled')
+    ctx.sessions.create(id, { meta: { cwd: '/workspace', agentPreset: 'standard' } })
+    const abort = new AbortController()
+    const ready = Promise.withResolvers<AbortSignal | undefined>()
+    const source = Promise.withResolvers<undefined>()
+    const read = (options: { signal?: AbortSignal }): Promise<undefined> => {
+      ready.resolve(options.signal)
+      const onAbort = (): void => { source.reject(options.signal?.reason) }
+      options.signal?.addEventListener('abort', onAbort, { once: true })
+      return source.promise.finally(() => { options.signal?.removeEventListener('abort', onAbort) })
+    }
+    ctx.provide('skills', {
+      list: async (options: { signal?: AbortSignal }) => {
+        if (method === 'list') await read(options)
+        return [{ name: 'pending', invocation: { userInvocable: true, modelInvocable: true } }]
+      },
+      get: (_name: string, options: { signal?: AbortSignal }) => read(options),
+    } as never)
+    const response = method === 'list'
+      ? api.skills.list(request({ sessionId: id }), abort.signal)
+      : api.skills.get(request({ sessionId: id, name: 'pending' }), abort.signal)
+    onTestFinished(async () => {
+      abort.abort()
+      source.resolve(undefined)
+      await response
+    })
+    expect(await ready.promise).toBe(abort.signal)
+    abort.abort(new Error('preview closed'))
+    expect((await response).result).toMatchObject({
+      ok: false, error: { code: 'internal', message: `skill ${method === 'list' ? 'listing' : 'preview'} failed: Error: preview closed` },
+    })
+  })
+
   it('passes the live agent as the view scope to the host registry', async () => {
     const { api, ctx } = await harness(['standard'])
     const seen: unknown[] = []

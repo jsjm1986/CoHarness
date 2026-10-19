@@ -67,7 +67,10 @@ interface BashToolArgs {
   workdir?: string
   run_in_background?: boolean
   sandbox_permissions?: string
-  /** Optional for an omitted or repeated effective mode; widening requires a non-empty reason. */
+  /**
+   * Omitted only on an exact repeat of the effective mode; an explicit blank is
+   * always rejected and widening requires a non-empty reason.
+   */
   justification?: string
 }
 
@@ -81,13 +84,13 @@ function validateBashArgs(args: BashToolArgs, effectiveMode: SandboxMode | undef
   if (args.timeoutMs !== undefined && (!Number.isFinite(args.timeoutMs) || args.timeoutMs <= 0)) {
     throw new Error(`invalid timeoutMs: expected a positive number, got ${JSON.stringify(args.timeoutMs)}`)
   }
-  if (args.sandbox_permissions !== undefined && args.sandbox_permissions === effectiveMode) return
-  const justification = args.sandbox_permissions === undefined && args.justification?.trim() === ''
-    ? undefined
-    : args.justification
+  // An exact repeat of the effective mode asks for no new permission, so an
+  // omitted justification is exempt — but an explicitly-passed one still goes
+  // through the shared pairing rule below, where a blank is rejected.
+  if (args.sandbox_permissions !== undefined && args.sandbox_permissions === effectiveMode && args.justification === undefined) return
   // The escalation pairing (sandbox_permissions ⇔ justification, non-empty) is
   // the shared rule both enforcing families validate identically.
-  validateEscalationArgs(args.sandbox_permissions, justification)
+  validateEscalationArgs(args.sandbox_permissions, args.justification)
 }
 
 function bashDescription(backgroundEnabled: boolean, escalationModes: readonly SandboxMode[]): string {

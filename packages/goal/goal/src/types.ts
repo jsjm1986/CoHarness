@@ -1,8 +1,8 @@
 /**
  * Pure types of the goal domain: the ONE home of the `goal` projection-key
- * declaration plus the durable payload vocabulary it carries, free of this
- * package's host-side imports (cordis events, dsh-agent, dsh-llm, the
- * service). Two namespace projections serve it — `./types` for host
+ * declaration, durable payload vocabulary, and client-safe activation event,
+ * free of this package's host-side imports (dsh-agent, dsh-llm, the service).
+ * Two namespace projections serve it — `./types` for host
  * consumers, `./client` (the browser half-entry's re-export) for client
  * aggregates — with zero content duplication. Host-coupled domain
  * vocabulary (message sources, events, fold shapes) lives in ./domain.ts.
@@ -11,6 +11,7 @@
  */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** Identifies one goal across its durable revisions. */
 export type GoalId = Branded<'GoalId'>
@@ -69,6 +70,32 @@ export interface GoalSnapshot extends GoalRef {
 
 /** Whether this live process may automatically continue an active goal. */
 export type GoalActivation = 'armed' | 'disarmed'
+
+/** Live process-local activation update forwarded to UI clients. */
+export interface GoalActivationChanged {
+  /** Session whose live goal activation changed. */
+  readonly sessionId: SessionId
+  /** Current exact activation, absent when no goal is current. */
+  readonly goal?: {
+    /** Exact current goal identity. */
+    readonly id: GoalId
+    /** Exact current goal revision. */
+    readonly revision: number
+    /** Current process-local continuation state. */
+    readonly activation: GoalActivation
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Process-local goal activation changed for one session.
+     * @mode emit
+     * @param payload - session id and the exact current goal activation, or no goal after a clear.
+     */
+    'goal/activation-changed'(payload: GoalActivationChanged): void
+  }
+}
 
 /** Current goal projection, including values derived from the session log. */
 export interface GoalView extends GoalSnapshot {

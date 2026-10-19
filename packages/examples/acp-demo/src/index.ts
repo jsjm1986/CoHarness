@@ -18,7 +18,8 @@ import * as acp from '@deepseek-ai/dsh-acp'
 import * as agentCore from '@deepseek-ai/dsh-agent-spine-demo'
 import * as workspaceContext from '@deepseek-ai/dsh-agent-instructions'
 import ToolRuntime, { type Config as ToolsConfig } from '@deepseek-ai/dsh-tools'
-import JsonlSessionPersistence, {
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import {
   JsonlCompressionSchema,
   type JsonlCompression,
 } from '@deepseek-ai/dsh-session-persistence-jsonl'

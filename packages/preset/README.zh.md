@@ -21,7 +21,7 @@ kind: "package-group"
 
 设计详见 [按会话组装 agent preset 的 Agent Note](../../.agents/notes/implemented/architecture/2026-08-03-per-session-agent-presets.zh.md)。
 
-[`AgentPresets` 参考](../../docs/subsystems/core.zh.md#ctxagentpresets--agentpresets)记录发现、挂载、继承与重组；[scope](../../docs/subsystems/scope.zh.md)负责挂载加入 agent 所用的 scope 键与父链，[system prompt](../../docs/subsystems/system-prompt.zh.md)负责预设提示词节的注册与装配。
+[`AgentPresetRegistry` 参考](../../docs/subsystems/core.zh.md#ctxagentpresets--agentpresetregistry)记录发现、挂载、继承与重组；[scope](../../docs/subsystems/scope.zh.md)负责挂载加入 agent 所用的 scope 键与父链，[system prompt](../../docs/subsystems/system-prompt.zh.md)负责预设提示词节的注册与装配。
 
 ## 概述
 

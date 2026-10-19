@@ -205,6 +205,11 @@
         # The listener's bind IP is accepted separately from this list.
         trustedHosts: !!js ctx.webStartup.trustedHosts
 
+    # Raw Blob and ReadableStream uploads run independently of Connection's
+    # RPC and generation service.
+    - id: file-upload
+      name: '@deepseek-ai/dsh-client-file-upload'
+
     - id: terminal-controller
       name: '@deepseek-ai/dsh-api-terminal-controller'
 
@@ -254,6 +259,11 @@
     - id: ui-plugin-manager
       name: '@deepseek-ai/dsh-client-ui-plugin-manager'
 
+    # Read-only Plugin list tab in the Settings Plugins section; the built-in
+    # bundles the sidebar page leaves out are inspected here.
+    - id: ui-settings-plugin-inventory
+      name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
+
     - id: ui-settings-unarchive-sessions
       name: '@deepseek-ai/dsh-client-ui-settings-unarchive-sessions'
 
@@ -266,6 +276,9 @@
       name: '@deepseek-ai/dsh-client-ui-sidebar-browser'
     - id: ui-sidebar-terminal
       name: '@deepseek-ai/dsh-client-ui-sidebar-terminal'
+    # The right Sidebar's workspace file tree tab type.
+    - id: ui-sidebar-files
+      name: '@deepseek-ai/dsh-client-ui-sidebar-files'
 
 
     # Gateway project scope, shared-conversation visibility, read-only role UI,

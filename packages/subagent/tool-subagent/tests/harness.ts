@@ -18,7 +18,7 @@ afterEach(async () => {
 })
 
 /** Register a test context for awaited teardown. */
-export function ownContext(ctx: Context): Context {
+function ownContext(ctx: Context): Context {
   contexts.add(ctx)
   return ctx
 }

@@ -32,6 +32,12 @@ export interface ConfigurableProviderView {
    * surface must treat absence as "unknown", not as "shipped".
    */
   declared?: boolean
+  /** Route endpoint the adapter uses when the profile sets no `baseURL`. */
+  defaultBaseURL?: string
+  /** Environment variables used to construct a provider endpoint. */
+  baseURLEnv?: readonly string[]
+  /** Authentication the route performs when the profile names no credential reference. */
+  nativeAuth?: { env: readonly string[]; oauth: boolean }
   /** Public project id for a project-owned route. */
   projectId?: number
 }

@@ -66,7 +66,8 @@ import type {} from '@deepseek-ai/dsh-permission-presets'
 import { SessionQueryError, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
 import type { SubagentListEntry as CatalogSubagentListEntry } from '@deepseek-ai/dsh-subagent'
-import { isUserInvocable } from '@deepseek-ai/dsh-skill'
+import type SkillRegistry from '@deepseek-ai/dsh-skill'
+import { isUserInvocable, type SkillViewOptions } from '@deepseek-ai/dsh-skill'
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 import type { Workspace, WorkspaceRecord } from '@deepseek-ai/dsh-workspace'
 import {
@@ -168,6 +169,8 @@ import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from
 import { questionResponsePayloadSchema } from './api/questions.schema.ts'
 import type { ClientResponse, RpcError, RpcReceipt, RpcRequest, RpcResponse } from './api/rpc.ts'
 import { RpcId, serverRequestJson } from './api/rpc.ts'
+import { requestInteractions } from './api/request-scope.ts'
+import type { ConnectionInteractions } from './api/interactions.ts'
 import type {
   AskUserQuestionAnswer, AskUserQuestionItem,
 } from '@deepseek-ai/dsh-user-questions'
@@ -1326,6 +1329,16 @@ interface MuxSubscription {
   publish(envelope: RpcRequest<MuxFrame>): void
 }
 
+/**
+ * Interaction frames a 'none' subscriber must never see: the answerable
+ * requested frames and their resolved echoes. Prefix matching keeps any
+ * future approval/question frame inside the same interaction family rather
+ * than leaking it to connections that cannot participate.
+ */
+function isInteractionFrame(frame: MuxFrame): boolean {
+  return frame.type.startsWith('approval/') || frame.type.startsWith('question/')
+}
+
 /** Project a pending entry into its answerable mux frame (initial push and mux-open replay share it). */
 function requestedFrame(pending: PendingApproval): RpcRequest<MuxFrame> {
   return {
@@ -2050,6 +2063,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   type AuthorizedSession = {
     authority: CollaborationAuthority | undefined
     access: CollaborationAccess | undefined
+  }
+
+  /**
+   * Capture the interaction mode the admitted connection declared for this
+   * request. Unbound dispatch reports 'answer', so only a Connection scope
+   * bound to 'none' narrows interaction traffic below.
+   */
+  function captureInteractions(): ConnectionInteractions {
+    return requestInteractions()
   }
 
   /** Capture the request principal when collaboration is composed. */
@@ -3293,6 +3315,46 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       // a deleted or broken preset must degrade this read, never fail it.
       return undefined
     }
+  }
+
+  /**
+   * Resolve authorized skill reads without activating a cold session's Agent.
+   * A preset-local registry takes precedence over the Host registry; cold
+   * sessions read through their recorded preset's standing scope.
+   */
+  async function skillViewFor(sessionId: SessionId, signal?: AbortSignal): Promise<
+    { registry: SkillRegistry; options: SkillViewOptions } | { error: RpcError }
+  > {
+    const authorized = await authorizeSession(sessionId, 'read')
+    if ('error' in authorized) return authorized
+    const session = ctx.sessions.get(sessionId)
+    if (session === undefined) {
+      return { error: {
+        code: 'session-not-found',
+        message: `session "${sessionId}" not found (not attached)`,
+        details: { sessionId },
+      } }
+    }
+    const workingDirectory = ctx.get('workingDirectory')
+    const cwd = workingDirectory === undefined ? session.header.cwd : workingDirectory.get(session)
+    if (cwd === undefined) {
+      return { error: { code: 'internal', message: `session "${sessionId}" has no project cwd`, details: {} } }
+    }
+    const live = ctx.agents.get(sessionId)
+    const scoped = live === undefined ? undefined : ctx.get('agentPresets')?.serviceFor(live, 'skills')
+    const registry = scoped ?? ctx.get('skills')
+    if (registry === undefined) {
+      return { error: {
+        code: 'internal',
+        message: 'skill registry is absent: neither this session\'s agent preset nor the host composition mounts @deepseek-ai/dsh-skill',
+        details: {},
+      } }
+    }
+    return { registry, options: {
+      cwd,
+      scope: await presenterScopeFor(sessionId, session),
+      ...signal === undefined ? {} : { signal },
+    } }
   }
 
   /**
@@ -5774,55 +5836,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
 
     skills: {
-      // Skill lookup never creates or resumes an agent: the session address
-      // resolves to its recorded working directory, and the view scope is
-      // the live agent or the preset's standing key.
-      async list(request) {
-        const { sessionId } = request.payload
-        const authorized = await authorizeSession(sessionId, 'read')
-        if ('error' in authorized) return err(request, authorized.error)
-        const session = ctx.sessions.get(sessionId)
-        if (session === undefined) {
-          return err(request, {
-            code: 'session-not-found',
-            message: `session "${sessionId}" not found (not attached)`,
-            details: { sessionId },
-          })
-        }
-        // The recorded working directory is the catalog's directory; a
-        // composition without the service can only ever have produced the
-        // original project directory, so the header read is the exact
-        // fallback, and `ctx.get` keeps the handler independent of this
-        // plugin's inject list (the service is optional in API
-        // compositions).
-        const workingDirectory = ctx.get('workingDirectory')
-        const cwd = workingDirectory === undefined ? session.header.cwd : workingDirectory.get(session)
-        if (cwd === undefined) {
-          // Every served session records its project at create time; a
-          // cwd-less header is a pre-project legacy log (not served).
-          return err(request, { code: 'internal', message: `session "${sessionId}" has no project cwd`, details: {} })
-        }
-        // The host registry is layered per scope and serves every session. A
-        // composition may still realm-mount its own registry instead; that
-        // instance is invisible to host contexts, so address it through the
-        // live agent (`agents.get` keeps the no-side-effect stance above).
-        const live = ctx.agents.get(sessionId)
-        const presets = ctx.get('agentPresets')
-        const scoped = live === undefined ? undefined : presets?.serviceFor(live, 'skills')
-        // Same stance as the commands domain: a missing service means no
-        // composition mounts dsh-skill, not an empty catalog. `ctx.get` also
-        // keeps this handler independent of the gateway plugin's inject list
-        // (an undeclared `ctx.skills` property read fails the reflect proxy).
-        const skillRegistry = scoped ?? ctx.get('skills')
-        if (skillRegistry === undefined) {
-          return err(request, { code: 'internal', message: 'skill registry is absent: neither this session\'s agent preset nor the host composition mounts @deepseek-ai/dsh-skill', details: {} })
-        }
-        // The scope presenters resolve in — the live agent, else the recorded
-        // preset's standing key, else the global layer — so a cold session's
-        // '/' popup lists the catalog its composition actually serves.
-        const scope = await presenterScopeFor(sessionId, session)
+      async list(request, signal) {
+        const view = await skillViewFor(request.payload.sessionId, signal)
+        if ('error' in view) return err(request, view.error)
         try {
-          const skills = (await skillRegistry.list({ cwd, scope })).filter(isUserInvocable)
+          const skills = (await view.registry.list(view.options)).filter(isUserInvocable)
           return ok(request, {
             skills: skills.map(skill => ({
               name: skill.name,
@@ -5833,6 +5851,24 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         } catch (error: unknown) {
           return err(request, { code: 'internal', message: `skill listing failed: ${String(error)}`, details: {} })
+        }
+      },
+      async get(request, signal) {
+        const view = await skillViewFor(request.payload.sessionId, signal)
+        if ('error' in view) return err(request, view.error)
+        try {
+          const visible = (await view.registry.list(view.options))
+            .some(skill => skill.name === request.payload.name && isUserInvocable(skill))
+          if (!visible) return ok(request, {})
+          const skill = await view.registry.get(request.payload.name, view.options)
+          if (skill === undefined || !isUserInvocable(skill)) return ok(request, {})
+          return ok(request, { skill: {
+            name: skill.name,
+            description: skill.description,
+            contentMarkdown: skill.content,
+          } })
+        } catch (error: unknown) {
+          return err(request, { code: 'internal', message: `skill preview failed: ${String(error)}`, details: {} })
         }
       },
     },
@@ -6000,6 +6036,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 ? 'project'
                 : organization.has(entry.provider) ? 'organization' : 'personal'),
             ...entry.declared === undefined ? {} : { declared: entry.declared },
+            ...entry.defaultBaseURL === undefined ? {} : { defaultBaseURL: entry.defaultBaseURL },
+            ...entry.baseURLEnv === undefined ? {} : { baseURLEnv: [...entry.baseURLEnv] },
+            ...entry.nativeAuth === undefined ? {} : { nativeAuth: { env: [...entry.nativeAuth.env], oauth: entry.nativeAuth.oauth } },
             ...(entry.projectId !== undefined
               ? { projectId: entry.projectId }
               : managedEntry?.projectId === undefined ? {} : { projectId: managedEntry.projectId }),
@@ -6066,6 +6105,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     events: {
       mux(_request, signal) {
         const captured = captureCollaboration('read')
+        // Captured at subscription time like the collaboration principal:
+        // a 'none' connection keeps ordinary mux traffic but never receives
+        // answerable or settlement interaction frames.
+        const interactions = captureInteractions()
         liveEventClients += 1
         const inner = openStream((async function*(): AsyncGenerator<RpcRequest<MuxFrame>, void, unknown> {
           if ('error' in captured) {
@@ -6122,6 +6165,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
           const subscription: MuxSubscription = {
             publish(envelope) {
+              // Interaction frames stop at the publish boundary: a 'none'
+              // subscription never observes the interaction it cannot answer.
+              if (interactions === 'none' && isInteractionFrame(envelope.payload)) return
               const sessionId = 'sessionId' in envelope.payload ? envelope.payload.sessionId : undefined
               if (sessionId === undefined) {
                 queue.push(envelope)
@@ -6206,7 +6252,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               })
             }),
             ...jobs === undefined ? [] : [jobs.events.subscribe({ owners: 'all' }, (event) => {
-              const owner = event.type === 'output' ? event.owner : event.job.owner
+              // Output readers have their own cursor; only lifecycle changes refresh the roster.
+              if (event.type === 'output') return
+              const owner = event.job.owner
               if (owner !== undefined) {
                 publishFor(owner, () => {
                   queue.push(frame({ type: 'session/jobs', sessionId: owner, jobs: jobViews(jobs.list(owner)) }))
@@ -6242,7 +6290,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               if (readable.has(session.id)) subscribe(session, lastSeq)
             }
             for (const pending of initialQuestions) {
-              if (!readable.has(pending.sessionId)) continue
+              if (interactions === 'none' || !readable.has(pending.sessionId)) continue
               queue.push({
                 rpcId: pending.rpcId,
                 payload: {
@@ -6253,7 +6301,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               })
             }
             for (const pending of initialApprovals) {
-              if (readable.has(pending.sessionId)) queue.push(requestedFrame(pending))
+              if (interactions !== 'none' && readable.has(pending.sessionId)) queue.push(requestedFrame(pending))
             }
             for (const session of sessions) {
               if (!readable.has(session.id)) continue
@@ -6301,6 +6349,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       host(_request, signal) {
         const captured = captureCollaboration('read')
+        // A 'none' connection keeps host state frames but no forwarded events:
+        // the remote-event listeners below are never registered for it.
+        const interactions = captureInteractions()
         return openStream((async function*(): AsyncGenerator<RpcRequest<HostFrame>, void, unknown> {
           if ('error' in captured) {
             yield frame({ type: 'stream/error', error: captured.error })
@@ -6472,7 +6523,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 void pushWorkspace(changedWorkspaceView(change.key, change.value))
               })
             }),
-            ...API_REMOTE_FORWARDED_EVENTS.map(name => ctx.on(
+            // Forwarded events are interaction-channel traffic: a 'none'
+            // subscription gets no listeners, so no `host/remote-event`
+            // frame is ever produced for it.
+            ...interactions === 'none' ? [] : API_REMOTE_FORWARDED_EVENTS.map(name => ctx.on(
               name,
               ((...args: unknown[]) => {
                 const jsonArgs = assertJsonArgs(name, args)
@@ -6578,6 +6632,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     },
 
     async respond(message: ClientResponse): Promise<RpcReceipt> {
+      // A 'none' connection was never shown the interaction, so from its
+      // view the echoed rpcId is simply not pending — refuse before any
+      // registry lookup and before the claiming ladder can run.
+      if (requestInteractions() === 'none') return { accepted: false, reason: 'not-pending' }
       // Route by the echoed rpcId (the wire correlation): approvals first,
       // then questions — the two registries share one id space of UUIDs.
       const approval = pendingApprovals.get(message.rpcId)

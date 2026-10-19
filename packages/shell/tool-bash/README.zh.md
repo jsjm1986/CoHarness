@@ -45,7 +45,7 @@ kind: "package-reference"
 | `workdir` | string | 本次调用的工作目录。默认为 Session 的当前工作目录（`ctx.workingDirectory`），使每个会话都在自己的工作区中运行；相对 `workdir` 也以该目录为基准解析。 |
 | `run_in_background` | boolean | 立即返回 job id；不应用超时。 |
 | `sandbox_permissions` | string enum | 仅当已挂载的执行器启用沙箱时才会公开（`ctx.shell.sandboxMode` 报告一个具有限制作用的默认值）：被拒命令所需的更宽模式，取自封闭的目标词汇 `workspace-write`/`danger-full-access`（绝不能缩减为执行器默认值；有效模式按会话确定；更宽模式在执行时检查并审批，重复生效模式无需审批即可执行，更窄请求直接失败，不会向任何人发起提示）。 |
-| `justification` | string | 必须与 `sandbox_permissions` 一同提供（缺少任一项都会产生验证错误）：用一句话向用户解释此命令为何需要这项更宽权限。 |
+| `justification` | string | 必须与 `sandbox_permissions` 一同提供（缺少任一项都会产生验证错误），但当 `sandbox_permissions` 重复调用的生效模式时可以省略：用一句话向用户解释此命令为何需要这项更宽权限。显式传入的空白或仅含空白的 `justification` 一律是验证错误——包括重复模式的请求；普通调用可以省略它。 |
 
 执行前，`command`、`workdir` 和 `timeoutMs` 会通过 `ctx.shell.resolve()` 依据执行器配置默认值完成解析，因此 Service Definition（`ShellExecSpec`）收到显式的 `workdir`/`timeoutMs` 值。工具层会先根据 Session 的当前目录（`ctx.workingDirectory.ensure(exec.agent)`）应用工作目录默认值，然后才调用 `resolve()`：由于 N 个会话共享一个执行器，逐会话 cwd 必须来自 `exec.agent`；只有未绑定 agent 时，执行器才回退到自身配置／`process.cwd()`。有效目录独立于沙箱权限根目录，后者仍以 Session 的原始项目目录为锚点。
 
@@ -74,7 +74,7 @@ kind: "package-reference"
 
 除非启用沙箱的执行器（[`dsh-bash-sandbox`](../bash-sandbox/)）限制命令，否则命令以执行器的完整权限运行。仅拒绝型沙箱会把拒绝作为结果事实报告，并在此渲染为拒绝标记；逐调用的允许／拒绝／询问策略由 `tools/pre-execute` waterfall（瀑布式事件）负责（参见 docs/architecture.md）。
 
-需要升权的 bash 调用会在执行前解析 `ctx.approval`。`allowed-once` 只对该次调用应用请求模式；审批被拒、取消、不可用或缺少审批上下文时，命令完全不会执行，并返回不同的错误。发生真实拒绝后，模型可以在同一轮次中使用满足需要的最窄模式和理由重试同一命令一次；审批提示本身就是征求同意的步骤。升权绝不能预先推测，禁用或拒绝审批即为最终结果。重复指定调用的生效模式无需审批即可执行，更窄目标则在执行前失败。其理由见 [沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
+需要升权的 bash 调用会在执行前解析 `ctx.approval`。`allowed-once` 只对该次调用应用请求模式；审批被拒、取消、不可用或缺少审批上下文时，命令完全不会执行，并返回不同的错误。发生真实拒绝后，模型可以在同一轮次中使用满足需要的最窄模式和理由重试同一命令一次；审批提示本身就是征求同意的步骤。升权绝不能预先推测，禁用或拒绝审批即为最终结果。重复指定调用的生效模式无需审批即可执行，也可以省略 `justification`——但显式传入的空白值仍会被拒绝；更窄目标则在执行前失败。其理由见 [沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
 
 <a id="per-session-mode-switching"></a>
 ## 逐会话模式切换

@@ -969,7 +969,7 @@ export class PluginManager extends TypertRemoteService {
       const packages = this.ownerContext.get('pluginPackages')
       // A link-mode launch has no interception to republish; its materialized node_modules already changed on disk.
       // A dropped mapping's bundle is not running: the guard above keeps the table while a deselected startup bundle runs.
-      if (packages?.resolution !== undefined && packages.installed === true) await packages.refresh()
+      if (packages?.resolution !== undefined && packages.installed) await packages.refresh()
     } catch (error) {
       if (!(error instanceof ResolutionRestartRequired)) throw error
     }

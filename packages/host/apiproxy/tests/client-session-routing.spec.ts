@@ -79,6 +79,6 @@ it('resolves registered Session policies beside built-ins and rejects duplicate 
   expect(remoteSessionId(endpoint, { widget: {} })).toBeUndefined()
   expect(mapRemoteSessionIds(endpoint, { widget: { sessionId: 'a' }, other: 'a' }, id => `w:${id}` as typeof id))
     .toEqual({ widget: { sessionId: 'w:a' }, other: 'a' })
-  expect(() => registerRemoteSessionPolicy(endpoint, policy)).toThrow(/already has a Session policy/)
-  expect(() => registerRemoteSessionPolicy('commands/list', policy)).toThrow(/already has a Session policy/)
+  expect(() => { registerRemoteSessionPolicy(endpoint, policy) }).toThrow(/already has a Session policy/)
+  expect(() => { registerRemoteSessionPolicy('commands/list', policy) }).toThrow(/already has a Session policy/)
 })

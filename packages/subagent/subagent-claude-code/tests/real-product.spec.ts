@@ -35,6 +35,7 @@ import {
   type MessagesFixture,
 } from './messages-fixture.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { parentAgent } from './agent-fixture.ts'
 
 const observedSdkMessages = vi.hoisted((): SDKMessage[] => [])
 const sdkTestOverrides = vi.hoisted((): { maxTurns?: number } => ({}))
@@ -222,11 +223,7 @@ async function realHarness(
     ...permissionMode === undefined ? {} : { permissionMode },
     disposeGraceMs: 3_000,
   })
-  const parent = {
-    id: 'real-parent',
-    ctx,
-    session: { header: { cwd: instance.workspace }, append: () => {} },
-  } as unknown as Agent
+  const parent = parentAgent(instance.workspace, 'real-parent', ctx)
   return {
     harness: {
       ctx,
@@ -402,16 +399,8 @@ describe('real Claude Agent SDK 0.3.263 and its distributed Claude Code 2.1.263 
       permissionMode: 'bypassPermissions',
       disposeGraceMs: 3_000,
     })
-    const safeParent = {
-      id: 'safe-parent',
-      ctx,
-      session: { header: { cwd: safeInstance.workspace }, append: () => {} },
-    } as unknown as Agent
-    const bypassParent = {
-      id: 'bypass-parent',
-      ctx,
-      session: { header: { cwd: bypassInstance.workspace }, append: () => {} },
-    } as unknown as Agent
+    const safeParent = parentAgent(safeInstance.workspace, 'safe-parent', ctx)
+    const bypassParent = parentAgent(bypassInstance.workspace, 'bypass-parent', ctx)
     const safeController = new AbortController()
 
     const [safeRun, bypassRun] = await Promise.all([

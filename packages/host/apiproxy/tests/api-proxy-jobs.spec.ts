@@ -1,13 +1,9 @@
 /**
- * Background-task carrier paths of the host ApiProxy: the subscription
- * baseline is sent only for a session that has tasks, every registry change
- * pushes that owner's whole set, an unowned change fans out to every
- * subscribed session, the projection drops the three internal snapshot
- * fields, a composition without `ctx.jobs` emits nothing, and listing never
- * resumes a cold session.
+ * Background-job roster and cursor APIs on the authenticated host carrier.
+ * Roster baselines and lifecycle frames preserve visibility without consuming output.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -35,7 +31,10 @@ function producer(label = 'sleep 60') {
     label,
     run: () => ({
       cancel: () => {},
-      done: new Promise<JobOutcome>((resolve) => { settle = resolve }),
+      done: new Promise<JobOutcome>((resolve) => {
+        settle = resolve
+        onTestFinished(() => { resolve({ status: 'killed' }) })
+      }),
     }),
   }
   return { spec, settle: (outcome: JobOutcome) => { settle(outcome) } }
@@ -56,7 +55,10 @@ function writingProducer(label = 'cat log.txt') {
       handle = job
       return {
         cancel: () => {},
-        done: new Promise<JobOutcome>((resolve) => { settle = resolve }),
+        done: new Promise<JobOutcome>((resolve) => {
+          settle = resolve
+          onTestFinished(() => { resolve({ status: 'killed' }) })
+        }),
       }
     },
   }
@@ -73,6 +75,7 @@ async function harness(
   registryConfig?: ConstructorParameters<typeof LocalJobRegistry>[1],
 ): Promise<{ ctx: Context; session: Session; agent: Agent }> {
   const ctx = new Context()
+  onTestFinished(async () => { await ctx.fiber.dispose() })
   await ctx.plugin(SessionStore)
   await ctx.plugin(UserQuestionService)
   await ctx.plugin(AgentRegistry)
@@ -132,7 +135,7 @@ describe('session/jobs subscription baseline', () => {
 
   it('carries the live set for a session that already has tasks when the stream opens', async () => {
     const { ctx, session, agent } = await harness(true)
-    ctx.jobs.start({ ...producer('pnpm run build').spec, owner: agent.id })
+    const id = ctx.jobs.start({ ...producer('pnpm run build').spec, owner: agent.id })
     const abort = new AbortController()
     const stream = api(ctx).events.mux({ rpcId: RpcId('t-tasks-baseline'), payload: {} }, abort.signal)
     const [baseline] = await collect(stream, 1, abort)
@@ -141,7 +144,7 @@ describe('session/jobs subscription baseline', () => {
     const [job] = baseline?.jobs ?? []
     expect(job?.startedAt).toBeTypeOf('number')
     expect({ ...job, startedAt: 0 }).toEqual({
-      id: 'bash-1',
+      id,
       kind: 'bash',
       label: 'pnpm run build',
       status: 'running',
@@ -201,6 +204,64 @@ describe('session/jobs change pushes', () => {
     const frames = await collected
     expect(frames[0]?.jobs[0]?.progress).toBeUndefined()
     expect(frames[1]?.jobs[0]?.progress).toBe('3/10 chunks')
+  })
+
+  it.each(['owned', 'unowned'] as const)('keeps %s output appends off the roster while preserving lifecycle coordinates', async (ownership) => {
+    const { ctx, session, agent } = await harness(true)
+    const other = ctx.sessions.create()
+    const proxy = api(ctx)
+    const abort = new AbortController()
+    const stream = proxy.events.mux({ rpcId: RpcId('t-roster-output'), payload: {} }, abort.signal)
+    const frames: JobFrame[] = []
+    const drained = (async () => {
+      for await (const { payload } of stream) {
+        if (payload.type === 'session/jobs') frames.push(payload)
+        if (payload.type === 'session/event'
+          && payload.sessionId === session.id
+          && payload.event.type === 'turn/start') abort.abort()
+      }
+    })()
+    onTestFinished(async () => { abort.abort(); await drained })
+    const p = writingProducer()
+    const id = ctx.jobs.start({
+      ...p.spec,
+      ...(ownership === 'owned' ? { owner: agent.id } : {}),
+    })
+    const settled = Promise.withResolvers<undefined>()
+    const stop = ctx.jobs.events.subscribe({ owners: 'all' }, (event) => {
+      if (event.type === 'settled' && event.job.id === id) settled.resolve(undefined)
+    })
+    onTestFinished(stop)
+    p.append('α')
+    p.append('tail\n')
+    p.progress('output ready')
+    p.settle({ status: 'completed' })
+    await settled.promise
+    // This ordered Session event bounds the observation after all job commits.
+    session.append('turn/start', { turn: 1 })
+    await drained
+
+    expect(frames).toHaveLength(ownership === 'owned' ? 3 : 6)
+    for (const frame of frames) expect(frame.jobs).toHaveLength(1)
+    const targets = ownership === 'owned' ? [session.id] : [session.id, other.id]
+    for (const target of targets) {
+      expect(frames.filter(frame => frame.sessionId === target).map(frame => [
+        frame.jobs[0]?.status, frame.jobs[0]?.progress ?? null, frame.jobs[0]?.output.total,
+      ])).toEqual([
+        ['running', null, 0],
+        ['running', 'output ready', 7],
+        ['completed', null, 7],
+      ])
+    }
+    const { result } = await proxy.jobs.output({
+      rpcId: RpcId('t-roster-output-read'),
+      payload: { sessionId: session.id, jobId: id },
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.chunks.map(chunk => chunk.text).join('')).toBe('αtail\n')
+    expect(result.value.job.status).toBe('completed')
+    expect(ctx.jobs.read(id, session.id).chunks.map(chunk => chunk.text).join('')).toBe('αtail\n')
   })
 
   it('fans an unowned change out to every subscribed session', async () => {

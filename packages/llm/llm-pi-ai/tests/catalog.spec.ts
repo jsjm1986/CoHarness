@@ -1230,7 +1230,7 @@ describe('resolution snapshots', () => {
       profiles: () => current,
       // Credential resolution is the real await inside a stream call, and the
       // window a configuration change has to land in.
-      resolveApiKey: async () => { await held; return 'k' },
+      resolveApiKey: async (provider) => { if (provider === 'deepseek') await held; return 'k' },
       auth: memoryAuth(),
     })
 
@@ -1359,6 +1359,8 @@ describe('configurable-provider directory', () => {
       settingsNs: 'llm-pi-ai',
       settingsPath: ['providers', 'openai-codex'],
       declared: false,
+      defaultBaseURL: 'https://chatgpt.com/backend-api',
+      nativeAuth: { env: [], oauth: true },
     })
   })
   it('refuses compat keys pi-ai’s catalog owns, pointing at the catalog route', () => {

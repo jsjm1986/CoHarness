@@ -57,7 +57,7 @@ import {
   workspaceFilesStatRequestSchema,
 } from '../api/workspace-files.schema.ts'
 import { jobsKillRequestSchema, jobsOutputRequestSchema } from '../api/jobs.schema.ts'
-import { skillListRequestSchema } from '../api/skills.schema.ts'
+import { skillGetRequestSchema, skillListRequestSchema } from '../api/skills.schema.ts'
 import { agentPresetOpenDocumentRequestSchema } from '../api/agent-presets.schema.ts'
 import {
   settingsDescribeRequestSchema, settingsMutateRequestSchema, settingsOpenDocumentRequestSchema,
@@ -143,7 +143,8 @@ const UNARY_ROUTES: UnaryRoutes = {
   'workspaceFiles.stat': { schema: workspaceFilesStatRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.stat(r, signal) },
   'workspaceFiles.read': { schema: workspaceFilesReadRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.read(r, signal) },
   'workspaceFiles.readBytes': { schema: workspaceFilesReadBytesRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.readBytes(r, signal) },
-  'skill.list': { schema: skillListRequestSchema, invoke: (api, r) => api.skills.list(r) },
+  'skill.list': { schema: skillListRequestSchema, invoke: (api, r, signal) => api.skills.list(r, signal) },
+  'skill.get': { schema: skillGetRequestSchema, invoke: (api, r, signal) => api.skills.get(r, signal) },
   'agentPreset.openDocument': { schema: agentPresetOpenDocumentRequestSchema, invoke: (api, r, signal) => api.agentPresets.openDocument(r, signal) },
   'settings.describe': { schema: settingsDescribeRequestSchema, invoke: (api, r) => api.settings.describe(r) },
   'settings.openDocument': { schema: settingsOpenDocumentRequestSchema, invoke: (api, r, signal) => api.settings.openDocument(r, signal) },

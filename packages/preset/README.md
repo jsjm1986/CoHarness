@@ -21,7 +21,7 @@ The composition split this group assumes: registries and cross-session facilitie
 
 Design: [the per-session agent-preset note](../../.agents/notes/implemented/architecture/2026-08-03-per-session-agent-presets.md).
 
-The [`AgentPresets` reference](../../docs/subsystems/core.md#ctxagentpresets--agentpresets) records discovery, mounting, inheritance, and recomposition; [scope](../../docs/subsystems/scope.md) owns the scope keys and parent chain the mount uses to join agents, and [system prompt](../../docs/subsystems/system-prompt.md) owns how preset prompt sections register and assemble.
+The [`AgentPresetRegistry` reference](../../docs/subsystems/core.md#ctxagentpresets--agentpresetregistry) records discovery, mounting, inheritance, and recomposition; [scope](../../docs/subsystems/scope.md) owns the scope keys and parent chain the mount uses to join agents, and [system prompt](../../docs/subsystems/system-prompt.md) owns how preset prompt sections register and assemble.
 
 ## Summary
 

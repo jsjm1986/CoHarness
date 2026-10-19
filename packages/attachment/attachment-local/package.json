@@ -35,7 +35,7 @@
   "dependencies": {
     "@deepseek-ai/dsh-lazy-require": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

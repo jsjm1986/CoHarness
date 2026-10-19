@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import type { GatewayRequestPrincipal, GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
+import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
 import GatewayCollaboration from '../src/index.ts'
@@ -40,7 +40,7 @@ describe('GatewayCollaboration', () => {
       requireCurrent: () => PRINCIPAL,
       request,
       sessionCreation: () => undefined,
-    } as unknown as GatewayRuntime
+    }
     const ctx = new Context()
     ctx.provide('gatewayRuntime', runtime)
     const fiber = ctx.plugin(GatewayCollaboration)
@@ -98,7 +98,7 @@ describe('GatewayCollaboration', () => {
       sessionCreation: (sessionId: string) => sessionId === 'pending-root'
         ? Promise.resolve('creation-authorization')
         : undefined,
-    } as unknown as GatewayRuntime
+    }
     const ctx = new Context()
     ctx.provide('gatewayRuntime', runtime)
     const fiber = ctx.plugin(GatewayCollaboration)
@@ -130,7 +130,7 @@ describe('GatewayCollaboration', () => {
       requireCurrent: () => PRINCIPAL,
       request,
       sessionCreation: () => undefined,
-    } as unknown as GatewayRuntime
+    }
     const ctx = new Context()
     ctx.provide('gatewayRuntime', runtime)
     const fiber = ctx.plugin(GatewayCollaboration)
@@ -145,11 +145,12 @@ describe('GatewayCollaboration', () => {
 })
 
 it('derives scope-level capabilities without contacting the gateway', async () => {
+  const request = vi.fn()
   const runtime = {
     requireCurrent: () => PRINCIPAL,
-    request: vi.fn(),
+    request,
     sessionCreation: () => undefined,
-  } as unknown as GatewayRuntime
+  }
   const ctx = new Context()
   ctx.provide('gatewayRuntime', runtime)
   const fiber = ctx.plugin(GatewayCollaboration)
@@ -157,7 +158,7 @@ it('derives scope-level capabilities without contacting the gateway', async () =
 
   const authority = ctx.collaboration.capture()
   expect(authority.capabilities()).toEqual({ actions: ['read', 'write', 'approve'] })
-  expect(runtime.request).not.toHaveBeenCalled()
+  expect(request).not.toHaveBeenCalled()
 
   const personal = {
     ...PRINCIPAL,

@@ -321,7 +321,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId>',
-        description: 'Connect a Workspace to its reusable or freshly created blank session.',
+        description: 'Connect a Workspace to its reusable or freshly created blank session — the workspace-reconnection arm (openWorkspace fallback and draft-prepared starts); a bare New Session never lands here and always mints a fresh Session instead.',
         parameters: [{ name: 'workspaceId', description: 'target workspace.' }, { name: 'options', description: '`agentPreset` names the composition the conversation runs; omitted composes the deployment default. A reused blank runs this choice rather than its recorded preset, and a preset the roster no longer declares degrades to the default instead of failing the connect.' }],
         returns: 'the connected session id.',
       },
@@ -333,8 +333,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void',
-        description: 'The New Session flow: connect the explicit, current-Session, or recent Workspace and open the resulting session. Connect and navigation failures are non-fatal — they log and reach `onFailure` when supplied; the current view stays usable.',
-        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }, { name: 'options', description: 'draft initialization (`prompt` prefills the target Session\'s composer without sending; `clearPreviousDraft` discards its draft text first) plus `onFailure`, the observer for the rejected connect/open.' }],
+        description: 'The New Session flow: resolve the explicit, current-Session, or recent Workspace, then create a fresh Session+Agent under the current preset definition and open it. Draft-preparation options instead keep the reconnect arm (`connectWorkspace`), so the landed Session may be the Workspace\'s existing draft or blank. Connect and navigation failures are non-fatal — they log and reach `onFailure` when supplied; the current view stays usable.',
+        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }, { name: 'options', description: 'draft initialization (`prompt` prefills the target Session\'s composer without sending; `clearPreviousDraft` discards its draft text first) plus `onFailure`, the observer for the rejected connect/open. A call carrying neither draft option always creates fresh.' }],
       },
       {
         signature: 'create(input: { path: string }): Promise<WorkspaceView>',
@@ -442,6 +442,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type AssistantBlock = {\n    kind: \'text\';\n    text: string;\n} | {\n    kind: \'reasoning\';\n    text: string;\n} | {\n    kind: \'image\';\n    attachment: ImageAttachmentRef;\n} | {\n    kind: \'tool-call\';\n    callId: string;\n    name: string;\n    argsRaw: string;\n} | {\n    kind: \'other\';\n    block: unknown;\n};',
   },
   {
+    name: 'AssistantLiveChunkEvent',
+    declaration: 'export interface AssistantLiveChunkEvent {\n    readonly type: \'assistant/live-chunk\';\n    readonly seq: number;\n    readonly time: number;\n    readonly data: {\n        readonly attemptId: LlmAttemptId;\n        readonly turn: number;\n        readonly step: number;\n        readonly chunk: StreamChunk;\n    };\n}',
+  },
+  {
     name: 'AssistantMessageNode',
     declaration: 'export interface AssistantMessageNode {\n    kind: \'assistant\';\n    seq: number;\n    messageId?: MessageId;\n    time: number;\n    turn: number;\n    step: number;\n    blocks: readonly AssistantBlock[];\n    usage?: unknown;\n    providerMetadata?: AssistantProviderMetadataView;\n    requestConfig?: AssistantRequestConfig;\n    timing?: AssistantTiming;\n    interrupted?: true;\n}',
   },
@@ -486,6 +490,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ChatConversationViewNode extends ConversationViewNode {\n    readonly target: \'chat\';\n    readonly anchorSeq: number;\n    readonly location: ConversationLocation;\n    readonly visibility: \'visible\' | \'hidden\';\n}',
   },
   {
+    name: 'ChatFlowEntry',
+    declaration: 'export type ChatFlowEntry = {\n    readonly kind: \'node\';\n    readonly key: string;\n    readonly groupPart?: \'reasoning\' | \'response\';\n} | {\n    readonly kind: \'group\';\n    readonly key: string;\n};',
+  },
+  {
+    name: 'ChatGroupMember',
+    declaration: 'export interface ChatGroupMember {\n    readonly key: string;\n    readonly groupPart?: \'reasoning\' | \'response\';\n}',
+  },
+  {
+    name: 'ChatGroupSnapshot',
+    declaration: 'export interface ChatGroupSnapshot {\n    readonly key: string;\n    readonly members: readonly ChatGroupMember[];\n    readonly data: unknown;\n}',
+  },
+  {
+    name: 'ChatGroupStore',
+    declaration: 'export interface ChatGroupStore {\n    get(key: string): ChatGroupSnapshot | undefined;\n}',
+  },
+  {
     name: 'ChatLocationNodeIndex',
     declaration: 'export interface ChatLocationNodeIndex {\n    getTurn(turn: number): readonly string[];\n    getStep(turn: number, step: number): readonly string[];\n}',
   },
@@ -495,7 +515,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ChatSnapshot',
-    declaration: 'export interface ChatSnapshot {\n    readonly order: readonly string[];\n    readonly nodes: ChatNodeStore;\n    readonly locations: ChatLocationNodeIndex;\n    readonly navigation: ChatTurnNavigationIndex;\n    readonly timeline: ConversationTimelineSnapshot;\n    readonly legacy: LegacyConversationSlice;\n}',
+    declaration: 'export interface ChatSnapshot {\n    readonly order: readonly string[];\n    readonly nodes: ChatNodeStore;\n    readonly locations: ChatLocationNodeIndex;\n    readonly entries: readonly ChatFlowEntry[];\n    readonly groups: ChatGroupStore;\n    readonly navigation: ChatTurnNavigationIndex;\n    readonly timeline: ConversationTimelineSnapshot;\n    readonly legacy: LegacyConversationSlice;\n}',
   },
   {
     name: 'ChatTurnNavigationIndex',
@@ -902,8 +922,28 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionAreaProps {\n    empty?: (() => ReactNode) | undefined;\n    sessionId?: SessionIdOf;\n    children: (sessionId: SessionIdOf) => ReactNode;\n}',
   },
   {
+    name: 'SessionAssistantSettlementEntry',
+    declaration: 'export interface SessionAssistantSettlementEntry {\n    readonly type: \'event\';\n    readonly event: SessionEvent<\'assistant/message\'> | SessionEvent<\'assistant/attempt\'>;\n}',
+  },
+  {
     name: 'SessionBinding',
-    declaration: 'export interface SessionBinding {\n    readonly sessionId: SessionId;\n    readonly session: SessionFace;\n    readonly ctx: AgentContext;\n    readonly hostDescription?: HostDescriptionSource;\n}',
+    declaration: 'export interface SessionBinding {\n    readonly sessionId: SessionId;\n    readonly session: SessionFace;\n    readonly eventSource: import(\'../contract/events.ts\').SessionEventSource;\n    readonly ctx: AgentContext;\n    readonly hostDescription?: HostDescriptionSource;\n}',
+  },
+  {
+    name: 'SessionEventChange',
+    declaration: 'export type SessionEventChange = {\n    readonly kind: \'replace\';\n    readonly entries: readonly SessionEventLikeEntry[];\n} | {\n    readonly kind: \'prepend\';\n    readonly entries: readonly SessionEventLikeEntry[];\n} | {\n    readonly kind: \'append\';\n    readonly entries: readonly SessionEventLikeEntry[];\n} | {\n    readonly kind: \'settle-assistant\';\n    readonly attemptId: LlmAttemptId;\n    readonly entry?: SessionAssistantSettlementEntry;\n};',
+  },
+  {
+    name: 'SessionEventLikeEntry',
+    declaration: 'export type SessionEventLikeEntry = {\n    readonly type: \'event\';\n    readonly event: SessionEvent;\n} | {\n    readonly type: \'transient\';\n    readonly event: AssistantLiveChunkEvent;\n};',
+  },
+  {
+    name: 'SessionEventSource',
+    declaration: 'export type SessionEventSource = ObservableSnapshot<SessionEventWindow>;',
+  },
+  {
+    name: 'SessionEventWindow',
+    declaration: 'export interface SessionEventWindow {\n    readonly entries: readonly SessionEventLikeEntry[];\n    readonly hasMore: boolean;\n    readonly revision: number;\n    readonly change: SessionEventChange;\n}',
   },
   {
     name: 'SessionFace',

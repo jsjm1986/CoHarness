@@ -8,8 +8,7 @@
  */
 
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { GoalActivation, GoalId, GoalRef, GoalSnapshot, GoalView } from './types.ts'
+import type { GoalId, GoalRef, GoalSnapshot, GoalView } from './types.ts'
 
 /** Goal state-changing verbs recorded in the durable source change. */
 export type GoalOperation =
@@ -56,21 +55,6 @@ export interface GoalMessageSource {
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
     goal: GoalMessageSource
-  }
-}
-
-/** Live process-local activation update forwarded to UI clients. */
-export interface GoalActivationChanged {
-  /** Session whose live goal activation changed. */
-  readonly sessionId: SessionId
-  /** Current exact activation, absent when no goal is current. */
-  readonly goal?: {
-    /** Exact current goal identity. */
-    readonly id: GoalId
-    /** Exact current goal revision. */
-    readonly revision: number
-    /** Current process-local continuation state. */
-    readonly activation: GoalActivation
   }
 }
 
@@ -128,11 +112,5 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'goal/changed'(this: import('@deepseek-ai/dsh-scope').Scoped<Agent>, payload: { agent: Agent; change: GoalChanged }): void
-    /**
-     * Process-local goal activation changed for one session.
-     * @mode emit
-     * @param payload - session id and the exact current goal activation, or no goal after a clear.
-     */
-    'goal/activation-changed'(payload: GoalActivationChanged): void
   }
 }

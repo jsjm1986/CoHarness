@@ -1,7 +1,7 @@
 /** Test-owned sessions face: the SlotRegistry host contract over declarative fixtures. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { AttachmentIdType } from '@deepseek-ai/dsh-attachment'
-import { createScope, scopeOf, scopeIdentityOf, SessionProvideChannel, NavigationController } from '@deepseek-ai/dsh-client-runtime/client'
+import { createScope, scopeOf, scopeIdentityOf, SessionProvideChannel, NavigationController, MutableSessionEventSource } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   AgentContext, ConversationSnapshot, ISessions, ObservableSnapshot, ProjectionsFace, SessionFace, SessionId,
@@ -166,6 +166,7 @@ interface SessionRecord {
   summary: SessionSummary
   snapshot: SnapshotStore<ConversationSnapshot>
   session: FixtureSession
+  eventSource: MutableSessionEventSource
   scope: AgentContext | undefined
   scopeFiber: { dispose(): Promise<void> } | undefined
   /** Materialized standard-props bundle (identity-stable per session; invalidated on roster change). */
@@ -176,6 +177,7 @@ interface SessionRecord {
 export interface TestSessionBinding {
   readonly sessionId: SessionId
   readonly session: FixtureSession
+  readonly eventSource: MutableSessionEventSource
   readonly ctx: AgentContext
 }
 
@@ -323,6 +325,7 @@ export class TestSessions implements ISessions {
       summary,
       snapshot,
       session: new FixtureSession(id, snapshot, fixture.session ?? {}),
+      eventSource: new MutableSessionEventSource(),
       scope: undefined,
       scopeFiber: undefined,
       provideInfo: undefined,
@@ -624,7 +627,7 @@ export class TestSessions implements ISessions {
     /* v8 ignore next 2 -- bindingOf only runs for a live record, whose scope
      * always resolves; kept so a future caller cannot mint a ctx-less binding. */
     if (ctx === undefined) throw new Error(`test session "${id}" resolved no scope`)
-    return { sessionId: id, session: record.session, ctx }
+    return { sessionId: id, session: record.session, eventSource: record.eventSource, ctx }
   }
 
   private require(id: string): SessionRecord {

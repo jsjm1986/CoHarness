@@ -32,7 +32,7 @@ import {
   workspaceListRequestSchema, workspaceListValueSchema,
   workspaceRenameRequestSchema, workspaceRenameValueSchema, workspaceViewSchema,
 } from '../src/api/workspace.schema.ts'
-import { skillEntrySchema, skillListRequestSchema, skillListValueSchema } from '../src/api/skills.schema.ts'
+import { skillEntrySchema, skillGetRequestSchema, skillGetValueSchema, skillListRequestSchema, skillListValueSchema } from '../src/api/skills.schema.ts'
 import { agentPresetOpenDocumentValueSchema } from '../src/api/agent-presets.schema.ts'
 import { hostFrameSchema, muxFrameSchema, askUserQuestionItemSchema } from '../src/api/events.schema.ts'
 import { approvalRequestIdSchema, approvalResponsePayloadSchema } from '../src/api/approvals.schema.ts'
@@ -542,6 +542,17 @@ describe('skills domain schemas', () => {
     expect(() => skillEntrySchema.parse({ name: '', description: 'd', modelInvocable: true })).toThrow()
     // modelInvocable is required wire data: an entry without it fails.
     expect(() => skillEntrySchema.parse({ name: 'n', description: 'd' })).toThrow()
+  })
+  it('requires a session and name for previews and omits provider metadata', () => {
+    expect(skillGetRequestSchema.parse({ sessionId: 's1', name: 'review' }))
+      .toEqual({ sessionId: 's1', name: 'review' })
+    expect(() => skillGetRequestSchema.parse({ name: 'review' })).toThrow()
+    expect(() => skillGetRequestSchema.parse({ sessionId: 's1', name: '' })).toThrow()
+    expect(skillGetValueSchema.parse({})).toEqual({})
+    expect(skillGetValueSchema.parse({ skill: {
+      name: 'review', description: 'Review changes', contentMarkdown: '# Review\n', path: '/private/skill',
+    } })).toEqual({ skill: { name: 'review', description: 'Review changes', contentMarkdown: '# Review\n' } })
+    expect(() => skillGetValueSchema.parse({ skill: { name: 'review', description: '' } })).toThrow()
   })
 })
 

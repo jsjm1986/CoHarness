@@ -59,6 +59,8 @@ export interface Config {
   leaseMs?: number
 }
 
+type ResolvedConfig = Required<Omit<Config, 'passwordRef'>> & Pick<Config, 'passwordRef'>
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     ssh: SshConnection
@@ -154,7 +156,7 @@ export class SshConnection extends Service {
   private failure: Error | undefined
   private sockets = new Set<Socket>()
   private nextSocket = 0
-  private readonly config: Required<Config>
+  private readonly config: ResolvedConfig
   private remote: Hello | undefined
 
   constructor(ctx: Context, config: Config) {
@@ -177,7 +179,7 @@ export class SshConnection extends Service {
       maxPending: z.number().int().positive().max(128).default(SSH_CONNECTION_DEFAULTS.maxPending),
       leaseMs: z.number().int().min(3000).max(600_000).default(SSH_CONNECTION_DEFAULTS.leaseMs),
       passwordRef: z.string().refine(isCredentialRefName, 'passwordRef must be a credential reference').optional(),
-    }).strict().parse(config) as Required<Config>
+    }).strict().parse(config) as ResolvedConfig
     this.ready = this.start()
     // Startup uses Node I/O, local validation, and Error-valued RPC failures.
     void this.ready.catch((error: unknown) => { this.fail(error as Error) })

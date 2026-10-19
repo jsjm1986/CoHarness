@@ -79,7 +79,7 @@ export type {
   WorkspaceFilesApi,
 } from './workspace-files.ts'
 export type { WorkspaceChangesApi, WorkspaceReviewSummary } from './workspace-changes.ts'
-export type { SkillsApi, SkillEntry } from './skills.ts'
+export type { SkillsApi, SkillEntry, SkillPreview } from './skills.ts'
 export type { AgentPresetsApi } from './agent-presets.ts'
 export type { EventsApi, MuxFrame, HostFrame, QueuedInboxItem, SessionAssistantStreamBaseline, SessionAssistantStreamFrame, ToolCallView, ToolEventView, ToolResultView } from './events.ts'
 export type { GoalId, GoalRef } from '@deepseek-ai/dsh-goal/client'
@@ -126,5 +126,9 @@ export type { RequestPayload, ResponseValue, RpcMethodMap } from './rpc-map.ts'
 
 export { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from './client-session.ts'
 export type { ClientSessionAddress, ClientSessionKey, ClientRuntimeTarget } from './client-session.ts'
+
+// ---- Connection interaction-participation mode (install option + wire declaration) ----
+export type { ConnectionInteractions } from './interactions.ts'
+export { INTERACTIONS_HEADER, INTERACTIONS_QUERY, parseInteractions } from './interactions.ts'
 export { REMOTE_SESSION_POLICIES, registerRemoteSessionPolicy, lookupRemoteSessionPolicy, remoteSessionId, mapRemoteSessionIds } from './remote-session-routing.ts'
 export type { RemoteSessionPolicy } from './remote-session-routing.ts'

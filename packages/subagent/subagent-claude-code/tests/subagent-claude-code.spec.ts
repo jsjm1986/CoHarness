@@ -35,6 +35,7 @@ import type {
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import * as claudeCode from '../src/index.ts'
+import { parentAgent } from './agent-fixture.ts'
 import { CLAUDE_MEMBER_MODEL, CLAUDE_MEMBER_ROUTE } from '../src/member.ts'
 import {
   claudeSpawnSpec,
@@ -79,10 +80,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async importOriginal => ({
   query: queryMock,
 }))
 
-const fakeParent = {
-  id: 'parent',
-  session: { header: { cwd: process.cwd() }, append: () => {} },
-} as unknown as Agent
+const fakeParent = parentAgent(process.cwd())
 
 function request(
   prompt: ContentBlock[] = [{ type: 'text', text: 'do the task' }],
@@ -526,7 +524,7 @@ describe('task admission and package contracts', () => {
     )
     expect(manifest.dependencies).toHaveProperty(
       '@modelcontextprotocol/sdk',
-      '^1.30.0',
+      '^1.31.0',
     )
     expect(manifest.dependencies).toHaveProperty('zod', '^4.4.3')
     expect(manifest.dependencies).not.toHaveProperty('@deepseek-ai/dsh-subagent-codex')
@@ -801,10 +799,7 @@ describe('task admission and package contracts', () => {
     // the child still launches there instead of rejecting.
     const inherited = await ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
       ...request(),
-      parent: {
-        id: 'parent-without-cwd',
-        session: { header: {}, append: () => {} },
-      } as unknown as Agent,
+      parent: parentAgent(undefined, 'parent-without-cwd'),
     }))
     expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ cwd: process.cwd() }))
     await inherited.dispose()
@@ -812,10 +807,7 @@ describe('task admission and package contracts', () => {
     spawn.mockClear()
     warn.mockClear()
 
-    const invalidCwdParent = {
-      id: 'parent-with-invalid-cwd',
-      session: { header: { cwd: 'relative/SECRET_TOKEN' }, append: () => {} },
-    } as unknown as Agent
+    const invalidCwdParent = parentAgent('relative/SECRET_TOKEN', 'parent-with-invalid-cwd')
     const invalidCwd = ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
       ...request(),
       parent: invalidCwdParent,

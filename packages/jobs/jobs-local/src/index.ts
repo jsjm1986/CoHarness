@@ -9,6 +9,8 @@
  * teardown cancel force-fails only the record and reports a possible orphan.
  * @module @deepseek-ai/dsh-jobs-local
  */
+import { randomUUID } from 'node:crypto'
+
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 
 import { Context } from '@deepseek-ai/cordis'
@@ -161,7 +163,6 @@ export class LocalJobRegistry extends JobRegistry {
   /** Schemastery-defaulted pull-source poll interval. */
   private readonly pumpPollMs: number
   private store = new Map<JobId, TrackedJob>()
-  private counters = new Map<string, number>()
   /**
    * Controllers and scoped subscriptions layered by the scope that registered
    * them, in the tools-registry shape: a contribution files into its
@@ -226,13 +227,15 @@ export class LocalJobRegistry extends JobRegistry {
       )
     }
 
-    // The id is issued before the starter runs so the producer face can carry
-    // it; a throwing starter still leaves nothing registered — its ordinal is
-    // simply skipped.
+    // The producer face carries the same short-UUID identity as controls and
+    // lifecycle events. The mint precedes the starter, so a throwing starter
+    // still leaves nothing registered; a collision retries while this registry
+    // still holds an earlier id.
     const executionScope = owner === undefined ? undefined : executionAuthorityOf(this.ctx)?.capture(owner)
-    const count = (this.counters.get(spec.kind) ?? 0) + 1
-    this.counters.set(spec.kind, count)
-    const id = JobId(`${spec.kind}-${count}`)
+    let id: JobId
+    do {
+      id = JobId(`${spec.kind}-${randomUUID().replaceAll('-', '').slice(0, 16)}`)
+    } while (this.store.has(id))
     const ring = new OutputRing()
     const state: ProducerState = { progress: undefined, job: undefined }
     const handle: JobHandle = {

@@ -119,7 +119,7 @@ describe('serialized conversation updates', () => {
         { role: 'system', content: [{ type: 'text', text: 'full updated prompt' }] },
         { role: 'system', content: [
           { type: 'text', text: 'Instruction one.\nInstruction two.' },
-          { type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) } },
+          { type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) as object } },
         ] },
       ],
       tools: [
@@ -141,7 +141,7 @@ describe('serialized conversation updates', () => {
         { role: 'user', content: 'first' },
         { role: 'system', content: [
           { type: 'text', text: 'Instruction one.\nInstruction two.' },
-          { type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) } },
+          { type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) as object } },
         ] },
       ],
     })
@@ -240,7 +240,7 @@ describe('historical tool availability on the wire', () => {
     expect(requests[0]).toMatchObject({ messages: [
       { role: 'user', content: 'first' }, { role: 'user', content: 'restore' },
       { role: 'system', content: [{ type: 'tool_removal', tool: { type: 'tool_reference', name: 'search' } }] },
-      { role: 'system', content: [{ type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) } }] },
+      { role: 'system', content: [{ type: 'tool_addition', tool: { type: 'tool_definition', definition: expect.objectContaining({ name: 'search' }) as object } }] },
     ] })
   })
 

@@ -44,6 +44,7 @@
     "@deepseek-ai/dsh-api-remotes": "workspace:*",
     "@deepseek-ai/dsh-app-boot": "workspace:*",
     "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-client-file-upload": "workspace:*",
     "@deepseek-ai/dsh-client-hmr": "workspace:*",
     "@deepseek-ai/dsh-client-locale": "workspace:*",
     "@deepseek-ai/dsh-client-modules": "workspace:*",
@@ -75,6 +76,7 @@
     "@deepseek-ai/dsh-client-ui-settings": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-general": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-models": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-settings-plugin-inventory": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-plugins": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-unarchive-sessions": "workspace:*",
     "@deepseek-ai/dsh-client-ui-shortcuts": "workspace:*",
@@ -128,6 +130,7 @@
     "@deepseek-ai/dsh-office-to-pdf": "workspace:*",
     "@deepseek-ai/dsh-api-terminal-controller": "workspace:*",
     "@deepseek-ai/dsh-client-ui-sidebar-terminal": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-sidebar-files": "workspace:*",
     "@deepseek-ai/dsh-harness-dev-context": "workspace:*"
   },
   "peerDependencies": {

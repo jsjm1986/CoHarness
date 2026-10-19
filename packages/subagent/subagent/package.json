@@ -144,6 +144,7 @@
     "@deepseek-ai/dsh-storage": "workspace:*",
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
     "@deepseek-ai/dsh-storage-json": "workspace:*",
+    "@deepseek-ai/dsh-tool-schedule": "workspace:*",
     "@deepseek-ai/dsh-subagent-fork-in-process": "workspace:*",
     "@deepseek-ai/dsh-subagent-in-process-driver": "workspace:*",
     "@deepseek-ai/dsh-subagent-spawn-in-process": "workspace:*",

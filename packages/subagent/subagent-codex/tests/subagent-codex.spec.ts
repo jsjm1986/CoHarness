@@ -29,6 +29,7 @@ import {
 } from '../src/run.ts'
 import { CodexAppServerWire } from '../src/wire.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { parentAgent } from './agent-fixture.ts'
 
 const { hostStderrWrite } = vi.hoisted(() => ({
   hostStderrWrite: {
@@ -74,10 +75,7 @@ const CODEX_PLATFORM_PACKAGES = [
   '@openai/codex-win32-x64',
 ] as const
 
-const fakeParent = {
-  id: 'parent',
-  session: { header: { cwd: process.cwd() }, append: () => {} },
-} as unknown as Agent
+const fakeParent = parentAgent(process.cwd())
 
 function request(
   prompt: ContentBlock[] = [{ type: 'text', text: 'do the task' }],
@@ -753,10 +751,7 @@ describe('task admission and package contracts', () => {
 
     const starting = ctx.subagents.start('codex', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],
-      parent: {
-        id: 'parent-without-cwd',
-        session: { header: {}, append: () => {} },
-      } as unknown as Agent,
+      parent: parentAgent(undefined, 'parent-without-cwd'),
       signal: new AbortController().signal,
     }))
     const initialize = await child.peer.nextMethod('initialize')
@@ -2195,10 +2190,7 @@ describe('run lifecycle and quiescence', () => {
       disposeGraceMs: 25,
     })
 
-    const invalidCwdParent = {
-      id: 'parent-with-invalid-cwd',
-      session: { header: { cwd: 'relative/SECRET_TOKEN' }, append: () => {} },
-    } as unknown as Agent
+    const invalidCwdParent = parentAgent('relative/SECRET_TOKEN', 'parent-with-invalid-cwd')
     const invalidCwdError: unknown = await ctx.subagents.start('codex-diagnostic', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],
       parent: invalidCwdParent,

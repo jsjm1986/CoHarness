@@ -28,7 +28,7 @@ const [
   { Context },
   agentCore,
   { default: SubagentRuntime },
-  { default: JsonlSessionPersistence },
+  JsonlSessionPersistence,
   { HarnessSdkJsonRpcServer },
   { SessionId },
   { provideWorkingDirectoryFixture },

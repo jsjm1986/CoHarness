@@ -1445,10 +1445,23 @@ it.each([
   new LlmError('missing credential', 'MISSING_CREDENTIAL'),
   new LlmError('invalid credential', 'INVALID_CREDENTIAL'),
   new Error('credential storage failed'),
-])('retains its configured catalog independently of credential failures: $message', async (error) => {
+])('distinguishes missing credentials from catalog failures: $message', async (error) => {
   const adapter = new PiAiAdapter({
     profiles: () => resolveProfiles({ deepseek: { apiKeyEnv: 'PI_TEST_KEY' } }),
     resolveApiKey: () => Promise.reject(error),
+    auth: memoryAuth(),
+  })
+  if (error instanceof LlmError && error.code === 'MISSING_CREDENTIAL') {
+    expect(await adapter.listModels('deepseek')).toEqual([])
+  } else await expect(adapter.listModels('deepseek')).rejects.toBe(error)
+})
+
+it('keeps its configured catalog for a route naming no credential', async () => {
+  const adapter = new PiAiAdapter({
+    profiles: () => resolveProfiles({ deepseek: {} }),
+    // The plugin resolves `undefined` for a profile without apiKeyEnv: pi-ai's
+    // own auth owns the route, and the catalog stays offered.
+    resolveApiKey: () => Promise.resolve(undefined),
     auth: memoryAuth(),
   })
   expect(await adapter.listModels('deepseek')).not.toHaveLength(0)

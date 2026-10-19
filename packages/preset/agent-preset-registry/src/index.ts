@@ -850,7 +850,7 @@ export class AgentPresetRegistry extends TypertRemoteService {
    * @returns preset ids with the plugins their trees activated.
    */
   async inspectCompositions(ctx?: Context): Promise<AgentPresetInspection[]> {
-    const report = async (mount: PresetMount): Promise<AgentPresetInspection> => ({
+    const report = (mount: PresetMount): Promise<AgentPresetInspection> => Promise.resolve({
       id: mount.presetId,
       modules: mount.tree !== undefined ? activeCompositionModules(mount.tree) : [],
       leakedServices: leakedServices(mount.fiber.ctx, mount.fiber),

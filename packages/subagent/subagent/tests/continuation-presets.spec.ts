@@ -15,7 +15,7 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import AgentPresetRegistry, { UnknownPresetError } from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { queueHostSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
@@ -313,7 +313,7 @@ describe('continuable child presets', () => {
 
     await expect(continueChild(ctx, parent, started.childId)).rejects.toMatchObject({
       code: 'NOT_RESUMABLE',
-      cause: failure === 'missing' ? expect.any(UnknownPresetError) : expect.any(Error),
+      cause: (failure === 'missing' ? expect.any(UnknownPresetError) : expect.any(Error)) as Error,
     })
     const stored = await settled(ctx, started.childId)
     expect(adapter.requests).toHaveLength(1)

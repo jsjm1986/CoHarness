@@ -48,8 +48,9 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
-   * Connect a workspace to its reusable/new blank session (recorded). The
-   * default resolves the workspace id back as the session id; stub for
+   * Connect a workspace to its reusable/new blank session (recorded) — the
+   * reconnection arm; a bare `startSession` mints fresh and never lands here.
+   * The default resolves the workspace id back as the session id; stub for
    * cross-session flows.
    * @param workspaceId - target workspace.
    * @param options - `agentPreset` names the composition the conversation runs.
@@ -77,7 +78,9 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
-   * New-session flow (recorded; stubbed behavior runs when installed).
+   * New-session flow (recorded; stubbed behavior runs when installed). A call
+   * without draft options mints a fresh Session+Agent on the real service;
+   * draft options ride the reconnect arm.
    * @param workspaceId - optional explicit workspace target.
    * @param options - draft initialization and failure observer for the landed Session.
    */

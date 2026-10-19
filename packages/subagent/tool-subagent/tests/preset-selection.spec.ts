@@ -58,9 +58,9 @@ async function setup(config: Omit<tool.Config, 'provider'>, providerConfig: Part
   const presets = new Map<string, () => void>()
   for (const id of ['writer', 'reviewer']) {
     registerPreset(presetsRoot, { id, description: `${id} persona`, plugins: [] })
-    presets.set(id, () => rmSync(join(presetsRoot, id), { recursive: true, force: true }))
+    presets.set(id, () => { rmSync(join(presetsRoot, id), { recursive: true, force: true }) })
   }
-  await mountWorkingDirectoryFixture(ctx)
+  mountWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   const onStart = vi.fn()
   const provider = await mountScriptedProvider(ctx, {
@@ -72,7 +72,7 @@ async function setup(config: Omit<tool.Config, 'provider'>, providerConfig: Part
     config: { provider: 'custom-spawn', ...config },
   }])
   for (const entry of ctx.loader.entries()) await entry.fiber?.await()
-  return { ctx, onStart, provider, presets, register: (spec: PresetSpec) => registerPreset(presetsRoot, spec) }
+  return { ctx, onStart, provider, presets, register: (spec: PresetSpec) => { registerPreset(presetsRoot, spec) } }
 }
 
 const args = { description: 'review task', prompt: 'Review this change.' }

@@ -53,7 +53,7 @@ interface FakeChokidar {
   __instances: Array<{
     path: string
     options: { awaitWriteFinish: { stabilityThreshold: number; pollInterval: number } }
-    watcher: import('node:events').EventEmitter
+    watcher: import('node:events').EventEmitter & { close: () => Promise<void> }
   }>
 }
 
@@ -125,6 +125,29 @@ describe('watcher pipeline', () => {
     // The warn-and-keep path is asynchronous; give the serialized refresh a turn.
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'good', source: 'file' })
+  })
+
+  it('contains a watcher error emitted after close removed its listeners', async () => {
+    const dir = await tempDir()
+    const path = join(dir, '.credentials.yaml')
+    const ctx = new Context()
+    const fiber = ctx.plugin(LocalCredentialProvider, { path, debounceMs: 5 })
+    await fiber
+    const [instance] = await fakeInstances()
+    // The real close() drops every listener while a scheduled write-settle poll
+    // survives it; that straggler stats the document teardown is deleting,
+    // which Windows reports as EPERM. Without a listener the emitter rethrows
+    // the error as an uncaught exception and takes an unrelated test file down.
+    instance!.watcher.close = vi.fn(() => {
+      instance!.watcher.removeAllListeners()
+      return Promise.resolve()
+    })
+    await fiber.dispose()
+
+    expect(() => instance!.watcher.emit('error', Object.assign(
+      new Error("EPERM: operation not permitted, stat 'C:\\Temp\\dsh\\.credentials.yaml'"),
+      { code: 'EPERM', syscall: 'stat' },
+    ))).not.toThrow()
   })
 
   it('keeps the last good snapshot when the read fails after its permission check', async () => {

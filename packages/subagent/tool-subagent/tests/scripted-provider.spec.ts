@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { type Agent } from '@deepseek-ai/dsh-agent'
 import SubagentRuntime, { snapshotSubagentDescriptor, type ResolvedSubagentStartRequest, type SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
-import { SessionId } from '@deepseek-ai/dsh-session'
 import * as scripted from './scripted-provider.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { parentAgent } from './agent-fixture.ts'
 
 /** A minimal parent; the scripted provider only reads its id. */
 function fakeParent(id = 'parent-1'): Agent {
-  return { id: SessionId(id), session: { header: {}, append: () => {} } } as unknown as Agent
+  return parentAgent(undefined, id)
 }
 
 function baseRequest(over: Partial<SubagentStartRequest> = {}): SubagentStartRequest {

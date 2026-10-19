@@ -11,7 +11,9 @@ The model-facing `ralph` tool runs a fixed foreground workflow that gives one im
 
 ## Summary
 
-`ralph` runs a foreground sequence of fresh child agents against one immutable objective, with each round receiving only the previous bounded report and shared workspace state. It returns when a worker reports completion or a concrete blocker, or when the configured round limit is reached; those reports are not independently verified. Parent conversation and prior child sessions are never copied into a new round. Use it only when the direct human explicitly requests Ralph-style fresh-agent iteration; use goal tools for ordinary long-running work and subagents or workflows for bounded delegation.
+`ralph` runs a foreground sequence of fresh child agents on one immutable objective; each round receives only the previous bounded report and shared workspace state. It returns on a worker's completion or blocker report, or at the configured round limit; reports are not independently verified. Use it only when the direct human explicitly requests Ralph-style fresh-agent iteration.
+
+Shipped compositions mount this plugin with `disabled: true`, so `ralph` does not appear in a default agent's tools or system prompt. Enabling it is an explicit opt-in: remove `disabled` from the `tool-ralph` row through a composition patch or a preset fork.
 
 ## Table of Contents
 
