@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { SubprocessSpawnSpec, SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
 import LocalSubprocessRuntime from '../src/index.ts'
@@ -10,7 +10,8 @@ import { launchLinuxScope, probeLinuxScope } from '../src/linux-scope.ts'
 import { targetEnvironment } from '../src/runner-launch.ts'
 import { bindManagedProcess } from '../src/spawn.ts'
 
-let scratch: string
+const scratch = mkdtempSync(join(tmpdir(), 'dsh-native-containment-'))
+afterAll(() => { rmSync(scratch, { recursive: true, force: true }) })
 
 function spec(argv: string[], graceMs = 100): SubprocessSpawnSpec {
   return {
@@ -140,15 +141,10 @@ async function waitForInputReadiness(handle: SubprocessTerminalHandle): Promise<
   throw new Error(`terminal ${String(handle.pid)} never became input-ready`)
 }
 
-const linuxNative = process.platform === 'linux' && probeLinuxScope()
+const literalArgv = process.platform === 'linux' ? probeLinuxScope() : undefined
 
-describe.skipIf(!linuxNative)('Linux user-systemd native containment', () => {
-  beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'dsh-native-containment-'))
-  })
-  afterAll(() => {
-    if (scratch) rmSync(scratch, { recursive: true, force: true })
-  })
+describe.skipIf(literalArgv === undefined)('Linux user-systemd native containment', () => {
+  const scopeOptions = literalArgv ?? []
 
   it('aborts an established scope before bootstrap consumption and joins its managed handle', async () => {
     const controller = new AbortController()
@@ -157,7 +153,7 @@ describe.skipIf(!linuxNative)('Linux user-systemd native containment', () => {
       signal: controller.signal,
       stdio: { stdin: 'pipe', stdout: { maxBytes: 1_024 }, stderr: { maxBytes: 1_024 } },
     }
-    const handle = bindManagedProcess(request, launchLinuxScope(request, targetEnvironment(request), {
+    const handle = bindManagedProcess(request, launchLinuxScope(request, targetEnvironment(request), scopeOptions, {
       runnerInvocation: [process.execPath, join(import.meta.dirname, 'fixtures/hold-linux-bootstrap.ts')],
     }))
     try {
@@ -179,7 +175,7 @@ describe.skipIf(!linuxNative)('Linux user-systemd native containment', () => {
     const pidFile = join(scratch, `setsid-${Date.now()}.pid`)
     const command = `setsid sh -c 'echo $$ > "$1"; trap "" TERM; while :; do sleep 60; done' sh ${JSON.stringify(pidFile)} & wait`
     const request = spec(['bash', '-c', command], 80)
-    const handle = bindManagedProcess(request, launchLinuxScope(request, targetEnvironment(request)))
+    const handle = bindManagedProcess(request, launchLinuxScope(request, targetEnvironment(request), scopeOptions))
     let descendant: number | undefined
     try {
       descendant = await waitForPid(pidFile)
@@ -200,7 +196,7 @@ describe.skipIf(!linuxNative)('Linux user-systemd native containment', () => {
     const missingArgv = [`missing-native-target-${Date.now()}`, 'literal arg']
     const expectedMissing = await directSpawnFailure(missingArgv)
     const missing = spec(missingArgv)
-    const missingHandle = bindManagedProcess(missing, launchLinuxScope(missing, targetEnvironment(missing)))
+    const missingHandle = bindManagedProcess(missing, launchLinuxScope(missing, targetEnvironment(missing), scopeOptions))
     await expect(missingHandle.done).rejects.toMatchObject({
       name: expectedMissing.name,
       message: expectedMissing.message,
@@ -215,7 +211,7 @@ describe.skipIf(!linuxNative)('Linux user-systemd native containment', () => {
     const deniedArgv = [deniedPath, 'literal arg']
     const expectedDenied = await directSpawnFailure(deniedArgv)
     const denied = spec(deniedArgv)
-    const deniedHandle = bindManagedProcess(denied, launchLinuxScope(denied, targetEnvironment(denied)))
+    const deniedHandle = bindManagedProcess(denied, launchLinuxScope(denied, targetEnvironment(denied), scopeOptions))
     await expect(deniedHandle.done).rejects.toMatchObject({
       name: expectedDenied.name,
       message: expectedDenied.message,

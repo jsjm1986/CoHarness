@@ -27,6 +27,9 @@ kind: "package-library"
 它是**库，不是服务也不是插件**：无 `ctx`、不注册任何东西、不持有状态。
 
 在接收时区的那个边界上调用它，让值在进入任何持久物之前先过一遍。不可用的名称回答 `undefined`，由调用方抛出自己的拒绝——Session prompt 用 `session/invalid-time-zone`，subagent 续话用 `subagent/invalid-time-zone`。
+不发布运行时不变量伴生入口；这个纯工具不拥有事件流或可变运行时数据，时区规范化由单元测试验证。
+
+在接收时区的那个边界上调用它，让值在进入任何持久物之前先过一遍。不可用的名称回答 `undefined`，由调用方抛出自己的拒绝——Session 提示词用 `session/invalid-time-zone`，subagent 续话用 `subagent/invalid-time-zone`。
 
 -----
 
@@ -41,8 +44,8 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 |---|---|
 | `canonicalClientTimeZone(value)` | 对接受的时区回答规范的 `UTC` 或 IANA `Area/Location` 名称；空串、带空白、缩写、单段或平台不支持的名称回答 `undefined`。 |
 
-<a id="model-experience"></a>
 
+<a id="model-experience"></a>
 ## 模型体验
 
 间接影响，取决于把规范时区记到持久消息上的那个消费方——`dsh-time-context` 据此渲染该轮模型可见的时区指令与时间戳。
@@ -68,5 +71,3 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 无。
 
 </details>
-
-<a id="model-experience"></a>

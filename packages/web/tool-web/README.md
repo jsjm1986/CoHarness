@@ -65,6 +65,7 @@ Tool registration follows product **enablement**, not backend availability. A to
 
 The tool never calls a provider's `available()` and never enumerates providers — its only execution path is `ctx.web.search()` / `ctx.web.fetch()`, and provider unavailability reaches it as the structured `WebError` codes selection throws at execution time. Provider selection stays entirely inside the seam, with one owner.
 
+
 <a id="model-experience"></a>
 ## Model Experience
 

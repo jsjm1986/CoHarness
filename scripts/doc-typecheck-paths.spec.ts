@@ -8,6 +8,9 @@ describe('builtDeclarationPath', () => {
       .toBe('./packages/core/session/lib/types/index.d.ts')
     expect(builtDeclarationPath('./packages/core/session/src/types.ts'))
       .toBe('./packages/core/session/lib/types/types.d.ts')
+    expect(builtDeclarationPath('./packages/experimental/claude-code-mods/examples/*'))
+      .toBe('./packages/experimental/claude-code-mods/examples/*')
+
   })
 
   it('rejects aliases without a supported source target', () => {

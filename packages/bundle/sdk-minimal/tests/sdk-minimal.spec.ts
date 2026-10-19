@@ -38,6 +38,10 @@ describe('dsh-sdk-minimal bundle', () => {
       ['tool-fs', '@deepseek-ai/dsh-tool-fs'],
       ['working-directory', '@deepseek-ai/dsh-working-directory'],
       ['tool-working-directory', '@deepseek-ai/dsh-tool-working-directory'],
+
+      ['attachment-local', '@deepseek-ai/dsh-attachment-local'],
+      ['tool-fs', '@deepseek-ai/dsh-tool-fs'],
+
       ['session-projection', '@deepseek-ai/dsh-session-projection'],
       ['token-meter', '@deepseek-ai/dsh-token-meter'],
       ['compaction-basic', '@deepseek-ai/dsh-compaction-basic'],
@@ -78,6 +82,8 @@ describe('dsh-sdk-minimal bundle', () => {
       personaPrefix: { __jsExpr: "process.env.DSH_SYSTEM_PROMPT ?? 'You are a helpful software engineer assistant.'" },
     })
     expect(rows.find(row => row.id === 'agent-loop')?.config).toEqual({ agents: [] })
+    expect(rows.find(row => row.id === 'tool-fs')?.config).toEqual({ read: false, readImage: true, write: false, edit: false })
+    expect(rows.find(row => row.id === 'compaction-basic')?.config).toBeUndefined()
     expect(rows.find(row => row.id === 'terminal-bash')).toMatchObject({
       disabled: { __jsExpr: "process.platform === 'win32'" },
     })

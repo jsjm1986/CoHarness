@@ -1,10 +1,7 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
-# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/launch-environment/README.md
-document:
-  en: 8c772cc8b972b3c05f8c8d9e61067b855d30d632
-  zh: b61e68ec193d2415708ce7a1afad31999fbf26cb
 /:
   en: 1929293fd2056315
   zh: 0a51af1cad6486b4
@@ -15,11 +12,26 @@ document:
   en: 45f36a3eceabaab0
   zh: 2ec9ea17a592aa7a
 /dsh-launch-environment/table-of-contents:
-  en: f8677a5cfcb80c57
-  zh: daadd1368b89ca36
+  en: a21fd63e81311e12
+  zh: eef655f6b908892a
 /dsh-launch-environment/resolving:
-  en: d70011e1840de975
-  zh: fe21aa7a1c97a8f3
+  en: 56ff8e9cafdb4b60
+  zh: cd848b4553e7f484
+/dsh-launch-environment/resolving/how-layers-rank:
+  en: ed6c00ea45dbd45d
+  zh: 2a0d5fb2bb68c357
+/dsh-launch-environment/resolving/when-no-launcher-booted-the-tree:
+  en: 3c368938c6960588
+  zh: c998ca6c64db98b9
+/dsh-launch-environment/understand-the-implementation:
+  en: c2cdb9ea66c61cc5
+  zh: 92ac052d4a7dfdbd
+/dsh-launch-environment/understand-the-implementation/source-map:
+  en: cde61faac5212951
+  zh: a919930fd908938a
+/dsh-launch-environment/further-exploration:
+  en: dc23396ea624f461
+  zh: 39d7560bb17a7f61
 /dsh-launch-environment/known-limitations-and-deferred-work:
   en: 3e9f21ca302a08e8
   zh: 79d90ad3b38c88ff
