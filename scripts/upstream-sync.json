@@ -48,7 +48,7 @@
       "sovereignty": "tracked"
     },
     "boot/hmr": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "boot/plugin-manager": {
       "sovereignty": "adapted",
@@ -395,7 +395,7 @@
       "sovereignty": "tracked"
     },
     "compaction/compaction-image-offload": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "compaction/compaction-tool-result-pruner": {
@@ -425,7 +425,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.md"
     },
     "context/file-reference": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "context/file-reference-local": {
       "sovereignty": "adapted"
@@ -521,11 +521,11 @@
       "sovereignty": "adapted"
     },
     "experimental/browser-use-chrome-devtools-mcp": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "experimental/browser-use-playwright-mcp": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "experimental/browser-use-runtime": {
@@ -560,7 +560,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "experimental/speech-to-text-sensevoice": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "experimental/tool-agent-team": {
@@ -758,11 +758,11 @@
       "sovereignty": "tracked"
     },
     "ptc-runtime/ptc-runtime": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "ptc-runtime/ptc-runtime-node": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "runtime-diagnostics/invariants": {
       "sovereignty": "owned",
@@ -875,11 +875,11 @@
       "sovereignty": "adapted"
     },
     "session/session-title-first-prompt-llm": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "session/session-title-llm": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "session/session-turn-outline": {
       "sovereignty": "tracked"
@@ -942,14 +942,14 @@
       "sovereignty": "adapted"
     },
     "skill/skill-office": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "skill/tool-skill": {
       "sovereignty": "adapted"
     },
     "skill/tool-workspace-dependencies": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "spill/spill": {
@@ -1047,7 +1047,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "test-support/llm-mock-server": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "test-support/llm-replay": {
@@ -1066,7 +1066,7 @@
       "sovereignty": "adapted"
     },
     "typert/generator": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "typert/loader": {
       "sovereignty": "adapted"
@@ -1096,7 +1096,7 @@
       "sovereignty": "tracked"
     },
     "util/home-paths": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "util/http-proxy": {
@@ -1119,7 +1119,7 @@
       "sovereignty": "adapted"
     },
     "util/package-manifest": {
-      "sovereignty": "adapted",
+      "sovereignty": "tracked",
       "note": ".agents/notes/archived/architecture/2026-09-05-package-manifest-types.md"
     },
     "util/time": {
@@ -1179,7 +1179,7 @@
       "sovereignty": "adapted"
     },
     "api/account-controller": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "api/job-controller": {
       "sovereignty": "adapted"
@@ -1194,22 +1194,22 @@
       "sovereignty": "adapted"
     },
     "boot/config-editor": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "credentials/deepseek-account": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "credentials/deepseek-account-platform": {
       "sovereignty": "adapted"
     },
     "host/product-telemetry-otel": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "llm/llm-deepseek-account": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "telemetry/otel": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/hook-protocol": {
       "sovereignty": "adapted"
@@ -1224,25 +1224,25 @@
       "sovereignty": "adapted"
     },
     "experimental/session-title-all-prompts-llm": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/badge-skill-bundle": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/ralph-bundle": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/terminal-bundle": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/session-titles-bundle": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "context/harness-dev-context": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/claude-code-mods": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/client-ui-claude-code-mods": {
       "sovereignty": "adapted"
@@ -1251,19 +1251,19 @@
       "sovereignty": "adapted"
     },
     "experimental/cua-macos": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/session-search": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "experimental/translator": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "ssh/ssh-helper-runtime": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "web/web-deepseek-api": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     }
   },
   "upstreamOnly": [
