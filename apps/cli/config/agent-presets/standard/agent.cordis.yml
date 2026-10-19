@@ -234,8 +234,11 @@
     - id: tool-workflow
       name: '@deepseek-ai/dsh-tool-workflow'
 
+    # Mounted but disabled by default; a preset fork or deployment patch
+    # enables Ralph by removing `disabled`.
     - id: tool-ralph
       name: '@deepseek-ai/dsh-tool-ralph'
+      disabled: true
       config:
         subagentProvider: spawn
         maxRounds: 64

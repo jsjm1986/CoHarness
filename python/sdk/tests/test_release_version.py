@@ -168,7 +168,7 @@ def test_stage_runtime_copies_platform_payload(
         if path.is_file()
     } == expected
     assert (runtime_dir / office.name / office_asset.relative_to(office)).read_bytes() == b"office data"
-    assert (runtime_dir / resources.name / resource.relative_to(resources)).read_text() == "checker"
+    assert (runtime_dir / resources.name / resource.relative_to(resources)).read_text() == "# office-docx"
     pyproject = (destination / "pyproject.toml").read_text()
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]' in pyproject

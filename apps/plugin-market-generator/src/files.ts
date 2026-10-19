@@ -45,7 +45,7 @@ export interface FileEntry {
  * relative to the tree root `''`; symbolic links, submodules, and directories without files do not exist.
  */
 /** Largest manifest, locale, or workspace file read, in bytes. */
-export const MAX_TEXT_FILE_BYTES = 1024 * 1024
+const MAX_TEXT_FILE_BYTES = 1024 * 1024
 
 export class PackageFiles {
   readonly #files: ReadonlyMap<string, FileEntry>

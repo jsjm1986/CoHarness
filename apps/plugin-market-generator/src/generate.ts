@@ -10,7 +10,7 @@ import { dshRange, findBundlePackages, isBundle, readManifest, type Manifest } f
 import type { Source } from './sources.ts'
 
 /** One generated version, in the field order of the format. */
-export interface GeneratedVersion {
+interface GeneratedVersion {
   readonly version: string
   readonly publishTimestamp: number
   readonly source: Readonly<Record<string, string>>
@@ -18,7 +18,7 @@ export interface GeneratedVersion {
 }
 
 /** One generated plugin, in the field order of the format. */
-export interface GeneratedEntry extends Display {
+interface GeneratedEntry extends Display {
   readonly name: string
   readonly versions: readonly GeneratedVersion[]
 }

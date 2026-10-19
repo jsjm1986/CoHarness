@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "include": [
     "../apps/web/tests/plugin-administration.e2e.ts",
-    "../apps/web/tests/admin-form-values.e2e.ts"
+    "../apps/web/tests/admin-form-values.e2e.ts",
+    "../apps/web/tests/admin-layout.e2e.ts"
   ]
 }

@@ -9,6 +9,7 @@ export {
 } from '../../../packages/client/ui-primitives/src/icons/index.tsx'
 
 export { Input } from '../../../packages/client/ui-primitives/src/Input.tsx'
+export { SegmentedTabs, type SegmentedTab } from '../../../packages/client/ui-primitives/src/SegmentedTabs.tsx'
 export { StateDot, type StateDotState } from '../../../packages/client/ui-primitives/src/StateDot.tsx'
 export { Switch } from '../../../packages/client/ui-primitives/src/Switch.tsx'
 export { Tag } from '../../../packages/client/ui-primitives/src/Tag.tsx'
