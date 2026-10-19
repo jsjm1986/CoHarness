@@ -63,6 +63,7 @@ export type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 export type {} from '@deepseek-ai/dsh-command-feedback/types'
 export type {} from '@deepseek-ai/dsh-collaboration/types'
 export type {} from '@deepseek-ai/dsh-permission-presets/types'
+export type {} from '@deepseek-ai/dsh-goal/client'
 export type {} from '@deepseek-ai/dsh-schedule/client'
 export type {} from '@deepseek-ai/dsh-settings/types'
 
@@ -80,7 +81,7 @@ export type {
   MuxFrame, PromptContentPart, QuestionResponsePayload, QueueAction, RpcError, RpcId, RpcReceipt,
   RpcRequest, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionDraftId, SessionId, SessionModels, SessionSearchItem,
-  SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, StreamChunk,
+  SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, SkillPreview, StreamChunk,
   SubagentAddress, SubagentCatalog, SubagentPromptContentPart,
   JobView, JobsApi, JobChannel, JobKillValue, JobOutputChunk, JobOutputCoords, JobOutputValue,
   ToolCallView, ToolEventView, ToolResultView,

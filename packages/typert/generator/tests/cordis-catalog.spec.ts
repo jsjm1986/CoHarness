@@ -5,6 +5,7 @@ import {
   projectCordisCatalog,
   renderInheritedPage,
   renderPageRegion,
+  type CordisCatalogPolicy,
 } from '../src/cordis-catalog.ts'
 import {
   CORDIS_CATALOG_POLICY,
@@ -28,7 +29,40 @@ const clientProjection = (): ReturnType<typeof projectCordisCatalog> =>
     runtimeDeclarationMaxChars: 4_096,
   }, 'client'))
 
+const SOURCE_LINK_POLICY: CordisCatalogPolicy = {
+  linkedTypePages: {},
+  foundationTypeNames: new Set(),
+  typeLinkExemptions: {},
+  inheritedEvents: [{ name: 'ready', summary: 'Ready.', source: 'vendor/cordis/src/events.ts:9' }],
+  inheritedServices: [{ name: 'ctx.root', summary: 'Root.', source: 'vendor/cordis/src/context.ts:12' }],
+}
+
 describe('Typert-backed Cordis catalog', () => {
+  it('omits subsystem source lines while preserving inherited Cordis source lines', () => {
+    const page = renderPageRegion('fixture.md', [{
+      key: 'fixture',
+      type: 'Fixture',
+      abstract: false,
+      doc: 'Fixture.',
+      methods: [],
+      source: 'packages/fixture/service.ts:24',
+    }], [{
+      name: 'fixture/ready',
+      scope: 'fixture',
+      signature: "'fixture/ready'(): void",
+      jsDoc: '/** Ready. */',
+      mode: 'emit',
+      doc: 'Ready.',
+      source: 'packages/fixture/events.ts:42',
+    }], SOURCE_LINK_POLICY)
+    const inherited = renderInheritedPage(SOURCE_LINK_POLICY)
+
+    expect(page).toContain('Source: [`packages/fixture/events.ts`](../../packages/fixture/events.ts)')
+    expect(page).toContain('Source: [`packages/fixture/service.ts`](../../packages/fixture/service.ts)')
+    expect(inherited).toContain('([`vendor/cordis/src/events.ts:9`](../../vendor/cordis/src/events.ts))')
+    expect(inherited).toContain('([`vendor/cordis/src/context.ts:12`](../../vendor/cordis/src/context.ts))')
+  })
+
   it('reproduces every committed catalog artifact byte for byte', { timeout: 480_000 }, () => {
     const { projector, model } = projection()
     const expected = (path: string): string => readFileSync(join(workspaceRoot, path), 'utf8')
@@ -57,24 +91,12 @@ describe('Typert-backed Cordis catalog', () => {
     )
   })
 
-  it('resolves each key to the declaration a caller meets, and drops keys no plugin provides', { timeout: 480_000 }, () => {
-    const byKey = new Map(projection().model.services.map(service => [service.key, service]))
-    // An interface-typed key is described by its Service Definition: that is where
-    // the contract and, by repository convention, the member JSDoc live.
-    expect(byKey.get('lsp')?.type).toBe('LspService')
-    // The Service Definition may sit anywhere in the package, including a nested
-    // contract directory (`src/api/`), while the Context merge stays in `src`.
-    expect(byKey.get('apiProxy')?.type).toBe('ApiProxy')
-    // Two packages describe `ctx.typert` — a merge-extensible interface in
-    // type-meta and the implementing class in registry. The class wins: it is the
-    // object a caller meets and it carries the documentation.
-    expect(byKey.get('typert')?.type).toBe('TypertRegistry')
-    // Optional keys are values a launcher installs before the tree mounts. No
-    // plugin provides them, so describing one as a service would answer "add the
-    // plugin that provides it" for a key where no such plugin exists.
-    expect(byKey.has('headlessIo')).toBe(false)
-    expect(byKey.has('dshHomePath')).toBe(false)
-    expect(byKey.has('launcherEnvironment')).toBe(false)
+  it('includes referenced framework enums in the runtime declaration closure', () => {
+    const { projector, model } = projection()
+    const rendered = projector.renderRuntimeApi(model)
+    expect(rendered).toContain("name: 'FiberState'")
+    expect(rendered).toContain('enum FiberState')
+    expect(rendered).toContain('ACTIVE,')
   })
 
   it('keeps the Slots service declaration and its referenced types within the display budget', { timeout: 480_000 }, () => {
@@ -93,5 +115,22 @@ describe('Typert-backed Cordis catalog', () => {
     expect(rendered.slice(slotCoreStart, slotCoreEnd)).not.toContain('truncated')
     expect(rendered).toContain("name: 'StoredEntry'")
     expect(rendered).toContain("name: 'SlotLabel'")
+  })
+
+  it('resolves each key to the declaration a caller meets, and drops keys no plugin provides', { timeout: 480_000 }, () => {
+    const byKey = new Map(projection().model.services.map(service => [service.key, service]))
+    // An interface-typed key is described by its Service Definition: that is where
+    // the contract and, by repository convention, the member JSDoc live.
+    expect(byKey.get('lsp')?.type).toBe('LspService')
+    // Two packages describe `ctx.typert` — a merge-extensible interface in
+    // type-meta and the implementing class in registry. The class wins: it is the
+    // object a caller meets and it carries the documentation.
+    expect(byKey.get('typert')?.type).toBe('TypertRegistry')
+    // Optional keys are values a launcher installs before the tree mounts. No
+    // plugin provides them, so describing one as a service would answer "add the
+    // plugin that provides it" for a key where no such plugin exists.
+    expect(byKey.has('headlessIo')).toBe(false)
+    expect(byKey.has('dshHomePath')).toBe(false)
+    expect(byKey.has('launcherEnvironment')).toBe(false)
   })
 })

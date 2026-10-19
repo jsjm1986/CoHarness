@@ -61,10 +61,10 @@ export interface SessionSummary {
   /** Finished while not selected and not yet opened — the sidebar's green "done" reminder. Absent = false. */
   completed?: boolean
   /**
-   * No-visible-content bit (host summary derivation mirror). New Session reuses a blank
-   * one targeting the same workspace. Filtering stays with the consumer: the
-   * store carries every row, while the Workspace browser shows only the
-   * selected blank entry.
+   * No-visible-content bit (host summary derivation mirror). Workspace
+   * reconnection reuses a blank member; a bare New Session always mints a
+   * fresh one. Filtering stays with the consumer: the store carries every
+   * row, while the Workspace browser shows only the selected blank entry.
    */
   blank: boolean
   updatedAt: number
@@ -155,6 +155,8 @@ export interface SessionBinding {
   readonly sessionId: SessionId
   /** The outward session face only — feature code never sees the concrete class. */
   readonly session: SessionFace
+  /** Raw event-window feed backing the session snapshot (inspection consumers). */
+  readonly eventSource: import('../contract/events.ts').SessionEventSource
   readonly ctx: AgentContext
   /** Description of the exact connection that owns this Session. */
   readonly hostDescription?: HostDescriptionSource
@@ -530,6 +532,16 @@ export class SessionRuntime implements ISessions {
       reference.release()
       throw error
     }
+  }
+
+  /**
+   * Retain a validated Gateway identity synchronously, without history or catalog I/O.
+   * @param id - Host-projected Session identity, possibly not yet catalogued.
+   * @returns a Gateway-source reference owned by the invocation.
+   */
+  retainAgentScope(id: SessionId): SessionReference {
+    if (this.closed) throw new Error('Session Controller is disposed')
+    return this.retainScope(id, 'gateway')
   }
 
   async using<T>(
@@ -1001,6 +1013,7 @@ export class SessionRuntime implements ISessions {
     const binding: SessionBinding = {
       sessionId: presentationId,
       session: presentationId === id ? session : sessionPresentation(session, presentationId, this.presentationKey), ctx,
+      eventSource: session.eventSource,
       ...this.hostDescription === undefined ? {} : { hostDescription: this.hostDescription },
     }
     const record: ScopeRecord = {

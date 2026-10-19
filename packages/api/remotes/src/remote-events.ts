@@ -7,7 +7,7 @@
  */
 
 import type {} from '@deepseek-ai/dsh-schedule/client'
-import type {} from '@deepseek-ai/dsh-goal'
+import type {} from '@deepseek-ai/dsh-goal/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 import type {} from '@deepseek-ai/dsh-plugin-market/types'
 

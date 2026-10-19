@@ -3,11 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/typert/README.md
 /:
-  en: 6a8f7dfb776a8761
-  zh: 5bd6fa8ddf4daed3
-/typert:
-  en: 9b896bc3a6b8d3cb
-  zh: 8da77319a098ad77
-/typert/summary:
+  en: 43fe34a7197464c7
+  zh: daece7b90e4daad9
+/packages-typert:
+  en: e40877a2c7aa409f
+  zh: 4c8399e41b2530b3
+/packages-typert/summary:
   en: 0d9c8dbe70597f50
   zh: 44e0f56a1140b912
+/packages-typert/table-of-contents:
+  en: 1eb35b015a6c423f
+  zh: a8a3dceee2c9e943
+/packages-typert/packages:
+  en: 02a7abfa8c4d5283
+  zh: d98c274255478861
+/packages-typert/related-documentation:
+  en: 579a757871b6cec6
+  zh: 7a559d7661631629
+/packages-typert/dev-note:
+  en: 5de1d6304e00c58f
+  zh: 8d8225361cfa29e5

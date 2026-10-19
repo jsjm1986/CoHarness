@@ -38,16 +38,33 @@ interface TypertLookupDefinition {
 
 ## Invocation descriptors
 
-An `InvocationDescriptor` is local reflection, not a wire message. Host and consumer builds generate corresponding descriptors; the request sends only the endpoint and named `args`. Strict codecs carry generated schemas, while SRC codecs enforce JSON-safe values without structural type recovery. Cancellation is an out-of-band carrier signal injected after business parameters and never enters `args`.
+An `InvocationDescriptor` is local reflection, not a wire message. Host and consumer builds generate corresponding descriptors; the request sends only the endpoint and named `args`. Strict codecs carry generated schema factories, while SRC codecs enforce JSON-safe inputs without structural type recovery. Unary result codecs can supply `encode()` for byte-containing subtrees and `decode()` for recursive native-byte validation; Client declarations narrow every `Uint8Array` to `ArrayBuffer` backing. Pure JSON results need neither byte detection nor Client decoding. Cancellation is an out-of-band carrier signal injected after business parameters and never enters `args`.
+
+`createTypertRemoteInfo` returns a lazy class instance implementing `TypertRemoteInfo`, which extends the mountable `TypertRemoteContribution`. Its `methods` index aliases the direct objects in `descriptors`: each `TypertRemoteMethod` adds named `input(options?)` and `invoke`, retains documentation on the method and its parameters, and uses `result` as its only output codec. Unary `mode` is absent; stream `mode` is `'stream'`. Context-only receivers remain in descriptors and scoped declarations. Registry queries return base descriptors; `isTypertRemoteMethod` narrows generated direct capabilities without recovering endpoint-specific generics.
+
+`TypertSchema` guarantees parsing, not arbitrary Zod operations, although the raw factory spec requires Zod factories. Missing documentation or an unsupported optional JSON Schema projection does not invalidate an ordinary method. The info index and each input-policy view, parser, and derived projection are independently lazy and cached; no metadata or schema access invokes the network. The [protocol reference](<../../packages/typert/protocol/README.md>) defines these APIs, and the [generator reference](<../../packages/typert/generator/README.md#ordinary-remote-metadata>) defines their separate Host `./typert`, consumer `./remote`, and Client `./client/typert` artifacts.
+
+`TypertRemoteSpec` holds a package and endpoint-keyed `TypertRemoteMethodSpec` values. Each ordered `TypertRemoteParameterSpec` contains normal `codec` and `strictCodec` factories from the same checker-resolved type model; the runtime derives identities, wire-name defaults, and named-call views. `TypertRemoteInputOptions` has only `strict?: boolean`; `method.input(options?)` selects a cached `TypertRemoteValue<T>` with matching parsing and optional documentation/projection, without changing Host dispatch or `result`. `RemoteDecoded<T>` describes carrier-reconstructed unary results without narrowing arbitrary parser outputs.
 
 ```ts type-equiv
 /** Codec attached to one invocation parameter or result. */
-type TypertCodec =
-  | {
+type TypertCodec<Value = unknown> =
+  | TypertRemoteValue<Value> & {
     readonly mode: 'strict'
     readonly typeSymbol: string
-    /** Materialize and return the process-realm schema on first boundary use. */
-    readonly create: () => TypertSchema
+    /**
+     * Decode a unary result whose fields require type-specific handling.
+     * @param value - result reconstructed by the RPC carrier.
+     * @returns the validated result, retaining native byte views.
+     */
+    readonly decode?: ((value: unknown) => unknown) | undefined
+    /**
+     * Project typed binary fields into RPC result attachments.
+     * @param value - native unary result.
+     * @param writeBytes - records a byte view at its result-relative path and returns its JSON placeholder.
+     * @returns JSON metadata with untouched JSON subtrees retained.
+     */
+    readonly encode?: ((value: unknown, writeBytes: (bytes: Uint8Array, path: readonly (string | number)[]) => null) => unknown) | undefined
   }
   | {
     readonly mode: 'src-json'
@@ -59,6 +76,8 @@ type TypertCodec =
 interface InvocationParameterDescriptor {
   /** Source-level parameter name. */
   readonly name: string
+  /** Source parameter documentation, independent of JSON Schema support. */
+  readonly description?: string
   /** Required key in the wire `args` object. */
   readonly wire: string
   /** Whether the value is JSON or requires a registered Host lookup. */
@@ -85,7 +104,7 @@ interface InvocationDescriptor {
   readonly method: string
   /** Service member invoked when the exported method name is an alias. */
   readonly implementation?: string
-  /** Absent for unary calls; stream calls validate and deliver every yielded item. */
+  /** Absent for unary calls; stream calls deliver every yielded item as the Host produced it. */
   readonly mode?: 'stream'
   /** Receiver selection mode. */
   readonly invocation:
@@ -105,6 +124,16 @@ interface InvocationDescriptor {
   }
   /** Ordered business parameters. */
   readonly parameters: readonly InvocationParameterDescriptor[]
+  /**
+   * Client-to-Host items of the same logical stream, generated from the `In`
+   * type argument of the method's `RemoteStream<Out, In>` return type; absent
+   * when `In` is `never`. The method reads the items through
+   * `RemoteInvocation.uplink()`, so nothing enters the parameter list.
+   */
+  readonly uplink?: {
+    /** Codec validating every uplink item before `uplink()` delivers it. */
+    readonly codec: TypertCodec
+  }
   /** Transport cancellation injected after business parameters instead of entering wire args. */
   readonly cancellation?: {
     /** Reserved final Host method parameter. */
@@ -112,14 +141,225 @@ interface InvocationDescriptor {
   }
   /** Codec for the unary result or each yielded stream item. */
   readonly result: TypertCodec
+  /** Source-owned method documentation; ordinary methods need not have JSDoc. */
+  readonly description?: string
   /** Source declaration used only for diagnostics. */
   readonly sourceLocation?: InvocationSourceLocation
 }
 ```
 
+The Host alias `RemoteStream<Out, In>` names both directions of one stream, and the receiving method reads its call context as `this.ctx.invocation`:
+
+```ts type-equiv
+/**
+ * One Remote stream as a Host method returns it: the items it yields to the
+ * Client, iterated as a plain `AsyncIterable<Out>`. `In` is the type of the
+ * items the Client may send back on the same logical stream, read through
+ * `RemoteInvocation.uplink()`; it is carried only as a type-level marker. The
+ * default `never` declares a method that reads none, and its descriptor
+ * carries no uplink codec. A generated Client stream method returns the same
+ * stream as a `RemoteStreamHandle<Out, In>`.
+ * @template Out - item type the Host method yields.
+ * @template In - item type the Client may send; `never` when the method reads none.
+ */
+type RemoteStream<Out, In = never> = AsyncIterable<Out> & { readonly [STREAM_UPLINK]?: In }
+```
+
+```ts type-equiv
+/**
+ * One open Remote stream as the Client holds it: the downlink items as an
+ * `AsyncIterable`, plus the uplink and cancellation of the same logical
+ * stream. A generated Client stream method returns it, and calling that
+ * method opens the stream: a holder that neither iterates nor disposes the
+ * handle keeps the Host stream alive. A handle stands for one generation:
+ * when the carrier is lost, iteration fails with the carrier error and the
+ * handle is finished.
+ * @template Out - item type the Host method yields.
+ * @template In - item type the Client may send; `never` when the method reads none.
+ */
+interface RemoteStreamHandle<Out, In> extends AsyncIterable<Out> {
+  /**
+   * Send one uplink item. Items sent before the stream has opened are queued
+   * and sent once the `open` frame is on the wire. A top-level `undefined`
+   * travels as an `item` frame without `value`.
+   * @param item - item the Host validates against the method's uplink codec.
+   * @throws {Error} when the item is not a lossless JSON value, when `end()`
+   * was called, or once the stream has terminated.
+   */
+  send(item: In): void
+  /** Half-close the uplink: the Host's `uplink()` iteration ends. Idempotent; ignored after termination. */
+  end(): void
+  /**
+   * Cancel the logical stream: send `cancel` unless a terminal frame has
+   * arrived, and end the downlink iterator quietly. Breaking out of
+   * `for await` early does the same.
+   */
+  dispose(): void
+}
+```
+
+```ts type-equiv
+/**
+ * Merge-extensible caller identities. Each driver declares its own entry.
+ * Every entry is a JSON value with a unique literal `kind`, carries no
+ * credential, and is safe to persist in a Session log.
+ */
+interface PrincipalMap {
+  /** The local user who owns this Host. */
+  owner: { readonly kind: 'owner' }
+}
+```
+
+```ts type-equiv
+/** One caller identity; the authorization layer reads only this. */
+type Principal = PrincipalMap[keyof PrincipalMap]
+```
+
+```ts type-equiv
+/**
+ * One Peer's session on this Host. Its creator owns it: `ctx` is the Cordis
+ * scope that owns connection-lifetime registrations and is disposed with the
+ * Peer, and `principal` is the caller identity fixed when the Peer was created.
+ */
+interface PeerScope {
+  readonly id: PeerId
+  /** Connection-lifetime registrations; disposed with the Peer. */
+  readonly ctx: Context
+  /** Caller identity fixed at creation by in-process Host code; no wire field can set it. */
+  readonly principal: Principal
+  /** Aborted once the Peer is disposed; Remote streams that speak for the Peer end with it. */
+  readonly signal: AbortSignal
+  /** Whether the Peer may open a forwarded-event stream; this does not grant business permissions. */
+  readonly interactions: 'answer' | 'none'
+  /**
+   * Tear down every registration made through `ctx`.
+   * @returns settles once the scope has quiesced; racing calls share one completion.
+   */
+  dispose(): Promise<void>
+}
+```
+
+```ts type-equiv
+/** Carrier capacity for buffered uplink frames of one logical stream. */
+interface RemoteUplinkWindow {
+  /** Maximum complete encoded frame bytes waiting for the Host consumer. */
+  readonly maxBytes: number
+  /** UTF-8 envelope bytes added to a compact JSON item with a present value field. */
+  readonly frameOverheadBytes: number
+}
+```
+
+```ts type-equiv
+/**
+ * The context of one Remote call, reachable inside the receiving method as
+ * `this.ctx.invocation`. The Gateway derives the receiver from a Context that
+ * carries it, so no parameter is injected and nothing crosses the wire.
+ */
+interface RemoteInvocation {
+  readonly request: {
+    readonly namespace: string
+    readonly method: string
+    readonly args: Readonly<Record<string, unknown>>
+  }
+  /** Cordis service key of the receiving Service. */
+  readonly service: string
+  /** Peer the call speaks for; every carrier names it explicitly. */
+  readonly peer: PeerScope
+  /** Carrier cancellation: Client cancel, socket close, or an uplink failure. */
+  readonly signal: AbortSignal
+  /** Carrier frame capacity; absent when the carrier imposes no encoded-frame inbox limit. */
+  readonly uplinkWindow?: RemoteUplinkWindow | undefined
+  /**
+   * The Client's uplink items for this call. Available once; a second call
+   * throws. With an uplink codec on the descriptor every item is decoded to
+   * `In`; without one items arrive as `unknown` after a JSON-safety check.
+   * Iteration ends when the Client ends its uplink; when the method finishes
+   * its downlink the Gateway calls the iterator's `return()` and unread items
+   * are dropped. `In` is the caller's assertion: the runtime decodes by the
+   * descriptor and does not cross-check it.
+   * @template In - item type the caller reads; the descriptor codec decides what arrives.
+   * @returns the single-consumer uplink iterable.
+   */
+  uplink<In = unknown>(): AsyncIterable<In>
+}
+```
+
+
+## Remote access resources
+
+Every Remote method declares the resources it touches: the package that owns an identity type merge-declares its resource kind in `TypertResourceMap`; `global`, the built-in identity-less resource, is never a kind there. An access-enforcing consumer reads a kind's identities from the `resources` readers of `@Remote({ resources })` or `@RemoteScope(key, { resources })`, else from a lookup parameter or scoped Context that declares the kind as its `resource`, else from the default field registered in `typert.resources`; a call that names no resource touches `global`.
+
+```ts type-equiv
+/**
+ * Merge-extensible resource kinds whose identities a Remote call or forwarded
+ * event may carry. The package that owns an identity type declares its kind;
+ * the value is that kind's identity type, a string type such as a branded id.
+ * `global` names the built-in identity-less resource and is never a kind here.
+ */
+interface TypertResourceMap {}
+```
+
+```ts type-equiv
+/** One resource kind: the built-in `global` kind or a declared kind. */
+type RemoteAccessResourceKind = 'global' | TypertResourceKind
+```
+
+```ts type-equiv
+/**
+ * One resource a call or forwarded event touches: `global`, or one identity
+ * of a declared kind. Identities are wire values, read before any lookup
+ * resolves or validates them.
+ */
+type RemoteAccessResource =
+  | { readonly kind: 'global' }
+  | {
+    [Kind in TypertResourceKind]: { readonly kind: Kind; readonly id: TypertResourceId<TypertResourceMap[Kind]> }
+  }[TypertResourceKind]
+```
+
+```ts type-equiv
+/**
+ * Explicit endpoint and resource choices for one Remote Scope method.
+ * @template WireArgs - the decorated method's positional parameters as the
+ *   wire carries them; the default `never` admits readers of any tuple.
+ */
+interface RemoteScopeOptions<WireArgs extends readonly unknown[] = never> {
+  /** Exported endpoint method; omission retains the implementation member name. */
+  readonly name?: string
+  /**
+   * Per-kind readers of the resources one call touches. Each receives the
+   * method's arguments as its own parameters, JSON arguments as their Typert
+   * codecs validated them, a lookup parameter as its wire identity and a
+   * cancellation parameter as the call's signal, so it performs plain reads
+   * only, and returns one identity, several, or `undefined` for none. A
+   * throw, an empty list, or an identity other than a non-empty string
+   * refuses the call. For a kind without a reader, the Gateway reads the
+   * identity of a scoped Context whose Host adapter declares that `resource`
+   * and of lookup parameters declaring it, else the field registered in
+   * `typert.resources`: a top-level argument or, failing that, the first
+   * object argument. A call that carries no identity touches `global`. The
+   * readers and these defaults together must name every resource the method
+   * accesses: access control never checks a resource they omit.
+   */
+  readonly resources?: TypertResourceReaders<WireArgs>
+}
+```
+
+```ts type-equiv
+/**
+ * Explicit endpoint, stream, and resource choices for one direct Remote method.
+ * @template WireArgs - the decorated method's positional parameters as the
+ *   wire carries them; the default `never` admits readers of any tuple.
+ */
+interface RemoteMethodOptions<WireArgs extends readonly unknown[] = never> extends RemoteScopeOptions<WireArgs> {
+  /** `stream`: deliver each Iterable item over the shared logical-stream carrier. */
+  readonly mode?: 'stream'
+}
+```
+
 ## Typert registry
 
-`ctx.typert` separates current-environment descriptors, explicitly selected Remote contributions, lookup providers, and scoped Context providers. A lookup provider owns the stable wire declaration and default resolver; Host composition can configure an effect-scoped synchronous or asynchronous resolver for the same key, and unloading that configuration restores the default policy. Registrations are Cordis-owned effects and return awaitable disposers.
+`ctx.typert` separates current-environment descriptors, explicitly selected Remote contributions, lookup providers, scoped Context providers, and the default fields of resource kinds. A lookup provider owns the stable wire declaration and default resolver; Host composition can configure an effect-scoped synchronous or asynchronous resolver for the same key, and unloading that configuration restores the default policy. Registrations are Cordis-owned effects and return awaitable disposers.
 
 ```ts type-equiv
 /** Minimal Typert runtime consumed through dependency inversion. */
@@ -128,6 +368,7 @@ interface TypertRegistryContract {
   readonly remotes: TypertRemoteRegistry
   readonly lookups: TypertLookupRegistry
   readonly contexts: TypertContextRegistry
+  readonly resources: TypertResourceRegistry
 }
 ```
 
@@ -137,6 +378,7 @@ Generated consumer declarations merge direct namespaces into the map inherited b
 /** Merge-extensible direct namespace surface generated for Client Remote services. */
 interface TypertRemoteNamespaceMap {}
 ```
+
 
 ## Host Gateway
 

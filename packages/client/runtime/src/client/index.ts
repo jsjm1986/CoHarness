@@ -6,6 +6,7 @@ import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/c
 // project sits in the Host build graph.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { TypertContext } from '@deepseek-ai/dsh-typert-protocol'
+import { typertOwnedValue } from '@deepseek-ai/dsh-typert-protocol'
 import type { MaybeSnapshotSelectorHook, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from './slots.ts'
 import { SessionRuntime } from './sessions/service.ts'
@@ -105,6 +106,11 @@ export type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/
 export type {
   SessionBinding, SessionListState, SessionProvideContribution, SessionProvideDescriptor, SessionSummary,
 } from './sessions/service.ts'
+export { MutableSessionEventSource, sessionEventLikeEntry } from './contract/events.ts'
+export type {
+  SessionAssistantSettlementEntry, SessionEventChange, SessionEventLikeEntry,
+  SessionEventSource, SessionEventWindow, SessionLiveEventEntry, SessionTransientEventEntry,
+} from './contract/events.ts'
 export type { SessionListPhase, SessionSearchResultItem, SubagentCatalogSnapshot } from './sessions/manager.ts'
 export type { SubagentAddress, JobView, JobOutputChunk, JobOutputCoords, JobOutputValue } from '@deepseek-ai/dsh-client-connection/client'
 export type { ObservedJob } from './sessions/manager.ts'
@@ -128,7 +134,8 @@ export {
 } from '@deepseek-ai/dsh-host-apiproxy/client'
 export type {
   AssistantBlock, AssistantMessageNode, AssistantProviderMetadataView, AssistantRequestConfig,
-  AssistantTiming, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot, ChatTurnNavigationIndex, TurnNavigationItem,
+  AssistantTiming, ChatFlowEntry, ChatGroupMember, ChatGroupSnapshot, ChatGroupStore,
+  ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot, ChatTurnNavigationIndex, TurnNavigationItem,
   CommandNode, CompactionSummaryNode, ComposerPhase,
   ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryNavigationItem, HistoryNavigationSnapshot,
   HistoryNavigationState, HistoryWindowMode,
@@ -343,6 +350,10 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => { permissionCatalog.dispose() }, 'runtime: permission catalog directory')
   ctx.typert.contexts.registerClient('agent', {
     identity: candidate => sessions.sessionOf(candidate)?.sessionId,
+    resolve: (sessionId) => {
+      const reference = sessions.retainAgentScope(sessionId)
+      return typertOwnedValue(reference.binding.ctx, () => { reference.release() })
+    },
   })
   const workspaces = new WorkspaceRuntime(ctx, connection.api, sessions)
   ctx.effect(
@@ -390,6 +401,7 @@ export interface SessionReferenceSourceMap {
   controllerOperation: true
   conversation: true
   workbench: true
+  gateway: true
 }
 
 /** Registered source of a local Session reference. */

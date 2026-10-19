@@ -551,6 +551,12 @@ export class SessionRuntimePool implements ISessions {
     let projected = args
     if (event === 'agent-preset/selected' && typeof args[0] === 'string') {
       projected = [this.keyFor(args[0] as SessionId, target), ...args.slice(1)]
+    } else if (event === 'goal/activation-changed') {
+      const first = args[0]
+      if (first !== null && typeof first === 'object' && !Array.isArray(first)
+        && Object.hasOwn(first, 'sessionId') && typeof Reflect.get(first, 'sessionId') === 'string') {
+        projected = [{ ...first, sessionId: this.keyFor(Reflect.get(first, 'sessionId') as SessionId, target) }, ...args.slice(1)]
+      }
     } else if (/^(?:@deepseek-ai\/)?cordis\/(?:request-run|inspect-query)$/u.test(event)) {
       const first = args[0]
       if (first !== null && typeof first === 'object' && !Array.isArray(first)
@@ -697,6 +703,22 @@ export class SessionRuntimePool implements ISessions {
 
   beginNavigation(): AbortSignal {
     return this.base.beginNavigation()
+  }
+
+  /**
+   * Retain a validated Gateway identity synchronously, without history or catalog I/O.
+   * The id is the pooled browser identity the session face publishes; its embedded runtime
+   * names the owner even before the Session is catalogued.
+   * @param id - Session identity received through the Typert client-context adapter.
+   * @returns a Gateway-source reference owned by the invocation.
+   */
+  retainAgentScope(id: SessionId): SessionReference {
+    const address = parseClientSessionKey(id)
+    const owner = address === undefined
+      ? this.ownerFor(id)
+      : this.entries.get(targetKey(address.runtime))
+    if (owner === undefined) throw new Error(`sessions.retainAgentScope: unknown session ${id}`)
+    return owner.runtime.retainAgentScope(address === undefined ? id : address.sessionId)
   }
 
   retain(target: SessionTarget, options: SessionRetainOptions): SessionReference {

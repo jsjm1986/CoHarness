@@ -11,7 +11,7 @@
  */
 export { RemoteMock, ok } from './remote-mock.ts'
 export type { OpenStreams, RemoteMockOptions, RemoteTable, StreamFilter, UnaryRuleFn } from './remote-mock.ts'
-export { frames, openStream, streamMethod } from './streams.ts'
+export { frames, openStream, streamHandle, streamMethod } from './streams.ts'
 export { MockStream } from './streams.ts'
 export type { StreamHandle, StreamScript } from './streams.ts'
 export type { LoggedCall, LoggedMiss, LoggedStream, MockLog } from './log.ts'

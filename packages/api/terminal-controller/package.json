@@ -91,6 +91,7 @@
     "@deepseek-ai/dsh-deque": "workspace:*",
     "@deepseek-ai/dsh-execution-authority": "workspace:*",
     "@deepseek-ai/dsh-lazy-require": "workspace:*",
+    "@deepseek-ai/dsh-remote-mock": "workspace:*",
     "@deepseek-ai/dsh-sandbox": "workspace:*",
     "@deepseek-ai/dsh-sandbox-policy": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
