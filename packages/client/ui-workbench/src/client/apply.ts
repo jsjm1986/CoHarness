@@ -1,7 +1,7 @@
 /** Contributes workbench controls without importing the conversation renderer. */
 import { WorkspaceResourceError, clientSessionKey, commitSessionNavigation, parseClientSessionKey, parseWorkspaceResourceAddress, resolveWorkspacePath, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest, WorkspaceResourceSource } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ClientContext, ConversationViewport, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, ConversationViewport, ProjectUiPolicySnapshot, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -37,6 +37,15 @@ function controller(ctx: ClientContext): ConversationViewport {
   const viewport = ctx.get('conversationViewport')
   if (viewport === undefined) throw new Error('ui-workbench requires the conversation viewport capability')
   return viewport
+}
+
+/** Personal-scope policy placeholder while the projectUiPolicy service is absent. */
+const ABSENT_PROJECT_POLICY_SNAPSHOT: ProjectUiPolicySnapshot = Object.freeze({
+  scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'unknown',
+})
+const ABSENT_PROJECT_POLICY = {
+  getSnapshot: (): ProjectUiPolicySnapshot => ABSENT_PROJECT_POLICY_SNAPSHOT,
+  subscribe: () => () => {},
 }
 
 /** Optional workbench management methods contributed onto the conversation viewport. */
@@ -331,7 +340,11 @@ export function apply(ctx: ClientContext): void {
       'conversation.workbench.display': { kind: 'single', scope: 'root' },
     },
     inject: (): WorkbenchSidebarInjected => ({
-      hooks: { viewport: viewport.snapshot },
+      hooks: {
+        viewport: viewport.snapshot,
+        // Row tiles resolve the same per-pane steward tone as the pane header.
+        projectPolicy: ctx.get('projectUiPolicy') ?? ABSENT_PROJECT_POLICY,
+      },
       focusPane: (sessionId) => { viewport.focus(sessionId) },
       removePane: (sessionId) => { viewport.remove(sessionId) },
       setPaneRatios: (ratios) => { viewport.setPaneRatios(ratios) },
@@ -343,6 +356,9 @@ export function apply(ctx: ClientContext): void {
     id: 'workbench-pane-header',
     locale: NS,
     inject: (sessionId: SessionId) => ({
+      // The pane's steward tone follows its own session runtime, read from the
+      // roster mirror — the page's active scope never applies to a pane.
+      hooks: { projectPolicy: ctx.get('projectUiPolicy') ?? ABSENT_PROJECT_POLICY },
       replacePane: () => {
         viewport.focus(sessionId)
         ctx.slots.bindStore(chooser).actions.openPicker(true)

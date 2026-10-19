@@ -39,7 +39,7 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
   const root = () => (
     <SidebarRoot
       collapsed={current.collapsed} width={current.width}
-      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
+      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })}
       usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
@@ -113,7 +113,7 @@ describe('SidebarRoot shell', () => {
     render(<SidebarRoot
       collapsed={false} width={300}
       useSessions={neverHook} useWorkspaces={neverHook}
-      useViewport={selector => selector({ mode: 'workbench', paneIds: [], paneRatios: [] })}
+      useViewport={selector => selector({ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] })}
       usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
       exitWorkbench={exitWorkbench}
       startSession={startSession} toggleSidebar={vi.fn()} t={t}
@@ -131,7 +131,7 @@ describe('SidebarRoot shell', () => {
     render(<SidebarRoot
       collapsed={false} width={300}
       useSessions={neverHook} useWorkspaces={neverHook}
-      useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
+      useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })}
       usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
       startSession={startSession} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
@@ -146,7 +146,7 @@ describe('SidebarRoot shell', () => {
     vi.stubEnv('DSH_CLIENT_COMMIT_HASH', '0123456')
     const { container } = render(<SidebarRoot
       collapsed={false} width={300}
-      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
+      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })}
       usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>

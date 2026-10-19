@@ -194,6 +194,15 @@ describe('managed execution identity', () => {
     expect(f.cancel).not.toHaveBeenCalled()
   })
 
+  it('posts the memory capability and cancels work when its re-check is revoked', async () => {
+    const f = await fixture()
+    await f.ctx.executionAuthority.authorize('memory', f.agent)
+    expect(f.requests.filter(row => row.path.endsWith('/authorize') && row.body.capability === 'memory')).toHaveLength(1)
+    f.responses.set('/authorize', async () => new Response(null, { status: 403 }))
+    f.stream.enqueue(new TextEncoder().encode('{"type":"invalidate","userId":1}\n'))
+    await vi.waitFor(() => { expect(f.cancel).toHaveBeenCalledOnce() })
+  })
+
   it('rechecks desktop confirmation on access invalidation even while qualification remains valid', async () => {
     const f = await fixture(), authority = f.ctx.executionAuthority as GatewayExecution
     await authority.authorizeDesktop(f.agent, 'display-0', new AbortController().signal)

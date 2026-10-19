@@ -7,7 +7,8 @@
  */
 
 import type {} from '@deepseek-ai/dsh-schedule/client'
-import type {} from '@deepseek-ai/dsh-goal/client'
+import type {} from '@deepseek-ai/dsh-goal/types'
+import type {} from '@deepseek-ai/dsh-memory/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 import type {} from '@deepseek-ai/dsh-plugin-market/types'
 
@@ -37,6 +38,7 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   '@deepseek-ai/cordis/inspect-query-resolved',
   'goal/activation-changed',
   'llm/adapters-updated',
+  'memory/changed',
   'permission-presets/catalog-changed',
   'plugin-manager/changed',
   'plugin-manager/install-log',

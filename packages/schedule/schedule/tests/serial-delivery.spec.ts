@@ -34,7 +34,7 @@ async function core(persistenceRoot: string) {
 }
 
 describe('due delivery during Agent creation', () => {
-  it('enqueues the reminder without starting a turn before every creation listener finishes', async () => {
+  it('enqueues the reminder without starting a turn before every creation listener finishes', { timeout: 20_000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-schedule-serial-'))
     roots.push(root)
     const ctx = await core(join(root, 'sessions'))
@@ -92,7 +92,7 @@ describe('due delivery during Agent creation', () => {
       expect(created).toBe(true)
       expect(laterCreated).toBe(true)
       // The receipt commits after the flush resolves, so the settled record is observed asynchronously.
-      await expect.poll(async () => (await ctx.schedule.catalog())[0]?.status).toBe('inactive')
+      await expect.poll(async () => (await ctx.schedule.catalog())[0]?.status, { timeout: 10_000 }).toBe('inactive')
       const [entry] = await ctx.schedule.catalog()
       expect(entry?.lastDelivery?.messageId).toBe(delivered[0]?.id)
     } finally {

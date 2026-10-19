@@ -35,7 +35,7 @@ afterEach(() => {
 async function bench(options: { locale?: 'en' } = {}) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('layout', { toggleSidebar: vi.fn() })
-  runtime.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} }, setMode: vi.fn() } as never)
+  runtime.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }), subscribe: () => () => {} }, setMode: vi.fn() } as never)
   const locale = new LocaleRuntime(runtime.ctx)
   // The apply-side self-registration lives in the package apply; the bench
   // mounts only this plugin, so the shared common dictionary is registered here.

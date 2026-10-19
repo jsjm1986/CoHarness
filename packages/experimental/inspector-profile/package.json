@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-inspector-profile",
   "description": "Optional Web bundle for raw Session logs and Chat node inspection",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "icon": "./icon.svg",
   "publishConfig": {
     "access": "public"
@@ -31,7 +31,7 @@
     "cordis.patch.yml",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-admin-managed-public-access-tunnel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.md
+/agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel:
+  en: d55247101c9441f7
+  zh: 6e974dd5916f60e6
+/agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/problem:
+  en: 50ac839901325a0b
+  zh: 832c24790b770046
+/agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/decision:
+  en: bac1f20dadbab1ab
+  zh: a1ebe49bc300c927
+/agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/alternatives-considered:
+  en: 8c912f0e3f6bd35d
+  zh: 05769df750e59c4a
+/agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/consequences:
+  en: 62cc028184207794
+  zh: ecb89da41f907ccd
+/agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/verification:
+  en: 4577745050bd8b46
+  zh: 935ab439bf799a0a

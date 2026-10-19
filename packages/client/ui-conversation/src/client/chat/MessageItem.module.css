@@ -1,9 +1,12 @@
 /* User bubble: right-aligned column (bubble + IconActions); beui
    message-bubble grammar (MIT) — r16, 10/14 padding. */
 
+/* Bubble enters with a small settle (rise + near-1 scale) rather than a bare
+   fade: the pop reads as the message landing, not the row repainting. */
 @keyframes user-bubble-in {
   from {
     opacity: 0;
+    transform: translateY(6px) scale(0.97);
   }
 }
 
@@ -235,15 +238,41 @@
   color: inherit;
 }
 
+/* Live countdown reads as an amber capsule: the tint and breathing dot mark
+   it as a waiting system action, distinct from settled history rows. */
+.retryRow[data-active] .retrySummary {
+  padding: 3px 10px;
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--dsw-alias-tint-warn);
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.retryRow[data-active] .retrySummary::before {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  corner-shape: round;
+  background: var(--dsw-alias-state-warn-primary);
+  content: '';
+  animation: dsh-retry-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes dsh-retry-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
 .retryRow[data-active] .retryText {
   background:
     linear-gradient(
       90deg,
-      var(--dsw-alias-label-tertiary) 0%,
-      var(--dsw-alias-label-tertiary) 40%,
-      var(--dsw-alias-label-secondary) 50%,
-      var(--dsw-alias-label-tertiary) 60%,
-      var(--dsw-alias-label-tertiary) 100%
+      var(--dsw-alias-state-warn-label) 0%,
+      var(--dsw-alias-state-warn-label) 40%,
+      var(--dsw-alias-state-warn-primary) 50%,
+      var(--dsw-alias-state-warn-label) 60%,
+      var(--dsw-alias-state-warn-label) 100%
     );
   background-position: 100% 50%;
   background-size: 200% 100%;
@@ -321,9 +350,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation: none;
+  }
+
   .retryRow[data-active] .retryText {
     background: none;
     color: inherit;
+    animation: none;
+  }
+
+  .retryRow[data-active] .retrySummary::before {
     animation: none;
   }
 }

@@ -612,9 +612,6 @@
   "packages/client/ui-conversation/tests/todo-panel.client.spec.tsx": {
     "88bd974d30d3b8da90642fa12ee8a1030174fad583bb78ff20a13202c8e04c25": 1
   },
-  "packages/client/ui-conversation/tests/viewport.client.spec.ts": {
-    "d21f101b1945644023063d2429c00216a10171a9642f8d15f5c3cbf807e0f0c4": 1
-  },
   "packages/client/ui-deliverables/tests/produced-files.client.spec.tsx": {
     "38a7cf3dfd5da2f739390f5b233b97731f3bfa1ac3a51fdb8e1594735764bb80": 2,
     "9bcd675720201c107e9fd7be15a4b0ac688260a5f2ef1df378a1b5ea33a559dd": 2,

@@ -31,36 +31,119 @@
 .workbenchDeleteDescription { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
 .toolbarTitle strong { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 600; }
 .toolbarTitle span { color: var(--dsw-alias-label-caption); font-size: 12px; }
-.paneCount { padding: 2px 6px; border-radius: var(--dsw-radius-full); background: var(--dsw-alias-bg-layer-2); font-variant-numeric: tabular-nums; }
+.seatDots { display: inline-flex; align-items: center; gap: 3px; padding: 2px 4px; }
+.seatDot { width: 6px; height: 6px; border-radius: 50%; corner-shape: round; background: var(--dsw-alias-bg-layer-2); }
+.seatDot[data-filled] { background: var(--dsw-alias-label-secondary); }
+.attentionPill { display: inline-flex; align-items: center; gap: var(--dsw-space-1); min-height: 24px; padding: 0 var(--dsw-space-2); border: none; border-radius: var(--dsw-radius-full); corner-shape: round; background: var(--dsw-alias-state-warn-tertiary); color: var(--dsw-alias-state-warn-label); font-size: 12px; font-weight: 550; cursor: pointer; }
+.attentionPill:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: 2px; }
 .toolbarActions { gap: var(--dsw-space-2); }
 
 .paneHeader {
   position: relative;
   flex: none;
   gap: var(--dsw-space-1);
-  min-height: 34px;
+  min-height: 40px;
   padding: 0 var(--dsw-space-1) 0 var(--dsw-space-2);
   cursor: pointer;
 }
-.paneHeader:has(.activeMark[data-active]) { box-shadow: inset 3px 0 0 var(--dsw-alias-state-business-primary); }
 
-.paneTitle { display: flex; min-width: 0; flex: 1; align-items: baseline; gap: 6px; }
-.paneStatus { display: inline-flex; flex: none; align-items: center; }
-.paneTitle strong, .paneTitle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.paneTitle strong { min-width: 0; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; font-weight: 500; }
-.paneWorkspace { flex: none; max-width: 45%; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 16px; }
-.paneWorkspace::before { content: '·'; margin-right: 6px; color: var(--dsw-alias-label-caption); }
-.activeMark { display: none; }
+/* 20px space tile: grey personal / blue project / amber steward. */
+.scopeTile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--dsw-radius-sm);
+  corner-shape: round;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-2);
+}
+/* Personal is the round blue user tile — the same mark the scope switcher
+   draws (tileRound + tileBlue) so the pane reads its space at a glance. */
+.scopeTile[data-scope-tone='personal'] { border-radius: 50%; corner-shape: round; color: var(--dsw-static-blue-600); background: var(--dsw-static-blue-100); }
+.scopeTile[data-scope-tone='project'] { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-accent-tint); }
+.scopeTile[data-scope-tone='steward'] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
+
+/* The identity cluster doubles as the pane-reorder drag handle. */
+.paneIdentity { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--dsw-space-2); cursor: grab; }
+.paneIdentity:active { cursor: grabbing; }
+.paneLead { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 0; }
+.paneLead strong, .paneLead span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paneLead strong { min-width: 0; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; font-weight: 500; }
+.paneLead span { min-width: 0; color: var(--dsw-alias-label-caption); font-size: 11px; line-height: 14px; }
+
+/* Persistent full-word status capsule; the receipt marker is a blue dot. */
+.paneState {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--dsw-radius-full);
+  corner-shape: round;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.paneState[data-tone='waiting'] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
+.paneState[data-tone='newReply'] { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-accent-tint); }
+.receiptDot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; corner-shape: round; background: var(--dsw-alias-state-business-primary); }
+
+/* Header actions ride in on pointer or keyboard approach; an active pane
+   keeps them pinned so the focus target stays stable. */
+.paneActions { display: inline-flex; flex: none; align-items: center; gap: 2px; opacity: 0; transition: opacity 120ms ease; }
+.paneHeader:hover .paneActions,
+.paneHeader:focus-within .paneActions,
+.paneHeader[data-active] .paneActions { opacity: 1; }
+.paneActions .iconAction { width: 24px; height: 24px; }
+
+/* Collapsed pane strip: tile + status + vertical title inside the 46px cell. */
+.paneStrip {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  padding: var(--dsw-space-2) 0;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+.paneStrip:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.paneStrip:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
+.paneStripTitle {
+  writing-mode: vertical-rl;
+  max-height: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
 
 .empty { display: flex; flex: 1; align-items: center; justify-content: center; gap: var(--dsw-space-2); flex-direction: column; color: var(--dsw-alias-label-secondary); text-align: center; }
 .empty strong { color: var(--dsw-alias-label-primary); font-size: 16px; }
 .empty span { max-width: 280px; font-size: 13px; }
+.emptyHints { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; color: var(--dsw-alias-label-caption); font-size: 12px; }
 .emptyIcon { display: grid; width: 36px; height: 36px; place-items: center; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: 50%; corner-shape: round; color: var(--dsw-alias-state-business-primary); }
 
 /* Tabbed mode keeps one row: the pane strip is a flex item that scrolls
    sideways rather than wrapping into a second band. */
 .toolbar[data-tabbed] { min-height: 40px; }
-.tabs { display: flex; flex: 1; min-width: 0; gap: var(--dsw-space-1); overflow-x: auto; scrollbar-width: none; --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
+/* Horizontal edge fades stand in for the hidden scrollbar: a clipped tab
+   reads as continuing past the edge instead of ending on a hard clip. The
+   8px bands stay inside a tab button's own 10px side padding, so end tabs
+   keep their glyphs fully opaque at either scroll stop. */
+.tabs { display: flex; flex: 1; min-width: 0; gap: var(--dsw-space-1); overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs button { display: flex; align-items: center; gap: var(--dsw-space-2); flex: 0 0 auto; max-width: 220px; overflow: hidden; padding: 8px 10px; border: 0; background: transparent; color: var(--dsw-alias-label-secondary); white-space: nowrap; cursor: pointer; transition: color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)), box-shadow var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .tabs button:hover { color: var(--dsw-alias-label-primary); }
@@ -88,10 +171,11 @@
 .candidate { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: var(--dsw-space-3); padding: 10px 8px; text-align: left; border: 0; border-radius: var(--dsw-radius-md); corner-shape: round; background: transparent; color: var(--dsw-alias-label-primary); cursor: pointer; transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .candidate:disabled { opacity: 0.45; cursor: default; }
 .candidate:not(:disabled):hover { background: var(--dsw-alias-interactive-bg-hover); }
-.candidate > span { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.candidateText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.candidateTime { flex: none; color: var(--dsw-alias-label-caption); font-size: 11px; font-variant-numeric: tabular-nums; }
 .candidate strong, .candidate small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .candidate strong { font-size: 13px; font-weight: 500; }
-.candidate small { color: var(--dsw-alias-label-caption); font-size: 12px; }
+.candidate .candidateText small { color: var(--dsw-alias-label-caption); font-size: 12px; }
 .notice, .pickerFooter { color: var(--dsw-alias-label-secondary); font-size: 12px; }
 .pickerFooter { display: flex; align-items: center; justify-content: space-between; gap: var(--dsw-space-3); padding-top: var(--dsw-space-3); border-top: 0.5px solid var(--dsw-alias-border-l1); }
 .pickerFooter > span { flex: 1; }
@@ -101,7 +185,7 @@
 .rowBadge { flex: none; padding: 3px 8px; border-radius: 999px; corner-shape: round; background: var(--dsw-alias-bg-layer-1); font-size: 11px; }
 .candidates { padding: 2px 4px 8px 0; margin-bottom: 8px; }
 .candidate { min-height: 58px; padding: 10px 12px; gap: 14px; }
-.candidate > span { gap: 3px; }
+.candidateText { gap: 3px; }
 .candidate small { font-size: 11px; }
 .workspaceTrigger { flex: 0 0 220px; width: 220px; min-width: 220px; }
 @media (max-width: 480px) {
@@ -209,22 +293,73 @@
   white-space: normal;
 }
 
-/* Sidebar workbench panel: one scrolling column under the region chrome. */
-.sidebarPanel { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--dsw-space-3); overflow-y: auto; padding: var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-3); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
+/* Sidebar workbench panel: roster cards under the region chrome; the footer stays pinned. */
+.sidebarPanel { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--dsw-space-3); overflow-y: auto; padding: var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-2); scrollbar-width: thin; scrollbar-color: var(--dsw-alias-scrollbar-bg-l2) transparent; --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
 .sidebarHeader { display: flex; flex: none; align-items: center; justify-content: space-between; gap: var(--dsw-space-2); min-height: 28px; padding: 0 var(--dsw-space-1); }
 .sidebarTitle { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 600; }
 .sidebarSection { display: flex; flex: none; flex-direction: column; gap: var(--dsw-space-1); }
 .sidebarSectionTitle { display: flex; align-items: center; justify-content: space-between; gap: var(--dsw-space-2); padding: 0 var(--dsw-space-1); color: var(--dsw-alias-label-caption); font-size: 12px; }
-.sidebarPanes { display: flex; flex-direction: column; gap: 1px; }
+.sidebarCount { color: var(--dsw-alias-label-caption); font-size: 11px; font-variant-numeric: tabular-nums; }
+/* Hairline row list: rows divide on fine rules; the active row reads via a
+   business-blue tint fill with an inked title — no card chrome or edge tick. */
+.sidebarPanes { display: flex; flex-direction: column; border-top: 0.5px solid var(--dsw-alias-border-l1); }
 .sidebarEmpty { margin: var(--dsw-space-1) var(--dsw-space-2); color: var(--dsw-alias-label-caption); font-size: 12px; }
-.sidebarPaneRow { display: flex; align-items: center; gap: var(--dsw-space-1); min-height: 30px; padding: 0 var(--dsw-space-1); border-radius: var(--dsw-radius-sm); corner-shape: round; }
-.sidebarPaneRow[data-active] { background: var(--dsw-alias-interactive-bg-hover); }
-.sidebarPaneFocus { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--dsw-space-2); padding: 4px 0; border: 0; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; text-align: left; cursor: pointer; }
+
+.sidebarPaneRow { position: relative; display: flex; border-bottom: 0.5px solid var(--dsw-alias-border-l1); transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
+.sidebarPaneRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.sidebarPaneRow[data-active] { background: var(--dsw-alias-state-business-tertiary); }
+.sidebarPaneRow[data-active] .sidebarPaneTitle { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
+.sidebarPaneRow[data-active] .sidebarPaneIndex { color: var(--dsw-alias-state-business-primary); font-weight: 700; }
+.sidebarPaneRow[data-attention] .sidebarPaneTitle { color: var(--dsw-alias-state-warn-label); }
+/* Index cell: static numeral swaps to the pane shortcut on row hover. */
+.sidebarPaneIndex { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 14px; margin-top: 1px; color: var(--dsw-alias-label-caption); font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; pointer-events: none; }
+.sidebarPaneNum { display: inline; }
+.sidebarPaneKey { display: none; color: var(--dsw-alias-state-business-primary); font-size: 9.5px; font-weight: 700; }
+.sidebarPaneRow:hover .sidebarPaneNum,
+.sidebarPaneRow:focus-within .sidebarPaneNum { display: none; }
+.sidebarPaneRow:hover .sidebarPaneKey,
+.sidebarPaneRow:focus-within .sidebarPaneKey { display: inline; }
+.sidebarPaneFocus { display: flex; flex: 1; min-width: 0; align-items: flex-start; gap: var(--dsw-space-2); padding: 8px var(--dsw-space-2) 7px 4px; border: 0; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; text-align: left; cursor: pointer; }
 .sidebarPaneRow[data-active] .sidebarPaneFocus { color: var(--dsw-alias-label-primary); }
 .sidebarPaneFocus:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
-.sidebarPaneTitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.sidebarActions { display: flex; gap: var(--dsw-space-2); padding: var(--dsw-space-1); }
-.sidebarAction { display: inline-flex; flex: 1; min-width: 0; align-items: center; justify-content: center; gap: var(--dsw-space-1); min-height: 28px; padding: 0 var(--dsw-space-2); border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); corner-shape: round; background: transparent; color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; cursor: pointer; transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)), border-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
-.sidebarAction:not(:disabled):hover { background: var(--dsw-alias-interactive-bg-hover); }
-.sidebarAction:disabled { color: var(--dsw-alias-label-caption); cursor: default; }
-.sidebarAction:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: 2px; }
+.sidebarPaneFocus .scopeTile { margin-top: 1px; }
+.sidebarPaneText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 1px; }
+.sidebarPaneLine { display: flex; align-items: baseline; gap: var(--dsw-space-2); min-width: 0; }
+.sidebarPaneTitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 550; }
+/* Recency and Close share the trailing cell: the time fades out as Close fades
+   in, so the two never overlap. */
+.sidebarPaneAgo { flex: none; min-width: 20px; text-align: right; color: var(--dsw-alias-label-caption); font-size: 10.5px; font-variant-numeric: tabular-nums; transition: opacity var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
+.sidebarPaneRow:hover .sidebarPaneAgo,
+.sidebarPaneRow:focus-within .sidebarPaneAgo { opacity: 0; }
+/* Status word, space, and workspace merge into one quiet subtitle line. */
+.sidebarPaneStatus { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--dsw-alias-label-caption); font-size: 11px; }
+.sidebarPaneStatusWord { flex: none; color: var(--dsw-alias-label-secondary); font-weight: 500; }
+.sidebarPaneStatus[data-tone='warn'] .sidebarPaneStatusWord { color: var(--dsw-alias-state-warn-label); font-weight: 600; }
+.sidebarPaneStatus[data-tone='reply'] .sidebarPaneStatusWord { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
+.sidebarReplyDot { flex: none; width: 7px; height: 7px; border-radius: 50%; corner-shape: round; background: var(--dsw-alias-state-business-primary); }
+.sidebarPaneScope { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sidebarPaneClose { position: absolute; top: 7px; right: 8px; display: flex; align-items: center; justify-content: center; width: 20px; height: 18px; border: 0; border-radius: var(--dsw-radius-sm); corner-shape: round; background: transparent; color: var(--dsw-alias-label-caption); cursor: pointer; opacity: 0; transition: opacity var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
+.sidebarPaneRow:hover .sidebarPaneClose,
+.sidebarPaneRow:focus-within .sidebarPaneClose,
+.sidebarPaneClose:focus-visible { opacity: 1; }
+.sidebarPaneClose:hover { color: var(--dsw-alias-state-error-primary); }
+.sidebarPaneClose:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -1px; }
+/* Add affordance closes the row list with the same hairline rule. */
+.sidebarAdd { display: flex; align-items: center; gap: var(--dsw-space-2); width: 100%; padding: 7px var(--dsw-space-2) 6px; border: 0; border-bottom: 0.5px solid var(--dsw-alias-border-l1); background: transparent; color: var(--dsw-alias-label-caption); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.sidebarAdd:not(:disabled):hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.sidebarAdd:disabled { opacity: 0.5; cursor: default; }
+.sidebarAdd:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
+.sidebarAddPlus { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1px dashed var(--dsw-alias-border-l2); border-radius: 5px; corner-shape: round; }
+/* Capacity caption + equalize link replace the floating seat dots and button row. */
+.sidebarCapacity { display: flex; align-items: center; justify-content: space-between; padding: var(--dsw-space-1) var(--dsw-space-1) 0; color: var(--dsw-alias-label-caption); font-size: 11px; }
+.sidebarEqualize { display: inline-flex; align-items: center; border: 0; padding: 2px 4px; border-radius: var(--dsw-radius-sm); corner-shape: round; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.sidebarEqualize:not(:disabled):hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
+.sidebarEqualize:disabled { opacity: 0.45; cursor: default; }
+.sidebarEqualize:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -1px; }
+/* Exit stays pinned at the panel foot, away from pane navigation. */
+.sidebarFooter { margin-top: auto; flex: none; padding-top: var(--dsw-space-1); border-top: 0.5px solid var(--dsw-alias-border-l2); position: sticky; bottom: 0; background: var(--dsw-specific-sidebar-fill); }
+.sidebarExit { display: flex; align-items: center; gap: var(--dsw-space-2); width: 100%; padding: 8px var(--dsw-space-2); border: 0; border-radius: var(--dsw-radius-md); corner-shape: round; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+.sidebarExit:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.sidebarExit:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
+.sidebarExitHint { margin-left: auto; color: var(--dsw-alias-label-caption); font-size: 10.5px; font-weight: 500; }

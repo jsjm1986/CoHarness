@@ -62,7 +62,7 @@ The database is disposable but reset is guarded: every recognized schema version
 <a id="tokenizer-and-limits"></a>
 ## Tokenizer and limits
 
-The index uses FTS5 `unicode61`. The trade-off is token/phrase recall rather than arbitrary substring recall: `AI` does not match the token `BRAID`. Use `ctx.sessionQuery.filterEvents()` with a `text` clause when a literal whitespace-flexible substring scan is required. NUL is rejected in queries; reserved highlight markers and NUL in documents are normalized before indexing so presentation markers cannot collide with source text.
+The index uses FTS5 `unicode61`. Document and query text pass the same normalizer, which separates every Han-adjacent character pair with a reserved zero-width space, so each CJK character becomes its own token and phrase matching yields substring semantics at any length (`记忆` matches inside `记忆系统`, and mixed runs such as `试A版` split too). Non-Han runs keep the token/phrase trade-off rather than arbitrary substring recall: `AI` does not match the token `BRAID`. Use `ctx.sessionQuery.filterEvents()` with a `text` clause when a literal whitespace-flexible substring scan is required. NUL is rejected in queries; reserved highlight markers and NUL in documents are normalized before indexing so presentation markers cannot collide with source text.
 
 Abort signals stop queued work and flow unchanged through snapshot listing and non-mutating inspection. Once source work starts, the serialized state machine awaits that backend promise itself—even when a backend ignores cancellation—then checks the signal before starting any further listing, inspection, reconciliation, or query work. The caller therefore observes cancellation only after started backend work is quiescent, and a later search cannot enter the serializer while that cleanup is pending. Node's synchronous `DatabaseSync` API cannot interrupt a metadata or MATCH statement already executing on the JavaScript thread; signals are checked immediately before and after those non-preemptible calls.
 
@@ -79,7 +79,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **No caller authorization** — this is a trusted context-wide service; a model tool or UI must enforce its own access policy.
 - **Synchronous query execution** — `DatabaseSync` blocks the JavaScript thread during MATCH execution and cannot interrupt a statement already running.
-- **Token recall, not arbitrary substrings** — the `unicode61` tokenizer does not match substrings inside a larger token; use `filterEvents()` for literal scans.
+- **Token recall for non-Han runs, not arbitrary substrings** — the `unicode61` tokenizer does not match substrings inside a larger non-Han token; use `filterEvents()` for literal scans. Han-adjacent character pairs are split at index time, so CJK queries do match substrings of any length.
 - **Single-owner derived index** — one service in one process must own each index path; external writers and multi-process sharing are unsupported.
 
 <a id="dev-note"></a>

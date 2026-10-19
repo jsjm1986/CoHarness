@@ -304,7 +304,7 @@ function TurnStatus({ startTime, t }: {
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, openDetails, openExternalLink, loadOlder,
   loadHistoryUntil, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, presentation, t,
+  fileMentions, presentation, useRevealTarget, ackReveal, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const entries = useSession(s => s.chat.entries)
@@ -897,6 +897,19 @@ export function ChatView({
     }
     void jump()
   }, [chatScroll.save, loadHistoryUntil, navigation])
+
+  // Cross-plugin reveal: a pending viewport request names a session-log seq;
+  // land on the turn containing it through the same jump path as the rail.
+  const revealTarget = useRevealTarget(v => v)
+  const revealedNonceRef = useRef(0)
+  useEffect(() => {
+    if (revealTarget === undefined || revealTarget.nonce <= revealedNonceRef.current) return
+    revealedNonceRef.current = revealTarget.nonce
+    const item = [...navigationItems].reverse().find(candidate =>
+      candidate.startSeq !== undefined && candidate.startSeq <= revealTarget.seq) ?? navigationItems[0]
+    if (item !== undefined) navigateToTurn(item)
+    ackReveal()
+  }, [revealTarget, navigationItems, navigateToTurn, ackReveal])
 
   return (
     <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile} fileImages={fileImages}>

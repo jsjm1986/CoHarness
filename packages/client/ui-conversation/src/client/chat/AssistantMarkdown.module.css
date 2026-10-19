@@ -3,12 +3,31 @@
    43:32997) — separate from the body's internal gap so the footer spacing
    stays fixed when the body is a single block. */
 
+/* Assistant body enters on a short rise (the user bubble's pop counterpart —
+   lighter, because the body is canvas-flat and carries no seat shape). The
+   animation runs once at mount: streaming appends re-render inside the same
+   element and do not replay it. */
+@keyframes assistant-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 .root {
   display: flex;
   flex-direction: column;
   font-size: var(--dsh-chat-font-size, 16px);
   line-height: calc(var(--dsh-chat-font-size, 16px) * 1.75);
   color: var(--dsw-alias-label-primary);
+  animation: assistant-fade-up var(--dsw-motion-duration-fast)
+    var(--dsw-motion-ease-out-expo) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation: none;
+  }
 }
 
 .body {

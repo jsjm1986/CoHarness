@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-runtime",
   "description": "Client core services: SlotRegistry, SessionRuntime (scope tree + object layer)",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -36,7 +36,7 @@
       "immediately": true
     }
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "immer": "^11.1.18",
     "zustand": "~5.0.14"

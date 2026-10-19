@@ -33,6 +33,7 @@ describe('verify-plugin-surfaces', () => {
       '@deepseek-ai/dsh-steward-tools',
     ])
     expect(facts.dynamicClientPackages.length).toBe(60)
+    expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-memory')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-workbench')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-open-in-app')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-cordis')

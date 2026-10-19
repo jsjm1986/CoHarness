@@ -22,6 +22,8 @@ vi.mock('../api.ts', () => ({
   setProjectModelAccess: vi.fn(),
   setAllProjectModelAccess: vi.fn(),
   setQuota: vi.fn(),
+  getMemoryPolicy: vi.fn(),
+  setMemoryPolicy: vi.fn(),
 }))
 
 const project = {
@@ -180,6 +182,7 @@ describe('ProjectDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.getProject).mockResolvedValue(project)
+    vi.mocked(api.getMemoryPolicy).mockImplementation(async (kind, id) => ({ kind, id, enabled: false, revision: '0' }))
     vi.mocked(api.listUsers).mockResolvedValue([alice])
     vi.mocked(api.getProjectUsage).mockResolvedValue(usage)
     vi.mocked(api.listUsageContributors).mockResolvedValue(contributors)

@@ -73,6 +73,7 @@ const CODE_KEYS = {
   'unaddressable': 'reasonUnaddressable',
   'unknown-plugin': 'reasonUnknownPlugin',
   'invalid-spec': 'reasonInvalidSpec',
+  'already-installed': 'reasonAlreadyInstalled',
   'ambiguous-install': 'reasonAmbiguousInstall',
   'not-bundle': 'reasonNotBundle',
   'not-removable': 'reasonNotRemovable',

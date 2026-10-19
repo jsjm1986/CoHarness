@@ -22,7 +22,7 @@ import type { ProfileContext, ProfileManifest } from '@deepseek-ai/dsh-app-boot'
 import { bundleManifest, readProfileRegistry, registryArguments, runProfilePnpm, saveManifest, viewProfilePackage } from './operations.ts'
 import { installationStream } from './install-stream.ts'
 import { classifyInstallFailure } from './install-failure.ts'
-import { dependencySpec, InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts'
+import { dependencySpec, InvalidInstallSpecError, parseInstallSpec } from './install-spec.ts'
 import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryPlan } from './registry.ts'
 import { writePluginEnabled } from './patch.ts'
 import { applyDesiredState, readDesiredState } from './desired-state.ts'
@@ -33,11 +33,11 @@ import type {
   BundleInfo, BundleRowInfo, ChangeResult, InspectOptions, InstallBundleOptions, ManagementError, PackageResult, PluginChange,
   PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress,
   PluginInstallRequestId, PluginInstallFrame, PluginManagementAccess, PluginManagementCapability, PluginRegistries,
-  PluginSpecInspection, PluginManagementAuthorization, Registry,
+  PluginSpecInspection, PluginManagementAuthorization, ParsedInstallSpec, Registry,
 } from './types.ts'
 export type * from './types.ts'
 export { classifyInstallFailure, type InstallFailureFacts } from './install-failure.ts'
-export { InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts'
+export { InvalidInstallSpecError, parseInstallSpec } from './install-spec.ts'
 
 /** The pnpm executable, registries, and limits for diagnostics, lookups and connection checks. */
 export interface Config {

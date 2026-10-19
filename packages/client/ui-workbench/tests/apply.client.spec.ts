@@ -41,7 +41,7 @@ async function harness(services: HarnessServices = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry)
   const slots = ctx.get('slots') as SlotRegistry
-  const snapshot = createSnapshotStore<ConversationViewportSnapshot>({ mode: 'workbench', paneIds: [], paneRatios: [] })
+  const snapshot = createSnapshotStore<ConversationViewportSnapshot>({ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] })
   const viewport = {
     snapshot,
     add: vi.fn(() => ({ ok: true })),
@@ -133,7 +133,7 @@ describe('workbench navigation lifecycle', () => {
       h.actions.setMode('single')
       expect(h.viewport.focus).toHaveBeenCalledWith(A)
       expect(h.viewport.setMode).toHaveBeenCalledWith('single')
-      h.snapshot.set({ mode: 'workbench', paneIds: ['b', 'c', 'd', 'e'] as SessionId[], paneRatios: [1, 1, 1, 1] })
+      h.snapshot.set({ mode: 'workbench', paneIds: ['b', 'c', 'd', 'e'] as SessionId[], paneRatios: [1, 1, 1, 1], collapsedIds: [] })
       await expect(h.actions.chooseSession(item, false)).resolves.toEqual({ ok: false, reason: 'limit' })
       await expect(h.actions.createSession({ kind: 'personal' }, false)).resolves.toEqual({ ok: false, reason: 'limit' })
       expect(h.sessions.createSession).not.toHaveBeenCalled()
@@ -355,7 +355,7 @@ describe('workbench navigation lifecycle', () => {
   it('handles optional runtime methods and does not duplicate a pinned pane', async () => {
     const h = await harness()
     try {
-      h.snapshot.set({ mode: 'workbench', paneIds: [A, 'b', 'c', 'd'] as SessionId[], paneRatios: [1, 1, 1, 1] })
+      h.snapshot.set({ mode: 'workbench', paneIds: [A, 'b', 'c', 'd'] as SessionId[], paneRatios: [1, 1, 1, 1], collapsedIds: [] })
       await expect(h.actions.chooseSession(item, false)).resolves.toEqual({ ok: true })
       Object.assign(h.sessions, { ensureSession: undefined, createSession: undefined, setBaseRuntimeTarget: undefined })
       await expect(h.actions.chooseSession(item, true)).resolves.toEqual({ ok: false, reason: 'unknown' })
@@ -540,10 +540,10 @@ describe('workspace file serving', () => {
       pane.openFiles()
       expect(h.actions.filesAvailable()).toBe(false)
       h.actions.openFiles()
-      h.snapshot.set({ mode: 'workbench', paneIds: [A], activePaneId: A, paneRatios: [1] })
+      h.snapshot.set({ mode: 'workbench', paneIds: [A], activePaneId: A, paneRatios: [1], collapsedIds: [] })
       expect(h.actions.filesAvailable()).toBe(true)
       h.actions.openFiles()
-      h.snapshot.set({ mode: 'single', paneIds: [], paneRatios: [] })
+      h.snapshot.set({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })
       expect(h.actions.filesAvailable()).toBe(true)
       h.actions.openFiles()
     } finally { await h.ctx.fiber.dispose() }

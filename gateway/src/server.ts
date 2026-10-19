@@ -74,6 +74,8 @@ export interface GatewayDeps {
   pluginAccess?: Pick<import('./plugin-access.ts').PluginAccess, 'get' | 'set'>
   /** Optional administrator-owned steward-space qualification store. */
   stewardAccess?: Pick<import('./steward-access.ts').StewardAccess, 'get' | 'set' | 'list'>
+  /** Optional administrator-owned shared-memory write qualification store. */
+  memoryAccess?: Pick<import('./memory-access.ts').MemoryAccess, 'get' | 'set'>
   pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke' | 'state' | 'saveState'>
   /** Optional durable plugin desired-state store backing spawn projection and runtime write-back. */
   pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'get' | 'set' | 'readForSubject' | 'publishForSubject' | 'projection' | 'markApplied' | 'applied' | 'observed' | 'project'>
@@ -84,6 +86,8 @@ export interface GatewayDeps {
   webhookDeliveries?: Pick<import('./postgres/webhook-delivery-service.ts').PostgresWebhookDeliveryService, 'list'>
   /** Optional administrator-registered webhook endpoint service. */
   webhookEndpoints?: Pick<import('./postgres/webhook-endpoint-service.ts').PostgresWebhookEndpointService, 'list' | 'create' | 'update' | 'mutate'>
+  /** Optional public-access tunnel (cloudflared) orchestration for this node. */
+  tunnelAccess?: Pick<import('./tunnel-access.ts').GatewayTunnelAccess, 'view' | 'install' | 'startQuick' | 'startNamed' | 'stop' | 'clear'>
   /** Optional public provider ingress and administrator redispatch orchestrator. */
   webhookIntake?: Pick<import('./webhook-intake.ts').GatewayWebhookIntake, 'handle' | 'redispatch'>
   /** Maintenance windows, writer convergence, and restore fencing for shared PostgreSQL. */
@@ -1695,6 +1699,32 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       send(res, 200, JSON.stringify({
         items: await deps.collaboration.listConversations(user.id, resolved.context.scope.projectId),
       }), 'application/json')
+      return
+    }
+
+    if (pathname === '/account/api/activity' && req.method === 'GET') {
+      if (resolved.context.scope.kind !== 'project' || deps.collaboration === undefined) {
+        send(res, 400, '{"error":"project-scope-required"}', 'application/json')
+        return
+      }
+      const params = new URL(req.url ?? '/', 'http://x').searchParams
+      const limitValue = params.get('limit')
+      const limit = limitValue === null ? 50 : Number(limitValue)
+      if (!Number.isSafeInteger(limit) || limit <= 0) {
+        send(res, 400, '{"error":"invalid-limit"}', 'application/json')
+        return
+      }
+      const before = params.get('before') ?? undefined
+      try {
+        send(res, 200, JSON.stringify(await deps.collaboration.listActivity(
+          user.id, resolved.context.scope.projectId, { limit, before })), 'application/json')
+      } catch (error) {
+        if (error instanceof CollaborationDeniedError) {
+          send(res, error.code === 'not-member' ? 403 : 404, JSON.stringify({ error: error.code }), 'application/json')
+          return
+        }
+        throw error
+      }
       return
     }
 

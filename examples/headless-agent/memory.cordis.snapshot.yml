@@ -1,0 +1,30 @@
+# Replay counterpart to memory.cordis.yml: same memory stack, keyless replay model.
+- id: base
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@deepseek-ai/dsh-llm-deepseek-api-key'
+        disabled: true
+      - insert:
+          - id: storage
+            name: '@deepseek-ai/dsh-storage'
+          - id: storage-json
+            name: '@deepseek-ai/dsh-storage-json'
+            config:
+              root: !!js process.cwd() + '/.memory-store'
+          - id: storage-domain
+            name: '@deepseek-ai/dsh-storage-domain'
+            config:
+              backend: json
+          - id: memory
+            name: '@deepseek-ai/dsh-memory'
+          - id: memory-context
+            name: '@deepseek-ai/dsh-memory-context'
+          - id: tool-memory
+            name: '@deepseek-ai/dsh-tool-memory'
+          - id: memory-curation
+            name: '@deepseek-ai/dsh-memory-curation'
+          - id: llm-replay
+            name: '@deepseek-ai/dsh-llm-replay'

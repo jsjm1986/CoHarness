@@ -695,6 +695,56 @@ describePg('Gateway execution identities', () => {
     expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(403)
   })
 
+  it('admits qualified members for project memory writes until the grant is revoked', async () => {
+    const f = await fixture(), id = await f.session()
+    const receipt = await f.admit(id, f.member)
+    await f.enter(id, receipt)
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+      [f.organizationId, f.member.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,project_id,enabled,revision) VALUES($1,$2,true,1)',
+      [f.organizationId, f.project.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(200)
+    await pool.query('UPDATE harness.memory_access_policies SET enabled=false,revision=revision+1 WHERE organization_id=$1 AND user_id=$2',
+      [f.organizationId, f.member.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
+  })
+
+  it('denies memory writes for an administrator without the qualification, private sessions, and personal runtimes', async () => {
+    const f = await fixture(), id = await f.session()
+    const receipt = await f.admit(id, f.admin)
+    await f.enter(id, receipt)
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+      [f.organizationId, f.admin.uuid])
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,project_id,enabled,revision) VALUES($1,$2,true,1)',
+      [f.organizationId, f.project.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(200)
+    // Writable membership binds non-administrator actors; administrators keep
+    // the shared rule's exemption.
+    await pool.query("UPDATE harness.project_members SET access_mode='ro' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.admin.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(200)
+    await pool.query("UPDATE harness.project_members SET access_mode='rw' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.admin.uuid])
+    const memberReceipt = await f.admit(id, f.member)
+    await f.enter(id, memberReceipt)
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
+    await pool.query('INSERT INTO harness.memory_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+      [f.organizationId, f.member.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(200)
+    await pool.query("UPDATE harness.project_members SET access_mode='ro' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.member.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
+    await pool.query("UPDATE harness.project_members SET access_mode='rw' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.member.uuid])
+    await pool.query("UPDATE harness.conversation_sessions SET visibility='private' WHERE id=$1", [id])
+    expect((await f.call('authorize', { sessionId: id, capability: 'memory' })).status).toBe(403)
+    const personalId = await f.session(f.personal)
+    const personalReceipt = await f.admit(personalId, f.admin, f.personal)
+    await f.enter(personalId, personalReceipt, f.personal)
+    const personal = await f.call('authorize', { sessionId: personalId, capability: 'memory' }, undefined, f.personal)
+    expect(personal.status).toBe(403)
+    expect((personal.body as { message?: string }).message).toBe('memory qualification applies only to project runtimes')
+  })
+
   it('keeps administrator plugin management authority in a project without any policy', async () => {
     const f = await fixture(), id = await f.session()
     const receipt = await f.admit(id, f.admin)

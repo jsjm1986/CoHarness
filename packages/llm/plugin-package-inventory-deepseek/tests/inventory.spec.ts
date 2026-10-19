@@ -105,6 +105,24 @@ describe('DeepSeek plugin package inventory', () => {
     ])
   })
 
+  it.each([
+    ['2.0.0', undefined, '1.0.0'],
+    ['1.0.0', undefined, '2.0.0'],
+    [undefined, '2.0.0', '1.0.0'],
+  ])('sorts same-name identities when a parallel entry is unversioned (versions=%j)', async (...versions) => {
+    const { ctx, root } = await harness()
+    for (const [index, version] of versions.entries()) {
+      const manifest = version === undefined ? { name: 'same' } : { name: 'same', version }
+      await ctx.loader.create({ name: await packagePlugin(root, `same-${index}`, manifest) })
+    }
+    const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
+    expect(prepared.fields.dsh_plugin_packages?.packages).toStrictEqual([
+      { name: 'same' },
+      { name: 'same', version: '1.0.0' },
+      { name: 'same', version: '2.0.0' },
+    ])
+  })
+
   it.each(['invalid JSON', 'null', 'deleted'])('retains readable packages when another manifest is %s', async (kind) => {
     const { ctx, root } = await harness()
     const bad = await packagePlugin(root, 'bad', { name: 'bad', version: '1.0.0' })

@@ -85,7 +85,7 @@ describe('web e2e: plugin configuration section', () => {
 
     // Each card belongs to a Host settings namespace served by this composition.
     const group = panel.locator('[data-plugin-group="config"]')
-    for (const name of ['终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索']) {
+    for (const name of ['终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索', '记忆']) {
       await expect.poll(async () => group.getByRole('button', { name: `查看 ${name}`, exact: true }).count(), { timeout: 10_000 }).toBe(1)
     }
     // The form lives on the item's own page: the card shows the one-liner only.

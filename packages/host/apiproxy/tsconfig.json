@@ -96,6 +96,9 @@
       "path": "../../preset/agent-preset-registry"
     },
     {
+      "path": "../../memory/memory"
+    },
+    {
       "path": "../../schedule/schedule"
     },
     {

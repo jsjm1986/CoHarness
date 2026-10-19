@@ -2112,17 +2112,14 @@ export async function handleUserDocHttp(host: UserDocHttpHost, req: UserDocReque
         res.end()
         return
       }
-      const trash = (host.userDocs as { trash?: (id: UserDocId) => Promise<unknown> }).trash
-      if (typeof trash === 'function') {
-        try {
-          await trash.call(host.userDocs, docId)
-        } catch (error) {
-          if (!(error instanceof UserDocError)
-            || (error.code !== DOCUMENT_NOT_FOUND_CODE && error.code !== DOCUMENT_TRASHED_CODE
-              && error.code !== DOCUMENT_UPLOAD_PROTOCOL_CODE)) throw error
-          if (error.code === DOCUMENT_UPLOAD_PROTOCOL_CODE) await host.userDocs.remove(docId)
-        }
-      } else await host.userDocs.remove(docId)
+      try {
+        await host.userDocs.trash(docId)
+      } catch (error) {
+        if (!(error instanceof UserDocError)
+          || (error.code !== DOCUMENT_NOT_FOUND_CODE && error.code !== DOCUMENT_TRASHED_CODE
+            && error.code !== DOCUMENT_UPLOAD_PROTOCOL_CODE)) throw error
+        if (error.code === DOCUMENT_UPLOAD_PROTOCOL_CODE) await host.userDocs.remove(docId)
+      }
       const runtime = runtimeForCatalog(host)
       if (runtime !== undefined) {
         try {

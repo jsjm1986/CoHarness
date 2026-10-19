@@ -1,7 +1,10 @@
 /** Reading install specs and classifying pnpm failures: pure, table-driven. */
 
+import { homedir } from 'node:os'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { classifyInstallFailure, InvalidInstallSpecError, parseInstallSpec } from '@deepseek-ai/dsh-plugin-manager'
+import { dependencySpec } from '../src/install-spec.ts'
 
 describe('parseInstallSpec', () => {
   it('reads registry names with an optional range, scoped or not', () => {
@@ -52,6 +55,29 @@ describe('parseInstallSpec', () => {
     expect(refusal('has space')).toBe('not a package name the registry accepts')
     expect(refusal('a'.repeat(215))).toBe('not a package name the registry accepts')
     expect(refusal('pkg@')).toBe('a version after @ must not be empty')
+  })
+})
+
+describe('dependencySpec', () => {
+  it('spells registry values as name@range and local directories as resolved file:/link: paths', () => {
+    const dir = resolve('/profiles/main')
+    expect(dependencySpec('dsh-x', '^1.2.3', dir)).toBe('dsh-x@^1.2.3')
+    expect(dependencySpec('@acme/dsh-x', '2.0.0', dir)).toBe('@acme/dsh-x@2.0.0')
+    expect(dependencySpec('dsh-x', 'file:../addons/dsh-x', dir)).toBe(`file:${resolve(dir, '../addons/dsh-x')}`)
+    expect(dependencySpec('dsh-x', 'link:~/addons/dsh-x', dir)).toBe(`link:${resolve(homedir(), 'addons/dsh-x')}`)
+  })
+
+  it('keeps non-registry values as recorded, stripping credentials a git-over-HTTP URL carries', () => {
+    const dir = resolve('/profiles/main')
+    expect(dependencySpec('dsh-x', 'git+https://ci:secret@github.com/a/b.git', dir)).toBe('git+https://github.com/a/b.git')
+    expect(dependencySpec('dsh-x', 'github:a/b#main', dir)).toBe('github:a/b#main')
+    expect(dependencySpec('dsh-x', 'dsh-y@https://cdn.example.com/dsh-y-1.0.0.tgz', dir)).toBe('dsh-y@https://cdn.example.com/dsh-y-1.0.0.tgz')
+  })
+
+  it('spells the alias form when the installed manifest name differs from the dependency key', () => {
+    const dir = resolve('/profiles/main')
+    expect(dependencySpec('dsh-x', '^1.2.3', dir, 'dsh-y')).toBe('dsh-x@^1.2.3')
+    expect(dependencySpec('dsh-x', 'file:../addons/dsh-y', dir, 'dsh-y')).toBe(`dsh-x@file:${resolve(dir, '../addons/dsh-y')}`)
   })
 })
 

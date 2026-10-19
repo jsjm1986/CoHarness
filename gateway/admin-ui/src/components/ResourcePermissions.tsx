@@ -10,7 +10,7 @@ const keyOf = (owner: Owner): string => `${owner.kind}:${String(owner.id)}`
 const messageOf = (error: unknown): string => error instanceof Error ? error.message : translateCopy(adminLanguage(), { zh, en })('updateFailed')
 
 /** Shared optimistic editor; each resource owns its decisions and explanation. */
-export function ResourcePermissions({ name, description, saved, read, write, kinds = ['user', 'project'] }: {
+export function ResourcePermissions({ name, description, saved, read, write, kinds = ['user', 'project'], owner }: {
   name: string
   description: string
   saved: string
@@ -18,6 +18,8 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
   write: (policy: AdminResourcePolicy) => Promise<AdminResourcePolicy>
   /** Subject kinds offered by the picker; user-scoped grants live on the user detail page. */
   kinds?: ReadonlyArray<AdminResourcePolicy['kind']>
+  /** Fixed subject on a detail page; the picker is skipped. */
+  owner?: Pick<AdminResourcePolicy, 'kind' | 'id'>
 }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const [owners, setOwners] = useState<Owner[]>([])
@@ -35,9 +37,17 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
 
   const allowUser = kinds.includes('user')
   const allowProject = kinds.includes('project')
+  const fixedKind = owner?.kind
+  const fixedId = owner?.id
 
   useEffect(() => {
     let disposed = false
+    if (fixedKind !== undefined && fixedId !== undefined) {
+      setOwners([{ kind: fixedKind, id: fixedId, label: '' }])
+      setSelected(`${fixedKind}:${String(fixedId)}`)
+      setLoadingOwners(false)
+      return
+    }
     setLoadingOwners(true)
     void Promise.all([allowUser ? listUsers() : Promise.resolve([]), allowProject ? listProjects() : Promise.resolve([])]).then(([users, projects]) => {
       if (disposed) return
@@ -49,7 +59,7 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
     }).catch((cause: unknown) => { if (!disposed) setError(messageOf(cause)) })
       .finally(() => { if (!disposed) setLoadingOwners(false) })
     return () => { disposed = true; generation.current++ }
-  }, [ownerReload, allowUser, allowProject, t])
+  }, [ownerReload, allowUser, allowProject, t, fixedKind, fixedId])
 
   useEffect(() => {
     const owner = owners.find(item => keyOf(item) === selected)
@@ -84,7 +94,7 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
     <p className="muted">{description}</p>
     {allowUser ? null : <p className="muted">{t('projectOnlyHint', { name })}</p>}
     <ErrorBanner message={error} />
-    {loadingOwners ? <LoadingState label={t('loadingOwners')} /> : <Field label={t('ownerField')}>
+    {owner !== undefined ? null : loadingOwners ? <LoadingState label={t('loadingOwners')} /> : <Field label={t('ownerField')}>
       <select className="select" aria-label={t('ownerAria', { name })} value={selected} disabled={saving} onChange={(event) => {
         generation.current++; setPolicy(null); setLoading(false); setNotice(''); setError(''); setSelected(event.target.value)
       }}>

@@ -96,12 +96,20 @@
   display: flex;
   flex-direction: column;
   background: transparent;
-  transition: border-color .16s, background .16s;
+  transition: border-color .16s, background .16s, transform .16s,
+    box-shadow .16s;
 }
 
 
 .card:hover:not(.cardActive) {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Selectable cards also lift a hair on hover — the active card is already
+   engaged and the broken card cannot be picked, so neither moves. */
+.card:hover:not(.cardActive):not(.cardBroken) {
+  transform: translateY(-1px);
+  box-shadow: var(--dsw-elevation-control);
 }
 
 /* The default preset reads as selected exactly like the Appearance cubes:

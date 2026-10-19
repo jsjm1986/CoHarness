@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-client-ui-voice-input",
   "description": "Record speech and insert editable text into the conversation draft",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +30,7 @@
     "lib/client.js",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-api-gateway": "workspace:*",

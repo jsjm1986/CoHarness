@@ -24,7 +24,7 @@
   - text: Context injection runtime-context
 - paragraph: partial
 - status: Deep diving...
-- textbox "Message the agent": Queue this follow-up while the current turn is running.
+- textbox "Message COHARNESS": Queue this follow-up while the current turn is running.
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

@@ -1,6 +1,7 @@
 /** Deployment control: maintenance windows, node convergence, backups, restore requests, and the operation ledger. */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NodeConfigurationSection } from './NodeConfigurationSection.tsx'
+import { TunnelAccessSection } from './TunnelAccessSection.tsx'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import { DatabaseBackup, HardDriveDownload, RefreshCw, ShieldCheck, Wrench } from 'lucide-react'
 import {
@@ -137,6 +138,8 @@ export function DeploymentPage() {
           </div>
         )}
       </Section>
+
+      <TunnelAccessSection />
 
       <NodeConfigurationSection />
 

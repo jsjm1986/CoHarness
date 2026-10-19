@@ -21,7 +21,7 @@ function createWorkspace(): string {
   roots.push(root)
   writeManifest(root, 'package.json', {
     name: '@deepseek-ai/dsh-root',
-    license: 'MIT',
+    license: 'Apache-2.0',
     workspaces: ['apps/*', 'packages/*/*', 'vendor/*'],
   })
   return root
@@ -30,7 +30,7 @@ function createWorkspace(): string {
 describe('DSH package license gate', () => {
   it('checks root, unhyphenated CLI, and dsh-prefixed package names while ignoring other families', () => {
     const root = createWorkspace()
-    writeManifest(root, 'apps/cli/package.json', { name: '@deepseek-ai/dsh', license: 'MIT' })
+    writeManifest(root, 'apps/cli/package.json', { name: '@deepseek-ai/dsh', license: 'Apache-2.0' })
     writeManifest(root, 'packages/core/agent/package.json', {
       name: '@deepseek-ai/dsh-agent',
       license: 'BSD-3-Clause',
@@ -43,7 +43,7 @@ describe('DSH package license gate', () => {
     expect(inspectDshPackageLicenses(root)).toEqual({
       packageCount: 3,
       failures: [
-        'packages/core/agent/package.json: @deepseek-ai/dsh-agent must declare "license": "MIT"; found "BSD-3-Clause".',
+        'packages/core/agent/package.json: @deepseek-ai/dsh-agent must declare "license": "Apache-2.0"; found "BSD-3-Clause".',
       ],
     })
   })
@@ -53,7 +53,7 @@ describe('DSH package license gate', () => {
     writeManifest(root, 'packages/core/agent/package.json', { name: '@deepseek-ai/dsh-agent' })
 
     expect(inspectDshPackageLicenses(root).failures).toEqual([
-      'packages/core/agent/package.json: @deepseek-ai/dsh-agent must declare "license": "MIT"; found undefined.',
+      'packages/core/agent/package.json: @deepseek-ai/dsh-agent must declare "license": "Apache-2.0"; found undefined.',
     ])
   })
 })

@@ -389,6 +389,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     useWorkspaces: emptyWorkspaces(),
     usePanelInfo: (() => { throw new Error('unused') }),
     useProjection: (() => undefined),
+    useRevealTarget: (<S,>(selector: (value: undefined) => S) => selector(undefined)),
+    ackReveal: () => {},
     useInput: (() => { throw new Error('unused') }),
     inputActions: {
       setDraft: () => {},

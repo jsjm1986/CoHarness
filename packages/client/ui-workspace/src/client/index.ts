@@ -384,7 +384,7 @@ export function apply(ctx: ClientContext): void {
     hooks: {
       directoryFlow: browserFlowSource,
       hostDescription,
-      viewport: viewport?.snapshot ?? { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} },
+      viewport: viewport?.snapshot ?? { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }), subscribe: () => () => {} },
       currentSessions: ctx.sessions.currentScopeList ?? ctx.sessions.list,
       workspaceShortcuts: shortcutControls.state,
       shortcuts: ctx.shortcuts.catalog,

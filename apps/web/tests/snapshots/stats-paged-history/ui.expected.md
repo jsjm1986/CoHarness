@@ -599,7 +599,7 @@
 - group "Message time and speed": "{{clock}}"
 - button "Back to bottom":
   - img
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

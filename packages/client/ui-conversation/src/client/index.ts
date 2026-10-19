@@ -41,7 +41,7 @@ export type {
   ConvViewProps, ConversationContentInputProps, ConversationContentProps, ConversationViewsProps,
   ConversationWorkbenchDisplayOwnerProps,
   ConversationWorkbenchEmptyOwnerProps,
-  ConversationWorkbenchPaneHeaderOwnerProps, ConversationWorkbenchToolbarOwnerProps,
+  ConversationWorkbenchPaneHeaderOwnerProps, ConversationWorkbenchToolbarOwnerProps, WorkbenchLayoutPreset,
   DetailsInjected, DetailsSlotProps, DetailsToolOwnerProps, EmptyWorkspaceOwnerProps, HeroBrandMarkOwnerProps,
   MessageImageLoader, MessageImageSource, MessageImagesOwnerProps, MessageImagesProps,
   ReasoningBodyOwnerProps, ReasoningContentInput, RenderMessageImages, TurnTailOwnerProps, UseChatNodeTurnData,

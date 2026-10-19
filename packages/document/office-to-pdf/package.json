@@ -1,14 +1,14 @@
 {
   "name": "@deepseek-ai/dsh-office-to-pdf",
   "description": "Shared Office-to-PDF conversion with bounded queues and caching",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",

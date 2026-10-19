@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-remote-mock",
   "description": "Endpoint-named mock for the Client's wire traffic: unary answers and stream scripts per endpoint, live stream control, a log, and the Connection api/rpc carrier faces whole-client specs install",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -21,7 +21,7 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@vitest/spy": "^4.1.11"
   },

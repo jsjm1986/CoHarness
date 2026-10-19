@@ -99,6 +99,7 @@ export interface CollaborationAuthority {
    * @param kind - interaction class whose ids occupy an independent namespace.
    * @param interactionId - stable approval or question request id.
    * @param outcome - exact response payload being committed.
+   * @param callId - tool call id when the pending interaction carries one.
    * @returns true for the first accepted responder; false after another responder won.
    */
   claimInteraction(
@@ -106,6 +107,7 @@ export interface CollaborationAuthority {
     kind: CollaborationInteractionKind,
     interactionId: string,
     outcome: unknown,
+    callId?: string,
   ): Promise<boolean>
 }
 

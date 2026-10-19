@@ -65,6 +65,7 @@
     "tests/draft-initialization.e2e.ts",
     "tests/responsive-shell.e2e.ts",
     "tests/project-collaboration.e2e.ts",
+    "tests/project-activity.e2e.ts",
     "tests/workspace-history-entry.e2e.ts",
     "tests/document-manager.e2e.ts",
     "tests/chat-sender-attribution.e2e.ts",

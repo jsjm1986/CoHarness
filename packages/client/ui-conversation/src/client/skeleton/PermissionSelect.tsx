@@ -215,9 +215,11 @@ export function PermissionSelect({ value, catalog, availability, locked, command
             {permissionGlyph(currentValue) !== undefined && (
               <span className={css.triggerIcon} aria-hidden>{permissionGlyph(currentValue)}</span>
             )}
-            <span className={css.triggerLabel}>{current === undefined ? displayName(currentValue) : optionLabel(current, t)}</span>
+            <span className={css.triggerLabel} data-clip-label>
+              {current === undefined ? displayName(currentValue) : optionLabel(current, t)}
+            </span>
             {/* Same glyph + open rotation as the sibling ModelSelect trigger. */}
-            <span className={clsx(css.chevron, open && css.chevronOpen)} aria-hidden>
+            <span className={clsx(css.chevron, open && css.chevronOpen)} aria-hidden data-clip-label>
               <IconChevronDownOutline14 />
             </span>
           </button>

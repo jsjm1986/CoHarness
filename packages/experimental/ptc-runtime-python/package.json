@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-ptc-runtime-python",
   "description": "CPython subprocess implementation of the DeepSeek Harness PTC execution seam",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
@@ -22,7 +22,7 @@
     "py/**/*.py",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-ptc-runtime": "workspace:*",

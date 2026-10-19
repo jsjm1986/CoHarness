@@ -149,6 +149,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Add durable session state | extend `SessionEventMap`; render and replay from the log |
 | Generate session titles | register the sole `ctx.sessionTitle` provider |
 | Manage a same-session objective | use `ctx.goals`; continue through `agent/*` |
+| Remember facts across sessions | save entries through `ctx.memory`; memory-context publishes the catalog |
 | Fork a live session | `ctx.sessions.fork(source, boundary?, childSessionId?)` |
 | Scope a registration to one agent | use that agent's `agent.ctx` |
 

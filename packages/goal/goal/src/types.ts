@@ -1,11 +1,14 @@
 /**
  * Pure types of the goal domain: the ONE home of the `goal` projection-key
- * declaration, durable payload vocabulary, and client-safe activation event,
- * free of this package's host-side imports (dsh-agent, dsh-llm, the service).
- * Two namespace projections serve it — `./types` for host
- * consumers, `./client` (the browser half-entry's re-export) for client
- * aggregates — with zero content duplication. Host-coupled domain
- * vocabulary (message sources, events, fold shapes) lives in ./domain.ts.
+ * declaration plus the durable and wire payload vocabulary it carries, free
+ * of this package's host-side imports (dsh-agent, dsh-llm, the service).
+ * The client-forwarded `goal/activation-changed` cordis event is declared
+ * here because remote consumers subscribe through client aggregates; the
+ * agent-scoped `goal/changed` event stays in ./domain.ts with the rest of
+ * the host-coupled domain vocabulary (message sources, fold shapes). Two
+ * namespace projections serve this file — `./types` for host consumers,
+ * `./client` (the browser half-entry's re-export) for client aggregates —
+ * with zero content duplication.
  *
  * @module @deepseek-ai/dsh-goal/types
  */
@@ -71,6 +74,18 @@ export interface GoalSnapshot extends GoalRef {
 /** Whether this live process may automatically continue an active goal. */
 export type GoalActivation = 'armed' | 'disarmed'
 
+/** Current goal projection, including values derived from the session log. */
+export interface GoalView extends GoalSnapshot {
+  /** Highest admitted round number for this goal. */
+  readonly roundsStarted: number
+  /** Epoch milliseconds of the create mutation. */
+  readonly createdAt: number
+  /** Epoch milliseconds of the latest mutation. */
+  readonly updatedAt: number
+  /** Process-local continuation eligibility; never persisted. */
+  readonly activation: GoalActivation
+}
+
 /** Live process-local activation update forwarded to UI clients. */
 export interface GoalActivationChanged {
   /** Session whose live goal activation changed. */
@@ -84,29 +99,6 @@ export interface GoalActivationChanged {
     /** Current process-local continuation state. */
     readonly activation: GoalActivation
   }
-}
-
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    /**
-     * Process-local goal activation changed for one session.
-     * @mode emit
-     * @param payload - session id and the exact current goal activation, or no goal after a clear.
-     */
-    'goal/activation-changed'(payload: GoalActivationChanged): void
-  }
-}
-
-/** Current goal projection, including values derived from the session log. */
-export interface GoalView extends GoalSnapshot {
-  /** Highest admitted round number for this goal. */
-  readonly roundsStarted: number
-  /** Epoch milliseconds of the create mutation. */
-  readonly createdAt: number
-  /** Epoch milliseconds of the latest mutation. */
-  readonly updatedAt: number
-  /** Process-local continuation eligibility; never persisted. */
-  readonly activation: GoalActivation
 }
 
 /**
@@ -148,5 +140,16 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
      * advance `roundsStarted`.
      */
     goal: GoalProjection | null
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Process-local goal activation changed for one session.
+     * @mode emit
+     * @param payload - session id and the exact current goal activation, or no goal after a clear.
+     */
+    'goal/activation-changed'(payload: GoalActivationChanged): void
   }
 }

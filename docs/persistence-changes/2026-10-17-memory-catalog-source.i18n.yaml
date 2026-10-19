@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-17-memory-catalog-source.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-17-memory-catalog-source.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-17-memory-catalog-source:
+  en: 4f61981c7bc0f49a
+  zh: 40ef3e6797a9f079
+/2026-10-17-memory-catalog-source/summary:
+  en: e7a34a2184d07c11
+  zh: a2d54575061570a7
+/2026-10-17-memory-catalog-source/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-17-memory-catalog-source/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-17-memory-catalog-source/compatibility:
+  en: fd9d84141d03977e
+  zh: fff26a2322341b94
+/2026-10-17-memory-catalog-source/verification:
+  en: 8c787fbaab829729
+  zh: b9b7c4b595be7502
+/2026-10-17-memory-catalog-source/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

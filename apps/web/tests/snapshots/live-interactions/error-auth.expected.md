@@ -27,7 +27,7 @@
 - status:
   - text: This turn failedAPI key is invalid
   - code: AUTH
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

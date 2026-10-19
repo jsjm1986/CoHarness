@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-ptc-runtime-node",
   "description": "Node PTC execution with per-call sandboxed processes or in-memory REPL state",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -32,7 +32,7 @@
     "lib/persistent-process.js",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-fs": "workspace:*",

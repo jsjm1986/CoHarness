@@ -23,6 +23,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Gr
 | [`api/`](api/README.md) | Remote BFF assembly and Typert RPC gateway | Product — stable API |
 | [`typert/`](typert/README.md) | Type graph generation, artifact loading, and runtime registry | Product — stable API |
 | [`goal/`](goal/README.md) | Same-session goal persistence and lifecycle | Product — stable API |
+| [`memory/`](memory/README.md) | Space-scoped durable agent memory | Product — stable API |
 | [`schedule/`](schedule/README.md) | Session-local scheduled follow-ups | Product — stable API |
 | [`feedback/`](feedback/README.md) | Human feedback | Product — stable API |
 | [`identity/`](identity/README.md) | Shared anonymous identity | Product — stable API |
@@ -68,11 +69,11 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Gr
 | [`test-support/`](test-support/README.md) | Support infrastructure (testkits, replay, Loader smokes) | Support — lower compatibility expectations |
 | [`util/`](util/README.md) | Low-level zero-dependency utilities shared across groups (`Branded<B>`, Harness home/path helpers, timeout, retention) | Support — small, stable, harness-dep-free |
 
-New packages join existing groups; new groups update their README and this table.
+New packages join existing groups; new groups update this table.
 
 ## Dependencies
 
-The dependency graph is generated: [docs/module-graph.md](../docs/module-graph.md) (`pnpm run gen-module-graph`, freshness-gated in CI).
+The generated dependency graph: [docs/module-graph.md](../docs/module-graph.md).
 
 **Extension plugins depend on Service Definitions, never concrete providers.** `dsh-agent-loop` is swappable; UI, hook, and tool plugins use `dsh-agent`. Composition bundles, including `dsh-agent-spine-demo`, may depend on spine plugins. Capabilities separate Service Definition / Service Provider / Consumer roles when they evolve independently; see [capability seams](../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md).
 

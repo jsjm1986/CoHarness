@@ -94,8 +94,10 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   // product data, not a package reference. Renaming it changed which preset
   // the creator flow stages and which id the roster reports.
   { file: 'packages/client/ui-agent-preset/src/client/AgentPresetSection.tsx', upstream: ['cordis'] },
+  { file: 'packages/client/ui-agent-preset/src/client/CreatePluginMenuItem.tsx', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/src/client/index.ts', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/apply.client.spec.ts', upstream: ['cordis'] },
+  { file: 'packages/client/ui-agent-preset/tests/create-plugin-menu-item.client.spec.tsx', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/locales.client.spec.ts', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/section.client.spec.tsx', upstream: ['cordis'] },
   // The guide dialog keys its preset blurbs by the `cordis` preset id, not a package.

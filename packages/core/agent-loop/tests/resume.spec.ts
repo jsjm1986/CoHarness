@@ -441,8 +441,12 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     const spies: Array<{ mockRestore: () => void }> = []
     ctx.sessionPersistence.open = async (id, access, options) => {
       const handle = await originalOpen(id, access, options)
-      spies.push(vi.spyOn(handle, 'read').mockRejectedValue(new Error('stored read failed')))
-      spies.push(vi.spyOn(handle, 'close').mockRejectedValue(new Error('close failed')))
+      // Only the resume-owned write handle is sabotaged; internal read handles
+      // (opened by the cold-recovery load) must keep working.
+      if (access === 'write') {
+        spies.push(vi.spyOn(handle, 'read').mockRejectedValue(new Error('stored read failed')))
+        spies.push(vi.spyOn(handle, 'close').mockRejectedValue(new Error('close failed')))
+      }
       return handle
     }
 
@@ -499,6 +503,44 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     expect(stored.map(event => event.type)).toEqual(['turn/start', 'turn/end', 'session/end-seed'])
     expect(stored[1]).toMatchObject({ data: { reason: { kind: 'interrupted' } } })
     await ctx2.fiber.dispose()
+  })
+
+  it('resume commits cold recovery through load before reading the stored log', async () => {
+    // Coordinator backends durably repair an interrupted tail inside `load`;
+    // reading first and appending the same synthetic closers through the write
+    // handle double-commits the repair and collides on sequence validation.
+    const sessionId = SessionId('resume-load-before-read')
+    const root = await persistSession(sessionId)
+    const ctx = await mountPersistentHarness(root, new MockAdapter([]))
+    const calls: string[] = []
+    const spies: Array<{ mockRestore: () => void }> = []
+    const originalLoad = ctx.sessionPersistence.load.bind(ctx.sessionPersistence)
+    ctx.sessionPersistence.load = async (id) => {
+      calls.push('load')
+      return originalLoad(id)
+    }
+    const originalOpen = ctx.sessionPersistence.open.bind(ctx.sessionPersistence)
+    ctx.sessionPersistence.open = async (id, access, options) => {
+      const handle = await originalOpen(id, access, options)
+      if (access === 'write') {
+        const realRead = handle.read.bind(handle)
+        spies.push(vi.spyOn(handle, 'read').mockImplementation((...args) => {
+          calls.push('read')
+          return realRead(...args)
+        }))
+      }
+      return handle
+    }
+
+    const handle = await ctx.agents.resume({
+      resumeSessionId: sessionId,
+      agentOptions: { provider: 'mock', model: 'mock' },
+    })
+    expect(calls).toEqual(['load', 'read'])
+    await handle.dispose()
+
+    for (const spy of spies.splice(0)) spy.mockRestore()
+    await ctx.fiber.dispose()
   })
 
   it('resume closes an interrupted tool call durably: tool/result, step/end, turn/end', async () => {
@@ -818,6 +860,9 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     let opens = 0
     ctx.sessionPersistence.open = (id, access, options) => {
       expect(id).toBe(sessionId)
+      // Only write opens are counted and stalled; resume's cold-recovery load
+      // opens an internal read handle that must flow through unimpeded.
+      if (access !== 'write') return originalOpen(id, access, options)
       opens += 1
       if (opens === 1) {
         openStarted.resolve(undefined)

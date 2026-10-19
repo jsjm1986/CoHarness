@@ -14,7 +14,7 @@
   - img
   - img
   - text: "goal No goal is currently set. Usage: /goal [<objective>|clear|edit <objective>|pause|resume]"
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

@@ -1023,6 +1023,113 @@ describe('installLlmReplay (through the real LlmRuntime)', () => {
     await expect(iterator.next()).rejects.toThrow('aborted')
   })
 
+  it('holds a chunks entry at the gate until the release file appears', async () => {
+    writeFileSync(file, sessionJsonl([]), 'utf8')
+    const overrideFile = join(dir, 'replay.override.json')
+    // A relative releaseFile resolves against the override file's directory.
+    writeFileSync(overrideFile, JSON.stringify([
+      { kind: 'chunks', chunks: TEXT_CHUNKS, hold: { after: 2, releaseFile: 'stream-release' } },
+    ]), 'utf8')
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    installLlmReplay(ctx, { file, overrideFile })
+
+    const iterator = ctx.llm.stream({ provider: 'm', model: 'm', messages: [] })[Symbol.asyncIterator]()
+    expect((await iterator.next()).value).toMatchObject({ type: 'block-start' })
+    expect((await iterator.next()).value).toMatchObject({ type: 'text-delta' })
+    vi.useFakeTimers()
+    try {
+      // The third pull must park inside the gate: advancing fake time fires
+      // the release poll while the file is still absent, so a settled flag
+      // would mean the stream leaked past its hold.
+      let released = false
+      const pending = iterator.next().then((result) => {
+        released = true
+        return result
+      })
+      await vi.advanceTimersByTimeAsync(40)
+      expect(released).toBe(false)
+      writeFileSync(join(dir, 'stream-release'), '')
+      await vi.advanceTimersByTimeAsync(20)
+      await expect(pending).resolves.toMatchObject({ value: { type: 'block-end' } })
+    } finally {
+      vi.useRealTimers()
+    }
+    expect((await iterator.next()).value).toMatchObject({ type: 'usage' })
+    expect((await iterator.next()).value).toMatchObject({ type: 'finish' })
+    expect((await iterator.next()).done).toBe(true)
+  })
+
+  it('passes a hold without waiting when the release file already exists', async () => {
+    writeFileSync(file, sessionJsonl([]), 'utf8')
+    const overrideFile = join(dir, 'replay.override.json')
+    const releaseFile = join(dir, 'already-released')
+    writeFileSync(releaseFile, '')
+    writeFileSync(overrideFile, JSON.stringify([
+      { kind: 'chunks', chunks: TEXT_CHUNKS, hold: { after: 1, releaseFile } },
+    ]), 'utf8')
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    installLlmReplay(ctx, { file, overrideFile })
+    expect(await drain(ctx.llm.stream({ provider: 'm', model: 'm', messages: [] }))).toEqual(TEXT_CHUNKS)
+  })
+
+  it('rejects a held chunks entry when the signal fires during the wait', async () => {
+    writeFileSync(file, sessionJsonl([]), 'utf8')
+    const overrideFile = join(dir, 'replay.override.json')
+    writeFileSync(overrideFile, JSON.stringify([
+      { kind: 'chunks', chunks: TEXT_CHUNKS, hold: { after: 2, releaseFile: join(dir, 'never-released') } },
+    ]), 'utf8')
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    installLlmReplay(ctx, { file, overrideFile })
+    const controller = new AbortController()
+    const iterator = ctx.llm.stream({ provider: 'm', model: 'm', messages: [], signal: controller.signal })[Symbol.asyncIterator]()
+    await iterator.next()
+    await iterator.next()
+    const pending = iterator.next()
+    await new Promise(r => setImmediate(r))
+    controller.abort()
+    await expect(pending).rejects.toThrow('aborted')
+  })
+
+  it('surfaces an already-aborted signal at a hold', async () => {
+    writeFileSync(file, sessionJsonl([]), 'utf8')
+    const overrideFile = join(dir, 'replay.override.json')
+    writeFileSync(overrideFile, JSON.stringify([
+      { kind: 'chunks', chunks: TEXT_CHUNKS, hold: { after: 0, releaseFile: join(dir, 'never-released') } },
+    ]), 'utf8')
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    installLlmReplay(ctx, { file, overrideFile })
+    const controller = new AbortController()
+    controller.abort()
+    await expect(drain(ctx.llm.stream({ provider: 'm', model: 'm', messages: [], signal: controller.signal })))
+      .rejects.toThrow('aborted')
+  })
+
+  it('rejects malformed chunks-entry hold fields before installing replay', async () => {
+    writeFileSync(file, sessionJsonl([]), 'utf8')
+    const overrideFile = join(dir, 'replay.override.json')
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const reject = (hold: unknown, pattern: RegExp): void => {
+      writeFileSync(overrideFile, JSON.stringify([
+        { kind: 'chunks', chunks: TEXT_CHUNKS, hold },
+      ]), 'utf8')
+      expect(() => installLlmReplay(ctx, { file, overrideFile })).toThrow(pattern)
+    }
+    reject('nope', /exactly after and releaseFile/)
+    reject({ after: 1 }, /exactly after and releaseFile/)
+    reject({ after: 1, releaseFile: 'x', extra: true }, /exactly after and releaseFile/)
+    reject({ after: 'x', releaseFile: 'x' }, /below the chunk count/)
+    reject({ after: 1.5, releaseFile: 'x' }, /below the chunk count/)
+    reject({ after: -1, releaseFile: 'x' }, /below the chunk count/)
+    reject({ after: TEXT_CHUNKS.length, releaseFile: 'x' }, /below the chunk count/)
+    reject({ after: 1, releaseFile: 7 }, /non-empty string/)
+    reject({ after: 1, releaseFile: '' }, /non-empty string/)
+  })
+
   it('fails loud when the script is exhausted', async () => {
     writeLog(TEXT_CHUNKS)
     const ctx = new Context()

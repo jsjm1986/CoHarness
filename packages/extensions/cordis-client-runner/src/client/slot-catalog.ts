@@ -1528,7 +1528,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/** Owner share for one workbench pane header. */\nexport interface ConversationWorkbenchPaneHeaderOwnerProps {\n  /** Whether this pane has focus. */\n  active: boolean\n  /** Focus this pane. */\n  onFocus: () => void\n  /** Remove this pane from the workbench. */\n  onClose: () => void\n  /** Whether this pane occupies the entire workbench surface. */\n  maximized: boolean\n  /** Toggle temporary full-width presentation for this pane. */\n  onMaximize: () => void\n}',
+      '/** Owner share for one workbench pane header. */\nexport interface ConversationWorkbenchPaneHeaderOwnerProps {\n  /** Whether this pane has focus. */\n  active: boolean\n  /** Focus this pane. */\n  onFocus: () => void\n  /** Remove this pane from the workbench. */\n  onClose: () => void\n  /** Whether this pane occupies the entire workbench surface. */\n  maximized: boolean\n  /** Toggle temporary full-width presentation for this pane. */\n  onMaximize: () => void\n  /** Whether this pane is collapsed to its identity strip. */\n  collapsed?: boolean\n  /** Whether collapsing still leaves one expanded pane. */\n  collapsible?: boolean\n  /** Toggle the collapsed identity strip. */\n  onToggleCollapse?: () => void\n  /** Whether every other pane is collapsed behind this one. */\n  solo?: boolean\n  /** Collapse every other pane to focus this one, or restore them while solo. */\n  onSolo?: () => void\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -1560,10 +1560,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'Workbench controls rendered above the multi-pane surface.',
     registerOptions: [],
     ownerProps: [
-      '/** Owner share for the root-level workbench toolbar. */\nexport interface ConversationWorkbenchToolbarOwnerProps {\n  /** Fit the controls into an existing session title row. */\n  inline?: boolean\n  /** Current viewport state, supplied as immutable render data. */\n  viewport: ConversationViewportSnapshot\n  /** Show tabs when the conversation container cannot fit parallel panes. */\n  tabbed: boolean\n}',
+      '/** Owner share for the root-level workbench toolbar. */\nexport interface ConversationWorkbenchToolbarOwnerProps {\n  /** Fit the controls into an existing session title row. */\n  inline?: boolean\n  /** Current viewport state, supplied as immutable render data. */\n  viewport: ConversationViewportSnapshot\n  /** Show tabs when the conversation container cannot fit parallel panes. */\n  tabbed: boolean\n  /** Preset matching the current arrangement; absent for a custom layout. */\n  layout?: WorkbenchLayoutPreset | undefined\n  /** Apply a width preset or switch to the single-pane tabbed presentation. Absent in inline mode. */\n  onSelectLayout?: ((preset: WorkbenchLayoutPreset) => void) | undefined\n}',
     ],
     ownerPropsReferences: [
       'ConversationViewportSnapshot',
+      'WorkbenchLayoutPreset',
     ],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
@@ -1943,6 +1944,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'main\' (client-ui-plugin-manager), so it exists while that entry is mounted',
     occupants: [
+      'client-ui-memory MemoryCard',
       'client-ui-settings-plugins BashCard',
       'client-ui-settings-plugins AgentLoopCard',
       'client-ui-settings-plugins SubagentLimitsCard id \'subagent\'',
@@ -2902,7 +2904,9 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'rightbar.session\' (client-ui-sidebar-right), so it exists while that entry is mounted',
     occupants: [
       'client-ui-deliverables ReviewTab',
+      'client-ui-memory MemoryTab',
       'client-ui-plan PlanPreview',
+      'client-ui-project-activity ActivityBody',
       'client-ui-schedule ScheduleTaskTab',
       'client-ui-sidebar-browser BrowserBody',
       'client-ui-sidebar-files FilesBody',
@@ -2950,6 +2954,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-deliverables ReviewTabTitle',
       'client-ui-plan PlanTitle',
+      'client-ui-project-activity ActivityTitle',
       'client-ui-schedule ScheduleTaskTabTitle',
       'client-ui-sidebar-browser BrowserTitle',
       'client-ui-sidebar-files FilesTitle',

@@ -74,7 +74,7 @@ Folders are real directories that the model can inspect through its ordinary fil
 <a id="license"></a>
 ## License
 
-MIT
+Apache-2.0
 
 <a id="model-experience"></a>
 ## Model Experience

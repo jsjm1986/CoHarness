@@ -63,6 +63,7 @@ allowBuilds:
   # The Python runtime deploy includes the reviewed workspace postinstall that
   # restores the executable bit on node-pty's macOS spawn helper.
   '@deepseek-ai/dsh-subprocess-local@file:packages/subprocess/subprocess-local': true
+  better-sqlite3: true
 
 minimumReleaseAgeExclude:
   # Office engines and their API are qualified and released together by the kit repository.

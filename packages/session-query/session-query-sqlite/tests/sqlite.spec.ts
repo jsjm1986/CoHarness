@@ -567,6 +567,35 @@ describe('SQLite session search', () => {
     await expect(ctx.sessionQuery.searchSessions({ query: '*' })).resolves.toEqual({ items: [] })
   })
 
+  it('matches CJK substrings of any length and restores snippets', async () => {
+    const ctx = await liveContext({ path: ':memory:', defaultLimit: 10, maxLimit: 10, snippetChars: 40 })
+    ctx.sessions.create(SessionId('memory'), {
+      seed: messageEvents('我们讨论过记忆系统的改造方案', 10), meta: { createdAt: 1 },
+    })
+    ctx.sessions.create(SessionId('mixed'), {
+      seed: messageEvents('internal 试A版 release notes', 10), meta: { createdAt: 1 },
+    })
+    ctx.sessions.create(SessionId('absent'), {
+      seed: messageEvents('unrelated english content', 10), meta: { createdAt: 1 },
+    })
+    ctx.sessions.create(SessionId('lone'), {
+      seed: messageEvents('x。记AB。y', 10), meta: { createdAt: 1 },
+    })
+
+    for (const query of ['记忆', '记忆系统', '忆系', '改造方案']) {
+      const result = await ctx.sessionQuery.searchSessions({ query })
+      expect(result.items.map(item => item.header.id)).toEqual([SessionId('memory')])
+      expect(result.items[0]?.bestMatch.snippet).toContain(query === '忆系' ? '忆系' : query.slice(0, 2))
+      expect(result.items[0]?.bestMatch.snippet).not.toContain('\u200B')
+    }
+    const mixed = await ctx.sessionQuery.searchSessions({ query: '试A版' })
+    expect(mixed.items.map(item => item.header.id)).toEqual([SessionId('mixed')])
+    const lone = await ctx.sessionQuery.searchSessions({ query: 'x' })
+    expect(lone.items.map(item => item.header.id)).toEqual([SessionId('lone')])
+    const absent = await ctx.sessionQuery.searchSessions({ query: '不存在词' })
+    expect(absent.items).toEqual([])
+  })
+
   it('ranks live and persisted matches on one source-comparable contract', async () => {
     const persisted = header('z-persisted')
     TestPersistence.reset([

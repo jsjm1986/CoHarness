@@ -2,12 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, ToolCallId, HarnessError , createMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { MAX_TIMER_DELAY_MS, TimeoutReason } from '@deepseek-ai/dsh-timeout'
 import * as TimeoutPolicy from '@deepseek-ai/dsh-tool-call-timeout-policy'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
+  SessionLogOffset,
   SessionSeq,
   type Session,
   type SessionEvent,
@@ -252,6 +253,7 @@ describe('registration and schemas', () => {
       'session_event_search',
       'session_trace',
       'session_event_trace',
+      'session_handoff',
       'session_event_read',
     ])
     const sessionSchema = mounted.ctx.tools.schemas().find(schema => schema.name === 'session_search')
@@ -263,6 +265,7 @@ describe('registration and schemas', () => {
     const parallelArgs: Record<string, unknown> = {
       session_trace: {},
       session_event_trace: { seq: 0 },
+      session_handoff: {},
       session_event_read: { seq: 0 },
     }
     for (const [name, args] of Object.entries(parallelArgs)) {
@@ -278,6 +281,10 @@ describe('registration and schemas', () => {
       .toEqual({ card: 'generic', kind: 'read', title: 'Trace current session' })
     expect(mounted.ctx.tools.get('session_trace')?.presentCall?.({ session_id: 'other' }))
       .toEqual({ card: 'generic', kind: 'read', title: 'Trace session other', rawInput: 'other' })
+    expect(mounted.ctx.tools.get('session_handoff')?.presentCall?.({}))
+      .toEqual({ card: 'generic', kind: 'read', title: 'Handoff current session' })
+    expect(mounted.ctx.tools.get('session_handoff')?.presentCall?.({ session_id: 'prior' }))
+      .toEqual({ card: 'generic', kind: 'read', title: 'Handoff session prior', rawInput: 'prior' })
     expect(mounted.ctx.tools.get('session_event_trace')?.presentCall?.({ session_id: 'other', seq: 3 }))
       .toEqual({
         card: 'generic',
@@ -328,14 +335,39 @@ describe('registration and schemas', () => {
       expect(() => { ToolSessionQuery.apply(mounted.ctx, { searchTimeoutMs }) })
         .toThrow(`no greater than ${MAX_TIMER_DELAY_MS}`)
     }
+    for (const handoffChars of [0, 1.5, Number.NaN]) {
+      expect(() => { ToolSessionQuery.apply(mounted.ctx, { handoffChars }) })
+        .toThrow('handoffChars')
+    }
+    for (const handoffExtractChars of [0, 1.5, Number.NaN]) {
+      expect(() => { ToolSessionQuery.apply(mounted.ctx, { handoffExtractChars }) })
+        .toThrow('handoffExtractChars')
+    }
+    for (const handoffTimeoutMs of [0, 1.5, Number.POSITIVE_INFINITY, MAX_TIMER_DELAY_MS + 1]) {
+      expect(() => { ToolSessionQuery.apply(mounted.ctx, { handoffTimeoutMs }) })
+        .toThrow(`no greater than ${MAX_TIMER_DELAY_MS}`)
+    }
     expect(() => { ToolSessionQuery.apply(new Context(), {}) }).toThrow()
   })
 
   it('expresses the complete Node timer range in the Loader config schema', () => {
+    const defaults = {
+      maxSearchResults: 100,
+      searchTimeoutMs: MAX_TIMER_DELAY_MS,
+      handoffChars: 24_000,
+      handoffExtraction: true,
+      handoffExtractChars: 60_000,
+      handoffTimeoutMs: 120_000,
+    }
     expect(new ToolSessionQuery.Config({ searchTimeoutMs: MAX_TIMER_DELAY_MS }))
-      .toEqual({ maxSearchResults: 100, searchTimeoutMs: MAX_TIMER_DELAY_MS })
+      .toEqual(defaults)
+    expect(new ToolSessionQuery.Config({ handoffTimeoutMs: MAX_TIMER_DELAY_MS }))
+      .toEqual({ ...defaults, searchTimeoutMs: 30_000, handoffTimeoutMs: MAX_TIMER_DELAY_MS })
     expect(() => new ToolSessionQuery.Config({ searchTimeoutMs: 1.5 })).toThrow()
     expect(() => new ToolSessionQuery.Config({ searchTimeoutMs: MAX_TIMER_DELAY_MS + 1 })).toThrow()
+    expect(() => new ToolSessionQuery.Config({ handoffChars: 0 })).toThrow()
+    expect(() => new ToolSessionQuery.Config({ handoffExtractChars: 1.5 })).toThrow()
+    expect(() => new ToolSessionQuery.Config({ handoffTimeoutMs: 0 })).toThrow()
   })
 })
 
@@ -1238,6 +1270,170 @@ describe('workspace authority and lineage redaction', () => {
   })
 })
 
+describe('collaboration participant readability', () => {
+  function installParticipantAcl(ctx: Context, readable: readonly SessionIdValue[]): void {
+    const allowed = new Set(readable)
+    ctx.provide('collaboration', {
+      capture: () => ({
+        readableSessionIds: (sessionIds: readonly SessionIdValue[]) => Promise.resolve(
+          new Set(sessionIds.filter(sessionId => allowed.has(sessionId))),
+        ),
+      }),
+    } as never)
+  }
+
+  it.each([
+    ['session_trace', {}],
+    ['session_event_search', { query: 'needle' }],
+    ['session_event_trace', { seq: 0 }],
+    ['session_event_read', { seq: 0 }],
+  ] as const)('denies a same-workspace %s target outside the participant-readable set', async (toolName, args) => {
+    const mounted = await mount()
+    const denied = createSession(mounted.ctx, 'member-private-secret', '/work')
+    installParticipantAcl(mounted.ctx, [mounted.caller.id])
+
+    const result = await mounted.call(toolName, { ...args, session_id: denied.id })
+
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+    expect(JSON.stringify(result)).not.toContain('member-private-secret')
+  })
+
+  it('authorizes a same-workspace target inside the participant-readable set', async () => {
+    const mounted = await mount()
+    const visible = createSession(mounted.ctx, 'shared-session', '/work')
+    installParticipantAcl(mounted.ctx, [mounted.caller.id, visible.id])
+
+    const result = await mounted.call('session_trace', { session_id: visible.id })
+
+    expect(result.isError).toBe(false)
+    expect(text(result)).toContain('Session shared-session')
+  })
+
+  it('filters search hits, requested parents, and hit parents through the readable set', async () => {
+    const mounted = await mount()
+    const hiddenParent = createSession(mounted.ctx, 'hidden-parent-secret', '/work')
+    const hiddenHit = createSession(mounted.ctx, 'hidden-hit-secret', '/work')
+    const visibleHit = createSession(mounted.ctx, 'visible-hit', '/work')
+    const visibleChild = createSession(mounted.ctx, 'visible-child', '/work', 40, hiddenParent.id)
+    installParticipantAcl(mounted.ctx, [mounted.caller.id, visibleHit.id, visibleChild.id])
+    FakeQuery.sessionSearch = () => Promise.resolve({
+      items: [
+        sessionHit(hiddenHit.id, '/work', 'hidden needle'),
+        sessionHit(visibleHit.id, '/work', 'visible needle'),
+        sessionHit(visibleChild.id, '/work', 'child needle', hiddenParent.id),
+      ],
+    })
+
+    const result = await mounted.call('session_search', {
+      query: 'needle',
+      parent_session_ids: [hiddenParent.id, visibleHit.id],
+    })
+
+    expect(FakeQuery.sessionRequests[0]?.sessionFilters).toContainEqual({
+      kind: 'parent',
+      values: [visibleHit.id],
+    })
+    const output = text(result)
+    expect(output).toContain('visible-hit')
+    expect(output).toContain('visible-child')
+    expect(output).toContain('Parent: [outside workspace]')
+    expect(output).not.toContain('hidden-hit-secret')
+    expect(output).not.toContain('hidden-parent-secret')
+  })
+
+  it('batches workspace readability into one authority request per search call', async () => {
+    const mounted = await mount()
+    const hit = createSession(mounted.ctx, 'batched-hit', '/work')
+    const batches: SessionIdValue[][] = []
+    mounted.ctx.provide('collaboration', {
+      capture: () => ({
+        readableSessionIds: (sessionIds: readonly SessionIdValue[]) => {
+          batches.push([...sessionIds])
+          return Promise.resolve(new Set(sessionIds))
+        },
+      }),
+    } as never)
+    FakeQuery.sessionSearch = () => Promise.resolve({ items: [sessionHit(hit.id, '/work')] })
+
+    const result = await mounted.call('session_search', {
+      query: 'needle',
+      parent_session_ids: [hit.id],
+    })
+
+    expect(result.isError).toBe(false)
+    expect(batches).toHaveLength(1)
+    expect(batches[0]).toEqual(expect.arrayContaining([hit.id, mounted.caller.id]))
+    expect(FakeQuery.sessionRequests[0]?.sessionFilters).toContainEqual({
+      kind: 'parent',
+      values: [hit.id],
+    })
+  })
+
+  it('redacts participant-unreadable ancestors and descendant subtrees in one lineage read', async () => {
+    const mounted = await mount()
+    const hiddenParent = createSession(mounted.ctx, 'hidden-lineage-parent-secret', '/work')
+    const target = createSession(mounted.ctx, 'shared-target', '/work', 20, hiddenParent.id)
+    const visibleChild = createSession(mounted.ctx, 'visible-lineage-child', '/work', 30, target.id)
+    const hiddenChild = createSession(mounted.ctx, 'hidden-lineage-child-secret', '/work', 40, target.id)
+    createSession(mounted.ctx, 'hidden-lineage-grandchild-secret', '/work', 50, hiddenChild.id)
+    installParticipantAcl(mounted.ctx, [mounted.caller.id, target.id, visibleChild.id])
+
+    const output = text(await mounted.call('session_trace', { session_id: target.id }))
+
+    expect(output).toContain('visible-lineage-child')
+    expect(output).toContain('[outside workspace boundary]')
+    expect(output).toContain('[outside workspace subtree]')
+    expect(output).not.toContain('hidden-lineage-parent-secret')
+    expect(output).not.toContain('hidden-lineage-child-secret')
+    expect(output).not.toContain('hidden-lineage-grandchild-secret')
+  })
+
+  it('fails closed for cross-session work when the composed capture has no bound principal', async () => {
+    const mounted = await mount()
+    const other = createSession(mounted.ctx, 'ambient-hidden-secret', '/work')
+    mounted.ctx.provide('collaboration', {
+      capture: () => {
+        throw new Error('no bound request principal')
+      },
+    } as never)
+
+    const own = await mounted.call('session_trace', {})
+    expect(own.isError).toBe(false)
+    expect(text(own)).toContain('Session caller')
+
+    expect(errorCode(await mounted.call('session_trace', { session_id: other.id })))
+      .toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+    expect(errorCode(await mounted.call('session_event_read', { session_id: other.id, seq: 0 })))
+      .toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+
+    FakeQuery.sessionSearch = () => Promise.resolve({
+      items: [sessionHit(other.id, '/work', 'ambient needle')],
+    })
+    const search = await mounted.call('session_search', { query: 'needle' })
+    expect(text(search)).toBe('No prior session matches found.')
+    expect(JSON.stringify(search)).not.toContain('ambient-hidden-secret')
+  })
+
+  it('surfaces a participant-readability failure as a sanitized operation failure', async () => {
+    const mounted = await mount()
+    const other = createSession(mounted.ctx, 'acl-failure-target', '/work')
+    const secret = 'participant ACL gateway unreachable secret'
+    mounted.ctx.provide('collaboration', {
+      capture: () => ({
+        readableSessionIds: () => Promise.reject(new Error(secret)),
+      }),
+    } as never)
+    const warn = vi.spyOn(mounted.ctx.logger, 'warn').mockImplementation(() => undefined)
+
+    const result = await mounted.call('session_trace', { session_id: other.id })
+
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_FAILED')
+    expect(text(result)).toBe('Error: session query operation failed')
+    expect(JSON.stringify(result)).not.toContain(secret)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(secret))
+  })
+})
+
 describe('search paging, prior-history bounds, titles, and cancellation', () => {
   it('drains hidden internal pages to the authorized non-self cap and masks an unauthorized parent id', async () => {
     const mounted = await mount({ maxSearchResults: 2 })
@@ -2077,5 +2273,268 @@ describe('trace and exact read rendering', () => {
   ])('rejects invalid exact-read integers for %s', async (name, args, expected = 'SESSION_QUERY_INVALID_FILTER') => {
     const mounted = await mount()
     expect(errorCode(await mounted.call(name, args))).toBe(expected)
+  })
+})
+describe('session handoff', () => {
+  function appendExchange(session: Session, userText: string, assistantText: string, turn = 1): void {
+    session.append('turn/start', { turn })
+    session.append(
+      'user/message',
+      createUserMessage({
+        content: [{ type: 'text', text: userText }], source: { kind: 'user' },
+      }),
+      { surfaceOp: 'append' },
+    )
+    session.append(
+      'assistant/message',
+      {
+        stream: [],
+        turn,
+        step: 1,
+        message: createMessage({
+          role: 'assistant',
+          content: [{ type: 'text', text: assistantText }],
+          source: { kind: 'model', provider: 'test', model: 'test' },
+        }),
+      },
+      { surfaceOp: 'append' },
+    )
+    session.append('turn/end', { turn, reason: { kind: 'completed' } })
+  }
+
+  it('renders the authorized target surface tail locally when no llm is mounted', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'handoff-target', '/work')
+    appendExchange(target, 'change the deploy rule', 'updated the deploy rule in config')
+
+    const output = text(await mounted.call('session_handoff', { session_id: 'handoff-target' }))
+    expect(output).toContain('Session handoff handoff-target')
+    expect(output).toContain('Source: local tail')
+    expect(output).toContain('[user] change the deploy rule')
+    expect(output).toContain('[assistant] updated the deploy rule in config')
+  })
+
+  it('marks omitted earlier messages under the local character budget', async () => {
+    const mounted = await mount({ handoffChars: 60 })
+    const target = createSession(mounted.ctx, 'budget-target', '/work')
+    appendExchange(target, 'first question with some length', 'first answer with some length', 1)
+    appendExchange(target, 'second question', 'second answer', 2)
+
+    const output = text(await mounted.call('session_handoff', { session_id: 'budget-target' }))
+    expect(output).toContain('earlier message(s) omitted')
+    expect(output).toContain('second answer')
+    expect(output).not.toContain('first question')
+  })
+
+  it('extracts a model capsule when an llm service is mounted', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'capsule-target', '/work')
+    appendExchange(target, 'ship the release', 'release is staged')
+    const requests: GenerateOptions[] = []
+    mounted.ctx.provide('llm', {
+      async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        requests.push(options)
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: '## Goal\nship the release' }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: '## Goal\nship the release' } }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      },
+    } as never)
+    const agent: Agent = {
+      ...fakeAgent(mounted.caller),
+      options: { provider: 'test-provider', model: 'test-model' },
+    }
+
+    const output = text(await mounted.call('session_handoff', { session_id: 'capsule-target' }, { agent }))
+    expect(output).toContain('Source: model capsule')
+    expect(output).toContain('## Goal')
+    expect(output).toContain('ship the release')
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.purpose).toBe('session-handoff')
+    expect(requests[0]?.provider).toBe('test-provider')
+    expect(requests[0]?.sessionId).toBe(mounted.caller.id)
+  })
+
+  it('falls back to the local tail when extraction fails', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'fallback-target', '/work')
+    appendExchange(target, 'keep the local tail', 'local tail text')
+    mounted.ctx.provide('llm', {
+      async * stream(): AsyncIterable<StreamChunk> {
+        throw new Error('provider down')
+      },
+    } as never)
+    const agent: Agent = {
+      ...fakeAgent(mounted.caller),
+      options: { provider: 'test-provider', model: 'test-model' },
+    }
+
+    const output = text(await mounted.call('session_handoff', { session_id: 'fallback-target' }, { agent }))
+    expect(output).toContain('Source: local tail')
+    expect(output).toContain('keep the local tail')
+  })
+
+  it('skips extraction beyond the serialized-conversation cap', async () => {
+    const mounted = await mount({ handoffExtractChars: 10 })
+    const target = createSession(mounted.ctx, 'long-target', '/work')
+    appendExchange(target, 'a user text longer than ten chars', 'assistant reply')
+    const requests: GenerateOptions[] = []
+    mounted.ctx.provide('llm', {
+      async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        requests.push(options)
+      },
+    } as never)
+
+    const output = text(await mounted.call('session_handoff', { session_id: 'long-target' }))
+    expect(output).toContain('Source: local tail')
+    expect(requests).toHaveLength(0)
+  })
+
+  it('renders an empty-surface marker when the target has no conversation', async () => {
+    const mounted = await mount()
+    createSession(mounted.ctx, 'quiet-target', '/work')
+    const output = text(await mounted.call('session_handoff', { session_id: 'quiet-target' }))
+    expect(output).toContain('(no conversation on the current surface)')
+  })
+
+  it('briefs the current session surface when session_id is omitted', async () => {
+    const mounted = await mount()
+    const output = text(await mounted.call('session_handoff', {}))
+    expect(output).toContain(`Session handoff ${mounted.caller.id}`)
+  })
+
+  it('retains compact checkpoints and skips developer, system, and tool events', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'surface-target', '/work')
+    vi.spyOn(mounted.ctx.sessionQuery, 'readSurface').mockResolvedValue({
+      session: target.header,
+      inheritedEventCount: SessionLogOffset(0),
+      capturedThroughSeq: SessionSeq(4),
+      events: [
+        { type: 'developer/message', data: { content: [{ type: 'text', text: 'dev hidden' }] } },
+        { type: 'system/message', data: { content: [{ type: 'text', text: 'system hidden' }] } },
+        { type: 'tool/result', data: { content: [{ type: 'text', text: 'tool hidden' }] } },
+        {
+          type: 'user/message',
+          data: {
+            source: { kind: 'compact-checkpoint' },
+            content: [{ type: 'text', text: 'checkpoint summary text' }, { type: 'image' }],
+          },
+        },
+        {
+          type: 'user/message',
+          data: {
+            source: { kind: 'user' },
+            content: [{ type: 'text', text: '   ' }],
+          },
+        },
+        {
+          type: 'assistant/message',
+          data: { message: { content: [{ type: 'text', text: ' ' }] } },
+        },
+        {
+          type: 'assistant/message',
+          data: { message: { content: [{ type: 'text', text: 'kept assistant text' }] } },
+        },
+        {
+          type: 'user/message',
+          data: {
+            source: { kind: 'steer' },
+            content: [{ type: 'text', text: 'non-user hidden' }],
+          },
+        },
+      ] as never,
+    })
+
+    const output = text(await mounted.call('session_handoff', { session_id: 'surface-target' }))
+    expect(output).toContain('checkpoint summary text')
+    expect(output).toContain('kept assistant text')
+    expect(output).not.toContain('dev hidden')
+    expect(output).not.toContain('system hidden')
+    expect(output).not.toContain('tool hidden')
+    expect(output).not.toContain('non-user hidden')
+  })
+
+  it('routes extraction through the session request header when present', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'routed-target', '/work')
+    appendExchange(target, 'route me', 'routed reply')
+    vi.spyOn(mounted.caller, 'requestHeader')
+      .mockReturnValue({ config: { provider: 'routed-provider', model: 'routed-model' } })
+    const requests: GenerateOptions[] = []
+    mounted.ctx.provide('llm', {
+      async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        requests.push(options)
+        yield { type: 'block-start', index: 0, blockType: 'reasoning' }
+        yield { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'thinking' } }
+        yield { type: 'block-start', index: 1, blockType: 'text' }
+        yield { type: 'block-end', index: 1, block: { type: 'text', text: 'capsule' } }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      },
+    } as never)
+
+    const output = text(await mounted.call('session_handoff', { session_id: 'routed-target' }))
+    expect(output).toContain('Source: model capsule')
+    expect(requests[0]?.provider).toBe('routed-provider')
+    expect(requests[0]?.model).toBe('routed-model')
+  })
+
+  it('stays local when extraction is disabled, unrouted, or returns empty text', async () => {
+    const mounted = await mount({ handoffExtraction: false })
+    const target = createSession(mounted.ctx, 'disabled-target', '/work')
+    appendExchange(target, 'local only', 'local reply')
+    const requests: GenerateOptions[] = []
+    mounted.ctx.provide('llm', {
+      async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        requests.push(options)
+      },
+    } as never)
+    const output = text(await mounted.call('session_handoff', { session_id: 'disabled-target' }))
+    expect(output).toContain('Source: local tail')
+    expect(requests).toHaveLength(0)
+
+    const unrouted = await mount()
+    const unroutedTarget = createSession(unrouted.ctx, 'unrouted-target', '/work')
+    appendExchange(unroutedTarget, 'no route', 'no route reply')
+    unrouted.ctx.provide('llm', {
+      async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        requests.push(options)
+      },
+    } as never)
+    const unroutedAgent: Agent = {
+      ...fakeAgent(unrouted.caller),
+      options: {},
+    }
+    const unroutedOutput = text(await unrouted.call('session_handoff', { session_id: 'unrouted-target' }, { agent: unroutedAgent }))
+    expect(unroutedOutput).toContain('Source: local tail')
+    expect(requests).toHaveLength(0)
+
+    const empty = await mount()
+    const emptyTarget = createSession(empty.ctx, 'empty-target', '/work')
+    appendExchange(emptyTarget, 'empty capsule', 'empty reply')
+    empty.ctx.provide('llm', {
+      async * stream(): AsyncIterable<StreamChunk> {
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: '   ' } }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      },
+    } as never)
+    const emptyAgent: Agent = {
+      ...fakeAgent(empty.caller),
+      options: { provider: 'p', model: 'm' },
+    }
+    const emptyOutput = text(await empty.call('session_handoff', { session_id: 'empty-target' }, { agent: emptyAgent }))
+    expect(emptyOutput).toContain('Source: local tail')
+    expect(emptyOutput).toContain('empty capsule')
+  })
+
+  it.each([
+    [{ handoffChars: 0 }],
+    [{ handoffChars: 1.5 }],
+    [{ handoffExtractChars: 0 }],
+    [{ handoffTimeoutMs: 0 }],
+    [{ handoffTimeoutMs: Number.MAX_SAFE_INTEGER }],
+  ])('rejects invalid handoff config %j', async (config) => {
+    await expect(mount(config)).rejects.toThrow(TypeError)
   })
 })

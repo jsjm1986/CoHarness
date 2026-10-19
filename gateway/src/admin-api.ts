@@ -43,6 +43,7 @@ import { NodeConfigurationError } from './node-config-store.ts'
 import { MaintenanceError } from './postgres/maintenance-service.ts'
 import { BackupError } from './postgres/backup-service.ts'
 import { DeploymentCommandError } from './deployment-commands.ts'
+import { TunnelAccessError } from './tunnel-access.ts'
 import { ResourceAccessError, resourcePolicyOwner } from './resource-access.ts'
 import { stewardPolicyOwner } from './steward-access.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
@@ -114,6 +115,7 @@ function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof MaintenanceError) return { status: error.status, error: error.message }
   if (error instanceof BackupError) return { status: error.status, error: error.message }
   if (error instanceof DeploymentCommandError) return { status: 500, error: 'deployment-command-failed' }
+  if (error instanceof TunnelAccessError) return { status: error.status, error: error.message }
   if (error instanceof PluginManagementError) return { status: error.status, error: error.message }
   if (error instanceof PluginStateError) return { status: error.status === 500 ? 500 : error.status, error: error.message }
   if (error instanceof TerminalManagementError) return { status: error.status, error: error.message }
@@ -281,6 +283,37 @@ async function dispatch(
     sendJson(res, 200, { ...state, migrations: plan ?? null, operations })
     return true
   }
+  if (pathname === '/admin/api/tunnel' && method === 'GET') {
+    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
+    sendJson(res, 200, await deps.tunnelAccess.view())
+    return true
+  }
+  if (pathname === '/admin/api/tunnel/install' && method === 'POST') {
+    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
+    const view = await deps.tunnelAccess.install()
+    await deps.audit.write({ userId: admin.id, action: 'admin.tunnel.install',
+      detail: JSON.stringify({ binary: view.binary?.path ?? null }), ip })
+    sendJson(res, 200, view)
+    return true
+  }
+  if (pathname === '/admin/api/tunnel/actions' && method === 'POST') {
+    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
+    const input = parseObject(body)
+    const action = input.action
+    let view
+    if (action === 'start-quick') view = await deps.tunnelAccess.startQuick()
+    else if (action === 'start-named') view = await deps.tunnelAccess.startNamed({
+      hostname: input.hostname, domain: input.domain, apiToken: input.apiToken,
+    })
+    else if (action === 'stop') view = await deps.tunnelAccess.stop()
+    else if (action === 'clear') view = await deps.tunnelAccess.clear()
+    else throw new TunnelAccessError(400, 'invalid-tunnel-action')
+    await deps.audit.write({ userId: admin.id, action: `admin.tunnel.${String(action)}`,
+      detail: JSON.stringify({ mode: view.mode, publicUrl: view.publicUrl, hostname: view.hostname }), ip })
+    sendJson(res, 200, view)
+    return true
+  }
+
   if (pathname === '/admin/api/deployment/maintenance' && method === 'POST') {
     if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
     const input = parseObject(body)
@@ -507,7 +540,7 @@ async function dispatch(
     const action = input.action
     const ids = input.ids
     const idempotencyKey = input.idempotencyKey
-    if ((action !== 'restore' && action !== 'trash' && action !== 'purge')
+    if ((action !== 'restore' && action !== 'trash' && action !== 'purge' && action !== 'settle')
       || !Array.isArray(ids) || ids.length === 0 || ids.length > 50
       || !ids.every(id => typeof id === 'string' && id !== '')
       || (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey === ''))) {
@@ -519,6 +552,9 @@ async function dispatch(
         if (action === 'purge') {
           const accepted = await deps.archives.purge(rootSessionId, admin.id, idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
           if (!accepted) throw new Error('archive not found')
+        } else if (action === 'settle') {
+          const settled = await deps.archives.settle(rootSessionId, admin.id)
+          if (settled === null) throw new Error('archive not found')
         } else {
           const value = await deps.archives.setState(rootSessionId, action === 'restore' ? 'archived' : 'trash', admin.id,
             idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
@@ -611,11 +647,14 @@ async function dispatch(
 
   if ((pathname === '/admin/api/desktops/permissions' || pathname === '/admin/api/terminals/permissions'
     || pathname === '/admin/api/ssh/permissions' || pathname === '/admin/api/plugins/permissions'
-    || pathname === '/admin/api/steward/permissions') && (method === 'GET' || method === 'POST')) {
+    || pathname === '/admin/api/steward/permissions' || pathname === '/admin/api/memory/permissions')
+    && (method === 'GET' || method === 'POST')) {
     const resource = pathname.includes('/terminals/') ? 'terminal' : pathname.includes('/ssh/') ? 'ssh'
-      : pathname.includes('/plugins/') ? 'plugin' : pathname.includes('/steward/') ? 'steward' : 'desktop'
+      : pathname.includes('/plugins/') ? 'plugin' : pathname.includes('/steward/') ? 'steward'
+      : pathname.includes('/memory/') ? 'memory' : 'desktop'
     const access = resource === 'terminal' ? deps.terminalAccess : resource === 'ssh' ? deps.sshAccess
-      : resource === 'plugin' ? deps.pluginAccess : resource === 'steward' ? deps.stewardAccess : deps.desktopAccess
+      : resource === 'plugin' ? deps.pluginAccess : resource === 'steward' ? deps.stewardAccess
+      : resource === 'memory' ? deps.memoryAccess : deps.desktopAccess
     if (access === undefined) { sendError(res, 503, `${resource}-access-unavailable`); return true }
     const ownerOf = resource === 'steward' ? stewardPolicyOwner : resourcePolicyOwner
     if (method === 'GET') {

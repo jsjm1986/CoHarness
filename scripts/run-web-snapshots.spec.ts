@@ -22,7 +22,7 @@ const expectedSerial = [
 ].map(file => `${WEB_TESTS_ROOT}${file}`)
 
 describe('browser execution plan', () => {
-  it('keeps all eight independent owners and every other scenario in the full pool', () => {
+  it('keeps all nine independent owners and every other scenario in the full pool', () => {
     const plan = createWebSnapshotPlan(root, [], {})
     expect(plan.mode).toBe('full')
     expect(plan.serial).toEqual(expectedSerial)

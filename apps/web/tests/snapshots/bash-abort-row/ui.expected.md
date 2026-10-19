@@ -34,7 +34,7 @@
 - 'button "Failed Bash Error: tool call aborted before dispatch"':
   - img
   - text: "Failed Bash Error: tool call aborted before dispatch"
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

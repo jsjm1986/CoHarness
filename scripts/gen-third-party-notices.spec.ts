@@ -32,7 +32,8 @@ describe('THIRD_PARTY_NOTICES.md', () => {
     timeout: 120_000,
   }, async () => {
     const generated = await render()
-    expect(generated).toContain('It depends on the third-party software listed below.')
+    expect(generated).toContain('licensed under [Apache-2.0](LICENSE)')
+    expect(generated).toContain('The harness depends on the third-party software listed below.')
     expect(generated).toContain(`| [\`numpy\`](https://github.com/numpy/numpy) | ${primaryRuntimeLock.pythonPackages.numpy} | BSD-3-Clause |`)
     expect(generated).toContain('## LibreOffice conversion kit')
     expect(generated).toContain('Recipients must have access to those corresponding sources and notices.')

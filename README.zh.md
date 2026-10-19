@@ -1,6 +1,20 @@
+<p align="center"><img src="apps/web/public/favicon-coharness.svg" alt="CoHarness" width="88"></p>
+
 # CoHarness
 
 [English](README.md) | 中文
+
+<p align="center">
+  <a href="https://github.com/jsjm1986/CoHarness/actions/workflows/ci.yml"><img src="https://github.com/jsjm1986/CoHarness/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+  <a href="https://jsjm1986.github.io/CoHarness/"><img src="https://img.shields.io/badge/official%20site-jsjm1986.github.io%2FCoHarness-f59e0b.svg" alt="官方网站"></a>
+</p>
+
+<p align="center">
+  <a href="https://jsjm1986.github.io/CoHarness/">官方网站</a> · <a href="docs/user/guide/index.zh.md">使用指南</a> · <a href="SAFETY.zh.md">安全须知</a>
+</p>
+
+<p align="center"><img src="https://jsjm1986.github.io/CoHarness/assets/demo-conversation.gif" alt="真实会话中的 CoHarness 工作台" width="860"></p>
 
 **CoHarness 是一个面向团队共同构建、验证和强化人与 Agent 协作范式的全插件化 Harness。**
 
@@ -60,11 +74,13 @@ CoHarness 处于发布前开发阶段。生产部署应被视为需要自行评�
 
 ## 以团队方式使用
 
-Gateway 把协同哲学落实为经过认证的项目边界。每个账户拥有个人空间，共享项目则使用一个项目 scope 内的 runtime 和持久化存储；成员不会各自得到同一对话的互不相连副本。项目成员拥有 `ro` 或 `rw` 权限，根对话可以对项目可见，也可以仅创建者可见，子对话继承根对话的可见性。权限由 Host 和 Gateway 强制执行，不能信任浏览器自行保证。
+Gateway 把协同哲学落实为经过认证的项目边界。每个账户拥有个人空间，共享项目则使用一个项目 scope 内的 runtime 和持久化存储——包括项目作用域的记忆——成员不会各自得到同一对话的互不相连副本。项目成员拥有 `ro` 或 `rw` 权限，根对话可以对项目可见，也可以仅创建者可见，子对话继承根对话的可见性。权限由 Host 和 Gateway 强制执行，不能信任浏览器自行保证。
 
 团队可以让一个人开始调查，另一个人补充背景，专业智能体检查代码或测试，再由有权限的参与者决定是否允许等待中的操作继续。共享历史会记录这些贡献和决策；选定的子智能体报告会返回主任务，而不会把所有内部细节都带入主上下文。成员稍后回到项目时，仍可以从同一份持久化状态继续工作。
 
 管理员可以管理用户、项目、邀请、模型路由授权、额度、用量汇总、审计记录和运行时健康状态。组织管理的模型路由可以按角色、用户和项目授权。个人用户可以使用自己的 BYOK 路由；共享项目 runtime 仍由目录控制。用量记录会在不把 API 密钥、提示词或回复写入账本的情况下归属活动。Linux 部署增加 systemd 和 mount namespace 隔离；macOS 不提供这一内核边界，应按相应限制使用。
+
+<p align="center"><img src="https://jsjm1986.github.io/CoHarness/assets/admin-users.jpg" alt="CoHarness 管理中心：用户与运行时实例" width="860"></p>
 
 请阅读 [Gateway 参考](gateway/README.zh.md)了解控制面的行为，阅读[部署手册](gateway/deploy/README.zh.md)了解 PostgreSQL、release、隔离、TLS、备份、升级和回滚。
 
@@ -72,15 +88,17 @@ Gateway 把协同哲学落实为经过认证的项目边界。每个账户拥有
 
 | 领域 | 当前能力 |
 | --- | --- |
-| 智能体运行时 | Cordis profile 与 bundle、事件溯源 Session、持久化恢复/分叉、提示词和工具组合、模型请求、审批、问题、计划、目标、待办、后台任务、工作流、上下文压缩、telemetry 和 Session 投影。 |
+| 智能体运行时 | Cordis profile 与 bundle、事件溯源 Session、持久化恢复/分叉、提示词和工具组合、模型请求、审批、问题、计划、目标、待办、后台任务、持久化定时提醒、工作流、上下文压缩、telemetry 和 Session 投影。 |
 | 工具与执行 | 工作区文件系统工具、图片读取、Shell 与持久终端、LSP、网页搜索/抓取提供方、skill、结构化附件、用户文档，以及 sandbox 或目录策略。 |
 | 模型 | DeepSeek 与 pi-ai 适配器、目录和自定义 Provider、OpenAI 兼容及其他支持的协议、个人 BYOK 路由、组织托管路由、模型选择、推理控制、图片准入/规范化、Files 上传与回退，以及不会把秘密写入日志的凭据引用。 |
-| Web UI | 响应式浏览器应用，包含 Session、实时对话历史、模型选择、命令和 `@` 建议、图片/文档附件、文档管理、工作区选择、权限控制、目标、subagent、任务、设置、本地化、主题和反馈。 |
+| Web UI | 响应式浏览器应用，包含 Session、实时对话历史、模型选择、命令和 `@` 建议、图片/文档附件、文档管理、记忆面板、工作区选择、权限控制、目标、subagent、任务、设置、本地化、主题和反馈。 |
 | 项目 | 个人与共享项目 scope、每项目一个共享运行时、`ro`/`rw` 成员、邀请、项目或创建者私有对话、参与者归属、根对话可见性继承、目录授权、管理员权限，以及组织模型的项目级默认授权。 |
 | 文档 | 命名用户文档、上传/下载、加入对话、按 scope 浏览、跨 scope 复制、快照谱系、操作历史、冲突安全的目标命名，以及 PostgreSQL 元数据对账；文件字节仍保存在运行时拥有的目录中。默认不设置单文档大小上限，但仍受传输、文件系统和部署存储限制。 |
-| Gateway 与管理端 | PostgreSQL 认证、用户、项目、实例、协作、模型 Provider 与目录、额度、用量、审计、文档目录、HTTP/WebSocket 代理、运行时 principal、健康诊断和独立 Admin SPA。 |
+| 记忆 | 按个人、工作区或项目作用域划分的持久化 Agent 记忆：画像、指引、背景与资源四类条目；每个会话向模型展示的有界清单；`memory_search`/`memory_read`/`memory_save`/`memory_delete` 工具；可选的提取与整合治理；以及 Web UI 管理。 |
+| 会话检索 | 对实时与持久会话历史的授权查询，独立于上下文压缩：精确日志读取、过滤列表、关系追踪、SQLite 全文检索、五个经工作区授权的模型工具，以及 Web `/export` 命令导出会话 ZIP。 |
+| Gateway 与管理端 | PostgreSQL 认证、用户、项目、个人与项目运行时实例、协作、插件管理、模型 Provider 与目录、额度、用量、审计、文档目录、Webhook 端点与投递、SSH 目标、终端、受管桌面、会话归档、部署控制、预留 steward 空间、推送通知、HTTP/WebSocket 代理、运行时 principal、健康诊断和独立 Admin SPA。 |
 | 安全与部署 | Linux systemd mount namespace、`dsh-directory-guard`、sandbox 策略、Landlock/原生启动器、macOS 本地/launchd 运行、Nginx 或 tunnel 入口、所有者私有凭据文件、不可变生产 release，以及 SQLite 到 PostgreSQL 的导入/回滚工具。 |
-| 集成 | TypeScript SDK、Python SDK 与 bundled runtime、JSON-RPC、Agent Client Protocol（ACP）、Codex 和 Claude Code hook bridge、可选 Codex/Claude subagent 提供方，以及支持 FCM/JPush/厂商推送的 Capacitor Android 壳。 |
+| 集成 | TypeScript SDK、Python SDK 与 bundled runtime、JSON-RPC、Agent Client Protocol（ACP）、MCP 客户端与资源、Codex 和 Claude Code hook bridge、可选 Codex/Claude subagent 提供方，以及支持 FCM/JPush/厂商推送的 Capacitor Android 壳。 |
 
 ## 与 DSH 的关系和命名规范
 
@@ -152,6 +170,7 @@ pnpm run build:production
 | [`python/`](python/README.zh.md) | Python SDK 和 bundled runtime carrier。 |
 | [`native/`](native/README.zh.md) | 原生启动器，包括基于 Landlock 的进程隔离。 |
 | [`docs/`](docs) | 架构、用户、开发、协议、测试和生成参考文档。 |
+| [`website/`](website) | 将选定 `docs/` 来源投影为公开文档站的 VitePress 站点。 |
 | [`examples/`](examples) | 可运行的 Cordis 组合和集成示例。 |
 
 ## 开发与验证
@@ -185,12 +204,13 @@ CoHarness 处于发布前开发阶段。公共 API、配置、数据库 schema�
 ## 参与与支持
 
 - 在 [GitHub Issues](https://github.com/jsjm1986/CoHarness/issues) 报告 CoHarness 问题和产品问题。
+- 项目官网：[jsjm1986.github.io/CoHarness](https://jsjm1986.github.io/CoHarness/)。
 - 准备修改前请阅读[贡献指南](CONTRIBUTING.zh.md)。
 - 插件、工具、服务和 LLM adapter 的开发流程见[开发者文档](docs/user/develop/basic/index.zh.md)。
 - 上游 DSH 契约、生态软件包和上游讨论请访问 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。
 
 ## 许可证与归属
 
-CoHarness 使用[MIT 许可证](LICENSE)发布。本仓库是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的独立衍生项目，上游项目同样使用 MIT 许可证；仓库保留上游版权和许可证声明。在保留必要声明的前提下，你可以按照 MIT 条款使用、复制、修改、发布、分发、再许可和销售本软件。
+CoHarness 使用 [Apache License 2.0](LICENSE) 发布。本仓库是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的独立衍生项目，并按要求保留上游版权与许可证声明。
 
-第三方依赖、vendor 源码及其许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。本仓库的 MIT 许可证不表示可以删除第三方声明，也不替代源代码之外适用的 Provider、平台和服务条款。
+第三方依赖、vendor 源码及其许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。仓库许可证不替代第三方声明，也不替代源代码之外适用的 Provider、平台和服务条款。

@@ -417,8 +417,16 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'storage-domain',
     title: 'Domain data facility',
     mode: 'core',
-    consumers: ['workspace', 'message-feedback'],
+    consumers: ['workspace', 'message-feedback', 'memory'],
     note: 'Waits for every configured backend, then publishes the domain form as one lifecycle-bound service for typed durable state.',
+  },
+  {
+    key: 'memory',
+    pkg: 'memory',
+    title: 'Durable space-scoped memory records',
+    mode: 'core',
+    consumers: ['memory-context', 'tool-memory'],
+    note: 'Serializes scoped creates and revision-guarded writes through storageDomain, emits memory/changed at commit, and rechecks project writes through execution authority.',
   },
   {
     key: 'messageFeedback',

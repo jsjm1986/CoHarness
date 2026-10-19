@@ -15,8 +15,13 @@
   - button "Project settings":
     - text: Project settings
     - img
-  - text: All spaces · 3
+  - text: All spaces · 7
+  - searchbox "Search project spaces"
   - button "Personal Personal"
   - button "Payments migration"
   - button "Audit platform Read only"
+  - button "Archive space 1"
+  - button "Archive space 2"
+  - button "Archive space 3"
+  - button "Archive space 4"
   - button "New project space"

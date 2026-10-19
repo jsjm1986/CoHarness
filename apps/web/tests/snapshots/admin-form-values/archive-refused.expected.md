@@ -1,7 +1,7 @@
 - alert: 会话仍有运行中的终端，请关闭终端后重试。
 - term: 创建者
 - definition: Admin fixture
-- term: Workspace
+- term: 工作区
 - definition: 未分组
 - term: 项目
 - definition: 个人会话
@@ -9,8 +9,8 @@
 - definition:
   - time: 2026/09/27 08:00
 - term: 记录状态
-- definition: 已归档
-- term: 同步状态
+- definition: 回收站
+- term: 同步
 - definition: 操作未完成
 - region "对话记录":
   - heading "对话记录" [level=3]

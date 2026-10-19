@@ -744,7 +744,7 @@
   height: 48px;
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
-  background: linear-gradient(90deg, var(--dsw-alias-bg-layer-1), var(--dsw-alias-bg-layer-2), var(--dsw-alias-bg-layer-1));
+  background: linear-gradient(105deg, var(--dsw-alias-bg-layer-1), var(--dsw-alias-bg-layer-2), var(--dsw-alias-bg-layer-1));
   background-size: 200% 100%;
   animation: documents-skeleton 1.2s ease-in-out infinite;
 }

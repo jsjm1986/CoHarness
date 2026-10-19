@@ -65,7 +65,7 @@
   - text: Context injection AGENTS.md
 - img
 - text: permission preset read-only
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

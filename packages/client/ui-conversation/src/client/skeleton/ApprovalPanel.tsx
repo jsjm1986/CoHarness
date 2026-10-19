@@ -59,17 +59,23 @@ function ApprovalFlow({ pending, reason, command, t }: {
   t: ApprovalComposerProps['t']
 }) {
   // Local one-shot latch: the panel leaves only when the resolved frame
-  // lands; until then the buttons must not re-fire. An answer failure
-  // (rejected receipt / transport) re-arms them for retry.
-  const [answered, setAnswered] = useState(false)
+  // lands; until then the buttons must not re-fire and the strip echoes the
+  // recorded decision. An answer failure (rejected receipt / transport)
+  // re-arms them for retry.
+  const [answered, setAnswered] = useState<'allowed-once' | 'rejected' | null>(null)
   const answer = (outcome: 'allowed-once' | 'rejected'): void => {
-    setAnswered(true)
-    void pending.answer(outcome).catch(() => { setAnswered(false) })
+    setAnswered(outcome)
+    void pending.answer(outcome).catch(() => { setAnswered(null) })
   }
   return (
     <div className={css.root} data-approval-key={pending.key}>
-      <div className={css.card}>
-        <div className={css.strip}><span className={css.dot} />{t('approval.waiting')}</div>
+      <div className={css.card} data-answered={answered ?? undefined}>
+        <div className={css.strip}>
+          <span className={css.dot} />
+          {answered === null
+            ? t('approval.waiting')
+            : t(answered === 'allowed-once' ? 'approval.allowedEcho' : 'approval.rejectedEcho')}
+        </div>
         {/* Tab stop: the region scrolls once the command passes the cap and
             holds nothing focusable of its own, so without one a keyboard-only
             user cannot reach the command's tail before answering. */}
@@ -78,10 +84,10 @@ function ApprovalFlow({ pending, reason, command, t }: {
           {command !== undefined && <div className={css.command}>{command}</div>}
         </div>
         <div className={css.actionRow}>
-          <Button variant="outline" className={css.reject} disabled={answered} onClick={() => { answer('rejected') }}>
+          <Button variant="outline" className={css.reject} disabled={answered !== null} onClick={() => { answer('rejected') }}>
             {t('approval.reject')}
           </Button>
-          <Button variant="primary" disabled={answered} onClick={() => { answer('allowed-once') }}>
+          <Button variant="primary" disabled={answered !== null} onClick={() => { answer('allowed-once') }}>
             {t('approval.allowOnce')}
           </Button>
         </div>

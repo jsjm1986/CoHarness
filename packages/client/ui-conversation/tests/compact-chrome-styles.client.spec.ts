@@ -24,11 +24,12 @@ describe('conversation compact chrome', () => {
     expect(root).toMatch(/\.tabs\s*\{[^}]*min-height:\s*34px/u)
     expect(root).toMatch(/\.tab\s*\{[^}]*min-height:\s*28px/u)
     expect(root).toContain('.headerUtilities')
-    // The corner seat's edge reach re-anchors to the compact header's space-3
-    // trailing padding; the desktop -16px would push its button 4px off-screen.
-    expect(root).toMatch(
-      /\[data-viewport='compact'\]\)\s*\.headerCorner\s*\{[^}]*margin-right:\s*calc\(-1 \* var\(--dsw-space-3\)\)/u,
-    )
+    // The corner seat never reaches past the header's trailing padding — a
+    // negative right margin glued its button to the viewport edge on every
+    // surface, compact's space-3 included.
+    expect(root).toMatch(/\.headerCorner\s*\{[^}]*\}/u)
+    expect(root).not.toMatch(/\.headerCorner\s*\{[^}]*margin-right/u)
+    expect(root).not.toMatch(/\.headerCorner[^}]*margin-right/u)
   })
 
   it('shrinks the hero headline and grows the workspace chip on compact', () => {
@@ -115,6 +116,18 @@ describe('conversation compact chrome', () => {
     // The very narrowest panes hide the context meter; compact phones keep it.
     expect(contextMeter).toMatch(/@container\s*\(max-width:\s*340px\)\s*\{[^@]*\.root\s*\{[^}]*display:\s*none/u)
     expect(contextMeter).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.root\s*\{[^}]*display:\s*inline-flex/u)
+    // Contributed-item lanes and the modes seat share one degrade contract:
+    // a clip seat publishes data-clipped while it overflows, every descendant
+    // marked data-clip-label drops whole under the shared rule, and the lane
+    // floor keeps one icon seat intact only while an item actually rendered
+    // (empty slot wrappers are :empty). The modes seat never clips its box —
+    // the permission and plan popups render inside it — so it degrades by
+    // label removal alone and pins at its icon content while clipped.
+    expect(input).toMatch(/\.extensionItems\s*\{[^}]*overflow:\s*hidden/u)
+    expect(input).toMatch(/\[data-clip-seat\]\[data-clipped\]\s*\[data-clip-label\]\s*\{[^}]*position:\s*absolute[^}]*opacity:\s*0/u)
+    expect(input).toMatch(/\.extensionItems:has\(>\s*:not\(:empty\)\)\s*\{[^}]*min-width:\s*24px/u)
+    expect(input).toMatch(/\.modes\[data-clipped\]\s*\{[^}]*min-width:\s*max-content/u)
+    expect(permission).toMatch(/:global\(\[data-clip-seat\]\[data-clipped\]\)\s*\.trigger\s*\{[^}]*width:\s*28px/u)
     // Nothing may force the trailing group onto a second line.
     expect(input).not.toContain('flex-basis: 100%')
     expect(input).not.toMatch(/\.row:has\(\[data-model-select\]\)/u)

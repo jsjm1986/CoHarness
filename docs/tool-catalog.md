@@ -36,9 +36,10 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`, `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
+| `@deepseek-ai/dsh-tool-memory` | `memory_delete`, `memory_read`, `memory_save`, `memory_search` | `ctx.memory`, `ctx.tools`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `memory/changed` | - | In a project-space runtime (Gateway-managed sessions) the scope parameter is omitted from every schema and each tool addresses the shared project scope; the catalog above shows the personal-space variant shipped by the CLI presets. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.workingDirectory`, `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
-| `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
+| `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_handoff`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The six read-only tools hide provider cursors, authorize every result from the immutable calling agent session, and layer project readability over workspace equality when collaboration is mounted. The standard preset mounts the package; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
 | `@deepseek-ai/dsh-tool-subagent` | `subagent` | `ctx.tools`, `ctx.subagents`, `ctx.systemPrompt`, `ctx.sessionProjections` | `tool/call`, `tool/result`, `child session events through the chosen provider` | `subagent`, `subagent_fork` | The registered tool name is the load-time `toolName` config (default `subagent`); the schema above is that default. The shipped compositions load this package once per subagent backend, so the model additionally sees `subagent_fork` bound to the fork backend. Each instance's description, `run_in_background` parameter, and system-prompt policy follow its own `backgroundMode` and `enableRunInBackground`, so the two shipped schemas are not identical: `subagent` is `continuable` and defaults omitted calls to background with automatic settlement delivery, while `subagent_fork` stays `one-shot` and defaults them to foreground — see `packages/bundle/base/cordis.patch.yml` and `examples/acp-agent/cordis.yml`. |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message` | `ctx.tools`, `ctx.subagents`, `ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named control tools over continuable background subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while this package registers `send_message` and `interrupt_agent` once, plus `list_agents` from its separately loaded `/list-agents` plugin (whose catalog rows use the sessionProjections and live Agent registries). |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
@@ -1859,6 +1860,160 @@ Source: [`packages/lsp/tool-lsp/src/index.ts`](../packages/lsp/tool-lsp/src/inde
 
 The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.
 
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+### `memory_delete`
+
+Delete a saved memory that is wrong or no longer useful. Pass the revision from memory_read when you have one, so that a newer change is not deleted by mistake.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string",
+      "description": "personal: facts about the user that apply in every workspace. workspace: facts specific to this conversation's working directory.",
+      "enum": [
+        "personal",
+        "workspace"
+      ]
+    },
+    "key": {
+      "type": "string",
+      "description": "Key of the memory to delete."
+    },
+    "revision": {
+      "type": "string",
+      "description": "Revision returned by memory_read; when given, the memory is deleted only if it has not changed since."
+    }
+  },
+  "required": [
+    "scope",
+    "key"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_read`
+
+Read one saved memory in full, including the revision that memory_save and memory_delete use to change it.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string",
+      "description": "personal: facts about the user that apply in every workspace. workspace: facts specific to this conversation's working directory.",
+      "enum": [
+        "personal",
+        "workspace"
+      ]
+    },
+    "key": {
+      "type": "string",
+      "description": "Key of the memory, as listed in the saved-memory catalog or by memory_search."
+    }
+  },
+  "required": [
+    "scope",
+    "key"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_save`
+
+Save a memory that later conversations will see in their saved-memory catalog. Without a revision this creates a new memory and fails if the key is already used. To change an existing memory, read it with memory_read and pass its revision; the content you send replaces the old content entirely.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string",
+      "description": "personal: facts about the user that apply in every workspace. workspace: facts specific to this conversation's working directory.",
+      "enum": [
+        "personal",
+        "workspace"
+      ]
+    },
+    "key": {
+      "type": "string",
+      "description": "Stable identifier made of lowercase letters, digits, and single hyphens, at most 64 characters, for example \"release-freeze\"."
+    },
+    "kind": {
+      "type": "string",
+      "description": "profile: who the user or team is — role, expertise, preferences. guidance: how you should work — a correction or a confirmed approach, with the reason. background: goals, constraints, decisions, or deadlines that the code and its history do not show. resource: where to find information outside the workspace, such as a dashboard, tracker, or document.",
+      "enum": [
+        "profile",
+        "guidance",
+        "background",
+        "resource"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "description": "One line of at most 150 characters, specific enough to judge from the catalog alone whether this memory is relevant."
+    },
+    "content": {
+      "type": "string",
+      "description": "The memory in Markdown. For guidance and background, state the rule or fact, then a \"Why:\" line and a \"How to apply:\" line. Write dates as absolute dates."
+    },
+    "revision": {
+      "type": "string",
+      "description": "Revision returned by memory_read; required to replace an existing memory."
+    }
+  },
+  "required": [
+    "scope",
+    "key",
+    "kind",
+    "summary",
+    "content"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_search`
+
+Search saved memories by words in their key, summary, or content. Returns matching memories ranked by relevance, each with a short excerpt. Read a memory with memory_read before relying on its details.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Words to look for; matching ignores case."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Search only this scope; omit to search every scope. personal: facts about the user that apply in every workspace. workspace: facts specific to this conversation's working directory.",
+      "enum": [
+        "personal",
+        "workspace"
+      ]
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+In a project-space runtime (Gateway-managed sessions) the scope parameter is omitted from every schema and each tool addresses the shared project scope; the catalog above shows the personal-space variant shipped by the CLI presets.
+
 <a id="deepseek-aidsh-tool-ralph"></a>
 
 ## `@deepseek-ai/dsh-tool-ralph`
@@ -2037,6 +2192,24 @@ Read every direct replacement and relationship to a cited source event for one e
 
 Source: [`packages/session-query/tool-session-query/src/index.ts`](../packages/session-query/tool-session-query/src/index.ts)
 
+### `session_handoff`
+
+Read a compact continue-here brief from the end of an authorized session: decisions, files, state, and the next step.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Target session id. Omit for the current session."
+    }
+  }
+}
+```
+
+Source: [`packages/session-query/tool-session-query/src/index.ts`](../packages/session-query/tool-session-query/src/index.ts)
+
 ### `session_search`
 
 Search prior sessions in the caller workspace and return the strongest matching event from each session.
@@ -2148,7 +2321,7 @@ Read the authorized session lineage around one session, including complete visib
 
 Source: [`packages/session-query/tool-session-query/src/index.ts`](../packages/session-query/tool-session-query/src/index.ts)
 
-The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.
+The six read-only tools hide provider cursors, authorize every result from the immutable calling agent session, and layer project readability over workspace equality when collaboration is mounted. The standard preset mounts the package; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.
 
 <a id="deepseek-aidsh-tool-subagent"></a>
 

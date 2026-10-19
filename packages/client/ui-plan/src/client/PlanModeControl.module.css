@@ -28,6 +28,16 @@
       var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
+/* Clip-seat degrade: the shared contract hides the chip label while the
+   owning composer seat reports `data-clipped`; the exit glyph carries the
+   seat alone as a 28px icon. */
+:global([data-clip-seat][data-clipped]) .chip {
+  min-width: 0;
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+
 .chip:hover:not(:disabled) {
   background: color-mix(
     in srgb,
