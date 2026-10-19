@@ -222,7 +222,8 @@
     "verify-workflow-guest": "tsx scripts/gen-workflow-guest.ts --check",
     "verify:web-fixtures": "tsx scripts/verify-web-fixtures.ts",
     "website:build": "pnpm run docs:build",
-    "website:dev": "pnpm run docs:dev"
+    "website:dev": "pnpm run docs:dev",
+    "resolve-translation-pairing-conflicts": "tsx scripts/merge-translation-pairing.ts --resolve"
   },
   "devDependencies": {
     "@agentclientprotocol/sdk": "1.4.0",

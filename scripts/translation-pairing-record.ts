@@ -59,6 +59,19 @@ export function translationPairPaths(source: string): TranslationPairPaths {
   }
 }
 
+/**
+ * Derive one pair from its consistency-record path.
+ *
+ * @param meta - Repository-relative `foo.i18n.yaml` path.
+ * @returns The complete three-path pair.
+ */
+export function translationPairPathsFromMeta(meta: string): TranslationPairPaths {
+  if (!meta.endsWith('.i18n.yaml')) {
+    throw new Error(`expected a bilingual consistency-record path, received ${JSON.stringify(meta)}`)
+  }
+  return translationPairPaths(meta.replace(/\.i18n\.yaml$/, '.md'))
+}
+
 interface Section {
   heading?: Extract<Nodes, { type: 'heading' }>
   blocks: string[]

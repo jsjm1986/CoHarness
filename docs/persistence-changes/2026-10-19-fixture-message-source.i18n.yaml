@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-19-fixture-message-source.md
 document:
-  en: ca8b34d5c9d6a633f2e7ce4963b17f3b0f205766
-  zh: 11b4ed0fa41694a9203e20b567f793ec070c7069
+  en: dde1e6b542c5fd9494c5269be8e22c1c59ce1eee
+  zh: 68c0a10af2967147ce76603e4c69850059f53493
 /:
   en: 3d5a424ae7d7e46b
   zh: c22a8e4a62d8cc1a

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-21-compaction-summary-prefix-cache-reuse.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-21-compaction-summary-prefix-cache-reuse.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-21-compaction-summary-prefix-cache-reuse.md
+document:
+  en: b9b166d3bcbe7bf82faf67d3e1f1f21dc8a6cd60
+  zh: 5c060e0875e81a577b08347e0a328a0ffcf31194
 /agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse:
   en: f900f36b11a0dc20
   zh: 02155ff1a41e9d92

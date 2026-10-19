@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-16-harness-level-loop.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-16-harness-level-loop.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-16-harness-level-loop.md
+document:
+  en: 3fcb2aa27497ea62ccf1d4b0bca1d6b7caa9a223
+  zh: 5f4b00112cbfafc845896720ed119534e559ab9a
 /agent-note-harness-level-goal-based-execution:
   en: 20d103f4160b124d
   zh: 36e888ebeec1d366

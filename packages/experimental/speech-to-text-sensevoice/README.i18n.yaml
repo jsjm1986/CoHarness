@@ -4,7 +4,7 @@
 #   pnpm run verify-translation-pairing --write packages/experimental/speech-to-text-sensevoice/README.md
 document:
   en: 125b18fe57fa0fd1db282951dc55833be487510c
-  zh: 7cf7f2fd1b34c49f15d245a5534d0ead3a0be9f1
+  zh: 7c0c347d5c6722fdd814d1b64de2f841b9035b14
 /:
   en: 2c603fb20d2332f0
   zh: 2efd7f2811fe18bb

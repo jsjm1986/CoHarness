@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for shell.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for shell.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/shell.md
+document:
+  en: b7af587ea4ed1f6d30bc1520be9d43c6395b18d8
+  zh: 88fe095e468d429eecf9b829bd03421c67ceccc5
 /shell-executor:
   en: c9aba02120c42608
   zh: f76b6b9745015993

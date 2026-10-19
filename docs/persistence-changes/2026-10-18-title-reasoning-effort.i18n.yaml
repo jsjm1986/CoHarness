@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-18-title-reasoning-effort.md
 document:
-  en: 92ed7834e72f1e612b3e722fc55fd4ba371ee08d
-  zh: 9ba4680f29619cc2b71c9f39e31d2f242624b458
+  en: 9e90b75d974f83bf7d32460f6e3f27ae3f6b7658
+  zh: b53e3f3314a15d97be33e42049136dd916fce865
 /:
   en: 3d5a424ae7d7e46b
   zh: c22a8e4a62d8cc1a

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/lsp/lsp/README.md
 document:
-  en: 1f17c96a1f0ba62a42536b150dc775aa18452f27
-  zh: f9c51d873a4e8048476dbd60f74c22bade5da19b
+  en: 30c5f36b2c250c1c1b29dd4b6345d0fcedaaa898
+  zh: efbdb7896d3729a7949fc6cc34e9e5f70bafaf16
 /:
   en: d99d1b09a65136ee
   zh: 61495d48365178df
