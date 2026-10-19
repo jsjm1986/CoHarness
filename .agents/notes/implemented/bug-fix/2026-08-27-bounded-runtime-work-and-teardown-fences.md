@@ -68,6 +68,8 @@ The model-policy projection version cache is capped at 10,000 recent subject/pat
 
 The instance repository preserves manual, idle, shutdown, failure and permission-refresh stop reasons. Automatic startup cannot override a manual stop, including after Gateway reconstruction or a later background stop request; only an authenticated explicit start clears it. Start claims and readiness publication check durable state, and the production start admission participates in maintenance writer accounting. A stopped page offers an authorized start action without polling itself back into a running instance.
 
+[Provider teardown observers](2026-10-18-provider-teardown-observers.md) specify JSONL consumer-before-tracker disposal and credentials watcher error containment, including their limits during root disposal and late callbacks.
+
 ## Alternatives considered
 
 **Rely on one process-wide timeout.** Rejected because transport framing, provider parsing, durable writes, and streamed document bodies have different progress and ownership semantics; a single deadline either leaves a queue unbounded or aborts valid slow work without releasing its owner.

@@ -6,13 +6,13 @@ English | [中文](2026-10-17-session-draft-initialization.zh.md)
 
 ## Problem
 
-Upstream PR #5505 (`c222ea968b02`) widened `startSession(workspaceId?, options?)` with `prompt` and `clearPreviousDraft` so New Session flows can prefill a composer draft without sending it, and it made the structured draft store the initialization owner. The local composer is a textarea plus `InputMachine` with a plain-text draft, attachments tracked beside it, and a per-session chat store (`dsh.conversation.chat`) mirroring the draft for persistence — none of upstream's Lexical/structured-chip machinery exists to copy. The contract worth porting is the user-visible one: prefill lands only on the Session the navigation retained, an existing draft is preserved unless clearing is explicit, a live submission refuses the change, and nothing reaches the Host log before the user sends.
+New Session flows can prefill the composer without sending a message, following [upstream PR #5505](https://github.com/deepseek-ai/deepseek-harness/pull/5505) (`c222ea968b02`). The fork uses a textarea and `InputMachine`, editor-independent reference spans, separately owned attachments, and the per-session `dsh.conversation.chat` store. Prefill must target the Session retained by navigation, preserve an existing draft unless clearing is explicit, refuse a live submission, and write no Host event before the user sends.
 
 ## Decision
 
 **Options travel with the navigation, not the Session lookup.** `IWorkspaces.startSession` accepts `StartSessionOptions` (`prompt`, `clearPreviousDraft`, `onFailure`); `UiWorkspace.startSession` forwards the same minus the failure observer, which the Workspace UI's notice channel owns. The Workspace runtime emits the root `conversation/draft-initialize` event inside `commitSessionNavigation`'s commit callback, addressed to the exact retained `sessionId` — a superseded navigation never emits, so a delayed create cannot write into the wrong composer.
 
-**The chat store stays the single durable draft owner.** The ui-conversation listener resolves the existing draft as the live shell's text when it holds one, else the persisted store value — an empty shell not yet seeded from the store does not make a preserved draft adoptable. Clearing writes through `chat.actions.setDraft`, so a cleared draft cannot re-seed at the next mount, and a prefilled one survives remount and reload. Attachments are untouched in every arm.
+**The chat store owns browser draft persistence.** The initialization listener checks the live shell's text when it has content, otherwise the decoded stored draft. An empty shell that has not restored the store does not make an existing draft replaceable. Clearing writes through `chat.actions.setDraft`, so remount cannot revive the cleared value. [Structured draft persistence](2026-10-18-structured-browser-draft-persistence.md) owns reference restoration and legacy string decoding. Attachments remain separately owned and unchanged by initialization.
 
 **A live submission refuses first.** The listener and the `InputHub` apply path both check `adjudicating`/`submitting` before any write; refusal never clears the draft it declined.
 
@@ -20,7 +20,7 @@ Upstream PR #5505 (`c222ea968b02`) widened `startSession(workspaceId?, options?)
 
 ## Alternatives considered
 
-**Port upstream's structured `DraftSnapshot` and chip restoration.** Rejected: the local input is a textarea machine; the structured model belongs to a different editor architecture, and plain `prompt?: string` is the only part upstream exposes to `startSession` callers anyway.
+**Import the upstream editor and its draft store.** Rejected: the textarea input machine already owns text and reference occurrences. The [editor-independent snapshot](../feature/2026-10-18-rc2-client-surface-parity.md) projects that state without adding another editor model; `startSession` callers still supply only `prompt?: string`.
 
 **Emit the event at create time instead of navigation commit.** Rejected: a superseded or failed navigation would still have written a draft into a Session the user never landed on. Addressing the retained binding at commit is what bounds the write to the target.
 
@@ -34,4 +34,4 @@ Regression coverage lives in `packages/client/runtime/tests/workspaces-service.c
 
 ## Testing
 
-`packages/client/runtime`: workspaces suite — 52 tests. `packages/client/ui-conversation`: full suite — 714 tests. `apps/web` (built client bundle): `draft-initialization.e2e.ts` — 3 tests through the real Loader composition.
+Workspace service tests cover committed and superseded navigation; conversation tests cover preserved and cleared drafts, submission refusal, and structured restore. The built-client browser scenario covers prefill and structured references across reload, Workspace reuse, and absence of Host messages before submission.

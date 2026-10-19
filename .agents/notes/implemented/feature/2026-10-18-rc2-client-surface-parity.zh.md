@@ -20,6 +20,8 @@ fork 的会话栈是 `ui-conversation` 加纯文本输入机，不是上游 `ui-
 - `ui-primitives` 承载凭据脱敏文本节点：`ui-secret-mask` 的扫描器/掩码/格式表与 `SecretText` 移植进 `user-text.tsx` 的 `projectUserText`——对每个识别到的凭据区间输出 `SecretText`（调用方提供标签时带逐值揭示开关）。脱敏仅作用于呈现：日志原文、复制载荷与模型输入均保留原字符。
 - `ui-conversation.collapseTiming`（默认 `completion`，另为 `next-input`）以 `CollapseTimingPolicy` 落在设置 scope 上，配 `settings.collapseTiming` 设置行与 `ChatPresentationPolicy.collapseTiming` 字段。`next-input` 下最新已完成轮次的过程保持展开，直到 transcript 位置的待提交回显或更新轮次出现；已存的手动折叠仍然生效。
 
+[浏览器草稿的结构化持久化](../architecture/2026-10-18-structured-browser-draft-persistence.zh.md)规定这些独立于编辑器的快照的存储表示与刷新恢复行为。
+
 ## Alternatives considered
 
 - 整体移植上游 Lexical `DraftSnapshot`/存储层被否决：fork 输入机本就跟踪 occurrence 表，快照只是既有状态的投影，而非第二套文档模型。

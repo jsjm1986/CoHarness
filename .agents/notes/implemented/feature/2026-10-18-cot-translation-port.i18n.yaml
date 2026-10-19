@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-cot-translation-port.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-cot-translation-port.md
+/agent-note-chain-of-thought-translation-port-through-fork-seams:
+  en: b6d5f3edebe57587
+  zh: 25af37a05ad94ca8
+/agent-note-chain-of-thought-translation-port-through-fork-seams/problem:
+  en: c74d6ebc8fbc2d99
+  zh: 80bee69b31f8e642
+/agent-note-chain-of-thought-translation-port-through-fork-seams/decision:
+  en: 400cb6beb6189858
+  zh: 2433a8795e4e7189
+/agent-note-chain-of-thought-translation-port-through-fork-seams/alternatives-considered:
+  en: 5eae648f884b90cf
+  zh: 12b436d27a740533
+/agent-note-chain-of-thought-translation-port-through-fork-seams/testing:
+  en: f95d1c0c71585e21
+  zh: 773dd6020898911a
+/agent-note-chain-of-thought-translation-port-through-fork-seams/consequences:
+  en: 255df40dfb222548
+  zh: 3468cf7c06bf3089

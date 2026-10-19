@@ -26,7 +26,7 @@ PDF 与转换后的 Office 预览之前只按适合宽度渲染，图片预览�
 
 ## 影响
 
-- `packages/client/ui-workbench/src/client/zoom/` 承载共享层；`PdfBody` 与 `PreviewImage` 是两个消费方。
+- `packages/client/ui-workbench/src/client/contract/zoom/` 承载共享层；`PdfBody` 与 `PreviewImage` 是两个消费方。
 - `WorkspaceFileTab` 新增 `pdfView.zoom`/`fileView.zoom` 与本地化缩放文案；`document.ts` reader 契约不变。
 - Web e2e 覆盖 Office 缩放（显隐、固定缩放、横向滚动、文本层存活、恢复适合宽度、设备像素渲染）与工作区图片缩放（固有尺寸、200%/100% 固定缩放、scrollport 溢出）。
 

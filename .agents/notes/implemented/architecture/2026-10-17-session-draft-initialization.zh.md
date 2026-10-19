@@ -6,13 +6,13 @@ Status: implemented
 
 ## 问题
 
-上游 PR #5505(`c222ea968b02`)把 `startSession(workspaceId?, options?)` 扩展为携带 `prompt` 与 `clearPreviousDraft`，使 New Session 流程能预填编辑器草稿而不发送，并让结构化草稿 store 成为初始化 owner。本地 composer 是 textarea 加 `InputMachine` 的架构：草稿为纯文本，附件独立记账，会话级聊天 store(`dsh.conversation.chat`)负责镜像草稿以持久化——上游那套 Lexical/结构化 chip 机制在本地并不存在。值得移植的是用户可见契约：预填只落在导航最终保留的 Session 上；未显式清空时保留已有草稿；正在提交的输入拒绝该变更；用户发送前不写入任何 Host 日志。
+New Session 流程可预填编辑器而不发送消息，该行为对应[上游 PR #5505](https://github.com/deepseek-ai/deepseek-harness/pull/5505)（`c222ea968b02`）。分叉版使用 textarea 与 `InputMachine`、独立于编辑器的引用范围、单独管理的附件，以及会话级 `dsh.conversation.chat` store。预填必须指向导航最终保留的 Session；未显式清空时保留已有草稿；正在提交时拒绝修改；用户发送前不写入 Host 事件。
 
 ## 决策
 
 **选项随导航走，而不是随会话查询走。** `IWorkspaces.startSession` 接受 `StartSessionOptions`(`prompt`、`clearPreviousDraft`、`onFailure`);`UiWorkspace.startSession` 转发相同选项，但失败通知由 Workspace UI 的 notice 通道拥有，不再透传 `onFailure`。Workspace runtime 在 `commitSessionNavigation` 的提交回调里发出根级 `conversation/draft-initialize` 事件，寻址到准确保留的 `sessionId`——被取代的导航不发出事件，因此延迟到达的创建结果不可能写进错误的编辑器。
 
-**聊天 store 仍是唯一的持久草稿 owner。** ui-conversation 的监听器按下述规则判定现有草稿：shell 持有文字时以 shell 为准，否则以持久化 store 为准——一个尚未从 store 播种的空 shell 不会让受保护的草稿变成"可预填"。清空经 `chat.actions.setDraft` 写穿持久层，因此被清空的草稿不会在下次挂载时被重新播种，预填的草稿则能跨重新挂载与刷新保留。附件在任何分支都不受影响。
+**聊天 store 拥有浏览器草稿持久化。** 初始化监听器在 live shell 有内容时检查其文字，否则检查解码后的存储草稿。尚未恢复存储值的空 shell 不会让已有草稿变成可替换。清空经 `chat.actions.setDraft` 写入，因此重新挂载不会恢复已清除的值。[结构化草稿持久化](2026-10-18-structured-browser-draft-persistence.zh.md)负责引用恢复与旧字符串解码。附件保持独立所有权，初始化不改变附件。
 
 **正在提交的输入优先拒绝。** 监听器与 `InputHub` 的应用路径在任何写入之前都检查 `adjudicating`／`submitting`；被拒绝的变更不会先清空原稿。
 
@@ -20,7 +20,7 @@ Status: implemented
 
 ## 备选方案
 
-**移植上游的结构化 `DraftSnapshot` 与 chip 恢复。** 否决：本地输入是 textarea 状态机，结构化模型属于另一种编辑器架构；而且上游暴露给 `startSession` 调用方的本来就只有 `prompt?: string`。
+**引入上游编辑器及其草稿 store。** 否决：textarea 输入状态机已拥有文字与引用 occurrence。[独立于编辑器的快照](../feature/2026-10-18-rc2-client-surface-parity.zh.md)投影这份状态，不增加另一套编辑器模型；`startSession` 调用方仍只提供 `prompt?: string`。
 
 **在创建时而非导航提交时发出事件。** 否决：被取代或失败的导航仍会把草稿写进用户从未落入的 Session。在提交点对保留的 binding 寻址，才能把写入限定在目标上。
 
@@ -34,4 +34,4 @@ Status: implemented
 
 ## 测试
 
-`packages/client/runtime`:workspaces 套件——52 项测试。`packages/client/ui-conversation`：全量套件——714 项测试。`apps/web`（已构建 client bundle):`draft-initialization.e2e.ts`——3 项测试，走真实 Loader 组合。
+Workspace 服务测试覆盖已提交与被取代的导航；conversation 测试覆盖草稿保留与清除、提交期间拒绝修改，以及结构化恢复。已构建客户端的浏览器场景覆盖跨刷新预填与结构化引用、Workspace 复用，以及提交前不产生 Host 消息。

@@ -22,4 +22,4 @@ Loader 插值条目 `disabled` 字段（`vendor/loader/src/config/entry.ts`）�
 
 ## 后果
 
-行可以按平台或环境门控自身；错误的表达式在启动时响亮失败。其余元数据字段保持字面值，门禁继续拒绝那里的表达式——`disabled` 上的 postmortem-0002 隐患以「求值」而非「禁止」关闭。Windows shell 栈的切换从启动器注入的 patch 层移到 base bundle 自身的行上：win32 挂载受限 pwsh 栈，POSIX 携带被禁用的 pwsh 行，同一份 patch 文件服务两种阵容——[Windows 默认 pwsh](../feature/2026-08-01-windows-pwsh-default.zh.md) note 的层机制已被取代。shell 工具行遵循与其他预设声明行相同的 one-plane 规则：web-app overlay 禁用 host 面的 `tool-bash`/`tool-pwsh` 行，预设以互逆的平台门控声明两者，因此任一宿主的每个会话都可以按预设丢弃或替换 shell 工具。`minimal` 预设缺失的 win32 PTY 栈是预设元数据的后续工作。
+行可以按平台或环境门控自身；错误的表达式在启动时响亮失败。其余元数据字段保持字面值，门禁继续拒绝那里的表达式——`disabled` 上的 postmortem-0002 隐患以「求值」而非「禁止」关闭。Windows shell 栈的切换从启动器注入的 patch 层移到 base bundle 自身的行上：win32 挂载受限 pwsh 栈，POSIX 携带被禁用的 pwsh 行，同一份 patch 文件服务两种阵容——[Windows 默认 pwsh](../feature/2026-08-01-windows-pwsh-default.zh.md) note 的层机制已被取代。shell 工具行遵循与其他预设声明行相同的 one-plane 规则：web-app overlay 禁用 host 面的 `tool-bash`/`tool-pwsh` 行，预设以互逆的平台门控声明两者，因此任一宿主的每个会话都可以按预设丢弃或替换 shell 工具。`minimal` 预设以同样方式声明自身的平台门控 shell 栈：`persistent-bash`/`terminal-bash` 行在 win32 上禁用，`persistent-pwsh`/`terminal-pwsh` 行在 POSIX 上禁用，因此该预设每台宿主恰好挂载一个持久 shell。

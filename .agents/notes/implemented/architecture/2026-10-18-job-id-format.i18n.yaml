@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-18-job-id-format.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-job-id-format.md
+/agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters:
+  en: 8d09a09e99aaefd0
+  zh: 0a9b43217dedcb0f
+/agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters/problem:
+  en: b4f319f2e34d71cf
+  zh: 4bbd6e00cba9b117
+/agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters/decision:
+  en: 794cfcd7a4aa09c0
+  zh: ea5c873217690874
+/agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters/alternatives-considered:
+  en: 9a42420ff4375309
+  zh: 7107643433abbcd8
+/agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters/consequences:
+  en: c37d0ca8cd400535
+  zh: 7769a4c3a81c4787
+/agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters/verification:
+  en: f5d000ec1aa0e13d
+  zh: af4ec32431ad0f17
+/agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters/related:
+  en: b580ce0101209169
+  zh: 6a0760bbc6f478d4

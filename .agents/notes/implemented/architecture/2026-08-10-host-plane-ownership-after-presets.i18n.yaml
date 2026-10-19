@@ -2,21 +2,21 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-10-host-plane-ownership-after-presets.md
-/agent-note-what-stays-host-plane-once-presets-own-the-agent-plane:
-  en: 4b22d7def09af6eb
-  zh: 89b43fb2761cb17b
-/agent-note-what-stays-host-plane-once-presets-own-the-agent-plane/problem:
-  en: 2b309c6dc21fca5b
-  zh: ad6dfcee589878fc
-/agent-note-what-stays-host-plane-once-presets-own-the-agent-plane/decision:
-  en: 9170e43dda239543
-  zh: 4dc478c004231a73
-/agent-note-what-stays-host-plane-once-presets-own-the-agent-plane/testing:
-  en: 7cc5eda885c51623
-  zh: e34ba752fd250f96
-/agent-note-what-stays-host-plane-once-presets-own-the-agent-plane/alternatives-considered:
-  en: e298cd70d10bde79
-  zh: f539eece23915259
-/agent-note-what-stays-host-plane-once-presets-own-the-agent-plane/consequences:
-  en: f62b508bbee9733b
-  zh: 2c9788b7d7d0be4f
+/agent-note-host-ownership-of-token-accounting-across-presets:
+  en: 45be5970f9d763c9
+  zh: 9401a4292c7b40d0
+/agent-note-host-ownership-of-token-accounting-across-presets/problem:
+  en: c3bb938617e59943
+  zh: 6c52e5cb4688178f
+/agent-note-host-ownership-of-token-accounting-across-presets/decision:
+  en: adc02a3b2d93ba58
+  zh: 8d7f88a3463d57c9
+/agent-note-host-ownership-of-token-accounting-across-presets/testing:
+  en: b167ed775db04507
+  zh: 11cc182da2f69593
+/agent-note-host-ownership-of-token-accounting-across-presets/alternatives-considered:
+  en: 8ccf2c53f6c2b5f3
+  zh: 4b491ce373733ca4
+/agent-note-host-ownership-of-token-accounting-across-presets/consequences:
+  en: 1da45c87ee541b03
+  zh: 0f4626c8ee19fe7f

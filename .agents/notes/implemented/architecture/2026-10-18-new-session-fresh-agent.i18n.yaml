@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-new-session-fresh-agent.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-new-session-fresh-agent.md
+/agent-note-bare-new-session-mints-a-fresh-session-agent-under-the-current-preset:
+  en: b10a4c288ff59b0e
+  zh: 0eddca481773964b
+/agent-note-bare-new-session-mints-a-fresh-session-agent-under-the-current-preset/problem:
+  en: 42404a4d8bdc912d
+  zh: d093bcb449668f6f
+/agent-note-bare-new-session-mints-a-fresh-session-agent-under-the-current-preset/decision:
+  en: ae651d96dfe0f98d
+  zh: 146addcde4548de0
+/agent-note-bare-new-session-mints-a-fresh-session-agent-under-the-current-preset/alternatives-considered:
+  en: ebea32d8693a3c82
+  zh: 95ab00eab0c0ca89
+/agent-note-bare-new-session-mints-a-fresh-session-agent-under-the-current-preset/consequences:
+  en: 90698ae2c6ab0a01
+  zh: b71c18468b0a3879
+/agent-note-bare-new-session-mints-a-fresh-session-agent-under-the-current-preset/verification:
+  en: 6c9b65d4afed44e3
+  zh: 220300f5e9090098

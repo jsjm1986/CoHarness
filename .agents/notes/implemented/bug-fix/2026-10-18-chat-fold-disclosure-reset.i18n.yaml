@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-18-chat-fold-disclosure-reset.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-chat-fold-disclosure-reset.md
+/agent-note-a-folded-chat-turn-resets-its-mounted-child-disclosures:
+  en: 2806d3abe0b55132
+  zh: 099291e5a3f1ebf8
+/agent-note-a-folded-chat-turn-resets-its-mounted-child-disclosures/problem:
+  en: dcdd2e2816dd5984
+  zh: 70fb65c3275afb4e
+/agent-note-a-folded-chat-turn-resets-its-mounted-child-disclosures/decision:
+  en: 96a00a1f83e008d5
+  zh: 378e210149e1acca
+/agent-note-a-folded-chat-turn-resets-its-mounted-child-disclosures/files:
+  en: 65b37c4ff2683250
+  zh: 664556714a028186
+/agent-note-a-folded-chat-turn-resets-its-mounted-child-disclosures/alternatives-considered:
+  en: c08f9222d57a8886
+  zh: ce24529d96784e37
+/agent-note-a-folded-chat-turn-resets-its-mounted-child-disclosures/consequences:
+  en: d0be211c9e0e4b07
+  zh: 58a392d4e4abb01e
+/agent-note-a-folded-chat-turn-resets-its-mounted-child-disclosures/verification:
+  en: ff8f4fdb01e7132c
+  zh: 4904faf1c0f81979

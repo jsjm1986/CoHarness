@@ -26,7 +26,7 @@ Zoom preferences live on the containing tab's `view` object — `pdfView.zoom` f
 
 ## Consequences
 
-- `packages/client/ui-workbench/src/client/zoom/` holds the shared layer; `PdfBody` and `PreviewImage` are its two consumers.
+- `packages/client/ui-workbench/src/client/contract/zoom/` holds the shared layer; `PdfBody` and `PreviewImage` are its two consumers.
 - `WorkspaceFileTab` grows `pdfView.zoom`/`fileView.zoom` plus localized zoom labels; `document.ts` readers keep their contracts.
 - Web e2e covers Office zoom (reveal/hide, fixed scale, horizontal scroll, text-layer survival, fit restore, device-pixel rendering) and workspace image zoom (intrinsic sizing, fixed 200%/100% scale, scrollport overflow).
 

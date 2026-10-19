@@ -11,7 +11,7 @@ English | [中文](guide.zh.md)
 
 `dsh-tool-subagent` rejects `persona` and `toolFilter` configuration. New `SubagentStartRequest` values and provider capabilities no longer expose either field. In-process spawn selects a preset through `agentPreset`; its persona and tools come from that preset's plugins. Fork inherits the parent's preset and cannot independently change persona or restrict tools. Model and reasoning-effort options are unchanged.
 
-Compositions that mount `dsh-schedule` keep its reminder tools visible to delegated children; delegated callers still receive the existing execution refusal. Historical child Session descriptors retain their persona and tool restrictions when resumed.
+Reminder tools require `dsh-schedule` on the Host and `dsh-tool-schedule` in the selected preset. Delegated children using that composition can see the tools, but every tool rejects delegated execution before dispatch. Historical child Session descriptors retain their persona and tool restrictions when resumed.
 
 ## Migration
 

@@ -11,7 +11,7 @@ description: "Subagent 的 persona 与 toolFilter 配置由 Agent Preset 组装�
 
 `dsh-tool-subagent` 拒绝 `persona` 与 `toolFilter` 配置。新的 `SubagentStartRequest` 和提供方能力声明也不再暴露这两个字段。进程内 spawn 通过 `agentPreset` 选择 preset，其 persona 与工具来自该 preset 的插件。fork 继承父方 preset，不能独立改变 persona 或限制工具。模型与推理强度选项保持不变。
 
-挂载 `dsh-schedule` 的组装仍让委派子级看到其提醒工具；委派调用方仍会收到已有的执行拒绝。历史子 Session 的 descriptor 在恢复时仍应用其 persona 与工具限制。
+提醒工具要求 Host 挂载 `dsh-schedule`，并在选定 preset 中挂载 `dsh-tool-schedule`。使用该组合的委派子级可以看到工具，但每个工具都会在派发前拒绝委派执行。历史子 Session 的 descriptor 在恢复时仍应用其 persona 与工具限制。
 
 ## 迁移
 

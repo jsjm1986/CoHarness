@@ -320,7 +320,7 @@ Process-local goal activation changed for one session.
 'goal/activation-changed'(payload: GoalActivationChanged): void
 ```
 
-Source: [`packages/goal/goal/src/domain.ts`](../../packages/goal/goal/src/domain.ts)
+Source: [`packages/goal/goal/src/types.ts`](../../packages/goal/goal/src/types.ts)
 
 <a id="goalchanged--emit"></a>
 

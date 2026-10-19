@@ -22,6 +22,8 @@ Upstream PR #5460 and commit `3c1e3571329f` fixed a deadlock: a blank Session wh
 
 **Cold-list preset truth comes from the probe that already paid for it.** `summarizeCold` resolves `agentPreset` from folded probe events (`sessionListFields`) when the bounded blank probe read the log; an unprobed large artifact stays header-only because the switch fact is not worth a full read.
 
+**The reuse arm serves Workspace reconnection only.** `connectWorkspace`/`openWorkspace` fallbacks, startup restore, and draft-prepared starts keep the semantics above; a bare `startSession` call mints a fresh Session+Agent instead of adopting a member blank or a parked draft reservation — see [bare New Session fresh mint](2026-10-18-new-session-fresh-agent.md).
+
 ## Alternatives considered
 
 **Treat every named Session as a reuse candidate like upstream's folded create.** Rejected: upstream's UI cannot name an arbitrary Session to adopt; the local wire can, and adoption must preserve recorded composition for nonblank history.
@@ -38,4 +40,4 @@ Regression coverage lives in `packages/host/apiproxy/tests/api-proxy-agent-prese
 
 ## Testing
 
-`packages/host/apiproxy`: agent-preset and cold suites — 59 tests. `packages/client/runtime`: workspaces and sessions suites — 96 tests. `apps/web` (built host+client bundles): `blank-preset-reuse.e2e.ts` — 3 tests through the real Loader composition.
+`packages/host/apiproxy`: agent-preset and cold suites — 59 tests. `packages/client/runtime`: workspaces and sessions suites — 96 tests. `apps/web` (built host+client bundles): `blank-preset-reuse.e2e.ts` — 4 tests through the real Loader composition.

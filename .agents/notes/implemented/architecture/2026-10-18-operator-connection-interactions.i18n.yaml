@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-18-operator-connection-interactions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-operator-connection-interactions.md
+/agent-note-operator-connections-declare-an-interaction-mode-scoped-per-request:
+  en: c94aa66d4ebbeb50
+  zh: 175aef72fa128ec0
+/agent-note-operator-connections-declare-an-interaction-mode-scoped-per-request/problem:
+  en: c9f97ace6e268317
+  zh: 8f7b93ed28f57b84
+/agent-note-operator-connections-declare-an-interaction-mode-scoped-per-request/decision:
+  en: 7b77e4ce5623baaa
+  zh: 6aae63c560f7d966
+/agent-note-operator-connections-declare-an-interaction-mode-scoped-per-request/alternatives-considered:
+  en: 9069f856dfd4cbdb
+  zh: a1155bf7d1a437a7
+/agent-note-operator-connections-declare-an-interaction-mode-scoped-per-request/consequences:
+  en: e8e87ecf78ba7b26
+  zh: d8dc67c82379b5c6

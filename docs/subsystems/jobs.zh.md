@@ -6,7 +6,7 @@
 
 ## ID 与状态
 
-`JobId` 是按 `<kind>-N` 生成的[品牌化 id](core.zh.md#branded-ids)。访问控制依赖拥有者授权，而非 id 的保密性。`JobKind` 派生自可合并扩展的 map；注册表将各个 kind 视为不透明的 id 命名空间。
+`JobId` 是按 `<kind>-<short-uuid>` 生成的[品牌化 id](core.zh.md#branded-ids)：kind 后是 UUID 的 16 位小写十六进制字符。访问控制依赖拥有者授权，而非 id 的保密性。`JobKind` 派生自可合并扩展的 map；注册表将各个 kind 视为不透明的 id 命名空间。
 
 ```ts type-equiv
 /**
@@ -77,7 +77,7 @@ interface JobSpec {
  * throwing, so a producer's trailing flush cannot break its own teardown path.
  */
 interface JobHandle {
-  /** The registry-issued id (`<kind>-N`). */
+  /** The registry-issued id (`<kind>-<short-uuid>`). */
   readonly id: JobId
   /**
    * Append one chunk to the output ring. Offsets advance by the chunk's UTF-8
@@ -220,7 +220,7 @@ interface JobOutputRead {
  * stream all consume this one shape.
  */
 interface JobView {
-  /** The registry-issued id (`<kind>-N`). */
+  /** The registry-issued id (`<kind>-<short-uuid>`). */
   readonly id: JobId
   /**
    * The producer kind the job was registered with: a Host-registered
@@ -363,7 +363,7 @@ Implementations must honor these semantics:
  * rejection leaves no job id or execution resource. A throwing starter
  * leaves nothing registered; after it returns, registration cannot fail.
  * @param spec - job identity, owner, output sources, and synchronous starter.
- * @returns the registry-issued `<kind>-N` id.
+ * @returns the registry-issued `<kind>-<short-uuid>` id.
  */
 abstract start(spec: JobSpec): JobId
 

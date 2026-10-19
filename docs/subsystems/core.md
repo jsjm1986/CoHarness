@@ -506,18 +506,21 @@ Types: [SessionHeader](persistence.md)
 
 Source: [`packages/core/agent-loop/src/index.ts`](../../packages/core/agent-loop/src/index.ts)
 
-<a id="ctxagentpresets--agentpresets"></a>
+<a id="ctxagentpresets--agentpresetregistry"></a>
 
-### `ctx.agentPresets` — `AgentPresets`
+### `ctx.agentPresets` — `AgentPresetRegistry`
 
 Registry over the deployment's agent presets.
 
-Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every call so a preset authored while the process runs is visible immediately, and a preset deleted underneath a picker disappears from the next read.
+File discovery is unmemoized: `list()` and `resolve()` re-read the roots on every call so a preset authored while the process runs is visible immediately, and a preset deleted underneath a picker disappears from the next read. A second source joins the same roster: plugins declaring a `PresetDefinition` through AgentPresetRegistry.register, whose rows mount under registry-owned generations the way upstream's declarative model composes them.
 
 ```ts cordis-catalog
 /**
- * Every preset the configured roots currently supply.
- * @returns the presets, first-root-wins per id.
+ * Every preset the roster currently supplies.
+ *
+ * Declared presets are deliberate composition and read as the first root: a
+ * file preset id one declares is shadowed, not duplicated.
+ * @returns the presets, declared first then first-root-wins per id.
  */
 async list(): Promise<AgentPreset[]>
 
@@ -706,6 +709,14 @@ async remove(id: string): Promise<void>
 serviceFor<K extends string & keyof Context>(agent: { ctx: Context }, name: K): Context[K] | undefined
 
 /**
+ * Inspect the composition trees this roster mounted, or the one an agent
+ * runs on.
+ * @param ctx - an agent's scope context, or undefined for every live mount.
+ * @returns preset ids with the plugins their trees activated.
+ */
+async inspectCompositions(ctx?: Context): Promise<AgentPresetInspection[]>
+
+/**
  * Re-link one agent to a different preset's standing composition.
  *
  * Only valid while the agent has produced nothing: swapping tools mid
@@ -742,6 +753,17 @@ async recompose(agentCtx: Context, id: string): Promise<AgentPreset>
 async standingKeyFor(id?: string): Promise<ScopeKey>
 
 /**
+ * Acquire the standing scope one preset composes under.
+ *
+ * The returned lease is a read boundary, not a mount: release it when the
+ * cold read ends so a retired generation can collect.
+ * @param id - the preset id, or `undefined` for {@link defaultId}.
+ * @returns the scope key and its release.
+ * @throws when the preset is unknown or its composition is unusable.
+ */
+async acquireScope(id?: string): Promise<{ key: ScopeKey; dispose: () => Promise<void> }>
+
+/**
  * Install the environment hook one realm key resolves to.
  *
  * The hook runs inside each NEW standing generation created under `realm`,
@@ -767,6 +789,14 @@ registerRealm(realm: string, mount: StandingRealmHook): () => void
  * @param realm - the realm key to retire.
  */
 invalidateRealm(realm: string): void
+
+/**
+ * Register and eagerly activate one declared preset.
+ * @param definition - parsed configuration supplied by the declaring plugin.
+ * @returns definition disposer after activation or its diagnostic settles;
+ * the declaring plugin owns it.
+ */
+async register(definition: PresetDefinition): Promise<() => Promise<void>>
 ```
 
 Types: [ScopeKey](scope.md)

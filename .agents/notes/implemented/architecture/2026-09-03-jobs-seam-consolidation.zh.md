@@ -16,8 +16,8 @@ job seam 是逐步堆出来的。生产者要把输出声明两次——模型�
 - **一个投影。** `JobView`（客户端安全叶子 `@deepseek-ai/dsh-jobs/view`）是模型工具、浏览器名册与观测帧共同消费的形状；`owner` 是会话 id，从不是 `Agent`。
 - **直接传入调用方的操作。** `JobRegistry.list`、`get`、`read`、`readAt`、`kill` 与 `wait` 在每次调用时接收调用方会话。省略调用方时仅允许访问无主 job。输出环与浏览器流不需要独立的调用方操作对象。
 - **一条事件流。** 带 `{ owner }`、`{ owners: 'scope' }` 或 `{ owners: 'all' }` 过滤的 `events.subscribe(filter, listener)` 取代三个监听器家族。`settled` 标出原因（`producer`、`kill`、`teardown`）；`output` 只携带 id 与新的 total。
-- **播报台账移到 `dsh-tool-jobs`。** 注册表不再跟踪 `reported`。工具在等待开始时认领 job（超时或中止则撤回），在 `job_kill` 被接受时也认领；结算事件删除条目，teardown 结算与无主 job 被跳过，投递目标是结算时登记在拥有者会话下的 agent。
-- **名册离开会话控制流。** `dsh-api-job-controller` 在 `job.follow` 旁拥有 `job.list({ sessionId })`——每轮聚合过的生命周期提交之后发一次整集帧，从不按追加发——其客户端安装 `ctx.jobs`（`watchRows`、`observe`、一份快照）。`dsh-api-session-controller` 只承载队列与投影；`ui-jobs` 在挂载期间关注其会话的名册，行在 job 进行中或留有保留输出时可展开。
+- **完成通知归 `dsh-tool-jobs` 所有。** 注册表的 `settled.awaited` 记录结算是否释放了仍在进行的等待。工具通过 `killedByModel` 跟踪已受理的模型 `job_kill` 请求并抑制重复通知，结算或移除会清除条目。尚未通过等待或模型 kill 投递的结算发送给当前登记的属主 Agent，跳过 teardown 与无主任务。浏览器 kill 不进入该台账。
+- **名册传输遵循 Web 任务决策。** 分叉版经过授权的 BFF 在订阅基线与生命周期提交时发布 `session/jobs` 完整可见集，输出通过非消费的 `jobs.output` 独立读取。[Web 任务输出决策](../feature/2026-09-30-web-job-output-and-kill.zh.md) 负责该复用传输与客户端观察生命周期。输出事件不重发名册，BFF 保留生命周期发布顺序。
 
 `attachController` 与相对拥有者的 `servesOwner` 门保持原样；没有挂载控制器的生产者是否可以提供 `run_in_background`，因为这个缺口早于本次变更，暂不处理。
 
@@ -25,11 +25,10 @@ job seam 是逐步堆出来的。生产者要把输出声明两次——模型�
 
 - **保留三个监听器并共享一个拥有者过滤。** 它保住了堆出来的名字，却保不住评审要的性质——一个地方就能学会注册表宣布什么——而且 `onJobDone` 的精确拥有者投递正是迫使注册表在每个投影里保留 `Agent` 的原因。
 - **把 `reported`留在注册表。** 只有工具知道哪些投递到达了模型（等待的工具结果、kill 的确认）；注册表只能近似，而这个近似正是评审列出的重复播报与漏播报 bug 的来源。
-- **把名册留在会话控制流上。** 省了一条 Remote 流，却把会话控制器耦合到 job 注册表，还镜像了一个环的字节数如今直接回答的 `record` 标志（`output.total`）。
 - **也把 `log` 块交给模型。** 生产者叙述是给观察者的；模型已经通过 `progress` 与终态 `detail` 收到同样的事实。
 
 ## 后果
 
 模型可见文本保持不变：状态行、工具描述与 schema、播报措辞逐字节相同，唯一新增的模型可见事实是 `killed` 状态行现在携带的 kill 原因。需要流式输出的生产者选择拉取源或 `append`，从不格式化消耗式增量。Web 客户端把每个进行中的 job 渲染为可展开，因此从不写输出的 job 显示为空的运行中面板而非静态行。`JobKindMap` 的合并发生在宿主侧，浏览器程序把 `JobView.kind` 视为它认识的 kind 集合，其余当作不透明字符串——名册对它也只做这些。
 
-合并 master 之后的评审跟进收紧了其中四条边。job 的第一个事件永远是 `registered`：通告先于泵，而泵的首轮 drain 同步执行且可能通告输出。已结算的环在模型的首次终态读取之前保留模型游标尚未消费的全部字节，因此在首次 `job_output` 之前结束的 job 不会丢失运行期上限保留的任何内容。`dsh-tool-jobs` 为每次等待调用保存一条带 `live` 标记的认领，调用方 abort 时在 abort 事件里同步清掉该标记，因此注册表的拒绝尚未传回工具之前宣布的结算仍会投递通知；超时的等待只丢弃自己的认领，并发的另一个等待仍覆盖该结算。浏览器把先于锚点发生的观察失败记录为带错误的视图，面板显示提示而不是留白。拉取源保留的 spill 文件是 job 元数据（`JobView.output.spillPaths`，每次泵读取都会上报，读取不再点名时即撤回），不是逐块元数据；模型读取对生产者侧缺口与环淘汰都渲染 shell 工具的丢失输出提示并列出这些文件，即使缺口块本身已被淘汰——本次变更曾引入的 `before this read` 变体已删除。观察生成过程若在流中看到其 job 被移除（拥有者 teardown），以被移除 job 的终态投影收尾，而不是一次失败的读取。被拒绝的后台 spawn 不产生任何进程输出，因此 shell provider 现在把 `spawn failed: …` 提示作为 observed stderr 的整条流提供（消耗式读取仍只折入一次），且 `ShellProcess.observed` 及其两个读取器改为必填：这类失败之后模型的首次 `job_output` 读到的正是 master 的消耗式读取所渲染的内容。
+job 的第一个事件永远是 `registered`：通告先于泵，而泵的首轮 drain 同步执行且可能通告输出。已结算的环在模型的首次终态读取之前保留模型游标尚未消费的全部字节，因此在首次 `job_output` 之前结束的 job 不会丢失运行期上限保留的任何内容。等待在超时或中止时同步解除其结算回调，因此 `settled.awaited` 只反映仍应接收终态投影的等待。浏览器的轮询观察者把注册表拒绝显示为读取错误，并在仍有查看者持有观察时重试传输失败。拉取源保留的 spill 文件是 job 元数据（`JobView.output.spillPaths`，每次泵读取都会上报，读取不再点名时即撤回），不是逐块元数据；模型读取对生产者侧缺口与环淘汰都渲染 shell 工具的丢失输出提示并列出这些文件，即使缺口块本身已被淘汰。被拒绝的后台 spawn 不产生任何进程输出，因此 shell provider 把 `spawn failed: …` 提示作为 observed stderr 的整条流提供（消耗式读取仍只折入一次），且 `ShellProcess.observed` 及其两个读取器为必填。

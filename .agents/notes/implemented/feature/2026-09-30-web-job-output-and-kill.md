@@ -27,7 +27,7 @@ Two gaps had to close without undoing that frame's contract: a per-job output ch
 
 ### The list control
 
-`JobListAction` renders an observable row — a live job, or a settled one with retained output — as expandable into a `TerminalBlock` panel; the row's state dot stays the status source, the panel draws none of its own, copies the command rather than the output, and shows gap and read-failure notices above the terminal. A running row carries a two-press stop control: the first press arms it, the confirming press inside three seconds issues `killJob`, an admitted press stays pending until the roster frame removes the row from the killable set, and a refused press shows a brief failure hint. The settled section folds behind its count while live work exists and clears client-side; below 768px the whole list rides the shared mobile sheet.
+`JobListAction` renders an observable row — a live job, or a settled one with retained output — as expandable into a `TerminalBlock` panel; the row's state dot stays the status source, the panel draws none of its own, copies the command rather than the output, and shows gap and read-failure notices above the terminal. A running row carries a two-press stop control: the first press arms it, the confirming press inside three seconds issues `killJob`, an admitted press stays pending until the roster frame removes the row from the killable set, and a refused or transport-failed press shows a brief failure hint and permits another confirmed attempt. Settlement updates only the control state belonging to that exact attempt. The settled section folds behind its count while live work exists and clears client-side; below 768px the whole list rides the shared mobile sheet.
 
 ## Alternatives considered
 

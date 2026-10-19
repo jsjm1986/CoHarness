@@ -6,13 +6,34 @@
     "previousTag": "dsh-v0.2.0-rc.1",
     "previousCommit": "4878cdabd87d4041bdaff61d04c966883b9fd07a",
     "targetTags": [
-      { "tag": "dsh-v0.2.1-alpha.1", "commit": "5badb15009ae1756c3afe0ae0cef1faafc290ccc" },
-      { "tag": "dsh-v0.2.1-alpha.2", "commit": "6851e496285b2c9670066fdd142e7e46da586649" },
-      { "tag": "dsh-v0.2.1-alpha.3", "commit": "2fbf4359b82fb94c03dcce0b831660d87f12ea5c" },
-      { "tag": "dsh-v0.2.1-alpha.4", "commit": "86a402200d95fecef4529d969836f1fe13c6cb0d" },
-      { "tag": "dsh-v0.2.1-alpha.5", "commit": "1517a4dbca0a2789ff1d41ba439600f8547d23fa" },
-      { "tag": "dsh-v0.2.1-rc.1", "commit": "1600d8a1e140dcde43a1a0941940a0480712c011" },
-      { "tag": "dsh-v0.2.1-rc.2", "commit": "687f282e8625c6b8d11ff58211a90524be2e4317" }
+      {
+        "tag": "dsh-v0.2.1-alpha.1",
+        "commit": "5badb15009ae1756c3afe0ae0cef1faafc290ccc"
+      },
+      {
+        "tag": "dsh-v0.2.1-alpha.2",
+        "commit": "6851e496285b2c9670066fdd142e7e46da586649"
+      },
+      {
+        "tag": "dsh-v0.2.1-alpha.3",
+        "commit": "2fbf4359b82fb94c03dcce0b831660d87f12ea5c"
+      },
+      {
+        "tag": "dsh-v0.2.1-alpha.4",
+        "commit": "86a402200d95fecef4529d969836f1fe13c6cb0d"
+      },
+      {
+        "tag": "dsh-v0.2.1-alpha.5",
+        "commit": "1517a4dbca0a2789ff1d41ba439600f8547d23fa"
+      },
+      {
+        "tag": "dsh-v0.2.1-rc.1",
+        "commit": "1600d8a1e140dcde43a1a0941940a0480712c011"
+      },
+      {
+        "tag": "dsh-v0.2.1-rc.2",
+        "commit": "687f282e8625c6b8d11ff58211a90524be2e4317"
+      }
     ]
   },
   "baseline": {
@@ -25,23 +46,47 @@
   "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
   "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json",
   "auditEvidence": [
+    "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md",
+    "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.json",
     "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json",
     "upgrades/alignment/UPSTREAM-RELEASE-NOTES-LEDGER-dsh-v0.2.1-rc.1.md",
-    ".agents/notes/implemented/architecture/2026-10-22-preset-two-package-migration.md",
-    ".agents/notes/implemented/architecture/2026-10-21-experimental-claude-code-mods-extraction.md"
+    ".agents/notes/implemented/architecture/2026-10-18-preset-two-package-migration.md",
+    ".agents/notes/implemented/architecture/2026-10-17-experimental-claude-code-mods-extraction.md"
   ],
   "verification": [
-    { "phase": "E12", "command": "pnpm exec tsx scripts/verify-upstream-sovereignty.ts", "exitCode": 0, "note": "63 tracked, 219 adapted, 46 owned, 2 replaced, 57 upstream-only package(s) conform to dsh-v0.2.1-rc.2" },
-    { "phase": "E12", "command": "pnpm run verify-upgrade-records", "exitCode": 0, "note": "20 record file(s) conform; rc.2 matrix partitions 9323 cumulative paths into 395 rows with 30 re-reviewed gate replays" },
-    { "phase": "E10", "command": "npx vitest run packages/preset/agent-preset-registry packages/preset/agent-preset", "exitCode": 0, "note": "188 preset tests pass including declared-generation lifecycle coverage" },
-    { "phase": "E9", "command": "pnpm exec tsc -b tsconfig.host.json tsconfig.client.json", "exitCode": 0, "note": "host and client aggregates compile after the invariant removal and claude-code-mods extraction" }
+    {
+      "phase": "E12",
+      "command": "pnpm exec tsx scripts/verify-upstream-sovereignty.ts",
+      "exitCode": 0,
+      "note": "63 tracked, 219 adapted, 46 owned, 2 replaced, 57 upstream-only package(s) conform to dsh-v0.2.1-rc.2"
+    },
+    {
+      "phase": "E12",
+      "command": "pnpm run verify-upgrade-records",
+      "exitCode": 0,
+      "note": "20 record file(s) conform; rc.2 matrix partitions 9323 cumulative paths into 395 rows with 30 re-reviewed gate replays"
+    },
+    {
+      "phase": "E10",
+      "command": "npx vitest run packages/preset/agent-preset-registry packages/preset/agent-preset",
+      "exitCode": 0,
+      "note": "188 preset tests pass including declared-generation lifecycle coverage"
+    },
+    {
+      "phase": "E9",
+      "command": "pnpm exec tsc -b tsconfig.host.json tsconfig.client.json",
+      "exitCode": 0,
+      "note": "host and client aggregates compile after the invariant removal and claude-code-mods extraction"
+    }
   ],
   "decisions": [
     {
       "id": "preset-two-package-migration",
       "status": "adapt",
       "localOwner": "preset owners",
-      "commitScope": ["packages/preset/"],
+      "commitScope": [
+        "packages/preset/"
+      ],
       "reviewState": "implemented-local-tests-passing",
       "notes": "agent-presets split into agent-preset + agent-preset-registry at 8a6aa525882; the upstream declaration model merged onto the fork file-discovery/authoring/inventory core; settings namespace preserved"
     },
@@ -49,7 +94,11 @@
       "id": "runtime-invariant-removal",
       "status": "adapt",
       "localOwner": "runtime diagnostics owners",
-      "commitScope": ["packages/", "scripts/", "docs/"],
+      "commitScope": [
+        "packages/",
+        "scripts/",
+        "docs/"
+      ],
       "reviewState": "implemented-local-tests-passing",
       "notes": "upstream f028f25667d parity: 44 src/invariant.ts companions and their gates removed at b569ce4f87e; compensation specs retained where upstream kept them"
     },
@@ -57,7 +106,9 @@
       "id": "subagent-catalog-external-executions",
       "status": "adapt",
       "localOwner": "subagent owners",
-      "commitScope": ["packages/subagent/"],
+      "commitScope": [
+        "packages/subagent/"
+      ],
       "reviewState": "implemented-local-tests-passing",
       "notes": "catalog gains versioned leaf entries for external executions at c73e7e911de; upstream unified-activation surface not ported by decision"
     },
@@ -65,15 +116,20 @@
       "id": "remote-access-concept-port",
       "status": "adapt",
       "localOwner": "collaboration/api owners",
-      "commitScope": ["packages/context/collaboration", "packages/api/"],
+      "commitScope": [
+        "packages/context/collaboration",
+        "packages/api/"
+      ],
       "reviewState": "implemented-local-tests-passing",
-      "notes": "upstream api/remote-access RBAC concepts ported onto the collaboration.authorize seam at 95e354ad9ef; upstreamOnly records api/remote-access -> context/collaboration"
+      "notes": "upstream api/remote-access RBAC concepts ported onto the collaboration.authorize seam at 95e354ad9ef; extended this round: operator connections carry an interactions mode (none default for non-page, answer via claimInteraction) and launch-token admission on the connection/authenticate seam — upstream Peer/cookie/$events mechanism remains not-carried"
     },
     {
       "id": "ssh-helper-runtime",
       "status": "adapt",
       "localOwner": "ssh owners",
-      "commitScope": ["packages/ssh/"],
+      "commitScope": [
+        "packages/ssh/"
+      ],
       "reviewState": "implemented-local-tests-passing",
       "notes": "ported at 079462b5208 with executable launch kind adapted to the fork pipeline"
     },
@@ -81,7 +137,9 @@
       "id": "deepseek-search-fetch-apis",
       "status": "adapt",
       "localOwner": "web owners",
-      "commitScope": ["packages/web/web-deepseek-api"],
+      "commitScope": [
+        "packages/web/web-deepseek-api"
+      ],
       "reviewState": "implemented-local-tests-passing",
       "notes": "rc.2 DeepSeek Search/Fetch API providers ported at a410ac34995 with a live provider switch"
     },
@@ -89,7 +147,10 @@
       "id": "claude-code-mods-extraction",
       "status": "adapt",
       "localOwner": "experimental owners",
-      "commitScope": ["packages/experimental/claude-code-mods", "packages/experimental/client-ui-claude-code-mods"],
+      "commitScope": [
+        "packages/experimental/claude-code-mods",
+        "packages/experimental/client-ui-claude-code-mods"
+      ],
       "reviewState": "implemented-local-tests-passing",
       "notes": "mod bridge and banner band extracted at 10cff3fb193 with import remaps; sibling experimental packages deferred with named blockers in the extraction note"
     },
@@ -97,15 +158,21 @@
       "id": "upgrade-guide-dispositions",
       "status": "adapt",
       "localOwner": "docs owners",
-      "commitScope": ["docs/upgrade-guide/", "upgrades/"],
+      "commitScope": [
+        "docs/upgrade-guide/",
+        "upgrades/"
+      ],
       "reviewState": "implemented-local-tests-passing",
-      "notes": "cb4fc43d05b: five upstream rc.2 guides not published because their underlying behavior is not carried; remove-runtime-invariants guide retained"
+      "notes": "cb4fc43d05b 五篇 rc.2 指南不发布(行为未携带);本轮 alpha.1-alpha.4 未发布 29 篇逐篇核定:15 篇回填发布(5 篇按 fork 实况改写,不声称未承载迁移),14 篇登记不发布(排除面 5/未携带 6/已裁决 3);逐篇证据见审计报告指南处置节"
     },
     {
       "id": "schedule-tool-preset-declaration",
       "status": "defer",
       "localOwner": "schedule/preset owners",
-      "commitScope": ["packages/schedule/", "packages/preset/"],
+      "commitScope": [
+        "packages/schedule/",
+        "packages/preset/"
+      ],
       "reviewState": "deferred-platform-review",
       "notes": "upstream schedule/tool-schedule declared into presets at rc.2; the fork ships schedule/schedule locally and records the preset declaration as an open gap"
     },
@@ -113,7 +180,10 @@
       "id": "python-alias-validation",
       "status": "defer",
       "localOwner": "python owners",
-      "commitScope": ["python/", "scripts/primary-runtime/"],
+      "commitScope": [
+        "python/",
+        "scripts/primary-runtime/"
+      ],
       "reviewState": "deferred-platform-review",
       "notes": "upstream primary-runtime python alias validation not carried; upgrade-guide disposition recorded at cb4fc43d05b"
     },
@@ -121,25 +191,152 @@
       "id": "bundled-numpy-pandas-tests",
       "status": "defer",
       "localOwner": "python owners",
-      "commitScope": ["python/"],
+      "commitScope": [
+        "python/"
+      ],
       "reviewState": "deferred-platform-review",
       "notes": "upstream exclusion of bundled NumPy/pandas test suites not carried; disposition recorded at cb4fc43d05b"
     },
     {
       "id": "subpath-plugin-display-manifest",
-      "status": "defer",
+      "status": "adapt",
       "localOwner": "plugin-manager owners",
-      "commitScope": ["packages/boot/plugin-manager"],
-      "reviewState": "pending-cumulative-source-review",
-      "notes": "relevant code exists but requires deeper verification against upstream rc.2 semantics before the guide can be published"
+      "commitScope": [
+        "packages/boot/plugin-manager"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "Verified against rc.2: subpath-declared plugin names resolve to the package root identically in both trees (`parts.slice(0, name.startsWith(\"@\") ? 2 : 1)` in operations.ts); BundleRowInfo.moduleName carries the declared subpath name for display. Residual upstream-only BundleInfo fields (official/availability/installTarget) belong to the excluded official-bundle/on-demand lane."
     },
     {
       "id": "ui-plugin-market-and-ui-gaps",
       "status": "defer",
       "localOwner": "client owners",
-      "commitScope": ["packages/client/"],
+      "commitScope": [
+        "packages/client/"
+      ],
       "reviewState": "deferred-platform-review",
       "notes": "ui-plugin-market policy/violation review, ui-secret-mask, and remaining UI gap items queued; GUI-visible changes require the real-flow GIF before PR"
+    },
+    {
+      "id": "minimal-preset-shell-only",
+      "status": "adapt",
+      "localOwner": "preset owners",
+      "commitScope": [
+        "apps/cli/config/agent-presets/",
+        "packages/bundle/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "owner decision: web minimal aligned to SDK minimal — persistent shell only; fs-local and str_replace_editor are explicit opt-ins; presets and goldens updated"
+    },
+    {
+      "id": "ralph-disabled-by-default",
+      "status": "adapt",
+      "localOwner": "bundle owners",
+      "commitScope": [
+        "packages/bundle/",
+        "apps/cli/config/agent-presets/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "owner decision: ralph disabled:true in shipped defaults (base bundle + standard/cordis/ptc); example overlays keep explicit opt-in; ralph replay goldens still pass"
+    },
+    {
+      "id": "bash-blank-justification",
+      "status": "adapt",
+      "localOwner": "shell owners",
+      "commitScope": [
+        "packages/shell/tool-bash",
+        "packages/shell/tool-pwsh"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "owner decision: explicit blank justification rejected everywhere; same-mode repeat exempts only omitted justification (bash+pwsh symmetric); real escalation still requires non-empty reason"
+    },
+    {
+      "id": "jobs-wake-unbounded",
+      "status": "retain",
+      "localOwner": "jobs owners",
+      "commitScope": [
+        "packages/jobs/tool-jobs"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "owner decision reaffirmed: maxConsecutiveWakes stays unset = no cap; optional field remains configurable; matrix generator text corrected"
+    },
+    {
+      "id": "credentials-env-first",
+      "status": "retain",
+      "localOwner": "credentials owners",
+      "commitScope": [
+        "packages/credentials/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "owner decision reaffirmed per 2026-08-04 governance note: env-first precedence kept; upstream saved-first/headless env-only remains intentional divergence; stored-credentials-precedence guide not published"
+    },
+    {
+      "id": "plugin-option-placement",
+      "status": "adapt",
+      "localOwner": "cli owners",
+      "commitScope": [
+        "apps/cli/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream alignment: passThroughOptions on dsh plugin — --profile read only before forwarded pnpm args; late --profile now reaches pnpm and fails (intentional break); guide triplet backfilled"
+    },
+    {
+      "id": "session-title-provider-strategy",
+      "status": "adapt",
+      "localOwner": "session owners",
+      "commitScope": [
+        "packages/session/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "ported upstream prepareCall adapter path: executeSessionTitleLlm + ctx.sessionTitle.register; legacy registerSessionTitleLlmProvider/generateSessionTitleWithLlm/MessageSelector removed; effort ordered least-to-greatest and recorded on session/title-llm-request; 2716 session tests green, title goldens replay clean"
+    },
+    {
+      "id": "pi-ai-model-discovery",
+      "status": "adapt",
+      "localOwner": "llm owners",
+      "commitScope": [
+        "packages/llm/llm-pi-ai"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "apiKeyEnv credential resolved before catalog: MISSING_CREDENTIAL returns empty catalog (UI hides group); other credential errors still fail; symmetric with DeepSeek-side port; guide triplet backfilled"
+    },
+    {
+      "id": "new-session-generations",
+      "status": "adapt",
+      "localOwner": "client-runtime owners",
+      "commitScope": [
+        "packages/client/runtime/",
+        "packages/client/connection/",
+        "packages/client/ui-workspace/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream semantics: New Session/startSession always mint fresh Session+Agent on current preset; connectWorkspace/openWorkspace keep eligible-blank reuse; draft options keep existing rules; prior blank-reuse divergence superseded (fresh agent carries current permission defaults by construction)"
+    },
+    {
+      "id": "operator-connect-interactions",
+      "status": "adapt",
+      "localOwner": "connection/apiproxy owners",
+      "commitScope": [
+        "packages/host/apiproxy/",
+        "packages/client/connection/",
+        "packages/api/gateway/",
+        "packages/client/runtime/"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "owner decision: capability wanted; implemented via fork seams instead of upstream /connect+Peer+$events (sovereignty retained): launch-token admission via connection/authenticate (Bearer/?token), per-connection interactions mode (none default non-page, answer for page/answerers), answerable-frame filtering in apiproxy mux/events.host, $on throws under none, claimInteraction atomic answer path"
+    },
+    {
+      "id": "job-id-identity",
+      "status": "adapt",
+      "reviewState": "implemented-local-tests-passing",
+      "commitScope": [
+        "packages/jobs/jobs-local",
+        "packages/test-support/session-snapshot",
+        "snapshots/",
+        "examples/"
+      ],
+      "notes": "上游 e493fd40dcfa 移植：LocalJobRegistry.start 铸 <kind>-<16hex>(randomUUID 碰撞重试),移除进程内计数器。fork 无 executionId/持久化 job 生命周期记录,该部分不适用。规范化器对齐上游语义:语料外悬挂会话引用(catalog childId 指向未收采会话)记为 {{id:N}} 而非 {{session:N}}——修复 refresh 自 perpetuating 陈旧 token 的不稳定。",
+      "localOwner": "jobs owners"
     }
   ]
 }

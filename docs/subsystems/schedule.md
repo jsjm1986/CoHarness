@@ -499,7 +499,9 @@ async create(sessionId: SessionId, request: ScheduleCreateRequest, signal?: Abor
  * Delete one task belonging to the selected Session, leaving queued messages intact.
  *
  * The row is removed: the task no longer schedules, leaves `list` and `catalog`, and its
- * saved delivery records go with it.
+ * saved delivery records go with it. A task bound to a Session a delegated child owns
+ * stays deletable even though creation and timing edits refuse that binding, so a task
+ * stored before that rule existed remains removable.
  * @param request - Session and exact task identity.
  * @param signal - Optional cancellation checked before persistence begins, including after FIFO waits.
  * @returns Whether that Session owned a deleted task. Cancellation does not roll back an in-flight write.
@@ -513,8 +515,8 @@ async create(sessionId: SessionId, request: ScheduleCreateRequest, signal?: Abor
  * Each supplied field replaces its stored value; an omitted field keeps it. A name or
  * instruction change alone does not reset the committed target. A Session a delegated
  * child owns returns the non-mutating `subagent_session` result, so an edit cannot
- * re-arm a task bound to a Session delivery can never reach, and management views can
- * explain the refusal through the ordinary result they already render.
+ * re-arm a task bound to a Session delivery can never reach, and the Web editor can
+ * explain the refusal through the ordinary result it already renders.
  * @param request - Task binding, complete observed record, and any combination of timing, name, and instruction.
  * @param signal - Cancellation checked after domain readiness and FIFO waits, before persistence begins.
  * @returns The committed record, unchanged record for a no-op, or a non-mutating input/lookup/conflict/refusal result.

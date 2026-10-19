@@ -1,4 +1,4 @@
-# Agent Note: What stays host-plane once presets own the agent plane
+# Agent Note: 跨 preset 的 token 记账由 Host 拥有
 
 Status: implemented
 
@@ -6,36 +6,30 @@ Status: implemented
 
 ## 问题
 
-[逐会话 agent preset](2026-08-03-per-session-agent-presets.zh.md) 把每一个面向模型的行搬上了 agent 平面，此后的每一处修复都是一个仍按搬迁之前的世界写成的读取点。`tasks` 因为 realm 之外的 preset 行要解析它而搬回宿主；`goals` 因为同样的理由从未离开；而当所有面向模型的工具都变成祖先贡献之后，子 agent 的 `toolFilter` 也已被修好（[子 agent 加入父方 preset](../bug-fix/2026-08-10-child-agents-join-their-parent-preset.zh.md)）。
+[逐 Session 的 agent preset](2026-08-03-per-session-agent-presets.zh.md)拥有面向模型的工具、提示词段落与技能。Token meter 则按 Session 存储数据，并向进程级投影注册表发布。将 meter 从某个 preset 注册，会让另一个 Session 的上下文显示取决于已经挂载过哪些 preset。
 
-还有两个读取点仍站在这条线的错误一侧。
-
-`dsh-token-meter` 在宿主侧被禁用，改挂进每个 preset 的 `compaction` realm。它不接受任何配置，每次折叠都以 `Session` 建键，也不注册工具或提示段——但它拥有 `tokenUsage`、`contextPressure` 与 `contextBreakdown` 三个投影单元，而 `sessionProjections` 是一张进程级、没有作用域分层的表。因此从某个 preset 内部注册的单元会替所有会话作答：一个 `minimal` 会话是否显示 context meter，取决于本次启动以来有没有**别的**会话挂过 `standard`；而只跑过 `minimal` 的进程根本不显示。
-
-没有加入任何 preset 的 agent 也无人指出。加入是一条 scope 父链链接；缺了它，`tools`、`system-prompt` 与 `skill` 的视图都解析到空的全局层，模型什么也收不到——不报错，也没有空目录可看，只是一个无法行动的 agent。被委派的子 agent 在 preset 存在的整段时间里都是这样运行的，而同一个洞在每一个早于 preset 的入口点上都开着。
+没有 preset 作用域父链的 agent 无法看到该 preset 的贡献。这种 agent 可能是刻意创建的，因此仅凭发布动作无法区分漏掉的加入与不使用 preset 的组合。
 
 ## 决策
 
-**meter 属于宿主平面。** `dsh-token-meter` 回到宿主组装，并离开各 preset 的 `isolate` 映射，于是 `compaction-basic` 与 `tool-result-pruner` 在自己的 realm 内部解析到那一份宿主实例。preset 保留 realm 与压缩后端——preset 选择的是它的 agent 是否压缩，而不是它的 token 是否被计。这正是 `tasks` 与 `goals` 已经采用的判据，只是这次适用于一个因**投影**触达面而不该归 preset 所有的 Service：当一个单元的空值与真实值无法区分时，只要它注册进的那张表是进程级的，它就不能是逐组装的。
+**Meter 属于 Host。** Host 组合挂载 `dsh-token-meter`，preset 中的压缩插件解析该共享实例。Preset 选择压缩行为，但不决定是否统计 Session token。Meter 的 `tokenUsage`、`contextPressure` 与 `contextBreakdown` 单元属于冷读取方使用的同一个进程级投影注册表。
 
-有三处限制不在此处修复，而是记录在会咬到它们的地方：投影 key 是否存在不能当作逐会话的能力信号（[`dsh-session-projection`](../../../../packages/session/session-projection/README.zh.md)）；被替代的常驻代际永不回收，而设置页的编写流程把它变成每次保存的代价（[`dsh-agent-presets`](../../../../packages/preset/agent-preset-registry/README.zh.md)）；通过 `cordis_mount` 挂上的临时插件属于组装而非挂载它的会话（[`dsh-tool-cordis`](../../../../packages/extensions/tool-cordis/README.zh.md)）。
+**未加入的 agent 产生提示性诊断。** 配置了文件 preset 根目录时，preset 注册表为已发布但未加入的 agent 警告一次。它不否决创建，也不安装提示词组装拒绝检查。需要使用 preset 的入口必须通过注册表建立加入关系。
+
+投影 key 的存在不是逐 Session 的能力信号；该限制由[投影注册表](../../../../packages/session/session-projection/README.zh.md)维护。[Preset 注册表](../../../../packages/preset/agent-preset-registry/README.zh.md)拥有代际生命周期：被替代的文件代际保留到 Host 释放，而已退役的声明式代际在最后一个使用者离开后释放。运行时检查遵循[只读 Cordis 工具契约](../../../../packages/extensions/tool-cordis/README.zh.md)。
 
 ## 测试
 
-`apps/cli/tests/web-agent-presets.e2e.ts` 在本文件中任何 preset 挂载**之前**，于已启动的 Web 组装上读取 `ctx.get('tokenMeter')`——preset 侧的 meter 会待在 `isolate` realm 里，对 `ctx.get` 不可见，因此这次读取是一次所有权断言而不是挂载顺序的巧合——随后断言一个 `minimal` 会话的快照带齐三个单元。
-
-`packages/preset/agent-presets/tests/mount.spec.ts` 断言警告对裸 agent 恰好触发一次、对已加入的 agent 完全不触发。`tests/invariant.spec.ts` 承担负控：未加入 agent 的组装被拒绝，而已加入 agent 的组装与不带作用域的宿主组装都通过。
+[Web 历史场景](../../../../apps/web/tests/seeded-history.e2e.ts)在写入 Session 夹具前获取 Host token meter。[注册表挂载测试](../../../../packages/preset/agent-preset-registry/tests/mount.spec.ts)覆盖未加入、已加入和没有名单的 agent，不将警告视为创建否决。
 
 ## 考虑过的替代方案
 
-**把 meter 留在 preset，改为给投影注册表分层。** 这是更精确的修法，代价也大得多：`snapshot`、`checkpoint` 与主动驱动都需要一次「会话 → 作用域」的解析，而冷读在没有 api-proxy 的 `presenterScopeFor` 时并不具备。相对于一个完全没有 per-preset 状态的 Service，这不成比例，因此改为把通则写在注册表上。
+**将 meter 留在 preset，并为投影注册表增加作用域。** 冷快照、检查点与投影更新都将需要 Session 到作用域的解析，而该服务并无逐 preset 状态。Host 所有权避免了这种额外依赖。
 
-**对未加入的 agent 否决发布。** 大声胜过静默，注册表也支持这么做——同步的 `agent/created` 监听器抛出会把创建整体回滚。否决的理由是：在名单之外组装 agent 是合法的——`recompose` 写明了它随后绑定的那个裸 agent，而 ACP 桥、SDK server 与 headless bundle 今天都会创建一个。否决会把能力缺口变成一次故障。
+**否决未加入 agent 的发布。** 独立 agent 与稍后才绑定的 agent 都是合法用法。创建否决无法将这些情况与漏掉的预期加入区分开。
 
-**让配套也在 `agent/created` 处检查加入情况。** 否决：发布时分不清漏掉的加入与之后才会被绑定的 agent，因此该检查会拒绝一条已写明的路径。提示词组装分得清。
-
-**基于同样的投影理由，把 `plan-mode` 与 `tool-todo` 也搬离 agent 平面。** 否决：两者确实是逐 preset 的能力，且对从不使用它们的会话，其单元算出的就是空值，而客户端本来就按值读取（`plan.active`、空列表）。只有空值与真实值无法区分的单元——meter——才被迫归宿主所有。
+**基于同样理由将 plan mode 与 todo 工具移到 Host。** 它们的可用性由 preset 决定，客户端按投影值解释状态，例如未激活的计划或空 todo 列表。Token 记账必须独立于该选择而可用。
 
 ## 后果
 
-context meter 成为逐会话的事实，而不再是挂载历史的函数。代价是 preset 不能再选择不做 token 记账；随附的 preset 没有一个这么做，`minimal` 现在也写明它放弃的是自动压缩而非记账。
+上下文用量是独立于 preset 挂载顺序的 Session 事实。Preset 的压缩选择不禁用 token 记账。提示性的加入诊断暴露漏配问题，同时允许刻意创建的独立 agent。

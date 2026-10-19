@@ -10,7 +10,7 @@ Models can repeat `sandbox_permissions: danger-full-access` while that mode is a
 
 ## Decision
 
-`approveEscalation` returns the effective mode immediately when the requested mode matches it. Argument pairing remains mandatory at the tool. Wider modes still require approval; narrower and unsupported targets still fail. This partially supersedes the non-widening rejection in the [sandbox decision](2026-07-06-sandbox.md); its confinement and per-call approval decisions remain active.
+`approveEscalation` returns the effective mode immediately when the requested mode matches it. The bash tool keeps one pairing exemption on that path: an exact repeat may omit `justification`, while an explicitly-passed blank or whitespace-only `justification` is always rejected (`invalid justification: expected a non-empty sentence`). The [filesystem family](2026-07-14-cross-family-fs-sandbox.md) keeps pairing mandatory on every request. Wider modes still require approval; narrower and unsupported targets still fail. This partially supersedes the non-widening rejection in the [sandbox decision](2026-07-06-sandbox.md); its confinement and per-call approval decisions remain active.
 
 ## Alternatives considered
 

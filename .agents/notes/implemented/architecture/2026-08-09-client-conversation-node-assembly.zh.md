@@ -406,3 +406,5 @@ Step/Turn 成为业务间共享聚合的稳定宿主。Turn Tail 和 Deliverable
 代价是 Runtime 新增 Registry、Assembler、Location data、依赖重放和 per-target Builder 契约，UI Slots 也新增 parent-owned common inject 与 per-occurrence `hookContext`。Definition 作者必须理解稳定 ID、唯一 start、正序 replay、Step→Turn 发布顺序、只读 Reader 和 Node 不撤回规则。
 
 `useTurnData()` 不撤销 session-scoped renderer 的标准 `useSession`，因此该边界依靠 API 引导和测试，而不是能力隔离。Registry 变化仍是低频完整 rebuild；Chat Builder 继续为 StatsLine 和顶层公共字段维护 legacy slice，Trajectory 则在共享 Session 窗口上拥有 target 专属 Definition 与 Builder。内建 Definition 分别留在所属 UI package；这些兼容边界不把业务解释权交还给 Session。
+
+两份后续 note 在不改变本契约的前提下细化了该面：[分组过程渲染决策](../feature/2026-10-18-grouped-process-rendering.zh.md)以 `ChatSnapshot.entries`/`groups` 包含有序 Node，[turn-trigger 决策](../bug-fix/2026-10-18-turn-trigger-and-turn-end-anchored-tail.zh.md)将单一 Inbox 认领 Definition 拆分为 `inbox-next-step` 与 `inbox-next-turn`。

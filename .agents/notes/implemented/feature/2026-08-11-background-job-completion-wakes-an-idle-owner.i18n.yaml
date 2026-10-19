@@ -14,9 +14,9 @@
 /agent-note-background-job-completion-wakes-an-idle-owner/decision/the-busy-owner-keeps-injection:
   en: 841588bc73fc4613
   zh: 7fb4095bd55ee241
-/agent-note-background-job-completion-wakes-an-idle-owner/decision/waking-is-bounded-and-the-bound-is-not-time:
-  en: 840be3afc655c3d2
-  zh: 4f35b0ea3c299fe5
+/agent-note-background-job-completion-wakes-an-idle-owner/decision/the-wake-bound-is-an-optional-counter-not-time:
+  en: 4d57a4955036eef7
+  zh: 26814415c8afc75e
 /agent-note-background-job-completion-wakes-an-idle-owner/decision/teardown-claims-the-report:
   en: 89efaa83188b28d7
   zh: 7e78f3b616602402
@@ -27,8 +27,8 @@
   en: b80a12acae34748b
   zh: 2fe0cf811081c0dc
 /agent-note-background-job-completion-wakes-an-idle-owner/consequences:
-  en: 1789c0a08c9d5c64
-  zh: 6abc2ed0925c9d91
+  en: 67c6fc49d382a52e
+  zh: 7989421f9725e904
 /agent-note-background-job-completion-wakes-an-idle-owner/consequences/accepted-risks:
   en: 5499d16929dbc8c0
   zh: 48ae7ce777fb09dc

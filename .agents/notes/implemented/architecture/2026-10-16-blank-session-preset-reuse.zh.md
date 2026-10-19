@@ -22,6 +22,8 @@
 
 **冷列表的 preset 真值来自已经付过成本的探测。** 当有界空白探测已读过日志时，`summarizeCold` 从折叠的探测事件（`sessionListFields`）解析 `agentPreset`；未探测的大型 artifact 保持仅 header——为这一条切换事实付出全量读取不值得。
 
+**复用臂只服务 Workspace 重连。** `connectWorkspace`/`openWorkspace` 回退、启动恢复与携带草稿的启动保留上述语义；不带草稿选项的 `startSession` 改为铸造全新 Session+Agent，不再采用成员空白或停放的草稿预留——见[裸 New Session 全新铸造](2026-10-18-new-session-fresh-agent.zh.md)。
+
 ## 备选方案
 
 **像上游折叠后的 create 一样，把每个命名 Session 都当作复用候选。** 否决：上游 UI 无法命名任意 Session 来收养，本地 wire 可以；收养必须为非空历史保留记录的 composition。
@@ -38,4 +40,4 @@
 
 ## 测试
 
-`packages/host/apiproxy`：agent-preset 与 cold 套件——59 个测试。`packages/client/runtime`：workspaces 与 sessions 套件——96 个测试。`apps/web`（host+client 构建产物）：`blank-preset-reuse.e2e.ts`——经真实 Loader composition 的 3 个测试。
+`packages/host/apiproxy`：agent-preset 与 cold 套件——59 个测试。`packages/client/runtime`：workspaces 与 sessions 套件——96 个测试。`apps/web`（host+client 构建产物）：`blank-preset-reuse.e2e.ts`——经真实 Loader composition 的 4 个测试。

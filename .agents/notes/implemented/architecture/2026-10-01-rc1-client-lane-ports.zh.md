@@ -12,7 +12,7 @@ Status: implemented
 
 每项行为都落在本地 session-store 模型上，而不是上游的 controller 包结构。
 
-- **`ui-sidebar-right` 保留与焦点**——`SidebarSessionViews` 经 runtime `sessions` 引用选择并保留视图；每个 View 持有自己的 Session 引用，`keepMounted` 正文在切 tab、切会话与收起之间不重新挂载。`sidebarTargetFromElement`/`visibleSidebarPane` 捕获聚焦的停靠格或浮窗 occurrence；`registerSidebarShortcuts` 把 `sidebar.right.toggle`、`pane.split`、`pane.fullscreen.toggle`、`page.close`、`page.refresh` 绑定到 `commandTarget`/`focusedTarget`/`isTargetCurrent`，`page.close` 的模态解散片段由 `closeTopModal` 承担。
+- **`ui-sidebar-right` 保留与焦点**——`SidebarSessionViews` 经 runtime `sessions` 引用选择并保留视图；每个 View 持有自己的 Session 引用，`keepMounted` 正文在切 tab、切会话与收起之间不重新挂载。`sidebarTargetFromElement`/`visibleSidebarPane` 捕获聚焦的停靠格或浮窗 occurrence；`registerSidebarShortcuts` 把 `sidebar.right.toggle`、`pane.split`、`pane.fullscreen.toggle`、`page.close`、`page.refresh` 绑定到 `commandTarget`/`focusedTarget`/`isTargetCurrent`，`page.close` 的模态解散片段由 `closeTopModal` 承担。每个采用组拥有当前 Session 存储的持久化与身份订阅。替换会释放旧组，运行时裁剪还会释放其标签资源；世代身份可防止迟到的清理删除替代布局。
 - **Preparing 行**——`phase: 'preparing'` 经 `CordisPreparingRow`、`PreparingPresentRow` 与 `SkillRow` 分支；keyed toolview 卡片在参数流式期间不再读取参数，Cordis 行失败时保留工具字形而不再替换为 `StateDot`。共享 `DisclosureRow` 增加 `running`/`contentClassName`/`contentLayoutClassName` 属性与 `TextShimmer` 原语，以及驱动活跃生命周期文案的 `--dsw-alias-label-shimmer` 主题 token。
 - **Workspace 置顶**——`pinnedSessionIds` 进入 workspace 行状态；置顶行在各分区内领先并保持区内次序且只能彼此重排。`pinSession`/`unpinSession` 走既有 Host RPC，`pin-order.ts` 经 `pinOrderSource` 调和分组与扁平账户的次序。
 - **Agent Teams 描述折叠**——`TaskCard` 把描述折叠在两行并用 `ResizeObserver` 测量真实折叠后才提供展开开关。
@@ -34,4 +34,4 @@ Status: implemented
 
 ## 测试
 
-`ui-sidebar-right` 持有 258 个聚焦 spec 覆盖保留、焦点捕获与命令解析；真实组合 spec（15 个测试）证明无快捷键撞车。Cordis status-icon、present-row 与 skill-row spec 钉住 preparing 分支；workspace tree/rows spec 钉住排序与菜单接线。
+聚焦的侧栏测试覆盖保留、焦点捕获、命令解析、存储世代替换与裁剪。组合测试覆盖快捷键组合。Cordis status-icon、present-row 和 skill-row 测试覆盖 preparing 分支；workspace tree 与 row 测试覆盖置顶排序和菜单。

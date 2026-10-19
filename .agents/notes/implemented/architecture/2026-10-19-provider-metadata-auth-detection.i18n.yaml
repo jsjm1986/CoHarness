@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-19-provider-metadata-auth-detection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-19-provider-metadata-auth-detection.md
+/agent-note-provider-metadata-drives-native-authentication-detection-in-the-models-editor:
+  en: 9da79e40c1545ab0
+  zh: 2ea5e2f2919007e1
+/agent-note-provider-metadata-drives-native-authentication-detection-in-the-models-editor/problem:
+  en: c6147e1331c72766
+  zh: f375bb4b9b3f60c3
+/agent-note-provider-metadata-drives-native-authentication-detection-in-the-models-editor/decision:
+  en: 197bced3ad880143
+  zh: c2ebd7be8609722e
+/agent-note-provider-metadata-drives-native-authentication-detection-in-the-models-editor/alternatives-considered:
+  en: f8ffa556943acc6e
+  zh: f6b8c147ab2d2981
+/agent-note-provider-metadata-drives-native-authentication-detection-in-the-models-editor/consequences:
+  en: 84bc69e02b7ed915
+  zh: 35cacbb9cc3e2e05
+/agent-note-provider-metadata-drives-native-authentication-detection-in-the-models-editor/verification:
+  en: c5d5ed6865812e91
+  zh: fef7528186c8c752

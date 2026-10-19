@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-18-grouped-process-rendering.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-grouped-process-rendering.md
+/agent-note-grouped-process-rendering-and-the-turn-process-fold-control:
+  en: 0886063f0aeca2eb
+  zh: 30387ca59e82c321
+/agent-note-grouped-process-rendering-and-the-turn-process-fold-control/problem:
+  en: ab25309a80853389
+  zh: e350021be5cdb164
+/agent-note-grouped-process-rendering-and-the-turn-process-fold-control/decision:
+  en: 6b7442b3ccf87f09
+  zh: e0f84302449fb5d4
+/agent-note-grouped-process-rendering-and-the-turn-process-fold-control/alternatives-considered:
+  en: 1ae7ac16a97869f0
+  zh: 04df3c26339d6ca7
+/agent-note-grouped-process-rendering-and-the-turn-process-fold-control/consequences:
+  en: 1d11e96e7e18b785
+  zh: 1898f77d753a3bf8

@@ -2,10 +2,7 @@
 
 English | [中文](README.zh.md)
 
-One home for every upstream-alignment artifact, organized by what the file is.
-Each upgrade produces a set of files across these folders, named
-`<TYPE>-dsh-<version-or-tag>` so a full set for one release stays findable by
-prefix and version.
+One home for every upstream-alignment artifact, organized by what the file is. Each upgrade produces a set of files across these folders, named `<TYPE>-dsh-<version-or-tag>` so a full set for one release stays findable by prefix and version.
 
 | Folder | Contents |
 | --- | --- |
@@ -19,3 +16,5 @@ Rules:
 - Links between folders use repository-relative paths (`upgrades/plans/…`) so they survive moves; cross-references inside a plan may use `../alignment/…`.
 - A record that documents a shipped sync stays as the source of truth for that version; update the facts (paths, names, versions) when the code moves, never rewrite the decision.
 - The active matrix must match [the sovereignty manifest](../scripts/upstream-sync.json) for carried packages. Source presence does not imply completed business or deployment acceptance; keep those evidence states explicit.
+- The active commit inventory must match the matrix's interval and complete Git history. Fetch the endpoint ancestry before generation; when the manifest already names the target, pass the matrix's baseline commit through `--from`. `verify-upgrade-records` rejects missing, truncated or stale current inventories.
+- Keep historical inventories unchanged. Corrections under `alignment/` record the original SHA-256 digest and the missing and extra commit ids so the corrected membership can be reconstructed without changing earlier evidence.

@@ -20,6 +20,8 @@ The fork's conversation stack is `ui-conversation` over a plain-text input machi
 - `ui-primitives` owns the credential-masked text run: the `ui-secret-mask` scanner/masks/format tables and `SecretText` ported into `user-text.tsx`'s `projectUserText`, which emits a `SecretText` run (per-value reveal control when the caller supplies labels) for every recognized credential range. Masking is display-only: the logged text, copy payload, and model input keep the original characters.
 - `ui-conversation.collapseTiming` (`completion` default, `next-input`) lands as a `CollapseTimingPolicy` over the settings scope, a `settings.collapseTiming` row, and a `ChatPresentationPolicy.collapseTiming` field. With `next-input`, the newest completed Turn's process stays open until a transcript-placed pending submission or a newer Turn arrives; a stored manual fold still wins.
 
+[Structured browser draft persistence](../architecture/2026-10-18-structured-browser-draft-persistence.md) owns the stored representation and reload behavior of these editor-independent snapshots.
+
 ## Alternatives considered
 
 - Porting upstream's Lexical `DraftSnapshot`/storage layer wholesale was rejected: the fork's input machine already tracks occurrences, so the snapshot is a projection of existing state rather than a second document model.

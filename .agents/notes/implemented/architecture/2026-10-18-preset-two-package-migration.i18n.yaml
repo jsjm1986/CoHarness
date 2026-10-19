@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-preset-two-package-migration.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-preset-two-package-migration.md
+/agent-note-preset-two-package-migration-onto-the-declaration-model:
+  en: 2a582c63d9611a18
+  zh: e1518628058b1fa5
+/agent-note-preset-two-package-migration-onto-the-declaration-model/problem:
+  en: 858c4b7920fb1251
+  zh: 5ab860a3d9b96d2a
+/agent-note-preset-two-package-migration-onto-the-declaration-model/decision:
+  en: 76d3b35eb106a62d
+  zh: 0fc78e268d370130
+/agent-note-preset-two-package-migration-onto-the-declaration-model/alternatives-considered:
+  en: ef5d601e82bd4f75
+  zh: 605b2f76a440a6dc
+/agent-note-preset-two-package-migration-onto-the-declaration-model/consequences:
+  en: cdcaf6c75845f5ed
+  zh: 86c580d19032a264
+/agent-note-preset-two-package-migration-onto-the-declaration-model/verification:
+  en: 298000149aca94cb
+  zh: ae65dfb6451f5eb5

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-session-skill-source-preview.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-session-skill-source-preview.md
+/agent-note-read-only-skill-source-through-the-session-registry:
+  en: fe4d376239bbdf14
+  zh: 4c1e4fd00a5e97c8
+/agent-note-read-only-skill-source-through-the-session-registry/problem:
+  en: 83bf629d67a2f6d7
+  zh: ed9ac85d2e47b82e
+/agent-note-read-only-skill-source-through-the-session-registry/decision:
+  en: 74ca0cea7af47916
+  zh: e518de27d986c8de
+/agent-note-read-only-skill-source-through-the-session-registry/alternatives-considered:
+  en: d128de650a8b29c7
+  zh: 361bc299356ae9a9
+/agent-note-read-only-skill-source-through-the-session-registry/consequences:
+  en: cd3cb7db2e154770
+  zh: 302bd196d820f313
+/agent-note-read-only-skill-source-through-the-session-registry/verification:
+  en: dd1f3b0f91fc0acc
+  zh: 68f1cf1ce18fa455

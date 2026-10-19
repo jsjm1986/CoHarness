@@ -41,6 +41,10 @@ v4→v5 的唯一实质差异是 identity 新增两个 lineage 字段；v6 只�
 
 7. **predecessor title 是列表 hint，而不是 fold shortcut**：Session list 启动保持 metadata/cache-only，绝不打开冷 log body。log header 是权威来源；生命周期匹配的 checkpoint 是 durable prefix witness，可以落后但不能领先日志。因此 `cachedPredecessorTitle` 只公开仍通过当前 title unit `stateVersion` 与 schema 的 predecessor `title` row。两条相邻 Session format edge 都保留 title 文本。该 hint 使用 `asOfSeq: -1`，而不使用存储 row 的序号，因为改变日志事件数量的迁移会重新映射该坐标。其他 predecessor row 继续隐藏，`hydratePrepared`/`coldSnapshot` 仍要求严格格式 identity，因为即使物理存储一致，normalizer 仍可能改变 `blank` 或 `lastPromptAt` 等值。
 
+### 不透明检查点值
+
+域使用与写入相同的无损 JSON predicate 验证每个检查点的 `val`。验证保留值的自有键，包括记录和数组内部的 `__proto__`。静默删除键的解析器会在保留行身份和序列水位的同时，改变用于恢复折叠的状态。投影单元自己的 `stateSchema` 仍负责解释该状态。
+
 ### v3-v6 → v7 处置
 
 版本 3 至 6 仍可结构化读取，因为它们的记录与行表示是当前 schema 的有效输入。其 identity 缺少 `formatVersion`，因此有意不能作为当前折叠捷径。unseeded 且生命周期匹配的记录仍可向零 I/O 列表提供版本兼容的 title，但不能提供任何权威 seed。冷读或实时检查点会从迁移后的 Session 日志重建值，并写入带完整格式与 lineage identity 的 v7 记录。启动时不运行 eager 值迁移；schema 校验失败的已接受记录执行 `backup-and-skip`。

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-19-historical-catalog-completion.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-19-historical-catalog-completion.md
+/agent-note-historical-catalog-completion-binds-explicit-child-evidence-to-v6-v7:
+  en: 44b54541c4bdf763
+  zh: 13582198fcad3a63
+/agent-note-historical-catalog-completion-binds-explicit-child-evidence-to-v6-v7/problem:
+  en: 68e07c131fb99891
+  zh: 2b48f1c7edd5ea9a
+/agent-note-historical-catalog-completion-binds-explicit-child-evidence-to-v6-v7/decision:
+  en: 4473afb5d731e901
+  zh: ae1f2ee46db7658f
+/agent-note-historical-catalog-completion-binds-explicit-child-evidence-to-v6-v7/alternatives-considered:
+  en: b9064a496ae46bbe
+  zh: 0ccda9ab307348db
+/agent-note-historical-catalog-completion-binds-explicit-child-evidence-to-v6-v7/consequences:
+  en: 0104891404d4e32d
+  zh: ad26e0153f8f61d8
+/agent-note-historical-catalog-completion-binds-explicit-child-evidence-to-v6-v7/verification:
+  en: 0a9a80f714123934
+  zh: 0bd614813910805f

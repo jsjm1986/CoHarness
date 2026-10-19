@@ -14,7 +14,7 @@ Status: implemented
 
 `update_goal resume` 会在调用 goal 服务前用 `GOAL_TOOL_RESUME_PAUSED` 拒绝持久 paused goal。它仍会在会话恢复或 fork 后恢复 active-but-disarmed goal，并在人类要求继续时恢复 blocked goal。暂停权威仍属于 goal 领域和人类 `/goal resume` 命令，它们仍可恢复每个可恢复 phase。
 
-上游 GoalBar 的激活态显示——区分 armed、disarmed 与 paused goal 的 activation source——另行安排；本次变更交付运行时事件及其转发，不含显示消费方。
+Web GoalBar 通过会话级来源组合 `goals.get` 与 `goal/activation-changed`，读取实时激活态。该来源只接纳当前 goal id 与 revision 的激活态，按所属运行时连接映射事件，并丢弃先前订阅或请求代次的响应。重连与观察者重新启动会先使缓存的激活态失效，再刷新。激活态未知的 active goal 保留 Pause；Resume 要求已确认停用，或持久 phase 为 paused。
 
 ## 考虑过的替代方案
 
@@ -28,8 +28,10 @@ Status: implemented
 
 ## 后果
 
-客户端无需持久化 activation 即可区分 armed 与 disarmed goal。持久 paused goal 只能通过 `/goal resume` 或其他直接调用 goal 服务的调用方恢复；模型 `update_goal resume` 仅限 disarmed-active 与 blocked goal。API 表面新增一个读取和一个转发 live 事件；持久 goal change 载荷与投影 stateVersion 不变。在显示消费方交付前，发出的边界服务于远程消费方与测试。
+客户端无需持久化 activation 即可区分 armed 与 disarmed goal。持久 paused goal 只能通过 `/goal resume` 或其他直接调用 goal 服务的调用方恢复；模型 `update_goal resume` 仅限 disarmed-active 与 blocked goal。API 表面新增一个读取和一个转发 live 事件；持久 goal change 载荷与投影 stateVersion 不变。
 
 ## 测试
 
 Goal 单元测试固定 create、会话启动与 resume 过程中 activation 事件的 id 与 revision，且回放失败路径让 `agent/created` 停用不抛出，而保留的失败仍在读取时浮现。工具测试固定后续人类轮次中持久 paused goal 的拒绝，同时保留已恢复 disarmed-active goal 的恢复。api-proxy 测试固定 `host/remote-event` JSON 转发。
+
+激活态来源测试覆盖不同运行时中的同名 Session id、过期 goal ref、迟到读取、连接重置、观察者重启与卸载。GoalBar 测试固定无法读取激活态时仍保留 Pause。[浏览器场景](../../../../apps/web/tests/goal-bar.e2e.ts)通过完整应用恢复已停用的 active goal，再将其清除。
