@@ -308,6 +308,11 @@ export class HostConnectionService extends Service implements HostConnectionHand
       headers: request.headers, method: request.method, url: request.url, kind,
     })
     if (decision !== undefined) return decision === 'allow' ? undefined : 401
+    // The direct-browser flow also admits the launch token as a non-cookie
+    // operator credential; an explicit invalid credential fails before the
+    // cookie fallback rather than being laundered through it.
+    const operator = this.browserAuth.operatorInteractions(request)
+    if (operator !== undefined) return operator === 'invalid' ? 401 : undefined
     return this.browserAuth.isAuthenticated(request, carrier?.protocol === 'https:') ? undefined : 401
   }
 
@@ -353,6 +358,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
           headers: req.headers,
           ...(req.method === undefined ? {} : { method: req.method }),
           pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+          ...(req.url === undefined ? {} : { url: req.url }),
         }, async () => {
           await bridge(req, res, fetchHandler)
         })

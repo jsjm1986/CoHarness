@@ -304,6 +304,8 @@ describe('the new-session chip controller', () => {
       failList?: string
       throwOn?: 'list' | 'select'
       modeSelection?: boolean
+      select?: ClientRemote['agentPresets']['select']
+      onApplied?: ConstructorParameters<typeof AgentPresetSeatController>[2]
       list?: () => Promise<{
         ok: true
         value: { presets: unknown[]; authorable: boolean; modeSelectionEnabled: boolean }
@@ -320,7 +322,7 @@ describe('the new-session chip controller', () => {
             } }
             : { ok: false as const, error: { code: 'internal', message: options.failList, details: {} } })
         }),
-        select: (_sessionId: string, agentPreset: string) => {
+        select: options.select ?? ((_sessionId: string, agentPreset: string) => {
           if (options.throwOn === 'select') return Promise.reject(new Error('socket closed'))
           options.writes?.push({ ns: 'select', patch: agentPreset })
           return Promise.resolve(options.failSelect === undefined
@@ -329,16 +331,175 @@ describe('the new-session chip controller', () => {
               code: 'agent-preset-locked', message: options.failSelect,
               details: options.failSelectReason === undefined ? {} : { reason: options.failSelectReason },
             } })
-        },
+        }),
       },
-    } as unknown as Pick<ClientRemote, 'agentPresets'>
-    return new AgentPresetSeatController(remote, () => current as SeatSessionSummary | undefined)
+    } as Pick<ClientRemote, 'agentPresets'>
+    return new AgentPresetSeatController(remote, () => current as SeatSessionSummary | undefined, options.onApplied)
   }
 
   const ROSTER: { id: string; trust: 'system' | 'user'; isDefault: boolean }[] = [
     { id: 'standard', trust: 'system', isDefault: true },
     { id: 'minimal', trust: 'system', isDefault: false },
   ]
+
+  type SelectReply = Awaited<ReturnType<ClientRemote['agentPresets']['select']>>
+
+  function pendingChip(current: { id: string; blank: boolean; agentPreset?: string }) {
+    const first = Promise.withResolvers<SelectReply>()
+    const second = Promise.withResolvers<SelectReply>()
+    const calls: string[][] = []
+    const applied: string[][] = []
+    const pending: Promise<unknown>[] = []
+    const controller = chip(ROSTER, current, {
+      select: (sessionId, preset) => {
+        calls.push([sessionId, preset])
+        return calls.length === 1 ? first.promise : second.promise
+      },
+      onApplied: (sessionId, preset) => { applied.push([sessionId, preset]) },
+    })
+    return {
+      controller, first, second, calls, applied, pending,
+      async close() {
+        first.resolve({ ok: true, value: 'minimal' })
+        second.resolve({ ok: true, value: 'cordis' })
+        await Promise.allSettled(pending)
+      },
+    }
+  }
+
+  it('does not repeat an active selection on list updates', async () => {
+    const bench = pendingChip({ id: 's1', blank: true, agentPreset: 'standard' })
+    await bench.controller.load()
+    try {
+      bench.pending.push(bench.controller.select('minimal'), bench.controller.apply(), bench.controller.apply())
+      expect(bench.calls).toEqual([['s1', 'minimal']])
+      expect(bench.controller.store.getSnapshot()).toMatchObject({ busy: true, current: 'minimal' })
+    } finally {
+      await bench.close()
+    }
+  })
+
+  it('keeps the pending choice visible across a roster publication', async () => {
+    const bench = pendingChip({ id: 's1', blank: true, agentPreset: 'standard' })
+    await bench.controller.load()
+    const previous = bench.controller.store.getSnapshot().options
+    const published = Promise.withResolvers<undefined>()
+    const stop = bench.controller.store.subscribe(() => {
+      if (bench.controller.store.getSnapshot().options !== previous) published.resolve(undefined)
+    })
+    try {
+      bench.pending.push(bench.controller.select('minimal'), bench.controller.load())
+      await published.promise
+      expect(bench.calls).toEqual([['s1', 'minimal']])
+      expect(bench.controller.store.getSnapshot()).toMatchObject({ busy: true, current: 'minimal' })
+    } finally {
+      stop()
+      await bench.close()
+    }
+  })
+
+  it('applies a requested stage to an arriving Session after the active selection settles', async () => {
+    const current = { id: 's1', blank: true, agentPreset: 'standard' }
+    const bench = pendingChip(current)
+    await bench.controller.load()
+    try {
+      const selected = bench.controller.select('minimal')
+      bench.pending.push(selected)
+      current.id = 's2'
+      bench.controller.stage('minimal', true)
+      bench.pending.push(bench.controller.apply())
+      expect(bench.calls).toEqual([['s1', 'minimal']])
+      bench.first.resolve({ ok: true, value: 'minimal' })
+      await selected
+      expect(bench.calls).toEqual([['s1', 'minimal'], ['s2', 'minimal']])
+      expect(bench.applied).toEqual([['s1', 'minimal']])
+      expect(bench.controller.store.getSnapshot()).toMatchObject({ current: 'minimal', introduce: true, busy: true })
+      bench.second.resolve({ ok: true, value: 'minimal' })
+      await bench.second.promise
+      expect(bench.controller.store.getSnapshot()).toMatchObject({ current: 'minimal', busy: false })
+      expect(bench.applied).toEqual([['s1', 'minimal'], ['s2', 'minimal']])
+    } finally {
+      await bench.close()
+    }
+  })
+
+  it('does not apply a replacement stage without a new apply request', async () => {
+    const current = { id: 's1', blank: true, agentPreset: 'standard' }
+    const bench = pendingChip(current)
+    await bench.controller.load()
+    try {
+      const selected = bench.controller.select('minimal')
+      bench.pending.push(selected)
+      current.id = 's2'
+      bench.controller.stage('minimal')
+      bench.pending.push(bench.controller.apply())
+      bench.controller.clearStage()
+      bench.controller.stage('minimal')
+      bench.first.resolve({ ok: true, value: 'minimal' })
+      await selected
+      expect(bench.calls).toEqual([['s1', 'minimal']])
+      expect(bench.controller.store.getSnapshot()).toMatchObject({ current: 'minimal', busy: false })
+    } finally {
+      await bench.close()
+    }
+  })
+
+  it('serializes Settings choices and returns each attempt outcome', async () => {
+    const current = { id: 's1', blank: true, agentPreset: 'standard' }
+    const bench = pendingChip(current)
+    await bench.controller.load()
+    try {
+      const first = bench.controller.syncBlankSession(current.id as SeatSessionSummary['id'], 'minimal')
+      const second = bench.controller.syncBlankSession(current.id as SeatSessionSummary['id'], 'cordis')
+      bench.pending.push(first, second)
+      expect(bench.calls).toEqual([['s1', 'minimal']])
+      bench.first.reject(new Error('first selection refused'))
+      expect(await first).toBe('first selection refused')
+      expect(bench.calls).toEqual([['s1', 'minimal'], ['s1', 'cordis']])
+      bench.second.resolve({ ok: true, value: 'cordis' })
+      expect(await second).toBeUndefined()
+      expect(bench.controller.store.getSnapshot()).toMatchObject({ current: 'cordis', error: null, busy: false })
+    } finally {
+      await bench.close()
+    }
+  })
+
+  it.each(['moved', 'started'] as const)('rechecks a captured blank Session that %s while Settings waits', async (change) => {
+    const current = { id: 's1', blank: true, agentPreset: 'standard' }
+    const bench = pendingChip(current)
+    await bench.controller.load()
+    try {
+      const selected = bench.controller.select('minimal')
+      const synced = bench.controller.syncBlankSession(current.id as SeatSessionSummary['id'], 'cordis')
+      bench.pending.push(selected, synced)
+      expect(bench.calls).toEqual([['s1', 'minimal']])
+      if (change === 'moved') current.id = 's2'
+      else current.blank = false
+      bench.first.resolve({ ok: true, value: 'minimal' })
+      await selected
+      expect(await synced).toBeUndefined()
+      expect(bench.calls).toEqual([['s1', 'minimal']])
+    } finally {
+      await bench.close()
+    }
+  })
+
+  it('returns a refusal even when a newer stage replaces the displayed error', async () => {
+    const controller = chip(
+      ROSTER, { id: 's1', blank: true, agentPreset: 'standard' }, { failSelect: 'host refused' },
+    )
+    await controller.load()
+    const stop = controller.store.subscribe(() => {
+      const error = controller.store.getSnapshot().error
+      if (error !== null && typeof error === 'object' && error.reason === 'host refused') controller.stage('standard')
+    })
+    try {
+      expect(await controller.syncBlankSession('s1' as SeatSessionSummary['id'], 'minimal')).toBe('host refused')
+      expect(controller.store.getSnapshot()).toMatchObject({ current: 'standard', error: null })
+    } finally {
+      stop()
+    }
+  })
 
   it('opens on the deployment default', async () => {
     const controller = chip(ROSTER, undefined)
@@ -423,7 +584,7 @@ describe('the new-session chip controller', () => {
     expect(writes).toEqual([{ ns: 'select', patch: 'minimal' }])
   })
 
-  it('drops the stage against a session that already started', async () => {
+  it('keeps the stage while the current session has already started', async () => {
     const writes: Recorded[] = []
     const controller = chip(ROSTER, { id: 's1', blank: false, agentPreset: 'standard' }, { writes })
     await controller.load()

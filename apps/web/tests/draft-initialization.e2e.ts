@@ -5,17 +5,22 @@
  * reaches the Host log.
  */
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
-import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
+import {
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/plugins/fixture-draft-init', import.meta.url))
+const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/draft-initialization', import.meta.url))
+const MODE = webSnapshotMode()
 
 interface DraftInitHandle {
   startSession(workspaceId: string | undefined, options: { prompt?: string; clearPreviousDraft?: boolean }): void
@@ -133,5 +138,50 @@ describe('web e2e: Session draft initialization', () => {
     await startSession(page, wid, {})
     await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBeUndefined()
     await expect.poll(() => composerText(page)).toBe('')
+  })
+
+  it('restores an editable file reference after browser reload and preserves it on Workspace reuse', async () => {
+    const wid = await newWorkspace('structured')
+    await writeFile(join(scaffold.workspaceCwd, 'structured', 'reference target.md'), 'draft reference\n')
+    const page = await openPage()
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-draft-init-reference'))
+    const previous = await selected(page)
+    await startSession(page, wid, {})
+    await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBe(previous)
+    const sessionId = await selected(page)
+    const input = page.locator('textarea:enabled').first()
+    await input.fill('@reference')
+    const menu = page.getByRole('listbox', { name: 'Trigger suggestions', exact: true })
+    await menu.getByRole('option', { name: /reference target\.md/u }).click()
+    const reference = page.locator('[data-reference-appearance="file"]')
+    await expect.poll(() => reference.textContent()).toBe('@reference target.md')
+    await expect.poll(() => input.inputValue()).toBe('@reference target.md ')
+
+    await page.reload({ waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.waitForFunction(() => (window as typeof window & { __draftInit?: DraftInitHandle }).__draftInit !== undefined)
+    await expect.poll(() => input.inputValue(), { timeout: 15_000 }).toBe('@reference target.md ')
+    await expect.poll(() => reference.textContent()).toBe('@reference target.md')
+    expect(await reference.locator('svg').count()).toBe(1)
+    await input.focus()
+    const snapshot = await captureStableAria(page, '[data-composer-card] textarea', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'reference.expected.md'), snapshot, MODE)
+
+    await startSession(page, wid, { prompt: 'keep the existing reference' })
+    await expect.poll(() => selected(page)).toBe(sessionId)
+    await expect.poll(() => input.inputValue()).toBe('@reference target.md ')
+    await input.press('End')
+    await input.press('Backspace')
+    await input.press('Backspace')
+    await expect.poll(() => input.inputValue()).toBe('')
+    expect(await reference.count()).toBe(0)
+    const events = await hostEvents(sessionId!)
+    expect(events.some(event => event.type === 'user/message' || event.type === 'turn/start')).toBe(false)
+    expect(tripwires.at(-1)?.pageErrors).toEqual([])
+    expect(tripwires.at(-1)?.warnings).toEqual([])
+  })
+
+  it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
+    await assertFixtureInventory(SNAPSHOT_DIR, ['reference.expected.md'])
   })
 })

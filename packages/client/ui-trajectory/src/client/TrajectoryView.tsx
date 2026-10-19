@@ -1,8 +1,8 @@
 /** Trajectory view: compact summary over a turn-aware event ledger. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ConvViewProps, MessageImageLoader, RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { InjectFace, PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   AssistantBlock, AssistantMessageNode,
   SnapshotStore,
@@ -72,6 +72,7 @@ export interface TrajectoryViewInjected {
     wrap: SnapshotStore<boolean>
   }
   loadOlder: () => Promise<boolean>
+  loadImage: MessageImageLoader
   setActualDuration: (actualDuration: boolean) => void
   setWrapLines: (wrapLines: boolean) => void
   ensureHistoryDetail: () => Promise<void>
@@ -122,9 +123,16 @@ function addUsage(
 }
 
 export function TrajectoryView({
-  useSession, useDuration, useWrap, loadOlder, setActualDuration, setWrapLines, ensureHistoryDetail,
-  inspect, onInspectDone, t, compact = false,
-}: ConvViewProps & InjectFace<TrajectoryViewInjected> & PropsLocale<'trajectory'>) {
+  useSession, useDuration, useWrap, loadOlder, loadImage, setActualDuration, setWrapLines, ensureHistoryDetail,
+  inspect, onInspectDone, renderSlot, t, compact = false,
+}: ConvViewProps
+  & PropsRenderSlots<'conversation.trajectory.images'>
+  & InjectFace<TrajectoryViewInjected>
+  & PropsLocale<'trajectory'>) {
+  const renderImages = useCallback<RenderMessageImages>(
+    owner => renderSlot('conversation.trajectory.images', { ...owner, loadImage }),
+    [loadImage, renderSlot],
+  )
   const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<number>>(EMPTY_TURN_IDS)
   const [collapsedAssistants, setCollapsedAssistants] =
     useState<ReadonlySet<string>>(EMPTY_RECORD_IDS)
@@ -497,6 +505,7 @@ export function TrajectoryView({
       />
       <div className={css.ledger}>
         <TrajectoryTable
+          renderImages={renderImages}
           t={t}
           compact={compact}
           requestNumbers={requestNumbers}

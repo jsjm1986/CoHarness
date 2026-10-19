@@ -8,6 +8,7 @@ import type {
 import { sessionRecallLabels, skillInvocationName } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatNode } from '../contract/chat-nodes.ts'
 import { isRunningTool } from '../contract/chat-nodes.ts'
+import { orderedVisibleChatNodes, ProcessFlowProjector } from './process-groups.ts'
 
 const EMPTY_KEYS: readonly string[] = []
 const EMPTY_TURNS: readonly number[] = []
@@ -94,17 +95,12 @@ function sameReferences<T>(left: readonly T[], right: readonly T[]): boolean {
 class MutableChatNodeStore implements ChatNodeStore {
   private readonly byKey = new Map<string, ChatConversationViewNode>()
   private valuesCache: readonly ChatConversationViewNode[] = EMPTY_LIST
-  private valuesDirty = false
 
   get(key: string): ChatConversationViewNode | undefined {
     return this.byKey.get(key)
   }
 
   values(): readonly ChatConversationViewNode[] {
-    if (this.valuesDirty) {
-      this.valuesCache = [...this.byKey.values()]
-      this.valuesDirty = false
-    }
     return this.valuesCache
   }
 
@@ -112,7 +108,6 @@ class MutableChatNodeStore implements ChatNodeStore {
     this.byKey.clear()
     for (const node of nodes) this.byKey.set(node.key, node)
     this.valuesCache = [...this.byKey.values()]
-    this.valuesDirty = false
   }
 
   upsert(nodes: readonly ChatConversationViewNode[]): void {
@@ -122,7 +117,9 @@ class MutableChatNodeStore implements ChatNodeStore {
       this.byKey.set(node.key, node)
       changed = true
     }
-    if (changed) this.valuesDirty = true
+    // Eager recompute keeps values() a pure read: published snapshots are
+    // deep-frozen by the dev snapshot-store path, so a lazy write would throw.
+    if (changed) this.valuesCache = [...this.byKey.values()]
   }
 }
 
@@ -205,12 +202,6 @@ function locationCoordinates(location: ConversationLocation): { turn?: number; s
   if (location.kind === 'step') return { turn: location.turn.turn, step: location.step.step }
   if (location.kind === 'turn') return { turn: location.turn.turn }
   return {}
-}
-
-function orderedVisible(nodes: readonly ChatConversationViewNode[]): ChatConversationViewNode[] {
-  return nodes
-    .filter(node => node.visibility === 'visible')
-    .sort((left, right) => left.anchorSeq - right.anchorSeq || left.key.localeCompare(right.key))
 }
 
 function referenceMessageSeq(node: ChatConversationViewNode): number | undefined {
@@ -538,6 +529,7 @@ function legacyContribution(raw: ChatConversationViewNode): LegacyContribution {
     case 'user':
     case 'steering':
     case 'context':
+    case 'turn-trigger':
     case 'command':
     case 'compaction':
     case 'turn-error':
@@ -763,6 +755,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
   private readonly legacy = new LegacySliceBuilder()
   private readonly referenceLabels = new ReferenceLabelProjector()
   private readonly skillNames = new SkillNameProjector()
+  private readonly flow = new ProcessFlowProjector()
   private order: readonly string[] = EMPTY_KEYS
   readonly empty: ChatSnapshot
 
@@ -776,9 +769,10 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
   }): ChatSnapshot {
     const nodes = this.skillNames.replace(this.referenceLabels.replace(input.nodes))
     this.store.replace(nodes)
-    this.order = orderedVisible(nodes).map(node => node.key)
+    this.order = orderedVisibleChatNodes(nodes).map(node => node.key)
     this.locations.rebuild(this.order, this.store)
     this.navigation.rebuild(input.timeline, this.locations, this.store)
+    this.flow.replace(this.order, this.locations, this.store, input.timeline)
     return this.snapshot(input.timeline, this.legacy.replace(nodes, input.timeline))
   }
 
@@ -789,8 +783,10 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     const upserts = this.skillNames.apply(this.referenceLabels.apply(input.upserts, this.store), this.store)
     let structural = false
     const contentOnly: ChatConversationViewNode[] = []
+    const changes: { readonly previous: ChatConversationViewNode | undefined; readonly current: ChatConversationViewNode }[] = []
     for (const node of upserts) {
       const previous = this.store.get(node.key)
+      changes.push({ previous, current: node })
       const nodeStructural = previous === undefined
         || previous.anchorSeq !== node.anchorSeq
         || previous.visibility !== node.visibility
@@ -799,13 +795,16 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       if (!nodeStructural) contentOnly.push(node)
     }
     this.store.upsert(upserts)
+    let orderChanged = false
     if (structural) {
-      const next = orderedVisible(this.store.values()).map(node => node.key)
-      this.order = sameReferences(this.order, next) ? this.order : next
+      const next = orderedVisibleChatNodes(this.store.values()).map(node => node.key)
+      orderChanged = !sameReferences(this.order, next)
+      this.order = orderChanged ? next : this.order
       this.locations.rebuild(this.order, this.store)
     }
     this.locations.touch(contentOnly)
     this.navigation.rebuild(input.timeline, this.locations, this.store)
+    this.flow.apply(changes, this.order, orderChanged, this.locations, this.store, input.timeline)
     return this.snapshot(input.timeline, this.legacy.apply(upserts, input.timeline))
   }
 
@@ -817,6 +816,8 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       order: this.order,
       nodes: this.store,
       locations: this.locations,
+      entries: this.flow.flowEntries,
+      groups: this.flow.groupStore,
       navigation: this.navigation,
       timeline,
       legacy,

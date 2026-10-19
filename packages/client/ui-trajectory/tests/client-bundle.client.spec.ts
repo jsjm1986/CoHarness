@@ -65,7 +65,7 @@ describe('tsdown client artifact', () => {
     expect(handoff.id).toBe(PLUGIN_ID)
     expect(exports.apply).toBeTypeOf('function')
     expect(exports.inject).toEqual([
-      'slots', 'conversationEvents', 'conversationViews', 'sessions', 'locale',
+      'slots', 'conversation', 'conversationEvents', 'conversationViews', 'sessions', 'locale',
     ])
   })
 
@@ -87,6 +87,10 @@ describe('tsdown client artifact', () => {
     ctx.provide('sessions', { binding: () => undefined })
     ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
+    ctx.provide('conversation', {
+      resolveImage: () => Promise.resolve('blob:stub'),
+      peekImage: () => undefined,
+    } as never)
     ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     const locale = await import('@deepseek-ai/dsh-client-locale/client')
     ctx.plugin({ inject: [...locale.inject], apply: locale.apply })

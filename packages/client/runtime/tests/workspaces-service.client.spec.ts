@@ -43,7 +43,7 @@ it.each(['plain', 'encoded-looking'] as const)('keeps %s draft reservations in w
   api.onCreate = async request => ok({ sessionId: callField(request, 'sessionId') as SessionId })
   const base = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { provideService: false })
   const pool = new SessionRuntimePool(ctx, base, {
-    api, isLoopback: false,
+    api, isLoopback: false, interactions: 'none',
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     state: { getSnapshot: () => undefined, subscribe: () => () => {} },
     rpc: { call: () => Promise.reject(new Error('Unexpected Remote')) },
@@ -795,21 +795,22 @@ describe('WorkspaceRuntime', () => {
     await Promise.all([workspaces.refresh(), sessions.refresh()])
     await Promise.resolve()
     sessions.open(sid('current'))
-    const unresolved = new Promise<SessionId>(() => {})
-    const connect = vi.spyOn(workspaces, 'connectWorkspace').mockReturnValue(unresolved)
+    const create = vi.spyOn(sessions, 'create').mockReturnValue(new Promise<SessionId>(() => {}))
 
     workspaces.startSession(wid('recent-home'))
     await Promise.resolve()
-    expect(connect).toHaveBeenLastCalledWith(wid('recent-home'))
+    expect(create).toHaveBeenLastCalledWith({ workspaceId: wid('recent-home') })
 
     workspaces.startSession()
     await Promise.resolve()
-    expect(connect).toHaveBeenLastCalledWith(wid('current-home'))
+    expect(create).toHaveBeenLastCalledWith({ workspaceId: wid('current-home') })
 
     sessions.clear()
     workspaces.startSession()
     await Promise.resolve()
-    expect(connect).toHaveBeenLastCalledWith(wid('recent-home'))
+    // The recent-Workspace target joins the still-pending fresh create for
+    // it rather than issuing a second request.
+    expect(create).toHaveBeenCalledTimes(2)
 
     const emptyCtx = new Context()
     const emptyApi = new FakeApiClient()
@@ -833,18 +834,21 @@ describe('WorkspaceRuntime', () => {
     try {
       await Promise.all([workspaces.refresh(), sessions.refresh()])
       sessions.open(sid('old'))
-      const pending = deferred<SessionId>()
-      const connect = vi.spyOn(workspaces, 'connectWorkspace').mockReturnValue(pending.promise)
+      const creating = deferred<Awaited<ReturnType<FakeApiClient['onCreate']>>>()
+      api.onCreate = () => creating.promise
       workspaces.startSession(wid('target'))
+      await vi.waitFor(() => { expect(api.callsOf('session.create')).toHaveLength(1) })
       if (action === 'select') sessions.open(sid('new'))
       else if (action === 'clear') sessions.clear()
       else {
-        connect.mockResolvedValue(sid('new'))
-        workspaces.startSession(wid('target'))
-        await Promise.resolve()
+        // A draft-prepared start is the other connect arm: it does not join
+        // the pending bare create, and its commit supersedes it.
+        api.onCreate = () => Promise.resolve(ok({ sessionId: sid('new') }))
+        workspaces.startSession(wid('target'), { prompt: 'second take' })
+        await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe(sid('new')) })
       }
-      pending.resolve(sid('late'))
-      await pending.promise
+      creating.resolve(ok({ sessionId: sid('late') }))
+      await creating.promise
       await Promise.resolve()
       await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe(action === 'clear' ? undefined : sid('new')) })
       expect(sessions.binding(sid('late'))).toBeUndefined()
@@ -875,10 +879,17 @@ describe('WorkspaceRuntime', () => {
     // The local hint is supplied by the draft reservation and does not imply
     // Host membership in the Workspace view.
     expect(sessions.list.getSnapshot().byId[sid('draft')]).toMatchObject({ workspaceId: wid('hinted') })
-    const connect = vi.spyOn(workspaces, 'connectWorkspace').mockReturnValue(new Promise(() => {}))
+    const hanging = deferred<Awaited<ReturnType<FakeApiClient['onCreate']>>>()
+    api.onCreate = () => hanging.promise
     workspaces.startSession()
-    await Promise.resolve()
-    expect(connect).toHaveBeenCalledWith(wid('hinted'))
+    await vi.waitFor(() => {
+      // The bare arm asks the Host to mint a fresh Session in the hinted
+      // Workspace — no preallocated identity or reuse flag rides the wire.
+      expect(api.callsOf('session.create')).toEqual([
+        { workspaceId: 'hinted', sessionId: 'draft', draftId: 'draft-hinted' },
+        { workspaceId: 'hinted' },
+      ])
+    })
   })
 
   it('emits draft-initialize for the retained Session once navigation commits', async () => {
@@ -943,9 +954,147 @@ describe('WorkspaceRuntime', () => {
     const onFailure = vi.fn()
     try {
       await Promise.all([workspaces.refresh(), sessions.refresh()])
-      vi.spyOn(workspaces, 'connectWorkspace').mockRejectedValue(new Error('connect refused'))
+      api.onCreate = () => Promise.resolve(err({ code: 'internal', message: 'connect refused', details: {} }))
       workspaces.startSession(wid('target'), { onFailure })
       await vi.waitFor(() => { expect(onFailure).toHaveBeenCalledOnce() })
+      // The bare start rides the fresh arm — no reuse candidate or draft
+      // reservation rides the wire.
+      expect(api.callsOf('session.create')).toEqual([{ workspaceId: 'target' }])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('bare startSession mints a fresh Session past the member blank and the parked reservation', async () => {
+    const storage = new Map<string, string>([['dsh.workspace.drafts.v1', JSON.stringify({
+      // An outstanding draft reservation is the draft arm's pending Session,
+      // never a bare New Session's: it may still carry an earlier preset.
+      alpha: { draftId: 'draft-parked', sessionId: 's-parked', workspacePath: '/w/alpha' },
+    })]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+      removeItem: (key: string) => { storage.delete(key) },
+    })
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('alpha', [sid('s-blank')])] as never[],
+    }))
+    api.onList = () => Promise.resolve(ok({ items: [
+      { sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha' },
+    ] as never[] }))
+    try {
+      await Promise.all([workspaces.refresh(), sessions.refresh()])
+      api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-fresh') }))
+      workspaces.startSession(wid('alpha'))
+      await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe('s-fresh') })
+      // Neither the member blank nor the reserved draft identity is offered:
+      // the Host mints and composes a fresh Session+Agent itself.
+      expect(api.callsOf('session.create')).toEqual([{ workspaceId: 'alpha' }])
+      expect(JSON.parse(storage.get('dsh.workspace.drafts.v1')!)).toMatchObject({
+        alpha: { draftId: 'draft-parked', sessionId: 's-parked' },
+      })
+
+      // A settled fresh create never satisfies a later bare call.
+      api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-next') }))
+      workspaces.startSession(wid('alpha'))
+      await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe('s-next') })
+      expect(api.callsOf('session.create')).toEqual([{ workspaceId: 'alpha' }, { workspaceId: 'alpha' }])
+    } finally {
+      await ctx.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('draft-preparation startSession keeps member-blank reuse and reservation adoption', async () => {
+    const storage = new Map<string, string>([['dsh.workspace.drafts.v1', JSON.stringify({
+      alpha: { draftId: 'draft-parked', sessionId: 's-parked', workspacePath: '/w/alpha' },
+      beta: { draftId: 'draft-beta', sessionId: 's-beta-parked', workspacePath: '/w/beta' },
+    })]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+      removeItem: (key: string) => { storage.delete(key) },
+    })
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('alpha', [sid('s-blank')]), workspace('beta')] as never[],
+    }))
+    api.onList = () => Promise.resolve(ok({ items: [
+      { sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha' },
+    ] as never[] }))
+    api.onCreate = payload => Promise.resolve(ok({
+      sessionId: (payload as { sessionId?: SessionId }).sessionId ?? sid('s-unexpected'),
+    }))
+    try {
+      await Promise.all([workspaces.refresh(), sessions.refresh()])
+      workspaces.startSession(wid('alpha'), { prompt: 'seeded' })
+      await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe('s-blank') })
+      expect(api.callsOf('session.create')).toEqual([{
+        workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true,
+      }])
+      // Landing on a real member retires the reservation.
+      expect(JSON.parse(storage.get('dsh.workspace.drafts.v1')!)).toEqual({
+        beta: { draftId: 'draft-beta', sessionId: 's-beta-parked', workspacePath: '/w/beta' },
+      })
+
+      // With no eligible member the draft arm adopts the parked reservation,
+      // so the prompt lands on the Workspace's own pending draft identity.
+      workspaces.startSession(wid('beta'), { prompt: 'carry over' })
+      await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe('s-beta-parked') })
+      expect(api.callsOf('session.create')[1]).toEqual({
+        workspaceId: 'beta', sessionId: 's-beta-parked', draftId: 'draft-beta',
+      })
+    } finally {
+      await ctx.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('coalesces bare New Session calls only within the fresh arm', async () => {
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('alpha', [sid('s-blank')])] as never[],
+    }))
+    api.onList = () => Promise.resolve(ok({ items: [
+      { sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha' },
+    ] as never[] }))
+    try {
+      await Promise.all([workspaces.refresh(), sessions.refresh()])
+      const fresh = deferred<Awaited<ReturnType<FakeApiClient['onCreate']>>>()
+      const reuse = deferred<Awaited<ReturnType<FakeApiClient['onCreate']>>>()
+      let calls = 0
+      api.onCreate = () => (calls++ === 0 ? fresh.promise : reuse.promise)
+
+      workspaces.startSession(wid('alpha'))
+      workspaces.startSession(wid('alpha'))
+      await vi.waitFor(() => { expect(api.callsOf('session.create')).toHaveLength(1) })
+
+      // A workspace reconnect cannot ride the fresh create: its contract is
+      // member-blank reuse, which the fresh attempt never attempts.
+      const reconnect = workspaces.connectWorkspace(wid('alpha'))
+      await vi.waitFor(() => { expect(api.callsOf('session.create')).toHaveLength(2) })
+      expect(api.callsOf('session.create')[0]).toEqual({ workspaceId: 'alpha' })
+      expect(api.callsOf('session.create')[1]).toEqual({
+        workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true,
+      })
+      reuse.resolve(ok({ sessionId: sid('s-blank') }))
+      await expect(reconnect).resolves.toBe('s-blank')
+
+      fresh.resolve(ok({ sessionId: sid('s-fresh') }))
+      await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe('s-fresh') })
     } finally {
       await ctx.fiber.dispose()
     }

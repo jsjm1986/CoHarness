@@ -171,7 +171,7 @@ it('keeps an opened Session and draft when the server restarts on the same port'
 
   expect(errors).toEqual([])
   expect(graphs.at(-1)).toEqual(graphs[beforeGraphs - 1])
-  expect(await originalRoot!.evaluate(element => element.isConnected)).toBe(true)
+  expect(await originalRoot.evaluate(element => element.isConnected)).toBe(true)
   expect(await composer.inputValue()).toBe(draft)
   expect(await response.isVisible()).toBe(true)
 

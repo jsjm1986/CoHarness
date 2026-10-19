@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "调用技能、预览当前说明，并查看已记录的技能输出。"
 kind: "package-reference"
 ---
 
@@ -7,31 +7,64 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-skill（技能）调用 source 的浏览器端：把 `/` 触发的 `skill` source 注册进 `ctx.inputTriggers`。普通会话的候选来自 `skill.list` RPC，以每次调用的 `ClientSessionContext` 投影中的 `{sessionId}` 寻址，host 从会话 header 解析 `cwd`。宿主提供每一个用户可调用的 skill；`modelInvocable: false` 的条目（即 `disable-model-invocation` skill，此路径是其唯一入口）会以当前语言把仅限用户标记作为描述前缀带上。由目录寻址的可继续 subagent 在客户端解析为没有 skill 候选，因为现有 skill RPC 要求会话已挂载；查看其持久化历史不得激活它。目录按普通会话缓存，拉取走 single-flight；scope 创建时的 `warm` 钩子预热该会话的缓存项，转发的 owner 事件 `agent-preset/selected` 丢弃该会话这一项（目录属于 preset，而空会话可能在预热之后才切换），`connection/reset` 清空全部缓存。结果经 `/` 菜单共享的候选排序器 ui-primitives 的 `rankByName` 排名：查询作为不区分大小写的有序子序列与 skill 名匹配，前缀命中排最前，同分保持宿主顺序（[排名决策](../../../.agents/notes/implemented/feature/2026-08-04-web-slash-command-fuzzy-discovery.zh.md)）。
-
-pick 会落下字面文本 `/name `，发出的提示词中也是同一段字面文本（[slash 流水线 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.zh.md)）——本 source 不实现任何裁决钩子，也没有引用 codec。确定性在宿主侧：pre-step 手势边界（`dsh-tool-skill`）识别用户消息中任意位置、以空白为界、指名用户可调用 skill 的 `/name` token，并为每个入口注入渲染后的 `<skill_content>`，因此菜单 pick、手动键入的 token 与 TUI/ACP（Agent Client Protocol）提示词都以同一种方式加载 skill。与宿主命令同名的名称仍解析为命令：裁决在客户端把该行认领走，它根本不会成为提示词——这是有意的优先级，与同类产品一致。列表 RPC 使用插件注册时捕获的根上下文连接——source 绝不从每次调用的参数上读取服务；草稿 chip 视觉由 `lexicon` 扫描派生。
-
-`skill.list` 失败时 `candidates` 抛出异常，slash 壳层记录日志，并静默丢弃该菜单组——菜单只显示 pending／ready 状态。
-
-`/client` 导出接口只有插件主体（`apply`／`inject`）；source 对象是注册 effect 的内部实现。
-
 ## 概述
 
-`dsh-client-ui-skill` 让用户通过 `/` 建议选择或直接键入 `/name` 来调用 skill（技能）。同一条字面命令可以从 Web 编辑器、TUI 和 ACP（Agent Client Protocol）一致地加载 skill；如果名称与宿主命令相同，它仍会解析为该命令。skill 调用在对话中显示为可展开的 `Instructions` 卡片；即使已安装的 skill 目录发生变化，卡片落定后的内容仍保持稳定。
+从 Web 编辑器的 `/` 建议中选择 skill（技能），或输入 `/name` 即可调用。点击已发送消息中的技能引用，可以预览当前说明而不启动轮次。技能工具调用可展开为已记录的 `Instructions` 卡片；即使已安装的技能改变，卡片内容也保持稳定。源码预览与已记录结果分别帮助用户查看当前定义和较早调用所使用的说明。
 
 ## 目录
 
-- [skill 工具行](#skill-tool-row)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
 
-<a id="skill-tool-row"></a>
-## skill 工具行
+<a id="use-this-package"></a>
+## 使用本包
 
-浏览器插件还会把 `skill` wire 名称注册进 `ui-tool` 的 keyed `tool.call.toolview` slot。收起的行以与 Bash 行相同的中性视觉层级显示 14 像素的 skill 文档与闪光组合图标、`Skill` 标题、分隔符和请求加载的 skill 名称；运行中的工具调用带有 transcript（文本记录）的扫光效果，失败时用错误首行替换名称，中断的工具调用则使用警告状态。已结算的行以整行作为展开入口，展开后显示一个尺寸受限的 `Instructions` 卡片，其中原样呈现持久化的工具输出；可用时还会提供标准执行轨迹的 `Inspect` 入口。该行的名称、生命周期和正文只派生自 `ui-tool` 提供的冻结的工具调用／工具结果切片，绝不读取当前 skill 目录，因此即使已安装的 skill 或其描述发生变化，回放仍保持稳定。
+[Web 应用 bundle](../../bundle/web-app/README.zh.md) 在其浏览器组合中包含此插件。本包没有专属配置字段。
+
+选择 `/` 建议或直接输入技能名称。仅限用户调用的技能会在菜单中显示本地化标记。在命令位置，同名的 Host 命令优先。
+
+<a id="current-skill-source"></a>
+### 当前技能源码
+
+点击已加载技能的消息中的技能引用，即可读取当前 Markdown 源码。预览使用该 Session 的运行时、工作目录和 preset；全局或其他提供方提供的技能无需具有工作区文件路径。预览不会展开参数、执行内嵌命令、启动轮次或改变历史。关闭或替换预览会取消读取。缺失或隐藏的技能显示不可用状态；读取失败时显示错误，重新打开预览即可重试。
+
+<a id="skill-tool-row"></a>
+### skill 工具行
+
+展开已完成的 Skill 工具行，可在尺寸受限的 `Instructions` 卡片中读取完整的已记录输出。运行中的调用显示进度，失败调用以错误首行作摘要，中断调用显示警告。提供 `Inspect` 时，该操作会在轨迹中打开对应调用。
+
+<a id="understand-the-implementation"></a>
+## 理解实现
+
+<details>
+<summary>实现细节——点击展开</summary>
+
+`/` source 通过 Session 的连接读取 `skill.list`。Host 选择其当前工作目录和 preset 作用域，不激活冷 Agent。目录按 Session 共享一次拉取；`warm` 在作用域打开时启动它，候选查询等待它完成，`agent-preset/selected` 使该 Session 的缓存失效，`connection/reset` 使全部 Session 的缓存失效。菜单调用方的取消不终止共享发现；失效与插件释放会将其终止。列表失败由 slash 壳层记录，并从该菜单移除技能分组。
+
+source 插入字面文本 `/name `，没有裁决钩子或引用 codec。Host 的 [`dsh-tool-skill`](../../skill/tool-skill/README.zh.md) 识别提示词任意位置、以空白为界且允许用户调用的名称，并在模型步骤前注入 `<skill_content>`。因此 Web、TUI 和 ACP 使用相同的调用文本。lexicon 为草稿 token 添加视觉标记；`rankByName` 对不区分大小写的子序列匹配排序，前缀优先，同分保留 Host 顺序（[排名决策](../../../.agents/notes/implemented/feature/2026-08-04-web-slash-command-fuzzy-discovery.zh.md)、[纯文本决策](../../../.agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.zh.md)）。
+
+插件向 `conversation.chat.skill-preview` 提供当前源码对话框，向 `tool.call.toolview` 提供已记录结果的 renderer。对话框读取 `skill.get`；工具行的名称、状态和正文只来自持久化的调用／结果切片。两项注册都随插件 fiber 释放。`/client` 入口只导出插件主体；组件与 source 保持内部实现。
+
+| 源码 | 职责 |
+| --- | --- |
+| [index.ts](src/client/index.ts) | Session 路由、目录生命周期和注册 |
+| [SkillPreview.tsx](src/client/SkillPreview.tsx) | 可取消的源码对话框 |
+| [SkillRow.tsx](src/client/SkillRow.tsx) | 已记录工具输出与轨迹导航 |
+
+</details>
+
+<a id="further-exploration"></a>
+## 进一步探索
+
+- [Conversation](../ui-conversation/README.zh.md)——已发送消息与编辑器的归属。
+- [技能注册表](../../skill/skill/README.zh.md)——提供方与调用控制。
+- [Host API](../../host/apiproxy/README.zh.md)——经授权的技能读取。
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -44,18 +77,21 @@ pick 会落下字面文本 `/name `，发出的提示词中也是同一段字面
 
 #### Token 影响
 
-一次调用会把渲染后的 skill 正文作为注入上下文加进该轮次——成本与模型经由工具加载该 skill 相同，只是无条件支付，而非由模型自行裁量。浏览菜单和拉取候选不会增加任何模型 token。
+一次调用会把渲染后的 skill 正文作为注入上下文加进该轮次——成本与模型经由工具加载该 skill 相同，只是无条件支付，而非由模型自行裁量。浏览菜单、拉取候选和源码预览都不会增加模型 token。
 
 #### KV Cache 影响
 
 仅追加：注入的消息落在可复用历史前缀之后。该包绝不改写较早的请求 token。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
+<a id="known-limitations-and-deferred-work"></a>
+
+以下限制由可用的 Session 历史与寻址方式决定。
+
 - **仅含工具结果的 history 页使用通用行**：键控分派要求配对的工具调用位于运行时窗口内；分页将工具调用留在窗口外时，工具结果没有工具身份。这项客户端呈现功能不会为了恢复该身份而扩展 history 协议约定。
-- **文本是唯一依据**：引用是普通的草稿文本；手动键入的相同 token 就是同一个引用，宿主手势边界评判的是发出的文本，而不是菜单交互。chip 视觉由 lexicon 扫描派生；没有 occurrence 身份、位置跟踪，也没有提示词协议上的结构化引用载荷（两者都是台账事项）。
-- **预热落定之前打开的菜单**：在那次击键下不显示 skill 候选；下一次击键会重新轮询已落定的缓存。
+- **技能引用是普通文本**：手动键入与菜单选择的 token 含义相同。技能 chip 不携带 occurrence 身份、位置跟踪或结构化引用载荷。
+- **由目录寻址的子会话没有目录或当前源码预览**：这些读取要求已挂载的 Session，不得仅为显示历史而激活子会话。
 
 <a id="dev-note"></a>
 ### 开发备注

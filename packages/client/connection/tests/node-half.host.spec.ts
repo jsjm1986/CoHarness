@@ -10,6 +10,7 @@ import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { RpcId, type ClientRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { requestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/request-scope'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   API_PATH,
@@ -271,6 +272,56 @@ describe('connection node half', () => {
       } finally {
         await dispose()
       }
+    }
+  })
+
+  it('admits a launch-token operator credential and binds its interaction scope', async () => {
+    const { ctx, connection, dispose } = await mounted()
+    try {
+      const token = new URL(connection.authenticatedUrl('http://127.0.0.1:3080')).searchParams.get('token')!
+      // The same process credential the index redeems admits a programmatic
+      // client directly: query form and Bearer form are equivalent.
+      expect(connection.requestRejection(fakeRequest(
+        { host: '127.0.0.1:3080' }, `${API_PATH}/session.list?token=${token}`,
+      ))).toBeUndefined()
+      expect(connection.requestRejection(fakeRequest(
+        { host: '127.0.0.1:3080', authorization: `Bearer ${token}` },
+      ))).toBeUndefined()
+      // A mismatched credential refuses before the cookie fallback — even a
+      // request that also carries a valid cookie fails rather than launder.
+      const cookie = browserCookie(connection, '127.0.0.1:3080')
+      expect(connection.requestRejection(fakeRequest(
+        { host: '127.0.0.1:3080' }, `${API_PATH}/session.list?token=bad-token`,
+      ))).toBe(401)
+      expect(connection.requestRejection(fakeRequest(
+        { host: '127.0.0.1:3080', cookie: cookie }, `${API_PATH}/session.list?token=bad-token`,
+      ))).toBe(401)
+
+      // The request waterfall binds the admitted mode before dispatch:
+      // operator credentials default to 'none', an explicit declaration wins,
+      // and cookie-only traffic keeps its historical 'answer'.
+      const observed: string[] = []
+      ctx.on('connection/request', (_request, next) => {
+        observed.push(requestInteractions())
+        return next()
+      })
+      const boundary = (url: string, cookieHeader?: string): {
+        kind: 'http'
+        headers: Record<string, string>
+        pathname: string
+        url: string
+      } => ({
+        kind: 'http',
+        headers: { host: '127.0.0.1:3080', ...cookieHeader === undefined ? {} : { cookie: cookieHeader } },
+        pathname: '/api/session.list',
+        url,
+      })
+      await ctx.waterfall('connection/request', boundary(`${API_PATH}/session.list?token=${token}`), async () => {})
+      await ctx.waterfall('connection/request', boundary(`${API_PATH}/session.list?token=${token}&interactions=answer`), async () => {})
+      await ctx.waterfall('connection/request', boundary(`${API_PATH}/session.list`, cookie), async () => {})
+      expect(observed).toEqual(['none', 'answer', 'answer'])
+    } finally {
+      await dispose()
     }
   })
 

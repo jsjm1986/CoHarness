@@ -13,6 +13,7 @@ import { API_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from './api-path.ts'
 import type { ConnectionAuthenticationRequest } from './rpc.ts'
 import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
 import { assertTrustedAuthority } from './api-request-trust.ts'
+import { bindRequestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/request-scope'
 import { BrowserAuth } from './browser-auth.ts'
 import { HostConnectionService } from './rpc-host.ts'
 import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
@@ -46,6 +47,8 @@ export interface ConnectionRequestBoundary {
   method?: string
   /** URL pathname before any RPC dispatch. */
   pathname?: string
+  /** Full request URL as sent by the client; carriers that cannot set headers declare credentials and modes in its query. */
+  url?: string
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -257,11 +260,18 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   // silently authorizing its hostname prefix at request time.
   for (const entry of trustedHosts) assertTrustedAuthority(entry)
   assertImageBodyCapacity(ctx, maxRequestBodyBytes)
+  const browserAuth = await BrowserAuth.create(ctx.root, ctx.credentials, cookieMaxAgeDays)
   const connection = new HostConnectionService(
     ctx,
     trustedHosts,
-    await BrowserAuth.create(ctx.root, ctx.credentials, cookieMaxAgeDays),
+    browserAuth,
   )
+  // Bind each accepted request's interaction scope before any downstream
+  // waterfall listener or dispatch runs: the same propagation point
+  // request-context plugins use, so API handlers read the admitted mode
+  // synchronously through `requestInteractions`.
+  ctx.on('connection/request', (request, next) =>
+    bindRequestInteractions(browserAuth.scopeInteractions(request), next))
   // Construct the Fetch carrier once per resident ApiProxy. Rebuilding its
   // route tables on every request adds avoidable allocations on the hot path;
   // a WeakMap still lets HMR replace the proxy without retaining the old one.
@@ -311,6 +321,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           headers: req.headers,
           ...(req.method === undefined ? {} : { method: req.method }),
           pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+          ...(req.url === undefined ? {} : { url: req.url }),
         }, async () => {
           if (await connection.dispatchHttp(req, res)) return
           await bridge(req, res, fetchHandler, maxRequestBodyBytes)
@@ -338,6 +349,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
             headers: req.headers,
             ...(req.method === undefined ? {} : { method: req.method }),
             pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+            ...(req.url === undefined ? {} : { url: req.url }),
           }, async () => {
             await handle(req, socket, head)
           })

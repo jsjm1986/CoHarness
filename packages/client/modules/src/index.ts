@@ -34,7 +34,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
 import { exactPackageSpecifier, parseDshClient, stripClientSuffix } from './client/manifest.ts'
-import type { WebBootBatch, WebBootBatchPhase, WebBootEntry, WebBootGraph } from './client/manifest.ts'
+import type { WebBootBatch, WebBootBatchPhase, WebBootEntry, WebBootGraph, WebBootRelease } from './client/manifest.ts'
 
 export { stripClientSuffix } from './client/manifest.ts'
 export type {
@@ -568,6 +568,11 @@ window.__ModuleLoader__={
 export class ClientModuleRegistry extends Service {
   static inject = ['loader']
 
+  /**
+   * Host release identity published in every graph: this package's version, which releases share
+   * with the CLI, and the source commit the client build fixes into the built Host artifact.
+   */
+  private readonly release: WebBootRelease
   private readonly table = new Map<string, WebPluginRecord>()
   private readonly sources = new Map<string, ClientPackageSource>()
   // Resolution is entry-local: the same specifier can resolve differently in
@@ -590,6 +595,10 @@ export class ClientModuleRegistry extends Service {
    */
   constructor(ctx: Context) {
     super(ctx, 'clientModules')
+    const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
+    // The client build fixes this read into the built Host artifact.
+    const commit = process.env.DSH_CLIENT_COMMIT_HASH
+    this.release = commit === undefined ? { version } : { version, commit }
     // Subscribe before seeding so a fiber arriving mid-activation lands in the
     // same dirty set (Set idempotence makes the overlap harmless). An entry-less
     // fiber is a child plugin or a manual mount — never a loader row; O(1) drop.
@@ -775,7 +784,12 @@ export class ClientModuleRegistry extends Service {
     this.batchResponses = batchResponses
     this.responses = responses
     const batches = artifacts.map(artifact => artifact.descriptor)
-    return { rev: shortHash(JSON.stringify({ entries, batches })), entries, batches }
+    return {
+      rev: shortHash(JSON.stringify({ entries, batches })),
+      release: this.release,
+      entries,
+      batches,
+    }
   }
 
   private notifyGraphChanged(): void {

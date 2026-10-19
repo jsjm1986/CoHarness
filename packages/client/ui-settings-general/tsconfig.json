@@ -18,10 +18,16 @@
       "path": "../locale"
     },
     {
+      "path": "../modules"
+    },
+    {
       "path": "../runtime"
     },
     {
       "path": "../shortcuts/tsconfig.client.json"
+    },
+    {
+      "path": "../ui-layout"
     },
     {
       "path": "../ui-primitives"

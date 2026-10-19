@@ -152,7 +152,7 @@ function TurnMaxTokensItem({ t }: {
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  content, source, renderMessageImages, actions, pending = false, referenceLabels = [], skillNames = [], previewImages, t,
+  content, source, renderMessageImages, actions, pending = false, referenceLabels = [], skillNames = [], references, previewImages, t,
 }: {
   content: readonly unknown[]
   source?: unknown
@@ -165,6 +165,8 @@ function UserStyleBubble({
   referenceLabels?: readonly string[]
   /** Skill names the step's `skill-invocation` injections loaded for this message. */
   skillNames?: readonly string[]
+  /** Available preview actions; pending submissions keep their references inert. */
+  references?: Parameters<typeof projectUserText>[4]
   /** Local submission previews replacing content-derived durable images. */
   previewImages?: readonly MessageImageSource[]
   t: ChatViewSlotProps['t']
@@ -185,7 +187,7 @@ function UserStyleBubble({
         )}
         {renderMessageImages({ images, align: 'end' })}
         {showBubble && <div className={css.bubble}>
-          {projectUserText(text, referenceLabels, skillNames, 'skill', undefined, { reveal: t('secret.reveal'), hide: t('secret.hide') })}
+          {projectUserText(text, referenceLabels, skillNames, 'skill', references, { reveal: t('secret.reveal'), hide: t('secret.hide') })}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
         {referenceLabels.length > 0 && (
@@ -271,7 +273,7 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, t,
+  node, renderMessageImages, openFile, openSkill, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
   return (
@@ -279,6 +281,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       content={data.content}
       source={data.source}
       renderMessageImages={renderMessageImages}
+      references={{ openFile, openSkill }}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
       {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}
       t={t}
@@ -296,7 +299,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
 })
 
 /** Injected-context keyed Chat renderer. */
-export const ContextMessageNodeView = memo(function ContextMessageNodeView({ node, t }: ChatNodeViewProps<'context'>) {
+export const ContextMessageNodeView = memo(function ContextMessageNodeView({ node, useDisclosure, t }: ChatNodeViewProps<'context'>) {
   const data = node.data
   return (
     <ContextInjectionRow
@@ -304,6 +307,7 @@ export const ContextMessageNodeView = memo(function ContextMessageNodeView({ nod
       source={data.source}
       producer={data.producer}
       form={data.form}
+      useDisclosure={useDisclosure}
       t={t}
     />
   )

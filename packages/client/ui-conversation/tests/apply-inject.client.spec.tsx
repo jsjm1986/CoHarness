@@ -26,6 +26,7 @@ import type {
   ConversationSessionInjected, DetailsInjected,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { createChatStore } from '../src/client/stores.ts'
+import type { DraftSnapshot } from '../src/client/input/contract.ts'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
@@ -205,10 +206,11 @@ describe('conversation slot inject API', () => {
     // The provide contribution is idempotent per session: one shell identity.
     expect(b.inputApi(ROOT).state).toBe(state)
     // The draft mirror rides the conversation inject face.
-    const mirrored: string[] = []
+    const mirrored: (string | DraftSnapshot)[] = []
     const unbind = injected.bindDraftMirror(text => mirrored.push(text))
+    expect(mirrored).toEqual(['typed during flight'])
     actions.setDraft('mirrored text')
-    expect(mirrored).toEqual(['mirrored text'])
+    expect(mirrored).toEqual(['typed during flight', 'mirrored text'])
     unbind()
     // Stop failure is swallowed (promptError owns the display).
     b.sessionFake.cancel.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'x', details: {} } })

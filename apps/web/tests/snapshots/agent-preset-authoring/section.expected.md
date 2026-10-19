@@ -50,7 +50,7 @@
         - text: 复制
     - listitem:
       - 'button "设为默认: 极简模式"':
-        - text: 极简模式 内置 仅提供持久 bash 与 str_replace_editor 的双工具编码 Agent。
+        - text: 极简模式 内置 仅提供平台持久 shell 的单工具编码 Agent。
         - code: minimal
       - 'button "模式说明: 极简模式"': 模式说明
       - 'button "如何使用: 极简模式"': 如何使用

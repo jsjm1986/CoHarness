@@ -4,13 +4,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ComponentProps } from 'react'
+import type { RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { TrajectoryTable as LocalizedTrajectoryTable } from '../src/client/TrajectoryTable.tsx'
 import type { TrajectoryTurnModel } from '../src/client/layout.ts'
 import { deriveTrajectoryLayout } from '../src/client/layout.ts'
 import { t, tZh } from './locale.client.ts'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+
+type TrajectoryAttachment = NonNullable<
+  NonNullable<TrajectoryTurnModel['groups'][number]['cells'][number]['sourceBlocks']>[number]['attachment']
+>
+
+const renderImagesStub: RenderMessageImages = ({ images }) => (
+  <div data-testid="record-images" data-count={images.length}>
+    {images.map((image, index) => (
+      <span key={index} data-attachment-id={'attachment' in image ? image.attachment.attachmentId : ''} />
+    ))}
+  </div>
+)
 
 function TrajectoryTable(
-  props: Omit<ComponentProps<typeof LocalizedTrajectoryTable>, 't'>,
+  props: Omit<ComponentProps<typeof LocalizedTrajectoryTable>, 't' | 'renderImages'>
+    & { renderImages?: RenderMessageImages },
 ) {
   const inferred: Array<NonNullable<typeof props.requestNumbers>[number] & { firstIndex: number }> = []
   for (const turn of props.turns) {
@@ -44,6 +59,7 @@ function TrajectoryTable(
     .map(({ firstIndex: _firstIndex, ...request }, index) => ({ ...request, number: index + 1 }))
   return (
     <LocalizedTrajectoryTable
+      renderImages={renderImagesStub}
       {...props}
       requestNumbers={requestNumbers}
       t={t}
@@ -760,6 +776,7 @@ describe('TrajectoryTable', () => {
     const table = (status: 'running' | 'complete' | 'error') => (
       <LocalizedTrajectoryTable
         turns={turns} {...FOLD_PROPS} t={translate}
+        renderImages={renderImagesStub}
         requestNumbers={[{
           turn: 1, step: 1, group: 'Step 1', number: 1, status,
           error: 'upstream 503', retry: 1, maxRetries: 2,
@@ -918,6 +935,80 @@ describe('TrajectoryTable', () => {
 
     expect(screen.getByRole('tree', { name: 'Result JSON' })).toBeTruthy()
     expect(screen.getByText('value:')).toBeTruthy()
+  })
+
+  it('renders user image attachments through the shared gallery in the details panel', () => {
+    const attachment: TrajectoryAttachment = {
+      attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
+      mediaType: 'image/png',
+      bytes: 68,
+      width: 640,
+      height: 320,
+      name: 'screenshot.png',
+    }
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{
+        title: 'Message',
+        cells: [{
+          index: 1,
+          kind: 'user',
+          text: 'Images ×2',
+          sourceBlocks: [
+            { type: 'image', content: '', attachment },
+            { type: 'image', content: '', attachment },
+          ],
+          timeSeconds: 0,
+        }],
+      }],
+    }]
+
+    render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+    fireEvent.click(screen.getByRole('row', { name: /USER/ }))
+
+    const preview = screen.getAllByTestId('record-images')
+    expect(preview.length).toBeGreaterThan(0)
+    expect(preview[0]?.getAttribute('data-count')).toBe('2')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Raw' }))
+    const rawGalleries = screen.getAllByTestId('record-images')
+    expect(rawGalleries).toHaveLength(2)
+    expect(rawGalleries[0]?.querySelector('[data-attachment-id]')?.getAttribute('data-attachment-id'))
+      .toBe(String(attachment.attachmentId))
+  })
+
+  it('renders a tool-result image through the shared gallery in the Result tab', () => {
+    const attachment: TrajectoryAttachment = {
+      attachmentId: AttachmentId(`sha256:${'b'.repeat(64)}`),
+      mediaType: 'image/png',
+      bytes: 68,
+      width: 320,
+      height: 640,
+      name: 'capture.png',
+    }
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{
+        title: 'Step 1',
+        cells: [{
+          index: 1,
+          kind: 'tool',
+          text: 'read_image {"path":"a.png"}',
+          outputDetail: 'Images ×1',
+          outputBlocks: [{ type: 'image', content: '', attachment }],
+          timeSeconds: 0.1,
+        }],
+      }],
+    }]
+
+    render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+    fireEvent.click(screen.getByRole('row', { name: /TOOL/ }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Result' }))
+
+    const gallery = screen.getAllByTestId('record-images').at(-1)
+    expect(gallery?.getAttribute('data-count')).toBe('1')
+    expect(gallery?.querySelector('[data-attachment-id]')?.getAttribute('data-attachment-id'))
+      .toBe(String(attachment.attachmentId))
   })
 
   it('keeps the first row and a compact summary when a turn is collapsed', () => {

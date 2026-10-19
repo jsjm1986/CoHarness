@@ -25,12 +25,16 @@ export type CollapseTimingRowProps =
   & PropsLocale<'conversation'>
   & InjectFace<CollapseTimingRowInjected>
 
+const OPTION_LABELS: Record<CollapseTiming, ConversationKey> = {
+  completion: 'settings.collapseTiming.completion',
+  'next-input': 'settings.collapseTiming.next-input',
+}
 const OPTIONS: readonly {
   id: CollapseTiming
   label: ConversationKey
 }[] = COLLAPSE_TIMINGS.map(id => ({
   id,
-  label: `settings.collapseTiming.${id}` as ConversationKey,
+  label: OPTION_LABELS[id],
 }))
 
 /**

@@ -4,9 +4,9 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceFileTextPage } from '@deepseek-ai/dsh-api-remotes/client'
 import { isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
-import { ZoomViewport, zoomSurfaceClass } from '../zoom/ZoomViewport.tsx'
-import { FIT_WIDTH, type ZoomLabels, type ZoomPreference } from '../zoom/types.ts'
-import type { WorkspacePreviewResource } from './WorkspaceFileTab.tsx'
+import { ZoomViewport, zoomSurfaceClass } from '../contract/zoom/ZoomViewport.tsx'
+import { FIT_WIDTH, type ZoomLabels, type ZoomPreference } from '../contract/zoom/types.ts'
+import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import css from './Workbench.module.css'
 
 /** Read one versioned page from the resource's explicit runtime. */
@@ -34,13 +34,18 @@ function imageMime(path: string): string | undefined {
  * @param props - preview metadata/callbacks, readers, lifecycle, and labels.
  * @returns a read-only region inside its resource tab.
  */
-export function WorkspaceFilePreview({ request, read, readBytes, resource, close, labels, zoomLabels, view, initialLine }: {
+export function WorkspaceFilePreview({ request, read, readBytes, resource, close, labels, zoomLabels, view, initialLine, nativeOpen }: {
   request: WorkspaceResourceOpenRequest
   initialLine?: number | undefined
   read: ReadWorkspacePreview
   readBytes?: ReadWorkspaceBytesPreview | undefined
   resource: WorkspacePreviewResource
   close: () => void
+  /**
+   * The authorized native-open gesture for a file the preview cannot render;
+   * absent when the serving Host cannot open native paths (remote/Gateway).
+   */
+  nativeOpen?: (() => Promise<void>) | undefined
   labels: {
     close: string
     reload: string
@@ -49,6 +54,8 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
     loading: string
     changed: string
     binary: string
+    /** Accessible name of the binary-fallback "open in the default application" action. */
+    openNative: string
     /** Accessible name for the image preview of a decoded file name. */
     imageAlt: (name: string) => string
     /** Decode-failure copy for a supported image type. */
@@ -186,9 +193,21 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
           signal={lifetime.signal} />
       )}
       {rawBytes !== undefined && imageType === undefined && !denied && (
-        <pre className={css.filePreviewText} data-workspace-file-bytes>
-          {labels.binary}{'\n'}{rawBytes}
-        </pre>
+        <>
+          {nativeOpen !== undefined && (
+            <div className={css.filePreviewActions}>
+              <Button size="sm" onClick={() => {
+                setError(undefined)
+                void nativeOpen().catch((cause: unknown) => {
+                  setError(cause instanceof Error ? cause : new Error(String(cause)))
+                })
+              }}>{labels.openNative}</Button>
+            </div>
+          )}
+          <pre className={css.filePreviewText} data-workspace-file-bytes>
+            {labels.binary}{'\n'}{rawBytes}
+          </pre>
+        </>
       )}
       {!denied && metadata.value !== undefined && page !== undefined && rawBytes === undefined && (
         <pre className={css.filePreviewText} data-workspace-file-preview>{page.text}</pre>

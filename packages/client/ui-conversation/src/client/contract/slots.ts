@@ -12,14 +12,14 @@ import type {
   TurnLocation, WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationViewportSnapshot, ProjectUiPolicySnapshot } from '@deepseek-ai/dsh-client-runtime/client'
-import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { MarkdownFileMentions, MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
 import type { PermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ComposerBlock } from '../input/blocks.ts'
 import type {
-  ComposerKeyboard, DraftAttachmentId, DraftDocument, DraftDocumentId, EditSelection, InputActions, InputNotice, InputState,
+  ComposerKeyboard, DraftAttachmentId, DraftDocument, DraftDocumentId, DraftSnapshot, EditSelection, InputActions, InputNotice, InputState,
 } from '../input/contract.ts'
 import type { createConversationViewportStore } from '../viewport.ts'
 import type { createChatStore } from '../stores.ts'
@@ -90,6 +90,20 @@ export interface MessageImagesOwnerProps {
 
 /** Slot-backed renderer used by chat nodes without importing an attachment implementation. */
 export type RenderMessageImages = (owner: Omit<MessageImagesOwnerProps, 'loadImage'>) => ReactNode
+
+/** Original model-provided reasoning offered to the expanded Body Slot. */
+export interface ReasoningBodyOwnerProps {
+  /** Complete or streaming reasoning text. */
+  readonly text: string
+  /** Whether the reasoning tail is still streaming. */
+  readonly running: boolean
+}
+
+/** Session-independent original or derived display input to the Content Factory. */
+export interface ReasoningContentInput extends ReasoningBodyOwnerProps {
+  /** Localized Markdown controls, used unchanged when supplied; omission uses Chat's defaults. */
+  readonly labels?: MarkdownLabels
+}
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -174,11 +188,17 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       scope: 'session'
       owner: ChatNodeOwnerProps
       keyProps: { [Kind in ChatNodeKind]: { node: ChatNode<Kind> } }
-      hookContext: string
-      inject: ChatNodeTurnDataInjected
+      hookContext: ChatNodeHookContext
+      inject: ChatNodeInjected
     }
     /** Optional renderer for one consecutive group of durable message images. */
     'conversation.message.images': { kind: 'single'; scope: 'session'; owner: MessageImagesOwnerProps }
+    /** Current instructions for a skill named in a sent user message. */
+    'conversation.chat.skill-preview': {
+      kind: 'single'
+      scope: 'session'
+      owner: { skillName: string; onClose: () => void }
+    }
     /**
      * The chat view's per-command row hole: keyed dispatch on the command
      * name (`command/run.name`; a run-less cross-window node has none and
@@ -188,6 +208,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * registration, and a domain upgrades by registering one row component.
      */
     'conversation.chat.commandview': { kind: 'keyed'; scope: 'session'; owner: CommandRowOwnerProps }
+    /**
+     * Expanded reasoning body with the unchanged model text. The official entry
+     * has priority 100 and calls the reasoning Content Factory; smaller priority
+     * values replace it. Contributions must preserve access to the original text.
+     */
+    'conversation.chat.reasoning.body': { kind: 'single'; scope: 'session'; owner: ReasoningBodyOwnerProps }
     /**
      * The completed Turn Node's extension list, rendered before that Node's
      * IconActions. Entries derive a match from the engine-owned Turn and
@@ -363,6 +389,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * embedded hosts (the sidebar chat) substitute the `views` local
      * Component to pin a fixed view.
      */
+    /** Session-independent reasoning Markdown with Conversation labels and compact typography. */
+    'conversation.chat.reasoning.content': {
+      scope: 'root'
+      props: ReasoningContentInput
+      locale: 'conversation'
+    }
     'conversation.content': {
       scope: 'session-maybe'
       props: ConversationContentInputProps
@@ -521,10 +553,46 @@ export type UseChatNodeTurnData = <Key extends Extract<keyof ConversationTurnDat
   key: Key,
 ) => Readonly<ConversationTurnDataMap[Key]> | undefined
 
-/** Slot-level Hook factory used by renderers reading their Node's Turn data. */
-export interface ChatNodeTurnDataInjected {
+/**
+ * One disclosure's expansion record. `expanded` is true only while the stored
+ * generation still equals the seat's current fold generation, so a reset
+ * collapses every bound disclosure without unmounting its row.
+ */
+export interface DisclosureHandle {
+  readonly expanded: boolean
+  /** @param open - whether this disclosure is expanded. */
+  readonly setExpanded: (open: boolean) => void
+  readonly toggle: () => void
+}
+
+/**
+ * Hook owning one disclosure bound to the seat's fold generation. Each
+ * invocation is independent; rows pass no seed and a standalone row without a
+ * seat binds generation 0 forever.
+ */
+export type UseDisclosure = () => DisclosureHandle
+
+/** Hook reading the seat's current disclosure fold generation. */
+export type UseDisclosureReset = () => number
+
+/**
+ * Per-render currency of one `conversation.chat.node` dispatch. The seat
+ * supplies the Node key plus its fold-generation source, which advances each
+ * time the Turn's process window folds while the Node stays mounted.
+ */
+export interface ChatNodeHookContext {
+  /** Chat Node key of the rendered business node. */
+  readonly nodeKey: string
+  /** Fold-generation source; child disclosures compare their expansion record to it. */
+  readonly disclosureReset: ObservableSnapshot<number>
+}
+
+/** Slot-level Hook factories used by renderers reading their Node's Turn and seat state. */
+export interface ChatNodeInjected {
   hooks: {
     turnData: SlotHookFactory<'conversation.chat.node', UseChatNodeTurnData>
+    disclosure: SlotHookFactory<'conversation.chat.node', UseDisclosure>
+    disclosureReset: SlotHookFactory<'conversation.chat.node', UseDisclosureReset>
   }
 }
 
@@ -541,13 +609,23 @@ export interface ChatNodeOwnerProps {
    * about passes it through `options`, and the opened surface lands there.
    */
   openFile: (path: string, options?: { line?: number }) => void
+  /** Preview the current source of a skill referenced by a sent message. */
+  openSkill?: ((name: string) => void) | undefined
   inspectCall: (callId: ToolCallId) => void
   forkAt: (seq: number) => void
   /** Render a historical image group through the attachment slot. */
   renderMessageImages: RenderMessageImages
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
-  /** Turn-process disclosure controller for the process summary row. */
-  turnProcess?: { readonly open: boolean; readonly setOpen: (open: boolean) => void }
+  /** Turn-process disclosure controller for the process summary row. `foldable`
+   *  gates the toggle itself; `hasContent` reports process evidence to collapse. */
+  turnProcess?: {
+    readonly open: boolean
+    readonly setOpen: (open: boolean) => void
+    readonly foldable: boolean
+    readonly hasContent: boolean
+  }
+  /** When set, the renderer draws only this part of a split Node (reasoning vs reply). */
+  groupPart?: 'reasoning' | 'response' | undefined
   /** Active work-details presentation policy; absent in runtimes without the preference. */
   presentation?: ChatPresentationPolicy | undefined
 }
@@ -647,8 +725,11 @@ export interface ConversationSessionInjected {
   }
   /** Release historical image URLs when this rendered session scope unmounts. */
   releaseSessionImages: (sessionId: SessionId) => void
-  /** Bind the input machine's draft persistence mirror to the session store. */
-  bindDraftMirror: (write: (text: string) => void) => () => void
+  /** Restore an empty input from storage, then mirror its semantic draft until unbound. */
+  bindDraftMirror: (
+    write: (draft: string | DraftSnapshot) => void,
+    initialDraft?: string | DraftSnapshot,
+  ) => () => void
 }
 
 /** Business callbacks injected into the strict session header seat. */
@@ -1052,7 +1133,7 @@ export interface ChatViewInjected {
 /** Full chat-view component props: runtime & its Tool/command/tail render shares & store & injected & locale seat. */
 export type ChatViewSlotProps =
   PropsRuntime<'conversation.view'>
-  & PropsRenderSlots<'conversation.chat.node' | 'conversation.message.images'>
+  & PropsRenderSlots<'conversation.chat.node' | 'conversation.message.images' | 'conversation.chat.skill-preview'>
   & PropsStore<ChatStore> & ChatViewInjected & PropsLocale<'conversation'>
 
 /** Full props of the attachment plugin's composer entry. */

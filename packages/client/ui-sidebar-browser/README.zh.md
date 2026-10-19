@@ -44,7 +44,7 @@ Client 插件可以调用 `ctx.sidebarRight.openSessionTab(sessionId, 'browser',
 
 Loopback 与 localhost 指访问者的机器，不是 Gateway 或 SSH 执行目标。
 
-工具栏提供后退、前进、刷新、前往、在系统浏览器中打开，以及最右侧的逐 tab sandbox 开关。关闭 sandbox 是临时选择，并会显示警告。外部打开接受已知的 HTTP(S) 目标。tab 标题显示 Web 主机名。
+工具栏提供后退、前进、刷新、前往、在系统浏览器中打开，以及最右侧的逐 tab sandbox 开关。关闭 sandbox 是临时选择，并会显示警告。外部打开接受已知的 HTTP(S) 目标。tab 标题显示 Web 主机名。从历史恢复打开的 tab 会展示已保存地址，并提供显式「恢复页面」操作，而不会直接加载。
 
 -----
 
@@ -62,7 +62,7 @@ Loopback 与 localhost 指访问者的机器，不是 Gateway 或 SSH 执行目�
 
 Web 应用默认使用 `sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"`。frame 没有直接的下载或顶层导航 flag。popup 会脱离 sandbox；在 Web 中，逃逸的 popup 会保留 opener，并可以导航顶层应用。被访问的 origin 可以使用自身 Cookie 与 Web storage，但跨域目标无法读取 DSH DOM、storage 或 API 响应。iframe 不发送 referrer，也不添加包自有的 Permissions Policy，因此浏览器默认策略与用户授权生效。toolbar 可以为当前 tab occurrence 移除 sandbox；该选择不持久化。未受 sandbox 约束的页面可以按浏览器 activation 规则导航顶层应用，并使用下载、模态对话框和输入锁定。本包不代理或探测远程页面。
 
-Web 记录 toolbar 提交和 typed tab 打开。导航状态机把每个受控 revision 的第一次 iframe load 视为已知，把后续 load 视为页面已经变化到不可读取 URL 的证据。进入 unknown 状态后，地址会显示标记，后退、前进和外部打开会禁用，刷新则返回最后一个受控 URL。body 重挂载时会重新加载应用最后已知的 URL，并且仅在尚无受控目标时使用可选初始 URL。不产生 iframe load 的 History API 与 fragment 变化仍不可见。iframe `error` event 会显示临时加载失败 notice，直到下一个受控加载，但不会改变 URL history。
+Web 记录 toolbar 提交和 typed tab 打开。导航状态机把每个受控 revision 的第一次 iframe load 视为已知，把后续 load 视为页面已经变化到不可读取 URL 的证据。进入 unknown 状态后，地址会显示标记，后退、前进和外部打开会禁用，刷新则返回最后一个受控 URL。body 重挂载不会自行导航：它以显式恢复操作呈现应用最后已知的 URL，只有该操作或新的显式导航才会加载 iframe；typed-open 初始 URL 每个 occurrence 只消费一次。不产生 iframe load 的 History API 与 fragment 变化仍不可见。iframe `error` event 会显示临时加载失败 notice，直到下一个受控加载，但不会改变 URL history。
 
 ### Controller
 
@@ -104,7 +104,7 @@ Controller 接口不依赖 iframe API。未来的 `ElectronWebViewImpl` 可以�
 - 在 Web 中，逃逸出 sandbox 的 popup 会保留 opener，并可以通过该链导航顶层应用。本包没有原生浏览器载体。
 - 后续 iframe load 能表明发生了导航，但无法给出新的跨域 URL。History API 与 fragment 变化可能仍不可见；状态变成 unknown 后，Web 的后退与前进不可用。
 - 出于安全原因，浏览器会隐藏很多 iframe 失败：DNS、TLS、mixed-content、CSP 与 `X-Frame-Options` 失败可能触发 `load`，也可能不提供可操作 event，而不是触发 `error`。加载失败 notice 只能作为 best-effort 提示。
-- Browser history 在已验证的 principal/runtime/Session key 下跨 body 重挂载与普通页面刷新保留。身份失效会清除活动 tab，不会将其历史分配给新账号。关闭 tab 会删除其历史。已存储的 URL 在恢复前重新校验；sandbox 例外绝不持久化。
+- Browser history 在已验证的 principal/runtime/Session key 下跨 body 重挂载与普通页面刷新保留。身份失效会清除活动 tab，不会将其历史分配给新账号。关闭 tab 会删除其历史；Sidebar 卸载或热重载会保留它。已存储的 URL 在恢复前重新校验；sandbox 例外绝不持久化。
 - 本地文件会被拒绝，并继续由工作区文件预览负责。
 - 拟议的 Electron `<webview>` 载体、per-tab Cookie partition、原生 history 和 target-specific CDP 连接尚未实现。
 

@@ -40,7 +40,7 @@ async function bench() {
   runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
   const settingsScopeStub = stubSettingsScope()
   runtime.provide('settingsScope', { bind: () => settingsScopeStub.scope, developerTools: stubDeveloperTools().preference } as never)
-  const prompt = sessionFake().prompt!
+  const prompt = sessionFake().prompt
   await runtime.sessions.add({
     id: ROOT,
     summary: { title: 'R', displayTitle: 'R', cwd: '/proj' },
@@ -111,6 +111,29 @@ describe('draft initialization', () => {
     expect(b.draft(ROOT)).toBe('replaced')
     expect(b.chat(ROOT).store.getSnapshot().draft).toBe('replaced')
     await b.runtime.dispose()
+  })
+
+  it('preserves a stored structured draft until an explicit clear replaces it', async () => {
+    const b = await bench()
+    const draft = {
+      text: '@Research ',
+      references: [{
+        source: 'reference', ref: 'research-session', label: 'Research', clipboardText: '@Research',
+        offset: 0, length: 9,
+      }],
+    }
+    try {
+      b.chat(OTHER).actions.setDraft(draft)
+      b.runtime.ctx.emit('conversation/draft-initialize', { sessionId: OTHER, prompt: 'ignored' })
+      expect(b.chat(OTHER).store.getSnapshot().draft).toEqual(draft)
+      b.runtime.ctx.emit('conversation/draft-initialize', {
+        sessionId: OTHER, prompt: 'replacement', clearPreviousDraft: true,
+      })
+      expect(b.chat(OTHER).store.getSnapshot().draft).toBe('replacement')
+      expect(b.draft(OTHER)).toBe('replacement')
+    } finally {
+      await b.runtime.dispose()
+    }
   })
 
   it('refuses while a submission owns the draft', async () => {

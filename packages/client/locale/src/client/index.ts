@@ -151,7 +151,8 @@ function normalizeLanguage(input: LanguageRegistration): Readonly<LanguageRegist
 function syncDocumentLanguage(snapshot: LocaleSnapshot): void {
   // Non-browser runs (node boots of the client tree) have no document.
   if (typeof document === 'undefined') return
-  document.documentElement.lang = snapshot.active === 'zh' ? 'zh-CN' : snapshot.active
+  const language = snapshot.active === 'zh' ? 'zh-CN' : snapshot.active
+  if (document.documentElement.lang !== language) document.documentElement.lang = language
 }
 
 /**

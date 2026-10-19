@@ -24,6 +24,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { CredentialView, IApiClient, SettingsNamespaceView, SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
+import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   DeepSeekModelsEditor, modelDrafts, validateDeepSeekModels, validatePiAiModels,
 } from './DeepSeekModelsEditor.tsx'
@@ -31,7 +32,8 @@ import { apiKeyFailure } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
 import { ModelListEditor } from './ModelListEditor.tsx'
 import type { ModelDiscoveryProbe } from './ModelListEditor.tsx'
-import { deriveKeyRef, messageOf, protocolChoices } from './store.ts'
+import { deriveKeyRef, messageOf, protocolChoices, reasoningLevelChoices } from './store.ts'
+import { protocolLabel } from './protocol-label.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import type { en } from './locales.ts'
 import { ApiKeyInput } from './ApiKeyInput.tsx'
@@ -59,6 +61,14 @@ export interface ProviderEditorProps {
    * override every one of them and the card does not offer it.
    */
   declared?: boolean
+  /** Route endpoint the adapter uses when the profile sets no `baseURL`. */
+  defaultBaseURL?: string
+  /** Environment variables used to construct a provider endpoint. */
+  baseURLEnv?: readonly string[]
+  /** Authentication the route performs when the profile names no credential reference. */
+  nativeAuth?: { env: readonly string[]; oauth: boolean }
+  /** Directory-described credential states for the route's native references. */
+  credentialChecks?: Readonly<Record<string, CredentialView>>
   /** The owning namespace view (schema, layers, secrets). */
   namespace: SettingsNamespaceView
   /** Settings-owned synchronous schema and immutable path operations. */
@@ -167,7 +177,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const { namespace, schema, settingsPath, api, discoverModels, t } = props
   const [draft, setDraft] = useState<Record<string, unknown>>(() => draftAt(schema, namespace, settingsPath))
   const [keyDraft, setKeyDraft] = useState('')
-  const [keyState, setKeyState] = useState<CredentialView | undefined>(undefined)
+  const [keyStates, setKeyStates] = useState<Record<string, CredentialView>>({})
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
   const { onBusyChange } = props
@@ -185,6 +195,19 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const disabled = props.readOnly || busy
   const layout = layoutOf(namespace.ns)
   const keyRef = refFor(schema, namespace, settingsPath, props.provider, props.credentialScope ?? 'personal', props.projectId)
+  const namedRefValue = schema.getPath(fallback, ['apiKeyEnv'])
+  const namedRef = typeof namedRefValue === 'string' && namedRefValue.trim().length > 0 ? namedRefValue : undefined
+  const endpointEnv = props.baseURLEnv ?? []
+  const nativeAuth = namedRef === undefined ? props.nativeAuth : undefined
+  // A named reference is the only credential the adapter reads for this
+  // route. Without one, a catalog route authenticates the way the directory
+  // reports, and a declared route sends no key at all.
+  const authRefs = useMemo(
+    () => namedRef === undefined
+      ? (nativeAuth?.env ?? []).filter(ref => !(props.baseURLEnv ?? []).includes(ref))
+      : [namedRef],
+    [namedRef, nativeAuth, props.baseURLEnv],
+  )
   // The same schema read the create card makes, so the choices offered here
   // and there cannot drift apart: both come from the adapter's own `Config`.
   // Only the pi-ai layout has a per-route protocol for the read to find, and
@@ -193,23 +216,31 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     () => layout === 'pi-ai' ? protocolChoices(namespace, schema) : [],
     [layout, namespace, schema],
   )
+  // Only a hand-declared pi-ai route's rows edit reasoning levels — the one
+  // model list with no installed catalog behind it — so only there are the
+  // levels read out of the adapter's schema.
+  const reasoningLevels = useMemo(
+    () => layout === 'pi-ai' && props.declared === true ? reasoningLevelChoices(namespace, schema) : undefined,
+    [layout, props.declared, namespace, schema],
+  )
 
   useEffect(() => {
     let stale = false
-    setKeyState(undefined)
-    // The key state is a placeholder hint, not a precondition for editing:
+    setKeyStates({})
+    // The key states are placeholder hints, not a precondition for editing:
     // neither a business rejection nor a transport failure may reach the
     // browser as an unhandled rejection, so the card simply renders without
     // the "already configured" hint.
-    void api.credentials.describe({ refs: [keyRef] }).then(
+    void api.credentials.describe({ refs: [...new Set([keyRef, ...authRefs])] }).then(
       (response) => {
         if (stale || !response.result.ok) return
-        setKeyState(response.result.value.credentials[keyRef])
+        setKeyStates(response.result.value.credentials)
       },
       () => undefined,
     )
     return () => { stale = true }
-  }, [api.credentials, keyRef])
+  }, [api.credentials, keyRef, authRefs])
+  const keyState = keyStates[keyRef]
 
   const stringAt = (source: unknown, key: string): string | undefined => {
     const value = schema.getPath(source, [key])
@@ -391,14 +422,49 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     const models = modelDrafts(modelsOverridden ? customModels : inheritedModels())
     const defaultContextWindow = schema.getPath(fallback, ['defaultContextWindow'])
     const defaultMaxTokens = schema.getPath(fallback, ['maxTokens'])
+    const baseURL = stringAt(fallback, 'baseURL') ?? props.defaultBaseURL
+    const endpointHint = family === 'deepseek' ? t('deepSeekEndpointHint')
+      : baseURL === undefined && endpointEnv.length > 0
+        ? t('baseUrlEnvironment').replace('{env}', () => endpointEnv.join(', '))
+        : undefined
+    // Display method-neutral references without changing the adapter's lookup.
+    const visibleRefs = authRefs.filter(ref => !ref.toLowerCase().includes('oauth'))
+    const keyHint = visibleRefs[0]
+    const checkedRefs = authRefs.map(ref => [
+      ref, keyStates[ref] ?? props.credentialChecks?.[ref],
+    ] as const)
+    const detected = checkedRefs.find(([, info]) => info?.configured === true)
+    const detectedRef = detected?.[0]
+    const detectedVisibleRef = detectedRef === undefined || !visibleRefs.includes(detectedRef) ? undefined : detectedRef
+    const missingRefs = checkedRefs.length > 0 && checkedRefs.every(([, info]) => info?.configured === false)
+    const savedCredential = detected?.[1]?.source === 'file'
+      || (keyState?.configured === true && keyState.source === 'file')
+    const credentialHint = keyDraft.length > 0 || savedCredential || keyHint === undefined || props.credentialRequired === true
+      ? undefined
+      : t(detectedRef === undefined ? missingRefs ? 'keyFallbackMissing' : 'keyFallbackUnchecked'
+        : detectedVisibleRef === undefined ? 'keyFallbackDetectedHidden' : 'keyFallbackDetected')
+        .replace('{hint}', () => detectedVisibleRef ?? keyHint)
+    const keyHelp = visibleRefs.length === 0
+      ? undefined
+      : t('keyHelp').replace('{env}', () => visibleRefs.join(' / '))
+    const authHelp = keyHelp === undefined ? null : (
+      <Tooltip label={keyHelp} side="right" delayMs={0} focusDelayMs={0} portal openOnClick>
+        <button type="button" className={styles['helpButton']} aria-label={t('authHelp')}>?</button>
+      </Tooltip>
+    )
+    // A provider with no native key authentication has no key for this field to store.
+    const keylessNativeAuth = nativeAuth?.env.length === 0 && nativeAuth.oauth
     const keyPlaceholder = keyLocked
       ? t('keyEnvLocked')
-      : keyState?.configured === true && props.credentialRequired !== true
-        ? t('keyStored')
-        : family === 'pi-ai' ? t('keyPlaceholderNative') : t('keyPlaceholder')
+      : keyHint === undefined || props.credentialRequired === true
+        ? keyState?.configured === true && props.credentialRequired !== true
+          ? t('keyStored')
+          : family === 'pi-ai' ? t('keyPlaceholderNative') : t('keyPlaceholder')
+        : t(savedCredential ? 'keyPlaceholderSaved' : 'keyPlaceholderFallback').replace('{hint}', () => keyHint)
     /** What both family editors take: the rows, whose layer owns them, and the two writes. */
     const catalogProps = {
       models,
+      ...reasoningLevels === undefined ? {} : { reasoningLevels },
       overridden: modelsOverridden,
       t,
       disabled,
@@ -411,21 +477,36 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     }
     return (
       <>
-        <div className={styles['field']}>
-          <span className={styles['fieldLabel']}>{t('keyInput')}</span>
-          <ApiKeyInput
-            t={t}
-            value={keyDraft}
-            placeholder={keyPlaceholder}
-            aria-label={t('keyInput')}
-            aria-invalid={shownKeyFailure !== undefined}
-            required={props.credentialRequired === true}
-            autoFocus={props.autoFocusCredential === true}
-            disabled={disabled || keyLocked}
-            onChange={(event) => { setKeyDraft(event.target.value) }}
-          />
-          {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
-        </div>
+        {keylessNativeAuth
+          ? null
+          : (
+            <div className={styles['field']}>
+              <span className={styles['fieldLabel']}>{t('keyInput')}{authHelp}</span>
+              <ApiKeyInput
+                t={t}
+                value={keyDraft}
+                placeholder={keyPlaceholder}
+                aria-label={t('keyInput')}
+                aria-invalid={shownKeyFailure !== undefined}
+                aria-describedby={credentialHint === undefined ? undefined : `${props.provider}-credential-hint`}
+                required={props.credentialRequired === true}
+                autoFocus={props.autoFocusCredential === true}
+                disabled={disabled || keyLocked}
+                onChange={(event) => { setKeyDraft(event.target.value) }}
+              />
+              {credentialHint === undefined
+                ? null
+                : (
+                  <p
+                    id={`${props.provider}-credential-hint`}
+                    className={styles[missingRefs ? 'notice' : detectedRef === undefined ? 'advancedHint' : 'savedNotice']}
+                  >
+                    {credentialHint}
+                  </p>
+                )}
+              {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
+            </div>
+          )}
         {props.credentialOnly === true ? null : <details className={styles['customized']}>
           <summary className={styles['customizedSummary']}>{t('customized')}</summary>
           <div className={styles['customizedBody']}>
@@ -464,13 +545,19 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
                 value={stringAt(draft, 'baseURL') ?? ''}
                 placeholder={family === 'deepseek'
                   ? DEEPSEEK_PUBLIC_BASE_URL
-                  : stringAt(fallback, 'baseURL') ?? t('baseUrlDefault')}
+                  : baseURL === undefined
+                    ? t(endpointEnv.length > 0 ? 'baseUrlConfigured' : 'baseUrlDefault')
+                    : t('baseUrlPlaceholder').replace('{url}', () => baseURL)}
                 aria-label={t('baseUrl')}
+                aria-describedby={endpointHint === undefined ? undefined : `${props.provider}-endpoint-hint`}
                 disabled={disabled}
                 onChange={(event) => {
                   setField('baseURL', event.target.value === '' ? undefined : event.target.value)
                 }}
               />
+              {endpointHint === undefined
+                ? null
+                : <p id={`${props.provider}-endpoint-hint`} className={styles['advancedHint']}>{endpointHint}</p>}
             </div>
             {/* The protocol sits beside the endpoint it describes, as it does
                 on the create card. */}
@@ -492,7 +579,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
                         reader announces it either way, and an empty one is
                         announced as a choice with no identity. */}
                     {probeApi === undefined ? <option value="">{t('customApiUnset')}</option> : null}
-                    {protocols.map(choice => <option key={choice} value={choice}>{choice}</option>)}
+                    {protocols.map(choice => <option key={choice} value={choice}>{protocolLabel(t, choice)}</option>)}
                   </select>
                 </div>
               )

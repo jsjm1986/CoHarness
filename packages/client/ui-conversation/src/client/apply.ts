@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
 import type { ViewTab } from './contract/views.ts'
 import type {
-  ApprovalInjected, ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
+  ApprovalInjected, ApprovalWait, ChatNodeInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
   ComposerChainProps, ConversationInjected,
   ConversationViewportInjected, ConversationSessionHeaderInjected, ConversationSessionInjected, MessageImageLoader,
   DetailsInjected, WorkspaceSelectionOptions,
@@ -31,6 +31,7 @@ import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './input/blocks.ts'
 import { InputHub } from './input/hub.ts'
+import { readPersistedDraft } from './input/persisted-draft.ts'
 import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
 import { InputBar } from './skeleton/InputBar.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
@@ -52,6 +53,7 @@ import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
+import { bindDisclosure, bindDisclosureReset } from './chat/use-disclosure.ts'
 import { CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_TRANSCRIPT_VIEW_MODE, type ConversationSettings } from '../submission-settings.ts'
 import { ConversationDisplaySettings } from './display-settings.ts'
 import { TranscriptViewPolicy } from './transcript-view.ts'
@@ -127,9 +129,9 @@ const ABSENT_POLICY = {
   subscribe: () => () => {},
 }
 
-const CHAT_NODE_INJECT: ChatNodeTurnDataInjected = {
+const CHAT_NODE_INJECT: ChatNodeInjected = {
   hooks: {
-    turnData: ({ useSession }, nodeKey) => function useTurnData(key) {
+    turnData: ({ useSession }, { nodeKey }) => function useTurnData(key) {
       return useSession((snapshot) => {
         const location = snapshot.chat.nodes.get(nodeKey)?.location
         return location?.kind === 'turn' || location?.kind === 'step'
@@ -137,6 +139,8 @@ const CHAT_NODE_INJECT: ChatNodeTurnDataInjected = {
           : undefined
       })
     },
+    disclosure: (_standard, { disclosureReset }) => bindDisclosure(disclosureReset),
+    disclosureReset: (_standard, { disclosureReset }) => bindDisclosureReset(disclosureReset),
   },
 }
 
@@ -413,8 +417,10 @@ export function apply(ctx: Context): void {
       // The existing draft is the live shell text when present, else the
       // persisted owner — an empty shell not yet seeded from the store does
       // not make a preserved draft adoptable.
+      const stored = readPersistedDraft(chat.store.getSnapshot().draft)
       const current = shell === undefined || shell.snapshot.draft === ''
-        ? chat.store.getSnapshot().draft : shell.snapshot.draft
+        ? typeof stored === 'string' ? stored : stored.text
+        : shell.snapshot.draft
       const next = options.clearPreviousDraft === true ? options.prompt ?? ''
         : options.prompt !== undefined && current === '' ? options.prompt : undefined
       if (next === undefined) return
@@ -553,7 +559,7 @@ export function apply(ctx: Context): void {
       return {
         views,
         releaseSessionImages: (id) => { conversation.releaseSessionImages(id) },
-        bindDraftMirror: write => inputHub.shell(sessionId).bindMirror(write),
+        bindDraftMirror: (write, initialDraft) => inputHub.shell(sessionId).bindMirror(write, initialDraft),
       }
     },
   }, ConversationSession)
@@ -731,6 +737,7 @@ export function apply(ctx: Context): void {
     children: {
       'conversation.chat.node': { kind: 'keyed', scope: 'session', inject: CHAT_NODE_INJECT },
       'conversation.message.images': { kind: 'single', scope: 'session' },
+      'conversation.chat.skill-preview': { kind: 'single', scope: 'session' },
     },
     store: chatStore,
     inject: (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ChatViewInjected => {

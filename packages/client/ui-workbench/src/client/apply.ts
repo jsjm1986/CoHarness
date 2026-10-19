@@ -1,5 +1,5 @@
 /** Contributes workbench controls without importing the conversation renderer. */
-import { WorkspaceResourceError, clientSessionKey, commitSessionNavigation, parseClientSessionKey, parseWorkspaceResourceAddress, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
+import { WorkspaceResourceError, clientSessionKey, commitSessionNavigation, parseClientSessionKey, parseWorkspaceResourceAddress, resolveWorkspacePath, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest, WorkspaceResourceSource } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, ConversationViewport, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -20,8 +20,8 @@ import { en as markdownEn, zh as markdownZh } from './markdown/locales.ts'
 import { en as htmlEn, zh as htmlZh } from './html/locales.ts'
 import { en as excelEn, zh as excelZh } from './excel/locales.ts'
 import { Config } from '../config.ts'
-import { createReadHtmlRelative } from './html/read-relative.ts'
-import { packHtml } from './html/pack.ts'
+import { createReadHtmlRelative } from './contract/html/read-relative.ts'
+import { packHtml } from './contract/html/pack.ts'
 import { createHtmlDocument } from './html/bootstrap.ts'
 import { en, NS, zh } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -106,6 +106,16 @@ export function apply(ctx: ClientContext): void {
           runtimeTarget: runtimeTarget(),
         })
       }
+      // The authorized native-open path, mirroring the conversation's openFile
+      // gate: only a base loopback Host that declares canOpenPath can hand the
+      // Workspace path to a native desktop. The capability is re-read per call
+      // so a post-mount handshake or reconnect flips the action's visibility.
+      const nativeCapable = (): boolean => {
+        const description = connection?.hostDescription.getSnapshot()
+        return connection !== undefined && connection.isLoopback
+          && runtimeTarget().kind === 'base'
+          && description?.executionAuthorityRequired === false && description.canOpenPath
+      }
       return {
         ...createWorkspacePreviewReaders(connection),
         pdfT: ctx.locale.bind('sidebarPdf'),
@@ -118,6 +128,17 @@ export function apply(ctx: ClientContext): void {
         reloadResource: request => ctx.workspaceResources.source(request).reload(),
         revokeResource: (request, message) => {
           ctx.workspaceResources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
+        },
+        nativeOpenAvailable: nativeCapable,
+        openNativePath: async (request) => {
+          const target = runtimeTarget()
+          if (target.kind !== request.runtimeTarget.kind
+            || (target.kind === 'project' && request.runtimeTarget.kind === 'project' && target.projectId !== request.runtimeTarget.projectId)) {
+            throw new WorkspaceResourceError('access-revoked', 'Workspace resource runtime no longer owns this Session')
+          }
+          if (!nativeCapable()) throw new Error('native path opening is unavailable in this application')
+          const cwd = ctx.sessions.list.getSnapshot().byId[request.sessionId]?.cwd
+          await ctx.workspaces.openPath(resolveWorkspacePath(cwd, request.path))
         },
         renderHtml: async (data, read, request, lifetime, signal) =>
           createHtmlDocument(await packHtml(data, createReadHtmlRelative(read, request, lifetime), signal)),

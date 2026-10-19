@@ -550,11 +550,45 @@ export interface LegacyConversationSlice {
   readonly runningCalls: readonly RunningToolCall[]
 }
 
+/** One Node or a renderer-owned part of that Node inside a process group. */
+export interface ChatGroupMember {
+  readonly key: string
+  /** When set, only this part of the Node renders for the member seat (reasoning vs reply). */
+  readonly groupPart?: 'reasoning' | 'response'
+}
+
+/** Stable snapshot of one process group; member Nodes remain in {@link ChatNodeStore}. */
+export interface ChatGroupSnapshot {
+  readonly key: string
+  readonly members: readonly ChatGroupMember[]
+  /** Group-owner payload; consumers narrow it to the business data they registered. */
+  readonly data: unknown
+}
+
+/** Stable live reader over the current process groups. */
+export interface ChatGroupStore {
+  /** @param key - group identity. @returns the current group snapshot, absent after removal. */
+  get(key: string): ChatGroupSnapshot | undefined
+}
+
+/**
+ * Root render units in presentation order. A `node` entry renders one row
+ * (optionally one part of a split Node); a `group` entry renders the process
+ * disclosure that owns its member rows.
+ */
+export type ChatFlowEntry =
+  | { readonly kind: 'node'; readonly key: string; readonly groupPart?: 'reasoning' | 'response' }
+  | { readonly kind: 'group'; readonly key: string }
+
 /** Incremental Chat publication with immutable order and stable live keyed readers. */
 export interface ChatSnapshot {
   readonly order: readonly string[]
   readonly nodes: ChatNodeStore
   readonly locations: ChatLocationNodeIndex
+  /** Root flow units in presentation order; covers every key in {@link order} either directly or as a group member. */
+  readonly entries: readonly ChatFlowEntry[]
+  /** Process groups referenced by {@link entries}; stable live reader like {@link nodes}. */
+  readonly groups: ChatGroupStore
   /** Stable live navigation projection for the loaded conversation turns. */
   readonly navigation: ChatTurnNavigationIndex
   readonly timeline: ConversationTimelineSnapshot
@@ -579,6 +613,10 @@ export const EMPTY_CHAT_SNAPSHOT: ChatSnapshot = {
   locations: {
     getTurn: () => EMPTY_LIST,
     getStep: () => EMPTY_LIST,
+  },
+  entries: EMPTY_LIST,
+  groups: {
+    get: () => undefined,
   },
   navigation: {
     items: () => EMPTY_LIST,
@@ -649,7 +687,8 @@ export interface ConversationSnapshot {
    * Mirrors the host summary's derived blank bit: seeded from `session.list`
    * / the `host/session-added` frame, converted by the first visible event,
    * and re-aligned by every list re-pull (the summary stays authoritative).
-   * Blank sessions are hidden from session lists and reused by New Session.
+   * Blank sessions are hidden from session lists and reused by Workspace
+   * reconnection; a bare New Session mints a fresh one.
    */
   blank: boolean
   lastAgentError: string | null

@@ -11,6 +11,7 @@ import { DeveloperToolsRow } from '../src/client/DeveloperToolsRow.tsx'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { SettingsDocumentStore } from '../src/client/settings-document-store.ts'
+import { HostReleasePrompt, type HostReleasePromptProps } from '../src/client/HostReleasePrompt.tsx'
 
 /** Store over a real mirror derived from the same fake wire. */
 function derivedDocumentStore(api: object) {
@@ -198,5 +199,57 @@ describe('SettingsDocumentAction', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open configuration file' }))
     expect((await screen.findByRole('alert')).textContent).toBe('Could not open configuration file')
     expect(screen.getByRole('button', { name: 'Open configuration file' })).toBeTruthy()
+  })
+})
+
+describe('Host release change confirmation', () => {
+  type Release = { version: string; commit?: string }
+  type Change = { page: Release | undefined; previous: Release | undefined; host: Release | undefined } | undefined
+  function prompt(change: Change) {
+    const dismissRelease = vi.fn()
+    const reloadPage = vi.fn()
+    const props: HostReleasePromptProps = {
+      ...kit,
+      t: key => (en as Record<string, string>)[key] ?? key,
+      useReleaseChange: select => select(change),
+      dismissRelease,
+      reloadPage,
+    }
+    return { dismissRelease, reloadPage, view: render(<HostReleasePrompt {...props} />) }
+  }
+
+  it('stays hidden while no release change is announced', () => {
+    prompt(undefined)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows the service and page transitions and either reloads or keeps the page', () => {
+    const { dismissRelease, reloadPage } = prompt({
+      page: { version: '0.2.1' }, previous: { version: '0.2.2' }, host: { version: '0.2.3', commit: 'abc1234' },
+    })
+    const dialog = screen.getByRole('dialog', { name: 'Service version changed' })
+    // Changed versions show only the versions.
+    expect(dialog.textContent).toContain('Service0.2.20.2.3Page0.2.10.2.3')
+    expect(dialog.textContent).toContain(en['hostRelease.description'])
+    // The dialog opens without a user gesture; initial focus keeps the page.
+    expect(document.activeElement?.textContent).toBe('Not now')
+    fireEvent.click(screen.getByRole('button', { name: 'Reload to load the new version' }))
+    expect(reloadPage).toHaveBeenCalledOnce()
+    expect(dismissRelease).not.toHaveBeenCalled()
+    const keep = screen.getAllByRole('button', { name: 'Not now' })
+    // The footer action and the dialog's close control both keep the page.
+    expect(keep).toHaveLength(2)
+    for (const button of keep) fireEvent.click(button)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(dismissRelease).toHaveBeenCalledTimes(3)
+  })
+
+  it('shows commits for a transition within one version and labels what the Host did not publish', () => {
+    prompt({
+      page: { version: '0.2.0' },
+      previous: { version: '0.2.1', commit: 'aaaaaaa' },
+      host: { version: '0.2.1', commit: 'bbbbbbb' },
+    })
+    expect(screen.getByRole('dialog').textContent).toContain('Serviceaaaaaaabbbbbbb' + 'Page0.2.00.2.1')
   })
 })

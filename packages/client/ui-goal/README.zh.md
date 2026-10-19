@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "在 Web 输入框上方查看、编辑、暂停、恢复和清除会话目标。"
 kind: "package-reference"
 ---
 
@@ -7,21 +7,61 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-Goal 界面插件（浏览器端部分）：`GoalBar` 条带是 `conversation.input.dock` composer 上下文堆栈中的第二张独立卡片（order 10，位于 Todo 之后、Queue 之前）。活值经 `useProjection('goal')` 到达——host 计算的全量值由历史尾页播种、由 `session/projection` 帧更新——因此本插件不持有领域 store、不设刷新链、不挂事件监听。slot 注入面只携带四个变更动词（edit / pause / resume / clear，经 `ctx.remote.goals` 调用——active 的 goal 提供暂停动作，paused 的提供恢复；编辑在 ui-primitives 的 `InlineEditor` 增高文本域中重写目标文本，Enter 保存，Shift+Enter 换行，Escape 取消）；每个动词在调用时从会话当前投影值读取 CAS ref，并将 Remote 调用的拒绝错误内联呈现。由于 React 的 pending 渲染无法拦住同一帧内的点击，横条会同步为变更建立 single-flight 防护；清除成功后，会立即抑制该 goal id 对应的目标显示，直到权威的 null 投影追上。goal 的创建仍归 `/goal` host 命令；加载中、无 goal、已完成和已成功清除的 goal 一律不渲染。
-
-该插件还会通过自有 Conversation Definition 投影每条持久 `/goal` `command/run`。它在通用命令结果 Node 之前构建一个 `command-input` Chat Node，并为该 Node 注册 keyed renderer；renderer 将其呈现为右对齐的用户样式气泡，使用本地化分组名称 `Command input`／`命令输入`，且不含时间戳、复制或分支操作；行首 `/goal` token 经 ui-primitives `projectUserText` 呈现为代码字体的命令引用 chip，目标正文则在用户气泡字号轴上保持普通文本。可见的非命令 Node 会激活新 Chat；重新加载时会根据 run 重建该 Node，而仅包含 `command/done` 的历史窗口只保留通用结果行。该投影绝不会创建 `user/message` 或模型轮次。
-
-`/client` 的导出接口包括插件本体（`apply`/`inject`）、`GoalBar`/`GoalDock` 组件与注入动词面类型。
-
 ## 概述
 
-Web GUI 的 goal 界面同时显示持久 goal 状态及当前的进程本地激活状态，供用户编辑、暂停、恢复或清除 goal；被拒绝的变更所产生的错误会内联显示。它把持久的 `/goal` 运行显示为 `Command input` 气泡，让用户或模型发出的命令在重新加载后仍然可见。goal 创建仍不归本包。除 `minimal` 外，随附的 Web preset 都会向 agent（智能体）提供 `/goal`。
+在 Web 输入框上方查看会话目标，并编辑、暂停、恢复或清除它。目标栏区分正在运行的活动目标与需要重新激活的目标，并内联显示被拒绝的变更。重新加载后，已记录的目标命令仍然可见。通过 Host 的 `/goal` 命令创建目标。
 
 ## 目录
 
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步阅读](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
+
+-----
+
+<a id="use-this-package"></a>
+## 使用本包
+
+本插件与会话输入框和 Host 目标服务配合使用。标准 Web 组合提供其浏览器依赖；本包没有配置字段。
+
+目标栏位于 Todo 之后、Queue 之前。加载中、无目标、已完成及已成功清除的目标均不渲染。已激活的活动目标提供暂停操作；未激活的活动目标与已暂停目标提供恢复操作。活动目标的激活状态未知时，暂停仍可用，因为 Host 可以凭当前目标修订暂停任一激活状态下的目标。
+
+编辑使用可增长文本框：Enter 保存，Shift+Enter 换行，Escape 取消。同一时刻只执行一个变更。被拒绝的变更内联显示；清除成功后立即隐藏该目标，等待持久投影更新。
+
+已记录的 `/goal` 命令显示为右对齐的 `命令输入` 气泡，不含时间戳、复制或分支操作。命令 token 使用引用样式，目标正文保留普通文本样式。重放这些条目不会再次提交用户消息，也不会启动模型轮次。
+
+-----
+
+<a id="understand-the-implementation"></a>
+## 理解实现
+
+<details>
+<summary>实现细节——点击展开</summary>
+
+Session 投影提供持久目标状态。私有可观察源通过 Remote 读取和事件提供进程内激活状态，仅在目标栏被观察时订阅。挂载、投影变化、连接重置和运行状态变化都会触发读取；更新的事件或目标修订会使较早的读取失效。连接重置或恢复观察时会清除缓存的激活状态，直到收到当前读取结果或事件。
+
+变更回调在调用时读取当前 CAS ref。同步变更保护覆盖 React 渲染 pending 状态之前的点击。目标命令的 Conversation Definition 根据持久运行记录重建面向用户的命令条目；仅包含完成数据的历史窗口保留通用结果行。
+
+| 源码 | 职责 |
+|---|---|
+| [index.ts](src/client/index.ts) | Slot 贡献、Remote 回调和框架绑定的激活状态源。 |
+| [activation-source.ts](src/client/activation-source.ts) | 读取排序、事件更新和订阅生命周期。 |
+| [GoalBar.tsx](src/client/GoalBar.tsx) | 目标操作与内联编辑。 |
+| [goal-command-input.ts](src/client/goal-command-input.ts) | 持久命令的展示。 |
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## 进一步阅读
+
+- [会话界面](../ui-conversation/README.zh.md)——输入框与命令条目。
+- [目标服务](../../goal/goal/README.zh.md)——阶段、激活状态和修订校验。
+- [目标参考](../../../docs/subsystems/goal.zh.md)——共享类型与 Remote 操作。
 
 -----
 
@@ -34,10 +74,14 @@ Web GUI 的 goal 界面同时显示持久 goal 状态及当前的进程本地激
 
 除非已排队的 goal 上下文获准，否则没有影响。获准的上下文会像其他消息一样扩展历史尾部；准入前被丢弃的插入项不会影响缓存。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
-- **只反映持久 phase**——投影省略进程本地 activation，因此条带无法区分 active-but-disarmed 与 armed 状态；resume 通过 RPC 重新置为 armed 状态。不存在 host 实时 activation 通道。
+<a id="known-limitations-and-deferred-work"></a>
+
+激活状态的确认依赖存活的 Host。
+
+- 首次或重置后的读取失败时，激活状态保持未知。暂停仍可用；恢复要求目标已暂停，或已确认其处于未激活状态。后续事件或成功读取会提供当前激活状态。
+- 同一连接与目标修订内的普通刷新若读取失败，会保留最后已知的激活状态。
 
 <a id="dev-note"></a>
 ### 开发备注

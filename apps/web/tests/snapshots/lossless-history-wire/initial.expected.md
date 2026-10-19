@@ -4,18 +4,82 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
+  - button "Jump to turn 3"
+  - button "Jump to turn 4"
   - button "Jump to turn 5"
   - button "Jump to turn 6"
   - button "Jump to turn 7"
   - button "Jump to turn 8"
 - button "Load earlier"
+- text: WIRE_USER_03
+- group "Message time and speed": "{{date}} {{clock}}"
+- button "Copy":
+  - img
+- status: Completed
+- button "Completed":
+  - text: Completed
+  - img
+- button "Analysis completed"
+- button "Thinking WIRE_REASONING_03":
+  - img
+  - img
+  - text: Thinking WIRE_REASONING_03
+- paragraph: WIRE_ASSISTANT_03
+- text: <!--文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文-->
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Message time and speed": "{{date}} {{clock}}"
+- text: WIRE_USER_04
+- group "Message time and speed": "{{date}} {{clock}}"
+- button "Copy":
+  - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
+- button "Thinking WIRE_REASONING_04":
+  - img
+  - img
+  - text: Thinking WIRE_REASONING_04
+- paragraph: WIRE_ASSISTANT_04
+- text: <!--文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文-->
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - text: WIRE_USER_05
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_05":
   - img
   - img
@@ -30,14 +94,23 @@
   - img
 - button "Branch into a new conversation":
   - img
-- group "Message time and speed": "{{date}} {{clock}}"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
+- button "Usage 450 tok · Cache hit 75%":
   - img
+  - text: Usage 450 tok · Cache hit 75%
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - text: WIRE_USER_06
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_06":
   - img
   - img
@@ -60,18 +133,21 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 tool call · 2 intermediate messages" [expanded]:
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - text: WIRE_USER_TOOL
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_TOOL_CALL":
   - img
   - img
   - text: Thinking WIRE_REASONING_TOOL_CALL
 - paragraph: WIRE_ASSISTANT_TOOL_CALL
+- button "Ran commands"
 - button "Bash Verify history wire pagination" [expanded]:
   - img
   - text: Bash Verify history wire pagination
@@ -103,13 +179,13 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - text: WIRE_USER_INTERRUPTED
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Stopped
+- button "Stopped" [disabled] [expanded]
+- button "Analysis completed"
 - button "Thinking WIRE_INTERRUPTED_REASONING":
   - img
   - img

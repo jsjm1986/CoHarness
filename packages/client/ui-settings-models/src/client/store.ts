@@ -39,6 +39,13 @@ export interface ProviderRow {
    * dormant and keyless rows, matching the editor's derivation rule.
    */
   derivedCredential?: CredentialView
+  /**
+   * Described state for each catalog-declared native authentication reference
+   * of a keyless row — the environment names the route authenticates with
+   * while the profile names no credential. Endpoint-construction variables
+   * (`baseURLEnv`) are excluded.
+   */
+  credentialChecks?: Record<string, CredentialView>
   /** Models the current runtime policy permits through this route. */
   models: readonly ModelProviderGroup['models'][number][]
   /** Provider catalog failure, when model listing failed for this route. */
@@ -130,10 +137,46 @@ export function protocolChoices(
 }
 
 /**
+ * The reasoning levels a hand-declared route's models may declare, read out of
+ * the owning namespace's own schema for the same reason as
+ * {@link protocolChoices}: the levels the page offers and the keys the
+ * adapter accepts in `reasoningEfforts` come from the same `Config`.
+ * @param namespace - the namespace view whose schema declares the profile shape.
+ * @param schema - settings schema operations.
+ * @returns the levels in the schema's escalation order, or an empty list when the schema has none.
+ */
+export function reasoningLevelChoices(
+  namespace: SettingsNamespaceView | undefined,
+  schema: SettingsSchemaOperations,
+): string[] {
+  if (namespace === undefined) return []
+  const path = ['providers', PROBE_ROUTE, 'models', '0', 'reasoningEfforts']
+  const node = schema.nodeAtPath(schema.rehydrate(namespace.schema), path)
+  // `false | { [level]: value }`: the dict branch's key schema lists the levels.
+  const branches = (node as { list?: readonly { type?: string; sKey?: unknown }[] } | undefined)?.list ?? []
+  const keys = branches.find(branch => branch.type === 'dict')?.sKey as { list?: readonly { value?: unknown }[] } | undefined
+  return (keys?.list ?? []).map(entry => entry.value).filter((value): value is string => typeof value === 'string')
+}
+
+/**
+ * The environment references a keyless route authenticates with natively —
+ * the catalog's declared `nativeAuth.env` names minus any that construct the
+ * endpoint rather than carry a credential.
+ * @param entry - the directory row to inspect.
+ * @returns the native credential references, possibly empty.
+ */
+function nativeAuthRefsOf(entry: ConfigurableProviderView): string[] {
+  const endpoint = entry.baseURLEnv ?? []
+  return (entry.nativeAuth?.env ?? []).filter(ref => !endpoint.includes(ref))
+}
+
+/**
  * The credential reference the page derives for a keyless row, under the
  * ownership scope the directory entry itself declares. External routes owe
  * this page no credential, and a project route without its project id cannot
  * name one — both contribute nothing to the describe.
+ * @param entry - the directory row to inspect.
+ * @returns the derived credential reference, or undefined when none applies.
  */
 function derivedKeyRefOf(entry: ConfigurableProviderView): string | undefined {
   if (entry.management === 'external') return undefined
@@ -252,7 +295,7 @@ export class ModelsSettingsStore {
     const refs = [...new Set(rows.flatMap((row) => {
       if (row.apiKeyEnv !== undefined) return [row.apiKeyEnv]
       const derived = derivedKeyRefOf(row.entry)
-      return derived === undefined ? [] : [derived]
+      return [...derived === undefined ? [] : [derived], ...nativeAuthRefsOf(row.entry)]
     }))]
     let credentials: Record<string, CredentialView> = {}
     let credentialError: string | null = null
@@ -281,10 +324,15 @@ export class ModelsSettingsStore {
         const named = row.apiKeyEnv === undefined ? undefined : credentials[row.apiKeyEnv]
         const derivedRef = row.apiKeyEnv === undefined ? derivedKeyRefOf(row.entry) : undefined
         const derived = derivedRef === undefined ? undefined : credentials[derivedRef]
+        const nativeRefs = row.apiKeyEnv === undefined ? nativeAuthRefsOf(row.entry) : []
+        const credentialChecks = Object.fromEntries(
+          nativeRefs.flatMap(ref => credentials[ref] === undefined ? [] : [[ref, credentials[ref]]] as const),
+        )
         return {
           ...row,
           ...named === undefined ? {} : { credential: named },
           ...derived === undefined ? {} : { derivedCredential: derived },
+          ...nativeRefs.length === 0 ? {} : { credentialChecks },
         }
       })
       s.namespaces = namespaces

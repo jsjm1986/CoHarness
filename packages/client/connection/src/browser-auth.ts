@@ -3,6 +3,13 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider, CredentialRecord } from '@deepseek-ai/dsh-credentials'
+import {
+  INTERACTIONS_HEADER,
+  INTERACTIONS_QUERY,
+  LAUNCH_TOKEN_QUERY,
+  parseInteractions,
+  type ConnectionInteractions,
+} from '@deepseek-ai/dsh-host-apiproxy/api/interactions'
 import type {
   ConnectionIndexRequest,
   ConnectionIndexResponse,
@@ -12,7 +19,7 @@ import type {
 const AUTH_RECORD_KEY = credentialKey('client-connection', 'browser-session')
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000
 const SECRET_BYTES = 32
-const TOKEN_QUERY = 'token'
+const TOKEN_QUERY = LAUNCH_TOKEN_QUERY
 const COOKIE_PREFIX = 'dsh-auth-'
 const COOKIE_PAYLOAD_VERSION = 1
 const STORED_SECRET_VERSION = 1
@@ -102,6 +109,14 @@ function tokenMatches(actual: string, expected: string): boolean {
   const actualBytes = Buffer.from(actual, 'utf8')
   const expectedBytes = Buffer.from(expected, 'utf8')
   return actualBytes.byteLength === expectedBytes.byteLength && timingSafeEqual(actualBytes, expectedBytes)
+}
+
+/** Read the Bearer credential out of one Authorization header, or undefined when the scheme is not Bearer. */
+function bearerToken(authorization: string | undefined): string | undefined {
+  if (authorization === undefined) return undefined
+  const at = authorization.indexOf(' ')
+  if (at === -1 || authorization.slice(0, at).toLowerCase() !== 'bearer') return undefined
+  return authorization.slice(at + 1).trim()
 }
 
 function cookieName(authority: string): string {
@@ -297,6 +312,50 @@ export class BrowserAuth {
     if (this.isAuthenticated(req, secure)) return true
     this.writeUnauthorized(req, res)
     return false
+  }
+
+  /**
+   * Verify a non-cookie operator credential: the process launch token
+   * presented as an `Authorization: Bearer` header or the `?token=` query of
+   * the request URL — the same credential the index exchange redeems, held
+   * by programmatic connections that never mint a cookie — plus the optional
+   * `x-dsh-interactions`/`?interactions=` mode declaration.
+   * @param request - request headers and URL.
+   * @returns the declared mode or 'none' when the credential is valid,
+   *   'invalid' for a mismatched token or a malformed mode declaration, or
+   *   undefined when no operator credential is present.
+   */
+  operatorInteractions(request: ConnectionIndexRequest): ConnectionInteractions | 'invalid' | undefined {
+    const bearer = bearerToken(header(request.headers, 'authorization'))
+    const url = new URL(request.url ?? '/', 'http://dsh.invalid')
+    const token = bearer ?? url.searchParams.get(TOKEN_QUERY) ?? undefined
+    if (token === undefined || token === '') return bearer === '' ? 'invalid' : undefined
+    if (!tokenMatches(token, this.launchToken)) return 'invalid'
+    const declared = parseInteractions(
+      header(request.headers, INTERACTIONS_HEADER) ?? url.searchParams.get(INTERACTIONS_QUERY) ?? undefined,
+    )
+    if (declared === 'invalid') return 'invalid'
+    // The launch credential admits a non-page connection; its interaction
+    // participation defaults to 'none' until the client declares otherwise.
+    return declared ?? 'none'
+  }
+
+  /**
+   * Resolve the interaction scope one admitted request binds: a valid
+   * declared mode wins; otherwise a valid operator credential defaults to
+   * 'none' and every other request keeps the historical full 'answer'
+   * participation.
+   * @param request - accepted request headers and URL.
+   * @returns the mode the request scope binds for this dispatch.
+   */
+  scopeInteractions(request: ConnectionIndexRequest): ConnectionInteractions {
+    const url = new URL(request.url ?? '/', 'http://dsh.invalid')
+    const declared = parseInteractions(
+      header(request.headers, INTERACTIONS_HEADER) ?? url.searchParams.get(INTERACTIONS_QUERY) ?? undefined,
+    )
+    if (declared !== undefined && declared !== 'invalid') return declared
+    const operator = this.operatorInteractions(request)
+    return operator === undefined || operator === 'invalid' ? 'answer' : operator
   }
 
   /**

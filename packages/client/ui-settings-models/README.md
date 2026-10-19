@@ -45,6 +45,8 @@ A pi-ai profile's `models` list is edited on the card: one row per model showing
 
 **Add a custom provider** declares a route pi-ai does not ship. It is its own card rather than the editor with extra fields, because the route id is being chosen here and the settings address does not exist until it is: one `settings.mutate` sets the whole profile at `providers.<route>`, and the key travels separately through `credentials.set`. Provider IDs are accepted as non-empty names without a catalog or shell-identifier restriction; the `org-` and `project-` namespaces remain reserved for managed routes, credential references are derived independently, and unusual names receive a stable suffix. The create button still requires an endpoint, a supported protocol, and at least one uniquely identified model because those are the minimum facts the adapter needs to route a request. Capacities do not gate it: the adapter's fallbacks size a model the endpoint described by id alone. The protocol choices come from the namespace schema, so they stay aligned with the adapter. Leaving the key blank preserves provider-native authentication. When a profile write succeeds but the key write fails, the provider remains visible and the retry writes only the credential.
 
+Custom provider URLs are trimmed and must be absolute HTTP or HTTPS addresses. An invalid value blocks both creation and model discovery before either request is sent.
+
 <a id="model-experience"></a>
 ## Model Experience
 

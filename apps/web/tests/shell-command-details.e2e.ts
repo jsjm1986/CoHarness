@@ -14,7 +14,7 @@ import { expectCommandFocusAfterResize, expectSelectableCommandText } from './te
 
 const COMMAND = 'node ./scripts/start-worker.mjs --workspace=/tmp/diagnostics/long-workspace-name-for-background-command-details --log-level=debug --trace-tag=background-shell-full-command-selection --include=worker,lifecycle,transport,subscriptions --output=/tmp/diagnostics/background-worker.log'
 const ARGS = { command: COMMAND, description: 'Start the diagnostic worker', run_in_background: true }
-const OUTPUT = 'started background job bash-1'
+const OUTPUT = 'started background job bash-831c2f23f4114e9e'
 const EXPECTED = fileURLToPath(new URL('./snapshots/shell-command-details/background.expected.md', import.meta.url))
 
 /** A settled background launch acknowledgement rendered from durable call arguments. */

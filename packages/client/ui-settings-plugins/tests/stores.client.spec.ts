@@ -17,11 +17,13 @@ function acceptWrites<T>(host: StubSettingsScope<T>): void {
   const layer = (): Record<string, unknown> => ({ ...host.scope.getSnapshot().user as object })
   host.set.mockImplementation((field: string, value: unknown) => {
     host.publish({ value: { ...section(), [field]: value } as T, user: { ...layer(), [field]: value } })
+    return Promise.resolve()
   })
   host.unset.mockImplementation((field: string) => {
     const user = Object.fromEntries(Object.entries(layer()).filter(([key]) => key !== field))
     const base = host.scope.getSnapshot().base as Record<string, unknown> | undefined
     host.publish({ value: { ...section(), [field]: base?.[field] } as T, user })
+    return Promise.resolve()
   })
 }
 
@@ -454,7 +456,7 @@ function acceptScopeWrites<T>(host: StubSettingsScope<T>): void {
   host.set.mockImplementation((field: string, value: unknown) => {
     const user = { ...(host.scope.getSnapshot().user as Record<string, unknown> | undefined), [field]: value }
     const value_ = { ...(host.scope.getSnapshot().value as Record<string, unknown> | undefined), [field]: value }
-    host.publish({ user: user as T, value: value_ as T })
+    host.publish({ user, value: value_ as T })
     return Promise.resolve()
   })
   host.unset.mockImplementation((field: string) => {
@@ -462,7 +464,7 @@ function acceptScopeWrites<T>(host: StubSettingsScope<T>): void {
     const value_ = { ...(host.scope.getSnapshot().value as Record<string, unknown> | undefined) }
     Reflect.deleteProperty(user, field)
     Reflect.deleteProperty(value_, field)
-    host.publish({ user: user as T, value: value_ as T })
+    host.publish({ user, value: value_ as T })
     return Promise.resolve()
   })
 }

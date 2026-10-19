@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "对话输入、消息和 Trajectory 图片的附件展示插件"
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-对话 UI 的动态附件呈现插件。它通过 `ctx.slots.inject` 等待 conversation 包声明 `conversation.input.attachments` 与 `conversation.message.images`，随后注册输入框草稿图片栏、文档拖放目标、聊天历史图片画廊和原图灯箱。conversation slot 持有方提供附件数据、图片加载、回调及其命名空间翻译器；呈现组件保持纯 props，且不从包入口导出。
+对话 UI 的动态附件呈现插件。它通过 `ctx.slots.inject` 等待 conversation 和 Trajectory 包声明 `conversation.input.attachments`、`conversation.message.images`、`conversation.details.images` 与 `conversation.trajectory.images`，随后注册输入框草稿图片栏、文档拖放目标、历史图片画廊和原图灯箱。各 slot 持有方提供附件数据、图片加载与回调，框架绑定 conversation 命名空间翻译器。呈现组件保持纯 props，且不从包入口导出。
 
 只有活动对话面板处理 document 级文件拖放事件；选择器回调始终保留打开它的 Session。
 

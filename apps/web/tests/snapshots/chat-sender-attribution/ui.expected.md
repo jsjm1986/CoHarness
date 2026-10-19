@@ -1,13 +1,12 @@
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: Zhou ZHOU_PROMPT
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: ZHOU_REPLY
 - button "Copy":
   - img
@@ -22,13 +21,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: Lin Admin LIN_PROMPT
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: LIN_REPLY
 - button "Copy":
   - img

@@ -470,7 +470,7 @@ describe('WorkspaceBrowser', () => {
       useWorkspaces: hook(workspaceState([workspace('alpha', [newest.id, ...items.map(item => item.id)])])),
     })
     act(() => {
-      b.store.actions.setSessionOrder('alpha', [newest.id as string, ...items.map(item => item.id as string)])
+      b.store.actions.setSessionOrder('alpha', [newest.id, ...items.map(item => item.id)])
     })
     // The watermark remembers a row count, so the pushed-down row folds.
     expect(screen.getByText('session-8')).toBeTruthy()

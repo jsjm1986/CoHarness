@@ -60,7 +60,7 @@ import SessionStore, {
   type SessionEvent,
   type SessionHeader,
 } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
 import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 // Empty type imports carry the webServer/agents/sessionPersistence Context merges.
@@ -70,7 +70,7 @@ import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { REPO_ROOT, requireDist } from './support.ts'
 
 import { webSnapshotMode, type WebSnapshotMode } from './expected.ts'
-import { normalizeAria } from './aria-normalize.ts'
+import { normalizeAria, type AriaPathDecl } from './aria-normalize.ts'
 export { webSnapshotMode, compareOrRefreshGolden } from './expected.ts'
 
 /** The shipped composition under test: the dsh-base and dsh-web-app bundle patches over the empty profile root. */
@@ -102,6 +102,13 @@ const REPLAY_PROVIDERS = [{
     },
   ],
 }]
+
+// Mirrored from packages/client/ui-settings-models/src/onboarding-copy.ts; the
+// scaffold inlines them so the test harness stays independent of the client
+// package graph.
+export const WELCOME_NOTICE_SETTINGS_NAMESPACE = 'ui-onboarding'
+export const WELCOME_NOTICE_ACK_FIELD = 'welcomeNoticeVersion'
+export const WELCOME_NOTICE_VERSION = '2026-09-28.1'
 
 /**
  * The routes a shipped composition always has, with no ability to stream.
@@ -174,6 +181,8 @@ export interface WebScaffold {
   workspaceCwd: string
   /** Temp persistence root (seeded sessions land here through the real API). */
   persistenceRoot: string
+  /** Temp userdoc upload root; rendered document text embeds paths below it. */
+  documentRoot: string
   /** Isolated harness home the settings/credentials rows write ($DSH_HOME double). */
   harnessHome: string
   /** Await a settled turn end: in-process turn/end, then the agent's idle flip (which follows the persistence flush). */
@@ -194,6 +203,8 @@ export interface LaunchOptions {
   workbench?: boolean
   /** Disable the optional native Open In app rows when the host package is not built in a fixture. */
   openInApp?: boolean
+  /** Leave the current welcome notice pending; ordinary scenarios pre-acknowledge it before browser boot. */
+  welcomeNoticePending?: boolean
   /**
    * Optional product overlay applied after the shipped Web surface and before
    * the scaffold's hermetic test patches, matching the launcher's `--patch`
@@ -643,6 +654,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     })
     await ctx.loader.await()
     await auditStartupEntries(ctx, 'web e2e scaffold')
+    if (options.welcomeNoticePending !== true) {
+      await ctx.settings.mutate(WELCOME_NOTICE_SETTINGS_NAMESPACE, [{
+        op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION,
+      }])
+    }
     const boundPort = ctx.get('webServer')?.port
     if (boundPort === undefined) {
       throw new Error('web e2e scaffold: webServer service missing after settled boot')
@@ -757,6 +773,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     ctx,
     workspaceCwd,
     persistenceRoot,
+    documentRoot,
     // Barrier stack: the in-process turn/end identifies the session, its
     // explicit flush makes the transcript durable, and the caller's browser
     // settled-poll comes last because host completion strictly precedes render.
@@ -805,7 +822,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
  * @param session - Captured live Session, including any inherited fork prefix.
  * @returns Current-writer Session JSONL.
  */
-export function rawSessionLog(session: Session): string {
+function rawSessionLog(session: Session): string {
   const encodedEvents = (session.snapshotEvents() as unknown as readonly SessionFormatEvent[])
     .map(event => sessionFormatCatalog.encodeCurrentEvent(event))
   const header = sessionFormatCatalog.encodeCurrentHeader({
@@ -1089,13 +1106,19 @@ async function persistSeedSession(
  * @param page - the page under test.
  * @param selector - the region locator selector.
  * @param workspaceCwd - normalization input.
+ * @param paths - additional declared temporary paths to tokenize (e.g. documentRoot).
  * @returns the stable normalized snapshot.
  */
-export async function captureStableAria(page: Page, selector: string, workspaceCwd: string): Promise<string> {
+export async function captureStableAria(
+  page: Page,
+  selector: string,
+  workspaceCwd: string,
+  paths: readonly AriaPathDecl[] = [],
+): Promise<string> {
   const region = page.locator(selector).first()
-  let previous = normalizeAria(await region.ariaSnapshot(), workspaceCwd)
+  let previous = normalizeAria(await region.ariaSnapshot(), workspaceCwd, paths)
   await expect.poll(async () => {
-    const current = normalizeAria(await region.ariaSnapshot(), workspaceCwd)
+    const current = normalizeAria(await region.ariaSnapshot(), workspaceCwd, paths)
     const busy = await region.locator('[data-model-trigger][aria-busy="true"]').count() !== 0
     const stable = current === previous && !busy
     previous = current

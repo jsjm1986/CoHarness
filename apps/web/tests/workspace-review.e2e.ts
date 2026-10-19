@@ -30,6 +30,9 @@ describe('web e2e: delivered files and historical review', () => {
     scaffold = await launchWebScaffold({ workbench: true })
     const { ctx, workspaceCwd } = scaffold
     execFileSync('git', ['init', '--quiet'], { cwd: workspaceCwd })
+    // The scaffold plants the private harness homes inside the workspace; a
+    // work-tree snapshot must never walk their live temporary files.
+    await writeFile(join(workspaceCwd, '.gitignore'), '.dsh-home/\n.agents-home/\n.bundled-skills/\n')
     await writeFile(join(workspaceCwd, 'review.txt'), 'before the turn\n')
     const created = await ctx.apiProxy.sessions.create({ rpcId: RpcId('review-create'), payload: { sessionId: SESSION, cwd: workspaceCwd } })
     if (!created.result.ok) throw new Error(created.result.error.message)
@@ -102,9 +105,11 @@ describe('web e2e: delivered files and historical review', () => {
     expect(await review.textContent()).toContain('after the turn')
     expect(await review.textContent()).not.toContain('current file changed later')
     // The host reports an open-in-app handler only on desktops that probe
-    // one, so the default-app row is environment-dependent chrome.
+    // one, so the default-app row and its overflow menu are
+    // environment-dependent chrome.
     const reviewSnapshot = (await captureStableAria(page, '[data-changes-review]', scaffold.workspaceCwd))
       .replace(/\n *- button "Open [^\n]* in default app":\n *- img/g, '')
+      .replace(/\n *- button "More file actions for [^\n]*":\n *- img/g, '')
     await compareOrRefreshGolden(join(DIRECTORY, 'review.expected.md'), reviewSnapshot, webSnapshotMode())
     await review.locator('[data-review-tool="split"]').click()
     // The appended row has no old-side text; constrain the columns so the hunk header overflows it.

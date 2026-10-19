@@ -1,7 +1,7 @@
 /** Node-half composition diagnostics for package metadata and built client bundles. */
 
 import { Hash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SourceMap } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -69,6 +69,24 @@ it.each([false, true])('tracks the Web carrier lifetime when server-first is %s'
   await expect.poll(() => routes.size).toBe(1)
   await modules.dispose()
   expect(routes.size).toBe(0)
+})
+
+it('publishes this package version and the build commit as the Host release in every composed graph', async () => {
+  const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
+  const mount = async (commit: string | undefined) => {
+    vi.stubEnv('DSH_CLIENT_COMMIT_HASH', commit)
+    const ctx = new Context()
+    contexts.push({ ctx })
+    ctx.provide('loader', { entries: () => [] })
+    await ctx.plugin(ClientModuleRegistry)
+    vi.unstubAllEnvs()
+    return ctx.get('clientModules')!.graph()
+  }
+  const graph = await mount('abc1234')
+  expect(graph.release).toEqual({ version, commit: 'abc1234' })
+  expect(bootInjections(graph).at(-1)).toEqual({ kind: 'global', name: '__DSH_BOOT__', value: graph })
+  expect(modulesClient.parseBootManifest(graph).release).toEqual({ version, commit: 'abc1234' })
+  expect((await mount(undefined)).release).toEqual({ version })
 })
 
 /** Create a resolvable package whose client export points at the returned path. */

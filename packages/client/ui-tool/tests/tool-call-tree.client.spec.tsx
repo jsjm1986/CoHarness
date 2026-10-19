@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /** ToolCallTree-owned root/subcall markers and selection projection. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import type { HostDescription } from '@deepseek-ai/dsh-client-connection/client'
 import type { ConversationSnapshot, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
@@ -23,6 +23,7 @@ function props(
   block: ToolResultNode,
   selectedCallId?: string,
   description?: HostDescription,
+  useDisclosureReset: ToolTreeProps['useDisclosureReset'] = () => 0,
 ): ToolTreeProps {
   const snapshot = {} as ConversationSnapshot
   const useSession = ((selector: (value: ConversationSnapshot) => unknown) => selector(snapshot)) as ToolTreeProps['useSession']
@@ -31,6 +32,7 @@ function props(
   return {
     useSession,
     renderSlot,
+    useDisclosureReset,
     node: {
       key: `tool:${block.callId}`,
       kind: 'tool-call',
@@ -46,9 +48,25 @@ function props(
     inspectCall: vi.fn(),
     forkAt: vi.fn(),
     fileMentions: vi.fn(),
-    useHostDescription: (selector => selector(description)) as ToolTreeProps['useHostDescription'],
+    renderMessageImages: () => null,
+    useTurnData: () => undefined,
+    useDisclosure: () => ({ expanded: false, setExpanded: () => {}, toggle: () => {} }),
+    useHostDescription: selector => selector(description),
+    SessionProvider: ({ children }) => <>{children('s1' as ToolTreeProps['sessionId'])}</>,
+    sessionId: 's1' as ToolTreeProps['sessionId'],
+    useSessions: () => { throw new Error('unused') },
+    useWorkspaces: () => { throw new Error('unused') },
+    usePanelInfo: () => { throw new Error('unused') },
+    useProjection: () => undefined,
+    useInput: () => { throw new Error('unused') },
+    inputActions: {
+      setDraft: () => {}, addImages: () => true, removeImage: () => {},
+      pruneImages: () => {}, addDocuments: () => true, removeDocument: () => {},
+      pruneDocuments: () => {}, captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+      insertText: () => false, submit: () => {},
+    },
     t,
-  } as unknown as ToolTreeProps
+  }
 }
 
 describe('ToolCallTree', () => {
@@ -80,6 +98,33 @@ describe('ToolCallTree', () => {
     expect(view.container.querySelector('[data-chat-call-id="parent:ptc:1"]')?.hasAttribute('data-selected')).toBe(false)
     expect(view.container.querySelector('[data-chat-call-id="parent:ptc:1:ptc:1"]')?.getAttribute('data-selected')).toBe('true')
     expect(nests).toHaveLength(2)
+  })
+
+  it('collapses root and nested call disclosures when the seat generation advances', () => {
+    const leaf = root('parent:ptc:1', { name: 'bash', argsRaw: '{"command":"ls"}' })
+    const block = {
+      ...root('parent', { name: 'run_code', argsRaw: '{"code":"return 1"}' }),
+      subCalls: [leaf],
+    }
+    let generation = 0
+    const treeProps = props(block, undefined, undefined, () => generation)
+    const view = render(<ToolCallTree {...treeProps} />)
+    const rowOf = (callId: string): HTMLElement =>
+      view.container.querySelector(`[data-chat-call-id="${callId}"] [data-disclosure-row]`) as HTMLElement
+    const rootRow = rowOf('parent')
+    const leafRow = rowOf('parent:ptc:1')
+    fireEvent.click(rootRow)
+    fireEvent.click(leafRow)
+    expect(rootRow.getAttribute('aria-expanded')).toBe('true')
+    expect(leafRow.getAttribute('aria-expanded')).toBe('true')
+
+    // A fold bumps the seat generation; mounted cells keep their record but it
+    // no longer matches, so both levels read collapsed without unmounting.
+    generation = 1
+    view.rerender(<ToolCallTree {...treeProps} />)
+    expect(rootRow.getAttribute('aria-expanded')).toBe('false')
+    expect(leafRow.getAttribute('aria-expanded')).toBe('false')
+    expect(view.container.querySelector('[data-chat-call-id="parent:ptc:1"]')).not.toBeNull()
   })
 
   it('abbreviates a POSIX home path in the generic tool summary', () => {

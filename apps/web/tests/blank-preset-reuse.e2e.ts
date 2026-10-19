@@ -1,6 +1,7 @@
 /** Blank Session reuse under the requested or default Agent preset through the shipped Web composition. */
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
@@ -10,11 +11,12 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 // filter below types as the plan-mode event in the host aggregate.
 import type {} from '@deepseek-ai/dsh-plan-mode'
 import { resolveSessionPreset } from '@deepseek-ai/dsh-agent-preset-registry'
-import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
+import { launchWebScaffold, seedSession, watchConsole, type WebScaffold } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
 /** A preset these blank Sessions recorded that the deployment no longer declares. */
 const UNDECLARED = 'liangshen'
+const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 
 describe('web e2e: blank Session reuse under the requested preset', () => {
   let scaffold: WebScaffold
@@ -98,7 +100,7 @@ describe('web e2e: blank Session reuse under the requested preset', () => {
     expect(events.filter(event => event.type === 'agent-preset/selected').map(event => event.data))
       .toEqual([{ agentPreset: 'standard' }])
     // The standalone switch survived the reuse rather than being replayed away.
-    expect(events.some(event => event.type === 'plan/mode' && event.data.active === true)).toBe(true)
+    expect(events.some(event => event.type === 'plan/mode' && event.data.active)).toBe(true)
     expect(scaffold.ctx.workspaceRegistry.list().find(item => item.sessionIds.includes(stale))?.sessionIds).toEqual([stale])
     expect(await page.getByRole('alert').count()).toBe(0)
   })
@@ -112,6 +114,36 @@ describe('web e2e: blank Session reuse under the requested preset', () => {
     await expect.poll(() => liveComposition(picked)).toMatchObject({ mounted: 'minimal', resolved: 'minimal' })
     // Nothing recomposed, so no selection event is appended.
     expect((await storedEvents(picked)).filter(event => event.type === 'agent-preset/selected')).toEqual([])
+  })
+
+  it('a bare New Session mints a fresh Agent under the current preset past the parked blank member', async () => {
+    const stale = SessionId('blank-stale-preset')
+    await storeBlank(stale, 'stale-preset', 'minimal')
+    // A saved non-blank Session holds startup open on itself, so the stale
+    // blank's Workspace is never reconnected and the member stays parked.
+    const anchor = await seedSession(scaffold, await readFile(SEED, 'utf8'), 'anchor-history')
+
+    const page = await openPage(anchor)
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-blank-preset-new-session'))
+    await expect.poll(() => selected(page), { timeout: 15_000 }).toBe(anchor)
+
+    // The bare gesture targets a Workspace whose only member is the stale
+    // blank: reconnecting would reopen that recorded composition, so the
+    // contract mints a fresh Session+Agent instead.
+    await page.getByRole('button', { name: 'New session in stale-preset' }).click()
+    let fresh: string | undefined
+    await expect.poll(async () => {
+      fresh = await selected(page)
+      return fresh !== undefined && fresh !== anchor && fresh !== stale
+    }, { timeout: 15_000 }).toBe(true)
+    await expect.poll(() => liveComposition(SessionId(fresh!)), { timeout: 15_000 })
+      .toMatchObject({ mounted: 'standard', resolved: 'standard' })
+    // The parked member kept its recorded preset and stayed unopened.
+    expect((await scaffold.ctx.sessionPersistence.inspect(stale)).meta.agentPreset).toBe('minimal')
+    expect((await storedEvents(stale)).filter(event => event.type === 'agent-preset/selected')).toEqual([])
+    expect([...(scaffold.ctx.workspaceRegistry.list().find(item => item.sessionIds.includes(stale))?.sessionIds ?? [])].sort())
+      .toEqual([stale, SessionId(fresh!)].sort())
+    expect(await page.getByRole('alert').count()).toBe(0)
   })
 
   it('restores a saved blank under the default once its recorded preset is undeclared', async () => {

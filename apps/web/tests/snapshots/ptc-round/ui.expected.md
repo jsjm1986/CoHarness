@@ -5,11 +5,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "1 tool call · 2 intermediate messages":
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -18,10 +17,11 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Thinking The program ran successfully. Let me now reply DONE as instructed.":
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
   - img
-  - img
-  - text: Thinking The program ran successfully. Let me now reply DONE as instructed.
+- button "Ran code, ran commands, read files"
 - paragraph: DONE
 - button "Copy":
   - img

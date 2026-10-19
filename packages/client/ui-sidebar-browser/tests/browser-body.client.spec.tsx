@@ -7,6 +7,9 @@ import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { createBrowserControllers } from '../src/client/browser/BrowserController.ts'
 import type { BrowserFrameState } from '../src/client/browser/BrowserFrame.ts'
 import { createBrowserStore } from '../src/client/browser/store.ts'
+import { emptyBrowserState } from '../src/client/contract/navigation.ts'
+import type { BrowserTabState } from '../src/client/contract/navigation.ts'
+import type { BrowserTarget } from '../src/client/browser/url.ts'
 import type { BrowserBodyProps } from '../src/client/view/BrowserBody.tsx'
 import { BrowserBody, WEB_BROWSER_SANDBOX } from '../src/client/view/BrowserBody.tsx'
 import { zh } from '../src/client/locales.ts'
@@ -15,6 +18,12 @@ const SESSION = 'session' as SessionId
 const TAB = 'tab' as TabId
 const lifetimes = new Set<AbortController>()
 let mountSequence = 0
+
+/** Persisted checkpoint shape: history plus a zero-revision pending request. */
+function savedTabState(url: string): BrowserTabState {
+  const target: BrowserTarget = { kind: 'https', url, title: new URL(url).hostname }
+  return { ...emptyBrowserState(), entries: [target], index: 0, request: { target, revision: 0 } }
+}
 
 function hookOf<T>(store: { subscribe(listener: () => void): () => void; getSnapshot(): T }) {
   return function useSelector<S>(select: (state: T) => S): S {
@@ -30,11 +39,14 @@ const absentFrame = {
   getSnapshot: (): BrowserFrameState | undefined => undefined,
 }
 
-function mountBrowser(navigation?: { readonly url?: string }) {
+function mountBrowser(navigation?: { readonly url?: string }, seed?: BrowserTabState) {
   const store = createBrowserStore().create(`browser-body-test-${String(++mountSequence)}`)
+  if (seed !== undefined) store.actions.replace(TAB, seed)
   let lifetime = new AbortController()
   lifetimes.add(lifetime)
-  const injected = createBrowserControllers(store.actions)
+  // The layout's committed membership; aborts distinguish removal from teardown.
+  const openTabs = new Set<TabId>([TAB])
+  const injected = createBrowserControllers(store.actions, tabId => openTabs.has(tabId))
   const { keyedHooks, ...commands } = injected
   const props = {
     sessionId: SESSION,
@@ -68,9 +80,12 @@ function mountBrowser(navigation?: { readonly url?: string }) {
     view, remount: renderBody, store, lifetime, injected,
     replaceOccurrence() {
       act(() => {
+        // The record vanished and a new record took the id: removal aborts, then reopens.
+        openTabs.delete(TAB)
         lifetime.abort()
         lifetime = new AbortController()
         lifetimes.add(lifetime)
+        openTabs.add(TAB)
         navigation = undefined
         view.rerender(<BrowserBody {...props} />)
       })
@@ -247,6 +262,31 @@ describe('BrowserBody', () => {
     await waitFor(() => { expect(remounted.container.querySelector('iframe')?.getAttribute('src')).toBe('https://latest.example/path') })
     expect(remounted.getByRole('textbox')).toHaveProperty('value', 'https://latest.example/path')
     expect(mounted.store.getSnapshot().byTab[TAB]?.entries.at(-1)?.url).toBe('https://latest.example/path')
+  })
+
+  it('presents a saved entry for explicit restore without auto-navigating', async () => {
+    const mounted = mountBrowser(undefined, savedTabState('https://saved.example/page'))
+    // A restored checkpoint only waits for the user: no frame and no new load request.
+    expect(mounted.view.container.querySelector('iframe')).toBeNull()
+    expect(mounted.store.getSnapshot().byTab[TAB]?.request?.revision).toBe(0)
+    expect(mounted.view.getByText(zh['restore.previous'])).toBeDefined()
+    expect(mounted.view.getByText('saved.example')).toBeDefined()
+    expect(mounted.view.getByText('https://saved.example/page')).toBeDefined()
+    expect(mounted.view.getByRole('textbox')).toHaveProperty('value', 'https://saved.example/page')
+
+    fireEvent.click(mounted.view.getByRole('button', { name: zh['restore.action'] }))
+    await waitFor(() => { expect(mounted.view.container.querySelector('iframe')?.getAttribute('src')).toBe('https://saved.example/page') })
+    expect(mounted.store.getSnapshot().byTab[TAB]?.request?.revision).toBe(1)
+    expect(mounted.view.queryByText(zh['restore.previous'])).toBeNull()
+  })
+
+  it('loads a typed-open URL over a saved entry and keeps the saved history', async () => {
+    const mounted = mountBrowser({ url: 'https://typed.example/open' }, savedTabState('https://saved.example/page'))
+    await waitFor(() => { expect(mounted.view.container.querySelector('iframe')?.getAttribute('src')).toBe('https://typed.example/open') })
+    const state = mounted.store.getSnapshot().byTab[TAB]
+    expect(state?.entries.map(entry => entry.url)).toEqual(['https://saved.example/page', 'https://typed.example/open'])
+    expect(state?.index).toBe(1)
+    expect(mounted.view.queryByText(zh['restore.previous'])).toBeNull()
   })
 
 })

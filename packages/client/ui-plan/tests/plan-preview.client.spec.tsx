@@ -7,15 +7,20 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { Profiler, useSyncExternalStore } from 'react'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
-import type { TurnLocation } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  ChatNodeStore, ChatSnapshot, ConversationSnapshot, QueuedMessage, TurnLocation,
+} from '@deepseek-ai/dsh-client-runtime/client'
 import type { PlanReview } from '@deepseek-ai/dsh-client-ui-user-questions/client'
+import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { PlanCards, PlanReviewOpen } from '../src/client/PlanCard.tsx'
 import { PlanPreview, PlanTitle } from '../src/client/PlanPreview.tsx'
+import { plansSourceFor } from '../src/client/plan-definition.ts'
 import type { PlanRead } from '../src/client/plan-resource.ts'
 import { reviewPreviewAddress } from '../src/client/review-preview.ts'
 import { createPlanReviewStore } from '../src/client/review-store.ts'
@@ -74,6 +79,116 @@ describe('PlanCards', () => {
   it('renders nothing for a Turn without plans', () => {
     const { view } = setup([])
     expect(view.container.innerHTML).toBe('')
+  })
+})
+
+describe('PlanCards isolation', () => {
+  function planNode(seq: number, plan: SubmittedPlan, turnNumber = 1): ChatNode<'submitted-plan'> {
+    return {
+      key: `plan:${plan.callId}`,
+      id: plan.callId,
+      target: 'chat',
+      kind: 'submitted-plan',
+      anchorSeq: seq,
+      location: { kind: 'turn', turn: turn(turnNumber) },
+      visibility: 'hidden',
+      data: plan,
+    }
+  }
+
+  function chatWith(nodes: ChatNodeStore): ChatSnapshot {
+    return {
+      order: [], entries: [], nodes,
+      locations: { getTurn: () => [], getStep: () => [] },
+      groups: { get: () => undefined },
+      navigation: { items: () => [] },
+      timeline: { turnOrder: [], turns: new Map() },
+      legacy: { nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [] },
+    }
+  }
+
+  function nodeStore(list: readonly ChatNode<'submitted-plan'>[]): ChatNodeStore {
+    const byKey = new Map(list.map(node => [node.key, node]))
+    return { get: key => byKey.get(key), values: () => [...byKey.values()] }
+  }
+
+  function sessionStore(nodes: readonly ChatNode<'submitted-plan'>[]) {
+    return createSnapshotStore<ConversationSnapshot>({
+      chat: chatWith(nodeStore(nodes)),
+    } as ConversationSnapshot)
+  }
+
+  it('republishes a stable plan list through unrelated session commits', () => {
+    const plan = planNode(3, PLAN)
+    const store = sessionStore([plan])
+    const source = plansSourceFor(store, 1)
+    const first = source.getSnapshot()
+    expect(first).toEqual([PLAN])
+    // Unrelated commits (running flag, queue churn, a fresh snapshot object):
+    // the derived list keeps its identity, so card subscribers never repaint.
+    for (let i = 0; i < 3; i += 1) {
+      act(() => {
+        store.set({
+          ...store.getSnapshot(),
+          running: i % 2 === 0,
+          queue: [{
+            id: `q-${i}` as QueuedMessage['id'],
+            messageId: `m-q-${i}` as QueuedMessage['messageId'],
+            placement: 'queued', content: [], preview: `q-${i}`, text: `q-${i}`,
+          }],
+        })
+      })
+      expect(source.getSnapshot()).toBe(first)
+    }
+    // A real plan change republishes exactly once.
+    const second = { ...PLAN, callId: 'c-2' as ToolCallId, title: 'Second' }
+    act(() => { store.set({ ...store.getSnapshot(), chat: chatWith(nodeStore([plan, planNode(4, second)])) }) })
+    const republished = source.getSnapshot()
+    expect(republished).not.toBe(first)
+    expect(republished).toEqual([PLAN, second])
+    // ...and stays stable through the next unrelated commit.
+    act(() => { store.set({ ...store.getSnapshot(), running: true }) })
+    expect(source.getSnapshot()).toBe(republished)
+  })
+
+  it('does not re-render the cards when an unrelated session field moves', () => {
+    const plan = planNode(3, PLAN)
+    const store = sessionStore([plan])
+    const source = plansSourceFor(store, 1)
+    // Mirror of the renderer's keyedHooks binding: one uSES subscription over
+    // the keyed source, identity selector. The Profiler commit count measures
+    // the card subtree itself — the subscription lives inside PlanCards.
+    const usePlans = ((_key: string) => useSyncExternalStore(
+      onStoreChange => source.subscribe(onStoreChange),
+      () => source.getSnapshot(),
+    )) as never
+    let commits = 0
+    render(
+      <Profiler id="plan-cards" onRender={() => { commits += 1 }}>
+        <PlanCards
+          {...sessionStandard()}
+          turn={turn(1)} seq={10} openFile={() => {}}
+          usePlans={usePlans} openPlan={() => {}} t={t} />
+      </Profiler>,
+    )
+    expect(commits).toBe(1)
+    act(() => { store.set({ ...store.getSnapshot(), running: true }) })
+    act(() => {
+      store.set({
+        ...store.getSnapshot(),
+        chat: { ...store.getSnapshot().chat, order: ['other:node'] },
+      })
+    })
+    expect(commits).toBe(1)
+    // A plan entering the Turn republishes and repaints exactly once.
+    act(() => {
+      store.set({
+        ...store.getSnapshot(),
+        chat: chatWith(nodeStore([plan, planNode(4, { ...PLAN, callId: 'c-2' as ToolCallId, title: 'Second' })])),
+      })
+    })
+    expect(commits).toBe(2)
+    expect(screen.getByRole('button', { name: '打开计划：Second' })).toBeTruthy()
   })
 })
 

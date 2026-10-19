@@ -4,15 +4,19 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "16 tool calls · 2 intermediate messages" [expanded]:
-  - text: 16 tool calls · 2 intermediate messages
-  - img
 - text: "Assemble the link gallery: write the report and styles, inspect the sources, and summarize."
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Wrote files, called tools, searched code, etc."
 - button "Write site/report.html +1 -0":
   - img
   - img

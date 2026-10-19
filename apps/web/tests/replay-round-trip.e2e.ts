@@ -17,8 +17,9 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { expandAssistantStream, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
-  launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses,
+  fixtureUserPrompts, launchWebScaffold, recordFixture, watchConsole, webSnapshotMode,
+  type WebScaffold,
 } from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
 
@@ -171,11 +172,19 @@ describe('web e2e: fresh round trip through the real assembly', () => {
     // tier pins the same gesture against FixtureApiClient; this one runs on
     // mux-frame-fed state). Runs after the golden capture so the committed
     // aria surface stays the untouched settled state.
-    const think = page.getByRole('button', { name: /^Think/ }).first()
+    // Settled work folds into collapsed process groups; open the turn process
+    // and its group so the reasoning disclosure is reachable.
+    await expandTurnProcesses(page)
+    for (const title of await page.locator('[data-step-process] [data-process-activity][aria-expanded="false"]').all()) {
+      await title.click()
+    }
+    // Each step keeps its own Think disclosure inside the group; the closing
+    // reply's reasoning is the last one in DOM order.
+    const think = page.getByRole('button', { name: /^Think/ }).last()
+    await think.waitFor({ timeout: 15_000 })
     expect(await think.getAttribute('aria-expanded')).toBe('false')
     await think.click()
     await expect.poll(() => think.getAttribute('aria-expanded'), { timeout: 5_000 }).toBe('true')
-    // Earlier step reasoning belongs to the collapsed intermediate-message group.
     const closingReply = sessionEvents.findLast(event => event.type === 'assistant/message')
     const reasoning = closingReply?.type === 'assistant/message'
       ? closingReply.data.message.content.find(block => block.type === 'reasoning') : undefined

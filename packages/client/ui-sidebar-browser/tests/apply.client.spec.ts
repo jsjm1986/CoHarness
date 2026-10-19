@@ -43,7 +43,7 @@ async function boot() {
   ctx.provide('sidebarRightTabs', tabs as never)
   const openSessionTab = vi.fn()
   const focusRightbar = vi.fn()
-  ctx.provide('sidebarRight', { openSessionTab } as never)
+  ctx.provide('sidebarRight', { openSessionTab, openTabs: createSnapshotStore([]) } as never)
   ctx.provide('layout', { focusRightbar } as never)
   ctx.provide('sessions', { list: createSnapshotStore({ byId: {} }) } as never)
   ctx.provide('connection', { hostDescription: createSnapshotStore(undefined) } as never)

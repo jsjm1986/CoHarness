@@ -44,7 +44,7 @@ export type {
   ConversationWorkbenchPaneHeaderOwnerProps, ConversationWorkbenchToolbarOwnerProps,
   DetailsInjected, DetailsSlotProps, DetailsToolOwnerProps, EmptyWorkspaceOwnerProps, HeroBrandMarkOwnerProps,
   MessageImageLoader, MessageImageSource, MessageImagesOwnerProps, MessageImagesProps,
-  RenderMessageImages, TurnTailOwnerProps, UseChatNodeTurnData,
+  ReasoningBodyOwnerProps, ReasoningContentInput, RenderMessageImages, TurnTailOwnerProps, UseChatNodeTurnData,
 } from './contract/slots.ts'
 // Export discipline: packages/client/AGENTS.md.
 

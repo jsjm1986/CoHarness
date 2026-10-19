@@ -4,11 +4,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - button "System prompt":
   - img
   - img
@@ -17,6 +16,8 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - heading "Math rendering" [level=2]
 - paragraph:
   - text: Inline dollar

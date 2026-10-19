@@ -11,18 +11,29 @@
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
-- button "2 tool calls · 1 intermediate message" [expanded]:
-  - text: 2 tool calls · 1 intermediate message
-  - img
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Stopped
+- button "Stopped" [disabled] [expanded]
+- button "Analysis completed"
 - button "Thinking The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
   - img
   - img
   - text: Thinking The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
 - paragraph: I will read both files before answering.
+- button "Read files"
+- button "Read a.txt":
+  - img
+  - img
+  - text: Read
+  - button "a.txt"
+- button "Read b.txt":
+  - img
+  - img
+  - text: Read
+  - button "b.txt"
 - button "Copy":
   - img
 - button "Good response":
@@ -37,23 +48,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "Read a.txt":
-  - img
-  - img
-  - text: Read
-  - button "a.txt"
-- button "Read b.txt":
-  - img
-  - img
-  - text: Read
-  - button "b.txt"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: Now give the final answer.
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: DONE
 - button "Copy":
   - img

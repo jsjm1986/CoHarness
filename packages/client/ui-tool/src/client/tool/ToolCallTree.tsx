@@ -23,7 +23,7 @@ function callName(call: ToolCallPhaseProps): string {
 /** One atomic call dispatched through the Tool-owned keyed slot. */
 const ToolCall = memo(function ToolCall({
   renderSlot, callId, toolName, call, assistant, openFile, selected, cwd, home, openCallDetails, inspectCall, nested,
-  renderMessageImages, t, children,
+  renderMessageImages, resetVersion, t, children,
 }: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 'openCallDetails' | 'renderMessageImages' | 't'> & {
   callId: string
   toolName: string
@@ -32,16 +32,18 @@ const ToolCall = memo(function ToolCall({
   selected: boolean
   home?: string | undefined
   nested?: boolean | undefined
+  /** Owning seat's current disclosure fold generation. */
+  resetVersion: number
   children?: ReactNode
 }) {
   const preparing = call.phase === 'preparing'
   const hookContext = useMemo<ToolCallHookContext>(() => ({
     callId,
     assistant: preparing ? assistant : undefined,
-    disclosure: createSnapshotStore(false),
+    disclosure: createSnapshotStore<number | null>(null),
   }), [assistant, callId, preparing])
   const useDisclosure = useMemo(
-    () => bindToolCallDisclosure(hookContext.disclosure), [hookContext])
+    () => bindToolCallDisclosure(hookContext.disclosure, resetVersion), [hookContext, resetVersion])
   const owner: ToolCallOwnerProps = useMemo(() => ({
     callId,
     toolName,
@@ -81,12 +83,15 @@ const ToolCall = memo(function ToolCall({
 })
 
 const ToolCallBranch = memo(function ToolCallBranch({
-  renderSlot, block, assistant, selectedCallId, cwd, home, openFile, openCallDetails, inspectCall, nested, renderMessageImages, t,
+  renderSlot, block, assistant, selectedCallId, cwd, home, openFile, openCallDetails, inspectCall, nested, renderMessageImages,
+  resetVersion, t,
 }: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 'openCallDetails' | 'renderMessageImages' | 't'> & {
   block: ToolCallBlock
   assistant: ToolCallHookContext['assistant']
   home?: string | undefined
   nested?: boolean | undefined
+  /** Owning seat's current disclosure fold generation. */
+  resetVersion: number
 }) {
   const call = useMemo(() => toolCallPhase(block), [block])
   return (
@@ -104,6 +109,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
       renderMessageImages={renderMessageImages}
       openCallDetails={openCallDetails}
       inspectCall={inspectCall}
+      resetVersion={resetVersion}
       t={t}
     >
       {call.phase !== 'preparing' && call.block.subCalls.length > 0 ? (
@@ -122,6 +128,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
               openFile={openFile}
               openCallDetails={openCallDetails}
               inspectCall={inspectCall}
+              resetVersion={resetVersion}
               t={t}
             />
           ))}
@@ -138,9 +145,13 @@ const ToolCallBranch = memo(function ToolCallBranch({
  * @returns the Tool call tree.
  */
 export function ToolCallTree({
-  renderSlot, node, selectedCallId, cwd, openFile, openCallDetails, inspectCall, renderMessageImages, useHostDescription, t,
+  renderSlot, node, selectedCallId, cwd, openFile, openCallDetails, inspectCall, renderMessageImages, useDisclosureReset,
+  useHostDescription, t,
 }: ToolTreeProps) {
   const home = useHostDescription(description => description?.home)
+  // One generation read at the root: nested branches re-render inside the same
+  // pass, so every level binds the same version without extra subscriptions.
+  const resetVersion = useDisclosureReset()
   // A preparing call's partial argument prefix lives on the owning Step's
   // assistant-step Location data; the source exists only for step-scoped roots.
   const assistant = node.location.kind === 'step'
@@ -158,6 +169,7 @@ export function ToolCallTree({
       openCallDetails={openCallDetails}
       inspectCall={inspectCall}
       renderMessageImages={renderMessageImages}
+      resetVersion={resetVersion}
       t={t}
     />
   )

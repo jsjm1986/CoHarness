@@ -3,20 +3,32 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-skill/README.md
 /:
-  en: b356f495de79d68d
-  zh: 61495d48365178df
+  en: 5f8b11ef8ba052e9
+  zh: 876a79ffea759627
 /deepseek-ai-dsh-client-ui-skill:
-  en: 70758f25415da698
-  zh: 2b50f4093a472e96
+  en: 17b91cfc2300ea2b
+  zh: 1fcd42e48e14c5ec
 /deepseek-ai-dsh-client-ui-skill/summary:
-  en: fad7bff8d3371dfc
-  zh: c546189c87d6fbf2
+  en: b2caa98f21dd5113
+  zh: b96bbdee61a15d3e
 /deepseek-ai-dsh-client-ui-skill/table-of-contents:
-  en: 7305a3362b661ebc
-  zh: c84b239ec6a2a402
-/deepseek-ai-dsh-client-ui-skill/skill-tool-row:
-  en: 1f6674d9f9bf1e87
-  zh: f7e597aa5daba339
+  en: d152484eb41ac6b4
+  zh: bda879a892f240f0
+/deepseek-ai-dsh-client-ui-skill/use-this-package:
+  en: a2999e11e38167d4
+  zh: 833c5153e6393f8e
+/deepseek-ai-dsh-client-ui-skill/use-this-package/current-skill-source:
+  en: 372062ed6bf9cf10
+  zh: dd7f17d245da6161
+/deepseek-ai-dsh-client-ui-skill/use-this-package/skill-tool-row:
+  en: c2e0667290d92d1f
+  zh: b9f51caaf0d5c415
+/deepseek-ai-dsh-client-ui-skill/understand-the-implementation:
+  en: 67ae61ec33d53f0c
+  zh: b6bb4f0f859f3611
+/deepseek-ai-dsh-client-ui-skill/further-exploration:
+  en: a6dcc53df5766750
+  zh: b8b9563640ac64d2
 /deepseek-ai-dsh-client-ui-skill/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -27,14 +39,14 @@
   en: 02313760445799a2
   zh: 46007ed9e9f35b44
 /deepseek-ai-dsh-client-ui-skill/model-experience/user-explicit-skill-invocation/token-effect:
-  en: cb759321f8c62a96
-  zh: 6d479501856d9cd6
+  en: 0eb3d2fd1cba6ee9
+  zh: a9efad5c768174fb
 /deepseek-ai-dsh-client-ui-skill/model-experience/user-explicit-skill-invocation/kv-cache-effect:
   en: da53c649077dad7e
-  zh: e013432e5b73883b
+  zh: 845f77793f8e10a2
 /deepseek-ai-dsh-client-ui-skill/known-limitations-and-deferred-work:
-  en: 864738069835efab
-  zh: 5f333906f87eaed3
+  en: 94efb5d51b2a82b0
+  zh: 09d93c1edb67bfe9
 /deepseek-ai-dsh-client-ui-skill/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

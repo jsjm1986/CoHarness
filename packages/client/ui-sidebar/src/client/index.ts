@@ -64,7 +64,7 @@ export function apply(ctx: ClientContext): void {
     // The shell's New Session button rides the runtime's shared action
     // (current Session Workspace, then recent Workspace). The Conversation
     // reset cannot ride the session-list subscription — the no-workspace
-    // clear and a same-session reuse emit no selection change.
+    // clear emits no selection change.
     startSession: (workspaceId) => {
       ctx.layout.selectPanel(null)
       ctx.workspaces.startSession(workspaceId)

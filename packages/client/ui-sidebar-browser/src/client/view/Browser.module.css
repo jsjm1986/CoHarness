@@ -81,6 +81,9 @@
 }
 
 .addressUnknown {
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+
   color: var(--dsw-alias-label-tertiary);
   background: var(--dsw-alias-bg-layer-2);
 }
@@ -131,6 +134,41 @@
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xs-13);
   text-align: center;
+}
+
+.restore {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+  text-align: center;
+}
+
+.restoreLabel {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.restoreTitle {
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: var(--dsw-font-xs-13);
+  font-weight: 500;
+}
+
+.restoreUrl {
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
 }
 
 .failure {

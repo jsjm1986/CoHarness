@@ -204,14 +204,26 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   expect(levelBounds.x).toBeGreaterThan(pickerBounds.x + pickerBounds.width / 2)
   expect(levelBounds.x + levelBounds.width).toBeLessThan(pickerBounds.x + pickerBounds.width)
   await page.setViewportSize({ width: 1280, height: 900 })
+  // A bare New Session mints a fresh Session+Agent asynchronously; until it
+  // binds, the composer still shows the previous session's draft, so a typed
+  // draft would land on the wrong session. The previous draft is the seeded
+  // prefix, and an emptied textarea marks the fresh session's binding.
   await page.getByRole('button', { name: 'New session', exact: true }).last().click()
+  await expect.poll(() => input.inputValue(), { timeout: 15_000 }).toBe('')
   await mic.waitFor()
   await expect.poll(() => page.evaluate(() => (window as Window & { voiceTestStreams?: MediaStream[] }).voiceTestStreams!
     .every(stream => stream.getTracks().every(track => track.readyState === 'ended')))).toBe(true)
+  // The second swap needs a distinguishing draft: this session's textbox is
+  // already empty, so seed a marker the next fresh binding must clear.
+  await input.fill('pending-swap')
   await page.getByRole('button', { name: 'Plugins', exact: true }).click()
   await page.locator('[data-plugin-item="speech-to-text"]').waitFor()
   expect(await page.locator('[data-plugin-item-detail]').count()).toBe(0)
+  // Plugins is a global panel that owns the browsing region (the composer
+  // unmounts); the shell's New Session returns to the Conversation and mints
+  // a fresh Session+Agent, so the next enabled textarea is the new binding.
   await page.getByRole('button', { name: 'New session', exact: true }).last().click()
+  await expect.poll(() => input.inputValue(), { timeout: 15_000 }).toBe('')
   await mic.waitFor()
   const micBox = await mic.boundingBox(), modelBox = await page.getByRole('button', { name: /^Select model, current/ }).boundingBox()
   const sendBox = await page.getByRole('button', { name: 'Send message', exact: true }).boundingBox()

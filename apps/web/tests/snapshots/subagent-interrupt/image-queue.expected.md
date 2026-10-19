@@ -18,9 +18,6 @@
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - button "System prompt":
   - img
   - img
@@ -29,6 +26,9 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Stopped
+- button "Stopped" [disabled] [expanded]
+- button "Analysis completed"
 - button "Context injection runtime-context":
   - img
   - img

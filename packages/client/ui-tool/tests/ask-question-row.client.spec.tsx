@@ -63,7 +63,7 @@ function rowProps(block: ToolCallBlock, env: RowEnvironment = {}): Parameters<ty
   const useProjection = (key: string, select: (value: never) => unknown) =>
     select((key === 'userQuestions' ? questionView : []) as never)
   const props = {
-    useDisclosure: bindToolCallDisclosure(createSnapshotStore(false)),
+    useDisclosure: bindToolCallDisclosure(createSnapshotStore<number | null>(null), 0),
     callId: 'c1', toolName: 'ask_user_question', t,
     ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
     useToolCallArgumentsPartial: () => '',

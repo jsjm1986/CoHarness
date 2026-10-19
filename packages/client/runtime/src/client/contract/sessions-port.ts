@@ -15,7 +15,7 @@ import type { ObservableSnapshot } from './store.ts'
 /** Session-list row facts sibling domains read: recency, blank-reuse eligibility, and its cwd canon. */
 export interface SessionsPortSummary {
   id: SessionId
-  /** No-visible-content bit (blank sessions are reused by New Session instead of minting another). */
+  /** No-visible-content bit (blank sessions are reused by Workspace reconnect instead of minting another). */
   blank: boolean
   /** Highest visible-content event sequence known to the Host or live stream. */
   visibleContentSeq?: number

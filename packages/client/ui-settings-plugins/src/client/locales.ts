@@ -2,13 +2,14 @@
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** Plugin configuration card copy. */
+    /** Plugins settings section and plugin configuration page copy. */
     'settings.plugins': PluginsSettingsLocaleKey
   }
 }
 
 /** Locale keys these surfaces render. */
 export type PluginsSettingsLocaleKey =
+  | 'nav' | 'title' | 'intro' | 'tabs' | 'empty'
   | 'subagentModelSelectionAllowed' | 'subagentModelSelectionChoose' | 'subagentModelSelectionConflict'
   | 'subagentModelSelectionEmpty' | 'subagentModelSelectionLoadFailed' | 'subagentModelSelectionLoading'
   | 'subagentModelSelectionOff' | 'subagentModelSelectionPartial' | 'subagentModelSelectionRequired'
@@ -29,6 +30,11 @@ export type PluginsSettingsLocaleKey =
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
+  nav: 'Built-in plugins',
+  title: 'Built-in plugins',
+  intro: 'Inspect the plugins this deployment ships.',
+  tabs: 'Plugin views',
+  empty: 'This deployment exposes no plugin views.',
   subagentModelSelectionTitle: 'Model selection',
   subagentModelSelectionToggle: 'Allow agents to choose models for Subagents',
   subagentModelSelectionChoose: 'When enabled, agents can choose a provider, model, and reasoning effort for each Subagent from the authorized models below. Applies only to new sessions.',
@@ -103,6 +109,11 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
 
 /** Simplified Chinese copy. */
 export const zh: Record<PluginsSettingsLocaleKey, string> = {
+  nav: '内置插件',
+  title: '内置插件',
+  intro: '查看内置部署的插件列表。',
+  tabs: '插件视图',
+  empty: '本部署没有开放任何插件视图。',
   subagentModelSelectionTitle: '模型选择',
   subagentModelSelectionToggle: '允许 Agent 为子智能体选择模型',
   subagentModelSelectionChoose: '开启后，Agent 可以从下方授权模型中，为每个子智能体选择提供方、模型和推理强度。仅影响新会话。',

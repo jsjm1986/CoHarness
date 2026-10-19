@@ -1,33 +1,16 @@
 /**
- * Skill reference plugin, browser half: registers the '/' skill source —
- * candidates from the skill.list RPC addressed by the per-call session
- * projection's sessionId (sessions are always agent-backed; the host
- * resolves cwd from the session header). A pick lands the literal `/name `
- * text and the prompt ships the same literal (plain-text-reference decision;
- * see .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md);
- * determinism
- * lives host-side — the pre-step boundary (`dsh-tool-skill`) recognizes a
- * leading `/name` naming a user-invocable skill and injects the rendered
- * body for every entry point, including `disable-model-invocation` skills the
- * model-side catalog never lists (issue #1470). The RPC rides the plugin's
- * root-context connection captured at registration — the source never reads
- * services off a per-call argument. Draft chip visuals derive from
- * the lexicon scan; this source implements no reference codec.
+ * Skill discovery and source previews for the addressed session's runtime.
+ * A pick inserts literal `/name ` text; `dsh-tool-skill` owns recognition
+ * and instruction injection, including user-only skills. The source has no
+ * adjudication hook or reference codec; its lexicon supplies draft decoration.
  *
- * Catalog fetches are cached per session (the small twin of the ui-commands
- * directory): the per-keystroke candidates re-poll filters a settled
- * snapshot locally, so one session costs one RPC. The scope-birth warm hook
- * prewarms the session's key; a preset switch drops that one key (the
- * catalog is the preset's, and a blank session may switch after the warm);
- * connection/reset clears everything — the host
- * catalog may differ across generations. A shared in-flight fetch
- * deliberately outlives any single menu interaction: closing the menu must
- * not kill the prewarm other consumers will hit, so it carries its own
- * abort (fired only on invalidation/teardown) while a candidates caller
- * with an aborted signal just returns early.
+ * Catalog fetches are shared per session and prewarmed when its scope opens.
+ * A preset switch invalidates that session; connection/reset invalidates all.
+ * Shared discovery outlives one menu interaction; invalidation or disposal
+ * aborts it. Source previews own separate reads cancelled on close or replacement.
  *
- * This browser half also owns the `skill` keyed toolview: a replay-stable
- * accent row derived only from each logged call/result slice.
+ * The `skill` tool row reads only the durable call/result slice, independently
+ * of the current catalog or source preview.
  */
 // Type-only: the carrier types, the forwarded Host-event face and the ctx.remote merge.
 import type { ConnectionHandle, SessionId, SkillEntry } from '@deepseek-ai/dsh-api-remotes/client'
@@ -37,6 +20,7 @@ import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { SkillRow } from './SkillRow.tsx'
+import { SkillPreview, type SkillPreviewInjected } from './SkillPreview.tsx'
 import { en, NS, zh, type SkillKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -70,6 +54,27 @@ export function apply(ctx: ClientContext): void {
 
   const connection = ctx.get('connection') as ConnectionHandle
   const sessions = ctx.get('sessions') as ISessions
+  const apiFor = (sessionId: SessionId): ConnectionHandle['api'] => {
+    if (connection.forSession !== undefined) return connection.forSession(sessionId).api
+    const target = sessions.runtimeTargetFor?.(sessionId)
+    if (target === undefined) return connection.api
+    const scoped = connection.forTarget?.(target)
+    if (scoped === undefined) throw new Error('The session runtime connection is unavailable')
+    return scoped.api
+  }
+  ctx.slots.inject('conversation.chat.skill-preview', () => ctx.slots.register({
+    name: 'conversation.chat.skill-preview',
+    locale: NS,
+    inject: (sessionId: SessionId): SkillPreviewInjected => ({
+      async loadSkill(name, signal) {
+        signal.throwIfAborted()
+        if (sessions.subagentAddress(sessionId) !== undefined) return undefined
+        const { result } = await apiFor(sessionId).skills.get({ sessionId, name }, signal)
+        if (!result.ok) throw new Error(`skill.get failed: ${result.error.code}: ${result.error.message}`)
+        return result.value.skill
+      },
+    }),
+  }, SkillPreview))
   // Session-keyed catalog cache; single-flight per key. Plugin-closure state:
   // the fiber effect below is its teardown boundary.
   const fetches = new Map<SessionId, CatalogFetch>()
@@ -95,9 +100,7 @@ export function apply(ctx: ClientContext): void {
     if (existing !== undefined) return existing.promise
     const abort = new AbortController()
     const promise = (async () => {
-      const target = sessions.runtimeTargetFor?.(sessionId)
-      const skills = (target === undefined ? connection : connection.forTarget?.(target) ?? connection).api.skills
-      const { result } = await skills.list({ sessionId }, abort.signal)
+      const { result } = await apiFor(sessionId).skills.list({ sessionId }, abort.signal)
       if (!result.ok) throw new Error(`skill.list failed: ${result.error.code}: ${result.error.message}`)
       return result.value.skills
     })()
@@ -170,13 +173,6 @@ export function apply(ctx: ClientContext): void {
       }
     },
     onPick({ candidate }) {
-      // Plain-text-reference decision (web-input-machine note): the pick
-      // lands plain text and the prompt ships the same
-      // literal. Determinism lives host-side — the host's
-      // pre-step boundary (dsh-tool-skill) recognizes the leading /name and
-      // injects the rendered body for every entry point. A name shared with a
-      // host command still resolves to the command: adjudication claims the
-      // line client-side before it ever becomes a prompt.
       return { text: `/${candidate.name} ` }
     },
   }

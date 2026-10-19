@@ -5,11 +5,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
 - img
 - text: plan Plan mode on. Use /plan off to leave.
-- button "1 tool call · 2 intermediate messages":
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -18,14 +17,17 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
+- button "Called tools"
 - button "System prompt":
   - img
   - img
   - text: System prompt
-- 'button "Thinking The plan was approved. The user''s last instruction says: \"Once the plan is approved, reply with the single word DONE and stop.\" So I should just reply with DONE and stop."':
-  - img
-  - img
-  - text: "Thinking The plan was approved. The user's last instruction says: \"Once the plan is approved, reply with the single word DONE and stop.\" So I should just reply with DONE and stop."
+- button "Analysis completed"
 - paragraph: DONE
 - 'button "Open plan: Add `--greeting` flag to CLI"': "Add `--greeting` flag to CLI Plan · Markdown Open"
 - button "Copy":

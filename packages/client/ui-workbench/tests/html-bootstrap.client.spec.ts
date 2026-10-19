@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { runInNewContext } from 'node:vm'
 import { createHtmlDocument } from '../src/client/html/bootstrap.ts'
-import { decodeText, encodeText } from '../src/client/html/bytes.ts'
+import { decodeText, encodeText } from '../src/client/contract/html/bytes.ts'
 
 afterEach(() => { vi.restoreAllMocks() })
 

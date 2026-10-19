@@ -5,11 +5,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "1 tool call · 2 intermediate messages" [expanded]:
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -18,6 +17,9 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Stopped
+- button "Stopped" [disabled] [expanded]
+- button "Analysis completed"
 - button "Context injection runtime-context":
   - img
   - img
@@ -27,6 +29,7 @@
   - img
   - text: Thinking The user wants me to begin with "Reading the workspace now." and call bash with "echo alpha" in the same message. Then after the tool result, reply with the single word DONE and stop.
 - paragraph: Reading the workspace now.
+- button "Ran commands"
 - button "Bash Print alpha to stdout":
   - img
   - img

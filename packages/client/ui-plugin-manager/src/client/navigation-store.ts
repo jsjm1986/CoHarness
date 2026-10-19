@@ -1,12 +1,13 @@
 /** Plugin page selection shared by the page and cross-plugin navigation. */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
 
-/** The plugin list or one bundle, official item, or bundle row of the Installed tab. */
+/** The main or additional plugin list, or one bundle, official item, or bundle row of the Installed tab. */
 type View =
   | { readonly kind: 'list' }
-  | { readonly kind: 'package'; readonly name: string }
+  | { readonly kind: 'more' }
+  | { readonly kind: 'package'; readonly name: string; readonly from?: 'more' }
   | { readonly kind: 'item'; readonly id: string }
-  | { readonly kind: 'row'; readonly name: string; readonly rowId: string }
+  | { readonly kind: 'row'; readonly name: string; readonly rowId: string; readonly from?: 'more' }
 
 /** `installed` is the page's own tab; any other value is the id of a `plugins.tab` entry. */
 type NavigationState = { view: View; tab: string }

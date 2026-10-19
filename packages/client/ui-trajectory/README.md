@@ -21,7 +21,7 @@ Trajectory's next-step message classifier folds a persistent inbox splice chain 
 
 ## Summary
 
-The Trajectory tab lets you inspect agent activity as a turn-aware ledger and interactive timing overview. It groups User, Assistant, Tool, nested Subtool, and compaction records, marks turn and step boundaries, and opens a record inspector for token usage, duration, input, output, timing, images, and attachment summaries. Long histories open at the current tail, load older pages on demand, and render only visible rows. During streaming, the view follows the tail until you scroll upward, and in-flight records show a start marker without inventing elapsed time.
+Trajectory displays agent activity as a turn-aware ledger and interactive timing overview. It groups User, Assistant, Tool, nested Subtool, and compaction records, marks turn and step boundaries, and opens a record inspector for token usage, duration, input, output, timing, images, and attachment summaries. Long histories open at the current tail, load older pages on demand, and render only visible rows. During streaming, the view follows the tail until you scroll upward, and in-flight records show a start marker without inventing elapsed time. User, Assistant, and Tool-result images share Chat's session-authorized gallery and image cache.
 
 ## Table of Contents
 

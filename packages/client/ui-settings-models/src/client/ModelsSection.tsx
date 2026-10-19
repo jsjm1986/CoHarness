@@ -14,14 +14,14 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
-import { Button, IconPlusOutline16, Modal, SegmentedTabs } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ConfigurableProviderView, CredentialView, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import { Button, IconPlusOutline16, Modal, SegmentedControl } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from './slot-contract.ts'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import type { ModelDiscoveryProbe } from './ModelListEditor.tsx'
-import { deriveKeyRef, messageOf, protocolChoices, providerUsable } from './store.ts'
+import { deriveKeyRef, messageOf, protocolChoices, providerUsable, reasoningLevelChoices } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
@@ -91,6 +91,14 @@ interface EditorTarget extends ProviderIdentity {
   credentialRef?: string
   /** The adapter reports this route as one it does not ship (see {@link ProviderEditorProps.declared}). */
   declared?: boolean
+  /** Route endpoint the adapter uses when the profile sets no `baseURL`. */
+  defaultBaseURL?: string
+  /** Environment variables used to construct a provider endpoint. */
+  baseURLEnv?: readonly string[]
+  /** Authentication the route performs when the profile names no credential reference. */
+  nativeAuth?: ConfigurableProviderView['nativeAuth']
+  /** Described state for the route's native authentication references. */
+  credentialChecks?: Record<string, CredentialView>
 }
 
 /** Values that vary around the shared provider-editor rendering. */
@@ -109,6 +117,10 @@ function renderProviderEditor({ target, ...props }: ProviderEditorRenderProps): 
       displayName={target.displayName}
       settingsPath={target.settingsPath}
       {...target.declared === true ? { declared: true } : {}}
+      {...target.defaultBaseURL === undefined ? {} : { defaultBaseURL: target.defaultBaseURL }}
+      {...target.baseURLEnv === undefined ? {} : { baseURLEnv: target.baseURLEnv }}
+      {...target.nativeAuth === undefined ? {} : { nativeAuth: target.nativeAuth }}
+      {...target.credentialChecks === undefined ? {} : { credentialChecks: target.credentialChecks }}
       {...props}
     />
   )
@@ -183,6 +195,7 @@ function keyConfiguredOf(row: ProviderRow): boolean {
   return row.apiKeyEnv !== undefined
     ? row.credential?.configured === true
     : row.derivedCredential?.configured === true
+      || Object.values(row.credentialChecks ?? {}).some(info => info.configured)
 }
 
 function targetOf(row: ProviderRow, managementScope: 'personal' | 'organization' | 'project', projectId?: number): EditorTarget {
@@ -203,6 +216,10 @@ function targetOf(row: ProviderRow, managementScope: 'personal' | 'organization'
     // route-level fields only a declared route owns off the card, exactly as
     // it leaves the custom tag off the row.
     ...row.entry.declared === true ? { declared: true } : {},
+    ...row.entry.defaultBaseURL === undefined ? {} : { defaultBaseURL: row.entry.defaultBaseURL },
+    ...row.entry.baseURLEnv === undefined ? {} : { baseURLEnv: row.entry.baseURLEnv },
+    ...row.entry.nativeAuth === undefined ? {} : { nativeAuth: row.entry.nativeAuth },
+    ...row.credentialChecks === undefined ? {} : { credentialChecks: row.credentialChecks },
   }
 }
 
@@ -416,25 +433,32 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     ? state.rows.filter(row => row.entry.management === 'organization')
     : []
   const configured = scopedRows.filter(row => row.configured)
-  const addable = scopedRows.filter(row => !row.configured)
-  // Organization routes are created as new `org-*` profiles. The shared
-  // personal directory may still expose dormant adapter routes, but when no
-  // such route is addable there is no valid target for the generic action.
-  const canAdoptProvider = addable.length > 0
+  const addable = scopedRows.filter(row => !row.configured && state.namespaces.has(row.entry.settingsNs))
   const addTarget = addMode === 'adopt' || visitedModes.has('adopt') ? adoptDraft : undefined
   const addRow = addTarget === undefined
     ? undefined
     : addable.find(row => row.entry.provider === addTarget.provider)
   const addNamespace = addTarget === undefined ? undefined : state.namespaces.get(addTarget.settingsNs)
   // Hand-declared routes live in the pi-ai namespace, which is also the only
-  // one whose schema names the protocols one may speak; without it mounted
-  // there is nothing to declare and the entry point stays disabled.
-  const protocols = protocolChoices(state.namespaces.get('llm-pi-ai'), schema)
+  // one whose schema names the protocols and reasoning levels one may speak;
+  // without it mounted there is nothing to declare and the entry point stays
+  // disabled.
+  const piAi = state.namespaces.get('llm-pi-ai')
+  const protocols = protocolChoices(piAi, schema)
+  const reasoningLevels = reasoningLevelChoices(piAi, schema)
 
-  // Each add mode is offered while its precondition holds: adopt needs a
-  // dormant adapter route, custom needs the pi-ai namespace's protocol list.
-  const adoptOffered = canAdoptProvider
-  const customOffered = protocols.length > 0
+  // Each add mode is offered while its namespace is mounted and enabled while
+  // it has something to offer: adopt needs a dormant adapter route, custom
+  // needs the pi-ai protocol list. The card shows the chosen mode where both
+  // are offered, else the only one there is.
+  const adoptOffered = scopedRows.some(row => state.namespaces.has(row.entry.settingsNs))
+  const adoptEnabled = addable.length > 0
+  const customOffered = piAi !== undefined
+  const customEnabled = protocols.length > 0
+  const bothOffered = adoptOffered && customOffered
+  const shownMode: 'adopt' | 'custom' = bothOffered
+    ? (addMode ?? (adoptEnabled ? 'adopt' : 'custom'))
+    : customOffered ? 'custom' : 'adopt'
   /** An in-flight write in either mounted panel locks the mode switch. */
   const switchLocked = cardBusy.adopt || cardBusy.custom
 
@@ -650,8 +674,8 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
               <button
                 type="button"
                 className={`${styles['addButton']} ${styles['addButtonFull']}`}
-                disabled={(!adoptOffered && !customOffered) || !state.writable || state.status !== 'ready'}
-                onClick={() => { openAdd(adoptOffered ? 'adopt' : 'custom') }}
+                disabled={(!adoptEnabled && !customEnabled) || !state.writable || state.status !== 'ready'}
+                onClick={() => { openAdd(adoptEnabled ? 'adopt' : 'custom') }}
               >
                 {/* Same glyph as the composer's attach button. */}
                 <IconPlusOutline16 size={14} />
@@ -661,26 +685,44 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
           )
           : (
             <div className={styles['addCard']}>
-              {adoptOffered && customOffered
-                ? (
-                  <SegmentedTabs
-                    items={[
-                      { value: 'adopt' as const, label: t('addModeAdopt'), id: 'models-add-adopt', panelId: 'models-add-adopt-panel' },
-                      { value: 'custom' as const, label: t('addModeCustom'), id: 'models-add-custom', panelId: 'models-add-custom-panel' },
-                    ]}
-                    value={addMode}
-                    onChange={(mode) => {
-                      if (switchLocked) return
-                      openAdd(mode)
-                    }}
-                    label={t('add')}
-                    className={styles['addModes']}
-                  />
-                )
-                : null}
+              <div className={styles['addModes']}>
+                {bothOffered
+                  ? (
+                    <SegmentedControl
+                      id="models-add"
+                      label={t('add')}
+                      value={shownMode}
+                      disabled={switchLocked}
+                      options={[
+                        {
+                          value: 'adopt' as const,
+                          label: t('addModeAdopt'),
+                          disabled: !adoptEnabled,
+                          ...adoptEnabled ? {} : { title: t('addAdoptExhausted') },
+                        },
+                        {
+                          value: 'custom' as const,
+                          label: t('addModeCustom'),
+                          disabled: !customEnabled,
+                          ...customEnabled ? {} : { title: t('addCustomUnavailable') },
+                        },
+                      ]}
+                      onChange={openAdd}
+                    />
+                  )
+                  : (
+                    <div className={styles['editorHeader']}>
+                      <span className={styles['editorTitle']}>{t(shownMode === 'adopt' ? 'addModeAdopt' : 'addModeCustom')}</span>
+                    </div>
+                  )}
+              </div>
               {visitedModes.has('adopt')
                 ? (
-                  <div id="models-add-adopt-panel" role="tabpanel" aria-labelledby="models-add-adopt" hidden={addMode !== 'adopt'}>
+                  <div
+                    id="models-add-adopt-panel"
+                    {...bothOffered ? { role: 'tabpanel', 'aria-labelledby': 'models-add-adopt' } : {}}
+                    hidden={shownMode !== 'adopt'}
+                  >
                     {addTarget === undefined
                       ? null
                       : (
@@ -714,6 +756,10 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                                 namespace={addNamespace}
                                 schema={schema}
                                 settingsPath={addTarget.settingsPath}
+                                {...addTarget.defaultBaseURL === undefined ? {} : { defaultBaseURL: addTarget.defaultBaseURL }}
+                                {...addTarget.baseURLEnv === undefined ? {} : { baseURLEnv: addTarget.baseURLEnv }}
+                                {...addTarget.nativeAuth === undefined ? {} : { nativeAuth: addTarget.nativeAuth }}
+                                {...addTarget.credentialChecks === undefined ? {} : { credentialChecks: addTarget.credentialChecks }}
                                 api={api}
                                 discoverModels={discoverModels}
                                 t={t}
@@ -738,10 +784,15 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                 : null}
               {visitedModes.has('custom')
                 ? (
-                  <div id="models-add-custom-panel" role="tabpanel" aria-labelledby="models-add-custom" hidden={addMode !== 'custom'}>
+                  <div
+                    id="models-add-custom-panel"
+                    {...bothOffered ? { role: 'tabpanel', 'aria-labelledby': 'models-add-custom' } : {}}
+                    hidden={shownMode !== 'custom'}
+                  >
                     <CustomProviderCard
                       taken={scopedRows.map(row => row.entry.provider)}
                       protocols={protocols}
+                      reasoningLevels={reasoningLevels}
                       {...(managementScope === 'project'
                         ? { routePattern: PROJECT_PROVIDER_PATTERN }
                         : injected.providerIdPattern === undefined

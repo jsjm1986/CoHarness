@@ -4,6 +4,8 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
@@ -15,13 +17,15 @@
   - button "Jump to turn 6"
   - button "Jump to turn 7"
   - button "Jump to turn 8"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - text: WIRE_USER_01
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_01":
   - img
   - img
@@ -44,13 +48,15 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - text: WIRE_USER_02
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_02":
   - img
   - img
@@ -73,13 +79,15 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - text: WIRE_USER_03
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_03":
   - img
   - img
@@ -102,13 +110,15 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - text: WIRE_USER_04
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_04":
   - img
   - img
@@ -131,13 +141,15 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - text: WIRE_USER_05
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_05":
   - img
   - img
@@ -160,13 +172,15 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - text: WIRE_USER_06
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_06":
   - img
   - img
@@ -189,18 +203,21 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 tool call · 2 intermediate messages" [expanded]:
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - text: WIRE_USER_TOOL
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking WIRE_REASONING_TOOL_CALL":
   - img
   - img
   - text: Thinking WIRE_REASONING_TOOL_CALL
 - paragraph: WIRE_ASSISTANT_TOOL_CALL
+- button "Ran commands"
 - button "Bash Verify history wire pagination":
   - img
   - img
@@ -223,13 +240,13 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{date}} {{clock}}"
-- button "1 intermediate message" [expanded]:
-  - text: 1 intermediate message
-  - img
 - text: WIRE_USER_INTERRUPTED
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Stopped
+- button "Stopped" [disabled] [expanded]
+- button "Analysis completed"
 - button "Thinking WIRE_INTERRUPTED_REASONING":
   - img
   - img

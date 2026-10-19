@@ -50,7 +50,7 @@ describe('PermissionCatalogMirror', () => {
     const pending = Promise.withResolvers<{ ok: true; value: PermissionCatalog }>()
     const ownership = createSnapshotStore<{ byId: Record<SessionId, unknown> }>({ byId: { [id]: {} } })
     const connection: ConnectionHandle = {
-      api: new FakeApiClient(), isLoopback: true, hostDescription: idleHost(),
+      api: new FakeApiClient(), isLoopback: true, interactions: 'none', hostDescription: idleHost(),
       state: { getSnapshot: () => undefined, subscribe: () => () => {} },
       rpc: { call: () => pending.promise }, reconnect: () => {}, start: () => ({ stop: () => {} }),
     }

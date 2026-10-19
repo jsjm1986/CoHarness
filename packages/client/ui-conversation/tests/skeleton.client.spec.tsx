@@ -217,7 +217,7 @@ function mount(
           renderSlot={renderSlot as never}
           views={views}
           releaseSessionImages={vi.fn()}
-          bindDraftMirror={write => wiring.bindMirror(write)}
+          bindDraftMirror={(write, initialDraft) => wiring.bindMirror(write, initialDraft)}
         />
       )
     }

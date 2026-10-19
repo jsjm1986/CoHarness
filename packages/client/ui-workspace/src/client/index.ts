@@ -80,7 +80,9 @@ export interface UiWorkspace {
    */
   openSession(sessionId: SessionId): void
   /**
-   * Start a New Session flow and navigate to its Session.
+   * Start a New Session flow and navigate to its Session. A bare call mints
+   * a fresh Session+Agent under the current preset definition; draft options
+   * keep the Workspace's existing draft or blank instead.
    * @param workspaceId - explicit target; absent inherits the current or most recent Workspace.
    * @param options - draft initialization for the landing composer: `prompt`
    * prefills unsent text (an empty draft only; it never sends or executes),

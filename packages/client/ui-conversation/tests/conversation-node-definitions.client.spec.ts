@@ -9,7 +9,7 @@ import { chatViewDefinition } from '../src/client/conversation-nodes/chat-snapsh
 import { commandDefinition } from '../src/client/conversation-nodes/command.ts'
 import { compactionDefinition } from '../src/client/conversation-nodes/compaction.ts'
 import { unknownFallbackDefinition } from '../src/client/conversation-nodes/fallback.ts'
-import { nextStepInboxDefinition } from '../src/client/conversation-nodes/inbox.ts'
+import { nextStepInboxDefinition, nextTurnInboxDefinition } from '../src/client/conversation-nodes/inbox.ts'
 import { developerMessageDefinition, messageDefinition } from '../src/client/conversation-nodes/message.ts'
 import { retryDefinition } from '../src/client/conversation-nodes/retry.ts'
 import { systemPromptDefinition } from '../src/client/conversation-nodes/system-prompt.ts'
@@ -24,6 +24,7 @@ import type {
 
 const DEFINITIONS: readonly ConversationNodeDefinition[] = [
   nextStepInboxDefinition,
+  nextTurnInboxDefinition,
   messageDefinition,
   developerMessageDefinition,
   assistantDefinition,
@@ -207,23 +208,29 @@ describe('built-in conversation node Definitions', () => {
     const value = assembler([
       at(10, 'turn/start', { turn: 2 }),
       at(11, 'step/start', { turn: 2, step: 1 }),
-      at(12, 'tool/call', { turn: 2, step: 1, callId: 'ordinary', name: 'manage_agent', arguments: '{}' }),
-      at(13, 'tool/call', { turn: 2, step: 1, callId: 'delegate', name: 'subagent', arguments: '{}' }),
-      at(14, 'step/end', { turn: 2, step: 1 }),
-      at(15, 'step/start', { turn: 2, step: 2 }),
-      at(16, 'tool/call', { turn: 2, step: 2, callId: 'fork', name: 'subagent_fork', arguments: '{}' }),
-      at(17, 'llm/retry', {
+      at(12, 'assistant/message', {
+        stream: [],
+        turn: 2,
+        step: 1,
+        message: assistantMessage('process-checking', 'checking'),
+      }, { surfaceOp: 'append' }),
+      at(13, 'tool/call', { turn: 2, step: 1, callId: 'ordinary', name: 'manage_agent', arguments: '{}' }),
+      at(14, 'tool/call', { turn: 2, step: 1, callId: 'delegate', name: 'subagent', arguments: '{}' }),
+      at(15, 'step/end', { turn: 2, step: 1 }),
+      at(16, 'step/start', { turn: 2, step: 2 }),
+      at(17, 'tool/call', { turn: 2, step: 2, callId: 'fork', name: 'subagent_fork', arguments: '{}' }),
+      at(18, 'llm/retry', {
         retryId: 'retry-process', turn: 2, step: 2, provider: 'fake', mode: 'normal',
         policyKey: 'fake-normal', retry: 1, maxRetries: 2, delayMs: 10,
         failure: { code: 'TRANSPORT', message: 'temporary' },
       }),
-      at(18, 'assistant/message', {
+      at(19, 'assistant/message', {
         stream: [],
         turn: 2,
         step: 2,
         message: assistantMessage('process-answer', 'done'),
       }, { surfaceOp: 'append' }),
-      at(19, 'turn/end', { turn: 2, reason: { kind: 'completed' } }),
+      at(20, 'turn/end', { turn: 2, reason: { kind: 'completed' } }),
     ])
     const process = node(snapshot(value), 'turn-process')
     expect(process?.data).toMatchObject({
@@ -231,7 +238,7 @@ describe('built-in conversation node Definitions', () => {
       messageCount: 1,
       toolCallCount: 1,
       subagentCount: 2,
-      answerAnchorSeq: 18,
+      answerAnchorSeq: 19,
     })
 
     const interrupted = assembler([
@@ -654,8 +661,8 @@ describe('built-in conversation node Definitions', () => {
     expect(after.nodes.get(existing?.key ?? '')).toBe(existing)
     expect(after.order).toHaveLength(before.order.length + 4)
     expect(after.order.map(key => after.nodes.get(key)?.kind)).toEqual([
-      'turn-process', 'user', 'assistant-step', 'turn-tail',
-      'turn-process', 'user', 'assistant-step', 'turn-tail',
+      'user', 'turn-process', 'assistant-step', 'turn-tail',
+      'user', 'turn-process', 'assistant-step', 'turn-tail',
     ])
   })
 
@@ -686,7 +693,7 @@ describe('built-in conversation node Definitions', () => {
     expect(after.order.slice(0, oldOrder.length)).toEqual(oldOrder)
     expect(oldOrder.map(key => after.nodes.get(key))).toEqual(oldNodes)
     expect(after.order.map(key => after.nodes.get(key)?.kind)).toEqual([
-      'turn-process', 'user', 'assistant-step', 'turn-tail', 'user',
+      'user', 'turn-process', 'assistant-step', 'turn-tail', 'user', 'turn-process',
     ])
   })
 
@@ -743,7 +750,7 @@ describe('built-in conversation node Definitions', () => {
     expect(node(snapshot(value), 'user')).toBeUndefined()
   })
 
-  it('orders claimed steering after the finalized Turn tail', () => {
+  it('anchors the finalized Turn tail at the recorded turn/end, after claimed steering', () => {
     const steering = textMessage('steer-after-answer', 'change direction')
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
@@ -772,8 +779,96 @@ describe('built-in conversation node Definitions', () => {
 
     const current = snapshot(value)
     const steeringNode = node(current, 'steering')
+    const tailNode = node(current, 'turn-tail')
     expect(steeringNode).toBeDefined()
-    expect(current.locations.getTurn(1).at(-1)).toBe(steeringNode?.key)
+    expect(tailNode?.data).toMatchObject({ seq: 8 })
+    // The footer anchors at the recorded turn/end sequence: it must render
+    // after the claimed steering row, not beside the closing Assistant.
+    expect(tailNode?.anchorSeq).toBeGreaterThan(8)
+    expect(current.locations.getTurn(1).at(-2)).toBe(steeringNode?.key)
+    expect(current.locations.getTurn(1).at(-1)).toBe(tailNode?.key)
+    expect(current.order.at(-1)).toBe(tailNode?.key)
+  })
+
+  it.each(['next-turn', 'idle-notice', 'idle-human'] as const)(
+    'classifies the %s opening input from admission through first output', (route) => {
+      const target = route === 'next-turn' ? 'next-turn' : 'next-step'
+      const input = {
+        ...textMessage('opening-input', 'start this work'),
+        source: { kind: route === 'idle-human' ? 'user' : 'schedule' },
+      }
+      const kind = route === 'idle-human' ? 'steering' : 'turn-trigger'
+      const value = assembler([
+        at(1, 'agent/inbox/spliced', { target, start: 0, inserted: [input] }),
+        at(2, 'turn/start', { turn: 1 }),
+        at(3, 'agent/inbox/spliced', { target, start: 0, removedCount: 1, inserted: [] }),
+        at(4, 'step/start', { turn: 1, step: 1 }),
+        at(5, 'user/message', input, { surfaceOp: 'append' }),
+      ])
+      const opening = snapshot(value)
+      // The eager turn-process row is projection noise for this concern: the
+      // assertion targets the opening input's own kind and placement.
+      const kinds = (snap: ReturnType<typeof snapshot>) => snap.order
+        .map(key => snap.nodes.get(key)?.kind)
+        .filter(nodeKind => nodeKind !== 'turn-process')
+      expect(kinds(opening)).toEqual([kind])
+      value.append(at(6, 'assistant/live-chunk', {
+        turn: 1, step: 1, chunk: { type: 'reasoning-delta', index: 0, text: 'thinking' },
+      }))
+      value.flush()
+      const running = snapshot(value)
+      expect(opening.order.every(key => running.order.includes(key))).toBe(true)
+      expect(kinds(running)).toEqual([kind, 'assistant-step'])
+    },
+  )
+
+  it.each(['replay', 'live', 'prepend'] as const)('classifies waking Inbox messages through %s', (mode) => {
+    const notice = { ...textMessage('notice', 'scheduled work'), source: { kind: 'schedule' } }
+    const human = textMessage('human', 'user task')
+    const insertion = (target: 'next-step' | 'next-turn', messages = [notice]) =>
+      at(1, 'agent/inbox/spliced', { target, start: 0, inserted: messages })
+    const claim = (target: 'next-step' | 'next-turn', count = 1) =>
+      at(3, 'agent/inbox/spliced', { target, start: 0, removedCount: count, inserted: [] })
+    const start = at(2, 'turn/start', { turn: 1 })
+    const step = at(8, 'step/start', { turn: 1, step: 1 })
+    const cases: { name: string; before: ConversationEventInput[]; waking: boolean }[] = [
+      { name: 'next-turn claim', before: [insertion('next-turn'), start, claim('next-turn'), step], waking: true },
+      { name: 'idle non-human steer', before: [insertion('next-step'), start, claim('next-step'), step], waking: true },
+      { name: 'unclaimed input', before: [insertion('next-turn'), start, step], waking: false },
+      { name: 'canceled input', before: [insertion('next-turn'), start, at(3, 'agent/inbox/spliced', {
+        target: 'next-turn', start: 0, removedCount: 1, inserted: [], outcome: 'canceled',
+      }), step], waking: false },
+      { name: 'requeued claim', before: [insertion('next-turn'), start, claim('next-turn'),
+        at(4, 'agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [notice] }), step], waking: false },
+      { name: 'human steer in the same batch', before: [insertion('next-step', [notice, human]),
+        start, claim('next-step', 2), step], waking: false },
+      { name: 'a queued message starts this Turn', before: [insertion('next-step'), start, claim('next-step'),
+        at(4, 'agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [human] }),
+        at(5, 'agent/inbox/spliced', { target: 'next-turn', start: 0, removedCount: 1, inserted: [] }), step], waking: false },
+      { name: 'later step', before: [insertion('next-step'), start, claim('next-step'), step,
+        at(9, 'step/end', { turn: 1, step: 1 }), at(10, 'step/start', { turn: 1, step: 2 })], waking: false },
+      { name: 'missing Turn start', before: [insertion('next-step'), claim('next-step'), step], waking: false },
+      { name: 'missing Step', before: [insertion('next-step'), start, claim('next-step')], waking: false },
+      { name: 'claim before the Turn', before: [insertion('next-step'), claim('next-step'),
+        at(4, 'turn/start', { turn: 1 }), step], waking: false },
+      { name: 'not a member of the claim', before: [insertion('next-step', [{ ...notice, id: 'other' }]),
+        start, claim('next-step'), step], waking: false },
+    ]
+    for (const test of cases) {
+      const message = at(11, 'user/message', notice, { surfaceOp: 'append' })
+      const value = assembler(
+        mode === 'replay' ? [...test.before, message] : mode === 'prepend' ? [message] : [],
+        mode === 'prepend',
+      )
+      if (mode === 'live') for (const entry of [...test.before, message]) value.append(entry)
+      if (mode === 'prepend') value.prepend(test.before, false)
+      value.flush()
+      const current = snapshot(value)
+      const input = node(current, test.waking ? 'turn-trigger' : 'context')
+      expect(input?.kind, test.name).toBe(test.waking ? 'turn-trigger' : 'context')
+      expect(input?.data, test.name).toMatchObject({ waking: test.waking, source: { kind: 'schedule' } })
+      expect(current.order.includes(input!.key), test.name).toBe(true)
+    }
   })
 
   it('classifies appended producer context from durable source metadata', () => {

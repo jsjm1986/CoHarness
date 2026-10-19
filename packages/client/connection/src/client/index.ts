@@ -7,9 +7,10 @@ import { createBrowserIdentityFence, type BrowserIdentityFence } from './identit
 import { sessionAddressApi } from './session-api.ts'
 export { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { INTERACTIONS_QUERY, LAUNCH_TOKEN_QUERY } from '@deepseek-ai/dsh-host-apiproxy/api/interactions'
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ConnectionRuntimeTarget, HostDescription, IApiClient, SessionId } from './api.ts'
+import type { ConnectionInteractions, ConnectionRuntimeTarget, HostDescription, IApiClient, SessionId } from './api.ts'
 import { ConnectionController, resolveConnectionConfig, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
 import { FixtureApiClient } from './fixture.ts'
 import { WebApiClient } from './web-api-client.ts'
@@ -27,14 +28,15 @@ import type { ClientConnectionRpc } from '../rpc.ts'
 
 // ---- Contract re-exports (browser-safe apiproxy channels + core types) ----
 export type {
-  ApiProxy, SessionsApi, SessionSearchItem, SessionSummary, PromptContentPart, HostApi, EventsApi, MuxFrame, HostFrame,
+  ApiProxy, ConnectionInteractions, SessionsApi, SessionSearchItem, SessionSummary, PromptContentPart, HostApi, EventsApi,
+  MuxFrame, HostFrame,
   ApprovalResponsePayload, QuestionResponsePayload, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionHistoryIndex, SessionHistoryIndexItem, ToolEventView,
   DirectoryEntry, DirectoryListing, DesktopConfirmation,
   ToolCallView, ToolResultView, WorkspaceApi, WorkspaceId, WorkspaceView,
   WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
-  SkillsApi, SkillEntry,
+  SkillsApi, SkillEntry, SkillPreview,
   ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
   MessageId, ModelReasoningEffort, ModelSelection, QueueAction, QueuedInboxItem, SessionModels,
   SubagentsApi, SubagentAddress, SubagentCatalog, SubagentListEntry, SubagentPromptContentPart, SubagentPromptReceipt,
@@ -50,6 +52,7 @@ export {
   RpcId,
   AbstractApiClient,
   transportError,
+  interactionsUnavailableError,
 } from './api.ts'
 
 // Connection loop types are public through ConnectionHandle.start; the
@@ -98,8 +101,10 @@ export interface ClientTransportHooks {
   /**
    * Build the API carrier, including its downstream event streams; unused in
    * fixture mode. Absent members fall back to the browser HTTP carrier.
+   * The resolved interaction mode arrives so the carrier can declare it on
+   * the wire and gate answer helpers identically to the built-in clients.
    */
-  createApiClient?(): IApiClient
+  createApiClient?(interactions: ConnectionInteractions): IApiClient
   /**
    * Already decoded logical RPC carrier. When present it replaces the HTTP
    * caller outright: no envelopes and no `fetch` (an in-process Host such as
@@ -134,6 +139,11 @@ export interface ConnectionLocation {
 
 /** Instance-local inputs for installing a Connection service. */
 export interface ConnectionInstallOptions {
+  /**
+   * Forwarded-event and answer participation; omission selects 'answer' for a
+   * page install (location present) and 'none' otherwise.
+   */
+  readonly interactions?: ConnectionInteractions
   /** Explicit physical carrier; omit for the browser HTTP carrier. */
   readonly transport?: ClientTransportHooks
   /** Reconnect timing overrides; omitted fields use controller defaults. */
@@ -177,6 +187,8 @@ interface ConnectionShared {
  * is ready — connection stays consumer-agnostic).
  */
 export interface ConnectionHandle {
+  /** Forwarded-event and answer participation selected at installation. */
+  readonly interactions: ConnectionInteractions
   /** Shared api client (fixture or real, decided at boot from the page URL). */
   readonly api: IApiClient
   /** Raw per-runtime carrier, for owners that already hold original Host IDs. */
@@ -255,6 +267,8 @@ interface ConnectionCarrier {
   readonly fixture: FixtureApiClient | undefined
   /** Page identity fence; pooled target sockets reuse its authenticated URL preparation. */
   readonly identity: BrowserIdentityFence | undefined
+  /** Install-resolved interaction mode shared by every handle this carrier builds. */
+  readonly interactions: ConnectionInteractions
 }
 
 /**
@@ -270,12 +284,13 @@ function carrierOf(carrier: ConnectionCarrier, target: ConnectionRuntimeTarget |
     return {
       // A transport without its own api builder (fetch/rpc only) still gets the
       // per-target browser carrier; one with an in-process api shares it.
-      api: transport.createApiClient?.() ?? new WebApiClient(target, undefined, undefined, carrier.identity?.socketUrl),
+      api: transport.createApiClient?.(carrier.interactions)
+        ?? new WebApiClient(target, undefined, undefined, carrier.identity?.socketUrl, undefined, carrier.interactions),
       rpc: transport.rpc ?? createWebConnectionRpc(transport.fetch, target),
     }
   }
   return {
-    api: new WebApiClient(target, undefined, undefined, carrier.identity?.socketUrl),
+    api: new WebApiClient(target, undefined, undefined, carrier.identity?.socketUrl, undefined, carrier.interactions),
     rpc: createWebConnectionRpc(undefined, target),
   }
 }
@@ -286,6 +301,7 @@ function carrierOf(carrier: ConnectionCarrier, target: ConnectionRuntimeTarget |
  * @param pageLocation - page location used for loopback classification.
  * @param bootstrapRecovery - page-level recovery timings.
  * @param rpc - target's logical RPC carrier.
+ * @param interactions - the install-resolved interaction mode every derived handle keeps.
  * @param accountPreferences - account-preference transport when the carrier supplies one.
  * @param projectModelSettings - project-Provider transport when the carrier supplies one.
  * @param shared - pool state shared across derived handles.
@@ -298,6 +314,7 @@ function createConnectionHandle(
   pageLocation: ConnectionLocation | undefined,
   bootstrapRecovery: Required<ConnectionConfig>,
   rpc: ClientConnectionRpc,
+  interactions: ConnectionInteractions,
   accountPreferences?: AccountPreferencesTransport,
   projectModelSettings?: ProjectModelSettingsTransport,
   shared?: ConnectionShared,
@@ -340,6 +357,7 @@ function createConnectionHandle(
     return { api: selected.wireApi ?? selected.api, sessionId: sharedState.originalSession(key) }
   })
   const handle: ConnectionHandle = {
+    interactions,
     wireApi: api,
     get api() { return sharedState.originalSession === undefined ? api : routedApi },
     ...(accountPreferences === undefined ? {} : { accountPreferences }),
@@ -366,8 +384,8 @@ function createConnectionHandle(
       if (sharedState.root !== undefined && key === targetKey(sharedState.baseTarget ?? { kind: 'personal' })) return sharedState.root
       const existing = sharedState.handles.get(key)
       if (existing !== undefined) return existing
-      const composition = carrier === undefined
-        ? { api, rpc, transport: undefined, fixture: undefined, identity: sharedState.identity }
+      const composition: ConnectionCarrier = carrier === undefined
+        ? { api, rpc, transport: undefined, fixture: undefined, identity: sharedState.identity, interactions }
         : { ...carrier, fixture: undefined }
       const faces = carrierOf(composition, next)
       const child = createConnectionHandle(
@@ -375,6 +393,7 @@ function createConnectionHandle(
         pageLocation,
         bootstrapRecovery,
         faces.rpc,
+        interactions,
         undefined,
         undefined,
         sharedState,
@@ -479,8 +498,11 @@ function createConnectionHandle(
 export function installConnection(ctx: Context, options: ConnectionInstallOptions = {}): void {
   const pageLocation = options.location
   const transport = options.transport
+  // Non-page installs default to 'none': a programmatic operator declares
+  // participation explicitly while the page keeps full interaction behavior.
+  const interactions = options.interactions ?? (pageLocation === undefined ? 'none' : 'answer')
   const fixture = pageLocation?.search !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
-  const fixtureClient = fixture ? new FixtureApiClient() : undefined
+  const fixtureClient = fixture ? new FixtureApiClient(interactions) : undefined
   const nativeFetch = globalThis.fetch
   const identity = fixtureClient === undefined && transport === undefined && pageLocation?.origin !== undefined
     && /^https?:\/\//u.test(pageLocation.origin)
@@ -492,14 +514,14 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
       if (globalThis.fetch === identity.fetch) globalThis.fetch = nativeFetch
     }, 'connection: authenticated document requests')
   }
-  const api: IApiClient = fixtureClient ?? transport?.createApiClient?.()
+  const api: IApiClient = fixtureClient ?? transport?.createApiClient?.(interactions)
     ?? new WebApiClient(undefined, undefined, undefined, identity?.socketUrl, (description) => {
       if (description.executionAuthorityRequired === true && description.runtimeTarget === undefined) {
         throw new Error('Managed Host did not declare its runtime identity')
       }
       if (description.runtimeTarget === undefined) identity?.setRuntimeTarget(undefined)
       else handle.setBaseTarget?.(description.runtimeTarget)
-    })
+    }, interactions)
   const accountPreferences = fixtureClient === undefined
     ? transport?.createAccountPreferencesTransport?.() ?? createBrowserAccountPreferencesTransport()
     : undefined
@@ -508,12 +530,13 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
     : undefined
   const bootstrapRecovery = resolveConnectionConfig(options.recovery ?? {})
   const rpc = fixtureClient?.rpc ?? transport?.rpc ?? createWebConnectionRpc(transport?.fetch)
-  const carrier: ConnectionCarrier = { api, rpc, transport, fixture: fixtureClient, identity }
+  const carrier: ConnectionCarrier = { api, rpc, transport, fixture: fixtureClient, identity, interactions }
   const handle = createConnectionHandle(
     api,
     pageLocation,
     bootstrapRecovery,
     rpc,
+    interactions,
     accountPreferences,
     projectModelSettings,
     { root: undefined, handles: new Map(), ...(identity === undefined ? {} : { identity }) },
@@ -537,6 +560,65 @@ export function apply(ctx: Context): void {
     ...(recovery === undefined ? {} : { recovery }),
     ...(pageLocation === undefined ? {} : { location: pageLocation }),
   })
+}
+
+/** Browser API carrier that authenticates every request with an operator launch token. */
+class OperatorApiClient extends WebApiClient {
+  /**
+   * @param base - the Host's HTTP origin.
+   * @param token - the launch token admitted by the Host's connection bridge.
+   * @param interactions - the connection's interaction mode, declared on every URL.
+   */
+  constructor(
+    private readonly base: URL,
+    private readonly token: string,
+    interactions: ConnectionInteractions,
+  ) {
+    super(undefined, undefined, undefined, undefined, undefined, interactions)
+  }
+
+  protected override resolveBase(): string {
+    return this.base.href
+  }
+
+  protected override resolveUrl(path: string): URL {
+    const url = super.resolveUrl(path)
+    url.searchParams.set(LAUNCH_TOKEN_QUERY, this.token)
+    return url
+  }
+}
+
+/**
+ * Build the transport for a programmatic operator connection against an
+ * already-running Host. Every API, socket, and generic-RPC request carries
+ * the launch token and the install-resolved interaction mode, so the Host's
+ * connection bridge admits the carrier without a browser cookie. Install it
+ * as `installConnection(ctx, { transport, interactions })` with no location.
+ * @param baseUrl - the Host's HTTP origin, for example `http://127.0.0.1:4100`.
+ * @param token - the launch token the Host exposes for operator admission.
+ * @returns transport hooks authenticating api and generic-RPC carriers.
+ */
+export function createOperatorTransport(baseUrl: string, token: string): ClientTransportHooks {
+  const base = new URL(baseUrl)
+  // The mode arrives when the install builds the api carrier; the generic-RPC
+  // fetch reuses it so every request declares the same participation.
+  let resolved: ConnectionInteractions = 'none'
+  const decorate = (url: URL): URL => {
+    url.searchParams.set(LAUNCH_TOKEN_QUERY, token)
+    url.searchParams.set(INTERACTIONS_QUERY, resolved)
+    return url
+  }
+  const fetch: RpcFetch = (input, init) => globalThis.fetch(
+    decorate(new URL(`${input.pathname}${input.search}`, base)),
+    init,
+  )
+  return {
+    fetch,
+    createApiClient: (interactions) => {
+      resolved = interactions
+      return new OperatorApiClient(base, token, interactions)
+    },
+  }
 }
 
 export { ConnectionRpcStreamInterrupted } from '../rpc-stream.ts'

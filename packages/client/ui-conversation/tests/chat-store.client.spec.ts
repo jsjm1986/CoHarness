@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 /** Chat-store actions, scoped persistence, and instance isolation. */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { createChatStore } from '../src/client/stores.ts'
+import { SessionInputShell } from '../src/client/input/facade.ts'
+import { readPersistedDraft } from '../src/client/input/persisted-draft.ts'
 
 const KEY = 'dsh.conversation.chat'
 
@@ -61,6 +64,61 @@ describe('createChatStore', () => {
     expect(localStorage.getItem(`${KEY}.sess-9`)).not.toBeNull()
     store.clearPersisted()
     expect(localStorage.getItem(`${KEY}.sess-9`)).toBeNull()
+  })
+
+  it('rehydrates structured references in their own Session and keeps text from malformed metadata', () => {
+    const reference = (label: string, offset: number) => ({
+      source: 'reference', ref: `ref-${label}`, label, offset, length: 2, clipboardText: `@${label}`,
+    })
+    const a = reference('A', 0)
+    const b = reference('B', 3)
+    localStorage.setItem(`${KEY}.restored`, JSON.stringify({
+      draft: {
+        text: '@A @B',
+        references: [
+          null, { ...a, occurrenceId: 999 }, a,
+          { ...b, offset: 3.5 }, { ...b, label: 'wrong' }, b,
+        ],
+      },
+    }))
+    const store = createChatStore().create('restored')
+    const shell = new SessionInputShell({
+      actx: {} as ClientContext,
+      defaultSink: vi.fn(),
+      commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: token => token },
+    })
+    const unmirror = shell.bindMirror(store.actions.setDraft, store.store.getSnapshot().draft)
+    try {
+      expect(shell.snapshot.draft).toBe('@A @B')
+      expect(shell.snapshot.occurrences).toEqual([
+        { ...a, occurrenceId: 1 }, { ...b, occurrenceId: 2 },
+      ])
+      expect(createChatStore().create('restored').store.getSnapshot().draft)
+        .toEqual({ text: '@A @B', references: [a, b] })
+      expect(createChatStore().create('other').store.getSnapshot().draft).toBe('')
+    } finally {
+      unmirror()
+      shell.dispose()
+    }
+  })
+
+  it.each([
+    ['plain draft', 'plain draft'],
+    ['  ', '  '],
+    [null, ''],
+    [[], ''],
+    [{ text: 'keep this', references: null }, 'keep this'],
+    [{ text: 'keep this', references: [{}], command: { token: '/other' } }, 'keep this'],
+  ])('preserves readable text in stored draft %j', (value, expected) => {
+    expect(readPersistedDraft(value)).toBe(expected)
+  })
+
+  it('retains only the matching command token, without restoring executable claim data', () => {
+    expect(readPersistedDraft({
+      text: '/scan project',
+      references: [],
+      command: { token: '/scan', submit: 'discarded callback metadata' },
+    })).toEqual({ text: '/scan project', references: [], command: { token: '/scan' } })
   })
 
   it('every create() is an independent instance; the factory holds no singleton', () => {

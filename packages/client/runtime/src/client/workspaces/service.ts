@@ -131,8 +131,16 @@ export class WorkspaceRuntime implements IWorkspaces {
   readonly list: SnapshotStore<WorkspaceListState>
   /** Workspace baseline and frame owner. */
   private readonly manager: WorkspaceManager
-  /** In-flight blank-session creates keyed by workspace (connectWorkspace coalescing). */
-  private readonly connecting = new Map<WorkspaceId, { readonly agentPreset?: string; readonly attempt: Promise<SessionId> }>()
+  /**
+   * In-flight Session creates keyed by workspace. Connects coalesce only
+   * within one arm — a bare New Session (`fresh`) never joins a reuse
+   * connect, which may land on a member blank carrying an earlier preset.
+   */
+  private readonly connecting = new Map<WorkspaceId, {
+    readonly fresh?: true
+    readonly agentPreset?: string
+    readonly attempt: Promise<SessionId>
+  }>()
   /** Draft reservations survive a reload without storing prompt text or credentials. */
   private readonly activeDrafts = loadActiveDrafts()
   /** Guards the runtime-owned one-shot initial-selection subscription. */
@@ -159,11 +167,14 @@ export class WorkspaceRuntime implements IWorkspaces {
   }
 
   /**
-   * Resolve the session a New Session flow lands in once this Workspace is
-   * chosen: reuse the workspace's existing blank session when one is in the
-   * list mirror, else create a fresh one on the host (`session.create` births
-   * the full Session+Agent — the client holds no intermediate state). The
-   * caller owns navigation: take the returned id to `sessions.open`.
+   * Resolve the session a Workspace reconnection lands in: reuse the
+   * workspace's existing blank member when one is in the list mirror, else
+   * create a fresh one on the host (`session.create` births the full
+   * Session+Agent — the client holds no intermediate state). This is the
+   * `openWorkspace` history fallback and the draft-preparation arm of {@link
+   * startSession}; a bare New Session goes through {@link connectFreshSession}
+   * instead, which never offers member blanks. The caller owns navigation:
+   * take the returned id to `sessions.open`.
    * The returned identity is already catalogued. Retain it before borrowing
    * its binding for a draft hand-off, or open it to acquire a view reference.
    * @param workspaceId - chosen Workspace (must be in the workspace list).
@@ -172,22 +183,23 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @returns the reused or newly created session id.
    */
   async connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId> {
-    const workspace = this.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
-    if (workspace === undefined) throw new Error(`workspaces.connectWorkspace: unknown workspace ${workspaceId}`)
+    const workspace = this.requireWorkspace(workspaceId)
     // Coalesce concurrent connects: a create's summary lands without cwd
     // until the host frame arrives, so a second call inside that window
     // would miss the reuse scan and mint another hidden blank session. Two
     // connects asking for different presets cannot coalesce — each request
-    // names the composition its conversation must run.
+    // names the composition its conversation must run. A bare New Session
+    // create in flight is never joined either: it offers no member blank, so
+    // its resolution cannot satisfy this contract.
     const inflight = this.connecting.get(workspaceId)
-    if (inflight !== undefined && inflight.agentPreset === options?.agentPreset) return inflight.attempt
+    if (inflight !== undefined && inflight.fresh !== true && inflight.agentPreset === options?.agentPreset) return inflight.attempt
     // Reuse requires workspace membership (id in sessionIds AND same
     // canonical cwd — the host's own membership rule), never cwd alone:
     // a cwd match can belong to no account (sessions the CLI/TUI birthed at
     // the host cwd, or a deleted/recreated registration) and reusing it
     // would open a session no grouping surface shows under this workspace.
     // An archived blank is never reused either: reuse would open a session
-    // no grouping surface can show, so New Session mints a fresh one instead.
+    // no grouping surface can show, so the connect mints a fresh one instead.
     const archived = this.list.getSnapshot().archivedSessionIds
     const sessions = this.sessions.list.getSnapshot()
     const reusableSessionIds: SessionId[] = []
@@ -234,11 +246,47 @@ export class WorkspaceRuntime implements IWorkspaces {
   }
 
   /**
+   * The bare New Session arm: create through `sessions.create` with only the
+   * Workspace identity, so the Host mints a fresh Session and composes a new
+   * Agent under the current preset definition. Member blanks stay parked for
+   * {@link connectWorkspace} reuse — a blank minted by an earlier gesture can
+   * carry a stale composition, and adopting it would reopen that generation.
+   * The Workspace's live draft reservation is likewise never offered: its
+   * Session would resume under the composition it recorded, so the
+   * reservation stays untouched for draft preparation to reuse or retire.
+   * Concurrent New Session calls for one Workspace join the same in-flight
+   * create; a settled create never satisfies a later call.
+   * @param workspaceId - chosen Workspace (must be in the workspace list).
+   * @returns the fresh session id.
+   */
+  private connectFreshSession(workspaceId: WorkspaceId): Promise<SessionId> {
+    this.requireWorkspace(workspaceId)
+    const inflight = this.connecting.get(workspaceId)
+    if (inflight !== undefined && inflight.fresh === true) return inflight.attempt
+    const attempt = this.sessions.create({ workspaceId })
+      .finally(() => {
+        if (this.connecting.get(workspaceId)?.attempt === attempt) this.connecting.delete(workspaceId)
+      })
+    this.connecting.set(workspaceId, { fresh: true, attempt })
+    return attempt
+  }
+
+  /**
+   * The listed Workspace a connect targets; unknown ids fail loud rather than
+   * creating a Session no account can show.
+   */
+  private requireWorkspace(workspaceId: WorkspaceId): WorkspaceView {
+    const workspace = this.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
+    if (workspace === undefined) throw new Error(`workspaces.connectWorkspace: unknown workspace ${workspaceId}`)
+    return workspace
+  }
+
+  /**
    * Resolve the default conversation for an existing Workspace. The list
    * snapshot is the complete input: this method performs no additional Host
    * request and opens only the selected Session. A Workspace with no visible
-   * historical Session falls back to {@link connectWorkspace}, preserving the
-   * New Session blank-reuse semantics.
+   * historical Session falls back to {@link connectWorkspace}, preserving
+   * Workspace reconnection's blank-reuse semantics.
    * @param workspaceId - target workspace.
    * @param options - forwarded to {@link connectWorkspace} when the Workspace
    *   has no selectable history (`agentPreset` names the fallback
@@ -361,10 +409,13 @@ export class WorkspaceRuntime implements IWorkspaces {
    * The shared New Session action behind the shell entry points (sidebar
    * button, workspace browser): resolve the target Workspace — explicit wins,
    * then the current Session's Workspace, then the recent-Workspace
-   * projection — connect its blank session and navigate there; with no
-   * Workspace at all, clear the selection into the New Session view state.
-   * Connect failures are non-fatal (console diagnostics plus `onFailure`;
-   * the current view stays usable).
+   * projection — create its Session and navigate there; with no Workspace at
+   * all, clear the selection into the New Session view state.
+   * A bare call always mints a fresh Session+Agent under the current preset
+   * definition ({@link connectFreshSession}); draft-preparation options keep
+   * the reconnect arm ({@link connectWorkspace}), so a landed draft the
+   * Workspace already knows stays open. Connect failures are non-fatal
+   * (console diagnostics plus `onFailure`; the current view stays usable).
    * @param workspaceId - explicit target Workspace for scoped actions.
    * @param options - draft initialization for the landed Session and the
    * rejected-connect observer.
@@ -384,7 +435,10 @@ export class WorkspaceRuntime implements IWorkspaces {
       return
     }
     const navigation = this.sessions.beginNavigation()
-    void this.connectWorkspace(target).then(
+    const creating = prompt !== undefined || clearPreviousDraft === true
+      ? this.connectWorkspace(target)
+      : this.connectFreshSession(target)
+    void creating.then(
       (sessionId) => {
         if (navigation.aborted) return
         if (this.sessions.list.getSnapshot().archivedById[sessionId] !== undefined

@@ -1,8 +1,8 @@
 // Keyless assembled-browser coverage for the goal bar over the shipped Web
 // bundles and FixtureApiClient wire. The command creates a real projected
 // goal in the fixture session; the golden pins the active strip, while the
-// clear gesture proves the acknowledged tombstone leaves neither stale chrome
-// nor a duplicate-mutation error.
+// activation event exposes Resume without changing durable phase, and clear
+// leaves neither stale chrome nor a duplicate-mutation error.
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
@@ -16,6 +16,7 @@ import { expectTooltipOnTop, newEnglishPage, saveFailureShot } from './support.t
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/goal-bar', import.meta.url))
 const ACTIVE_EXPECTED = join(SNAPSHOT_DIR, 'active.expected.md')
+const INACTIVE_EXPECTED = join(SNAPSHOT_DIR, 'inactive.expected.md')
 const OVERLAY = fileURLToPath(new URL('./goal-bar.overlay.yml', import.meta.url))
 const MODE = webSnapshotMode()
 
@@ -42,7 +43,7 @@ describe('web e2e: goal bar clear convergence', () => {
     await scaffold?.close()
   })
 
-  it('renders one active goal and clears it without exposing a stale error', async () => {
+  it('resumes a disarmed active goal and clears it without exposing a stale error', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-goal-bar-clear'))
     // Startup opens the fixture workspace's most recent history — alpha's
     // running replay with its pending question — so ask for a blank session
@@ -55,6 +56,7 @@ describe('web e2e: goal bar clear convergence', () => {
 
     const bar = page.locator('[data-goal-bar]')
     await bar.waitFor({ timeout: 10_000 })
+    await bar.getByRole('button', { name: 'Pause goal', exact: true }).waitFor()
     const snapshot = await captureStableAria(page, '[data-goal-bar]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(ACTIVE_EXPECTED, snapshot, MODE)
 
@@ -65,6 +67,21 @@ describe('web e2e: goal bar clear convergence', () => {
     // The strip rides directly above the input card, which paints later; the
     // bubble must escape the strip's stacking context instead of landing under it.
     await expectTooltipOnTop(pauseTooltip)
+
+    await page.evaluate(() => {
+      const timing = (globalThis as Record<string, unknown>).__fxTiming as
+        | { disarmOnlyGoal(): void }
+        | undefined
+      if (timing === undefined) throw new Error('fixture timing controls are unavailable')
+      timing.disarmOnlyGoal()
+    })
+    const resume = bar.getByRole('button', { name: 'Resume goal', exact: true })
+    await resume.waitFor()
+    const inactive = await captureStableAria(page, '[data-goal-bar]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(INACTIVE_EXPECTED, inactive, MODE)
+    await resume.click()
+    await pause.waitFor()
+    expect(await resume.count()).toBe(0)
 
     const clear = bar.getByRole('button', { name: 'Clear goal' })
     await clear.evaluate((button) => {
@@ -79,6 +96,6 @@ describe('web e2e: goal bar clear convergence', () => {
   }, 60_000)
 
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['active.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['active.expected.md', 'inactive.expected.md'])
   })
 })

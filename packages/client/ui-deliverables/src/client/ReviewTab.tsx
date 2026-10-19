@@ -16,6 +16,7 @@ import type { WorkspaceChangedFile } from '@deepseek-ai/dsh-workspace-changes/ty
 import { changedFileUrl, changesDiffUrl, changesSummaryUrl, parseChangesReviewAddress } from '../changes.ts'
 import type { ChangesDiffStore } from './changes-diff.ts'
 import type { ChangesSummaryStore } from './changes-summary.ts'
+import { NativeOpenMenu } from './NativeOpenMenu.tsx'
 import type { PresentedOpenController } from './present-open.ts'
 import type { ChangesReviewParams } from './review-definition.ts'
 import type { createReviewStore } from './review-store.ts'
@@ -33,10 +34,12 @@ export interface ReviewInjected {
     changesDiff: ObservableSnapshot<ReturnType<ChangesDiffStore['state']['getSnapshot']>>
     presentedOpen: ObservableSnapshot<ReturnType<PresentedOpenController['state']['getSnapshot']>>
     presentedHost: ObservableSnapshot<ReturnType<PresentedOpenController['host']['getSnapshot']>>
+    presentedApps: ObservableSnapshot<ReturnType<PresentedOpenController['apps']['getSnapshot']>>
   }
   loadChangesSummary: ChangesSummaryStore['load']
   loadChangesDiff: ChangesDiffStore['load']
   reloadPresentedHost: PresentedOpenController['loadHost']
+  loadPresentedApps: PresentedOpenController['loadApplications']
   openChanged: PresentedOpenController['openChanged']
 }
 
@@ -68,7 +71,7 @@ function Counts({ file, t }: { file: WorkspaceChangedFile } & PropsLocale<typeof
  */
 export function ReviewTab({
   useTabInfo, sessionId, useSessions, useStore, actions, useChangesSummary, useChangesDiff, usePresentedOpen, usePresentedHost,
-  loadChangesSummary, loadChangesDiff, reloadPresentedHost, openChanged, t,
+  usePresentedApps, loadChangesSummary, loadChangesDiff, reloadPresentedHost, loadPresentedApps, openChanged, t,
 }: ReviewTabProps): ReactNode {
   const { tab } = useTabInfo()
   const { navigation, signal } = tab
@@ -104,10 +107,20 @@ export function ReviewTab({
     if (tab.visible && file !== undefined && diffState === undefined) void loadChangesDiff(sessionId, seq, index)
   }, [tab.visible, file, diffState, sessionId, seq, index, loadChangesDiff])
   const phase = usePresentedOpen(value => file === undefined ? undefined : value[changedFileUrl(sessionId, seq, index)])
+  const fileApps = usePresentedApps(value => file === undefined ? undefined : value[changedFileUrl(sessionId, seq, index)])
   const [menuOpen, setMenuOpen] = useState(false)
+  const [nativeMenuOpen, setNativeMenuOpen] = useState(false)
   const split = state?.split === true
   const wrap = state?.wrap === true
+  const nativePending = phase === 'opening' || phase === 'revealing'
   const native = host !== null && host !== 'error' && host.available && phase !== 'nativeUnavailable'
+  const nativeMenuDisabled = !native || nativePending
+  // An in-flight gesture or a revoked desktop takes its open chooser with it.
+  if (nativeMenuDisabled && nativeMenuOpen) setNativeMenuOpen(false)
+  const reveal = host !== null && host !== 'error' ? host.fileManager ?? 'directory' : 'directory'
+  const nativeTip = phase === 'error' ? t('diff.openNativeError')
+    : phase === 'revealError' ? t(reveal === 'directory' ? 'presented.directoryError' : 'presented.revealError')
+      : t('diff.openNative')
   const summaryState = summary === undefined || summary === 'loading' ? 'loading' : summary === 'missing' ? 'missing' : 'ready'
   return (
     <div className={`${diffCss.root} ${css.root}`} data-changes-review data-review-state={summaryState}>
@@ -143,11 +156,31 @@ export function ReviewTab({
                 tab.actions.openResource(workspaceResourceAddress(sessionId, workspacePathForResource(cwd, file.path)))
               }}><IconCodeOutline16 /></button>
           </Tooltip>}
-          {file !== undefined && native && <Tooltip label={t(phase === 'error' ? 'diff.openNativeError' : 'diff.openNative')} side="bottom" delayMs={500}>
-            <button type="button" className={css.tool} disabled={phase === 'opening'} data-review-tool="open-native"
-              aria-label={t('diff.openNativeAria', { name: file.display })} data-error={phase === 'error' || undefined}
-              onClick={() => { void openChanged(sessionId, seq, index, file.path) }}><IconRightUpOutline16 /></button>
-          </Tooltip>}
+          {file !== undefined && native && <>
+            <Tooltip label={nativeTip} side="bottom" delayMs={500}>
+              <button type="button" className={css.tool} disabled={nativePending} data-review-tool="open-native"
+                aria-label={t('diff.openNativeAria', { name: file.display })}
+                data-error={phase === 'error' || phase === 'revealError' || undefined}
+                onClick={() => { void openChanged(sessionId, seq, index, 'open', file.path) }}><IconRightUpOutline16 /></button>
+            </Tooltip>
+            <NativeOpenMenu open={nativeMenuOpen && !nativeMenuDisabled} apps={fileApps} host={host} t={t}
+              onClose={() => { setNativeMenuOpen(false) }}
+              onAction={(action, application) => {
+                setNativeMenuOpen(false)
+                void openChanged(sessionId, seq, index, action, file.path, application)
+              }}
+              anchor={<Tooltip label={t('presented.more', { name: file.display })} side="bottom" delayMs={500}>
+                <button type="button" className={css.tool} disabled={nativeMenuDisabled} data-review-tool="open-native-more"
+                  aria-haspopup="menu" aria-expanded={nativeMenuOpen && !nativeMenuDisabled}
+                  aria-label={t('presented.more', { name: file.display })}
+                  onClick={() => {
+                    if (!nativeMenuOpen) loadPresentedApps(changedFileUrl(sessionId, seq, index), file.path)
+                    setNativeMenuOpen(value => !value)
+                  }}>
+                  <IconChevronDownOutline14 size={11} />
+                </button>
+              </Tooltip>} />
+          </>}
         </span>
       </div>
       {summaryState === 'loading' && <p className={diffCss.status} role="status">{t('diff.loading')}</p>}

@@ -199,9 +199,10 @@ export type WorkspaceBrowserInjected = {
     shortcuts: HostObservable<readonly ShortcutCatalogEntry[]>
   }
   /**
-   * Start a New Session in a Workspace: reuse-or-create its blank session and
-   * open it; without an explicit workspace, inherit the current Session
-   * Workspace, then the recent Workspace, or clear into the New Session view.
+   * Start a New Session in a Workspace: create a fresh Session+Agent under
+   * the current preset definition and open it; without an explicit workspace,
+   * inherit the current Session Workspace, then the recent Workspace, or
+   * clear into the New Session view.
    */
   startSession: (workspaceId?: WorkspaceId) => void
   /** Open a real Session. */

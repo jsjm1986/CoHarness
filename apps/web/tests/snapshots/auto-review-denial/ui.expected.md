@@ -6,11 +6,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "2 tool calls · 2 intermediate messages" [expanded]:
-  - text: 2 tool calls · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -19,6 +18,11 @@
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Called tools, ran code, ran commands"
 - text: Failed
 - button "Tool call Rejected by Auto review":
   - img
@@ -58,11 +62,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "2 tool calls · 2 intermediate messages" [expanded]:
-  - text: 2 tool calls · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -71,6 +74,11 @@
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Called tools, ran code, ran commands"
 - text: Failed
 - button "Tool call Rejected by Auto review" [expanded]:
   - img
@@ -120,6 +128,8 @@
   - tablist:
     - tab "Chat"
     - tab "Trajectory" [selected]
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - toolbar "Trajectory toolbar":

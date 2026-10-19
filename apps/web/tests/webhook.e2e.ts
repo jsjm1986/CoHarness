@@ -102,6 +102,8 @@ describe('webhook composed delivery', () => {
     const admitted = session.snapshotEvents().flatMap(event => event.type === 'agent/inbox/spliced' ? event.data.inserted : [])
     expect(admitted.map(message => message.source)).toMatchObject([{
       kind: 'webhook', provider: 'github', source: 'acceptance', deliveryId: 'webhook-browser-delivery', ruleId: 'review',
+      // The durable notice fields the turn-trigger surface was designed from.
+      form: 'notice', summary: 'github webhook handled by review',
     }])
     await expect.poll(async () => (await scaffold.ctx.sessionPersistence.inspect(session.id)).events
       .some(event => event.type === 'assistant/message')).toBe(true)
@@ -112,12 +114,13 @@ describe('webhook composed delivery', () => {
     const tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.getByText(reply, { exact: true }).waitFor()
-    await page.locator('[data-turn-process="1"]').click()
-    await page.locator('[data-context-summary]').filter({ hasText: 'github webhook handled by review' }).click()
+    // The waking webhook message is the Turn's own trigger row, not folded context.
+    const trigger = page.locator('[data-turn-trigger]')
+    await trigger.getByRole('button', { name: 'GitHub event received' }).click()
     await page.getByText(prompt, { exact: true }).waitFor()
     expect(await page.getByText(prompt, { exact: true }).count()).toBe(1)
     await compareOrRefreshGolden(join(directory, 'notice.expected.md'),
-      await captureStableAria(page, '[data-context-injection-body][data-context-form="notice"]', scaffold.workspaceCwd), webSnapshotMode())
+      await captureStableAria(page, '[data-turn-trigger]', scaffold.workspaceCwd), webSnapshotMode())
     expect(tripwire.pageErrors).toEqual([])
     expect(await page.locator('[data-slot-error]').count()).toBe(0)
   })

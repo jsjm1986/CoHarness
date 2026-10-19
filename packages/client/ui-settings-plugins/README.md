@@ -7,11 +7,11 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The official **configuration items** on the sidebar's Plugins page: one `plugins.item` entry per host-plane settings namespace this package owns. The item's card sits in the page's **Configuration** group with a one-line summary, and opening it shows that plugin's settings form on the item's own page — hand-written controls bound to the namespace, each field marking whether the user overrode it and offering a reset back to the value the deployment composed. Install, removal, and enablement live in the same page's other groups, so the Plugins page is the single user-facing entry for both.
+The official **configuration items** on the sidebar's Plugins page: one `plugins.item` entry per host-plane settings namespace this package owns. The item's card sits in the page's **Built-in plugin settings** group with a one-line summary, and opening it shows that plugin's settings form on the item's own page — hand-written controls bound to the namespace, each field marking whether the user overrode it and offering a reset back to the value the deployment composed. Install, removal, and enablement live in the same page's other groups, so the Plugins page is the single user-facing entry for both.
 
 ## Summary
 
-Use the sidebar's **Plugins** page to inspect and manage the plugins this deployment ships, and its **Configuration** group to configure the host-plane plugins that expose settings. Each configuration page shows which values the user overrode, lets them reset those to deployment defaults, keeps edits local until save, and drops them when the page is left. If the configuration changed after the page loaded, the save is rejected instead of overwriting the newer values.
+Use the sidebar's **Plugins** page to inspect and manage the plugins this deployment ships, and its **Built-in plugin settings** group to configure the host-plane plugins that expose settings. Each configuration page shows which values the user overrode, lets them reset those to deployment defaults, keeps edits local until save, and drops them when the page is left. If the configuration changed after the page loaded, the save is rejected instead of overwriting the newer values.
 
 ## Table of Contents
 
@@ -27,7 +27,7 @@ Use the sidebar's **Plugins** page to inspect and manage the plugins this deploy
 <a id="what-appears-here"></a>
 ## What appears here
 
-The Plugins page's Configuration group renders the intersection of two ledgers: the `plugins.item` entries composed clients registered, and the settings namespaces the Host serves. A served namespace no item claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and an item whose namespace this deployment does not serve is filtered out, so an uncomposed plugin leaves no empty shell. Cards follow registration order, which is stable for the items one package installs together and not stable across plugins: apply order between packages is unconstrained.
+The Plugins page's Built-in plugin settings group renders the intersection of two ledgers: the `plugins.item` entries composed clients registered, and the settings namespaces the Host serves. A served namespace no item claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and an item whose namespace this deployment does not serve is filtered out, so an uncomposed plugin leaves no empty shell. Cards follow registration order, which is stable for the items one package installs together and not stable across plugins: apply order between packages is unconstrained.
 
 The items cover the shell executor (`shell`), tool-call parallelism (`agent-loop`), delegation depth and capacity (`subagent`), exact model routes (`subagent-model-selection`), and the DeepSeek search providers (`web`, `web-search-deepseek`, `web-deepseek-api`). Delegation controls retain the upstream integer validation, reset and explanatory help. Depth zero disables tools that inherit this setting; explicit tool depth takes precedence. Capacity counts live descendants of the same root Agent across all depths, excluding the root itself.
 
@@ -62,7 +62,7 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **Only host-plane plugins appear** — a plugin an agent preset mounts carries its configuration inline in that preset's `agent.cordis.yml` and cannot register a settings namespace at all (a second session mounting the same preset would fail on a duplicate registration), so the Configuration group lists nothing for it. Editing those values remains the preset editor's job.
+- **Only host-plane plugins appear** — a plugin an agent preset mounts carries its configuration inline in that preset's `agent.cordis.yml` and cannot register a settings namespace at all (a second session mounting the same preset would fail on a duplicate registration), so the Built-in plugin settings group lists nothing for it. Editing those values remains the preset editor's job.
 - **An item still needs a browser bundle** — the browser half must be a `dsh.client` package built in the client module system's lazy-CJS factory format, and the `clientBundle` preset that emits it lives in `packages/client/tsdown.client.ts` rather than a published package, so a plugin outside this repository has to reproduce that build itself. The bundle-purity gate also forbids importing this package's form chrome or model as values, so such an item owns its own staging and revision fencing.
 - **The served namespaces re-read on two signals only** — the wire announces settings-document commits and connection resets, not registrations, so a namespace whose owner registers after the group's read joins the list on the next document commit or reconnect.
 - **The shell item follows the composed executor** — the POSIX and PowerShell executor families share the `bash` namespace because a host composes exactly one of them, so the served schema differs by platform (PowerShell adds `pwshPath`) even though the form edits the same two fields on both, and a deployment composing neither shows no item.

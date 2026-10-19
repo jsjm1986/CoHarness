@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
-import { createMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createMessage, createSystemMessage, createUserMessage, type ImageBlock } from '@deepseek-ai/dsh-llm'
 import {
   SESSION_FORMAT_VERSION,
   Session,
@@ -33,6 +33,9 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/markdown-images', import
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/markdown-images/ui.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
 const SEED_ID = 'markdown-images-web-e2e'
+const ATTACHMENTS_EXPECTED = fileURLToPath(new URL('./snapshots/markdown-images/attachments.expected.md', import.meta.url))
+const IMAGE_SEED_ID = 'trajectory-images-web-e2e'
+const IMAGE_NAME = 'durable-image.png'
 const REMOTE_ALT = 'Remote test image'
 const LOCAL_ALT = 'Local test image'
 const WORKSPACE_ALT = 'Workspace test image'
@@ -169,6 +172,43 @@ function markdownImageFixture(remoteUrl: string, outsidePath: string): string {
   ].join('\n')
 }
 
+/** Build durable user and assistant image content for the shared gallery readers. */
+function durableImageFixture(image: ImageBlock): string {
+  const session = Session.create(SessionId('durable-image-source'))
+  const eventTimeOrigin = new Date().setHours(12, 0, 0, 0)
+  session.append('turn/start', { turn: 1 })
+  session.append('step/start', { turn: 1, step: 1 })
+  session.append('system/message', {
+    turn: 1, step: 1, message: createSystemMessage('Fixture system prompt.'),
+  }, { surfaceOp: 'append' })
+  const user = session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: 'Durable user image' }, image],
+    source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  session.append('session/title', {
+    title: 'Durable image sources', messageSeqs: [user.seq], source: { kind: 'fallback' },
+  })
+  session.append('assistant/message', {
+    stream: [], turn: 1, step: 1,
+    message: createMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Durable assistant image' }, image],
+      source: { kind: 'model', provider: 'fixture', model: 'fixture' },
+    }),
+  }, { surfaceOp: 'append' })
+  session.append('step/end', { turn: 1, step: 1 })
+  session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+  const header = {
+    type: 'session', version: SESSION_FORMAT_VERSION, id: '{{sessionId}}',
+    createdAt: 0, cwd: '{{cwd}}', isSeeded: false, delegationDepth: 0,
+  }
+  return [
+    JSON.stringify(header),
+    ...session.snapshotEvents().map(event => JSON.stringify({ ...event, time: eventTimeOrigin + event.seq * 1_000 })),
+    '',
+  ].join('\n')
+}
+
 describe('web e2e: Markdown image rendering', () => {
   let scaffold: WebScaffold
   let imageOrigin: ImageOrigin
@@ -200,6 +240,10 @@ describe('web e2e: Markdown image rendering', () => {
       '<p>File preview</p><script>document.body.dataset.scriptRan = "yes"</script>',
     )
     await seedSession(scaffold, markdownImageFixture(imageOrigin.url, outsidePath), SEED_ID)
+    const attachment = await scaffold.ctx.attachments.saveImage({
+      data: PNG, mediaType: 'image/png', name: IMAGE_NAME,
+    })
+    await seedSession(scaffold, durableImageFixture({ type: 'image', attachment }), IMAGE_SEED_ID)
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     page.on('response', (response) => {
@@ -214,9 +258,12 @@ describe('web e2e: Markdown image rendering', () => {
   }, 120_000)
 
   afterAll(async () => {
-    await browser?.close()
-    await scaffold?.close()
-    await stopServer(imageOrigin.server)
+    const failures: unknown[] = []
+    await browser?.close().catch((error: unknown) => failures.push(error))
+    await scaffold?.close().catch((error: unknown) => failures.push(error))
+    if (imageOrigin !== undefined) await stopServer(imageOrigin.server).catch((error: unknown) => failures.push(error))
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) throw new AggregateError(failures, 'markdown-images e2e cleanup failed')
   })
 
   it('authenticates file requests and isolates directly opened active content', async () => {
@@ -241,7 +288,7 @@ describe('web e2e: Markdown image rendering', () => {
     const groupRow = page.locator('[role="treeitem"]').first()
     await groupRow.waitFor({ timeout: 15_000 })
     await groupRow.click()
-    const sessionRow = page.locator('[role="treeitem"]').nth(1)
+    const sessionRow = page.locator(`[data-row-key^="session:"][data-row-key*="${SEED_ID}"]`)
     await sessionRow.waitFor({ timeout: 10_000 })
     await sessionRow.click()
     await expect.poll(() => page.getByText('REMOTE_IMAGE_DONE', { exact: true }).count(), {
@@ -356,6 +403,38 @@ describe('web e2e: Markdown image rendering', () => {
     }
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])
   }, 120_000)
+
+  it.skipIf(MODE === 'record')('shares durable image URLs between Chat and Trajectory records', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-trajectory-images'))
+    const group = page.locator('[role="treeitem"]').first()
+    await group.waitFor({ timeout: 15_000 })
+    if (await group.getAttribute('aria-expanded') === 'false') await group.click()
+    await page.locator(`[data-row-key^="session:"][data-row-key*="${IMAGE_SEED_ID}"]`).click()
+    const chatImage = page.locator('[data-align="end"]').getByRole('img', { name: IMAGE_NAME, exact: true })
+    await expect.poll(() => chatImage.evaluate(element => (element as HTMLImageElement).naturalWidth), { timeout: 10_000 }).toBe(1)
+    const chatSrc = await chatImage.getAttribute('src')
+    expect(chatSrc).toMatch(/^blob:/)
+    await page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
+    const search = page.getByRole('searchbox', { name: 'Search trajectory' })
+    const snapshots: string[] = []
+    for (const text of ['Durable user image', 'Durable assistant image']) {
+      await search.fill(text)
+      await page.locator('tr[data-trajectory-row-key]').filter({ hasText: text }).click()
+      const panel = page.getByRole('tabpanel')
+      const image = panel.getByRole('img', { name: IMAGE_NAME, exact: true })
+      await expect.poll(() => image.evaluate(element => (element as HTMLImageElement).naturalWidth), { timeout: 10_000 }).toBe(1)
+      expect(await image.getAttribute('src')).toBe(chatSrc)
+      const imageAria = await captureStableAria(page,
+        `#trajectory-detail-panel button:has(img[alt="${IMAGE_NAME}"])`, scaffold.workspaceCwd)
+      snapshots.push(`## ${text}\n\n${imageAria}`)
+    }
+    await compareOrRefreshGolden(ATTACHMENTS_EXPECTED, snapshots.join('\n\n'), MODE)
+    expect(tripwire.pageErrors).toEqual([])
+    expect(tripwire.warnings).toEqual([])
+  }, 120_000)
+
+  it('keeps the fixture inventory closed', async () => {
+    await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md', 'attachments.expected.md'])
+  })
 })

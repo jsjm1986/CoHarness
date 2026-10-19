@@ -2,12 +2,13 @@
 // Dedicated skill tool row: replay-stable naming, lifecycle states, disclosure,
 // keyboard operation, exact output, and the trajectory Inspect handoff.
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { SkillRow } from '../src/client/SkillRow.tsx'
+import { SkillPreview } from '../src/client/SkillPreview.tsx'
 import { zh } from '../src/client/locales.ts'
 
 type SkillRowProps = Parameters<typeof SkillRow>[0]
@@ -15,6 +16,75 @@ type SkillRowProps = Parameters<typeof SkillRow>[0]
 const t: SkillRowProps['t'] = makeTranslate(zh, commonZh)
 
 afterEach(cleanup)
+
+type PreviewProps = Parameters<typeof SkillPreview>[0]
+type PreviewValue = Awaited<ReturnType<PreviewProps['loadSkill']>>
+
+function previewProps(loadSkill: PreviewProps['loadSkill'], skillName = 'review'): PreviewProps {
+  return {
+    sessionId: 's1' as PreviewProps['sessionId'],
+    skillName, loadSkill, onClose: vi.fn(), t,
+    useSession: () => { throw new Error('unused') },
+    useSessions: () => { throw new Error('unused') },
+    useWorkspaces: () => { throw new Error('unused') },
+    usePanelInfo: () => { throw new Error('unused') },
+    useProjection: () => undefined,
+    useInput: () => { throw new Error('unused') },
+    inputActions: {
+      setDraft: () => {}, addImages: () => true, removeImage: () => {},
+      pruneImages: () => {}, addDocuments: () => true, removeDocument: () => {},
+      pruneDocuments: () => {}, captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+      insertText: () => false, submit: () => {},
+    },
+  }
+}
+
+describe('SkillPreview', () => {
+  it('shows current Markdown source and exposes the dialog dismissal', async () => {
+    const load = vi.fn<PreviewProps['loadSkill']>().mockResolvedValue({
+      name: 'review', description: 'Current instructions', contentMarkdown: '# Review\nRead the diff.\n',
+    })
+    const props = previewProps(load)
+    const view = render(<SkillPreview {...props} />)
+    expect(screen.getByRole('status').textContent).toBe('正在读取技能说明…')
+    const dialog = screen.getByRole('dialog', { name: '/review' })
+    await waitFor(() => { expect(dialog.querySelector('code')?.textContent).toBe('# Review\nRead the diff.') })
+    expect(dialog.textContent).toContain('Current instructions')
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    expect(props.onClose).toHaveBeenCalledTimes(1)
+    view.unmount()
+    expect(load.mock.calls[0]?.[1].aborted).toBe(true)
+  })
+
+  it('distinguishes an unavailable skill from a failed read', async () => {
+    const load = vi.fn<PreviewProps['loadSkill']>()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('offline'))
+    const view = render(<SkillPreview {...previewProps(load)} />)
+    await screen.findByText('此会话无法使用该技能。')
+    view.rerender(<SkillPreview {...previewProps(load, 'other')} />)
+    expect((await screen.findByRole('alert')).textContent).toBe('无法读取技能说明。请关闭后重试。')
+    expect(screen.queryByText('此会话无法使用该技能。')).toBeNull()
+  })
+
+  it('cancels replaced and closed reads and ignores a late result', async () => {
+    const old = Promise.withResolvers<PreviewValue>()
+    const next = Promise.withResolvers<PreviewValue>()
+    const load = vi.fn<PreviewProps['loadSkill']>()
+      .mockReturnValueOnce(old.promise)
+      .mockReturnValueOnce(next.promise)
+    const view = render(<SkillPreview {...previewProps(load, 'old')} />)
+    view.rerender(<SkillPreview {...previewProps(load, 'next')} />)
+    expect(load.mock.calls[0]?.[1].aborted).toBe(true)
+    await act(async () => { next.resolve({ name: 'next', description: '', contentMarkdown: 'Current body' }) })
+    const dialog = screen.getByRole('dialog', { name: '/next' })
+    expect(dialog.textContent).toContain('Current body')
+    await act(async () => { old.resolve({ name: 'old', description: '', contentMarkdown: 'Stale body' }) })
+    expect(dialog.textContent).not.toContain('Stale body')
+    view.unmount()
+    expect(load.mock.calls[1]?.[1].aborted).toBe(true)
+  })
+})
 
 function settled(over: Partial<ToolResultNode> = {}): ToolResultNode {
   return {

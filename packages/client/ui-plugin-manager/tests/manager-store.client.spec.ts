@@ -10,7 +10,7 @@ import { ProjectUiPolicyRuntime } from '@deepseek-ai/dsh-client-runtime/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PluginTab } from '../src/client/tab-ledger.ts'
 import type { ConfigLedger } from '../src/client/config-ledger.ts'
-import { offeredRegistries, packageView, PluginManagerController, rowKey, sortPackages } from '../src/client/manager-store.ts'
+import { offeredRegistries, packageView, PluginManagerController, rowKey, sortPackages, type HostCatalogFields } from '../src/client/manager-store.ts'
 
 const INCOMPATIBLE = { name: 'dsh-late', version: '2.0.0', runtimeVersion: '0.1.0', requirements: { '@deepseek-ai/dsh': '^0.2.0' } }
 const ROW_ENTRY = 'include:sidebar' as PluginEntryId
@@ -157,7 +157,7 @@ describe('packageView', () => {
   it('joins a bundle with the entries its rows run as', () => {
     expect(packageView(BUNDLE, PLUGINS)).toEqual({
       name: 'dsh-better-sidebar', version: '0.16.0', description: 'A sidebar.', source: 'dsh-better-sidebar@^0.16.0',
-      installed: true, optional: false, enabled: false,
+      official: false, availability: 'profile', installed: true, optional: false, removable: true, enabled: false,
       rows: [
         { rowId: 'sidebar', moduleName: 'dsh-better-sidebar', entryId: ROW_ENTRY, enabled: true, phase: 'active' },
         { rowId: 'theme', moduleName: 'dsh-better-sidebar/theme', enabled: false, phase: null },
@@ -171,7 +171,7 @@ describe('packageView', () => {
       overrides: [],
     }
     expect(packageView(protectedBundle, PLUGINS)).toEqual({
-      name: '@deepseek-ai/dsh-base', installed: false, optional: false, enabled: true, readOnlyReason: 'management-required',
+      name: '@deepseek-ai/dsh-base', official: false, availability: 'missing', installed: false, optional: false, removable: false, enabled: true, readOnlyReason: 'management-required',
       error: { code: 'operation-error', diagnostic: 'broken' },
       rows: [
         { rowId: 'core', moduleName: '@deepseek-ai/dsh-base', entryId: 'include:core', enabled: true, phase: 'active', readOnlyReason: 'management-required' },
@@ -1782,4 +1782,193 @@ it('marks a successful install as done', async () => {
   b.face.editInstallSpec('dsh-new')
   b.face.runInstall()
   await vi.waitFor(() => { expect(b.state().install.phase).toBe('done') })
+})
+
+// Upstream publishes these catalog fields on `BundleInfo`; the fork's wire
+// does not carry them yet, so the fixture carries them through the
+// `HostCatalogFields` extension the page forwards.
+const CATALOG = {
+  name: '@deepseek-ai/dsh-subagent-codex', official: true, availability: 'missing', installed: false, optional: false,
+  enabled: false, removable: false, rows: [], overrides: [],
+  installTarget: { spec: '@deepseek-ai/dsh-subagent-codex@2.0.0', version: '2.0.0' },
+} as BundleInfo & HostCatalogFields
+
+it('installs an absent Official entry directly at the host target and enables it through the normal installer', async () => {
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([CATALOG])) })
+  await controller.load()
+  face.setEnabled(CATALOG.name, true)
+  await vi.waitFor(() => { expect(plugins.installBundle).toHaveBeenCalledOnce() })
+  expect(plugins.inspect).not.toHaveBeenCalled()
+  expect(plugins.installBundle).toHaveBeenCalledWith(CATALOG.installTarget!.spec, {
+    enabled: true, saveExact: true, requestId: state().install.requestId, registry: null,
+  })
+  expect(state().install.subject).toMatchObject({ selection: true, saveExact: true, version: '2.0.0' })
+})
+
+it.each([true, false])('updates an Official entry with enabled=%s by removing it, then using the same exact installer', async (enabled) => {
+  const installed = { ...CATALOG, availability: 'profile', installed: true, version: '1.0.0', enabled, removable: true } as BundleInfo & HostCatalogFields
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([installed])),
+    installBundle: vi.fn().mockResolvedValue(ok({ ...APPLIED, bundle: CATALOG.name, application: 'restart-required' })),
+  })
+  await controller.load()
+  face.update(CATALOG.name)
+  await vi.waitFor(() => { expect(state().install.phase).toBe('done') })
+  expect(plugins.inspect).not.toHaveBeenCalled()
+  expect(plugins.removeBundle).toHaveBeenCalledWith(CATALOG.name)
+  expect(plugins.removeBundle.mock.invocationCallOrder[0]).toBeLessThan(plugins.installBundle.mock.invocationCallOrder[0]!)
+  expect(plugins.installBundle).toHaveBeenCalledWith(CATALOG.installTarget!.spec, {
+    enabled, saveExact: true, requestId: state().install.requestId, registry: null,
+  })
+  expect(state().install.restartRequired).toBe(true)
+})
+
+it('keeps an installed Official entry and installs nothing when its removal for an update fails', async () => {
+  const installed = { ...CATALOG, availability: 'profile', installed: true, version: '1.0.0', enabled: true, removable: true } as BundleInfo & HostCatalogFields
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([installed])),
+    removeBundle: vi.fn().mockResolvedValue(ok({ ...APPLIED, application: 'failed', error: { code: 'bundle-in-use' } })),
+  })
+  await controller.load()
+  face.update(CATALOG.name)
+  await vi.waitFor(() => { expect(state().notice).toMatchObject({ kind: 'failed', action: 'uninstall' }) })
+  expect(plugins.installBundle).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['an unreachable Host', () => refused('ERR_REMOTE', 'connection lost')],
+  ['a profile without HMR', () => ok({ ...APPLIED, application: 'failed', error: { code: 'stop-profile' } })],
+] as const)('installs an Official update only after the removal, except over a running bundle of %s', async (kind, answer) => {
+  const installed = { ...CATALOG, availability: 'profile', installed: true, version: '1.0.0', enabled: true, removable: true } as BundleInfo & HostCatalogFields
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([installed])),
+    removeBundle: vi.fn().mockResolvedValue(answer()),
+  })
+  await controller.load()
+  face.update(CATALOG.name)
+  if (kind === 'an unreachable Host') {
+    await vi.waitFor(() => { expect(state().notice).toMatchObject({ kind: 'failed', action: 'uninstall' }) })
+    expect(plugins.installBundle).not.toHaveBeenCalled()
+  } else {
+    // Without HMR a running bundle stays installed, and the installation over it waits for the restart.
+    await vi.waitFor(() => { expect(plugins.installBundle).toHaveBeenCalled() })
+  }
+})
+
+it('preserves the Official exact target and selection when script approval retries an installation', async () => {
+  const install = vi.fn().mockResolvedValueOnce(ok({ ...APPLIED, application: 'failed', stage: 'install',
+    error: { code: 'operation-error' }, pendingBuilds: ['native-provider'],
+  })).mockResolvedValueOnce(ok({ ...APPLIED, bundle: CATALOG.name }))
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([CATALOG])), installBundle: install })
+  await controller.load()
+  face.setEnabled(CATALOG.name, true)
+  await vi.waitFor(() => { expect(state().install.phase).toBe('failed') })
+  face.approveBuildsAndRetry()
+  await vi.waitFor(() => { expect(install).toHaveBeenCalledTimes(2) })
+  expect(plugins.inspect).not.toHaveBeenCalled()
+  expect(install).toHaveBeenLastCalledWith(CATALOG.installTarget!.spec, {
+    enabled: true, saveExact: true, requestId: state().install.requestId, registry: null, approvedBuilds: ['native-provider'],
+  })
+})
+
+it('retains a failed Official install target while changing its registry', async () => {
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([CATALOG])),
+    installBundle: vi.fn().mockResolvedValueOnce(ok({ ...APPLIED, application: 'failed', stage: 'install', error: { code: 'operation-error' } }))
+      .mockResolvedValue(ok({ ...APPLIED, bundle: CATALOG.name })),
+  })
+  await controller.load()
+  face.setEnabled(CATALOG.name, true)
+  await vi.waitFor(() => { expect(state().install.phase).toBe('failed') })
+  face.changeRegistry()
+  face.chooseRegistry({ kind: 'custom', url: CORP })
+  face.runInstall()
+  await vi.waitFor(() => { expect(plugins.installBundle).toHaveBeenCalledTimes(2) })
+  expect(plugins.installBundle).toHaveBeenLastCalledWith(CATALOG.installTarget!.spec, {
+    enabled: true, saveExact: true, requestId: state().install.requestId, registry: CORP,
+  })
+  expect(plugins.inspect).not.toHaveBeenCalled()
+  await vi.waitFor(() => { expect(state().install.phase).toBe('done') })
+  face.closeInstall()
+  face.setEnabled(CATALOG.name, true)
+  await vi.waitFor(() => { expect(plugins.installBundle).toHaveBeenCalledTimes(3) })
+  expect(plugins.installBundle).toHaveBeenLastCalledWith(CATALOG.installTarget!.spec, {
+    enabled: true, saveExact: true, requestId: state().install.requestId, registry: CORP,
+  })
+})
+
+it('keeps Official disablement on the existing selection operation', async () => {
+  const { controller, plugins, face } = bench({ listBundles: vi.fn().mockResolvedValue(ok([{ ...CATALOG, enabled: true } as BundleInfo])) })
+  await controller.load()
+  face.setEnabled(CATALOG.name, false)
+  await vi.waitFor(() => { expect(plugins.setBundleEnabled).toHaveBeenCalledWith(CATALOG.name, false) })
+  expect(plugins.installBundle).not.toHaveBeenCalled()
+})
+
+it('reopens one Official operation through registry preparation and installation instead of starting duplicates', async () => {
+  const registries = deferred<ReturnType<typeof ok<typeof REGISTRIES>>>()
+  const installing = deferred<ReturnType<typeof ok<ChangeResult>>>()
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([CATALOG])),
+    registries: vi.fn().mockReturnValue(registries.promise), installBundle: vi.fn().mockReturnValue(installing.promise),
+  })
+  await controller.load()
+  face.setEnabled(CATALOG.name, true)
+  expect(state().install.phase).toBe('checking')
+  face.setEnabled(CATALOG.name, true)
+  expect(plugins.registries).toHaveBeenCalledOnce()
+  registries.resolve(ok(REGISTRIES))
+  await vi.waitFor(() => { expect(state().install.phase).toBe('starting') })
+  face.update(CATALOG.name)
+  expect(plugins.installBundle).toHaveBeenCalledOnce()
+  installing.resolve(ok({ ...APPLIED, bundle: CATALOG.name }))
+  await vi.waitFor(() => { expect(state().install.phase).toBe('done') })
+})
+
+it('ignores a stale update target and prevents a disposed tab from beginning an Official install', async () => {
+  const { controller, plugins, face } = bench({ listBundles: vi.fn().mockResolvedValue(ok([CATALOG, BUNDLE])) })
+  await controller.load()
+  face.update('removed')
+  face.update(BUNDLE.name)
+  expect(plugins.installBundle).not.toHaveBeenCalled()
+  controller.dispose()
+  face.setEnabled(CATALOG.name, true)
+  expect(plugins.installBundle).not.toHaveBeenCalled()
+})
+
+it('installs a source Official entry as a local path through the ordinary installer', async () => {
+  const spec = 'link:/development/dsh/packages/subagent/subagent-codex'
+  const entry = { ...CATALOG, installTarget: { spec, version: '2.0.0' } } as BundleInfo & HostCatalogFields
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([entry])) })
+  await controller.load()
+  face.setEnabled(entry.name, true)
+  await vi.waitFor(() => { expect(state().install.phase).toBe('done') })
+  expect(plugins.inspect).not.toHaveBeenCalled()
+  expect(plugins.installBundle).toHaveBeenCalledWith(spec, {
+    enabled: true, requestId: state().install.requestId, registry: null,
+  })
+  expect(state().install.subject).toMatchObject({ kind: 'path', spec, selection: true })
+  expect(state().install.subject?.saveExact).toBeUndefined()
+})
+
+it.each([true, false])('replaces a same-version registry package with its source link and preserves enabled=%s', async (enabled) => {
+  const spec = 'link:/development/dsh/packages/subagent/subagent-codex'
+  const entry = { ...CATALOG, installTarget: { spec, version: '2.0.0' }, availability: 'profile',
+    installed: true, version: '2.0.0', source: `${CATALOG.name}@2.0.0`, enabled, removable: true } as BundleInfo & HostCatalogFields
+  const { controller, plugins, face, state } = bench({ listBundles: vi.fn().mockResolvedValue(ok([entry])),
+    installBundle: vi.fn().mockResolvedValue(ok({ ...APPLIED, bundle: CATALOG.name, application: 'restart-required' })),
+  })
+  await controller.load()
+  face.update(entry.name)
+  await vi.waitFor(() => { expect(state().install.phase).toBe('done') })
+  expect(plugins.removeBundle).toHaveBeenCalledWith(CATALOG.name)
+  expect(plugins.installBundle).toHaveBeenCalledWith(spec, { enabled, requestId: state().install.requestId, registry: null })
+  expect(state().install.subject).toMatchObject({ kind: 'path', spec, selection: enabled })
+  expect(state().install.restartRequired).toBe(true)
+})
+
+it('deselects a source bundle whose target is unavailable without starting installation', async () => {
+  const { installTarget: _target, ...withoutTarget } = CATALOG
+  const entry: BundleInfo = { ...withoutTarget, enabled: true,
+    error: { code: 'operation-error', diagnostic: 'Source package is not built' } }
+  const { controller, plugins, face } = bench({ listBundles: vi.fn().mockResolvedValue(ok([entry])) })
+  await controller.load()
+  face.setEnabled(entry.name, false)
+  await vi.waitFor(() => { expect(plugins.setBundleEnabled).toHaveBeenCalledWith(entry.name, false) })
+  expect(plugins.installBundle).not.toHaveBeenCalled()
 })

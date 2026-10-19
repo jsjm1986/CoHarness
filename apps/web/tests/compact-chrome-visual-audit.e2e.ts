@@ -262,7 +262,8 @@ describe('visual audit: compact product chrome', () => {
           findings[`${prefix}.tool`] = await dumpOverflow(page)
         }
 
-        const commands = page.getByRole('button', { name: '命令' })
+        // exact: seeded process rows ("…执行了命令") share the substring.
+        const commands = page.getByRole('button', { name: '命令', exact: true })
         if (await commands.count() > 0) {
           await commands.click()
           await page.waitForTimeout(300)

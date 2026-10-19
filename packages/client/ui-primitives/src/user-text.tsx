@@ -55,7 +55,7 @@ export interface UserTextReferences {
   /** Open a file path decoded from an `@` mention. */
   openFile: (path: string) => void
   /** Open the source of a skill loaded for this message. */
-  openSkill: (name: string) => void
+  openSkill?: ((name: string) => void) | undefined
 }
 
 /**
@@ -165,11 +165,12 @@ export function projectUserText(
       )}
       {displayLabel}
     </>
+    const openSkill = references?.openSkill
     const open = references === undefined ? undefined
       : referenceKind === 'file'
         ? () => { references.openFile(label.slice(1).replace(/^"|"$/gu, '')) }
-        : referenceKind === undefined && slashKind === 'skill'
-          ? () => { references.openSkill(label.slice(1)) }
+        : referenceKind === undefined && slashKind === 'skill' && openSkill !== undefined
+          ? () => { openSkill(label.slice(1)) }
           : undefined
     const className = clsx(css.refChip, referenceKind === undefined && css.slashChip)
     parts.push(open === undefined

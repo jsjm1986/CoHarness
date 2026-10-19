@@ -197,17 +197,22 @@ export function apply(ctx: ClientContext): void {
 
   ctx.effect(() => {
     const handle = createSidebarRightStore(() => defaultSeed(tabs), false)
-    // The runtime mints one instance of this handle per session (the scope key
-    // is the session id) and caches it per key. Each is adopted as it is minted,
-    // so a tab's own action reaches its session's store while another session
-    // is on screen, and that store's commits sync the Tab domain themselves.
-    const adoptions: Array<() => void> = []
+    // Each Session keeps only its current store generation and its subscriptions.
+    const adoptions = new Map<SessionId, () => void>()
     const store: typeof handle = {
       ...handle,
       create: (scopeKey) => {
         const instance = handle.create(scopeKey)
         if (scopeKey === undefined) return instance
         const sessionId = scopeKey as SessionId
+        adoptions.get(sessionId)?.()
+        const releases: Array<() => void> = []
+        const release = (): void => {
+          if (adoptions.get(sessionId) !== release) return
+          adoptions.delete(sessionId)
+          for (const dispose of releases.splice(0)) dispose()
+        }
+        adoptions.set(sessionId, release)
         const storageKey = (): string | undefined => sessionPersistenceKey(
           ctx.sessions, sessionId, connection.hostDescription.getSnapshot()?.executionAuthorityRequired,
           ctx.projectUiPolicy.getSnapshot().verifiedAccountId,
@@ -235,24 +240,29 @@ export function apply(ctx: ClientContext): void {
           } finally { restoring = false }
         }
         restore()
-        adoptions.push(adopt(sessionId, instance))
-        adoptions.push(instance.subscribe(() => {
+        releases.push(adopt(sessionId, instance))
+        releases.push(instance.subscribe(() => {
+          if (adoptions.get(sessionId) !== release) return
           const surface = instance.getSnapshot().bySession[scopeKey]
           if (!restoring && key !== undefined && surface !== undefined) writeSidebarLayout(key, surface)
         }))
         const reconcile = (): void => {
+          if (adoptions.get(sessionId) !== release) return
           const next = storageKey()
           if (next === key) return
           controller.tabDomain.forget(sessionId)
           key = next
           restore()
         }
-        adoptions.push(
+        releases.push(
           ctx.projectUiPolicy.subscribe(reconcile), connection.hostDescription.subscribe(reconcile), ctx.sessions.list.subscribe(reconcile),
         )
         return { ...instance, clearPersisted() {
+          if (adoptions.get(sessionId) !== release) return
+          release()
           if (key !== undefined) clearSidebarLayout(key)
           forget(sessionId)
+          controller.tabDomain.forget(sessionId)
         } }
       },
     }
@@ -371,7 +381,8 @@ export function apply(ctx: ClientContext): void {
       disposeExpand()
       disposeSeat()
       for (const dispose of disposeTypes.reverse()) dispose()
-      for (const release of adoptions) release()
+      for (const release of adoptions.values()) release()
+      adoptions.clear()
     }
   }, 'ui-sidebar-right: seats and shipped tab type')
 }

@@ -176,7 +176,7 @@ describe('LocaleRuntime', () => {
     })
     host.set.mockImplementation(() => {
       host.publish({ write: { status: 'error', code: 'settings-rejected', message: 'read-only' } })
-      return Promise.resolve() as never
+      return Promise.resolve()
     })
     const { svc } = make(host)
     svc.setLocale('en')

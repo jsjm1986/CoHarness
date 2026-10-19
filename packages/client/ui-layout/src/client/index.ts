@@ -94,6 +94,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Single auxiliary-panel root; owns its Session routing. */
     'rightbar': { kind: 'single'; scope: 'root'; owner: RightbarOwnerProps }
     /**
+     * Full-width bottom content below all columns. Its rendered height
+     * reduces the columns' available height; empty content reserves no space.
+     * The occupant owns its height, visibility, and controls. It receives no
+     * Session binding and remains mounted across main-panel navigation.
+     */
+    'shell.bottom': { kind: 'single'; scope: 'root' }
+    /**
      * Frame-wide floating layer, above every column and outside their scroll
      * containers. Deliberately generic and unowned by any feature: a badge, a
      * toast stack or a status pill all belong here, and entries order among
@@ -215,6 +222,7 @@ export function apply(ctx: ClientContext): void {
         'sidebar': { kind: 'single', scope: 'root' },
         'main': { kind: 'keyed', scope: 'root' },
         'rightbar': { kind: 'single', scope: 'root' },
+        'shell.bottom': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.mobile.header.actions': { kind: 'list', scope: 'session' },
       },

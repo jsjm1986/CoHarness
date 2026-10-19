@@ -64,18 +64,19 @@ const TABLE_NAMES = ['fill', 'wide', 'long-cell']
 /**
  * Viewport sweep. The wide stops leave the transcript far wider than the
  * 748px message column, so the breakout relation holds with a fat margin on
- * every platform; the narrow stop drops the transcript below the message
- * column, which must clamp the breakout to neutral. The sidebar is collapsed
- * for the whole sweep (see beforeAll), so the transcript width follows the
- * viewport identically on overlay- and classic-scrollbar platforms.
+ * every platform. At 640 the compact single-column grid leaves the
+ * scroll container's content box (~599px) wider than the clamped 560px
+ * message column, so the breakout still spans that transcript slack. The
+ * narrowest stop drops the transcript below the message column, which must
+ * clamp the breakout to neutral. The sidebar is collapsed for the whole
+ * sweep (see beforeAll), so the transcript width follows the viewport
+ * identically on overlay- and classic-scrollbar platforms.
  *
- * The 640 stop lands in the compact viewport class (below
- * VIEWPORT_MEDIUM_MIN): the shell swaps to its CSS-owned single-column grid
- * and the transcript still narrows under the message column, so the clamp
- * relation is the one under test — the layout wait reads the viewport class
- * instead of assuming the three-column track template.
+ * The 640 and 520 stops land in the compact viewport class (below
+ * VIEWPORT_MEDIUM_MIN): the layout wait reads the viewport class instead of
+ * assuming the three-column track template.
  */
-const WIDTHS = [1680, 1100, 640]
+const WIDTHS = [1680, 1100, 640, 520]
 
 /** A sentence long enough that three of them cannot sit unwrapped in the 748px column. */
 const SENTENCE = 'This cell carries one full sentence so the unwrapped table is far wider than the message column.'
@@ -207,23 +208,42 @@ function readTables(page: Page): Promise<TableReading[]> {
 /** A sweep stop: the three tables' readings at one viewport width. */
 interface TableStop {
   width: number
+  /** The transcript query container's content-box width (the `100cqw` axis). */
+  transcript: number
   tables: TableReading[]
 }
 
 /**
- * Wait for collapsed columns, completed grid transitions, and the
- * ConversationRoot ResizeObserver's width publication before measuring tables.
- * The frame's viewport class decides the track shape: compact owns a
- * CSS-driven single column, overlay (medium) keeps the sidebar rail plus the
- * center track, and the desktop classes append the zero-width details track.
- * @param target - the page whose frame to read.
+ * Mirrored from ui-layout's `viewportClassOf`: the sweep derives the class
+ * the frame must reach so the settle wait cannot pass on the previous
+ * stop's still-stamped class before the transition begins.
+ * @param width - viewport width in px.
+ * @returns the viewport class the frame stamps at that width.
  */
-async function awaitTableLayout(target: Page): Promise<void> {
+function expectedViewportClass(width: number): string {
+  if (width < 768) return 'compact'
+  if (width < 1024) return 'medium'
+  if (width < 1440) return 'expanded'
+  return 'wide'
+}
+
+/**
+ * Wait for the frame's viewport class to reach the expected class, the
+ * collapsed columns' grid transitions to complete, and the ConversationRoot
+ * ResizeObserver's width publication before measuring tables. The class
+ * decides the track shape: compact owns a CSS-driven single column, overlay
+ * (medium) keeps the sidebar rail plus the center track, and the desktop
+ * classes append the zero-width details track.
+ * @param target - the page whose frame to read.
+ * @param expectedClass - the viewport class the frame must report.
+ */
+async function awaitTableLayout(target: Page, expectedClass: string): Promise<void> {
   await target.evaluate(async () => { await document.fonts.ready })
-  await target.waitForFunction(() => {
+  await target.waitForFunction((expected) => {
     const element = document.querySelector('[data-sidebar-collapsed][data-details-collapsed]')
     if (element === null) return false
     const viewport = element.getAttribute('data-viewport')
+    if (viewport !== expected) return false
     const tracks = getComputedStyle(element).gridTemplateColumns.split(' ').map(Number.parseFloat)
     const root = element.querySelector<HTMLElement>('div[data-phase]')
     const columnsSettled = viewport === 'compact'
@@ -237,7 +257,7 @@ async function awaitTableLayout(target: Page): Promise<void> {
         animation.playState === 'finished' || animation.playState === 'idle')
       && root !== null
       && /(^[\d.]+px$|^calc\()/.test(root.style.getPropertyValue('--dsh-chat-user-width'))
-  }, undefined, { timeout: 10_000 })
+  }, expectedClass, { timeout: 10_000 })
 }
 
 /**
@@ -303,7 +323,7 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
     // viewport identically on every platform, which is what keeps one
     // committed golden true for all lanes.
     await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
-    await awaitTableLayout(page)
+    await awaitTableLayout(page, expectedViewportClass(page.viewportSize()?.width ?? 0))
   }, 180_000)
 
   afterAll(async () => {
@@ -316,12 +336,21 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
    * eases its column tracks, so a read straight after a resize can catch a
    * mid-transition width).
    * @param width - viewport width to settle at.
-   * @returns the three tables' readings at that width.
+   * @returns the three tables' readings plus the transcript width at that width.
    */
-  const settleAt = async (width: number): Promise<TableReading[]> => {
+  const settleAt = async (width: number): Promise<Omit<TableStop, 'width'>> => {
     await page.setViewportSize({ width, height: 900 })
-    await awaitTableLayout(page)
-    return readTables(page)
+    await awaitTableLayout(page, expectedViewportClass(width))
+    const transcript = await page.evaluate(() => {
+      const container = [...document.querySelectorAll<HTMLElement>('[class*="scroll"]')]
+        .find(e => getComputedStyle(e).containerType === 'inline-size')
+      if (container === undefined) throw new Error('no inline-size transcript container')
+      const styles = getComputedStyle(container)
+      return container.clientWidth
+        - Number.parseFloat(styles.paddingLeft) - Number.parseFloat(styles.paddingRight)
+    })
+    const tables = await readTables(page)
+    return { transcript, tables }
   }
 
   /** Sweep once; every assertion reads the same measurement. */
@@ -329,7 +358,7 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
   const sweep = (): Promise<TableStop[]> => {
     swept ??= (async () => {
       const stops: TableStop[] = []
-      for (const width of WIDTHS) stops.push({ width, tables: await settleAt(width) })
+      for (const width of WIDTHS) stops.push({ width, ...await settleAt(width) })
       return stops
     })()
     return swept
@@ -351,11 +380,16 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
       expect(wide!.wideHook).toBe(true)
       expect(fill!.wideHook).toBe(false)
       expect(longCell!.wideHook).toBe(false)
-      if (stop.width > 748) {
-        // Breakout: the wide wrapper spans past the message column, and its
-        // lead padding keeps the table content starting at the message
-        // column's left edge (compared to the fill table's content).
-        expect(wide!.clientWidth, `wide breakout at ${String(stop.width)}`).toBeGreaterThan(columnWidth + 8)
+      // The breakout's own trigger: spare transcript width past the message
+      // column. Keying on the measured relation (not the viewport width)
+      // keeps the assertion true whatever the frame's per-class insets are.
+      if (stop.transcript > columnWidth + 8) {
+        // Breakout: the wide wrapper spans the transcript's content box past
+        // the message column, and its lead padding keeps the table content
+        // starting at the message column's left edge (compared to the fill
+        // table's content).
+        expect(Math.abs(wide!.clientWidth - stop.transcript), `breakout spans the transcript at ${String(stop.width)}`)
+          .toBeLessThan(1.5)
         expect(wide!.paddingLeft, `lead at ${String(stop.width)}`).toBeGreaterThan(0)
         expect(Math.abs(wide!.tableLeft - fill!.tableLeft), `alignment at ${String(stop.width)}`).toBeLessThan(1.5)
       } else {
@@ -519,7 +553,7 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
       await sessionRow.click()
       await hidpiPage.getByText(TAIL_MARKER, { exact: true }).waitFor({ timeout: 15_000 })
       await hidpiPage.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
-      await awaitTableLayout(hidpiPage)
+      await awaitTableLayout(hidpiPage, expectedViewportClass(hidpiPage.viewportSize()?.width ?? 0))
       const readings = await readTables(hidpiPage)
       const baseline = (await sweep()).find(stop => stop.width === 1100)!
       const relations = (tables: TableReading[]) => tables.map(table => ({

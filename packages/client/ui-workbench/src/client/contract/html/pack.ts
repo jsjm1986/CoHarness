@@ -1,5 +1,5 @@
 /** Finite HTML-declared classic scripts and stylesheets; no module, CSS dependency or runtime fetch traversal. */
-import type { HtmlAsset, HtmlBundle } from './bootstrap.ts'
+import type { HtmlAsset, HtmlBundle } from '../../html/bootstrap.ts'
 import { decodeText } from './bytes.ts'
 
 /**

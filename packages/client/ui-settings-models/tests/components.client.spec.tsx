@@ -9,7 +9,7 @@ import {
   ModelsSection, needsSetup, providerCopy, providerTargetLabel, removeProviderProfile,
 } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected, ModelsSectionProps } from '../src/client/ModelsSection.tsx'
-import { pathOps } from '../src/client/ProviderEditor.tsx'
+import { pathOps, ProviderEditor, type ProviderEditorProps } from '../src/client/ProviderEditor.tsx'
 import {
   DeepSeekModelsEditor, formatCapacity, modelDrafts, parseCapacity, validateDeepSeekModels,
   validatePiAiModels,
@@ -149,6 +149,42 @@ function fail<T>(message: string, code = 'settings-rejected'): RpcResponse<T> {
 }
 
 const discoverModels = vi.fn(() => Promise.resolve({ ok: true as const, value: [] }))
+
+/** The pi-ai namespace with one more route profile stored in the user layer. */
+function piAiNamespaceWith(provider: string, profile: Record<string, unknown>): SettingsNamespaceView {
+  const namespace = wireNamespaces().find(view => view.ns === 'llm-pi-ai')!
+  const providers = { ...(namespace.value as { providers: object }).providers, [provider]: profile }
+  return { ...namespace, value: { providers }, user: { providers } }
+}
+
+/** Render one pi-ai route's editor with the directory and credential facts the page already holds. */
+function renderPiAiEditor(
+  provider: string,
+  namespace: SettingsNamespaceView,
+  facts: Pick<ProviderEditorProps, 'defaultBaseURL' | 'baseURLEnv' | 'nativeAuth' | 'credentialChecks'> = {},
+): void {
+  render(<ProviderEditor
+    provider={provider}
+    displayName={provider}
+    namespace={namespace}
+    settingsPath={['providers', provider]}
+    schema={settingsSchema}
+    api={scriptedFace().face as never}
+    discoverModels={discoverModels}
+    t={t}
+    readOnly={false}
+    onClose={vi.fn()}
+    {...facts}
+  />)
+}
+
+/** Hover the key label's help button and read its tooltip; null when the label has no button. */
+function authHelpText(): string | null {
+  const button = screen.queryByRole('button', { name: en.authHelp })
+  if (button === null) return null
+  fireEvent.mouseEnter(button)
+  return screen.getByRole('tooltip').textContent
+}
 
 function scriptedFace(overrides: {
   update?: ReturnType<typeof vi.fn>
@@ -1077,9 +1113,9 @@ describe('ModelsSection', () => {
   it('edits a pi-ai profile with the curated fields only', async () => {
     const { mutate } = await mountSection()
     fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
-    // The configured credential shows as the stored placeholder.
+    // The configured credential shows as the saved-credential placeholder.
     const editorKey = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-    await waitFor(() => { expect(editorKey.placeholder).toBe(en.keyStored) })
+    await waitFor(() => { expect(editorKey.placeholder).toBe(en.keyPlaceholderSaved) })
     // pi-ai carries Base URL too: the stored override shows as the value and
     // the effective profile endpoint as its placeholder source.
     fireEvent.click(screen.getByText(en.customized))
@@ -1224,7 +1260,7 @@ describe('ModelsSection', () => {
         renderSlot={() => null}
       />)
       const key = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-      expect(key.placeholder).toBe(en.keyPlaceholder)
+      expect(key.placeholder).toBe(en.keyPlaceholderFallback.replace('{hint}', 'DEEPSEEK_API_KEY'))
       await new Promise(resolve => setTimeout(resolve, 10))
       expect(unhandled).not.toHaveBeenCalled()
     } finally {
@@ -1287,7 +1323,7 @@ describe('ModelsSection', () => {
     face.credentials.describe.mockImplementation(() => Promise.resolve(fail('down', 'internal')) as never)
     fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
     const editorKey = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-    expect(editorKey.placeholder).toBe(en.keyPlaceholderNative)
+    expect(editorKey.placeholder).toBe(en.keyPlaceholderFallback.replace('{hint}', 'OPENAI_API_KEY'))
     fireEvent.change(editorKey, { target: { value: 'sk-live' } })
     fireEvent.click(screen.getByText(en.apply))
     await waitFor(() => { expect(set).toHaveBeenCalledTimes(1) })
@@ -1630,4 +1666,103 @@ describe('apiKeyFailure', () => {
     expect(apiKeyFailure('"')).toBeUndefined()
     expect(apiKeyFailure('"a')).toBeUndefined()
   })
+})
+
+it('keeps an OAuth-only provider on its native authentication path', () => {
+  renderPiAiEditor('openai-codex', piAiNamespaceWith('openai-codex', {}), {
+    nativeAuth: { env: [], oauth: true },
+  })
+  expect(screen.queryByLabelText(en.keyInput)).toBeNull()
+  expect(authHelpText()).toBeNull()
+  expect(document.body.textContent).not.toMatch(/oauth/i)
+})
+
+it('names the profile reference instead of the route native authentication', () => {
+  renderPiAiEditor('anthropic', piAiNamespaceWith('anthropic', { apiKeyEnv: 'TEAM_ANTHROPIC_KEY' }), {
+    nativeAuth: { env: ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'], oauth: true },
+  })
+  expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder)
+    .toBe(en.keyPlaceholderFallback.replace('{hint}', 'TEAM_ANTHROPIC_KEY'))
+  expect(authHelpText()).toBe(en.keyHelp.replace('{env}', 'TEAM_ANTHROPIC_KEY'))
+  expect(document.body.textContent).not.toMatch(/oauth/i)
+})
+
+it('lists method-neutral fallbacks for a catalog route', () => {
+  renderPiAiEditor('anthropic', piAiNamespaceWith('anthropic', {}), {
+    nativeAuth: { env: ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'], oauth: true },
+  })
+  expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder)
+    .toBe(en.keyPlaceholderFallback.replace('{hint}', 'ANTHROPIC_AUTH_TOKEN'))
+  expect(authHelpText()).toBe(en.keyHelp.replace('{env}', 'ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY'))
+  expect(document.body.textContent).not.toMatch(/oauth/i)
+})
+
+it('detects a hidden native credential without displaying its reference', () => {
+  renderPiAiEditor('anthropic', piAiNamespaceWith('anthropic', {}), {
+    nativeAuth: { env: ['ANTHROPIC_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'], oauth: true },
+    credentialChecks: {
+      ANTHROPIC_OAUTH_TOKEN: { configured: true, source: 'env', writable: true },
+      ANTHROPIC_API_KEY: { configured: false, writable: true },
+    },
+  })
+  expect(screen.queryByText(en.keyFallbackMissing.replace('{hint}', 'ANTHROPIC_API_KEY'))).toBeNull()
+  expect(screen.getByText(en.keyFallbackDetectedHidden)).toBeTruthy()
+  expect(document.body.textContent).not.toMatch(/oauth/i)
+})
+
+it('does not report endpoint variables as detected credentials', () => {
+  const env = ['CLOUDFLARE_API_KEY', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_GATEWAY_ID']
+  const baseURLEnv = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_GATEWAY_ID']
+  renderPiAiEditor('cloudflare-ai-gateway', piAiNamespaceWith('cloudflare-ai-gateway', {}), {
+    nativeAuth: { env, oauth: false },
+    baseURLEnv,
+    credentialChecks: Object.fromEntries(env.map(ref => [ref, {
+      configured: baseURLEnv.includes(ref), source: 'env', writable: true,
+    }])),
+  })
+  expect(screen.getByText(en.keyFallbackMissing.replace('{hint}', 'CLOUDFLARE_API_KEY'))).toBeTruthy()
+  expect(authHelpText()).toBe(en.keyHelp.replace('{env}', 'CLOUDFLARE_API_KEY'))
+  expect(screen.queryByText(/Env var detected/)).toBeNull()
+})
+
+it('shows endpoint configuration variables without presenting them as credential keys', () => {
+  const baseURLEnv = ['AZURE_OPENAI_BASE_URL', 'AZURE_OPENAI_RESOURCE_NAME']
+  renderPiAiEditor('azure', piAiNamespaceWith('azure', {}), {
+    baseURLEnv,
+    nativeAuth: { env: ['AZURE_OPENAI_API_KEY'], oauth: false },
+  })
+  expect(authHelpText()).toContain('AZURE_OPENAI_API_KEY')
+  expect(authHelpText()).not.toContain('AZURE_OPENAI_BASE_URL')
+  fireEvent.click(screen.getByText(en.customized))
+  const input = screen.getByLabelText<HTMLInputElement>(en.baseUrl)
+  expect(input.placeholder).toBe(en.baseUrlConfigured)
+  expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent)
+    .toBe(en.baseUrlEnvironment.replace('{env}', baseURLEnv.join(', ')))
+})
+
+it.each([true, false, undefined])('shows the confirmed fallback state without assuming a connection works: %s', (configured) => {
+  renderPiAiEditor('deepseek', piAiNamespaceWith('deepseek', {}), {
+    nativeAuth: { env: ['DEEPSEEK_API_KEY'], oauth: false },
+    ...configured === undefined
+      ? {}
+      : { credentialChecks: { DEEPSEEK_API_KEY: { configured, writable: true } } },
+  })
+  const input = screen.getByLabelText<HTMLInputElement>(en.keyInput)
+  expect(input.placeholder).toBe(en.keyPlaceholderFallback.replace('{hint}', 'DEEPSEEK_API_KEY'))
+  const hint = configured === true
+    ? en.keyFallbackDetected.replace('{hint}', 'DEEPSEEK_API_KEY')
+    : configured === false ? en.keyFallbackMissing.replace('{hint}', 'DEEPSEEK_API_KEY') : en.keyFallbackUnchecked
+  expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent).toBe(hint)
+  fireEvent.change(input, { target: { value: 'new-key' } })
+  expect(screen.queryByText(hint)).toBeNull()
+  expect(input.getAttribute('aria-describedby')).toBeNull()
+})
+
+it('keeps a method-specific profile reference usable without displaying its name', () => {
+  renderPiAiEditor('anthropic', piAiNamespaceWith('anthropic', { apiKeyEnv: 'TEAM_OAUTH_TOKEN' }), {
+    nativeAuth: { env: ['ANTHROPIC_API_KEY'], oauth: true },
+  })
+  expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder).toBe(en.keyPlaceholderNative)
+  expect(authHelpText()).toBeNull()
+  expect(document.body.textContent).not.toMatch(/oauth/i)
 })

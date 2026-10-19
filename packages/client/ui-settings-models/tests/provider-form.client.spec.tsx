@@ -638,7 +638,7 @@ describe('endpoint interrogation', () => {
     const scripted = scriptedFace()
     render(
       <CustomProviderCard
-        taken={[]} protocols={PROTOCOLS} revision={7} api={scripted.face as never}
+        taken={[]} protocols={PROTOCOLS} reasoningLevels={[]} revision={7} api={scripted.face as never}
         discoverModels={scripted.discover}
         t={t} readOnly={false} onClose={vi.fn()}
       />,
@@ -812,6 +812,7 @@ describe('hand-declared providers', () => {
       <CustomProviderCard
         taken={['openai']}
         protocols={PROTOCOLS}
+        reasoningLevels={[]}
         revision={7}
         api={scripted.face as never}
         discoverModels={scripted.discover}
@@ -1125,6 +1126,80 @@ describe('hand-declared providers', () => {
 
     fireEvent.change(routeField, { target: { value: 'openai' } })
     expect(screen.getByText(en.customRouteTaken).className).toMatch(/error/)
+  })
+
+  it.each(['not-a-url', 'localhost:11434', 'ftp://gateway.acme.example/v1', '   '])(
+    'rejects the non-HTTP base URL %j before discovery or creation', (baseURL) => {
+      const { discover, mutate, set } = mountCard()
+      fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
+      fireEvent.click(screen.getByRole('button', { name: en.addModel }))
+      fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'm' } })
+      fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: baseURL } })
+      fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'fixture-key' } })
+
+      expect(screen.getByText(en.customBaseUrlInvalid)).toBeTruthy()
+      expect(screen.getByLabelText(en.baseUrl).getAttribute('aria-invalid')).toBe('true')
+      expect(buttonNamed(en.fetchModels).disabled).toBe(true)
+      expect(buttonNamed(en.fetchModels).title).toBe(en.customBaseUrlInvalid)
+      expect(buttonNamed(en.create).disabled).toBe(true)
+      fireEvent.click(buttonNamed(en.fetchModels))
+      fireEvent.click(buttonNamed(en.create))
+      expect(discover).not.toHaveBeenCalled()
+      expect(mutate).not.toHaveBeenCalled()
+      expect(set).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each([
+    'http://localhost:11434/v1',
+    'http://127.0.0.1:8080/v1',
+    'http://[::1]:8080/v1',
+    'https://gateway.acme.example:8443/v1',
+  ])('allows the HTTP base URL %j to be interrogated', (baseURL) => {
+    const { discover } = mountCard()
+    fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
+    fireEvent.click(screen.getByRole('button', { name: en.addModel }))
+    fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'm' } })
+    fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: baseURL } })
+
+    expect(screen.queryByText(en.customBaseUrlInvalid)).toBeNull()
+    expect(buttonNamed(en.fetchModels).disabled).toBe(false)
+    expect(buttonNamed(en.create).disabled).toBe(false)
+    fireEvent.click(screen.getByText(en.fetchModels))
+    expect(firstProbe(discover)).toMatchObject({ baseURL })
+  })
+
+  it('normalizes surrounding whitespace before interrogating and storing a base URL', async () => {
+    const discover = vi.fn(() => Promise.resolve({ ok: true as const, value: [{ id: 'm' }] }))
+    const { mutate, onClose } = mountCard({}, { discover })
+    fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
+    fireEvent.change(screen.getByLabelText(en.baseUrl), {
+      target: { value: '  https://gateway.acme.example/v1  ' },
+    })
+
+    expect(screen.queryByText(en.customBaseUrlInvalid)).toBeNull()
+    fireEvent.click(screen.getByText(en.fetchModels))
+    await waitFor(() => { expect(discover).toHaveBeenCalledTimes(1) })
+    expect(firstProbe(discover)).toMatchObject({ baseURL: 'https://gateway.acme.example/v1' })
+
+    fireEvent.click(await screen.findByText(en.fetchAdopt))
+    await waitFor(() => { expect(buttonNamed(en.create).disabled).toBe(false) })
+    fireEvent.click(screen.getByText(en.create))
+    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true) })
+    expect(firstMutate(mutate).ops[0]?.value).toMatchObject({ baseURL: 'https://gateway.acme.example/v1' })
+  })
+
+  it('keeps a network failure distinct from base URL syntax', async () => {
+    const discover = vi.fn(() => Promise.resolve({
+      ok: false as const,
+      error: { message: 'connection refused' },
+    }))
+    mountCard({}, { discover })
+    fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: 'http://localhost:11434/v1' } })
+    fireEvent.click(screen.getByText(en.fetchModels))
+
+    await screen.findByText('connection refused')
+    expect(screen.queryByText(en.customBaseUrlInvalid)).toBeNull()
   })
 
   it('derives a reference the credential seam accepts for every id it admits', () => {

@@ -13,6 +13,9 @@ export const zh = {
   'row.instructions': '说明',
   'row.inspect': '查看',
   'menu.userOnly': '仅用户',
+  'preview.loading': '正在读取技能说明…',
+  'preview.failed': '无法读取技能说明。请关闭后重试。',
+  'preview.missing': '此会话无法使用该技能。',
 } satisfies Record<string, string>
 
 /** The skill namespace key union. */
@@ -28,4 +31,7 @@ export const en = {
   'row.instructions': 'Instructions',
   'row.inspect': 'Inspect',
   'menu.userOnly': 'user-only',
+  'preview.loading': 'Loading skill instructions…',
+  'preview.failed': 'Could not load skill instructions. Close this preview and try again.',
+  'preview.missing': 'This skill is unavailable in this session.',
 } satisfies Record<SkillKey, string>

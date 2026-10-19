@@ -297,6 +297,59 @@ readImageRequest( ref: ImageAttachmentRef, target: ImageRequestTarget, signal?: 
 
 Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)
 
+<a id="ctxfileuploads--fileuploads"></a>
+
+### `ctx.fileUploads` — `FileUploads`
+
+Host service owning upload storage and receipts keyed by each receiving Agent's exact Session.
+
+```ts cordis-catalog
+/**
+ * Persist one encoded upload and stage it under the Agent receiver selected by Typert.
+ * @param agent - receiving Agent resolved from the Remote Agent scope.
+ * @param request - canonical base64 bytes and optional display name.
+ * @param signal - caller cancellation before storage begins.
+ * @returns the staged receipt and durable file reference.
+ */
+@Remote('upload') upload(agent: Agent, request: EncodedFileUploadRequest, signal: AbortSignal): Promise<FileUploadValue>
+
+/**
+ * Persist raw chunks for one Session without aggregating the upload.
+ * @param request - Session identity, ordered bytes, cancellation, and optional display name.
+ * @returns the staged receipt and durable file reference.
+ */
+async uploadStream(request: { readonly sessionId: SessionId readonly data: AsyncIterable<Uint8Array> readonly signal?: AbortSignal readonly name?: string }): Promise<FileUploadValue>
+
+/**
+ * Resolve one staged receipt for the receiving Agent's exact Session.
+ * @param agent - receiving Agent.
+ * @param receiptId - opaque receipt minted for one completed upload.
+ * @returns durable file reference, or `undefined` for an unknown or foreign receipt.
+ */
+resolve(agent: Agent, receiptId: FileUploadReceiptId): FileAttachmentRef | undefined
+
+/**
+ * Bind receipts while one prompt enters an Agent inbox.
+ * Disposal restores every prior binding unless the caller commits successful delivery.
+ * @param agent - receiving Agent.
+ * @param receiptIds - distinct staged receipts referenced by the prompt.
+ * @param requestId - prompt identity later observed in queue or history.
+ * @returns binding kept after commit until queue or history observation retires its receipts.
+ */
+bindPrompt( agent: Agent, receiptIds: readonly FileUploadReceiptId[], requestId: string, ): PromptFileBinding
+
+/**
+ * Retire every receipt accepted by one removed queue occurrence.
+ * @param agent - receiving Agent.
+ * @param requestId - prompt identity carried by the queue occurrence.
+ */
+retirePrompt(agent: Agent, requestId: string): void
+```
+
+Types: [Agent](core.zh.md) · [SessionId](core.zh.md)
+
+Source: [`packages/client/file-upload/src/index.ts`](../../packages/client/file-upload/src/index.ts)
+
 <a id="ctxuserdocs--userdocstore-abstract-seam"></a>
 
 ### `ctx.userDocs` — `UserDocStore` (abstract seam)

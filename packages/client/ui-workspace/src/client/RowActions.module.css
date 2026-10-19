@@ -1,0 +1,39 @@
+/* Row-level action buttons share the session-row cell spec: 16px square,
+   tertiary glyph that lifts to primary on hover. */
+.iconButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: var(--dsw-radius-xs);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-tertiary);
+  transition: color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+}
+
+.iconButton:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+  .iconButton {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .iconButton {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}

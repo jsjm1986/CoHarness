@@ -49,13 +49,20 @@ export type UseDisclosure = () => {
   readonly toggle: () => void
 }
 
+/** Hook reading the owning Chat seat's disclosure fold generation. */
+export type UseDisclosureReset = () => number
+
 /** Call-local sources supplied by the Tool tree to the slot's Hook binding. */
 export interface ToolCallHookContext {
   readonly callId: string
   /** This call's Step source, present only while preparing. */
   readonly assistant: HostObservable<Readonly<AssistantChatData> | undefined> | undefined
-  /** Per-call expanded-state cell shared by every row form this call takes. */
-  readonly disclosure: SnapshotStore<boolean>
+  /**
+   * Per-call expansion record shared by every row form this call takes: the
+   * seat fold generation the call was expanded under, or `null` while
+   * collapsed. A generation bump collapses the record without unmounting it.
+   */
+  readonly disclosure: SnapshotStore<number | null>
 }
 
 /** Framework-bound subscriptions available to atomic Tool views on demand. */

@@ -142,7 +142,8 @@
     "tests/workspace-files.e2e.ts",
     "tests/auto-review-fixture.ts",
     "tests/auto-review-denial.e2e.ts",
-    "tests/voice-input.e2e.ts"
+    "tests/voice-input.e2e.ts",
+    "tests/file-upload-round.e2e.ts"
   ],
   "references": [
     {

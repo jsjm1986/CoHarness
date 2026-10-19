@@ -1,7 +1,7 @@
 /** Workspace preview contributed to the shared auxiliary tab system. */
 import { useMemo } from 'react'
 import { isWorkspaceAccessFailure, parseWorkspaceResourceAddress, workspaceResourceAddress, WorkspaceResourceError } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspaceResourceSource, WorkspaceResourceState, WorkspaceResourceTarget, WorkspaceResourceValue, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceResourceSource, WorkspaceResourceState, WorkspaceResourceTarget, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { WorkspaceFilePreview } from './WorkspaceFilePreview.tsx'
@@ -12,11 +12,12 @@ import { WorkspaceMarkdownPreview, isWorkspaceMarkdown } from './WorkspaceMarkdo
 import { WorkspaceHtmlPreview, isWorkspaceHtml } from './WorkspaceHtmlPreview.tsx'
 import type { RenderWorkspaceHtml } from './WorkspaceHtmlPreview.tsx'
 import { WorkspaceExcelPreview, isWorkspaceSpreadsheet } from './WorkspaceExcelPreview.tsx'
-import type { ReadWorkspaceFileData } from '../html/read-relative.ts'
+import type { ReadWorkspaceFileData } from '../contract/html/read-relative.ts'
+import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import type { ExcelLimits } from '../excel/model.ts'
 import type {} from '../excel/locales.ts'
 import type { NS } from '../locales.ts'
-import type { ZoomLabels, ZoomPreference } from '../zoom/types.ts'
+import type { ZoomLabels, ZoomPreference } from '../contract/zoom/types.ts'
 
 /** Readers and metadata belong to the existing authorized workspace service. */
 export interface WorkspaceFileTabInjected {
@@ -29,6 +30,15 @@ export interface WorkspaceFileTabInjected {
   reloadResource: (request: WorkspaceResourceOpenRequest) => Promise<void>
   /** Discard retained metadata and reads after an access failure. */
   revokeResource: (request: WorkspaceResourceOpenRequest, message: string) => void
+  /**
+   * Whether the serving Host can hand a path to a native desktop (base
+   * loopback target that advertises `canOpenPath`). Evaluated at render time
+   * like `filesAvailable`, so a capability arriving after first mount appears
+   * on the next render pass.
+   */
+  nativeOpenAvailable: () => boolean
+  /** Open the request's file in the operating system's default application through `host.openPath`. */
+  openNativePath: (request: WorkspaceResourceOpenRequest) => Promise<void>
   readDocument: ReadWorkspaceDocument
   pdfT: PropsLocale<'sidebarPdf'>['t']
   officeT: PropsLocale<'sidebarOffice'>['t']
@@ -40,22 +50,6 @@ export interface WorkspaceFileTabInjected {
   readBytesPreview: ReadWorkspaceBytesPreview
   readFileBytes: ReadWorkspaceFileData
   renderHtml: RenderWorkspaceHtml
-}
-
-/**
- * The plain metadata/callback face every preview reads. The subscription lives
- * in the tab's framework hook; children see JSON-compatible facts and bound
- * callbacks, never the registry or the raw source.
- */
-export interface WorkspacePreviewResource {
-  metadata: {
-    status: WorkspaceResourceState['status']
-    value?: WorkspaceResourceValue
-    error?: { message: string; code?: string }
-    accessDenied: boolean
-  }
-  reload: () => Promise<void>
-  revoke: (message: string) => void
 }
 
 /** Project one source snapshot to the JSON-compatible metadata previews read. */
@@ -96,6 +90,7 @@ export function WorkspaceFileTab(props:
   PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<typeof NS> & InjectFace<WorkspaceFileTabInjected>) {
   const {
     sessionId, useTabInfo, runtimeTarget, useWorkspaceResource, reloadResource, revokeResource,
+    nativeOpenAvailable, openNativePath,
     readDocument, pdfT, officeT, markdownT, htmlT, excelT, excelLimits, t,
     readPreview, readBytesPreview, readFileBytes, renderHtml,
   } = props
@@ -142,6 +137,7 @@ export function WorkspaceFileTab(props:
     close={() => { tab.actions.close() }} labels={{ ...actions, loading: t('previewLoading') }} />
   return <WorkspaceFilePreview key={key} request={request} initialLine={line} read={readPreview} readBytes={readBytesPreview}
     resource={resource} close={() => { tab.actions.close() }} zoomLabels={zoomLabels} view={fileView}
+    nativeOpen={nativeOpenAvailable() ? () => openNativePath(request) : undefined}
     labels={{ close: t('previewClose'), reload: t('previewReload'), previous: t('previewPrevious'), next: t('previewNext'), loading: t('previewLoading'), changed: t('previewChanged'), binary: t('previewBinary'),
-      imageAlt: name => t('previewImage', { name }), imageFailed: t('previewImageFailed') }} />
+      openNative: t('previewOpenNative'), imageAlt: name => t('previewImage', { name }), imageFailed: t('previewImageFailed') }} />
 }

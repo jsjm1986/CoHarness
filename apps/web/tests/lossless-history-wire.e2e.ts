@@ -564,7 +564,10 @@ async function stableUiEvidence(page: Page, scaffold: WebScaffold): Promise<Stab
     interruptedReasoningCount: await page.getByRole('button', {
       name: new RegExp(`^Thinking ${INTERRUPTED_REASONING}`),
     }).count(),
-    stoppedCount: await page.getByText('Stopped', { exact: true }).count(),
+    // A stopped turn-process announces through one hidden status row; its
+    // visible "Stopped" control label repeats the same text, so scope the
+    // count to the status seat rather than every matching text node.
+    stoppedCount: await page.getByRole('status').filter({ hasText: 'Stopped' }).count(),
   }
 }
 

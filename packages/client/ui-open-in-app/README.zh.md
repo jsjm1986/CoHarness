@@ -31,7 +31,7 @@ kind: "package-reference"
 
 ### 预期行为
 
-主按钮显示记住的应用图标——凡主机能提取的都是应用真实图标（macOS bundle 图标、Windows 可执行文件图标、Linux 主题图标），提取不到时是通用占位图形——并带设计系统 tooltip（「在本地打开」）；点击立即启动。下拉箭头打开已安装应用的紧凑菜单，记住的条目以整行填充标记。可用性每页读取一次；上次选择的应用持久化在浏览器中（`dsh.open-in-app.choice`），不再安装的选择回退到第一个可用条目。快速完成的启动不改变按钮外观——变暗的等待态只在飞行超过 250 毫秒后出现——失败的启动显示错误 tooltip 与红色描边两秒。所有文案在双语 `open-in-app` locale 命名空间中；词典无法命名的应用 id 不会被提供。
+主按钮显示记住的应用图标——凡主机能提取的都是应用真实图标（macOS bundle 图标、Windows 可执行文件图标、Linux 主题图标），提取不到时是通用占位图形——并带设计系统 tooltip（点名将打开的应用）；点击立即启动。下拉箭头打开已安装应用的紧凑菜单，记住的条目以整行填充标记。可用性每页读取一次；菜单选择在其启动兑现后才写入浏览器持久化存储（`dsh.open-in-app.choice`）——失败的打开保留先前的选择——不再安装的选择回退到第一个可用条目。快速完成的启动不改变按钮外观——变暗的等待态只在飞行超过 250 毫秒后出现——失败的启动显示错误 tooltip 与红色描边两秒。所有文案在双语 `open-in-app` locale 命名空间中；词典无法命名的应用 id 不会被提供。
 
 -----
 
@@ -41,7 +41,7 @@ kind: "package-reference"
 <details>
 <summary>实现内幕——点击展开</summary>
 
-插件经标准 slot/inject 通货把分体按钮注册到 `conversation.session.header.utilities`，并以一个 effect 注册 `open-in-app` 词典。一个页面生命周期的 controller（[`src/client/controller.ts`](src/client/controller.ts)）拥有每页一次的可用性读取、持久化选择的 snapshot store 与启动 POST；组件经 inject 的 `hooks` 隔间接收两个 store，因此所有会话头部共享同一份事实。文档相对的路由形式与 wire 载荷类型从主机包的浏览器安全子路径 `@deepseek-ai/dsh-host-open-in-app/shared` 内联。飞行中的启动由 ref 守卫——启动期间的重复点击与菜单选择被整体忽略（否则会持久化一个该手势从未打开的选择）——busy/error 视觉由围绕 `launch` promise 的定时器驱动。节点半边是一个空 `apply`，让插件出现在主机侧的插件名册上。
+插件经标准 slot/inject 通货把分体按钮注册到 `conversation.session.header.utilities`，并以一个 effect 注册 `open-in-app` 词典。一个页面生命周期的 controller（[`src/client/controller.ts`](src/client/controller.ts)）拥有每页一次的可用性读取、持久化选择的 snapshot store 与启动 POST；组件经 inject 的 `hooks` 隔间接收两个 store，因此所有会话头部共享同一份事实。文档相对的路由形式与 wire 载荷类型从主机包的浏览器安全子路径 `@deepseek-ai/dsh-host-open-in-app/shared` 内联。飞行中的启动由 ref 守卫——启动期间的重复点击与菜单选择被整体忽略（否则会持久化一个该手势从未打开的选择）——选中的 id 仅在 `launch` promise 兑现时才提交进 store；busy/error 视觉由围绕同一 promise 的定时器驱动。节点半边是一个空 `apply`，让插件出现在主机侧的插件名册上。
 
 </details>
 

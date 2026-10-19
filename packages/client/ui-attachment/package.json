@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-attachment",
-  "description": "Dynamic attachment presentation plugin for conversation input and message-image slots",
+  "description": "Dynamic attachment presentation plugin for conversation input, message-image, and trajectory image slots",
   "version": "0.1.5-alpha.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -49,6 +49,7 @@
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:*",
     "@deepseek-ai/dsh-client-ui-primitives": "workspace:*",
     "@deepseek-ai/dsh-client-ui-slots": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-trajectory": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "@deepseek-ai/dsh-attachment": "workspace:*"
@@ -62,6 +63,7 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-client-runtime": "workspace:*",
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-trajectory": "workspace:*",
     "@deepseek-ai/dsh-attachment": "workspace:*"
   }
 }

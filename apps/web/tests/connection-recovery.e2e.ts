@@ -79,7 +79,7 @@ it.each([false, true])('retains the mounted application across WebSocket recover
     await page.evaluate(() => new Promise<void>((resolve) => {
       requestAnimationFrame(() => { requestAnimationFrame(() => { resolve() }) })
     }))
-    expect(await root!.evaluate(element => element.isConnected)).toBe(true)
+    expect(await root.evaluate(element => element.isConnected)).toBe(true)
     expect(console.pageErrors).toEqual([])
     if (activeSession) expect(await composer.inputValue()).toBe(draft)
   }

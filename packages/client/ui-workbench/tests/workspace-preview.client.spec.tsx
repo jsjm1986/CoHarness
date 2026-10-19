@@ -8,7 +8,7 @@ import {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { WorkspaceFilePreview } from '../src/client/components/WorkspaceFilePreview.tsx'
-import type { ZoomPreference } from '../src/client/zoom/types.ts'
+import type { ZoomPreference } from '../src/client/contract/zoom/types.ts'
 import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
@@ -24,7 +24,7 @@ const extensionlessRequest: WorkspaceResourceOpenRequest = {
 }
 const labels = {
   close: 'Close', reload: 'Reload', previous: 'Previous', next: 'Next', loading: 'Loading',
-  changed: 'Changed; reload', binary: 'Binary (Base64)',
+  changed: 'Changed; reload', binary: 'Binary (Base64)', openNative: 'Open in default app',
   imageAlt: (name: string) => `Image preview: ${name}`, imageFailed: 'This image could not be displayed.',
 }
 const zoomLabels = {
@@ -147,6 +147,43 @@ describe('WorkspaceFilePreview', () => {
     await waitFor(() => { expect(view.getByText(/Binary \(Base64\)/)).toBeTruthy() })
     expect(view.getByText(/AAEC/)).toBeTruthy()
     expect(readBytes).toHaveBeenCalledWith(expect.objectContaining({ length: 10, version: 'v1' }), expect.any(AbortSignal))
+  })
+
+  it('offers the authorized native-open action only while the Host can open paths', async () => {
+    const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
+    const readBytes = vi.fn(async () => ({ path: request.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
+    const nativeOpen = vi.fn(async () => {})
+    const h = harness()
+    const view: { zoom?: ZoomPreference } = {}
+    const rendered = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
+      <WorkspaceFilePreview request={request} read={read} readBytes={readBytes} nativeOpen={nativeOpen}
+        resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
+    }</PreviewResourceBinding>)
+    await waitFor(() => { expect(rendered.getByText(/AAEC/)).toBeTruthy() })
+    fireEvent.click(rendered.getByRole('button', { name: 'Open in default app' }))
+    await waitFor(() => { expect(nativeOpen).toHaveBeenCalledOnce() })
+    // Without the injected gesture the fallback degrades to the bytes preview alone.
+    rendered.unmount()
+    const plain = renderPreview(read, { readBytes })
+    await waitFor(() => { expect(plain.getByText(/AAEC/)).toBeTruthy() })
+    expect(plain.queryByRole('button', { name: 'Open in default app' })).toBeNull()
+  })
+
+  it('surfaces a native-open failure as the preview alert', async () => {
+    const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
+    const readBytes = vi.fn(async () => ({ path: request.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
+    const nativeOpen = vi.fn(async () => { throw new Error('path open failed: no handler') })
+    const h = harness()
+    const view: { zoom?: ZoomPreference } = {}
+    const rendered = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
+      <WorkspaceFilePreview request={request} read={read} readBytes={readBytes} nativeOpen={nativeOpen}
+        resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
+    }</PreviewResourceBinding>)
+    await waitFor(() => { expect(rendered.getByText(/AAEC/)).toBeTruthy() })
+    fireEvent.click(rendered.getByRole('button', { name: 'Open in default app' }))
+    await waitFor(() => { expect(rendered.getByRole('alert').textContent).toBe('path open failed: no handler') })
+    // The bounded bytes preview stays up beside the failure.
+    expect(rendered.getByText(/AAEC/)).toBeTruthy()
   })
 
   it('hides content when the target loses access and reports an ordinary failure', async () => {

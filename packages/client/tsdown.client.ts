@@ -6,14 +6,15 @@
  * lightningcss inside the bundle: `x.module.css` yields its hashed class map
  * and injects a tagged style at factory execution, while `x.css?inline`
  * exports compiled text for a plugin-owned lifecycle effect. The virtual
- * loaders register each real stylesheet as a watch dependency.
+ * loaders register each real stylesheet as a watch dependency. SVG, PNG, and
+ * WebP imports become watched base64 data URLs inside the bundle.
  * Non-experimental client outputs reject experimental module and stylesheet
  * inputs, including origins recorded by chained source maps.
  */
 import { readFile, stat, utimes } from 'node:fs/promises'
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import { createRequire, isBuiltin } from 'node:module'
-import { basename, dirname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Rolldown, type TsdownPlugin, type UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
@@ -32,6 +33,9 @@ const GLOBAL_CSS_VIRTUAL_PREFIX = '\0dsh-global-css:'
 const INLINE_CSS_VIRTUAL_PREFIX = '\0dsh-inline-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 const INLINE_CSS_QUERY = '?inline'
+
+/** Image imports become base64 data URLs embedded in the plugin's own bundle. */
+const IMAGE_MEDIA_TYPES = new Map([['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.webp', 'image/webp']])
 
 /** Emit one plugin-owned style injector and an optional CSS Modules export. */
 function styleInjectionModule(
@@ -609,6 +613,19 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
         const source = await readFile(fileId)
         const { code } = transform({ filename: fileId, code: source, minify: true })
         return styleInjectionModule(id, fileId, code.toString())
+      },
+    }, {
+      name: 'dsh-image-inline',
+      resolveId(source: string, importer: string | undefined) {
+        if (importer === undefined || !IMAGE_MEDIA_TYPES.has(extname(source))) return null
+        return sourceAssetPath(source, importer)
+      },
+      async load(fileId: string) {
+        const mediaType = IMAGE_MEDIA_TYPES.get(extname(fileId))
+        if (mediaType === undefined) return null
+        this.addWatchFile(fileId)
+        const data = await readFile(fileId)
+        return `export default ${JSON.stringify(`data:${mediaType};base64,${data.toString('base64')}`)};`
       },
     }],
     outputOptions: {

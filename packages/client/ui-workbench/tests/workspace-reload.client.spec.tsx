@@ -13,7 +13,7 @@ import type { ReadWorkspaceDocument } from '../src/client/components/WorkspaceDo
 import { WorkspaceMarkdownPreview } from '../src/client/components/WorkspaceMarkdownPreview.tsx'
 import { WorkspaceHtmlPreview } from '../src/client/components/WorkspaceHtmlPreview.tsx'
 import { WorkspaceExcelPreview } from '../src/client/components/WorkspaceExcelPreview.tsx'
-import type { ReadWorkspaceFileData } from '../src/client/html/read-relative.ts'
+import type { ReadWorkspaceFileData } from '../src/client/contract/html/read-relative.ts'
 import { Config } from '../src/config.ts'
 import { en as pdfEn } from '../src/client/pdf/locales.ts'
 import { en as officeEn } from '../src/client/office/locales.ts'
@@ -35,7 +35,7 @@ const fileRequest = (path: string): WorkspaceResourceOpenRequest => ({
 })
 const labels = {
   close: 'Close', reload: 'Reload', previous: 'Previous', next: 'Next', loading: 'Loading',
-  changed: 'Changed; reload', binary: 'Binary (Base64)',
+  changed: 'Changed; reload', binary: 'Binary (Base64)', openNative: 'Open in default app',
   imageAlt: (name: string) => `Image preview: ${name}`, imageFailed: 'This image could not be displayed.',
 }
 const zoomLabels = {

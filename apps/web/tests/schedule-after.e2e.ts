@@ -309,6 +309,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
       sessionId: SessionId('schedule-after-web-e2e'),
       meta: { cwd },
       agentOptions: { provider: AFTER_PROVIDER, model: MODEL },
+      setup: agentCtx => scaffold.ctx.agentPresets.mount(agentCtx).then(() => undefined),
     })
     afterHandle.agent.session.append('session/title', {
       title: 'Scheduled After follow-up',
@@ -346,6 +347,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
       sessionId: SessionId('schedule-every-web-e2e'),
       meta: { cwd },
       agentOptions: { provider: EVERY_PROVIDER, model: MODEL },
+      setup: agentCtx => scaffold.ctx.agentPresets.mount(agentCtx).then(() => undefined),
     })
     everyHandle.agent.session.append('session/title', {
       title: 'Fixed-rate reminder batch',
@@ -395,6 +397,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
       sessionId: SessionId('schedule-at-web-e2e'),
       meta: { cwd },
       agentOptions: { provider: AT_PROVIDER, model: MODEL },
+      setup: agentCtx => scaffold.ctx.agentPresets.mount(agentCtx).then(() => undefined),
     })
     atHandle.agent.session.append('session/title', {
       title: 'Explicit local-time reminder',

@@ -37,13 +37,15 @@ A session's preset is fixed when the session is created — the host refuses to 
 <a id="the-new-session-chip"></a>
 ## The new-session chip
 
-The *Allow switching Agent modes* preference in Agent presets settings decides whether a mode can be chosen at all: with it off the new-session picker disappears, while the settings cards still choose the saved default that keeps composing new tasks and Creator stays available. Choosing a healthy default also synchronizes the blank session on the current new-task surface. Creator starts a new task using the `cordis` preset; the Plugins page's **Add plugin** menu offers the same entry, sharing the section button's single launch path.
+The *Allow switching Agent modes* preference controls the new-session picker. While it is off, unnamed sessions use the deployment default, and the settings default selector and Creator entry are disabled; the saved default remains available when the picker is enabled again. Choosing a healthy default while selection is enabled also synchronizes the current blank session. Creator starts a new task using the `cordis` preset; the Plugins page's **Add plugin** menu offers the same entry.
 
 A second surface, beside the workspace picker on the new-session screen. It sits there rather than in the composer because that is where the choice is still open: a control that spends most of its life disabled belongs on the screen where it still works.
 
 The chip opens on the deployment default and its pick is *staged* — the screen precedes the session it would apply to. The stage reaches a session when one becomes current and is still blank, which covers both the session the workspace connect created and the blank one it reused; riding along on `sessions.create` would miss the second. It is spent on first use, so the next new session opens on the default again, exactly like the workspace picker beside it. Turning *Show coding view* off clears an unspent stage; a stage made while it is off — either Creator entry, or a settings write syncing the still-blank session — still lands.
 
-A session that has started is refused rather than queued: the host answers `agent-preset-locked`, and the stage is dropped instead of waiting for a session that will never accept it. A refused pick announces itself in a banner that names the preset and its cause — a refusal can arrive after the picker hid, so the banner does not depend on the chip being visible — and the trigger keeps the bare reason as its title until the next attempt.
+The chip keeps an unapplied stage while the current session is nonblank; it can apply that choice when a blank session becomes current. The Host independently refuses a switch that fails its blank-session check with `agent-preset-locked`. A refused pick announces itself in a banner naming the preset and cause, including when the picker is hidden; the trigger retains the reason as its title until the next attempt.
+
+Each chip serializes selections. Settings waits for the active selection and rechecks its captured blank session before applying a default. A selection consumes its own stage before sending the request, so its response cannot erase a later choice. An apply request arriving during that selection is coalesced for the same staged choice and session; clearing or replacing the stage, or leaving that session, cancels the queued request.
 
 <a id="the-session-header-label"></a>
 ## The session-header label

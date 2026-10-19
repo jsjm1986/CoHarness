@@ -5,11 +5,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { useEffect } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type {
-  AssistantMessageNode, ChatConversationViewNode, CommandNode, CompactionSummaryNode, ConversationNode,
-  ConversationSnapshot, ModelRetryNode, RunningToolCall, SessionId, SessionListState, ToolCallBlock,
-  ToolResultNode, TurnErrorNode, TurnMaxTokensNode, TurnNavigationItem, UserMessageNode, WorkspaceListState,
+  AssistantMessageNode, CommandNode, CompactionSummaryNode, ContextMessageNode, ConversationNode,
+  ConversationSnapshot, ModelRetryNode, RunningToolCall, SessionId, SessionListState, SteeringMessageNode,
+  ToolCallBlock, ToolResultNode, TurnErrorNode, TurnMaxTokensNode, TurnNavigationItem, UserMessageNode,
+  WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
@@ -36,6 +37,7 @@ import {
   TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView,
 } from '../src/client/chat/MessageItem.tsx'
 import { TurnTailNodeView } from '../src/client/chat/TurnTailNodeView.tsx'
+import { TurnTriggerNodeView } from '../src/client/chat/TurnTriggerNodeView.tsx'
 import { formatRunDuration as durationParts } from '../src/client/chat/message-chrome.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
@@ -108,6 +110,24 @@ const user = (seq: number, text: string, source: unknown = null): UserMessageNod
 const assistant = (seq: number, text: string, turn = 1): AssistantMessageNode => ({
   kind: 'assistant', seq, time: seq * 1_000, turn, step: 1, blocks: [{ kind: 'text', text }],
 })
+const steering = (seq: number, text: string, turn: number): SteeringMessageNode & { turn: number } => ({
+  kind: 'steering',
+  messageId: `steering-${String(seq)}` as SteeringMessageNode['messageId'],
+  seq,
+  time: seq * 1_000,
+  turn,
+  content: [{ type: 'text', text }],
+  source: { kind: 'user' },
+})
+const contextNotice = (seq: number, text: string, source: unknown): ContextMessageNode => ({
+  kind: 'context',
+  seq,
+  time: seq * 1_000,
+  content: [{ type: 'text', text }],
+  source,
+  producer: { role: 'inject', label: null },
+  form: null,
+})
 const retry = (seq: number): ModelRetryNode => ({
   kind: 'model-retry', retryId: 'chat-view-retry' as ModelRetryNode['retryId'],
   seq, time: seq * 1_000, turn: 1, step: 0,
@@ -164,6 +184,77 @@ function emptyWorkspaces() {
   return bindSnapshotSelector(store)
 }
 
+/** Structural twin of the seat's fold-generation source (post-fix hookContext member). */
+interface SpecResetSource {
+  getSnapshot(): number
+  subscribe(fn: () => void): () => void
+}
+
+/** HookContext shapes the dispatch tolerates: legacy bare nodeKey, or the reset-bearing object. */
+type SpecHookContext = string | { nodeKey?: string; disclosureReset?: SpecResetSource } | undefined
+
+type SpecDisclosure = () => {
+  readonly expanded: boolean
+  readonly setExpanded: (open: boolean) => void
+  readonly toggle: () => void
+}
+
+const ZERO_DISCLOSURE_VERSION: () => number = () => 0
+
+/** Mirror of the slot inject's disclosure binding: one disclosure per call site, reset-keyed. */
+function bindSpecDisclosure(reset: SpecResetSource): SpecDisclosure {
+  const subscribe = (listener: () => void) => reset.subscribe(listener)
+  const getSnapshot = () => reset.getSnapshot()
+  return function useSpecDisclosure() {
+    const version = useSyncExternalStore(subscribe, getSnapshot)
+    const [expandedVersion, setExpandedVersion] = useState<number | null>(null)
+    return {
+      expanded: expandedVersion === version,
+      setExpanded: (open: boolean) => { setExpandedVersion(open ? version : null) },
+      toggle: () => { setExpandedVersion(previous => previous === version ? null : version) },
+    }
+  }
+}
+
+/** Mirror of the slot inject's reset-generation binding used by the Tool seat. */
+function bindSpecDisclosureReset(reset: SpecResetSource): () => number {
+  const subscribe = (listener: () => void) => reset.subscribe(listener)
+  const getSnapshot = () => reset.getSnapshot()
+  return function useSpecDisclosureReset() {
+    return useSyncExternalStore(subscribe, getSnapshot)
+  }
+}
+
+/**
+ * Tool seat probe mirroring the production cell encoding: the expanded state is
+ * the seat generation the toggle recorded, so a generation bump collapses it
+ * while the seat stays mounted for live updates.
+ */
+function ToolDisclosureProbe({ tool, useDisclosureReset }: {
+  readonly tool: { callId: string; toolName: string }
+  readonly useDisclosureReset?: (() => number) | undefined
+}) {
+  const resetVersion = (useDisclosureReset ?? ZERO_DISCLOSURE_VERSION)()
+  const [expandedGeneration, setExpandedGeneration] = useState<number | null>(null)
+  const expanded = expandedGeneration === resetVersion
+  return (
+    <div
+      data-testid={`tool-seat-${tool.callId}`}
+      data-chat-anchor-key={`call:${tool.callId}`}
+      data-chat-call-id={tool.callId}
+    >
+      {tool.toolName || '(unnamed)'}:{tool.callId}
+      <button
+        type="button"
+        data-tool-disclosure={tool.callId}
+        aria-expanded={expanded}
+        onClick={() => { setExpandedGeneration(previous => previous === resetVersion ? null : resetVersion) }}
+      />
+      {expanded && <span data-tool-body>tool body</span>}
+    </div>
+  )
+}
+
 function makeHarness(init?: Partial<ConversationSnapshot>) {
   const { set, source } = makeSource(init)
   const openDetails = vi.fn<(t: SelectionTarget) => void>()
@@ -194,59 +285,77 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     opts?.fallback ?? null) as unknown as React.ComponentProps<typeof CommandNodeView>['renderSlot']
   const renderTurnTailSlot = (() => null) as unknown as
     React.ComponentProps<typeof TurnTailNodeView>['renderSlot']
-  const renderSlot = ((key: string, owner: object, opts?: {
+  const renderSlot: ChatViewSlotProps['renderSlot'] = ((key: string, owner: object, opts?: {
     fallback?: React.ReactNode
     hookContext?: unknown
   }) => {
     if (key !== 'conversation.chat.node') return opts?.fallback ?? null
     const nodeOwner = owner as RoutedChatNodeOwner
-    const nodeKey = opts?.hookContext as string | undefined
+    const context = opts?.hookContext as SpecHookContext
+    const nodeKey = typeof context === 'string' ? context : context?.nodeKey
+    const disclosureReset = typeof context === 'object' && context !== null ? context.disclosureReset : undefined
+    const useDisclosure = disclosureReset === undefined ? undefined : bindSpecDisclosure(disclosureReset)
+    const useDisclosureReset = disclosureReset === undefined ? undefined : bindSpecDisclosureReset(disclosureReset)
     const useTurnData: UseChatNodeTurnData = dataKey => props.useSession((snapshot) => {
       const location = nodeKey === undefined ? undefined : snapshot.chat.nodes.get(nodeKey)?.location
       return location?.kind === 'turn' || location?.kind === 'step'
         ? location.turn.data.get(dataKey)
         : undefined
     })
-    const nodeProps = <Kind extends ChatNode['kind']>(): ChatNodeViewProps<Kind> => (
-      { ...props, ...nodeOwner, useTurnData } as unknown as ChatNodeViewProps<Kind>
-    )
+    // The inferred per-call result keeps the case-narrowed node type, which
+    // the generic KeyPropsOf conditional cannot verify inside a typed body.
+    // `__renders` rides the ChatView slot face, not the per-node dispatch set.
+    const { __renders: _chatViewRenders, ...chatProps } = props
+    const nodeProps = <N extends ChatNode>(node: N) => ({
+      ...chatProps, ...nodeOwner, node, useTurnData,
+      // ChatViewSlotProps carries the policy as a hook-backed union; the node
+      // owner share wants the resolved value.
+      presentation: nodeOwner.presentation,
+      useDisclosure: useDisclosure ?? (() => { throw new Error('disclosure hook not mounted for this node') }),
+      useDisclosureReset: useDisclosureReset ?? (() => 0),
+    })
     switch (nodeOwner.node.kind) {
       case 'user':
+        return <UserMessageNodeView {...nodeProps(nodeOwner.node)} />
       case 'steering':
-        return <UserMessageNodeView {...nodeProps<'user' | 'steering'>()} />
+        return <UserMessageNodeView {...nodeProps(nodeOwner.node)} />
       case 'context':
-        return <ContextMessageNodeView {...nodeProps<'context'>()} />
+        return <ContextMessageNodeView {...nodeProps(nodeOwner.node)} />
+      case 'turn-trigger':
+        return <TurnTriggerNodeView {...nodeProps(nodeOwner.node)} />
       case 'assistant-step':
-        return <AssistantNodeView {...nodeProps<'assistant-step'>()} />
+        return <AssistantNodeView {...nodeProps(nodeOwner.node)} />
       case 'command':
         return (
           <CommandNodeView
-            {...nodeProps<'command'>()}
+            {...nodeProps(nodeOwner.node)}
             renderSlot={renderCommandSlot}
             SessionProvider={props.SessionProvider}
           />
         )
       case 'manual-compaction':
-        return <ManualCompactionNodeView {...nodeProps<'manual-compaction'>()} />
+        return <ManualCompactionNodeView {...nodeProps(nodeOwner.node)} />
       case 'compaction':
-        return <CompactionNodeView {...nodeProps<'compaction'>()} />
+        return <CompactionNodeView {...nodeProps(nodeOwner.node)} />
       case 'model-retry':
-        return <RetryNodeView {...nodeProps<'model-retry'>()} />
+        return <RetryNodeView {...nodeProps(nodeOwner.node)} />
+      case 'turn-process':
+        return <TurnProcessNodeView {...nodeProps(nodeOwner.node)} />
       case 'turn-error':
-        return <TurnErrorNodeView {...nodeProps<'turn-error'>()} />
+        return <TurnErrorNodeView {...nodeProps(nodeOwner.node)} />
       case 'turn-max-tokens':
-        return <TurnMaxTokensNodeView {...nodeProps<'turn-max-tokens'>()} />
+        return <TurnMaxTokensNodeView {...nodeProps(nodeOwner.node)} />
       case 'turn-tail':
         return (
           <TurnTailNodeView
-            {...nodeProps<'turn-tail'>()}
+            {...nodeProps(nodeOwner.node)}
             renderSlot={renderTurnTailSlot}
             usePerformanceUsage={selector => selector(performanceUsageMode)}
             SessionProvider={props.SessionProvider}
           />
         )
       case 'unknown':
-        return <UnknownNodeView {...nodeProps<'unknown'>()} />
+        return <UnknownNodeView {...nodeProps(nodeOwner.node)} />
       case 'tool-call': {
         const block = nodeOwner.node.data.root
         const toolName = 'kind' in block ? block.call?.name ?? '' : block.name
@@ -260,19 +369,16 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
         }
         toolOwners.push(tool)
         return (
-          <div
-            data-testid={`tool-seat-${tool.callId}`}
-            data-chat-anchor-key={`call:${tool.callId}`}
-            data-chat-call-id={tool.callId}
-          >
-            {tool.toolName || '(unnamed)'}:{tool.callId}
-          </div>
+          <ToolDisclosureProbe
+            tool={tool}
+            useDisclosureReset={nodeProps(nodeOwner.node).useDisclosureReset}
+          />
         )
       }
       default:
         return opts?.fallback ?? null
     }
-  }) as unknown as ChatViewSlotProps['renderSlot']
+  })
   // SessionProvider seat arrives with the session-scope child declaration;
   // ChatView never invokes it (render-prop pass-through stub).
   const SessionProviderStub: ChatViewSlotProps['SessionProvider'] = ({ children }) => <>{children(SID)}</>
@@ -379,33 +485,68 @@ describe('Focused Chat disclosures', () => {
 
   it('renders turn process counts and toggles the collapsed state', () => {
     const setOpen = vi.fn()
-    const node = {
+    const chat = chatSnapshotFixture({ turnEnds: new Map([[1, 9]]) })
+    const turn = chat.timeline.turns.get(1)
+    if (turn === undefined) throw new Error('chat fixture lacks turn 1')
+    const node: ChatNode<'turn-process'> = {
       key: 'turn-process:1',
       id: '1',
       kind: 'turn-process',
       target: 'chat',
       anchorSeq: 1,
-      location: { kind: 'session' },
+      location: { kind: 'turn', turn },
       visibility: 'visible',
       data: {
         turn: 1,
         controlAnchorSeq: 1,
+        processStartSeq: 1,
         messageCount: 2,
         toolCallCount: 1,
         subagentCount: 1,
         answerAnchorSeq: 9,
+        answerStep: 1,
+        inlineReasoning: false,
       },
-    } as unknown as ChatNode<'turn-process'>
-    const view = render(
-      <TurnProcessNodeView
-        {...({ node, turnProcess: { open: false, setOpen }, t } as unknown as React.ComponentProps<typeof TurnProcessNodeView>)}
-      />,
-    )
+    }
+    const turnProcess = { foldable: true, hasContent: true, open: false, setOpen }
+    const props: ChatNodeViewProps<'turn-process'> = {
+      node,
+      turnProcess,
+      t,
+      sessionId: SID,
+      useSession: () => { throw new Error('unused') },
+      useSessions: emptySessions(),
+      useWorkspaces: emptyWorkspaces(),
+      useProjection: () => undefined,
+      useInput: () => { throw new Error('unused') },
+      usePanelInfo: () => { throw new Error('unused') },
+      inputActions: {
+        setDraft: () => {},
+        addImages: () => true,
+        removeImage: () => {},
+        pruneImages: () => {},
+        addDocuments: () => true,
+        removeDocument: () => {},
+        pruneDocuments: () => {},
+        captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+        insertText: () => false,
+        submit: () => {},
+      },
+      useTurnData: () => undefined,
+      useDisclosure: () => ({ expanded: false, setExpanded: () => {}, toggle: () => {} }),
+      useDisclosureReset: () => 0,
+      openFile: () => {},
+      inspectCall: () => {},
+      forkAt: () => {},
+      renderMessageImages: () => null,
+      fileMentions: () => undefined,
+    }
+    const view = render(<TurnProcessNodeView {...props} />)
     const button = view.getByRole('button')
     expect(button.getAttribute('aria-expanded')).toBe('false')
-    expect(button.textContent).toContain('1 次工具调用')
-    expect(button.textContent).toContain('2 条中间消息')
-    expect(button.textContent).toContain('1 个子智能体')
+    expect(button.getAttribute('data-turn-process-tool-calls')).toBe('1')
+    expect(button.getAttribute('data-turn-process-messages')).toBe('2')
+    expect(button.getAttribute('data-turn-process-subagents')).toBe('1')
     fireEvent.click(button)
     expect(setOpen).toHaveBeenCalledWith(true)
   })
@@ -421,35 +562,10 @@ describe('Focused Chat disclosures', () => {
   })
 
   it('folds a completed turn behind its process row unless the policy keeps turns expanded', () => {
-    const base = chatSnapshotFixture({
+    const chat = chatSnapshotFixture({
       nodes: [user(1, 'do it'), toolResult(2, 'a', 'bash', 1)],
       turnEnds: new Map([[1, 3]]),
     })
-    const turn = base.timeline.turns.get(1)
-    const processNode = {
-      key: 'fixture:turn-process:1',
-      id: 'p1',
-      target: 'chat',
-      kind: 'turn-process',
-      anchorSeq: 0.5,
-      location: { kind: 'turn', turn },
-      visibility: 'visible',
-      data: { turn: 1, controlAnchorSeq: 1, messageCount: 0, toolCallCount: 1, subagentCount: 0, answerAnchorSeq: null },
-    } as unknown as ChatNode
-    const byKey = new Map<string, ChatConversationViewNode>()
-    for (const key of base.order) {
-      const entry = base.nodes.get(key)
-      if (entry !== undefined) byKey.set(key, entry)
-    }
-    byKey.set(processNode.key, processNode)
-    const chat = {
-      ...base,
-      order: [processNode.key, ...base.order],
-      nodes: {
-        get: (key: string) => byKey.get(key),
-        values: () => [...byKey.values()],
-      },
-    }
     const detailed = makeHarness({ chat })
     const folded = render(<detailed.ChatView {...detailed.props} />)
     const member = folded.getByTestId('tool-seat-a').closest('[data-turn-process-member]')
@@ -465,6 +581,93 @@ describe('Focused Chat disclosures', () => {
     const shown = expanded.getByTestId('tool-seat-a').closest('[data-turn-process-member]')
     expect(shown).toBeNull()
     expanded.unmount()
+  })
+
+  /**
+   * One completed Turn whose process window owns a reasoning member, a context
+   * row, and a Tool call between the control row and the visible answer.
+   * `turnEnds` toggles the durable end event (open → closed fold transition).
+   */
+  function foldedTurnChat(input: { turnEnds?: ReadonlyMap<number, number> } = {}) {
+    const context: ContextMessageNode & { turn: number } = {
+      kind: 'context', seq: 3, time: 3_000, turn: 1, source: null,
+      content: [{ type: 'tool-addition', toolName: 'search' }, { type: 'tool-removal', toolName: 'old_search' }],
+      producer: { role: 'inject', label: null },
+      form: null,
+    }
+    const nodes: ConversationNode[] = [
+      user(1, 'do it'),
+      { kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1, blocks: [{ kind: 'reasoning', text: 'weighed options' }] },
+      context,
+      toolResult(4, 'a', 'bash', 1),
+      assistant(5, 'answer', 1),
+    ]
+    return chatSnapshotFixture({ nodes, turnEnds: input.turnEnds ?? new Map([[1, 6]]) })
+  }
+
+  it('collapses mounted child disclosures when the process window folds and reopens', () => {
+    const h = makeHarness({ chat: foldedTurnChat() })
+    const view = render(<h.ChatView {...h.props} />)
+    // The member wrapper keeps the node mounted; `data-turn-process-member`
+    // and `hidden` only exist while the window is folded.
+    const memberOf = (id: string): HTMLElement | null =>
+      view.getByTestId(id).closest('[data-turn-process-member]')
+    const processRow = view.getByRole('button', { name: /已完成/ })
+    expect(memberOf('tool-seat-a')?.hasAttribute('hidden')).toBe(true)
+    fireEvent.click(processRow)
+    expect(memberOf('tool-seat-a')).toBeNull()
+
+    // The unfolded window still leaves the process group collapsed; open it so
+    // its member disclosures become reachable.
+    const groupTitle = view.container.querySelector('[data-step-process] [data-process-activity]') as HTMLElement
+    fireEvent.click(groupTitle)
+    const reasoningRow = view.getByRole('button', { name: /思考/ })
+    const contextRow = view.getByRole('button', { name: /工具已更新/ })
+    const toolToggle = view.container.querySelector('[data-tool-disclosure="a"]') as HTMLElement
+    fireEvent.click(reasoningRow)
+    fireEvent.click(contextRow)
+    fireEvent.click(toolToggle)
+    expect(reasoningRow.getAttribute('aria-expanded')).toBe('true')
+    expect(contextRow.getAttribute('aria-expanded')).toBe('true')
+    expect(toolToggle.getAttribute('aria-expanded')).toBe('true')
+    expect(view.container.querySelector('[class*="thinkBody"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-context-injection-body]')).not.toBeNull()
+
+    fireEvent.click(view.getByRole('button', { name: /已完成/ }))
+    expect(memberOf('tool-seat-a')?.hasAttribute('hidden')).toBe(true)
+    // Folded nodes stay mounted (live updates) — only the disclosure state resets.
+    expect(view.getByTestId('tool-seat-a')).toBeTruthy()
+
+    fireEvent.click(view.getByRole('button', { name: /已完成/ }))
+    expect(memberOf('tool-seat-a')).toBeNull()
+    expect(reasoningRow.getAttribute('aria-expanded')).toBe('false')
+    expect(contextRow.getAttribute('aria-expanded')).toBe('false')
+    expect(view.container.querySelector('[data-tool-disclosure="a"]')?.getAttribute('aria-expanded')).toBe('false')
+    expect(view.container.querySelector('[class*="thinkBody"]')).toBeNull()
+    expect(view.container.querySelector('[data-context-injection-body]')).toBeNull()
+  })
+
+  it('collapses mounted child disclosures on the automatic completion fold', () => {
+    const h = makeHarness({ chat: foldedTurnChat({ turnEnds: new Map() }), running: true })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByTestId('tool-seat-a').closest('[data-turn-process-member]')).toBeNull()
+
+    const reasoningRow = view.getByRole('button', { name: /思考/ })
+    const toolToggle = view.container.querySelector('[data-tool-disclosure="a"]') as HTMLElement
+    fireEvent.click(reasoningRow)
+    fireEvent.click(toolToggle)
+    expect(reasoningRow.getAttribute('aria-expanded')).toBe('true')
+    expect(toolToggle.getAttribute('aria-expanded')).toBe('true')
+
+    act(() => { h.set({ chat: foldedTurnChat(), running: false }) })
+    const member = view.getByTestId('tool-seat-a').closest('[data-turn-process-member]')
+    expect(member?.hasAttribute('hidden')).toBe(true)
+
+    fireEvent.click(view.getByRole('button', { name: /已完成/ }))
+    expect(view.getByTestId('tool-seat-a').closest('[data-turn-process-member]')).toBeNull()
+    expect(reasoningRow.getAttribute('aria-expanded')).toBe('false')
+    expect(view.container.querySelector('[data-tool-disclosure="a"]')?.getAttribute('aria-expanded')).toBe('false')
+    expect(view.container.querySelector('[class*="thinkBody"]')).toBeNull()
   })
 
   it('shows the completed-turn usage panels in Detailed and drops them in Compact', () => {
@@ -639,7 +842,9 @@ describe('ChatView', () => {
       kind: row.getAttribute('data-chat-flow-kind'),
     }))).toEqual([
       { key: 'fixture:user:1', kind: 'user' },
+      { key: 'fixture:turn-process:1', kind: 'turn-process' },
       { key: 'fixture:assistant:2', kind: 'assistant-step' },
+      { key: 'process:fixture:tool:a:', kind: null },
       { key: 'fixture:tool:a', kind: 'tool-call' },
       { key: 'fixture:tool:b', kind: 'tool-call' },
     ])
@@ -647,8 +852,8 @@ describe('ChatView', () => {
       .toEqual(['a', 'b'])
     expect([...view.container.querySelectorAll('[data-chat-anchor-key]')].map(row => row.getAttribute('data-chat-anchor-key')))
       .toEqual([
-        'fixture:user:1', 'fixture:assistant:2',
-        'fixture:tool:a', 'call:a', 'fixture:tool:b', 'call:b',
+        'fixture:user:1', 'fixture:turn-process:1', 'fixture:assistant:2',
+        'group:process:fixture:tool:a:', 'fixture:tool:a', 'call:a', 'fixture:tool:b', 'call:b',
       ])
   })
 
@@ -713,12 +918,13 @@ describe('ChatView', () => {
       h.set({ running: false, turnEnds: new Map([[1, 3]]) })
     })
     // The Turn Tail belongs to the closed Turn, independently of a later
-    // steering bubble's placement in the Chat list.
+    // steering bubble's placement in the Chat list, and the branch action
+    // hands the Host the recorded turn/end seq it cuts at.
     const branchButtons = view.getAllByRole('button', { name: '在新对话中分支' })
     expect(branchButtons).toHaveLength(1)
     expect(branchButtons[0]!.getAttribute('aria-disabled')).toBeNull()
     fireEvent.click(branchButtons[0]!)
-    expect(h.forkAt).toHaveBeenCalledWith(1)
+    expect(h.forkAt).toHaveBeenCalledWith(3)
   })
 
   it('keeps a later pending occurrence visible when it reuses a durable MessageId', () => {
@@ -1006,6 +1212,21 @@ describe('ChatView', () => {
     expect(view.queryByText(/首 token|tok\/s/)).toBeNull()
   })
 
+  it('opens sent file references and offers a dismissible skill preview', async () => {
+    const message: UserMessageNode & Pick<ChatNode<'user'>['data'], 'skillNames'> = {
+      ...user(1, '@"notes a.md" /review'), skillNames: ['review'],
+    }
+    const h = makeHarness({ nodes: [message] })
+    const view = render(<h.ChatView {...h.props} />)
+    await act(async () => { fireEvent.click(view.getByRole('button', { name: 'notes a.md' })) })
+    expect(h.openFile).toHaveBeenCalledWith('notes a.md')
+    fireEvent.click(view.getByRole('button', { name: '/review' }))
+    const preview = screen.getByRole('dialog', { name: '/review' })
+    expect(preview.textContent).toContain('技能预览不可用。')
+    fireEvent.click(within(preview).getByRole('button', { name: '关闭' }))
+    expect(screen.queryByRole('dialog', { name: '/review' })).toBeNull()
+  })
+
   it('labels a project user bubble with the participant display name', () => {
     const h = makeHarness({
       nodes: [user(1, 'hello from lin', {
@@ -1097,34 +1318,66 @@ describe('ChatView', () => {
       openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
-    // The user bubble offers no branch; the settled answer's is live.
+    // The user bubble offers no branch; the settled answer's is live, and the
+    // action hands the Host the recorded turn/end seq it cuts at.
     const buttons = view.getAllByRole('button', { name: '在新对话中分支' })
     expect(buttons).toHaveLength(1)
     expect(buttons[0]!.getAttribute('aria-disabled')).toBeNull()
     fireEvent.click(buttons[0]!)
-    expect(h.forkAt.mock.calls).toEqual([[2]])
+    expect(h.forkAt.mock.calls).toEqual([[3]])
   })
 
-  it('disables fork when the indexed Turn has a later steering Node', () => {
-    const base = chatSnapshotFixture({
-      nodes: [user(1, 'question'), assistant(2, 'answer')],
+  it('anchors the completed-Turn footer after a later steering Node, actions hover-only', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'question'), assistant(2, 'answer'), steering(3, 'change direction', 1)],
       turnEnds: new Map([[1, 4]]),
+      openTurn: undefined,
     })
-    const chat = {
-      ...base,
-      locations: {
-        getTurn: (turn: number) => turn === 1
-          ? [...base.locations.getTurn(turn), 'fixture:steering:later']
-          : base.locations.getTurn(turn),
-        getStep: (turn: number, step: number) => base.locations.getStep(turn, step),
-      },
-    }
-    const h = makeHarness({ chat })
     const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('change direction')).toBeTruthy()
+    // The footer stays anchored at the recorded turn/end: the claimed
+    // steering row renders above it, not below the closing response.
+    const tail = view.container.querySelector<HTMLElement>('[data-turn-tail="1"]')
+    expect(tail).not.toBeNull()
+    const flow = [...view.container.querySelectorAll('[data-chat-flow-key]')]
+      .map(element => element.getAttribute('data-chat-flow-key'))
+    expect(flow.at(-1)).toBe(tail?.closest('[data-chat-flow-key]')?.getAttribute('data-chat-flow-key'))
+    // The turn's final meaningful content is steering, not the response, so
+    // the action row reveals on hover only and branch stays unavailable.
+    expect(tail?.getAttribute('data-actions-reveal')).toBe('hover')
     const branch = view.getByRole('button', { name: '在新对话中分支' })
     expect(branch.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(branch)
     expect(h.forkAt).not.toHaveBeenCalled()
+  })
+
+  it('keeps a non-human Turn trigger visible through the completed-Turn fold', () => {
+    const chat = chatSnapshotFixture({
+      nodes: [
+        contextNotice(1, 'scheduled work', { kind: 'schedule' }),
+        {
+          kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1,
+          blocks: [{ kind: 'reasoning', text: 'weighed options' }],
+        },
+        toolResult(3, 'a', 'bash', 1),
+        assistant(4, 'answer', 1),
+      ],
+      turnStarts: new Map([[1, 0]]),
+      turnTriggerSeqs: [1],
+      turnEnds: new Map([[1, 5]]),
+    })
+    const h = makeHarness({ chat })
+    const view = render(<h.ChatView {...h.props} />)
+    // Process evidence folds behind the turn's process row.
+    expect(view.getByTestId('tool-seat-a').closest('[data-turn-process-member]')?.hasAttribute('hidden')).toBe(true)
+    // The non-human opener is the Turn's input, not foldable evidence.
+    const trigger = view.container.querySelector<HTMLElement>('[data-turn-trigger]')
+    expect(trigger).not.toBeNull()
+    expect(trigger?.closest('[data-turn-process-member]')).toBeNull()
+    const header = view.getByRole('button', { name: /自动化任务/ })
+    expect(header.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(header)
+    expect(view.container.querySelector('[data-context-text]')?.textContent).toContain('scheduled work')
   })
 
   it('keeps final content actions but disables branch when Tool and interrupted Think follow it', () => {
@@ -1278,7 +1531,6 @@ describe('ChatView', () => {
     const row = view.container.querySelector('[data-chat-flow-key="fixture:tool:r1"]')
     expect(tool.dataset.state).toBe('running')
     expect(mounted).toHaveBeenCalledTimes(1)
-
     act(() => {
       h.set({
         nodes: [user(1, 'q'), toolResult(3, 'r1'), assistant(4, 'later')],
@@ -1778,6 +2030,166 @@ describe('ChatView', () => {
       expect(host.scrollTop).toBe(2000)
     } finally {
       host.remove()
+    }
+  })
+
+  it('keeps the bottom landing anchored while late content grows the flow', () => {
+    const host = document.createElement('div')
+    host.setAttribute('data-conversation-scroll', '')
+    const metrics = installScrollMetrics(host, 1_000, 300)
+    document.body.appendChild(host)
+    try {
+      const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+      const view = render(<h.ChatView {...h.props} />, { container: host })
+      // The opening landing writes the floor once — no reader input involved.
+      expect(host.scrollTop).toBe(700)
+      // Stream growth before any reader scroll: the landing keeps the floor.
+      metrics.setHeight(1_400)
+      act(() => { h.set({ nodes: [user(1, 'q'), assistant(2, 'a'), assistant(3, 'b')] }) })
+      expect(host.scrollTop).toBe(1_100)
+      // And again: a pinned landing never releases the floor on growth alone.
+      metrics.setHeight(1_800)
+      act(() => { h.set({ nodes: [user(1, 'q'), assistant(2, 'a'), assistant(3, 'b'), assistant(4, 'c')] }) })
+      expect(host.scrollTop).toBe(1_500)
+      view.unmount()
+    } finally {
+      host.remove()
+    }
+  })
+
+  it('restores the raw saved top when the saved anchor row folded before remount', () => {
+    const host = document.createElement('div')
+    host.setAttribute('data-conversation-scroll', '')
+    installScrollMetrics(host, 2_000, 500)
+    document.body.appendChild(host)
+    vi.spyOn(host, 'getBoundingClientRect').mockImplementation(
+      () => ({ top: 0, bottom: 500 } as DOMRect),
+    )
+    try {
+      const chat = chatSnapshotFixture({
+        nodes: [user(1, 'do it'), toolResult(2, 'a', 'bash', 1), assistant(5, 'answer', 1)],
+        turnEnds: new Map([[1, 6]]),
+      })
+      const h = makeHarness({ chat })
+      // The saved anchor is the tool row, which the completed-Turn fold hides
+      // (display:none → a zero box). Restoring its "position" would subtract
+      // anchorTop from nothing; only the raw saved top survives honestly.
+      h.chatScroll.save({ anchorKey: 'fixture:tool:a', anchorTop: 80, scrollTop: 1_400 })
+      const member = render(<h.ChatView {...h.props} />, { container: host })
+        .getByTestId('tool-seat-a').closest('[data-turn-process-member]')
+      expect(member?.hasAttribute('hidden')).toBe(true)
+      expect(host.scrollTop).toBe(1_400)
+      member?.remove()
+    } finally {
+      host.remove()
+    }
+  })
+
+  it('samples a visible row past folded members and turn controls', () => {
+    const chat = chatSnapshotFixture({
+      nodes: [user(1, 'do it'), toolResult(2, 'a', 'bash', 1), assistant(5, 'answer', 1)],
+      turnEnds: new Map([[1, 6]]),
+    })
+    const h = makeHarness({ chat })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 1_000, 300)
+    vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 300, left: 0, right: 400 } as DOMRect)
+    // Row geometry: the folded tool row would otherwise win (its stale box
+    // overlaps the viewport) — hidden rows are out of the candidate set, and
+    // the turn-process control is never an anchor.
+    const boxes = new Map<string, { top: number; bottom: number }>([
+      ['fixture:user:1', { top: -200, bottom: -160 }],
+      ['fixture:tool:a', { top: 40, bottom: 140 }],
+      ['fixture:turn-process:1', { top: 0, bottom: 30 }],
+      ['fixture:assistant:5', { top: 60, bottom: 100 }],
+      ['fixture:turn-tail:1', { top: 340, bottom: 380 }],
+    ])
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const box = this.dataset.chatAnchorKey === undefined ? undefined : boxes.get(this.dataset.chatAnchorKey)
+      if (box !== undefined) return { ...box } as DOMRect
+      return this === scroller ? { top: 0, bottom: 300, left: 0, right: 400 } as DOMRect
+        : { top: 0, bottom: 0, left: 0, right: 0 } as DOMRect
+    })
+    const member = view.getByTestId('tool-seat-a').closest('[data-turn-process-member]')
+    expect(member?.hasAttribute('hidden')).toBe(true)
+    try {
+      readerScroll(scroller, 100)
+      expect(h.chatScroll.read()?.anchorKey).toBe('fixture:assistant:5')
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('bounds fallback geometry reads to O(log n) rows', () => {
+    const nodes = Array.from({ length: 48 }, (_, index) =>
+      index % 2 === 0 ? user(index + 1, `q${index}`) : assistant(index + 1, `a${index}`))
+    const h = makeHarness({ nodes })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 10_000, 300)
+    let anchorRowReads = 0
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.chatAnchorKey !== undefined) anchorRowReads += 1
+      return { top: 0, bottom: 0, left: 0, right: 0 } as DOMRect
+    })
+    try {
+      readerScroll(scroller, 100)
+      // 48 anchor rows: a linear visibility filter reads ~48 boxes; the binary
+      // search reads ceil(log2 48) ≈ 6 plus the selected row's final box.
+      expect(anchorRowReads).toBeGreaterThan(0)
+      expect(anchorRowReads).toBeLessThanOrEqual(8)
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('anchors on the tall row spanning the scrollport top', () => {
+    const h = makeHarness({ nodes: [user(1, 'q1'), assistant(2, 'a1'), user(3, 'q2'), assistant(4, 'a2')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 5_000, 300)
+    vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 300, left: 0, right: 400 } as DOMRect)
+    // One row taller than the viewport spans the scrollport top: it IS the
+    // reader's row, not the first row below it.
+    const boxes = new Map<string, { top: number; bottom: number }>([
+      ['fixture:user:1', { top: -900, bottom: -860 }],
+      ['fixture:assistant:2', { top: -500, bottom: 900 }],
+      ['fixture:user:3', { top: 900, bottom: 940 }],
+      ['fixture:assistant:4', { top: 940, bottom: 980 }],
+    ])
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const box = this.dataset.chatAnchorKey === undefined ? undefined : boxes.get(this.dataset.chatAnchorKey)
+      if (box !== undefined) return { ...box } as DOMRect
+      return this === scroller ? { top: 0, bottom: 300, left: 0, right: 400 } as DOMRect
+        : { top: 0, bottom: 0, left: 0, right: 0 } as DOMRect
+    })
+    try {
+      readerScroll(scroller, 100)
+      expect(h.chatScroll.read()?.anchorKey).toBe('fixture:assistant:2')
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('resolves a hit-tested point to its containing row, never a hidden one', () => {
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 1_000, 300)
+    vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 300, left: 0, right: 400 } as DOMRect)
+    const targetRow = view.container.querySelector('[data-chat-anchor-key="fixture:assistant:2"]') as HTMLElement
+    const inner = document.createElement('span')
+    targetRow.appendChild(inner)
+    const hitTest = vi.fn(() => [inner] as Element[])
+    Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest })
+    try {
+      readerScroll(scroller, 100)
+      expect(hitTest).toHaveBeenCalled()
+      expect(h.chatScroll.read()?.anchorKey).toBe('fixture:assistant:2')
+      inner.remove()
+    } finally {
+      delete (document as { elementsFromPoint?: unknown }).elementsFromPoint
     }
   })
 

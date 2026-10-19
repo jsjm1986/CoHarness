@@ -9,9 +9,6 @@
     - img
   - button "Open right sidebar":
     - img
-- button "1 tool call · 2 intermediate messages":
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -20,10 +17,11 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Thinking The command executed successfully and output \"WEB_E2E_OK\". I just need to reply with \"DONE\".":
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
   - img
-  - img
-  - text: Thinking The command executed successfully and output "WEB_E2E_OK". I just need to reply with "DONE".
+- button "Ran commands"
 - paragraph: DONE
 - button "Copy":
   - img

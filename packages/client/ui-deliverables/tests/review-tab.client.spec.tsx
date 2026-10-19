@@ -4,8 +4,8 @@ import { useSyncExternalStore } from 'react'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
-import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
-import type { SidebarRightTabActions } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { PaneId, TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { SidebarRightNavigationParams, SidebarRightTabActions, SidebarRightTabNavigation } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
@@ -154,8 +154,10 @@ describe('ReviewTab', () => {
     const controller = options.controller ?? new PresentedOpenController(() => ({ name: '', available: false, fileManager: null }), async () => {}, async () => [])
     const store = createReviewStore().create()
     const aborter = new AbortController()
-    const tabActions = {
-      openResource: vi.fn<SidebarRightTabActions['openResource']>(),
+    const openResourceMock = vi.fn<SidebarRightTabActions['openResource']>()
+    const tabActions: SidebarRightTabActions = {
+      bindCommands: vi.fn(() => () => {}),
+      openResource: openResourceMock,
       openTab: vi.fn<SidebarRightTabActions['openTab']>(),
       close: vi.fn<SidebarRightTabActions['close']>(),
     }
@@ -163,29 +165,46 @@ describe('ReviewTab', () => {
       loadChangesSummary: vi.fn<ReviewInjected['loadChangesSummary']>(() => Promise.resolve()),
       loadChangesDiff: vi.fn<ReviewInjected['loadChangesDiff']>(() => Promise.resolve()),
       reloadPresentedHost: vi.fn<ReviewInjected['reloadPresentedHost']>(() => Promise.resolve()),
+      loadPresentedApps: vi.fn<ReviewInjected['loadPresentedApps']>(),
       openChanged: vi.fn<ReviewInjected['openChanged']>(() => Promise.resolve()),
     }
     const sessions = { byId: { [SESSION]: { cwd: options.cwd ?? '/work/app' } } } as unknown as SessionListState
-    const navigation = { address: options.address ?? ADDRESS, params: options.params, revision: options.revision ?? 1 }
-    const runtime = {
+    const navigation: SidebarRightTabNavigation = {
+      address: options.address ?? ADDRESS,
+      params: options.params as SidebarRightNavigationParams,
+      revision: options.revision ?? 1,
+    }
+    const runtime: ReviewTabProps = {
       useTabInfo: () => ({
-        sidebar: { expanded: true, fullscreen: false }, panel: { id: 'pane-1' },
+        sidebar: { expanded: true, fullscreen: false }, panel: { id: 'pane-1' as PaneId },
         tab: { id: TAB, kind: 'changes-review', contentId: options.address ?? ADDRESS, title: 'Review', visible: true, navigation, signal: aborter.signal, actions: tabActions },
       }),
       sessionId: SESSION,
+      useSession: () => { throw new Error('unused') },
       useSessions: <T,>(select: (state: SessionListState) => T): T => select(sessions),
+      useWorkspaces: () => { throw new Error('unused') },
+      usePanelInfo: () => { throw new Error('unused') },
+      useProjection: () => undefined,
+      useInput: () => { throw new Error('unused') },
+      inputActions: {
+        setDraft: () => {}, addImages: () => true, removeImage: () => {},
+        pruneImages: () => {}, addDocuments: () => true, removeDocument: () => {},
+        pruneDocuments: () => {}, captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+        insertText: () => false, submit: () => {},
+      },
       useStore: hookOf(store),
       actions: store.actions,
       useChangesSummary: hookOf(summaries.state),
       useChangesDiff: hookOf(diffs.state),
       usePresentedOpen: hookOf(controller.state),
       usePresentedHost: hookOf(controller.host),
+      usePresentedApps: hookOf(controller.apps),
       t: makeTranslate(options.locale ?? en),
       ...injected,
-    } as unknown as ReviewTabProps
+    }
     const view = render(<ReviewTab {...runtime} />)
     return {
-      view, injected, tabActions, store, aborter, summaries, diffs, controller,
+      view, injected, tabActions, openResourceMock, store, aborter, summaries, diffs, controller,
       rerender: () => { view.rerender(<ReviewTab {...runtime} />) },
     }
   }
@@ -269,24 +288,98 @@ describe('ReviewTab', () => {
     summaries.state.set({ [SUMMARY_URL]: summary })
     const controller = new PresentedOpenController(() => ({ name: '', available: false, fileManager: null }), async () => {}, async () => [])
     controller.host.set({ name: 'desktop', available: true, fileManager: 'finder' })
-    const { view, injected, tabActions } = mount({ summaries, controller, params: { index: 1 } })
+    const { view, injected, openResourceMock } = mount({ summaries, controller, params: { index: 1 } })
     expect(injected.reloadPresentedHost).not.toHaveBeenCalled()
     fireEvent.click(view.getByRole('button', { name: 'Open out/big.bin in sidebar' }))
-    expect(tabActions.openResource).toHaveBeenCalledWith(workspaceResourceAddress(SESSION, 'out/big.bin'))
+    expect(openResourceMock).toHaveBeenCalledWith(workspaceResourceAddress(SESSION, 'out/big.bin'))
     fireEvent.click(view.getByRole('button', { name: 'Open out/big.bin in default app' }))
-    expect(injected.openChanged).toHaveBeenCalledWith('viewed', 5, 1, 'out/big.bin')
+    expect(injected.openChanged).toHaveBeenCalledWith('viewed', 5, 1, 'open', 'out/big.bin')
     act(() => { controller.state.set({ '/api/changes.open?sessionId=viewed&seq=5&index=1': 'opening' }) })
     expect((view.getByRole('button', { name: 'Open out/big.bin in default app' }) as HTMLButtonElement).disabled).toBe(true)
     act(() => { controller.state.set({ '/api/changes.open?sessionId=viewed&seq=5&index=1': 'error' }) })
     expect(view.getByRole('button', { name: 'Open out/big.bin in default app' }).hasAttribute('data-error')).toBe(true)
     act(() => { controller.state.set({ '/api/changes.open?sessionId=viewed&seq=5&index=1': 'nativeUnavailable' }) })
     expect(view.queryByRole('button', { name: 'Open out/big.bin in default app' })).toBeNull()
+    expect(view.queryByRole('button', { name: 'More file actions for out/big.bin' })).toBeNull()
     act(() => {
       controller.state.set({})
       controller.host.set({ name: 'server', available: false, fileManager: null })
     })
     expect(view.queryByRole('button', { name: 'Open out/big.bin in default app' })).toBeNull()
+    expect(view.queryByRole('button', { name: 'More file actions for out/big.bin' })).toBeNull()
     expect(view.getByText(en['changes.oversized'])).toBeTruthy()
+  })
+
+  it('opens with a registered application or reveals through the same chooser as deliveries', () => {
+    const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
+    summaries.state.set({ [SUMMARY_URL]: summary })
+    const controller = new PresentedOpenController(() => ({ name: '', available: false, fileManager: null }), async () => {}, async () => [])
+    controller.host.set({ name: 'desktop', available: true, fileManager: 'finder' })
+    controller.apps.set({
+      '/api/changes.open?sessionId=viewed&seq=5&index=1': {
+        applications: [
+          { id: 'com.editor.zed', name: 'Zed', default: false, icon: null },
+          { id: 'com.apple.TextEdit', name: 'TextEdit', default: true, icon: null },
+        ],
+        loading: false, failed: false,
+      },
+    })
+    const { view, injected } = mount({ summaries, controller, params: { index: 1 } })
+    const chooser = view.getByRole('button', { name: 'More file actions for out/big.bin' })
+    fireEvent.click(chooser)
+    expect(injected.loadPresentedApps).toHaveBeenCalledWith('/api/changes.open?sessionId=viewed&seq=5&index=1', 'out/big.bin')
+    const items = view.getAllByRole('menuitem')
+    expect(items.map(item => item.textContent)).toEqual([
+      en['presented.defaultApp'], 'Zed', 'TextEdit (default)', en['presented.finder'],
+    ])
+    fireEvent.click(view.getByRole('menuitem', { name: 'Zed' }))
+    expect(injected.openChanged).toHaveBeenCalledWith('viewed', 5, 1, 'open', 'out/big.bin', 'com.editor.zed')
+    expect(view.queryByRole('menu')).toBeNull()
+    // The footer offers the Host's file manager; the first row stays the OS default.
+    fireEvent.click(view.getByRole('button', { name: 'More file actions for out/big.bin' }))
+    fireEvent.click(view.getByRole('menuitem', { name: 'Show in Finder' }))
+    expect(injected.openChanged).toHaveBeenLastCalledWith('viewed', 5, 1, 'reveal', 'out/big.bin', undefined)
+    fireEvent.click(view.getByRole('button', { name: 'More file actions for out/big.bin' }))
+    fireEvent.click(view.getByRole('menuitem', { name: 'Open in default app' }))
+    expect(injected.openChanged).toHaveBeenLastCalledWith('viewed', 5, 1, 'open', 'out/big.bin', undefined)
+    expect(injected.loadPresentedApps).toHaveBeenCalledTimes(3)
+    // An in-flight gesture closes the chooser and disables both controls.
+    fireEvent.click(view.getByRole('button', { name: 'More file actions for out/big.bin' }))
+    expect(view.getByRole('menu')).toBeTruthy()
+    act(() => { controller.state.set({ '/api/changes.open?sessionId=viewed&seq=5&index=1': 'revealing' }) })
+    expect(view.queryByRole('menu')).toBeNull()
+    expect((view.getByRole('button', { name: 'More file actions for out/big.bin' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((view.getByRole('button', { name: 'Open out/big.bin in default app' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('re-reads associations on each chooser open and shows their transient states', () => {
+    const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
+    summaries.state.set({ [SUMMARY_URL]: summary })
+    const controller = new PresentedOpenController(() => ({ name: '', available: false, fileManager: null }), async () => {}, async () => [])
+    controller.host.set({ name: 'desktop', available: true, fileManager: 'explorer' })
+    const { view, injected } = mount({ summaries, controller, params: { index: 1 } })
+    fireEvent.click(view.getByRole('button', { name: 'More file actions for out/big.bin' }))
+    // No read published yet: only the default-open row and the reveal footer.
+    expect(view.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+      en['presented.defaultApp'], en['presented.explorer'],
+    ])
+    act(() => {
+      controller.apps.set({
+        '/api/changes.open?sessionId=viewed&seq=5&index=1': { applications: [], loading: true, failed: false },
+      })
+    })
+    expect(view.getByText(en['presented.appsLoading'])).toBeTruthy()
+    act(() => {
+      controller.apps.set({
+        '/api/changes.open?sessionId=viewed&seq=5&index=1': { applications: [], loading: false, failed: true },
+      })
+    })
+    expect(view.getByText(en['presented.appsError'])).toBeTruthy()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    expect(view.queryByRole('menu')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: 'More file actions for out/big.bin' }))
+    expect(injected.loadPresentedApps).toHaveBeenCalledTimes(2)
+    expect(view.getByText(en['presented.appsError'])).toBeTruthy()
   })
 
   it('states the summary and comparison that stand in for hunks, and retries a failed read', () => {

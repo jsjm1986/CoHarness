@@ -46,7 +46,6 @@ const EXPECTED_TOOLS = [
   'job_output',
   'list_agents',
   'present',
-  'ralph',
   'read',
   'read_image',
   'send_message',
@@ -206,7 +205,8 @@ it('ships PTC with run_code but without the general workflow SDK binding', async
     const assembly = await ctx.systemPrompt.assemble({ scope: handle.agent })
     expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
     const sdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text ?? ''
-    expect(sdk).toContain('  ralph: {')
+    // Ralph ships disabled; enabling its preset row restores the binding.
+    expect(sdk).not.toContain('  ralph: {')
     expect(sdk).not.toContain('  workflow: {')
   } finally {
     await handle.dispose()
@@ -237,9 +237,14 @@ it('lets a preset producer reach the background-job registry', async () => {
       },
       agent: handle.agent,
     })
+    // The registry mints `<kind>-<16 lowercase hex>` job ids; capture the one
+    // this start produced so the controls below address it, not a guess.
+    const ack = started.content.map(block => block.type === 'text' ? block.text : '').join('')
+    const jobId = /^started background job (bash-[0-9a-f]{16})$/.exec(ack)?.[1]
+    if (jobId === undefined) throw new Error(`background bash ack carried no minted job id: ${ack}`)
     expect({ isError: started.isError, content: started.content }).toEqual({
       isError: false,
-      content: [{ type: 'text', text: 'started background job bash-1' }],
+      content: [{ type: 'text', text: `started background job ${jobId}` }],
     })
 
     // The controller reads what the producer started: same registry, one
@@ -253,7 +258,7 @@ it('lets a preset producer reach the background-job registry', async () => {
     })
     expect(listed.isError).toBe(false)
     expect(listed.content).toEqual([
-      { type: 'text', text: expect.stringContaining('bash-1 [bash]') as unknown as string },
+      { type: 'text', text: expect.stringContaining(`${jobId} [bash]`) as string },
     ])
 
     // The full round trip: the output a host-plane producer wrote is collected
@@ -262,7 +267,7 @@ it('lets a preset producer reach the background-job registry', async () => {
       signal,
       callId: ToolCallId('shipped-task-output'),
       name: 'job_output',
-      arguments: { job_id: 'bash-1', wait: true },
+      arguments: { job_id: jobId, wait: true },
       agent: handle.agent,
     })
     expect(collected.isError).toBe(false)

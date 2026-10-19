@@ -1,7 +1,8 @@
 /**
  * Workspace entry semantics through the shipped Web composition: an existing
  * Workspace opens its latest historical Session, while the explicit New Session
- * control still opens the reusable blank Session. Keyless replay; no model turn.
+ * control always mints a fresh Session+Agent and leaves the Workspace's blank
+ * member parked for reconnection. Keyless replay; no model turn.
  */
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -81,12 +82,13 @@ describe('web e2e: Workspace history-first entry', () => {
     await page.locator('textarea[placeholder="Describe what you want to build"]').waitFor({ timeout: 15_000 })
     expect((await scaffold.ctx.sessionPersistence.listHeaders()).filter(session =>
       session.id === SessionId(BLANK_ID) || session.id === SessionId(HISTORY_ID)).length).toBe(2)
-    // Repeated explicit New Session gestures reuse the same blank
-    // reservation instead of minting another empty Session.
+    // A bare New Session always mints a fresh Session+Agent: the workspace's
+    // blank member stays parked for reconnection flows, and a repeated
+    // gesture mints another Session rather than reopening either.
+    const durableCount = async () => (await scaffold.ctx.sessionPersistence.listHeaders()).length
+    expect(await durableCount()).toBe(3)
     await workspaceNew.click()
-    await page.waitForTimeout(50)
-    expect((await scaffold.ctx.sessionPersistence.listHeaders()).filter(session =>
-      session.id === SessionId(BLANK_ID) || session.id === SessionId(HISTORY_ID)).length).toBe(2)
+    await expect.poll(durableCount, { timeout: 15_000 }).toBe(4)
     expect(opened.tripwire.pageErrors).toEqual([])
     await page.close()
   }, 60_000)
@@ -155,9 +157,11 @@ describe('web e2e: Workspace history-first entry', () => {
       await page.getByText('DONE', { exact: true }).waitFor()
       expect(await history.getAttribute('aria-selected')).toBe('true')
       expect(await page.getByRole('alert').count()).toBe(0)
+      // A bare New Session mints another fresh Session: its composer starts
+      // empty while the parked draft stays with the Session it was typed in.
       await create.click()
       await page.locator('[data-phase]').getByText('COHARNESS', { exact: true }).waitFor()
-      expect(await draft.inputValue()).toBe('Draft survives failed history loading')
+      expect(await draft.inputValue()).toBe('')
       expect(tripwire.pageErrors).toEqual([])
     } finally {
       await page.unrouteAll({ behavior: 'wait' })

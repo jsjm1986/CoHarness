@@ -15,7 +15,8 @@ import type { ReactNode } from 'react'
 import type { AssistantBlock } from '@deepseek-ai/dsh-client-runtime/client'
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MarkdownFileMentions, MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
+import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ChatNodeOwnerProps, ChatViewSlotProps, UseDisclosure } from '../contract/slots.ts'
 import { markdownLabels } from '../markdown-labels.ts'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import css from './AssistantMarkdown.module.css'
@@ -40,6 +41,8 @@ export function localPathMediaUrl(base: string, value: string): string | undefin
 export interface AssistantMarkdownProps {
   blocks: readonly AssistantBlock[]
   streaming: boolean
+  /** Authorized renderer for each expanded reasoning body. */
+  renderSlot?: PropsRenderSlots<'conversation.chat.reasoning.body'>['renderSlot'] | undefined
   /** Frozen partial of an aborted turn: rendered with a stopped marker. */
   interrupted?: boolean | undefined
   /** Render consecutive image blocks through the attachment slot. */
@@ -48,13 +51,18 @@ export interface AssistantMarkdownProps {
   mentions?: MarkdownFileMentions | undefined
   /** Settled reasoning rows keep their first-line preview only while the work-details policy allows it. */
   settledReasoningPreview?: boolean | undefined
+  /** Seat-bound disclosure Hook shared by this node's reasoning rows. */
+  useDisclosure?: UseDisclosure | undefined
+  /** When set, only this part of the Node renders: `reasoning` draws reasoning
+   *  rows for the process group, `response` draws the reply outside it. */
+  groupPart?: 'reasoning' | 'response' | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
 
 /** Reasoning block as the Think variant summary row (figma 39:28304). */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
-  blocks, streaming, interrupted, renderMessageImages, mentions, settledReasoningPreview, t,
+  blocks, streaming, interrupted, renderSlot, renderMessageImages, mentions, settledReasoningPreview, useDisclosure, groupPart, t,
 }: AssistantMarkdownProps) {
   // Stable per locale revision (t identity changes on switch): a fresh object
   // per render would rebuild MarkdownText's component table every chunk.
@@ -63,18 +71,24 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   const pathImages = useMemo<MarkdownPathImages>(() => {
     return { resolve: value => localPathMediaUrl(document.baseURI, value) }
   }, [])
-  const last = blocks.length - 1
+  const partVisible = (block: AssistantBlock): boolean =>
+    groupPart === 'reasoning' ? block.kind === 'reasoning'
+      : groupPart === 'response' ? block.kind !== 'reasoning' && block.kind !== 'tool-call'
+        : block.kind !== 'tool-call'
+  const last = blocks.findLastIndex(partVisible)
   // Tool-call heads render as tool rows in the chat view's grouping pass, so
   // a node that is only those heads (or empty) would paint an empty root
   // between tool groups — skip the shell unless something visible remains.
   const hasVisible = streaming
     || interrupted === true
-    || blocks.some(block => block.kind !== 'tool-call')
+    || blocks.some(partVisible)
   if (!hasVisible) return null
   const rendered: ReactNode[] = []
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i]
     if (block === undefined) continue
+    if (groupPart === 'reasoning' && block.kind !== 'reasoning') continue
+    if (groupPart === 'response' && block.kind === 'reasoning') continue
     switch (block.kind) {
       case 'text':
         rendered.push(
@@ -90,7 +104,8 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         break
       case 'reasoning':
         rendered.push(<ReasoningRow key={i} text={block.text} running={streaming && i === last}
-          settledReasoningPreview={settledReasoningPreview} t={t} />)
+          settledReasoningPreview={settledReasoningPreview} useDisclosure={useDisclosure} t={t}
+          renderSlot={renderSlot} />)
         break
       case 'image': {
         // Consecutive image blocks share one gallery so several images tile
@@ -134,7 +149,9 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
     <div className={css.root} data-streaming={streaming || undefined}>
       <div className={css.body}>
         {rendered}
-        {interrupted && <span className={css.stopped}>{t('message.stopped')}</span>}
+        {interrupted && (groupPart === undefined || groupPart === 'response'
+          || !blocks.some(block => block.kind !== 'reasoning' && block.kind !== 'tool-call'))
+          && <span className={css.stopped}>{t('message.stopped')}</span>}
       </div>
     </div>
   )

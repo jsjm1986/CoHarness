@@ -71,7 +71,13 @@ describe('web e2e: durable Tool detail tab', () => {
       element.scrollTop = 0
       element.dispatchEvent(new Event('scroll'))
     })
-    await page.getByRole('button', { name: '2 tool calls · 2 intermediate messages', exact: true }).click()
+    // The whole-turn process disclosure carries the durable counts as data
+    // attributes; opening it reveals the collapsed step group over the calls.
+    const process = page.locator('[data-turn-process="1"]')
+    await process.waitFor()
+    expect(await process.getAttribute('data-turn-process-tool-calls')).toBe('2')
+    await process.click()
+    await page.getByRole('button', { name: 'Read files', exact: true }).click()
     const call = page.locator(`[data-chat-call-id="${CALL}"]`)
     await call.getByText('Read', { exact: true }).click()
     await call.getByRole('button', { name: 'Open details in sidebar', exact: true }).click()

@@ -29,7 +29,10 @@ export interface IWorkspaces {
   /** The useWorkspaces standard feed (read face — writes stay inside the domain). */
   readonly list: ObservableSnapshot<WorkspaceListState>
   /**
-   * Connect a Workspace to its reusable or freshly created blank session.
+   * Connect a Workspace to its reusable or freshly created blank session —
+   * the workspace-reconnection arm ({@link openWorkspace} fallback and
+   * draft-prepared starts); a bare New Session never lands here and always
+   * mints a fresh Session instead.
    * @param workspaceId - target workspace.
    * @param options - `agentPreset` names the composition the conversation
    *   runs; omitted composes the deployment default. A reused blank runs this
@@ -47,8 +50,11 @@ export interface IWorkspaces {
    */
   openWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId>
   /**
-   * The New Session flow: connect the explicit, current-Session, or recent
-   * Workspace and open the resulting session. Connect and navigation failures
+   * The New Session flow: resolve the explicit, current-Session, or recent
+   * Workspace, then create a fresh Session+Agent under the current preset
+   * definition and open it. Draft-preparation options instead keep the
+   * reconnect arm (`connectWorkspace`), so the landed Session may be the
+   * Workspace's existing draft or blank. Connect and navigation failures
    * are non-fatal — they log and reach `onFailure` when supplied; the current
    * view stays usable.
    * @param workspaceId - explicit target; omitted inherits the current
@@ -56,7 +62,7 @@ export interface IWorkspaces {
    * @param options - draft initialization (`prompt` prefills the target
    * Session's composer without sending; `clearPreviousDraft` discards its
    * draft text first) plus `onFailure`, the observer for the rejected
-   * connect/open.
+   * connect/open. A call carrying neither draft option always creates fresh.
    */
   startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void
   /**

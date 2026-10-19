@@ -55,7 +55,7 @@ export function FontFamilyRow({ t, role, setFontFamily, useStore }: FontFamilyRo
         onBlur={(event) => { commit(event.currentTarget) }}
         maxLength={200}
         onKeyDown={(event) => {
-          // Some IMEs report composition only through keyCode 229.
+          // oxlint-disable-next-line typescript/no-deprecated -- Some IMEs report composition only through keyCode 229.
           if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
           if (event.key === 'Enter') event.currentTarget.blur()
         }}

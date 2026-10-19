@@ -1,9 +1,8 @@
 /**
  * The slots the Plugins page declares for other plugins. Three carry a
- * plugin's own configuration: the official plugins listed in the page's
- * Configuration group, one bundle's configuration on its page, and one row's
- * configuration opened from that row. One takes additional add-plugin paths
- * for the header's add menu. Three more take contributions to any detail page —
+ * plugin's own configuration: the official plugins listed beside the official
+ * bundles, one bundle's configuration on its page, and one row's configuration
+ * opened from that row. Three more take contributions to any detail page —
  * its head actions, the badges beside its title, and the sections under its
  * own content — from a plugin that has something to say about bundles, rows,
  * or official plugins it does not own. A registrant merges this contract with
@@ -22,6 +21,14 @@
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+
+/**
+ * Where a bundle's readable files live, as the upstream `BundleInfo.availability`
+ * union names them. The fork's Host does not publish the field; the page
+ * derives it (`manager-store.ts#packageView`), so the same union is declared
+ * here for the detail-slot contract.
+ */
+export type BundleAvailability = 'installation' | 'profile' | 'missing'
 
 /** The view the page asks a configuration entry for. */
 export interface PluginConfigViewProps {
@@ -47,8 +54,12 @@ export interface PluginPackageRef {
   readonly name: string
   /** The installed version, when the Host reports one. */
   readonly version?: string
-  /** Whether the profile's own dependencies hold the package; false for a bundle the installation supplies. */
+  /** Whether the profile declares the package dependency. */
   readonly installed: boolean
+  /** Readable package location; missing entries can retain a dependency declaration. */
+  readonly availability: BundleAvailability
+  /** Whether the installation offers this package in Official. */
+  readonly official: boolean
   /** Whether the bundle is switched on. */
   readonly enabled: boolean
   /** The rows the bundle declares. */
@@ -122,15 +133,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Optional guidance after the user enables a bundle from the list, keyed by npm package name. */
     'plugins.bundle.activation': { kind: 'keyed'; scope: 'root'; owner: PluginActivationOwnerProps }
     /**
-     * One official plugin the Plugins page lists in its Configuration group:
-     * `id` is the host-plane settings namespace the entry edits, `label` the
-     * card's title, and `order` its place. The page renders the entry as the
-     * card's one-liner (`view: 'summary'`) and, once the card is opened, as
-     * the body of the plugin's own page (`view: 'page'`, with `form` bound to
-     * the namespace). A card lists only while the Host serves its namespace,
-     * so a plugin the composition never loads leaves no empty shell. A
-     * bundle's configuration belongs in `plugins.bundle.config` or
-     * `plugins.row.config` instead.
+     * One official plugin the Plugins page lists in its Official group after
+     * the official bundles: `label` is the card's title and `order` its place.
+     * The page renders the entry as the card's one-liner (`view: 'summary'`)
+     * and, once the card is opened, as the body of the plugin's own page
+     * (`view: 'page'`). OCCUPIED by the official settings pages, one companion
+     * package per host-plane namespace; a bundle's configuration belongs in
+     * `plugins.bundle.config` or `plugins.row.config` instead.
      */
     'plugins.item': { kind: 'list'; scope: 'root'; owner: PluginConfigViewProps }
     /**

@@ -53,8 +53,8 @@ export type { ConfigLedger, OfficialItem } from './config-ledger.ts'
 export type { PluginManagerFace } from './manager-store.ts'
 export type { PluginManagerLocaleKey } from './locales.ts'
 export type {
-  ConfigPageForm, PluginActivationOwnerProps, PluginAddActionsProps, PluginConfigViewProps, PluginDetailProps,
-  PluginPackageRef, PluginRowRef, PluginsSubject, PluginTabInstall, PluginTabProps,
+  ConfigPageForm, PluginActivationOwnerProps, PluginAddActionsProps, PluginTabInstall, PluginTabProps,
+  PluginConfigViewProps, PluginDetailProps, PluginPackageRef, PluginRowRef, PluginsSubject,
 } from './slot-contract.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -122,9 +122,9 @@ export function apply(ctx: ClientContext): void {
       store,
       inject: () => face,
       children: {
-        'plugins.item': { kind: 'list', scope: 'root' },
         'plugins.add.actions': { kind: 'list', scope: 'root' },
         'plugins.tab': { kind: 'list', scope: 'root' },
+        'plugins.item': { kind: 'list', scope: 'root' },
         'plugins.bundle.activation': { kind: 'keyed', scope: 'root' },
         'plugins.bundle.config': { kind: 'keyed', scope: 'root' },
         'plugins.row.config': { kind: 'keyed', scope: 'root' },
@@ -137,14 +137,14 @@ export function apply(ctx: ClientContext): void {
       if (ctx.layout.panelInfo.getSnapshot().activePanelId !== PANEL_ID) instance.actions.setView({ kind: 'list' })
     })
     const disposeNavigation = ctx.reflect.provide('pluginNavigation', {
+      openItem: (itemId: string) => {
+        ctx.layout.selectPanel(PANEL_ID)
+        instance.actions.setView({ kind: 'item', id: itemId })
+      },
       openBundle: (packageName: string) => {
         ctx.layout.selectPanel(PANEL_ID)
         instance.actions.setTab('installed')
         instance.actions.setView({ kind: 'package', name: packageName })
-      },
-      openItem: (itemId: string) => {
-        ctx.layout.selectPanel(PANEL_ID)
-        instance.actions.setView({ kind: 'item', id: itemId })
       },
     })
     yield () => { void disposeNavigation() }

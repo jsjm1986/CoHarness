@@ -22,7 +22,7 @@ import {
   fixtureUserPrompts, launchWebScaffold, seedSession, webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, expandOwningTurnProcess, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/pwsh-terminal', import.meta.url))
 const SEED = join(SNAPSHOT_DIR, 'seed.jsonl')
@@ -78,9 +78,11 @@ describe.skipIf(MODE === 'record' || !HAS_PWSH)('web e2e: pwsh calls use the bas
     await expect.poll(() => result.count(), { timeout: 15_000 }).toBe(1)
     await result.click()
     await page.getByRole('tab', { name: 'Chat', exact: true }).waitFor({ timeout: 15_000 })
-    // The tool row is expand-gated: the settled row uses the bash layout and carries the
-    // shell-family variant, and the terminal card lives in the expanded body.
+    // The tool row is expand-gated twice: a settled turn folds its members
+    // under the turn-process summary, and the row's own disclosure holds the
+    // terminal card in the expanded body.
     const row = page.locator('[data-tool="pwsh"]').first()
+    await expandOwningTurnProcess(page, row)
     await row.waitFor({ timeout: 15_000 })
     if (await row.getAttribute('aria-expanded') !== 'true') await row.click()
     const card = page.locator('[data-terminal]').first()

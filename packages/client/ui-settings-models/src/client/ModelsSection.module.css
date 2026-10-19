@@ -409,6 +409,29 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.helpButton {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: var(--dsw-space-1, 4px);
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 11px;
+  line-height: 15px;
+  text-align: center;
+  cursor: help;
+  vertical-align: 1px;
+}
+
+.helpButton:hover,
+.helpButton:focus-visible {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-label-tertiary);
+}
+
 .editorActions {
   display: flex;
   justify-content: flex-end;

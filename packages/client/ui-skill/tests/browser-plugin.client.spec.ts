@@ -14,14 +14,16 @@
  * source's own contract.
  */
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { InputTriggerService } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ClientSessionContext, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 import { apply, inject } from '../src/client/index.ts'
 import { SkillRow as SkillToolRow } from '../src/client/SkillRow.tsx'
+import { SkillPreview, type SkillPreviewInjected } from '../src/client/SkillPreview.tsx'
 
 type SkillRow = { name: string; description: string; whenToUse?: string; modelInvocable?: boolean }
 type ListResult =
@@ -40,11 +42,20 @@ interface PresentationCapture {
 }
 
 /** Provide the presentation registries and capture the plugin's registrations. */
+/** Runtime check that the registered inject face returns the SkillPreview verbs this spec calls. */
+function isSkillPreviewInjected(value: unknown): value is SkillPreviewInjected {
+  return typeof value === 'object' && value !== null
+    && 'loadSkill' in value && typeof value.loadSkill === 'function'
+}
+
 function providePresentation(ctx: Context): PresentationCapture {
   const slots = new SlotRegistry(ctx)
   slots.register({
     name: 'root',
-    children: { 'tool.call.toolview': { kind: 'keyed', scope: 'session' } },
+    children: {
+      'tool.call.toolview': { kind: 'keyed', scope: 'session' },
+      'conversation.chat.skill-preview': { kind: 'single', scope: 'session' },
+    },
   } as never, () => null)
   const capture: PresentationCapture = {
     slots,
@@ -106,6 +117,56 @@ const req = (query: string, signal?: AbortSignal) =>
   ({ query, position: 'leading' as const, signal: signal ?? new AbortController().signal })
 
 describe('apply', () => {
+  it('reads skill previews through the addressed runtime and disposes the preview contribution', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    const skill = { name: 'review', description: 'Review', contentMarkdown: 'Current source' }
+    const get = vi.fn<ConnectionHandle['api']['skills']['get']>()
+      .mockResolvedValue({ rpcId: 'preview' as never, result: { ok: true, value: { skill } } })
+    const rootRead = vi.fn()
+    const forSession = vi.fn(() => ({ api: { skills: { get } } }))
+    ctx.provide('inputTriggers', { registerSource: () => () => {} })
+    ctx.provide('connection', { api: { skills: { get: rootRead } }, forSession })
+    ctx.provide('sessions', {
+      subagentAddress: (id: SessionId) => id === sid('child')
+        ? { parentSessionId: sid('parent'), childSessionId: id, mode: 'continuable' }
+        : undefined,
+    })
+    new TestRemote(ctx)
+    const presentation = providePresentation(ctx)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const entry = presentation.slots.entries('conversation.chat.skill-preview')[0]!
+    expect(entry.component).toBe(SkillPreview)
+    const stored = entry.inject
+    if (stored === undefined) throw new Error('skill-preview entry missing inject')
+    // StoredEntry.inject is type-erased ((...args: never[])); the registered
+    // contract is the slot's declared inject face — check it at the seam.
+    const injectPreview = (id: SessionId): SkillPreviewInjected => {
+      const injected: unknown = Reflect.apply(stored, undefined, [id])
+      if (!isSkillPreviewInjected(injected)) throw new Error('skill-preview inject is incomplete')
+      return injected
+    }
+    const preview = injectPreview(sid('project-session'))
+    const abort = new AbortController()
+    await expect(preview.loadSkill('review', abort.signal)).resolves.toEqual(skill)
+    expect(forSession).toHaveBeenCalledWith(sid('project-session'))
+    expect(get).toHaveBeenCalledWith({ sessionId: sid('project-session'), name: 'review' }, abort.signal)
+    await expect(injectPreview(sid('child')).loadSkill('review', abort.signal)).resolves.toBeUndefined()
+    expect(get).toHaveBeenCalledTimes(1)
+    get.mockResolvedValueOnce({
+      rpcId: 'preview-error' as never,
+      result: { ok: false, error: { code: 'internal', message: 'offline', details: {} } },
+    })
+    await expect(preview.loadSkill('review', abort.signal)).rejects.toThrow('skill.get failed: internal: offline')
+    abort.abort()
+    await expect(preview.loadSkill('review', abort.signal)).rejects.toBe(abort.signal.reason)
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(rootRead).not.toHaveBeenCalled()
+    await fiber.dispose()
+    expect(presentation.slots.entries('conversation.chat.skill-preview')).toHaveLength(0)
+  })
+
   it('declares the services it binds', () => {
     expect(inject).toEqual(['inputTriggers', 'connection', 'sessions', 'slots', 'locale', 'remote'])
   })
@@ -133,6 +194,9 @@ describe('apply', () => {
           'row.inspect': '查看',
           'row.title': 'Skill',
           'menu.userOnly': '仅用户',
+          'preview.loading': '正在读取技能说明…',
+          'preview.failed': '无法读取技能说明。请关闭后重试。',
+          'preview.missing': '此会话无法使用该技能。',
         },
         en: {
           'row.preparing': 'Preparing to load a skill',
@@ -143,6 +207,9 @@ describe('apply', () => {
           'row.inspect': 'Inspect',
           'row.title': 'Skill',
           'menu.userOnly': 'user-only',
+          'preview.loading': 'Loading skill instructions…',
+          'preview.failed': 'Could not load skill instructions. Close this preview and try again.',
+          'preview.missing': 'This skill is unavailable in this session.',
         },
       },
     }])
@@ -171,6 +238,7 @@ describe('apply', () => {
     await fiber.dispose()
     expect(() => inputTriggers.registerSource(rival)).not.toThrow()
     expect(presentation.slots.entries('tool.call.toolview')).toHaveLength(0)
+    expect(presentation.slots.entries('conversation.chat.skill-preview')).toHaveLength(0)
     expect(presentation.localeDisposed).toBe(true)
   })
 })

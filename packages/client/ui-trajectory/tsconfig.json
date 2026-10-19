@@ -18,6 +18,9 @@
       "path": "../ui-conversation"
     },
     {
+      "path": "../../attachment/attachment"
+    },
+    {
       "path": "../ui-primitives"
     },
     {

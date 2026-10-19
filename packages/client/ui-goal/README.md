@@ -1,5 +1,5 @@
 ---
-description: "Session goal surface: GoalBar docked above the composer, read from the goal session projection"
+description: "View, edit, pause, resume, and clear a session goal above the Web composer."
 kind: "package-reference"
 ---
 
@@ -7,21 +7,61 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-Goal surface plugin, browser half: the `GoalBar` strip is the second standalone card in the `conversation.input.dock` composer-context stack (order 10, after Todo and before Queue). The live goal arrives through `useProjection('goal')` — the host-computed whole value seeded by the history tail page and updated by `session/projection` frames — so the plugin owns no domain store, refresh chain, or event listener. The slot inject face carries only the four mutation verbs (edit / pause / resume / clear through `ctx.remote.goals` — an active goal offers the pause action, a paused one resume; edit rewrites the objective in the ui-primitives `InlineEditor`, a growing textarea where Enter saves, Shift+Enter breaks the line, and Escape cancels); each reads the CAS ref from the session's current projected value at call time and surfaces the rejected Remote error inline. The strip single-flights mutations synchronously because React's pending render cannot fence same-frame clicks; after a successful clear it immediately suppresses that exact goal id while the authoritative null projection catches up. Goal creation stays on the `/goal` host command; loading, absent, completed, and successfully cleared goals render nothing.
-
-The plugin separately projects each durable `/goal` `command/run` through its own Conversation Definition. It builds a `command-input` Chat Node before the generic command result Node and registers that Node's keyed renderer as a right-aligned user-style bubble with the localized group name `Command input` / `命令输入` and no timestamp, copy, or branch actions; the leading `/goal` token renders as a command reference chip in the code face through ui-primitives `projectUserText`, and the objective stays plain body text on the user bubble's font-size axis. The visible non-command Node activates fresh Chat; reload reconstructs it from the run, while a history window containing only `command/done` keeps only the generic result row. This projection never creates `user/message` or a model turn.
-
-The `/client` exports are the plugin body (`apply`/`inject`), the `GoalBar`/`GoalDock` components, and the injected verb face types.
-
 ## Summary
 
-The Web GUI goal surface shows both the durable goal state and its current process-local activation, and lets users edit, pause, resume, or clear the goal; rejected changes appear inline. It displays durable `/goal` runs as `Command input` bubbles so commands from users or the model remain visible after reload. Goal creation remains outside this package. Shipped Web presets other than `minimal` make `/goal` available to agents.
+View the session's goal above the Web composer and edit, pause, resume, or clear it. The goal bar distinguishes an active goal that is running from one that needs reactivation, and shows rejected changes inline. Recorded goal commands remain visible after reload. Create goals through the Host's `/goal` command.
 
 ## Table of Contents
 
+- [Use this package](#use-this-package)
+- [Understand the implementation](#understand-the-implementation)
+- [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
+
+-----
+
+<a id="use-this-package"></a>
+## Use this package
+
+Use this plugin with the conversation composer and the Host goal service. The standard Web composition supplies its browser dependencies; the package has no configuration fields.
+
+The goal bar sits after Todo and before Queue. Loading, absent, completed, and successfully cleared goals render nothing. Armed active goals offer Pause; disarmed active goals and paused goals offer Resume. When an active goal's activation is unknown, Pause remains available because the Host can pause either activation state using the current goal revision.
+
+Editing uses a growing text box: Enter saves, Shift+Enter inserts a newline, and Escape cancels. Only one mutation runs at a time. Rejected mutations appear inline, and a successful clear hides that goal immediately while the durable projection catches up.
+
+Recorded `/goal` commands appear as right-aligned `Command input` bubbles without timestamp, copy, or branch actions. The command token uses reference styling; its objective stays plain text. Replaying these entries neither submits another user message nor starts a model turn.
+
+-----
+
+<a id="understand-the-implementation"></a>
+## Understand the implementation
+
+<details>
+<summary>Implementation internals — click to expand</summary>
+
+The Session projection supplies durable goal state. A private observable supplies process-local activation through Remote reads and events, subscribed only while the goal bar is observed. Reads run on mount, projection changes, connection resets, and running-state changes; newer events or goal revisions invalidate older reads. Resetting the connection or resuming observation clears cached activation until a current read or event arrives.
+
+Mutation callbacks read the current CAS ref when invoked. A synchronous mutation guard covers clicks that precede React's pending render. The goal command's Conversation Definition reconstructs the user-facing command entry from durable runs; a history window containing only completion data retains the generic result row.
+
+| Source | Responsibility |
+|---|---|
+| [index.ts](src/client/index.ts) | Slot contributions, Remote callbacks, and framework-bound activation source. |
+| [activation-source.ts](src/client/activation-source.ts) | Read ordering, event updates, and subscription lifetime. |
+| [GoalBar.tsx](src/client/GoalBar.tsx) | Goal controls and inline editing. |
+| [goal-command-input.ts](src/client/goal-command-input.ts) | Durable command presentation. |
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## Further Exploration
+
+- [Conversation UI](../ui-conversation/README.md) — composer and command entries.
+- [Goal service](../../goal/goal/README.md) — phases, activation, and revision checks.
+- [Goal reference](../../../docs/subsystems/goal.md) — shared types and Remote operations.
 
 -----
 
@@ -36,7 +76,12 @@ None unless the queued goal context is admitted. An admitted context extends the
 
 ## Known Limitations and Deferred Work
 
-- **Durable phase only** — the projection omits process-local activation, so the strip cannot distinguish an active-but-disarmed goal from an armed one; resume re-arms through the RPC side. There is no host-live activation channel.
+<a id="known-limitations-and-deferred-work"></a>
+
+Activation confirmation depends on the live Host.
+
+- A failed initial or reset read leaves activation unknown. Pause remains available; Resume requires a paused goal or confirmed disarmed activation. A later event or successful read supplies the current activation.
+- An ordinary refresh within the same connection and goal revision preserves the last known activation if the read fails.
 
 <a id="dev-note"></a>
 ### Dev Note

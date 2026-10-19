@@ -14,6 +14,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { WEB_SEARCH_MAX_RESULTS } from '@deepseek-ai/dsh-tool-web'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  expandTurnProcesses,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
@@ -229,8 +230,12 @@ describe('web e2e: opt-in Search API web search', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-search-aria'))
     await expect.poll(() => page.getByText('SEARCH_DONE', { exact: true }).count(), { timeout: 15_000 })
       .toBeGreaterThanOrEqual(1)
-    const process = page.getByRole('button', { name: '1 tool call · 2 intermediate messages', exact: true })
-    await process.click()
+    // Settled work folds into a collapsed process group; open the turn's
+    // process disclosures and the group so the search row is reachable.
+    await expandTurnProcesses(page)
+    for (const title of await page.locator('[data-step-process] [data-process-activity][aria-expanded="false"]').all()) {
+      await title.click()
+    }
     await page.locator('[data-tool="web_search"]').waitFor({ timeout: 10_000 })
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)

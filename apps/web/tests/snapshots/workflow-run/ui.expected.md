@@ -1,6 +1,3 @@
-- button "1 tool call · 2 intermediate messages" [expanded]:
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -9,6 +6,11 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Called tools"
 - button "Context injection runtime-context":
   - img
   - img

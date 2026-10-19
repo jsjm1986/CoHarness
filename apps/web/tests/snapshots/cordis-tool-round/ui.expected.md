@@ -5,15 +5,14 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
   - button "Jump to turn 3"
-- button "3 tool calls · 4 intermediate messages":
-  - text: 3 tool calls · 4 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -22,10 +21,11 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Thinking The activation request has been submitted, so I will return the requested readiness marker.":
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
   - img
-  - img
-  - text: Thinking The activation request has been submitted, so I will return the requested readiness marker.
+- button "Called tools"
 - paragraph: CORDIS_UI_READY
 - button "Copy":
   - img
@@ -40,9 +40,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
+- button "Plugin status updated 9/1 13:31":
+  - text: Plugin status updated
+  - time: 9/1 13:31
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: The Cordis Plugin is running.
 - button "Copy":
   - img
@@ -57,13 +60,15 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 tool call · 2 intermediate messages":
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - text: Use only Cordis tools. Call cordis_stop with pluginId "snap-1". After it succeeds, reply exactly CORDIS_UI_DONE and stop.
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Called tools"
 - paragraph: CORDIS_UI_DONE
 - button "Copy":
   - img

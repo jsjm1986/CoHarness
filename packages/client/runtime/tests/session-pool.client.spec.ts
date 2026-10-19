@@ -16,6 +16,7 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
   return {
     api,
     isLoopback: true,
+    interactions: 'none',
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     state: { getSnapshot: () => undefined, subscribe: () => () => {} },
     rpc: { call: () => Promise.reject(new Error('unexpected rpc')) },
@@ -576,6 +577,14 @@ it('retains four colliding Host IDs with independent scopes, payloads, holds, an
     }
     pool.dispatchRemoteEvent('agent-preset/selected', [id, 'plain'], targets[2])
     expect(dispatch).toHaveBeenLastCalledWith('agent-preset/selected', [keys[2], 'plain'])
+    const activation = { sessionId: id, goal: { id: 'g-1', revision: 1, activation: 'disarmed' } }
+    for (const [index, target] of targets.entries()) {
+      pool.dispatchRemoteEvent('goal/activation-changed', [activation], target)
+      expect(dispatch).toHaveBeenLastCalledWith('goal/activation-changed', [{ ...activation, sessionId: keys[index] }])
+      pool.dispatchRemoteEvent('goal/activation-changed', [{ sessionId: id, goal: undefined }], target)
+      expect(dispatch).toHaveBeenLastCalledWith('goal/activation-changed', [{ sessionId: keys[index], goal: undefined }])
+    }
+    expect(activation.sessionId).toBe(id)
     expect(() =>{  pool.openSubagent({ parentSessionId: keys[0]!, childSessionId: keys[1]!, mode: 'continuable' }) }).toThrow('another runtime')
     pool.setAdditionalStaged([keys[0]!, keys[2]!, keys[3]!])
     expect(pool.binding(keys[1]!)).toBeUndefined()

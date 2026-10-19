@@ -386,32 +386,6 @@
   margin: 0 -4px;
 }
 
-.iconButton {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: none;
-  border-radius: var(--dsw-radius-xs);
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-  color: var(--dsw-alias-label-tertiary);
-  transition: color var(--dsw-motion-duration-micro, 0.14s)
-    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
-}
-
-.iconButton:hover {
-  color: var(--dsw-alias-label-primary);
-}
-
-.iconButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-border-l3);
-  outline-offset: 1px;
-}
-
 /* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step
    darker (tertiary, #81858C) per the cell spec. */
 .chevron {
@@ -457,11 +431,6 @@
   .sessionRow .slotActions {
     display: none;
   }
-
-  .iconButton {
-    width: var(--dsw-touch-target);
-    height: var(--dsw-touch-target);
-  }
 }
 
 :global([data-viewport='compact']) .projectRow,
@@ -497,11 +466,6 @@
 
 :global([data-viewport='compact']) .sessionRow .slotActions {
   display: none;
-}
-
-:global([data-viewport='compact']) .iconButton {
-  width: var(--dsw-touch-target);
-  height: var(--dsw-touch-target);
 }
 
 /* Mobile Workspace cards keep the hierarchy visible: the Workspace row is a
