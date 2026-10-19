@@ -234,9 +234,16 @@ function freezeRestoredObject<T extends object>(value: T): T {
     // oxlint-disable-next-line typescript/no-non-null-assertion
     const current = pending.pop()!
     Object.freeze(current)
-    for (const key in current) {
-      const child = (current as Record<string, unknown>)[key]
-      if (child !== null && typeof child === 'object') pending.push(child)
+    if (Array.isArray(current)) {
+      for (let index = 0; index < current.length; index += 1) {
+        const child: unknown = current[index]
+        if (child !== null && typeof child === 'object') pending.push(child)
+      }
+    } else {
+      for (const key in current) {
+        const child = (current as Record<string, unknown>)[key]
+        if (child !== null && typeof child === 'object') pending.push(child)
+      }
     }
   }
   return value

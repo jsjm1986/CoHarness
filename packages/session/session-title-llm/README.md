@@ -1,5 +1,5 @@
 ---
-description: "Shared LLM generation policy for DeepSeek Harness session-title providers"
+description: "Shared model-execution policy for session-title providers: route, bounds, cancellation, request logging, and stream assembly."
 kind: "package-library"
 ---
 
@@ -7,13 +7,13 @@ kind: "package-library"
 
 English | [中文](README.zh.md)
 
-Shared implementation policy for model-backed session-title providers. It resolves the auxiliary route, frames exact selected human messages as JSON, records the exact dispatchable request, applies a language-aware title instruction, enforces input and output budgets, composes timeout and caller cancellation, assembles the stream, and returns normalized text with exact source seqs plus the provider/model route used to generate it.
+Shared execution policy for model-backed session-title providers. It resolves the auxiliary route, caps the provider-prepared input, output, and end-to-end duration, keeps caller cancellation effective throughout streaming, records the exact model-visible request, and assembles the stream into content blocks plus the terminal finish. Title wording, message framing, length targets, reasoning selection, and output interpretation belong to each provider.
 
-This package is a library, not a Cordis plugin. The provider plugins call `registerSessionTitleLlmProvider()` with their cadence and message selector; it validates shared config and delegates each revision to `generateSessionTitleWithLlm()`, so registration, route, prompt, cancellation, and validation behavior cannot drift between them.
+This package is a library, not a Cordis plugin. A provider plugin registers directly on `ctx.sessionTitle` and, inside its `generate(request)`, passes `{ system, input, messageSeqs, selectReasoningEffort }` to `executeSessionTitleLlm()`, so route, bounds, cancellation, request logging, and stream assembly cannot drift between providers.
 
 ## Summary
 
-`dsh-session-title-llm` generates concise session titles from selected human messages with a consistent model request policy. Callers choose which messages contribute to each revision and may either supply a provider and model route together or use the route recorded for the current session. Required limits cap the framed input, generated output, and end-to-end duration, while caller cancellation remains effective throughout streaming. Invalid, empty, late, tool-call, or otherwise non-text results are rejected before they can replace a title.
+`dsh-session-title-llm` executes one prepared auxiliary title request under consistent execution controls. Each provider supplies its own system instruction, user input, source-message attribution, reasoning selection, and output interpretation. Every request carries `currentTitle`, the latest accepted title snapshot the service captured for the call, including an accepted fallback; a provider decides whether and how to use it. Operational errors, aborts, and unsupported finish reasons reject; `stop`, `tool-calls`, and `max-tokens` return to the provider for its own acceptance decision.
 
 ## Table of Contents
 
@@ -28,20 +28,18 @@ This package is a library, not a Cordis plugin. The provider plugins call `regis
 <a id="route-and-failure-contract"></a>
 ## Route and failure contract
 
-`provider` and `model` overrides are optional but must be supplied together as non-empty strings. Without that pair, the helper uses the exact provider/model route captured from the current session's logged `request/header`; an explicit refresh before any route exists therefore needs overrides. The helper measures the final JSON-framed user prompt, including seq fields, wrappers, and JSON escaping, against `maxInputBytes` before logging or dispatch instead of truncating it. Timeout and caller cancellation are rechecked while consuming the stream and after it completes, so a late successful result cannot be accepted even if an interceptor or adapter ignores abort. Malformed or empty output, tool calls, and non-stop finish reasons also reject; the session-title service decides whether that rejection is an automatic warning or an explicit caller failure.
+`provider` and `model` overrides are optional but must be supplied together as non-empty strings. Without that pair, the function uses the exact provider/model route captured from the current session's logged `request/header`; an explicit refresh before any route exists therefore needs overrides. The function measures the final prepared user input against `maxInputBytes` before logging or dispatch instead of truncating it. Timeout and caller cancellation are rechecked while consuming the stream and after it completes, so a late successful result cannot be accepted even if an interceptor or adapter ignores abort. The title request uses `maxOutputTokens` independently of the conversation's cap. Its route must have a registered adapter so `ctx.llm.prepareCall()` can resolve the request before it is recorded.
 
-After route and input validation, the helper appends a log-only `session/title-llm-request` event directly through `Session` before model dispatch. It contains the title-provider id, exact source seqs, route, system prompt, message list, and output-token cap used by the call. Persistence observes the record eagerly; the append does not need a title-specific marker, cast, settlement queue, or flush. The dispatched envelope is deep-frozen, carries `purpose: 'session-title'`, and deliberately lacks dsh-agent-loop's process-local request identity. Interceptors stay aligned with the record while loop-only reconstruction observers do not compare it with the conversation header. The DeepSeek adapter maps that purpose to thinking-disabled so the small output budget is reserved for visible title text; other adapters own their purpose-specific behavior. A later model failure leaves the request record intact; validation failures that never become dispatchable requests do not create one. The event stays outside derived model history.
+After route and input validation, the function appends a log-only `session/title-llm-request` event directly through `Session` before model dispatch. It contains the title-provider id, exact source seqs, route, system prompt, message list, output-token cap, and the resolved reasoning effort when the provider's selector returned one. Persistence observes the record eagerly; the append does not need a title-specific marker, cast, settlement queue, or flush. The dispatched envelope is deep-frozen, carries `purpose: 'session-title'`, and deliberately lacks dsh-agent-loop's process-local request identity. Interceptors stay aligned with the record while loop-only reconstruction observers do not compare it with the conversation header. The DeepSeek adapter maps that purpose to thinking-disabled so the small output budget is reserved for visible title text; other adapters own their purpose-specific behavior. A later model failure leaves the request record intact; validation failures that never become dispatchable requests do not create one. The event stays outside derived model history.
 
 <a id="configuration"></a>
 ## Configuration
 
-Every field is required except the paired route override; there are no library defaults.
+Every execution field is required except the paired route override; there are no library defaults. Each provider adds its own title-length target settings, which that provider's README documents.
 
 | Key | Contract |
 |---|---|
-| `targetWords` | Positive target word count for non-CJK titles. |
-| `targetCjkCharacters` | Positive target character count for Chinese, Japanese, or Korean titles. |
-| `maxInputBytes` | Positive UTF-8 byte ceiling for the final JSON-framed user prompt. |
+| `maxInputBytes` | Positive UTF-8 byte ceiling for the prepared user input. |
 | `maxOutputTokens` | Positive auxiliary generation token cap. |
 | `timeoutMs` | Positive end-to-end deadline within the runtime timer limit. |
 | `provider`, `model` | Optional explicit route; both or neither. |
@@ -53,20 +51,21 @@ Every field is required except the paired route override; there are no library d
 
 #### What the model sees
 
-The title model receives a fixed system instruction to return one concise unadorned title in the input language, including the configured word and CJK-character targets. Its one user message contains a JSON array of the exact selected human messages and their seqs. For `all-prompts`, the helper also supplies the current title when a provider generated it, including a title inherited from the first-prompt provider; fallback and user-supplied titles are excluded from this input, and the first-prompt cadence uses only its selected messages. A supplied title moves the user message to an update form and adds preservation instructions, so an adequate existing title survives regeneration verbatim.
+The title model receives the provider-owned system instruction and one user message containing the provider-owned input. The executor records and dispatches those exact values without reconstruction; the framing, length targets, and output instruction belong to each provider, which the [first-prompt](../session-title-first-prompt-llm/README.md) and [all-prompts](../session-title-all-prompts-llm/README.md) READMEs document.
 
 #### Token effect
 
-The auxiliary request consumes tokens according to selected input size and `maxOutputTokens`. It is separate from the main agent request and does not add title text or framing to agent history. DeepSeek title calls disable thinking; the main conversation retains its configured thinking mode.
+The auxiliary request consumes tokens according to the provider-prepared input size and `maxOutputTokens`. It is separate from the main agent request and does not add title text or framing to agent history. The executor applies the provider's selected reasoning effort, or the route's normal default when the selector returns `undefined`; a model that still reasons spends part of `maxOutputTokens` on it. The main conversation retains its configured thinking mode.
 
 #### KV Cache effect
 
-No main-request invalidation. Auxiliary cache reuse is provider-specific; the fixed instruction is reusable while the JSON message array changes with each revision.
+No main-request invalidation. Auxiliary cache reuse is provider-specific: this executor dispatches the provider's exact system prompt and input, so reuse depends on how each provider frames successive revisions.
 
 ## Known Limitations and Deferred Work
 
-- The helper accepts text output only and rejects tool calls; structured-output adapters and provider-specific prompt variants are not exposed.
-- It enforces a byte ceiling for the whole framed user prompt rather than clipping individual messages or applying a retention policy.
+- The executor returns assembled content blocks and the terminal finish and does not accept or reject them; each shipped provider's README owns its acceptance policy.
+- It rejects prepared input over `maxInputBytes` rather than truncating it.
+- The executor applies the effort the provider returns and never chooses one; when the selector returns `undefined`, the route's normal default applies.
 
 <a id="dev-note"></a>
 ### Dev Note

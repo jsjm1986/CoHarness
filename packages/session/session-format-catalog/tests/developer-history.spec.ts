@@ -9,7 +9,7 @@ import { createSessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
 import { restoreReleasedV7Artifact } from '@deepseek-ai/dsh-session-format-v6-to-v7'
 import { sessionFormatCatalogOptions } from '../src/generated.ts'
 import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
-import { sessionFormatCatalog } from '../src/index.ts'
+import { createSessionFormatCatalogWithChildren, sessionFormatCatalog } from '../src/index.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -19,7 +19,7 @@ declare module '@deepseek-ai/dsh-llm' {
 
 function restore(session: Session): Session {
   const header = { ...session.header, delegationDepth: 0 }
-  const reader = sessionFormatCatalog.createRestore(
+  const reader = createSessionFormatCatalogWithChildren([]).createRestore(
     sessionFormatCatalog.encodeCurrentHeader(header, session.inheritedEventCount),
     { recovery: 'strict', validation: 'current' },
   )

@@ -42,7 +42,8 @@
     "@deepseek-ai/dsh-session-format-v6-to-v7": "workspace:*",
     "@deepseek-ai/node-addon-system": "workspace:~",
     "@deepseek-ai/schemastery": "workspace:~",
-    "koffi": "^3.1.6"
+    "koffi": "^3.1.6",
+    "p-limit": "7.3.3"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

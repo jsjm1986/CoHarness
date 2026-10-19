@@ -38,7 +38,7 @@ import {
 import { assertReleasedV4Header, assertV4EventAdmission, sessionFormatV3ToV4 } from '@deepseek-ai/dsh-session-format-v3-to-v4'
 import { assertReleasedV5Header, sessionFormatV4ToV5 } from '@deepseek-ai/dsh-session-format-v4-to-v5'
 import { assertReleasedV6Header, sessionFormatV5ToV6 } from '@deepseek-ai/dsh-session-format-v5-to-v6'
-import { assertReleasedV7Header, restoreReleasedV7Artifact, sessionFormatV6ToV7 } from '@deepseek-ai/dsh-session-format-v6-to-v7'
+import { assertReleasedV7Header, createSessionFormatV6ToV7, restoreReleasedV7Artifact } from '@deepseek-ai/dsh-session-format-v6-to-v7'
 import { coharnessV0ToV1Dialect } from './coharness-v0-dialect.ts'
 import { coharnessV1ToV2Dialect } from './coharness-v1-dialect.ts'
 import { coharnessV2ToV3Dialect } from './coharness-v2-dialect.ts'
@@ -215,7 +215,7 @@ const logicalChain = createSessionFormatChain({
     sessionFormatV3ToV4,
     sessionFormatV4ToV5,
     sessionFormatV5ToV6,
-    sessionFormatV6ToV7,
+    createSessionFormatV6ToV7([]),
   ],
   restoreCurrentHeader(header) {
     assertReleasedV7Header(header)

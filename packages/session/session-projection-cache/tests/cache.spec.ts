@@ -34,7 +34,7 @@ import {
   apply as storageDomainApply, Config as storageDomainConfig, inject as storageDomainInject, name as storageDomainName,
 } from '@deepseek-ai/dsh-storage-domain'
 import SessionProjectionCache from '../src/index.ts'
-import { checkpointRecord, projectionCacheDomainSpec } from '../src/spec.ts'
+import { checkpointRecord, checkpointRow, projectionCacheDomainSpec } from '../src/spec.ts'
 import type { CheckpointRecord } from '../src/spec.ts'
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
@@ -380,6 +380,10 @@ describe('SessionProjectionCache write policy', () => {
 })
 
 describe('SessionProjectionCache listing read', () => {
+  it('rejects stored state containing negative zero instead of accepting a lossy JSON value', () => {
+    expect(checkpointRow.safeParse({ ver: 1, seq: -1, val: { amount: -0 } }).success).toBe(false)
+  })
+
   it('rejects a nonzero inherited cut for an unseeded header', async () => {
     const { cache } = await harness()
 

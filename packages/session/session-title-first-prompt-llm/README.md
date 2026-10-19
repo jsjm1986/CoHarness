@@ -9,11 +9,11 @@ English | [中文](README.zh.md)
 
 Optional `ctx.sessionTitle` provider that summarizes the first eligible human message through `ctx.llm`. It registers the `first-prompt` cadence, runs automatically only when a fresh non-fork session first creates its fallback, and attributes the result to that message's exact seq. An automatic failure retains the fallback and is retried only through `ctx.sessionTitle.refresh()`.
 
-The plugin uses the complete required [shared LLM configuration](../session-title-llm/README.md#configuration). Omit both `provider` and `model` to inherit the exact route from the current logged main request, or set both to route title generation independently.
+The plugin owns its system instruction, JSON framing, and output parsing, and requires its own `targetWords` and `targetCjkCharacters` plus the shared [execution controls](../session-title-llm/README.md#configuration), all with no defaults. Omit both `provider` and `model` to inherit the exact route from the current logged main request, or set both to route title generation independently.
 
 ## Summary
 
-`dsh-session-title-first-prompt-llm` summarizes the first eligible human message through `ctx.llm` as an optional `ctx.sessionTitle` provider. It registers the `first-prompt` cadence, runs automatically only when a fresh non-fork session first creates its fallback, and attributes the result to that message's exact seq. An automatic failure retains the fallback and is retried only through `ctx.sessionTitle.refresh()`. It uses the complete required shared LLM configuration from `dsh-session-title-llm`, so route, prompt, budget, and cancellation behavior cannot drift. Automatic behavior and configuration come first; the implementation is a thin registration over the shared policy.
+`dsh-session-title-first-prompt-llm` summarizes the first eligible human message through `ctx.llm` as an optional `ctx.sessionTitle` provider. It registers the `first-prompt` cadence, runs automatically only when a fresh non-fork session first creates its fallback, and attributes the result to that message's exact seq. An automatic failure retains the fallback and is retried only through `ctx.sessionTitle.refresh()`. The plugin owns its system instruction, JSON framing, and output parsing; it shares only the execution module from `dsh-session-title-llm` with the all-prompts provider. Automatic behavior and configuration come first; the implementation is a small provider strategy over that executor.
 
 ## Table of Contents
 
@@ -30,11 +30,11 @@ The plugin uses the complete required [shared LLM configuration](../session-titl
 
 #### What the model sees
 
-The title model receives the shared title instruction and a JSON array containing only the first eligible human message. Later prompts and inherited fork history do not trigger another automatic call.
+The title model receives this provider's title instruction and a JSON array containing only the first eligible human message; it never receives a `currentTitle`. Later prompts and inherited fork history do not trigger another automatic call.
 
 #### Token effect
 
-At most one automatic auxiliary request is made for a fresh session, bounded by `maxInputBytes` and `maxOutputTokens`; explicit refreshes may make additional calls. The main agent request gains zero tokens.
+At most one automatic auxiliary request is made for a fresh session, bounded by `maxInputBytes` and `maxOutputTokens`; explicit refreshes may make additional calls. It selects the route's least supported reasoning effort, or leaves effort unspecified when the route exposes none. The main agent request gains zero tokens.
 
 #### KV Cache effect
 

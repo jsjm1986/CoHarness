@@ -7,6 +7,7 @@ import SessionTitleService, {
   type SessionTitleProvider,
   type SessionTitleProviderRequest,
   type SessionTitleProviderResult,
+  type SessionTitleSnapshot,
 } from '@deepseek-ai/dsh-session-title'
 
 const CONFIG = {
@@ -165,6 +166,136 @@ describe('SessionTitleService Provider lifecycle', () => {
     await ctx.sessionTitle.refresh(session)
     expect(requests).toHaveLength(2)
     expect(requests[1]?.messages.map(message => message.seq)).toEqual([first.seq, second.seq])
+  })
+
+  it('omits currentTitle when a one-byte cap makes the fallback underivable from a multibyte message', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionTitleService, { fallbackMaxWords: 5, fallbackMaxBytes: 1, maxTitleBytes: 24 })
+    const currentTitles: (SessionTitleSnapshot | undefined)[] = []
+    ctx.sessionTitle.register({
+      id: SessionTitleProviderId('absent-current'),
+      automatic: 'all-prompts',
+      async generate(request) {
+        currentTitles.push(request.currentTitle)
+        return { title: 'Provided title', messageSeqs: request.messages.map(message => message.seq) }
+      },
+    })
+    const session = ctx.sessions.create(SessionId('underivable-fallback'))
+    session.append('turn/start', { turn: 1 })
+    appendHumanPrompt(session, '番')
+    await settle()
+    appendRoute(session)
+    await settle()
+
+    expect(currentTitles).toEqual([undefined])
+    expect(ctx.sessionTitle.get(session)).toMatchObject({
+      title: 'Provided title',
+      source: { kind: 'provider', provider: SessionTitleProviderId('absent-current') },
+    })
+  })
+
+  it('passes the latest accepted title snapshot to each provider revision', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionTitleService, CONFIG)
+    const currentTitles: (SessionTitleSnapshot | undefined)[] = []
+    ctx.sessionTitle.register({
+      id: SessionTitleProviderId('current-title'),
+      automatic: 'all-prompts',
+      async generate(request) {
+        currentTitles.push(request.currentTitle)
+        return {
+          title: `Revision ${String(currentTitles.length)}`,
+          messageSeqs: request.messages.map(message => message.seq),
+        }
+      },
+    })
+    const session = ctx.sessions.create(SessionId('current-title-snapshot'))
+    session.append('turn/start', { turn: 1 })
+    const first = appendHumanPrompt(session, 'First prompt')
+    await settle()
+    appendRoute(session)
+    await settle()
+
+    expect(currentTitles[0]).toMatchObject({
+      source: { kind: 'fallback' },
+      messageSeqs: [first.seq],
+    })
+
+    appendHumanPrompt(session, 'Second prompt')
+    appendRoute(session, 'change')
+    await settle()
+
+    expect(currentTitles[1]).toMatchObject({
+      title: 'Revision 1',
+      messageSeqs: [first.seq],
+      source: { kind: 'provider', provider: SessionTitleProviderId('current-title') },
+    })
+    expect(Object.isFrozen(currentTitles[1])).toBe(true)
+  })
+
+  it('preserves provider input order across bounded title-input chunks', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionTitleService, CONFIG)
+    const session = ctx.sessions.create(SessionId('chunked-provider-input'))
+    session.append('turn/start', { turn: 1 })
+    const messages = Array.from({ length: 70 }, (_, index) =>
+      appendHumanPrompt(session, `Prompt ${String(index)}`))
+    await settle()
+    const generate = vi.fn(async (request: SessionTitleProviderRequest): Promise<SessionTitleProviderResult> => ({
+      title: 'Chunked history',
+      messageSeqs: request.messages.map(message => message.seq),
+    }))
+    ctx.sessionTitle.register({
+      id: SessionTitleProviderId('chunked-provider'),
+      automatic: 'all-prompts',
+      generate,
+    })
+
+    await ctx.sessionTitle.refresh(session)
+
+    expect(generate).toHaveBeenCalledOnce()
+    expect(generate.mock.calls[0]?.[0].messages).toEqual(messages.map((message, index) => ({
+      seq: message.seq,
+      text: `Prompt ${String(index)}`,
+    })))
+  })
+
+  it('cuts a first-message provider request at its scheduled watermark when a newer prompt lands first', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionTitleService, CONFIG)
+    const requests: SessionTitleProviderRequest[] = []
+    ctx.sessionTitle.register({
+      id: SessionTitleProviderId('watermark-cut'),
+      automatic: 'first-prompt',
+      async generate(request) {
+        requests.push(request)
+        return {
+          title: 'Watermarked title',
+          messageSeqs: request.messages.map(message => message.seq),
+        }
+      },
+    })
+    const session = ctx.sessions.create(SessionId('watermark-cut'))
+    session.append('turn/start', {
+      turn: 1,
+    })
+    const first = appendHumanPrompt(session, 'First prompt')
+    await settle()
+    appendHumanPrompt(session, 'A newer prompt before the route')
+    appendRoute(session)
+    await settle()
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.messages).toEqual([{ seq: first.seq, text: 'First prompt' }])
+    expect(ctx.sessionTitle.get(session)).toMatchObject({
+      title: 'Watermarked title',
+      messageSeqs: [first.seq],
+      source: { kind: 'provider', provider: SessionTitleProviderId('watermark-cut') },
+    })
   })
 
   it('rejects a second provider and drains stale work when the winner is disposed', async () => {

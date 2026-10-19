@@ -27,7 +27,7 @@ id: 2026-10-13-deepseek-search-thinking
 baseline: false
 changes:
   - root: "event:web/deepseek-search-llm-request"
-    previous: "2026-09-11-initial"
+    previous: "2026-09-18-coharness"
     after: "0c556c9b9f2a96238a6b9bbb99e748206cbff2ed6203041c9571f04ae5802f52"
     decision: same-version
 ```

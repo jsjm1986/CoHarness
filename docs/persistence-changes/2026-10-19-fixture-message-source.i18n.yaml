@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-19-fixture-message-source.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-19-fixture-message-source.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-19-fixture-message-source:
+  en: 0c4754b1be25cb05
+  zh: 8ae655fa9bc3aea1
+/2026-10-19-fixture-message-source/summary:
+  en: e61fd90f05223c01
+  zh: 10e3fb5f9cf4ac10
+/2026-10-19-fixture-message-source/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-19-fixture-message-source/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-19-fixture-message-source/compatibility:
+  en: 296e6b3e68227af7
+  zh: ea28e73df2b30c4e
+/2026-10-19-fixture-message-source/verification:
+  en: 6699840b0ee22b40
+  zh: ffbb8d287d8480db
+/2026-10-19-fixture-message-source/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269
