@@ -139,15 +139,25 @@ export const subagentCatalogProjectionDefinition = {
 export function establishCatalogChild(
   parent: Session,
   child: SessionHeader,
-  descriptor: { readonly mode: 'continuable'; readonly label: string },
+  descriptor:
+    | { readonly mode: 'one-shot'; readonly label?: string }
+    | { readonly mode: 'continuable'; readonly label: string },
 ): void {
-  parent.append('subagent/catalog', {
-    version: SUBAGENT_CATALOG_VERSION,
-    childId: child.id,
-    childCreatedAt: child.createdAt,
-    mode: descriptor.mode,
-    label: descriptor.label,
-  })
+  parent.append('subagent/catalog', descriptor.mode === 'one-shot'
+    ? {
+      version: SUBAGENT_CATALOG_VERSION,
+      childId: child.id,
+      childCreatedAt: child.createdAt,
+      mode: descriptor.mode,
+      ...descriptor.label === undefined ? {} : { label: descriptor.label },
+    }
+    : {
+      version: SUBAGENT_CATALOG_VERSION,
+      childId: child.id,
+      childCreatedAt: child.createdAt,
+      mode: descriptor.mode,
+      label: descriptor.label,
+    })
 }
 
 /** Catalog payload version emitted by external execution creation. */

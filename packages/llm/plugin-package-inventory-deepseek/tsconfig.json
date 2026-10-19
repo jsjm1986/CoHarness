@@ -9,18 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../deepseek-llm-api-extensions"
-    },
-    {
-      "path": "../../preset/agent-presets"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -31,6 +19,24 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../boot/app-boot"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../preset/agent-presets"
+    },
+    {
+      "path": "../../preset/agent-presets"
+    },
+    {
+      "path": "../deepseek-llm-api-extensions"
     }
   ]
 }

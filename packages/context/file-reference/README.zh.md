@@ -1,17 +1,11 @@
 ---
-description: "English | 中文"
+description: "面向宿主驱动 UI 的文件引用发现与 @file mention 语法，供选择该 seam 或为其搭配提供方的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
-# `@deepseek-ai/dsh-file-reference`
+# @deepseek-ai/dsh-file-reference
 
 [English](README.md) | 中文
-
-文件引用发现 seam，以及供宿主驱动的用户界面共享、可在浏览器中安全使用的 `@file` 语法。`ctx.fileReferences.list(agent, query, signal)` 为指定 agent（智能体）返回仅含路径的文件或目录候选；具体提供方负责命名空间访问、排序、缓存和失效处理。同一契约以一元 `fileReferences/list` Remote 方法对外可调（`@Remote` 标注在 Service Definition 上，经保留的末位 signal 参数取消），浏览器消费方直接调用 `ctx.remote.fileReferences.list`，无需 API Proxy 路由。
-
-`activeAtToken()` 只在输入开头或空白后识别 `@path` 或尚未闭合的 `@"path with spaces` token，因此类似电子邮件的文本不会打开补全。`formatFileMention()` 会生成与提示词匹配的写法，为目录候选追加 `/`，保留显式打开的引号，并拒绝编辑器语法无法安全表示的控制字符或内嵌引号。
-
-选择候选项不会读取或附加文件内容。导出的 `FILE_REFERENCE_PROMPT` 是稳定指引；当指定 agent 可以调用 `read` 时，提供方可以安装该指引。
 
 ## 概述
 
@@ -19,18 +13,73 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
 - [模型体验](#model-experience)
-- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
 
-<a id="invariants"></a>
-## 不变量
+<a id="use-this-package"></a>
+## 使用本包
 
-**运行时不变量：** 未发布配套入口。该 seam 定义列表契约与 `@file` 语法；索引、缓存与失效由提供方拥有。
+当宿主驱动 UI（Web 或终端）需要提供 `@file` 补全时选择本包，并搭配一个命名空间与 agent 实际生效的 `read` 工具一致的提供方。单独挂载该 seam 而没有提供方时，UI 只能得到空的补全列表。
 
+### mention 语法
+
+输入开头或空白后的 `@path` token 会触发补全；其他 token 内部的 `@`（如电子邮件地址）不会。`@"path with spaces"` 打开带引号的 mention，目录候选在其尾斜杠后保持引号打开，使补全可以继续深入下一层。格式化器会拒绝含有语法无法安全表示的控制字符或内嵌引号的路径。 已完成的目录 chip 在末尾斜杠之后闭合引号。相对引用从工作区根目录解析，绝对引用保留主机路径。
+
+### 获取候选
+
+`ctx.fileReferences.list(agent, query, signal)` 返回指定 agent 工作目录中仅含路径的文件与目录候选，由提供方确定性地排序。目录 mention 呈现时带尾随 `/`，使补全可以继续深入下一层。浏览器消费方通过 Session Controller 适配器的 `ctx.remote.fileReferences.list` 调用同一发现能力；末位 signal 参数可取消慢速自动补全。
+
+### 搭配提供方
+
+本地文件系统请挂载 `@deepseek-ai/dsh-file-reference-local`；其他命名空间（远程或虚拟文件系统）需要发现能力与生效工具一致的提供方。当指定 agent 可以调用 `read` 时，提供方可以安装稳定的 `FILE_REFERENCE_PROMPT` 指引，告诉模型先读取被引用文件、再声称检查过它。
+
+-----
+
+<a id="understand-the-implementation"></a>
+## 理解实现
+
+<details>
+<summary>实现细节——点击展开</summary>
+
+本节解释该 seam 的设计；可观察行为见[使用本包](#use-this-package)。
+
+### 设计理念
+
+本包把抽象发现服务与共享、浏览器安全的 mention 语法分开，由提供方负责命名空间访问、排序、缓存与失效。该服务保持 wire 中立；`dsh-api-session-controller` 持有 `fileReferences/list` Remote 适配器，并在解析 Agent 后委派给当前提供方。
+
+### 源码地图
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | 抽象 `FileReferenceService` 与 `FILE_REFERENCE_PROMPT` |
+| [`src/grammar.ts`](src/grammar.ts) | `activeAtToken` 识别与 `formatFileMention` 渲染 |
+| [`src/types.ts`](src/types.ts) | 仅含路径的结果类型 `FileReferenceCandidate` |
+
+### 主要流程
+
+UI 通过 `activeAtToken` 识别活动 `@` token，用查询文本调用 `list`，再渲染排序后的候选。选中后，`formatFileMention` 发出匹配的提示词写法（`@path`、`@"path with spaces"`，或带引号目录的开放形式 `@"dir/`）。任何环节都不读取文件内容；当指定 agent 拥有 `read` 工具时，提供方还可以安装稳定的 `FILE_REFERENCE_PROMPT` 提示词段。
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## 进一步探索
+
+包级约定不够用时阅读以下页面。它们从随附提供方进入共享引用表面，以及候选所指向的工具。
+
+- [本地文件引用提供方](../file-reference-local/README.zh.md)——本 seam 的随附本地工作区实现。
+- [会话引用子系统](../../../docs/subsystems/session-reference.zh.md)——宿主 UI 背后的共享文件引用与会话引用约定。
+- [上下文组地图](../README.zh.md)——相邻的请求上下文包。
+- [文件系统工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-fs)——被引用路径所对应的 `read` 工具。
+
+-----
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -41,12 +90,15 @@ kind: "package-reference"
 
 接口与语法本身不增加请求 token；提供方拥有的提示词段决定可复用前缀是否改变。
 
+## 已知限制与延期工作
+
 <a id="known-limitations-and-deferred-work"></a>
-## 已知限制与暂缓事项
+
+
+这些限制说明该 seam 何时不合适。它们是当前包约束。
 
 - **路径候选仅供参考**：该 seam 不保证后续面向模型的文件系统工具能够访问同一命名空间；部署时必须让提供方与实际生效的 `read` 实现对齐。
 - **没有文件内容引用对象**：所选文件仍是普通提示词文本，其内容必须经过模型显式调用工具后才对模型可见。
-- **`zod` 是生成的 Typert 契约面的运行时依赖，不是 `src` 的依赖。** 发布的 `./typert` 与 `./remote` 出口解析到不经打包的 `lib/typert.*.js` 文件，其中包含裸 `zod` 导入。manifest 必须保留 `zod`；只有当两份生成 JavaScript 契约面都不存在时，`knip.config.ts` 才注入 workspace 级例外，已构建 checkout 则由 Knip 直接观察该导入。
 
 <a id="dev-note"></a>
 ### 开发备注

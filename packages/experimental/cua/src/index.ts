@@ -24,6 +24,7 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-computer-use'
 import type {} from '@deepseek-ai/dsh-ptc-runtime'
 import type {} from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-config-editor'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 
 
@@ -155,17 +156,14 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
     maxRequestBytes: config.maxRequestBytes, maxResponseBytes: config.maxResponseBytes, graceMs: config.graceMs,
     textEventIntervalMs: config.textEventIntervalMs,
   }
-  const entryId = ctx.fiber.entry?.options.id
-  ctx.inject(['settings'], scope => scope.effect(() => scope.settings.configure({ auto: false }, ctx.fiber)))
+  const entry = ctx.fiber.entry
   const access = new ApplicationAccess(ctx, {
     grants: () => config.allowedApps.get().map(grant => ({ ...grant, id: grant.id as CuaApplicationId })),
     get save() {
-      const settings = ctx.get('settings')
-      if (entryId === undefined || settings === undefined) return undefined
-      const descriptor = settings.describe().find(entry => entry.ns === entryId)
-      if (!descriptor) return undefined
+      const editor = ctx.get('configEditor')
+      if (entry === undefined || editor === undefined) return undefined
       return async (grants: readonly CuaApplicationGrant[]) => {
-        await settings.mutate(entryId, [{ op: 'set', path: ['allowedApps'], value: grants }], descriptor.revision)
+        await editor.edit(entry, current => ({ ...current, allowedApps: grants }))
       }
     },
   })

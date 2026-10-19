@@ -16,7 +16,7 @@ Chat Builder 汇总整个目标的节点及索引。在其中固定创建 Chat �
 
 ## Decision
 
-分组基础机制提供独立的节点输入 `ConversationGroupDefinition`、注册表及 Session 内上下文、Builder 通用输入与发布、按键 Group 存储及两种 React 分支。Chat 在[业务规则参考](../../../../packages/client/ui-chat/src/client/conversation-nodes/README.zh.md)中拥有其已注册的分段与展示规则。[子系统参考](../../../../docs/subsystems/conversation.zh.md#group-definitions)与[源码类型](../../../../packages/client/ui-conversation/src/client/contract/groups.ts)拥有当前 API 细节。
+分组基础机制提供独立的节点输入 `ConversationGroupDefinition`、注册表及 Session 内上下文、Builder 通用输入与发布、按键 Group 存储及两种 React 分支。Chat 在业务规则参考中拥有其已注册的分段与展示规则。[子系统参考](../../../../docs/subsystems/conversation.zh.md)与源码类型拥有当前 API 细节。
 
 ### 职责
 
@@ -35,7 +35,7 @@ Chat Builder 汇总整个目标的节点及索引。在其中固定创建 Chat �
 | 记录 | 关系 |
 |---|---|
 | [业务节点组装](2026-08-09-client-conversation-node-assembly.zh.md) | 保留事件匹配、Context、Location、每个 Context 一个业务 Node 及目标 Builder，分组增加另一种输入类别。 |
-| [Chat 滚动与页脚](../../../../packages/client/ui-chat/README.zh.md) | 负责裁剪与独立的嵌套跟随，不改变 Group Definition 成员关系。 |
+| Chat 滚动与页脚 | 负责裁剪与独立的嵌套跟随，不改变 Group Definition 成员关系。 |
 
 分组保留独立的节点组装决策。跨 View 导航与 `toolCallFocus` 仍是独立职责，Group 引用不携带 View 句柄或资源导航策略。
 
@@ -98,18 +98,18 @@ GroupStore 按 GroupKey 索引记录和来源，不反复查找数组。等价�
 
 | 层／文件 | 职责 |
 |---|---|
-| [groups.ts](../../../../packages/client/ui-conversation/src/client/contract/groups.ts) | Group Definition、输入、引用、更新、类型数据映射及读取器。 |
-| [conversation.ts](../../../../packages/client/ui-conversation/src/client/contract/conversation.ts) | Builder 可选 groupInput/publish 和快照存储 grouped 读取，已有 Node/View Definition 不变。 |
-| [group-registry.ts](../../../../packages/client/ui-conversation/src/client/conversation/group-registry.ts) | 复用注册表基类，目标唯一性、类型化注册及 effect/disposer 生命周期。 |
-| [assembly.ts](../../../../packages/client/ui-conversation/src/client/conversation/assembly.ts) | UiConversation.groups 与现有 binding 重建通知。 |
-| [assembler.ts](../../../../packages/client/ui-conversation/src/client/conversation/assembler.ts) | 首次激活和 flush 共用调度，上下文归属、安装及发布。 |
-| [location-index.ts](../../../../packages/client/ui-conversation/src/client/conversation/location-index.ts) | 累积变化轮次，覆盖仅生命周期和 Location 数据变化。 |
-| [group-store.ts](../../../../packages/client/ui-conversation/src/client/conversation/group-store.ts) | 原子引用校验、按键来源、数组复用及局部发布。 |
-| [chat-snapshot-builder.ts](../../../../packages/client/ui-chat/src/client/conversation-nodes/chat-snapshot-builder.ts) | 记录投影后节点增量、目标位置及变化轮次顺序，提供索引读取器并推迟来源通知，不持有过程分组类。 |
-| [ChatView.tsx](../../../../packages/client/ui-chat/src/client/chat/ChatView.tsx) | 读取可选根引用并切换 node/group，无分组时使用既有 Node 顺序。 |
-| [ChatGroupSeat.tsx](../../../../packages/client/ui-chat/src/client/chat/ChatGroupSeat.tsx) | 稳定组父级、组内订阅及嵌套 Node 容器。 |
-| [ChatNodeSeat.tsx](../../../../packages/client/ui-chat/src/client/chat/ChatNodeSeat.tsx) | 既有 Node 来源及渲染器、groupPart 传递、独立部分锚点及 Store 替换时重绑定。 |
-| [slots.ts](../../../../packages/client/ui-chat/src/client/contract/slots.ts) 与 [apply.ts](../../../../packages/client/ui-chat/src/client/apply.ts) | 使用现有按键钩子注入 Group 来源，不改 Slot 引擎。 |
+| groups.ts | Group Definition、输入、引用、更新、类型数据映射及读取器。 |
+| conversation.ts | Builder 可选 groupInput/publish 和快照存储 grouped 读取，已有 Node/View Definition 不变。 |
+| group-registry.ts | 复用注册表基类，目标唯一性、类型化注册及 effect/disposer 生命周期。 |
+| assembly.ts | UiConversation.groups 与现有 binding 重建通知。 |
+| assembler.ts | 首次激活和 flush 共用调度，上下文归属、安装及发布。 |
+| location-index.ts | 累积变化轮次，覆盖仅生命周期和 Location 数据变化。 |
+| group-store.ts | 原子引用校验、按键来源、数组复用及局部发布。 |
+| chat-snapshot-builder.ts | 记录投影后节点增量、目标位置及变化轮次顺序，提供索引读取器并推迟来源通知，不持有过程分组类。 |
+| ChatView.tsx | 读取可选根引用并切换 node/group，无分组时使用既有 Node 顺序。 |
+| ChatGroupSeat.tsx | 稳定组父级、组内订阅及嵌套 Node 容器。 |
+| ChatNodeSeat.tsx | 既有 Node 来源及渲染器、groupPart 传递、独立部分锚点及 Store 替换时重绑定。 |
+| slots.ts 与 apply.ts | 使用现有按键钩子注入 Group 来源，不改 Slot 引擎。 |
 
 ## React 读取与展示
 
@@ -149,10 +149,10 @@ React key 由引用 kind、NodeKey/groupPart 或 GroupKey 的无歧义元组派�
 
 ## Verification
 
-- [Group 存储测试](../../../../packages/client/ui-conversation/tests/conversation-group-store.client.spec.ts)覆盖原子引用校验、根与成员身份复用、局部发布，以及删除组但保留原 Node。
-- [分组调度测试](../../../../packages/client/ui-conversation/tests/conversation-groups.client.spec.ts)覆盖首次激活、仅生命周期输入、注册替换、View 移除与恢复，以及完整替换输出。[Assembler 测试](../../../../packages/client/ui-conversation/tests/conversation-assembler.client.spec.ts)覆盖变化轮次报告和 Location 数据来源。
-- [Node 来源测试](../../../../packages/client/ui-chat/tests/chat-node-source.client.spec.ts)覆盖投影后的分组输入、索引读取器和空变化批次。
-- [Chat 渲染测试](../../../../packages/client/ui-chat/tests/chat-view.client.spec.tsx)保留模式切换时的组件状态，重绑定替换后的 Node 存储，传递独立部分，并省略未引用 Node。[视口测试](../../../../packages/client/ui-chat/tests/chat-viewport.client.spec.ts)覆盖组内阅读锚点、历史前插及部分感知的轮次导航。
+- Group 存储测试覆盖原子引用校验、根与成员身份复用、局部发布，以及删除组但保留原 Node。
+- 分组调度测试覆盖首次激活、仅生命周期输入、注册替换、View 移除与恢复，以及完整替换输出。Assembler 测试覆盖变化轮次报告和 Location 数据来源。
+- Node 来源测试覆盖投影后的分组输入、索引读取器和空变化批次。
+- Chat 渲染测试保留模式切换时的组件状态，重绑定替换后的 Node 存储，传递独立部分，并省略未引用 Node。视口测试覆盖组内阅读锚点、历史前插及部分感知的轮次导航。
 
 业务行为通过按键更新回归与已录制的 Web 回放验证。
 

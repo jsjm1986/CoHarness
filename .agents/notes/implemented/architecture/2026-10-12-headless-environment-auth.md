@@ -12,7 +12,7 @@ The [stored credential precedence](2026-10-09-stored-credential-precedence.md) d
 
 The shipped headless bundle disables the base `credentials`, `authorization` and `deepseek-account` rows. API-key adapters already support compositions without the credentials service and resolve through the launch snapshot: process environment, invocation-directory `.env`, then Harness-home `.env`. The profile does not read, migrate, write or delete `.credentials.yaml`. Dependent authorization and account rows are disabled explicitly so ordinary jobs do not emit pending-service warnings.
 
-This partially supersedes the per-run override policy in stored credential precedence for the shipped headless profile. Other profiles and an explicitly restored headless store retain stored-first resolution. The headless [README](../../../../packages/bundle/headless/README.md#credentials) owns the restoration patch.
+This partially supersedes the per-run override policy in stored credential precedence for the shipped headless profile. Other profiles and an explicitly restored headless store retain stored-first resolution. The headless [README](../../../../packages/bundle/headless/README.md) owns the restoration patch.
 
 ## Alternatives considered
 

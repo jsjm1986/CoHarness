@@ -9,13 +9,16 @@
   ],
   "references": [
     {
-      "path": "../../util/http-proxy"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
       "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../util/http-proxy"
+    },
+    {
+      "path": "../../util/launch-environment"
     }
   ]
 }

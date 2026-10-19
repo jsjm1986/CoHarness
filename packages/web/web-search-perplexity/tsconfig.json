@@ -9,12 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../util/launch-environment"
-    },
-    {
-      "path": "../web"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -22,6 +16,15 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../util/http-proxy"
+    },
+    {
+      "path": "../../util/launch-environment"
+    },
+    {
+      "path": "../web"
     }
   ]
 }

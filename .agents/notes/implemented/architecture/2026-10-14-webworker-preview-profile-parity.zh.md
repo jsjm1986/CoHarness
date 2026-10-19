@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-浏览器 Preview（[webworker-runtime](../../../../packages/experimental/webworker-runtime/README.zh.md)、[webworker-packer](../../../../packages/experimental/webworker-packer/README.zh.md)）的启动配置可以在打包时生成：packer 用临时 home 运行 `dsh --profile web --dump-config`，把输出写进镜像的 `config/cordis.yml`；Worker 再把整份配置当作 profile 自己的补丁（一条 `insert`）插回去。在这样的镜像上实测，会带来三个后果：
+浏览器 Preview（webworker-runtime、webworker-packer）的启动配置可以在打包时生成：packer 用临时 home 运行 `dsh --profile web --dump-config`，把输出写进镜像的 `config/cordis.yml`；Worker 再把整份配置当作 profile 自己的补丁（一条 `insert`）插回去。在这样的镜像上实测，会带来三个后果：
 
 | 现象 | 原因 |
 |---|---|
@@ -97,9 +97,9 @@ Preview 启动的组合与正式 Web 相同。不开 bundle 时，Worker 组合�
 
 ## 测试
 
-- [profile-image.spec.ts](../../../../packages/experimental/webworker-packer/tests/profile-image.spec.ts) 锁定收包清单（模板 bundle、全部 optional bundle、它们补丁行指向的包），以及记录 profile 和 installation、只带安装清单的镜像。
-- [lazy-chunks.spec.ts](../../../../packages/experimental/webworker-packer/tests/lazy-chunks.spec.ts) 锁定每个 `require.async` chunk 一个 archive、多次打包得到相同的 archive 名和字节、拒绝未发布的 chunk、`./client` 导出目标留在基础镜像。
-- [lazy-archive.spec.ts](../../../../packages/experimental/webworker-runtime/tests/storage/lazy-archive.spec.ts) 锁定登记后的作答、`ERR_DSH_VFS_DEFERRED` 拒绝、重命名目标保持不变、删除与 seed、共用一次拉取、拉取失败后重试，以及会等待的 `node:fs` 接口。
-- [require-builtin.spec.ts](../../../../packages/experimental/webworker-runtime/tests/node/require-builtin.spec.ts) 锁定提供的 internal 模块、其他 id 以平台错误码拒绝、cascaded loader、HMR 替换的成员和报告的 Node 版本；[fs-watch-context.spec.ts](../../../../packages/experimental/webworker-runtime/tests/node/fs-watch-context.spec.ts) 锁定监听器在 watcher 创建时的上下文里运行。
-- [bootstrap-route.host.spec.ts](../../../../packages/experimental/inspector/tests/bootstrap-route.host.spec.ts) 锁定 Inspector 降级；[transport.client.spec.ts](../../../../packages/client/hmr/tests/transport.client.spec.ts) 锁定经页面 transport 读取事件流；[node-half.client.spec.ts](../../../../packages/client/modules/tests/node-half.client.spec.ts) 锁定 chunk 读取重试。
-- [preview-boot.e2e.ts](../../../../apps/web/tests/preview-boot.e2e.ts) 启动打包好的 Worker 部署，经隧道请求一个懒加载 chunk，逐个开关全部 optional bundle，检查 session-titles 和 inspector-profile 的行，并在不刷新页面的情况下挂载已启用 bundle 的 Client 插件。镜像体积是实测值，没有测试锁定。
+- profile-image.spec.ts 锁定收包清单（模板 bundle、全部 optional bundle、它们补丁行指向的包），以及记录 profile 和 installation、只带安装清单的镜像。
+- lazy-chunks.spec.ts 锁定每个 `require.async` chunk 一个 archive、多次打包得到相同的 archive 名和字节、拒绝未发布的 chunk、`./client` 导出目标留在基础镜像。
+- lazy-archive.spec.ts 锁定登记后的作答、`ERR_DSH_VFS_DEFERRED` 拒绝、重命名目标保持不变、删除与 seed、共用一次拉取、拉取失败后重试，以及会等待的 `node:fs` 接口。
+- require-builtin.spec.ts 锁定提供的 internal 模块、其他 id 以平台错误码拒绝、cascaded loader、HMR 替换的成员和报告的 Node 版本；fs-watch-context.spec.ts 锁定监听器在 watcher 创建时的上下文里运行。
+- bootstrap-route.host.spec.ts 锁定 Inspector 降级；[transport.client.spec.ts](../../../../packages/client/hmr/tests/transport.client.spec.ts) 锁定经页面 transport 读取事件流；[node-half.client.spec.ts](../../../../packages/client/modules/tests/node-half.client.spec.ts) 锁定 chunk 读取重试。
+- preview-boot.e2e.ts 启动打包好的 Worker 部署，经隧道请求一个懒加载 chunk，逐个开关全部 optional bundle，检查 session-titles 和 inspector-profile 的行，并在不刷新页面的情况下挂载已启用 bundle 的 Client 插件。镜像体积是实测值，没有测试锁定。

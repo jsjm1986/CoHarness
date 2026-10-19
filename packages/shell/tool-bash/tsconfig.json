@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -36,19 +45,16 @@
       "path": "../../session/working-directory"
     },
     {
+      "path": "../../shell/shell"
+    },
+    {
+      "path": "../../shell/shell-env"
+    },
+    {
       "path": "../shell"
     },
     {
       "path": "../shell-env"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

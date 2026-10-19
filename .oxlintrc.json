@@ -26,6 +26,9 @@
     "packages/experimental/claude-code-mods/examples/*/{hooks,tests,types}/**", // Claude Code's published example mods and their tests keep the upstream style; see the headers.
     "native/**", // The imported landlock-run subtree has its own gates; see native/README.md.
     "gateway/admin-ui/**", // Independent npm project whose tsconfig needs its own node_modules (`vite/client` types); gateway/ owns its typecheck and test gates.
+    "apps/web/tests/plugin-administration.e2e.ts", // Gateway-lane e2e typed by gateway/tsconfig.browser.json against gateway's own node_modules.
+    "apps/web/tests/admin-form-values.e2e.ts",
+    "apps/web/tests/admin-layout.e2e.ts",
     "**/*.js",
     "**/*.mjs",
     "**/*.config.ts", // Tool and app configs are outside the repository TypeScript programs.

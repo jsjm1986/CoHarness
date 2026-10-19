@@ -37,7 +37,7 @@
       "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../host/apiproxy"
+      "path": "../../host/apiproxy/tsconfig.host.json"
     },
     {
       "path": "../../deliverables/workspace-changes"

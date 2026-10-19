@@ -9,6 +9,18 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -39,19 +51,13 @@
       "path": "../../util/brand"
     },
     {
+      "path": "../../util/http-proxy"
+    },
+    {
       "path": "../../util/values"
     },
     {
       "path": "../workflow"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../context/execution-authority"
     }
   ]
 }

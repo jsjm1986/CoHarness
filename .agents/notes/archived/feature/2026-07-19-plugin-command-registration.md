@@ -13,11 +13,11 @@ A shared mechanism must remain a UI concern rather than a model tool or agent-lo
 
 ## Decision
 
-`@deepseek-ai/dsh-commands` in `packages/interaction/commands/` is the product command registry. The TUI app bundle mounts it beside its consuming front end; the [automation-only ACP app](../simplification/2026-07-23-acp-automation-only-protocol.md) and the executor-less, UI-less agent spine omit it. TUI injects the service, while command producers depend only on the registry and any domain they operate.
+`@deepseek-ai/dsh-commands` in `packages/interaction/commands/` is the product command registry. `dsh-base` mounts it for consuming front ends; the [automation-only ACP app](../simplification/2026-07-23-acp-automation-only-protocol.md) and standalone `sdk-minimal` tree omit it. UI surfaces inject the service, while command producers depend only on the registry and any domain they operate.
 
 ### Registry contract
 
-A `CommandDefinition` contains an optional branded, plugin-namespaced `definitionId`, a lowercase name without `/`, a non-empty description, an optional unstructured-input hint, and an abortable handler. The identity is independent of display copy and per-execution `commandId`; effective descriptors carry only the selected scoped definition's identity. Registration validates and detaches the metadata, freezes the effective definition, and returns the exact Cordis effect disposer. Duplicate names fail within one layer. Every consumer sees every effective definition; a command plugin that cannot operate in a deployment omits its registration there instead of encoding consumer identities in the shared domain.
+A `CommandDefinition` contains a lowercase name without `/`, a non-empty description, an optional unstructured-input hint, and an abortable handler. Registration validates and detaches the metadata, freezes the effective definition, and returns the exact Cordis effect disposer. Duplicate names fail within one layer. Every consumer sees every effective definition; a command plugin that cannot operate in a deployment omits its registration there instead of encoding consumer identities in the shared domain.
 
 `list(agent)` returns immutable name-sorted descriptors after scoped shadowing. `find(agent, name)` resolves the effective definition. `execute(agent, line, signal)` parses and runs a known definition, returning a detached `success` or `error` result; invalid syntax and unknown names return `undefined` so the adapter owns its direct error text.
 
@@ -51,7 +51,7 @@ TUI tests exercise all migrated built-ins, live plugin discovery, help/autocompl
 
 - **Keep adapter-local switches** — rejected because optional plugins cannot contribute discovery and behavior without editing the TUI.
 - **Represent human commands as model tools** — rejected because discovery and direct invocation are human UI behavior; routing through the model adds latency, token cost, and reinterpretation.
-- **Put the registry in the core agent spine** — rejected because UI-less entry points do not consume it, while TUI can compose it explicitly.
+- **Put the registry in the mandatory agent core** — rejected because UI-less entry points do not consume it, while UI profiles can compose it explicitly.
 - **Make `dsh-agent-loop` inject commands** — rejected because the loop does not execute or discover human commands. Agent-scoped producers declare the UI dependency in a child plugin instead.
 - **Attach adapter masks to each definition** — rejected because support is a composition fact, not command-domain state. Every composed adapter exposes a registered command; an incompatible plugin omits registration in that deployment.
 - **Send unknown slash input to the model** — rejected because typoed or unavailable direct actions must fail predictably rather than change execution planes.

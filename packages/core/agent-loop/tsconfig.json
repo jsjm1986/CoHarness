@@ -9,19 +9,28 @@
   ],
   "references": [
     {
-      "path": "../agent"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../scope"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../session"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../system-prompt"
+      "path": "../../core/agent"
     },
     {
-      "path": "../tools"
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../core/tools"
     },
     {
       "path": "../../llm/llm"
@@ -39,13 +48,19 @@
       "path": "../../settings/settings"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../agent"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../scope"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../session"
+    },
+    {
+      "path": "../system-prompt"
+    },
+    {
+      "path": "../tools"
     }
   ]
 }

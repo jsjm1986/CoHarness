@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

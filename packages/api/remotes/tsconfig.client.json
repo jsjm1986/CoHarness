@@ -36,6 +36,12 @@
       "path": "../../credentials/credentials"
     },
     {
+      "path": "../../credentials/deepseek-account"
+    },
+    {
+      "path": "../../document/office-to-pdf"
+    },
+    {
       "path": "../../extensions/cordis-host-runner"
     },
     {
@@ -57,16 +63,25 @@
       "path": "../../interaction/permission-presets"
     },
     {
+      "path": "../../interaction/user-approval"
+    },
+    {
+      "path": "../../interaction/user-questions"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../memory/memory"
+    },
+    {
+      "path": "../../preset/agent-presets"
     },
     {
       "path": "../../preset/agent-presets"
     },
     {
       "path": "../../schedule/schedule"
-    },
-    {
-      "path": "../../memory/memory"
     },
     {
       "path": "../../settings/settings"
@@ -78,7 +93,25 @@
       "path": "../../typert/protocol"
     },
     {
+      "path": "../account-controller"
+    },
+    {
       "path": "../gateway/tsconfig.client.json"
+    },
+    {
+      "path": "../job-controller/tsconfig.host.json"
+    },
+    {
+      "path": "../workspace-controller/tsconfig.host.json"
+    },
+    {
+      "path": "../terminal-controller/tsconfig.host.json"
+    },
+    {
+      "path": "../session-controller/tsconfig.client.json"
+    },
+    {
+      "path": "../settings-controller"
     }
   ]
 }

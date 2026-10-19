@@ -476,7 +476,7 @@ const SERVICE_ROLES: ServiceRole[] = [
   },
   {
     key: 'agentPresets',
-    pkg: 'agent-preset-registry',
+    pkg: 'agent-presets',
     title: 'Per-session agent composition',
     mode: 'core',
     note: 'Eagerly mounts YAML-declared preset revisions, binds Agents and cold readers to scoped contributions, and retains retired revisions until their last user releases them.',
@@ -851,6 +851,118 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['experimental-speech-to-text-sensevoice'],
     consumers: ['experimental-api-speech-to-text'],
     note: 'Routes explicit recognizers; the browser uses the authenticated Remote and keeps transcripts in the draft until submission.',
+  },
+  {
+    key: 'connection',
+    pkg: 'client-connection',
+    title: 'Host connection carrier for one client generation',
+    mode: 'core',
+    consumers: ['host-webserver', 'gateway-runtime', 'archive-gateway', 'host-frontend-static', 'host-userdoc-http', 'host-open-in-app', 'app-boot'],
+    note: 'Serves the Host HTTP surface of one connection generation: declared Fetch routes, generated Remote dispatch, and the `connection/authenticate` bail that admits requests.',
+  },
+  {
+    key: 'webApp',
+    pkg: 'web-app',
+    title: 'Advertised Web application address',
+    mode: 'core',
+    consumers: ['harness-dev-context'],
+    note: 'Publishes the interactive GUI\'s authenticated URL so other plugins can direct the user into the running Web app.',
+  },
+  {
+    key: 'configEditor',
+    pkg: 'config-editor',
+    title: 'Profile-patch plugin configuration writer',
+    mode: 'core',
+    consumers: ['cua'],
+    note: 'Validates a complete candidate plugin configuration, writes it into the active profile\'s patch, applies it immediately, and serializes with profile changes and HMR.',
+  },
+  {
+    key: 'deepseekAccount',
+    pkg: 'deepseek-account',
+    title: 'DeepSeek account state seam',
+    mode: 'seam',
+    implementations: ['llm-deepseek-account'],
+    consumers: ['api-account-controller', 'web-deepseek-api'],
+    note: 'Reads stored login state, starts or cancels browser login, and signs out; Host model consumers resolve account credentials only for the provider-configured inference origin.',
+  },
+  {
+    key: 'otel',
+    pkg: 'otel',
+    title: 'OTel reporting channels',
+    mode: 'core',
+    consumers: ['host-product-telemetry-otel', 'session-telemetry-otel'],
+    note: 'Creates ordinary-event and Session-log reporting channels, each with its own exporter, resource, instrumentation scope, and queue; mounting alone sends nothing.',
+  },
+  {
+    key: 'productTelemetry',
+    pkg: 'host-product-telemetry-otel',
+    title: 'Product usage event submission',
+    mode: 'core',
+    note: 'Accepts explicitly submitted product usage events and forwards them to the configured OTLP/HTTP collector; mounting collects nothing by itself.',
+  },
+  {
+    key: 'translator',
+    pkg: 'experimental-translator',
+    title: 'Experimental text translation service',
+    mode: 'core',
+    note: 'Translates one bounded text request through anonymous Bing/Google routes or explicitly configured paid DeepSeek routes; opt-in experimental package.',
+  },
+  {
+    key: 'claudeCodeMods',
+    pkg: 'experimental-claude-code-mods',
+    title: 'Claude Code mod bridge',
+    mode: 'core',
+    consumers: ['experimental-claude-code-mods'],
+    note: 'Runs wrapped Claude Code mods inside agent runs; their hook registrations ride composed harness services through the shared `$`/`e`/`next` chain.',
+  },
+  {
+    key: 'settingsController',
+    pkg: 'api-settings-controller',
+    title: 'Settings Remote namespace',
+    mode: 'core',
+    note: 'Generated `ctx.remote.settings` namespace for browser configuration surfaces: redacted reads, validated writes without returning secret values, and provider-owned settings locations on the Host desktop.',
+  },
+  {
+    key: 'credentialsController',
+    pkg: 'api-settings-controller',
+    title: 'Credentials Remote namespace',
+    mode: 'core',
+    note: 'Generated `ctx.remote.credentials` namespace returning credential metadata and accepting writes without exposing secret values.',
+  },
+  {
+    key: 'jobController',
+    pkg: 'api-job-controller',
+    title: 'Jobs Remote namespace',
+    mode: 'core',
+    note: 'Generated `ctx.remote.job` namespace projecting `ctx.jobs`: whole-set `job.list` frames, `job.follow` retained output from an absolute offset, and `job.kill` on a human\'s behalf.',
+  },
+  {
+    key: 'workspaceController',
+    pkg: 'api-workspace-controller',
+    title: 'Workspace Remote namespace',
+    mode: 'core',
+    note: 'Generated `ctx.remote.workspace` namespace: Workspace create, rename, remove, and reorder, Session archive navigation, and the complete Workspace projection follow.',
+  },
+  {
+    key: 'directoryPickerController',
+    pkg: 'api-workspace-controller',
+    title: 'Directory-picker Remote namespace',
+    mode: 'core',
+    note: 'Generated `ctx.remote.directoryPicker` namespace for the Host-side directory-picking seam carried by the workspace controller.',
+  },
+  {
+    key: 'sessionFileReferences',
+    pkg: 'api-session-controller',
+    title: 'Session file-references Remote namespace',
+    mode: 'core',
+    note: 'Generated `ctx.remote.fileReferences` namespace serving Agent-scoped file reference reads addressed by Session.',
+  },
+  {
+    key: 'sessionSkillCatalog',
+    pkg: 'api-session-controller',
+    title: 'Session skill-catalog Remote namespace',
+    mode: 'core',
+    note: 'Generated `ctx.remote.skills` namespace serving user-invocable skill discovery for a Session.',
   },
 ]
 
@@ -1790,6 +1902,62 @@ function renderIndex(docs: GraphDoc[]): string {
     '',
     ...maintenanceFooter(maintenance),
   ].join('\n')
+}
+
+function memoize<A extends readonly unknown[], R>(
+  compute: (...args: A) => R,
+  key: (...args: A) => string,
+  copy: (value: R) => R,
+): (...args: A) => R {
+  const results = new Map<string, R>()
+  return (...args) => {
+    const id = key(...args)
+    const recorded = results.get(id)
+    if (recorded !== undefined) return copy(recorded)
+    const value = compute(...args)
+    results.set(id, value)
+    return copy(value)
+  }
+}
+
+/**
+ * Run read-only analysis with memoized TypeScript filesystem probes.
+ *
+ * While `run` executes, `fileExists`, `directoryExists`, `realpath`, `readDirectory`,
+ * and `getDirectories` on `system` return the first result recorded for each distinct
+ * argument list, so every compiler host and config parse built on it shares one view
+ * of the filesystem. The workspace must not change while `run` executes. A probe that
+ * throws records nothing, and array results are copied for each caller. The original
+ * methods are restored when `run` returns or throws. The memo patches `system` itself,
+ * so `run` must be synchronous and must not call this function again.
+ * @param run - read-only analysis that runs under the memo.
+ * @param system - TypeScript system whose probes are memoized.
+ * @returns the value returned by `run`.
+ */
+export function withMemoizedFileSystemProbes<T>(run: () => T, system: ts.System = ts.sys): T {
+  const probes = ['fileExists', 'directoryExists', 'realpath', 'readDirectory', 'getDirectories'] as const
+  const descriptors = probes.map(name => [name, Object.getOwnPropertyDescriptor(system, name)] as const)
+  const original: ts.System = { ...system }
+  const same = <V>(value: V): V => value
+  const copied = (value: string[]): string[] => [...value]
+  system.fileExists = memoize((path: string) => original.fileExists(path), path => path, same)
+  system.directoryExists = memoize((path: string) => original.directoryExists(path), path => path, same)
+  if (original.realpath !== undefined) system.realpath = memoize(original.realpath.bind(original), path => path, same)
+  system.readDirectory = memoize(
+    (path: string, extensions?: readonly string[], exclude?: readonly string[], include?: readonly string[], depth?: number) =>
+      original.readDirectory(path, extensions, exclude, include, depth),
+    (path, extensions, exclude, include, depth) => JSON.stringify([path, extensions, exclude, include, depth]),
+    copied,
+  )
+  system.getDirectories = memoize((path: string) => original.getDirectories(path), path => path, copied)
+  try {
+    return run()
+  } finally {
+    for (const [name, descriptor] of descriptors) {
+      if (descriptor === undefined) Reflect.deleteProperty(system, name)
+      else Object.defineProperty(system, name, descriptor)
+    }
+  }
 }
 
 function main(): void {

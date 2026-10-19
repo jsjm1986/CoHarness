@@ -122,4 +122,22 @@ export interface ClientConnectionRpc {
     payload: unknown,
     signal?: AbortSignal,
   ): Promise<ConnectionRpcResult<unknown>>
+
+  /**
+   * Open an in-process logical stream when the selected carrier supplies one.
+   * Browser transports omit this method; API Gateway owns their WebSocket mux.
+   * @param channel - absolute logical channel such as `/api`.
+   * @param endpoint - channel-relative endpoint such as `session/follow`.
+   * @param payload - channel-owned request payload.
+   * @param signal - caller cancellation for this logical stream.
+   * @param uplink - Client uplink items the Host method reads through `invocation.uplink()`.
+   * @returns decoded stream values from the in-process carrier.
+   */
+  readonly open?: (
+    channel: string,
+    endpoint: string,
+    payload: unknown,
+    signal: AbortSignal,
+    uplink?: AsyncIterable<unknown>,
+  ) => AsyncIterable<unknown>
 }

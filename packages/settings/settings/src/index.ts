@@ -98,6 +98,8 @@ export interface SettingsRegisterOptions<T> {
   authorizeWrite?: (value: T) => Promise<void>
   /** Logical owner shown by remote configuration surfaces. */
   owner?: SettingsOwner
+  /** Whether a configuration surface may generate a page when no custom page exists; defaults to `true`. */
+  autoGenerate?: boolean
   /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
   projectWrite?: SettingsProjectWrite
   /**
@@ -117,6 +119,8 @@ export interface SettingsDescriptor {
   // public API, provider contract, implementations, tests, and consumers.
   /** The registered namespace. */
   ns: SettingsNamespace
+  /** Whether the UI may generate a page when no custom page exists. */
+  autoGenerate: boolean
   /** Serialized schemastery schema (`schema.toJSON()`). */
   schema: unknown
   /** Current resolved value. */
@@ -415,6 +419,8 @@ interface SettingsRegistration {
   projectWrite: SettingsProjectWrite
   /** Optional path allowlist for project-manager writes. */
   projectWritePaths?: string[][]
+  /** Whether the UI may generate a page when no custom page exists. */
+  autoGenerate: boolean
   /** Registrant's localized display title. */
   label?: LocalizedText
   /** Owner-supplied check for constraints the schema cannot express. */
@@ -550,6 +556,7 @@ export abstract class SettingsProvider extends Service {
       schema: schema as z<unknown>,
       base: options?.base,
       applies: options?.applies ?? 'live',
+      autoGenerate: options?.autoGenerate ?? true,
       owner,
       projectWrite,
       ...projectWritePaths === undefined ? {} : { projectWritePaths },
@@ -661,6 +668,7 @@ export abstract class SettingsProvider extends Service {
       const serializedSchema = registration.schema.toJSON()
       const descriptor: SettingsDescriptor = {
         ns: registration.ns,
+        autoGenerate: registration.autoGenerate,
         schema: options?.redactSecrets === true ? redactSchemaDefaults(serializedSchema) : serializedSchema,
         value: registration.resolved,
         revision: registration.revision,

@@ -10,7 +10,7 @@ Desktop 更新和原生恢复可以在 Host 启动前或不可用时运行。依
 
 ## Decision
 
-Electron 主进程负责 `userData/desktop/settings.json`，不依赖 Host 启动或 Cordis 求值。测试鉴权弹窗开关使用此文件；[Desktop 参考文档](../../../../apps/desktop/README.zh.md#local-desktop-settings)统一说明字段和行为。
+Electron 主进程负责 `userData/desktop/settings.json`，不依赖 Host 启动或 Cordis 求值。测试鉴权弹窗开关使用此文件；Desktop 参考文档统一说明字段和行为。
 
 配置归属按运行依赖划分：由 Electron 负责且需要在 Host 启动前或不可用时读取配置的功能，使用壳层配置。Host 插件设置，包括 Web/Desktop 共用偏好，继续使用 Cordis。仅仅展示在 Desktop 中，不构成归属壳层的理由。统一设置界面可以使用不同的存储归属。
 

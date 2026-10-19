@@ -3,6 +3,10 @@
 Status: implemented
 Archived: 2026-09-30
 
+Superseded: the roster this note put on the session control stream (`jobsBySession`, `onJobsChanged`) now streams from the job controller's `job.list` into `ctx.jobs` — see [the jobs seam consolidation](../architecture/2026-09-03-jobs-seam-consolidation.md). The display decisions below (one roster, sections, durations, no kill control) still hold.
+
+Update: the output phase this note deferred now ships as the per-job observation record on `ctx.jobs` — see [jobs absorb the record](../architecture/2026-09-01-jobs-absorb-activity-record.md).
+
 English | [中文](2026-08-08-web-background-job-display.zh.md)
 
 ## Problem
@@ -15,33 +19,31 @@ The session header was already the place where per-session background activity l
 
 ## Decision
 
-Task state reaches the browser as **one whole-snapshot mux frame per session**, pushed at every registry commit point that changes what that session can see. The client keeps a last-wins mirror; a header action renders it. The roster itself has no RPC, no polling, and no client-side staleness bookkeeping.
+Task state reaches the browser as **one whole-snapshot control frame per session**, pushed at every registry commit point that changes what that session can see. The client keeps a last-wins mirror; a header action renders it. There is no RPC, no polling, and no client-side staleness bookkeeping.
 
-The frame is the only roster channel; per-task output and human kill ride cursor reads and a unary admission over the same carrier — [the output-and-kill note](2026-09-30-web-job-output-and-kill.md) owns that phase — so neither needed to undo it.
+This ships the list alone. Per-task streamed output and a human-initiated cancellation are separate phases, and the channel is shaped so neither has to undo it.
 
 ### Wire shape
 
-One frame in the mux stream:
+One frame in the Session Controller control stream:
 
 ```ts ignore-check
-| { type: 'session/jobs'; sessionId: SessionId; jobs: JobView[] }
+| { type: 'jobs'; sessionId: SessionId; jobs: SessionJob[] }
 ```
 
-`JobView` is browser-safe and owned by the carrier at [`packages/host/apiproxy/src/api/jobs.ts`](../../../../packages/host/apiproxy/src/api/jobs.ts), alongside the other domain contracts, with its wire schema beside it in `jobs.schema.ts`:
+`SessionJob` is browser-safe and owned beside the other Session Remote contracts in [`packages/api/session-controller/src/types.ts`](../../../../packages/api/session-controller/src/types.ts):
 
 ```ts
 import type { JobId } from '@deepseek-ai/dsh-jobs/brand'
 
-export interface JobView {
+export interface SessionJob {
   id: JobId
   kind: string
   label: string
   status: 'running' | 'stopping' | 'completed' | 'killed' | 'failed'
-  progress?: string
   detail?: string
   startedAt: number
   finishedAt?: number
-  output: { total: number; earliest: number; spillPaths?: string[] }
 }
 ```
 
@@ -49,9 +51,9 @@ export interface JobView {
 
 `kind` is `string` on the wire rather than `JobKind`. The kind map is merge-extensible by producer plugins, so a client build cannot enumerate the closed set; presentation falls through a documented default for an unrecognized kind.
 
-`output` carries the ring's absolute coordinates so a row's observability is roster data rather than a probe read; the bytes themselves still travel `jobs.output`. Two registry-view fields are deliberately absent: `owner` (the frame's `sessionId` already carries it) and `outputLimitBytes` (producer-owned model-presentation policy).
+Three `JobSnapshot` fields are deliberately absent: `ownerSession` (the frame's `sessionId` already carries it), `reported` (an internal notice-delivery bit with no user meaning), and `outputLimitBytes` (producer-owned model-presentation policy).
 
-The frame carries a whole snapshot rather than a delta for the reason [`session/queue`](../../../../packages/host/apiproxy/src/api/events.ts) states for itself: start, kill, settlement, reconnect, and a second browser tab all converge through one authoritative value. A session's task set is single-digit; the frame is small.
+The frame carries a whole snapshot rather than a delta so start, kill, settlement, reconnect, and a second browser tab all converge through one authoritative value. A session's task set is single-digit; the frame is small.
 
 ### The task-registry change feed
 
@@ -67,42 +69,44 @@ The listener is owner-granular rather than task-granular. The only consumer push
 
 `onJobDone` is not a subset of this. It delivers the terminal record with the exact owner `Agent` under first-wins semantics that `dsh-tool-jobs` couples to `reported`; `onJobsChanged` is pure observation with no delivery meaning and marks nothing reported. Listener throws are contained and never awaited, matching `onJobDone`, and each registration is an effect on the calling fiber.
 
-Service disposal deliberately announces nothing. Every `onJobsChanged` registration is an effect on the registry's own fiber, so the listeners are already gone by the time teardown clears the store; an observer learns the registry left through its own disposal, not through a final empty set.
+Service disposal announces each removal: after the registry has cancelled and awaited its jobs, it drops every record and emits one `removed` event per job, so a subscriber on a longer-lived fiber sees the roster empty out instead of keeping a stale set (a subscriber on the registry's own fiber is already gone by then).
 
-### The api-proxy carrier
+### The Session Controller carrier
 
-`mux()` subscribes `ctx.jobs.onJobsChanged` and pushes `session/jobs`; the subscription baseline rides next to the existing `session/subscribed` control frames, so a reconnecting client is current before it renders.
+[`SessionControlController.control()`](../../../../packages/api/session-controller/src/control.ts) emits one complete Host-wide baseline before later `jobs` replacement frames. Every physical reconnect opens a new generation, so the client replaces its process-local mirror before applying further changes.
 
 Four rules the carrier keeps:
 
-- **Never resume.** A change push reads `jobs.list(owner)` with the exact `Agent` the listener supplied, which stays correct even while that owner's scope is tearing down and a lookup by id would already miss. The baseline instead reads `ctx.jobs.list(ctx.agents.get(session.id))` — the non-resuming registry read, where a session with no live Agent correctly yields only the unowned tasks. Neither path touches the [`api-remotes` Agent resolver](../../../../packages/api/remotes/src/agent-lookup.ts), which resumes a cold session as a side effect of lookup; listing must never revive a session the user merely scrolled past.
-- **Fan out unowned changes.** An `undefined` owner pushes a fresh snapshot to every subscribed session, because unowned tasks are visible to every caller.
-- **Stay optional.** The carrier reads `ctx.get('jobs')`. A composition without the registry emits no frames, and the client renders no entry point — the posture `sessionProjections` already has in this file.
-- **Say nothing about nothing.** The baseline is pushed only for sessions whose list is non-empty, and an absent key on the client means an empty list. A change that empties a list still pushes `[]`, because that one transition is the only thing the client cannot infer from absence.
+- **Never resume.** A change push reads `jobs.list(owner)` with the exact `Agent` the listener supplied, which stays correct even while that owner's scope is tearing down and a lookup by id would already miss. The baseline instead reads `ctx.jobs.list(ctx.agents.get(session.id))`, where a Session with no live Agent correctly yields only unowned tasks. Neither path calls the [Session Controller Agent resolver](../../../../packages/api/session-controller/src/agent.ts), because listing must never revive a Session the user merely scrolled past.
+- **Fan out unowned changes.** An `undefined` owner pushes a fresh snapshot to every attached Session, because unowned tasks are visible to every caller.
+- **Stay optional.** The carrier reads `ctx.get('jobs')`. A composition without the registry reports empty job sets, and the client renders no entry point.
+- **Represent emptiness explicitly.** The opening baseline contains an entry for every attached Session, including `[]`; a later change that empties one list also pushes `[]`. The client may then normalize an empty set to an absent key without retaining stale rows.
 
 ### The client mirror
 
 `SessionListState` carries `jobsBySession: Readonly<Record<SessionId, readonly JobView[]>>`, owned by `SessionManager` and folded from the frame under last-wins, with an emptied set stored as an absent key so absence and `[]` are one representation.
 
-It lives on the list mirror rather than on `Session` for three reasons: the header action already reads list state through `useSessions`, nothing needs the pre-instantiation buffering `session/queue` requires (no composer behavior depends on tasks), and a later sidebar indicator gets the data without opening a second channel.
+It lives on the list mirror rather than on `Session` for three reasons: the header action already reads list state through `useSessions`, no composer behavior depends on tasks, and a later sidebar indicator gets the data without opening a second channel.
 
-Two clears keep it honest. On re-subscribe the manager drops the session's mirror — the rule `session/queue` already follows, because a fresh baseline is arriving and this generation sends none for an empty set, so a retained list would survive as a phantom. On `host/session-removed` it drops the mirror again: owner disposal already removed the records registry-side, but that lands on the mux stream while the removal frame rides the host stream, so the two have no relative order.
+Two replacement points keep it honest. Each control-stream generation clears the complete jobs mirror before installing the new baseline's non-empty sets. An `api-session/removed` event also drops that Session's entry, independently of the job-registry disposal notification's ordering.
 
 ### The header action
 
-[`@deepseek-ai/dsh-client-ui-jobs`](../../../../packages/client/ui-jobs/README.md) registers one entry in `conversation.session.header.actions`, ordered after the subagent catalog. Its own README owns the presentation contract; the decisions worth recording here are that the control does not render at all until the session has a task, that the live badge is omitted at zero so a history-only session keeps a quiet entry point, and that settled rows stay visible because a failed task's `detail` is the only place its failure is legible.
+`@deepseek-ai/dsh-client-ui-jobs` registers one entry in `conversation.session.header.actions`, ordered between the preset label and the subagent catalog (`order: 20` against the catalog's 30). Its own README owns the presentation contract; the decisions worth recording here are that the control does not render at all until the session has a task, that the live badge is omitted at zero so a history-only session keeps a quiet entry point, and that settled rows stay visible because a failed task's `detail` is the only place its failure is legible.
 
-A running one-shot background subagent therefore appears both there and in the subagent catalog. The two answer different questions — the catalog navigates into the child's transcript, this list is the handle the stop control attaches to — and suppressing `kind: 'subagent'` here would leave those tasks with no entry point for cancellation.
+A running one-shot background subagent therefore appears both there and in the subagent catalog. The two answer different questions — the catalog navigates into the child's transcript, this list is the only handle a cancellation can ever attach to — and suppressing `kind: 'subagent'` here would leave the cancellation phase with no entry point for exactly those tasks.
 
 ### What this deliberately does not do
 
-**No web path calls `ctx.jobs.read()`.** It consumes the single output cursor, so a browser read would silently take bytes the model's `job_output` will never see. The observation channel therefore rides the non-consuming `readAt` behind `jobs.output` ([the output-and-kill note](2026-09-30-web-job-output-and-kill.md)); the invariant holds for it too, and is worth a test rather than a convention because the failure is invisible at the call site.
+**No web path calls `ctx.jobs.read()`.** It consumes the single output cursor, so a browser read would silently take bytes the model's `job_output` will never see. This is an invariant worth a test rather than a convention, because the failure is invisible at the call site.
 
-**No output bytes on the frame.** Output travels the `jobs.output` cursor pull; the frame carries only the ring's coordinates, which is all a roster row needs to know whether a panel can open.
+**No cancellation.** That phase owed a decision the seam then did not answer: `kill()` marked terminal delivery reported, so a human interrupt written against the `kill()` contract would leave the model believing its task is still running. The [human job kill note](2026-08-26-human-job-kill.md) later resolved it: `kill` now takes an explicit `reported` claim, and the web stop control passes `reported: false` so the completion notice stays due.
+
+**No output watermark on the frame.** The output phase's delta channel is where an anchor field earns its place; one added now would have no reader.
 
 ## Alternatives considered
 
-**Signal frame plus RPC pull, the subagent-catalog shape.** Push a payload-free `jobs-changed` signal, debounce, then re-read authoritative state over a unary RPC. This is what the subagent catalog does, and the cost is visible in [`SessionManager`](../../../../packages/client/runtime/src/client/sessions/manager.ts): `catalogInflight` for single-flight, `catalogStale` for a trailing re-pull when a membership frame lands mid-request, `updateCatalogActivity` patching loaded rows in place *and* writing into the in-flight request so a response older than the frame gets overwritten, `parentAvailableOverride` replaying a stale `false`, and a reconnect path re-pulling every open catalog. That apparatus exists because the catalog's authority is split — durable lineage from a projection, liveness sampled at response time — and tasks have no durable half to justify inheriting it. It also fails specifically at the moment the output phase cares about: a task settles, its output stream closes immediately, but status only arrives after debounce plus round-trip, so the UI shows a running task with a dead stream for that window.
+**Signal frame plus RPC pull, the subagent-catalog shape.** Push a payload-free `jobs-changed` signal, debounce, then re-read authoritative state over a unary RPC. This is what the subagent catalog does, and the cost is visible in [`SessionManager`](../../../../packages/api/session-controller/src/client/sessions/manager.ts): `catalogInflight` for single-flight, `catalogStale` for a trailing re-pull when a membership frame lands mid-request, `updateCatalogActivity` patching loaded rows in place *and* writing into the in-flight request so a response older than the frame gets overwritten, `parentAvailableOverride` replaying a stale `false`, and a reconnect path re-pulling every open catalog. That apparatus exists because the catalog's authority is split — durable lineage from a projection, liveness sampled at response time — and tasks have no durable half to justify inheriting it. It also fails specifically at the moment the output phase cares about: a task settles, its output stream closes immediately, but status only arrives after debounce plus round-trip, so the UI shows a running task with a dead stream for that window.
 
 **Popover-scoped polling with no seam change.** Cheapest to build and the only option that avoids touching `JobRegistry`. It cannot support a resident count on the trigger without a resident poll, and both later phases need a real change feed anyway, so it buys a week and spends it back.
 
@@ -118,7 +122,7 @@ A running one-shot background subagent therefore appears both there and in the s
 
 The [web e2e scenario](../../../../apps/web/tests/background-job-list.e2e.ts) is the end-to-end proof and runs keyless: a real `run_in_background` bash call registers with `ctx.jobs`, the header count and row appear with no user interaction, and killing the task through the registry flips the open list to its producer detail. It asserts the whole delivery path rather than any single layer.
 
-Below it, [`jobs-local`](../../../../packages/jobs/jobs-local/tests/jobs.spec.ts) pins the change feed at all four commit points, its containment of a throwing observer, and its removal on both explicit disposal and fiber teardown; [`api-proxy-jobs`](../../../../packages/host/apiproxy/tests/api-proxy-jobs.spec.ts) pins the baseline-only-when-non-empty rule, the three change pushes, the dropped internal fields, the unowned fan-out, the no-resume guarantee, and the registry-absent composition; and the client suites pin the last-wins fold, the absent-key representation, both clears, and the component's ordering, duration, and dismissal behavior.
+Below it, [`jobs-local`](../../../../packages/jobs/jobs-local/tests/jobs.spec.ts) pins the change feed at all four commit points, its containment of a throwing observer, and its removal on both explicit disposal and fiber teardown; [`rows`](../../../../packages/api/job-controller/tests/rows.host.spec.ts) pins the roster stream that replaced the control-stream fan-out: the complete visible set on open, a refresh after each lifecycle commit and none per append, owner removal, and a clean abort; and the client suites pin baseline replacement, the last-wins fold, the absent-key representation, removal cleanup, and the component's ordering, duration, and dismissal behavior.
 
 ## Consequences
 
@@ -130,7 +134,7 @@ Below it, [`jobs-local`](../../../../packages/jobs/jobs-local/tests/jobs.spec.ts
 
 **Settled rows accumulate.** The registry retains settled tasks until owner disposal, so a long session with many background commands grows a long list. Capping the settled tail is a presentation change, not a protocol one, if it becomes a real complaint.
 
-**`stopping` marks a kill in flight.** The model's `job_kill` and the list's two-press stop both produce it; the status stays in the union because removing it would be a wire change with no reader benefit.
+**`stopping` is visible on every kill path.** The model's `job_kill` and the web stop control both produce it; carrying it in the union from the start is what kept the human-kill phase off the wire format.
 
 **Two entry points for one running subagent.** Accepted deliberately, and bounded to one-shot background delegations. If it reads as noise in practice, the fix is presentational — the catalog row can cite the task rather than the task list hiding the kind.
 

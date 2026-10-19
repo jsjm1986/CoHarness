@@ -14,7 +14,7 @@ An index must therefore carry everything a list page displays: localized title a
 
 ## Decision
 
-The **index** is separate from the **index generator**. DSH defines and reads one JSON index format. How an index is produced, and from which source list, belongs to the generator. [`dsh-plugin-market-index`](../../../../packages/util/plugin-market-index/README.md) is the executable rule set; the [Discover Agent Note](2026-10-02-plugin-market-discover.md) records how DSH reads and presents indexes. Indexes list [profile plugin bundles](../../implemented/architecture/2026-08-05-profile-plugin-bundles.md) and install them through [guided plugin installation](../../implemented/architecture/2026-09-15-guided-plugin-installation.md).
+The **index** is separate from the **index generator**. DSH defines and reads one JSON index format. How an index is produced, and from which source list, belongs to the generator. `dsh-plugin-market-index` is the executable rule set; the [Discover Agent Note](2026-10-02-plugin-market-discover.md) records how DSH reads and presents indexes. Indexes list [profile plugin bundles](../../implemented/architecture/2026-08-05-profile-plugin-bundles.md) and install them through [guided plugin installation](../../implemented/architecture/2026-09-15-guided-plugin-installation.md).
 
 The market reuses npm's package names, versions, ranges, distribution tags, and person declarations. Readers and generators use maintained npm parsers and validators. Additional fields or changed meanings require a plugin-market requirement that npm does not meet.
 

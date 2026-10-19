@@ -56,7 +56,7 @@ import type {
   ConversationLocation, ConversationNodeContext,
   ConversationNodeDefinition,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 type ReviewId = Branded<'ReviewId'>
 
@@ -111,7 +111,7 @@ interface ReviewChatData {
   readonly summary?: string
 }
 
-declare module '@deepseek-ai/dsh-client-ui-chat/client' {
+declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     'review-job': ReviewChatData
   }

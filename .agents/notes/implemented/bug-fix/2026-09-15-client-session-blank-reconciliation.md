@@ -10,7 +10,7 @@ A successful prompt response converts the Client's `New Session` row before a tu
 
 ## Decision
 
-The [Manager](../../../../packages/api/session-controller/src/client/sessions/manager.ts) retains accepted/running observations in a private set keyed by Session id. List rows and the existing Session blank updates use `summary.blank && !engagedSessions.has(sessionId)`, with `sessionListMetadata` hints still applied on top. The existing summary mutations, Session snapshot fields, constructor, and projection stores retain their responsibilities.
+The Manager retains accepted/running observations in a private set keyed by Session id. List rows and the existing Session blank updates use `summary.blank && !engagedSessions.has(sessionId)`, with `sessionListMetadata` hints still applied on top. The existing summary mutations, Session snapshot fields, constructor, and projection stores retain their responsibilities.
 
 Every successful prompt response invokes the existing `onEngaged` callback, including from a replaced Session object. The Manager updates its retained observation, the list row, and the currently resident Session by id. Rejection records no engagement. A `running: true` status, addition, or list baseline also records engagement; a baseline predating removal cannot restore that observation, even if the row is re-added during the pull.
 

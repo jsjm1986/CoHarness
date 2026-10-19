@@ -9,7 +9,16 @@
   ],
   "references": [
     {
-      "path": "../agent"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../boot/config-editor"
+    },
+    {
+      "path": "../../core/agent"
     },
     {
       "path": "../../llm/llm"
@@ -18,10 +27,7 @@
       "path": "../../settings/settings"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../agent"
     }
   ]
 }

@@ -388,7 +388,7 @@ async function timings(attempts: number): Promise<UserTextTimeReport> {
 
 assertBuiltBenchmarkRuntime(import.meta.url, {
   '@deepseek-ai/cordis': import.meta.resolve('@deepseek-ai/cordis'),
-  '@deepseek-ai/dsh-client-store': import.meta.resolve('@deepseek-ai/dsh-client-store'),
+  '@deepseek-ai/dsh-client-ui-conversation/client': import.meta.resolve('@deepseek-ai/dsh-client-ui-conversation/client'),
 })
 const [mode, count] = process.argv.slice(2)
 if (mode !== 'time' && mode !== 'allocation') throw new Error('usage: user-text.worker.js time <attempts> | allocation')

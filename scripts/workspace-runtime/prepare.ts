@@ -3,12 +3,14 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cp } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { parseArgs } from 'node:util'
 import { dirname, join, resolve } from 'node:path'
 import { x as extractTar } from 'tar'
 import { workspaceDependencyPaths, type PrimaryRuntimeManifest } from '../../packages/boot/workspace-dependencies/src/primary-runtime.ts'
 import { snapshotChildEnvironment } from '../../packages/test-support/session-snapshot/src/environment.ts'
-import { downloadPrimaryRuntimeAsset, downloadPythonArchive, installPrimaryNode, unpackPrimaryRuntimeWheel } from '../primary-runtime/prepare.ts'
+import { downloadNodeRuntime, downloadPrimaryRuntimeAsset, pythonArchive, unpackPrimaryRuntimeWheel } from '../primary-runtime/prepare.ts'
 import lock from './primary-runtime-lock.json' with { type: 'json' }
 
 /**
@@ -59,17 +61,14 @@ export async function preparePrimaryRuntime(options: {
     const output = join(staging, 'payload')
     const dependencies = join(output, 'dependencies')
     mkdirSync(dependencies, { recursive: true })
-    const pnpmVersion = await installPrimaryNode({
-      nodeVersion: lock.nodeVersion, nodeArchive: artifact.nodeArchive, nodeSha256: artifact.nodeSha256,
-      target, downloads, staging, dependencies,
-    })
-    await extractTar({
-      file: await downloadPythonArchive({
-        pythonVersion: lock.pythonVersion, pythonRelease: lock.pythonRelease,
-        artifact: lock.targets[target], cache: downloads,
-      }),
-      cwd: dependencies,
-    })
+    const node = join(dependencies, 'node')
+    await downloadNodeRuntime(target, node, downloads)
+    mkdirSync(join(node, 'node_modules'))
+    writeFileSync(join(node, 'node_modules', 'README.txt'), 'Reserved for bundled Node packages. pnpm uses its default installation directories.\n')
+    const pnpmManifest = createRequire(import.meta.url).resolve('pnpm')
+    const pnpmVersion = (JSON.parse(readFileSync(pnpmManifest, 'utf8')) as { version: string }).version
+    await cp(dirname(pnpmManifest), join(dependencies, 'pnpm'), { recursive: true, dereference: true })
+    await extractTar({ file: await pythonArchive(target, downloads), cwd: dependencies })
     const desktop = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'apps', 'cli', 'package.json'), 'utf8')) as { version: string }
     const manifest: PrimaryRuntimeManifest = {
       desktopVersion: desktop.version,

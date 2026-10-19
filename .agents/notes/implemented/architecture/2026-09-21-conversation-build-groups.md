@@ -16,7 +16,7 @@ Broad benchmark budgets do not establish that grouping updates are local. Keyed 
 
 ## Decision
 
-The grouping foundation provides a separate, Node-input `ConversationGroupDefinition`, its registry and Session-local context, generic Builder input/publication, keyed Group storage, and the two React branches. Chat owns its registered segmentation and presentation in the [business-rule reference](../../../../packages/client/ui-chat/src/client/conversation-nodes/README.md). The [subsystem reference](../../../../docs/subsystems/conversation.md#group-definitions) and [source types](../../../../packages/client/ui-conversation/src/client/contract/groups.ts) own the current API details.
+The grouping foundation provides a separate, Node-input `ConversationGroupDefinition`, its registry and Session-local context, generic Builder input/publication, keyed Group storage, and the two React branches. Chat owns its registered segmentation and presentation in the business-rule reference. The [subsystem reference](../../../../docs/subsystems/conversation.md) and source types own the current API details.
 
 ### Responsibilities
 
@@ -35,7 +35,7 @@ The grouping foundation provides a separate, Node-input `ConversationGroupDefini
 | Record | Relationship |
 |---|---|
 | [Business Node assembly](2026-08-09-client-conversation-node-assembly.md) | Retains event matching, Contexts, Locations, one business Node per Context, and target Builders; grouping adds another input category. |
-| [Chat scroll and footer](../../../../packages/client/ui-chat/README.md) | Owns clipping and independent nested following without changing Group Definition membership. |
+| Chat scroll and footer | Owns clipping and independent nested following without changing Group Definition membership. |
 
 Grouping preserves the independent Node-assembly decisions. Cross-View navigation and `toolCallFocus` remain separate responsibilities; Group references carry no View handles or resource-navigation policy.
 
@@ -98,18 +98,18 @@ Grouping never replays raw events. Node Definitions handle replay first; groupin
 
 | Layer/file | Responsibility |
 |---|---|
-| [groups.ts](../../../../packages/client/ui-conversation/src/client/contract/groups.ts) | Group Definition, input, references, updates, typed data map, and readers. |
-| [conversation.ts](../../../../packages/client/ui-conversation/src/client/contract/conversation.ts) | Optional Builder groupInput/publish and snapshot-store grouped reader; existing Node/View Definitions stay unchanged. |
-| [group-registry.ts](../../../../packages/client/ui-conversation/src/client/conversation/group-registry.ts) | Existing registry base, target uniqueness, typed registration, effect/disposer lifecycle. |
-| [assembly.ts](../../../../packages/client/ui-conversation/src/client/conversation/assembly.ts) | UiConversation.groups and existing binding rebuild notifications. |
-| [assembler.ts](../../../../packages/client/ui-conversation/src/client/conversation/assembler.ts) | Common first-activation/flush dispatch, context ownership, installation, and publication. |
-| [location-index.ts](../../../../packages/client/ui-conversation/src/client/conversation/location-index.ts) | Accumulate changed Turns, including lifecycle-only and Location-data changes. |
-| [group-store.ts](../../../../packages/client/ui-conversation/src/client/conversation/group-store.ts) | Atomic reference validation, keyed sources, array reuse, and local publication. |
-| [chat-snapshot-builder.ts](../../../../packages/client/ui-chat/src/client/conversation-nodes/chat-snapshot-builder.ts) | Record projected Node deltas, target positions, and changed Turn orders; provide indexed readers and defer source notification. No process grouping class. |
-| [ChatView.tsx](../../../../packages/client/ui-chat/src/client/chat/ChatView.tsx) | Read optional root entries and switch between node/group; fallback to existing Node order. |
-| [ChatGroupSeat.tsx](../../../../packages/client/ui-chat/src/client/chat/ChatGroupSeat.tsx) | Stable group parent, group-local subscriptions, nested Node seats. |
-| [ChatNodeSeat.tsx](../../../../packages/client/ui-chat/src/client/chat/ChatNodeSeat.tsx) | Existing Node sources/renderers, groupPart forwarding, distinct part anchors, Store-replacement rebind. |
-| [slots.ts](../../../../packages/client/ui-chat/src/client/contract/slots.ts) and [apply.ts](../../../../packages/client/ui-chat/src/client/apply.ts) | Existing keyed-hook injection for Group sources; no Slot-engine change. |
+| groups.ts | Group Definition, input, references, updates, typed data map, and readers. |
+| conversation.ts | Optional Builder groupInput/publish and snapshot-store grouped reader; existing Node/View Definitions stay unchanged. |
+| group-registry.ts | Existing registry base, target uniqueness, typed registration, effect/disposer lifecycle. |
+| assembly.ts | UiConversation.groups and existing binding rebuild notifications. |
+| assembler.ts | Common first-activation/flush dispatch, context ownership, installation, and publication. |
+| location-index.ts | Accumulate changed Turns, including lifecycle-only and Location-data changes. |
+| group-store.ts | Atomic reference validation, keyed sources, array reuse, and local publication. |
+| chat-snapshot-builder.ts | Record projected Node deltas, target positions, and changed Turn orders; provide indexed readers and defer source notification. No process grouping class. |
+| ChatView.tsx | Read optional root entries and switch between node/group; fallback to existing Node order. |
+| ChatGroupSeat.tsx | Stable group parent, group-local subscriptions, nested Node seats. |
+| ChatNodeSeat.tsx | Existing Node sources/renderers, groupPart forwarding, distinct part anchors, Store-replacement rebind. |
+| slots.ts and apply.ts | Existing keyed-hook injection for Group sources; no Slot-engine change. |
 
 ## React reading and presentation
 
@@ -149,10 +149,10 @@ The presentation channel maps each stored mode to a stable policy object. Seats 
 
 ## Verification
 
-- [Group store tests](../../../../packages/client/ui-conversation/tests/conversation-group-store.client.spec.ts) cover atomic reference validation, root/member identity reuse, local publication, and removal without deleting source Nodes.
-- [Grouping dispatch tests](../../../../packages/client/ui-conversation/tests/conversation-groups.client.spec.ts) cover first activation, lifecycle-only input, registry replacement, View removal/recovery, and complete replacement output. [Assembler tests](../../../../packages/client/ui-conversation/tests/conversation-assembler.client.spec.ts) cover changed-Turn reporting and Location data sources.
-- [Node source tests](../../../../packages/client/ui-chat/tests/chat-node-source.client.spec.ts) cover projected grouping inputs, indexed readers, and empty change batches.
-- [Chat rendering tests](../../../../packages/client/ui-chat/tests/chat-view.client.spec.tsx) retain component state across modes, rebind replacement Node stores, pass independent parts, and omit unreferenced Nodes. [Viewport tests](../../../../packages/client/ui-chat/tests/chat-viewport.client.spec.ts) cover grouped reading anchors, history prepend, and part-aware Turn navigation.
+- Group store tests cover atomic reference validation, root/member identity reuse, local publication, and removal without deleting source Nodes.
+- Grouping dispatch tests cover first activation, lifecycle-only input, registry replacement, View removal/recovery, and complete replacement output. Assembler tests cover changed-Turn reporting and Location data sources.
+- Node source tests cover projected grouping inputs, indexed readers, and empty change batches.
+- Chat rendering tests retain component state across modes, rebind replacement Node stores, pass independent parts, and omit unreferenced Nodes. Viewport tests cover grouped reading anchors, history prepend, and part-aware Turn navigation.
 
 Business behavior is verified through keyed-update regressions and recorded Web replay.
 

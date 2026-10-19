@@ -6,7 +6,7 @@ English | [中文](2026-10-13-chat-single-fold-motion.zh.md)
 
 ## Problem
 
-When "When to Collapse Work Details" is "On next message", the previous exchange's process rows close when the next human input arrives. The scroll layer had two fold paths and chose one by `ownInput` ([use-chat-scroll.ts](../../../../packages/client/ui-chat/src/client/chat/use-chat-scroll.ts)):
+When "When to Collapse Work Details" is "On next message", the previous exchange's process rows close when the next human input arrives. The scroll layer had two fold paths and chose one by `ownInput` (use-chat-scroll.ts):
 
 - **Input fold path:** when the fold starts, it measures the closing rows, computes the final landing and the required bottom room, and moves the rows and the scrollport on one frame clock to a single landing.
 - **Generic path:** scrollTop stays put, the closing height is reserved as bottom room in one block, and following scrolls once more after the fold ends. This holds only when the fold happens below the reader. When the folding region is above the reader, the content the reader is looking at moves up as a whole and the viewport shows only the room.
@@ -21,13 +21,13 @@ When "When to Collapse Work Details" is "On next message", the previous exchange
 | Send from a subagent child's composer in the right Sidebar | No (the composer skipped `beginSubmission`) | Whole viewport blank | Whole viewport blank |
 | Human send after parent messages woke several child Turns | No | Whole viewport blank (about 6000 px of room) | — |
 
-Notice-woken Turns no longer fold anything ([group-tree positions and exchanges](2026-10-11-chat-group-tree-exchanges.md)); the table above covers the human input that still folded through the generic path. The data comes from [fold-blank-matrix.e2e.ts](../../../../apps/web/tests/fold-blank-matrix.e2e.ts).
+Notice-woken Turns no longer fold anything ([group-tree positions and exchanges](2026-10-11-chat-group-tree-exchanges.md)); the table above covers the human input that still folded through the generic path. The data comes from fold-blank-matrix.e2e.ts.
 
 Subagent children showed no local echo because, when echoes were introduced, `subagents.prompt` carried no request id, so an echo could not be matched with the message the child recorded. Subagent control later moved to Remote, and the Host now records `SubagentPromptRequest.requestId` as the child message's `source.rpcId`; the client's `Session.prompt` still minted a separate id.
 
 ## Decision
 
-"On next message" keeps a single fold motion: [flow-motion.ts](../../../../packages/client/ui-chat/src/client/chat/flow-motion.ts) hands every batch of closing rows to the `InputFoldDriver` that the viewport supplies, and [use-chat-viewport.ts](../../../../packages/client/ui-chat/src/client/chat/use-chat-viewport.ts) chooses one of two landings when the batch begins.
+"On next message" keeps a single fold motion: flow-motion.ts hands every batch of closing rows to the `InputFoldDriver` that the viewport supplies, and use-chat-viewport.ts chooses one of two landings when the batch begins.
 
 ### Batches
 
@@ -73,7 +73,7 @@ Let `start` be the scrollTop when the batch begins, `above` the height of closin
 
 ## Testing
 
-[fold-blank-matrix.e2e.ts](../../../../apps/web/tests/fold-blank-matrix.e2e.ts) covers 19 main-Session cases and 8 right-Sidebar child cases across reader position (bottom, middle of the body, top of the body, inside the steps, previous Turn), input source (composer, Turn failing before its message is recorded, another tab, queued delivery, steer, parent message, several Turns folding at once), body length, and Standard and "On completion" controls. The layout gap is the tallest band between the scrollport top and the composer that no visible row's box covers: at most 120 px once settled, and over that for at most one animation frame. It counts boxes, so a closing row that has faded but not finished shrinking still covers its space. Tail cases assert the floor landing; reader-content-still cases assert that the reader's anchor row moves at most 2 px on screen. Short-body cases assert only that no room remains after the reply arrives.
+fold-blank-matrix.e2e.ts covers 19 main-Session cases and 8 right-Sidebar child cases across reader position (bottom, middle of the body, top of the body, inside the steps, previous Turn), input source (composer, Turn failing before its message is recorded, another tab, queued delivery, steer, parent message, several Turns folding at once), body length, and Standard and "On completion" controls. The layout gap is the tallest band between the scrollport top and the composer that no visible row's box covers: at most 120 px once settled, and over that for at most one animation frame. It counts boxes, so a closing row that has faded but not finished shrinking still covers its space. Tail cases assert the floor landing; reader-content-still cases assert that the reader's anchor row moves at most 2 px on screen. Short-body cases assert only that no room remains after the reply arrives.
 
 ## Alternatives considered
 

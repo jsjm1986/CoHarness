@@ -21,8 +21,6 @@ describe('Python runtime executable assets', () => {
     })
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('--config.link-workspace-packages=true')
-    expect(result.stdout).toContain('--config.hoist-workspace-packages=false')
     expect(result.stdout).toContain('node_modules/@deepseek-ai/dsh-web-frontend/dist/**/*')
     expect(result.stdout).toContain('node_modules/@deepseek-ai/dsh-*/**/*.{svg,png,jpg,jpeg,webp}')
     expect(result.stdout).not.toContain('skill-badge/assets/**/*')

@@ -10,7 +10,7 @@
 import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {
-  MessageId, PromptContentPart, QueueAction, RpcId, RpcResult, SessionId,
+  MessageId, PromptContentPart, QueueAction, RpcResult, SessionId, SessionRequestId,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { ChatSnapshot, ConversationSnapshot } from '../sessions/conversation.ts'
@@ -44,7 +44,7 @@ export interface BeginSubmissionInput {
 /** Identity and escape hatch returned by {@link ISession.beginSubmission}. */
 export interface SubmissionHandle {
   /** Prompt identity to pass to {@link ISession.prompt}. */
-  readonly requestId: RpcId
+  readonly requestId: SessionRequestId
   /** Retire the echo as failed when serialization cannot reach prompt(). */
   abandon(): void
 }
@@ -102,7 +102,7 @@ export interface ISession {
     content: PromptContentPart[],
     mode: 'queue' | 'steer',
     signal?: AbortSignal,
-    requestId?: RpcId,
+    requestId?: SessionRequestId,
   ): Promise<RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>>
   /**
    * Resolve one durable image referenced by this session.

@@ -66,6 +66,7 @@ class ForkInProcessProvider implements SubagentProvider {
     toolFilter: true,
     persona: true,
     agentOptions: true,
+    agentPreset: false,
   }
   // Context contract: a forked child IS seeded with the parent's completed-turn prefix.
   readonly inheritsParentContext = true

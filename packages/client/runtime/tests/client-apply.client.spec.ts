@@ -116,7 +116,7 @@ describe('runtime client apply', () => {
     // Frame sinks reach the object layer: a host session-added lands in the list store.
     bench.sinks?.onHostEnvelope?.({
       rpcId: 'r1' as never,
-      payload: { type: 'host/session-added', blank: true, sessionId: 's-new' } as never,
+      payload: { type: 'host/session-added', agentAvailable: true, blank: true, sessionId: 's-new' } as never,
     })
     await Promise.resolve()
     expect((sessions as { list: { getSnapshot(): { ids: string[] } } }).list.getSnapshot().ids).toContain(clientSessionKey({ kind: 'personal' }, 's-new' as never))
@@ -176,7 +176,7 @@ describe('runtime client apply', () => {
     const sessions = bench.ctx.get('sessions') as SessionRuntime
     bench.sinks?.onHostEnvelope?.({
       rpcId: 'r-registry' as never,
-      payload: { type: 'host/session-added', blank: true, sessionId: 's-registry' } as never,
+      payload: { type: 'host/session-added', agentAvailable: true, blank: true, sessionId: 's-registry' } as never,
     })
     await flushMicrotasks()
     sessions.open('s-registry' as never)
@@ -250,7 +250,7 @@ it('disposes every retained Client generation before reloading for a different c
   try {
     policy.setVerifiedAccountId(7)
     b.sinks?.onHostEnvelope?.({ rpcId: 'owned-frame' as never,
-      payload: { type: 'host/session-added', sessionId: 'same' as never, blank: true } })
+      payload: { type: 'host/session-added', agentAvailable: true, sessionId: 'same' as never, blank: true } })
     await flushMicrotasks()
     const key = clientSessionKey({ kind: 'personal' }, 'same' as never)
     const reference = sessions.retain(key, { source: 'controllerOperation' })

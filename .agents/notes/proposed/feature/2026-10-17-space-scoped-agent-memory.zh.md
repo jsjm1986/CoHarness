@@ -8,7 +8,7 @@ Status: proposed
 
 每个会话都从空的上下文窗口开始。agent 在工作中学到的持久知识——用户的纠正与偏好、代码里看不出的项目约束、外部资料在哪里——在会话结束时消失，下一个会话又问同样的问题、犯同样的错误。在共享的项目空间里损失成倍放大：一个成员的 agent 学到的团队约定，其他成员的 agent 全都不知道。
 
-harness 有相邻的机制，却没有跨会话记忆。[`agent-instructions`](../../../../packages/context/agent-instructions/README.zh.md) 加载人写的 `AGENTS.md`。[`session-reference`](../../../../packages/context/session-reference/README.zh.md) 注入用户引用的会话。[`tool-session-query`](../../../../packages/session-query/tool-session-query/README.zh.md) 让模型搜索同一目录下的更早会话。[可召回 compaction](2026-07-06-recallable-compaction.zh.md) 在一个会话内恢复被遮蔽的历史。它们都没有给 agent 一个记录持久事实的地方，也不会在同一空间后续的每个会话里提供这些事实的有界目录。
+harness 有相邻的机制，却没有跨会话记忆。[`agent-instructions`](../../../../packages/context/agent-instructions/README.zh.md) 加载人写的 `AGENTS.md`。[`session-reference`](../../../../packages/context/session-reference/README.zh.md) 注入用户引用的会话。`tool-session-query` 让模型搜索同一目录下的更早会话。[可召回 compaction](2026-07-06-recallable-compaction.zh.md) 在一个会话内恢复被遮蔽的历史。它们都没有给 agent 一个记录持久事实的地方，也不会在同一空间后续的每个会话里提供这些事实的有界目录。
 
 runtime 约束了这种存储放在哪里、谁能写：
 

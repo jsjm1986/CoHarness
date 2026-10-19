@@ -14,7 +14,7 @@ A teammate identity embedded in its initial task depends on ordinary history ret
 
 The loop owns logging, retained-snapshot comparison, and re-admission after compaction. A changed role appends the current full runtime-context snapshot after inherited history; unchanged retained context adds no message. No Team-specific retention state, event type, or log migration is introduced. Existing recorded reminders remain historical messages.
 
-This supersedes only the initial-task identity decision in [Agent Teams](../feature/2026-08-05-agent-teams.md#team-identity); its roster, mailbox, and task decisions remain active.
+This supersedes only the initial-task identity decision in [Agent Teams](../feature/2026-08-05-agent-teams.md); its roster, mailbox, and task decisions remain active.
 
 ## Alternatives considered
 

@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-非实验包必须具有有效产品用途，或在[包策略](../../../../scripts/product-package-policy.ts)中显式列出。策略区分可选集成、SDK、构建工具、测试工具、Web 分发包和纯声明基础设施，每个例外记录其维护职责。[实验性状态](../../../../packages/experimental/README.zh.md#status)描述成熟度与支持承诺，独立于安装、可选启用与官方发现。
+非实验包必须具有有效产品用途，或在[包策略](../../../../scripts/product-package-policy.ts)中显式列出。策略区分可选集成、SDK、构建工具、测试工具、Web 分发包和纯声明基础设施，每个例外记录其维护职责。[实验性状态](../../../../packages/experimental/README.zh.md)描述成熟度与支持承诺，独立于安装、可选启用与官方发现。
 
 [产品用途检查](../../../../scripts/verify-product-use.ts)跟踪有效的随附 profile、预设子行、运行时源码导入与显式动态挂载。检查在组与 Include 中保留禁用状态，并先应用 patch 再统计用途。Manifest 依赖和纯类型引用不产生运行时用途。可选组合包的可达关系与默认可达关系分别计算。未知包及无效或过时的策略条目会使静态 CI 和包卫生检查失败。
 

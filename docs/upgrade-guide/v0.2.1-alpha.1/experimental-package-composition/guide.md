@@ -24,5 +24,5 @@ Package ownership and naming follow the [experimental package policy](../../../.
          name: '@deepseek-ai/dsh-skill-badge'
    ```
 
-3. For GitHub review, use the example distributed with the adapter instead of the removed CLI example. Follow the [installed-profile instructions](../../../user/guide/github-review.md); keep customized rule modules inside the profile so their imports resolve its installed packages.
+3. For GitHub review, use the example distributed with the adapter instead of the removed CLI example. Follow the installed-profile instructions; keep customized rule modules inside the profile so their imports resolve its installed packages.
 4. Start the profile and confirm that its configured plugins activate without missing-package, missing-peer, or missing-row errors. Confirm the expected tool or skill is available in the intended Agent preset.

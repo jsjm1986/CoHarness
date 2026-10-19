@@ -1,6 +1,6 @@
 # AGENTS.md — Experimental packages
 
-These rules supplement the [package rules](../AGENTS.md). The [experimental reference](README.md#status) defines experimental, optional, and Official status; the rules below define dependency isolation and promotion.
+These rules supplement the [package rules](../AGENTS.md). The [experimental reference](README.md) defines experimental, optional, and Official status; the rules below define dependency isolation and promotion.
 
 - A package belongs here only when its complete public contract is experimental or internal-only. An experimental option inside a release package stays with its owning product role.
 - Package names follow [the experimental naming policy](../../scripts/experimental-package-policy.ts); packages join the dsh release family by default: omit `private` and set `publishConfig.access: public`. Only directories in `PRIVATE_EXPERIMENTAL_PACKAGE_DIRECTORIES` in [the publication policy](../../scripts/experimental-package-policy.ts) stay private: set `private: true` and omit `publishConfig`.

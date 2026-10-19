@@ -351,17 +351,51 @@ export class SessionProjectionRegistry extends Service {
    * Fully synchronous — every value and `asOfSeq` reflect the same log
    * position. Each value passes its unit's `viewSchema` before leaving.
    * @param session - the session whose projection values are read.
+   * @param keys - projection keys to include; omit to read every wire-visible unit.
    * @returns the snapshot; `values` is empty when no client-visible unit is registered.
    */
-  snapshot(session: Session): ProjectionSnapshot {
+  snapshot(
+    session: Session,
+    keys?: readonly Extract<keyof SessionProjectionMap, string>[],
+  ): ProjectionSnapshot {
     const values: Record<string, unknown> = {}
+    const selected = keys === undefined ? undefined : new Set<string>(keys)
     this.materializeCells(session)
     for (const registration of this.registrations.values()) {
       if (registration.def.wire === undefined) continue
+      if (selected !== undefined && !selected.has(registration.def.key)) continue
       const cell = this.cellFor(registration, session)
       values[registration.def.key] = this.viewCell(registration, cell)
     }
     return { asOfSeq: cursorBefore(session.seq), values }
+  }
+
+  /**
+   * Read only already-materialized client-visible cells without folding history.
+   * Values may trail the live Session and are therefore hints, not a complete
+   * baseline. Missing cells are omitted.
+   * @param session - attached Session whose cached cells are inspected.
+   * @param keys - optional wire keys to view.
+   * @returns the lowest common cached cut, or `undefined` when no wire cell exists.
+   */
+  cachedSnapshot(
+    session: Session,
+    keys?: readonly Extract<keyof SessionProjectionMap, string>[],
+  ): ProjectionSnapshot | undefined {
+    const values: Record<string, unknown> = {}
+    let asOfSeq: SessionSeqCursor | undefined
+    const selected = keys === undefined ? undefined : new Set<string>(keys)
+    for (const registration of this.registrations.values()) {
+      if (registration.def.wire === undefined) continue
+      if (selected !== undefined && !selected.has(registration.def.key)) continue
+      const cell = registration.cells.get(session)
+      if (cell === undefined) continue
+      values[registration.def.key] = this.viewCell(registration, cell)
+      if (asOfSeq === undefined || cell.observedSeq < asOfSeq) {
+        asOfSeq = cell.observedSeq
+      }
+    }
+    return asOfSeq === undefined ? undefined : { asOfSeq, values }
   }
 
   /**

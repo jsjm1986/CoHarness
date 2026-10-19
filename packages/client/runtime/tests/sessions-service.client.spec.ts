@@ -91,7 +91,7 @@ describe('list store projection', () => {
   it('reflects live increments (host stream via manager) into the store', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1' }])
-    b.svc.handleHostEnvelope({ rpcId: 'r1' as never, payload: { type: 'host/session-added', blank: true, sessionId: sid('s2') } as never })
+    b.svc.handleHostEnvelope({ rpcId: 'r1' as never, payload: { type: 'host/session-added', agentAvailable: true, blank: true, sessionId: sid('s2') } as never })
     await Promise.resolve()
     expect(b.svc.list.getSnapshot().ids).toContain('s2')
   })
@@ -635,7 +635,7 @@ describe('create', () => {
     // first visible mux event.
     b.svc.handleHostEnvelope({
       rpcId: 'upsert' as never,
-      payload: { type: 'host/session-added', sessionId: draft, blank: false },
+      payload: { type: 'host/session-added', agentAvailable: true, sessionId: draft, blank: false },
     })
     await Promise.resolve()
     expect(b.svc.list.getSnapshot().byId[draft]?.workspaceId).toBeUndefined()
@@ -749,7 +749,7 @@ describe('scope lifecycle rides the list mirror (entity parity: no client-side p
     expect(b.svc.scope(sid('s-new'))).toBeUndefined() // not in view: no scope, no exceptions
     b.svc.handleHostEnvelope({
       rpcId: 'add' as never,
-      payload: { type: 'host/session-added', sessionId: sid('s-new'), blank: true, cwd: '/w/a' } as never,
+      payload: { type: 'host/session-added', agentAvailable: true, sessionId: sid('s-new'), blank: true, cwd: '/w/a' } as never,
     })
     await Promise.resolve()
     expect(b.svc.scope(sid('s-new'))).toBeUndefined()
@@ -855,7 +855,7 @@ describe('blank mirror', () => {
     await feedList(b, [])
     b.svc.handleHostEnvelope({
       rpcId: 'add' as never,
-      payload: { type: 'host/session-added', sessionId: sid('s-new'), blank: true, cwd: '/w/a' } as never,
+      payload: { type: 'host/session-added', agentAvailable: true, sessionId: sid('s-new'), blank: true, cwd: '/w/a' } as never,
     })
     await Promise.resolve()
     expect(b.svc.list.getSnapshot().byId[sid('s-new')]).toMatchObject({ blank: true })

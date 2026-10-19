@@ -18,6 +18,10 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
     "./types": {
       "types": "./lib/types/types.d.ts",
       "default": "./lib/types/types.js"
@@ -44,6 +48,10 @@
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json",
+    "./discovery": {
+      "types": "./lib/types/discovery.d.ts",
+      "default": "./lib/types/discovery.js"
+    },
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
@@ -54,7 +62,8 @@
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "lib/invariant.js"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {
@@ -71,6 +80,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-attachment": "workspace:*",
-    "@deepseek-ai/cordis": "workspace:~"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-invariants": "workspace:*"
   }
 }

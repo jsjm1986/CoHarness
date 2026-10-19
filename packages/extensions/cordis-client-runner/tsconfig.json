@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
@@ -21,19 +30,13 @@
       "path": "../../client/runtime"
     },
     {
+      "path": "../../client/ui-renderer"
+    },
+    {
       "path": "../../client/ui-slots"
     },
     {
       "path": "../../client/ui-theme"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

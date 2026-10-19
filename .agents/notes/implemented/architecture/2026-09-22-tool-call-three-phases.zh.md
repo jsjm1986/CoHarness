@@ -14,7 +14,7 @@ Status: implemented
 
 ### 同一个 Tool 拥有三个阶段
 
-[Tool Definition](../../../../packages/client/ui-chat/src/client/conversation-nodes/tool.ts) 按 callId 聚合调用，向工具组件提供明确的阶段数据。
+Tool Definition 按 callId 聚合调用，向工具组件提供明确的阶段数据。
 
 | 阶段 | 创建或更新依据 | 可用数据与展示 |
 |---|---|---|
@@ -26,7 +26,7 @@ Status: implemented
 
 ### start 表示可创建入口
 
-沿用 [Conversation Definition](../../../../packages/client/ui-conversation/src/client/contract/conversation.ts) 的 `match/start/update` 接口和既有角色。持久事件与瞬态 delta 都可以匹配为 start；当前事件序列中最早的 start 初始化 State，后续 Match，包括同 ID 的其他 start，都交给 update。
+沿用 Conversation Definition 的 `match/start/update` 接口和既有角色。持久事件与瞬态 delta 都可以匹配为 start；当前事件序列中最早的 start 初始化 State，后续 Match，包括同 ID 的其他 start，都交给 update。
 
 Tool 的每个 delta 和 `tool/call` 都是创建入口。具名实时 delta 创建准备行；历史 `tool/call` 直接创建派发阶段。匹配函数仍然只读取当前事件，不查询 Context，不增加角色、注册表或旁路缓存。
 

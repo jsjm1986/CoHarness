@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-08-18-experimental-agent-teams-packages.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-experimental-agent-teams-packages.md
+/agent-note-incubate-agent-teams-as-private-experimental-packages:
+  en: 00c58c1f62f6c58f
+  zh: 7b59a91ce12f499b
+/agent-note-incubate-agent-teams-as-private-experimental-packages/problem:
+  en: 29e36a510381a7e1
+  zh: b87d793ae851e18c
+/agent-note-incubate-agent-teams-as-private-experimental-packages/decision:
+  en: a9b0b07a5f6a1d11
+  zh: d956d24241f079c1
+/agent-note-incubate-agent-teams-as-private-experimental-packages/alternatives-considered:
+  en: 79c7b970d42401a1
+  zh: ec1c278a0b5e18e9
+/agent-note-incubate-agent-teams-as-private-experimental-packages/consequences:
+  en: d4123a47ed967b04
+  zh: b4554905663c4cc1

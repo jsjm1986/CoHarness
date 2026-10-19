@@ -9,37 +9,40 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../util/brand"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../../llm/llm"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../core/session"
+      "path": "../../api/remotes/tsconfig.session-controller.json"
+    },
+    {
+      "path": "../../api/session-controller/tsconfig.host.json"
     },
     {
       "path": "../../core/agent"
     },
     {
+      "path": "../../core/session"
+    },
+    {
       "path": "../../core/tools"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
     },
     {
       "path": "../../session/session-persistence"
     },
     {
       "path": "../../session/session-persistence-jsonl"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../api/remotes/tsconfig.session-controller.json"
     },
     {
       "path": "../../storage/storage-domain"
@@ -51,10 +54,10 @@
       "path": "../../typert/protocol"
     },
     {
-      "path": "../../workspace/workspace"
+      "path": "../../util/brand"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../workspace/workspace"
     }
   ]
 }

@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../core/session"
     },
     {
@@ -30,13 +36,10 @@
       "path": "../../session/session-title"
     },
     {
+      "path": "../../todo/tool-todo"
+    },
+    {
       "path": "../../util/brand"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
     }
   ]
 }

@@ -1,6 +1,6 @@
 /** Durable references to Gateway-verified human input; references never grant permissions. */
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** Immutable input identity in the Gateway's execution registry. */
 export type ExecutionInputId = Branded<'ExecutionInputId'>

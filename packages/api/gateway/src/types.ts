@@ -20,6 +20,8 @@ export interface InvokeRemoteRequest {
   readonly signal?: AbortSignal
 }
 
+import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
+
 /** Stable infrastructure and boundary failures emitted before or after business execution. */
 export type TypertGatewayErrorCode =
   | 'gateway/ambiguous-endpoint'
@@ -30,18 +32,58 @@ export type TypertGatewayErrorCode =
   | 'gateway/context-unavailable'
   | 'gateway/definition-unavailable'
   | 'gateway/input-invalid'
+  | 'gateway/interactions-forbidden'
   | 'gateway/invocation-unavailable'
   | 'gateway/lookup-failed'
   | 'gateway/lookup-not-found'
   | 'gateway/lookup-unavailable'
   | 'gateway/method-unavailable'
+  | 'gateway/peer-disposed'
+  | 'gateway/protocol'
   | 'gateway/provider-mismatch'
   | 'gateway/result-invalid'
   | 'gateway/service-unavailable'
   | 'gateway/signature-invalid'
+  | 'gateway/uplink-overflow'
+
+/** Carrier-facing access to decoded Remote streams and their stable failures. */
+export interface TypertGatewayWireStream {
+  /**
+   * Open one logical stream from its wire endpoint and payload.
+   * @param endpoint - canonical Remote endpoint or Gateway-owned stream name.
+   * @param payload - decoded carrier payload; Remote endpoints carry exactly `{args}`.
+   * @param uplink - Client-to-Host items of the logical stream; this Gateway's
+   * invocation model has no uplink channel, so endpoints never receive items.
+   * @param peer - Peer the stream speaks for; required, never defaulted.
+   * @param signal - logical-stream cancellation.
+   * @returns validated stream values.
+   */
+  readonly open: (
+    endpoint: string,
+    payload: unknown,
+    uplink: AsyncIterable<unknown>,
+    peer: PeerScope,
+    signal: AbortSignal,
+  ) => Promise<AsyncIterable<unknown>>
+
+  /**
+   * Convert a stream failure to the carrier-safe Remote failure fields.
+   * @param error - failure raised while opening or consuming a stream.
+   * @returns stable code, message, and details for the Client.
+   */
+  readonly failure: (error: unknown) => {
+    readonly code: string
+    readonly message: string
+    readonly details: object
+  }
+}
 
 /** Host dispatcher consumed by Connection adapters. */
 export interface TypertGateway {
+  /** Carrier adapter shared by WebSocket and in-process transports. */
+  readonly wireStream: TypertGatewayWireStream
+
+
   /**
    * Invoke one live Remote method without assuming a carrier or response envelope.
    * @param request - decoded endpoint and named wire arguments.

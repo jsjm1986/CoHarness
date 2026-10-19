@@ -4,7 +4,7 @@
 #   pnpm run verify-translation-pairing --write docs/api-gateway.md
 /api-gateway:
   en: bb69b67db026edcb
-  zh: e1fa01966a574a5d
+  zh: 5e652d3c94e754b7
 /api-gateway/programming-model:
   en: 184ccd410db28179
   zh: 260c83b51bed85bd
@@ -22,7 +22,7 @@
   zh: 14c7bfb165f0070c
 /api-gateway/development-mode:
   en: 7b3d0180d1bd08a0
-  zh: 0dcdad63116a03d1
+  zh: 1c15e5a9b6768da3
 /api-gateway/boundaries:
   en: 2c35a1c27042fedd
   zh: 3e8d51bfb72b7e8c

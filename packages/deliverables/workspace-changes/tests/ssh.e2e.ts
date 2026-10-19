@@ -83,14 +83,14 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
       await recorder.dispose()
       recorder = undefined
       for (const path of remoteStorage) expect(await ctx.fs.stat(await ctx.fs.resolve(path))).toBeUndefined()
-      await run([hello.node, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', root], hello.workspace)
+      await run([hello.executable, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', root], hello.workspace)
       root = undefined
     } finally {
       await recorder?.dispose()
       if (root !== undefined) {
         const hello = await ctx.ssh.ready
         const child = ctx.subprocess.spawn({
-          argv: [hello.node, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', root], cwd: hello.workspace,
+          argv: [hello.executable, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', root], cwd: hello.workspace,
           stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 2000,
         })
         await child.done

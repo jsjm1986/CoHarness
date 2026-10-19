@@ -9,16 +9,25 @@
   ],
   "references": [
     {
-      "path": "../agent"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../scope"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../session"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../system-prompt"
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/system-prompt"
     },
     {
       "path": "../../interaction/user-approval"
@@ -48,13 +57,16 @@
       "path": "../../util/values"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../agent"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../scope"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../session"
+    },
+    {
+      "path": "../system-prompt"
     }
   ]
 }

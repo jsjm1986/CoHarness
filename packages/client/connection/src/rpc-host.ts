@@ -331,6 +331,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
           headers: req.headers,
           ...(req.method === undefined ? {} : { method: req.method }),
           pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+          deny: (status, message) => { res.writeHead(status); res.end(message) },
         }, async () => {
           await bridge(req, res, fetchHandler)
         })

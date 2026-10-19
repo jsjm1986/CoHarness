@@ -22,13 +22,19 @@
       "path": "../../../vendor/schemastery"
     },
     {
+      "path": "../../context/execution-authority"
+    },
+    {
       "path": "../../core/agent"
     },
     {
-      "path": "../../preset/agent-presets"
+      "path": "../../core/session"
     },
     {
-      "path": "../../core/session"
+      "path": "../../fs/fs"
+    },
+    {
+      "path": "../../preset/agent-presets"
     },
     {
       "path": "../../sandbox/sandbox"
@@ -58,7 +64,7 @@
       "path": "../../util/lazy-require"
     },
     {
-      "path": "../../context/execution-authority"
+      "path": "../../util/values"
     }
   ]
 }

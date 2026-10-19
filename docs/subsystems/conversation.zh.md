@@ -44,6 +44,8 @@ shell 拥有 View 选择，并在 binding 创建、被选为 current 或 View ro
 
 实时 Assistant delta 作为 Client-only `assistant/live-chunk` update 到达。重连 baseline 会把活跃的进程内紧凑 stream 展开为相同的瞬态 event，持久 `assistant/message` 与 `assistant/attempt` event 则嵌入完整紧凑 stream 供历史回放。瞬态 event 只能充当 update；`start()` 只接收标准 `SessionEvent`。消费 Assistant 输出的 Definition 在同一组 `match()` 与 `update()` 方法里处理 live chunk 与持久 settlement，其他 Definition 直接返回 `null`，无需展开 stream。
 
+<a id="definition-and-typed-chat-payload"></a>
+
 ## Definition 与类型化 Chat payload
 
 为了完整展示关联关系，下面把生产方声明和 Client 贡献写在同一个代码块里。实际的包族中，branded id 与 `SessionEventMap` 声明留在事件生产方，Definition、Chat data 合并与 renderer 留在 Client 插件。
@@ -56,7 +58,7 @@ import type {
   ConversationLocation, ConversationNodeContext,
   ConversationNodeDefinition,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 type ReviewId = Branded<'ReviewId'>
 
@@ -111,7 +113,7 @@ interface ReviewChatData {
   readonly summary?: string
 }
 
-declare module '@deepseek-ai/dsh-client-ui-chat/client' {
+declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     'review-job': ReviewChatData
   }

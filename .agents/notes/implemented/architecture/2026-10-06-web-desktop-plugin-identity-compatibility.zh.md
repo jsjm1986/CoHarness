@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-迁移的包保留[实验包命名策略](../../../../scripts/experimental-package-policy.ts)声明的已发布名称。这个带类型的目录到包名映射是命名例外唯一手工维护的清单。包清单、消费者、安装检查和打包检查与其保持一致；缺失、迁移到其他位置或重复归属的例外会被拒绝。[实验状态](../../../../packages/experimental/README.zh.md#status)仍独立于名称拼写、Official 发现和显式选择。
+迁移的包保留[实验包命名策略](../../../../scripts/experimental-package-policy.ts)声明的已发布名称。这个带类型的目录到包名映射是命名例外唯一手工维护的清单。包清单、消费者、安装检查和打包检查与其保持一致；缺失、迁移到其他位置或重复归属的例外会被拒绝。[实验状态](../../../../packages/experimental/README.zh.md)仍独立于名称拼写、Official 发现和显式选择。
 
 既有徽章、Ralph 和原生委派行 ID 作为 Host 行选择器保持有效。新增隔离组和新引入的能力保留各自的新 ID。后续用户层仍可替换配置或禁用行。可选 bundle 仍须显式选择：指向缺失行的 patch 不会自动选择其 bundle。
 

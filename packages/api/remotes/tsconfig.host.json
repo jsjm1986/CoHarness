@@ -13,7 +13,10 @@
   ],
   "references": [
     {
-      "path": "./tsconfig.session-controller.json"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../boot/plugin-manager"
     },
     {
       "path": "../../context/collaboration"
@@ -22,10 +25,16 @@
       "path": "../../core/agent"
     },
     {
+      "path": "../../core/scope"
+    },
+    {
       "path": "../../core/session"
     },
     {
       "path": "../../credentials/credentials"
+    },
+    {
+      "path": "../../credentials/deepseek-account"
     },
     {
       "path": "../../extensions/cordis-host-runner"
@@ -37,19 +46,31 @@
       "path": "../../goal/goal"
     },
     {
+      "path": "../../host/plugin-inventory"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {
       "path": "../../interaction/permission-presets"
     },
     {
+      "path": "../../interaction/user-approval"
+    },
+    {
+      "path": "../../interaction/user-questions"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../memory/memory"
     },
     {
       "path": "../../preset/agent-presets"
     },
     {
-      "path": "../../memory/memory"
+      "path": "../../preset/agent-presets"
     },
     {
       "path": "../../schedule/schedule"
@@ -70,7 +91,25 @@
       "path": "../../typert/registry"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../util/deque"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../account-controller"
+    },
+    {
+      "path": "../gateway/tsconfig.host.json"
+    },
+    {
+      "path": "../session-controller/tsconfig.host.json"
+    },
+    {
+      "path": "../terminal-controller/tsconfig.host.json"
+    },
+    {
+      "path": "./tsconfig.session-controller.json"
     }
   ]
 }

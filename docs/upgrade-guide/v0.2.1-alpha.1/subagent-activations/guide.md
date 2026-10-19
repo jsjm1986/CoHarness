@@ -24,7 +24,7 @@ The published `@deepseek-ai/dsh-subagent-in-process-driver` package is removed. 
        toolName: subagent
    ```
 
-   Local tool delegation requires Session persistence. Compose it with the [subagent service and provider](../../../../packages/subagent/subagent/README.md#use-this-package).
+   Local tool delegation requires Session persistence. Compose it with the [subagent service and provider](../../../../packages/subagent/subagent/README.md#capabilities).
 
 2. Remove `run_in_background` from tool calls and update result consumers to read `subagentId`. Collect the completion notice instead of foreground output or a Job result. Use `interrupt_agent` to stop the current execution; use `send_message` only for local children when those control tools are composed.
 

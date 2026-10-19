@@ -3,6 +3,10 @@
 Status: implemented
 Archived: 2026-09-30
 
+Superseded：本文放在会话控制流上的名册（`jobsBySession`、`onJobsChanged`）现在从 job 控制器的 `job.list` 流入 `ctx.jobs`——见 [jobs seam 收敛](../architecture/2026-09-03-jobs-seam-consolidation.zh.md)。下文的展示决策（单一名册、分组、时长、没有 kill 控件）仍然成立。
+
+Update：本文推迟的输出阶段现已作为 `ctx.jobs` 上的逐 job 观测 record 交付——见 [jobs 吸收 record](../architecture/2026-09-01-jobs-absorb-activity-record.zh.md)。
+
 [English](2026-08-08-web-background-job-display.md) | 中文
 
 ## 问题
@@ -15,33 +19,31 @@ Archived: 2026-09-30
 
 ## 决策
 
-任务状态以**每会话一帧的整份快照**到达浏览器，在注册表每一个会改变该会话可见内容的提交点推出。客户端保持一份 last-wins 镜像，由一个 header 入口渲染。名册本身没有 RPC，没有轮询，客户端不需要任何过期状态管理。
+任务状态以**每会话一帧的整份 control 快照**到达浏览器，在注册表每一个会改变该会话可见内容的提交点推出。客户端保持一份 last-wins 镜像，由一个 header 入口渲染。没有 RPC，没有轮询，客户端不需要任何过期状态管理。
 
-这一帧仍是唯一的名册通道；单任务输出与人类 kill 经同一载体上的游标读与一元受理到达——[输出与 kill note](2026-09-30-web-job-output-and-kill.zh.md) 拥有那一期——两者都不必推翻它。
+本次只交付列表。每个任务的流式输出与人类发起的中断是各自独立的阶段，而通道的形状让两者都不必推翻它。
 
 ### 线路形状
 
-mux 流中的一帧：
+Session Controller control 流中的一帧：
 
 ```ts ignore-check
-| { type: 'session/jobs'; sessionId: SessionId; jobs: JobView[] }
+| { type: 'jobs'; sessionId: SessionId; jobs: SessionJob[] }
 ```
 
-`JobView` 是浏览器安全类型，由载体在 [`packages/host/apiproxy/src/api/jobs.ts`](../../../../packages/host/apiproxy/src/api/jobs.ts) 里拥有，与其他领域契约并列，线路 schema 就在旁边的 `jobs.schema.ts`：
+`SessionJob` 是浏览器安全类型，与其他 Session Remote 约定一起由 [`packages/api/session-controller/src/types.ts`](../../../../packages/api/session-controller/src/types.ts) 拥有：
 
 ```ts
 import type { JobId } from '@deepseek-ai/dsh-jobs/brand'
 
-export interface JobView {
+export interface SessionJob {
   id: JobId
   kind: string
   label: string
   status: 'running' | 'stopping' | 'completed' | 'killed' | 'failed'
-  progress?: string
   detail?: string
   startedAt: number
   finishedAt?: number
-  output: { total: number; earliest: number; spillPaths?: string[] }
 }
 ```
 
@@ -49,9 +51,9 @@ export interface JobView {
 
 线路上的 `kind` 是 `string` 而非 `JobKind`。kind 映射由生产者插件按声明合并扩展，客户端构建无法枚举这个闭集；遇到无法识别的 kind，呈现层走一条有文档的默认分支。
 
-`output` 携带环的绝对坐标，使一行是否可观察成为名册数据而非探测读；字节本身仍走 `jobs.output`。注册表视图的两个字段被刻意省去：`owner`（帧的 `sessionId` 已经带了）与 `outputLimitBytes`（生产者拥有的模型呈现策略）。
+`JobSnapshot` 的三个字段被刻意省去：`ownerSession`（帧的 `sessionId` 已经带了）、`reported`（内部的通知投递位，对用户无意义），以及 `outputLimitBytes`（生产者拥有的模型呈现策略）。
 
-这一帧带整份快照而非增量，理由就是 [`session/queue`](../../../../packages/host/apiproxy/src/api/events.ts) 为自己写下的那条：启动、中断、结算、重连，以及第二个浏览器标签页，全都通过同一个权威值收敛。一个会话的任务集是个位数，帧很小。
+这一帧带整份快照而非增量，因此启动、中断、结算、重连，以及第二个浏览器标签页，全都通过同一个权威值收敛。一个会话的任务集是个位数，帧很小。
 
 ### 任务注册表变更订阅
 
@@ -67,42 +69,44 @@ abstract onJobsChanged(listener: JobsChangedListener): () => void
 
 `onJobDone` 不是它的子集。后者按 first-wins 语义投递终态记录和确切的 owner `Agent`，`dsh-tool-jobs` 把这套语义与 `reported` 绑在一起；`onJobsChanged` 是纯观察，不含任何投递含义，也不把任何东西标为已上报。监听器抛错被包住且从不 await，与 `onJobDone` 一致，每次注册都是调用方 fiber 上的 effect。
 
-服务销毁刻意什么都不通告。每个 `onJobsChanged` 注册都是注册表自身 fiber 上的 effect，等到 teardown 清空 store 时监听器早已消失；观察者通过自己的销毁而不是一份最终空集来得知注册表离开了。
+服务销毁逐条通告移除：注册表取消并等完自己的 job 之后，丢弃每条记录并对每个 job 发出一个 `removed` 事件，因此注册在更长命 fiber 上的订阅者看到名册逐条清空而不是留着陈旧集合（注册在注册表自身 fiber 上的订阅者此时早已消失）。
 
-### api-proxy 载体
+### Session Controller 载体
 
-`mux()` 订阅 `ctx.jobs.onJobsChanged` 并推送 `session/jobs`；订阅 baseline 紧挨着既有的 `session/subscribed` 控制帧发出，让重连的客户端在渲染前就是最新的。
+[`SessionControlController.control()`](../../../../packages/api/session-controller/src/control.ts) 先发出一份完整的 Host 范围 baseline，再发送后续 `jobs` 替换帧。每次物理重连都会打开新一代流，因此客户端会先替换进程本地镜像，再应用后续变更。
 
 载体守着四条规则：
 
-- **绝不 resume。** 变更推送用监听器给出的确切 `Agent` 调 `jobs.list(owner)`，即使该 owner 的 scope 正在拆除、按 id 查找已经查不到，它依然正确。baseline 则读 `ctx.jobs.list(ctx.agents.get(session.id))`——不触发 resume 的注册表读法，没有活体 Agent 的会话正确地只得到无主任务。两条路径都不碰 [`api-remotes` 的 Agent 解析器](../../../../packages/api/remotes/src/agent-lookup.ts)，那个解析器会把查询变成复活冷会话的副作用；列个任务不该让用户随手划过的会话活过来。
-- **无主变更要扇出。** `owner` 为 `undefined` 时向每一个已订阅会话推一份新快照，因为无主任务对所有调用方可见。
-- **保持可选。** 载体读 `ctx.get('jobs')`。没有挂注册表的组合不发任何帧，客户端也就不渲染入口——`sessionProjections` 在这个文件里已经是这个姿态。
-- **没有就不说。** baseline 只为列表非空的会话推送，客户端上键缺失即表示空列表。把列表清空的那次变更仍然推 `[]`，因为这一个转换是客户端唯一无法从「缺失」推断出来的东西。
+- **绝不 resume。** 变更推送用监听器给出的确切 `Agent` 调 `jobs.list(owner)`，即使该 owner 的 scope 正在拆除、按 id 查找已经查不到，它依然正确。baseline 则读 `ctx.jobs.list(ctx.agents.get(session.id))`，没有 live Agent 的 Session 正确地只得到无主任务。两条路径都不调用 [Session Controller Agent 解析器](../../../../packages/api/session-controller/src/agent.ts)，因为列出任务绝不能复活用户随手划过的 Session。
+- **无主变更要扇出。** `owner` 为 `undefined` 时向每一个已挂接 Session 推一份新快照，因为无主任务对所有调用方可见。
+- **保持可选。** 载体读 `ctx.get('jobs')`。没有挂注册表的组合报告空任务集，客户端也就不渲染入口。
+- **显式表示空集。** opening baseline 为每个已挂接 Session 提供一项，包括 `[]`；后续变更清空一个列表时也会推送 `[]`。客户端因此可以把空集归一化为缺失键，而不会保留陈旧行。
 
 ### 客户端镜像
 
 `SessionListState` 带有 `jobsBySession: Readonly<Record<SessionId, readonly JobView[]>>`，由 `SessionManager` 拥有，按 last-wins 从帧折叠而来；被清空的集合存为缺失的键，使「缺失」与 `[]` 成为同一种表示。
 
-它放在列表镜像而不是 `Session` 上，有三个理由：header 入口本来就通过 `useSessions` 读列表状态；没有任何东西需要 `session/queue` 那种实例化前的缓冲（没有 composer 行为依赖任务）；将来侧栏加指示器时不必再开第二条通道。
+它放在列表镜像而不是 `Session` 上，有三个理由：header 入口本来就通过 `useSessions` 读列表状态；没有 composer 行为依赖任务；将来侧栏加指示器时不必再开第二条通道。
 
-两处清理让它保持诚实。重新订阅时 manager 丢弃该会话的镜像——`session/queue` 已经遵循的规则，因为新的 baseline 正在路上，而这一世代对空集不发 baseline，被留下的列表会变成幽灵。`host/session-removed` 时再丢一次：owner 销毁在注册表侧已经移除了记录，但那件事落在 mux 流上而这一帧走 host 流，两者没有相对顺序。
+两个替换点让它保持诚实。每一代 control 流都会先清空完整任务镜像，再安装新 baseline 中的非空集合。`api-session/removed` 事件也会删除该 Session 的条目，不依赖任务注册表 disposal 通知与它之间的顺序。
 
 ### header 入口
 
-[`@deepseek-ai/dsh-client-ui-jobs`](../../../../packages/client/ui-jobs/README.zh.md) 在 `conversation.session.header.actions` 注册一个条目，排在 subagent 目录之后。呈现契约归它自己的 README；值得记在这里的决策是：会话没有任务时控件根本不渲染；活跃角标为零时省略，让只剩历史的会话保留一个安静的入口；终态行保持可见，因为失败任务的 `detail` 是其失败唯一可读之处。
+`@deepseek-ai/dsh-client-ui-jobs` 在 `conversation.session.header.actions` 注册一个条目，排在 preset 标签与 subagent 目录之间（`order: 20`，目录为 30）。呈现契约归它自己的 README；值得记在这里的决策是：会话没有任务时控件根本不渲染；活跃角标为零时省略，让只剩历史的会话保留一个安静的入口；终态行保持可见，因为失败任务的 `detail` 是其失败唯一可读之处。
 
-因此一个运行中的一次性后台 subagent 会同时出现在那里和 subagent 目录里。两者回答不同的问题——目录负责进入子会话的 transcript，而这个列表是停止控件附着的句柄——在这里屏蔽 `kind: 'subagent'` 会让这批任务没有中断入口。
+因此一个运行中的一次性后台 subagent 会同时出现在那里和 subagent 目录里。两者回答不同的问题——目录负责进入子会话的 transcript，而这个列表是中断能力唯一可能附着的句柄——在这里屏蔽 `kind: 'subagent'` 会让中断那一期恰好对这批任务没有入口。
 
 ### 刻意不做的事
 
-**没有任何 Web 路径调用 `ctx.jobs.read()`。** 它消费唯一的输出游标，浏览器读一次就悄悄拿走了模型 `job_output` 永远看不到的字节。观察通道因此落在 `jobs.output` 背后的非消费 `readAt` 上（见[输出与 kill note](2026-09-30-web-job-output-and-kill.zh.md)）；这条不变量对它同样成立，并且该有测试兜底而不是一条约定，因为故障在调用点完全不可见。
+**没有任何 Web 路径调用 `ctx.jobs.read()`。** 它消费唯一的输出游标，浏览器读一次就悄悄拿走了模型 `job_output` 永远看不到的字节。这该是一条有测试兜底的不变量而不是一条约定，因为它的故障在调用点完全不可见。
 
-**帧上不带输出字节。** 输出走 `jobs.output` 的游标拉取；帧只携带环的坐标，这正是名册行判断能否展开面板所需的全部。
+**不做中断。** 那一期欠一个 seam 当时没有回答的决策：`kill()` 会把终态投递标为已上报，所以照 `kill()` 契约写出来的人类中断，会让模型一直以为它的任务还在跑。[人工任务终止 Note](2026-08-26-human-job-kill.zh.md) 后来解决了它：`kill` 现在接受显式的 `reported` 认领，Web 停止控件传 `reported: false`，完成通知因此仍会投递。
+
+**帧上不带输出水位。** 输出那一期的增量通道才是锚点字段该出现的地方；现在加就是一个没有读者的字段。
 
 ## 备选方案
 
-**信号帧加 RPC 拉取，即 subagent 目录的形状。** 推一个无 payload 的 `jobs-changed` 信号，防抖后用一元 RPC 重读权威状态。subagent 目录就是这么做的，代价在 [`SessionManager`](../../../../packages/client/runtime/src/client/sessions/manager.ts) 里一览无余：`catalogInflight` 做单飞行、`catalogStale` 在成员帧落于请求中途时补一次尾拉、`updateCatalogActivity` 既就地打补丁又往在途请求里写一份好让比帧更旧的响应被覆盖、`parentAvailableOverride` 重放一个过期的 `false`，还有重连时逐一重拉每个打开的目录。这套装置之所以存在，是因为目录的权威被劈成两半——持久血缘来自投影，活跃度是响应时刻的采样——而任务没有持久的那一半，不该继承这份复杂度。它还恰好在输出那一期最在意的时刻失效：任务结算，输出流立即关闭，状态却要等防抖加一次往返才到，那段窗口里 UI 显示一个流已死的运行中任务。
+**信号帧加 RPC 拉取，即 subagent 目录的形状。** 推一个无 payload 的 `jobs-changed` 信号，防抖后用一元 RPC 重读权威状态。subagent 目录就是这么做的，代价在 [`SessionManager`](../../../../packages/api/session-controller/src/client/sessions/manager.ts) 里一览无余：`catalogInflight` 做单飞行、`catalogStale` 在成员帧落于请求中途时补一次尾拉、`updateCatalogActivity` 既就地打补丁又往在途请求里写一份好让比帧更旧的响应被覆盖、`parentAvailableOverride` 重放一个过期的 `false`，还有重连时逐一重拉每个打开的目录。这套装置之所以存在，是因为目录的权威被劈成两半——持久血缘来自投影，活跃度是响应时刻的采样——而任务没有持久的那一半，不该继承这份复杂度。它还恰好在输出那一期最在意的时刻失效：任务结算，输出流立即关闭，状态却要等防抖加一次往返才到，那段窗口里 UI 显示一个流已死的运行中任务。
 
 **只在弹层打开时轮询，不改 seam。** 最省事，也是唯一不碰 `JobRegistry` 的选项。它无法在不常驻轮询的前提下支持触发器上的常驻计数，而后面两期反正都需要一条真正的变更订阅，所以它省下一周又还回去。
 
@@ -118,7 +122,7 @@ abstract onJobsChanged(listener: JobsChangedListener): () => void
 
 [web e2e 场景](../../../../apps/web/tests/background-job-list.e2e.ts)是端到端的证据，且无需密钥：一次真实的 `run_in_background` bash 调用注册进 `ctx.jobs`，header 的计数与行在没有任何用户操作的情况下出现，通过注册表杀掉该任务后打开着的列表翻到生产者给出的 detail。它断言的是整条投递链路，而不是其中某一层。
 
-在它之下，[`jobs-local`](../../../../packages/jobs/jobs-local/tests/jobs.spec.ts) 钉住变更订阅的全部四个提交点、对抛错观察者的包容，以及显式销毁与 fiber 拆除两条路径上的注销；[`api-proxy-jobs`](../../../../packages/host/apiproxy/tests/api-proxy-jobs.spec.ts) 钉住「非空才发 baseline」、三次变更推送、被丢弃的内部字段、无主扇出、不 resume 的保证，以及没有注册表的组合；客户端各套件钉住 last-wins 折叠、缺失键表示、两处清理，以及组件的排序、时长与关闭行为。
+在它之下，[`jobs-local`](../../../../packages/jobs/jobs-local/tests/jobs.spec.ts) 钉住变更订阅的全部四个提交点、对抛错观察者的包容，以及显式销毁与 fiber 拆除两条路径上的注销；[`rows`](../../../../packages/api/job-controller/tests/rows.host.spec.ts) 钉住取代控制流扇出的名册流：打开时的完整可见集、每次生命周期提交后刷新一次且追加不刷新、拥有者移除，以及干净的中止；客户端各套件钉住 baseline 替换、last-wins 折叠、缺失键表示、移除清理，以及组件的排序、时长与关闭行为。
 
 ## 影响
 
@@ -130,7 +134,7 @@ abstract onJobsChanged(listener: JobsChangedListener): () => void
 
 **终态行会堆积。** 注册表把已结算任务留到 owner 销毁，所以一个跑了很多后台命令的长会话会积出长列表。如果真的成为抱怨，给终态尾巴加上限是呈现层改动而非协议改动。
 
-**`stopping` 表示一次进行中的 kill。** 模型的 `job_kill` 与列表的两段式停止都会产生它；这个状态留在联合类型里，因为拿掉它会是一次没有读者收益的线路变更。
+**`stopping` 在每条 kill 路径上都可见。** 模型的 `job_kill` 与 Web 停止控件都会产生它；从一开始就把它放进联合类型，正是人工 kill 这一期不必动线路格式的原因。
 
 **一个运行中的 subagent 有两个入口。** 这是刻意接受的，且被限制在一次性后台委派这一种情况。如果实际用起来读着像噪声，修法是呈现层的——可以让目录行引用那个任务，而不是让任务列表隐藏这个 kind。
 

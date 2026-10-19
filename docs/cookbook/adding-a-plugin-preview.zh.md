@@ -33,7 +33,7 @@ import examplePreviewZh from './assets/example-preview.zh.svg'
 ['@deepseek-ai/dsh-example-bundle', { en: examplePreview, zh: examplePreviewZh }]
 ```
 
-保留映射中必需的 `en` 和 `zh` 类型。不添加包元数据、Host 读取方法、导出的配图资源或第三方声明入口。可参考[徽章技能](../../packages/client/ui-plugin-manager/src/client/assets/badge-skill-preview.svg)和[语音输入](../../packages/client/ui-plugin-manager/src/client/assets/voice-input-preview.svg)配图。语音图中的转写文字是说明性示例，不是录音结果。
+保留映射中必需的 `en` 和 `zh` 类型。不添加包元数据、Host 读取方法、导出的配图资源或第三方声明入口。可参考映射中徽章技能与语音输入配图。语音图中的转写文字是说明性示例，不是录音结果。
 
 ## 4. 保持页面契约
 

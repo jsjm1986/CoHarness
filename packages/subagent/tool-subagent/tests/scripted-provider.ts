@@ -16,7 +16,7 @@ const DEFAULT_CAPABILITIES: SubagentCapabilities = {
   agentOptions: true,
   agentPreset: false,
   outputSchema: true,
-  depthLimit: true,
+  depthLimit: true, toolFilter: false, persona: false,
 }
 
 /** Options for one scripted provider fixture. */
@@ -89,6 +89,7 @@ class ScriptedSubagentProvider implements SubagentProvider {
 
     return {
       id: SessionId(`scripted-subagent:${this.name}:${request.parent.id}:${++this.started}`),
+      localAgent: undefined,
       result,
       dispose(): Promise<void> {
         state.cancelled = true

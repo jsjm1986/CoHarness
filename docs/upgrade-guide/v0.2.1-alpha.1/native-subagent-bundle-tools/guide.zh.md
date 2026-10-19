@@ -28,4 +28,4 @@ description: "Claude Code 与 Codex bundle 添加全局委派工具，同时保�
 3. 如果手动的 Host 行注册了同名工具，移除该重复行，或禁用 bundle 的贡献行。在 Session 中验证有效工具目录。
 4. 插件客户端收到必填的 `BundleInfo.official` 和 `BundleInfo.availability` 字段；详情 slot 的 `PluginPackageRef` 也会收到它们。`official` 标识项目维护，`availability` 表示 `installation`、`profile` 或 `missing`，`installed` 仍表示 profile 的依赖声明。只展示已有字段的详情 slot 读取方无需修改；构造方和精确校验器必须包含新增字段。可选的 `installTarget` 标识所提供的版本及注册表或本地链接 spec。
 
-**其他 profile。** 这些 bundle 层只插入 Host 行，因此 headless、SDK、ACP 和自定义 profile 也可以选择它们。保留提供方包而不选择其 bundle 的 profile，可以参考 [Codex](../../../../packages/subagent/subagent-codex/README.zh.md#exposing-the-tool) 或 [Claude Code](../../../../packages/subagent/subagent-claude-code/README.zh.md#exposing-the-tool) 示例组合相同的行。
+**其他 profile。** 这些 bundle 层只插入 Host 行，因此 headless、SDK、ACP 和自定义 profile 也可以选择它们。保留提供方包而不选择其 bundle 的 profile，可以参考 [Codex](../../../../packages/subagent/subagent-codex/README.zh.md#capabilities-and-context) 或 [Claude Code](../../../../packages/subagent/subagent-claude-code/README.zh.md#capabilities-and-context) 示例组合相同的行。

@@ -1,62 +1,6 @@
 /** Native namespace mocks shared by local callers and the Connection carrier. */
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import type { RemoteResult, TypertRemoteNamespace } from '@deepseek-ai/dsh-typert-protocol'
-import { RemoteMock, frames, ok, openStream, type StreamHandle } from '../src/index.ts'
-
-/**
- * Wire endpoints this spec scripts. The Host registers `settings/*` and
- * `session/*` through the gateway rather than a generated contribution in this
- * program, so the spec declares the namespaces it drives — the same fixture
- * pattern `gateway.client.spec.ts` uses for `probe`.
- */
-declare module '@deepseek-ai/dsh-typert-protocol' {
-  interface TypertRemoteMap {
-    'settings/describe': (signal?: AbortSignal) => Promise<RemoteResult<SettingsDocumentFixture>>
-    'settings/mutate': (
-      ns: string,
-      operations: readonly SettingsOperationFixture[],
-      expectedRevision: number,
-      signal?: AbortSignal,
-    ) => Promise<RemoteResult<SettingsMutationFixture>>
-    'session/control': (signal?: AbortSignal) => AsyncIterable<SessionControlFixture>
-  }
-
-  interface TypertRemoteNamespaceMap {
-    settings: TypertRemoteNamespace<'settings'>
-    session: TypertRemoteNamespace<'session'>
-  }
-}
-
-/** Minimal `settings/describe` document payload. */
-interface SettingsDocumentFixture {
-  readonly writable: boolean
-  readonly hasDocument: boolean
-  readonly namespaces: readonly unknown[]
-}
-
-/** Minimal `settings/mutate` path operation. */
-interface SettingsOperationFixture {
-  readonly op: string
-  readonly path: readonly string[]
-  readonly value: unknown
-}
-
-/** Minimal `settings/mutate` namespace view. */
-interface SettingsMutationFixture {
-  readonly ns: string
-  readonly schema: Record<string, unknown>
-  readonly value: unknown
-  readonly autoGenerate: boolean
-  readonly applies: string
-  readonly secrets: readonly unknown[]
-  readonly revision: number
-}
-
-/** Minimal `session/control` frame. */
-interface SessionControlFixture {
-  readonly type: string
-  readonly value: unknown
-}
+import { RemoteMock, frames, ok, openStream, streamHandle, type StreamHandle } from '../src/index.ts'
 
 const describeValue = (hasDocument: boolean) => ok({ writable: true, hasDocument, namespaces: [] })
 const baseline = { type: 'baseline' as const, value: { projections: {} } }
@@ -65,11 +9,6 @@ async function drain(source: AsyncIterable<unknown>): Promise<unknown[]> {
   const values: unknown[] = []
   for await (const value of source) values.push(value)
   return values
-}
-
-/** The rpc.stream face wraps items in result envelopes; unwrap for value assertions. */
-async function drainValues(source: AsyncIterable<unknown>): Promise<unknown[]> {
-  return (await drain(source)).map(item => (item as { ok: true; value: unknown }).value)
 }
 
 describe('RemoteMock.remote unary proxies', () => {
@@ -88,7 +27,7 @@ describe('RemoteMock.remote unary proxies', () => {
       expect(await Promise.resolve(value)).toBe(value)
     }
     expect(describe).not.toHaveBeenCalled()
-    expect(mock.endpoints()).toEqual(['events.host', 'events.mux', 'host.describe', 'settings/describe'])
+    expect(mock.endpoints()).toEqual(['$events', 'settings/describe'])
     expect(mock.log.calls()).toEqual([])
     expect(mock.log.streams()).toEqual([])
     expect(mock.log.unmatched()).toEqual([])
@@ -248,9 +187,9 @@ describe('RemoteMock.remote stream proxies', () => {
     const control = mock.remote.session.control
     const request = { after: 7 }
     const local = control(localController.signal)[Symbol.asyncIterator]()
-    const wire = mock.rpc.stream!('/api', 'session/control', { args: [request] }, wireController.signal)[Symbol.asyncIterator]()
+    const wire = mock.rpc.open!('/api', 'session/control', { args: [request] }, wireController.signal)[Symbol.asyncIterator]()
     await expect(local.next()).resolves.toEqual({ value: baseline, done: false })
-    await expect(wire.next()).resolves.toEqual({ value: { ok: true, value: baseline }, done: false })
+    await expect(wire.next()).resolves.toEqual({ value: baseline, done: false })
     expect(control.mock.calls).toEqual([[localController.signal], [request, wireController.signal]])
     expect(script.mock.calls.map(([args]) => args)).toEqual([[], [request]])
     expect(signals).toHaveLength(2)
@@ -292,10 +231,11 @@ describe('RemoteMock.remote stream proxies', () => {
       yield baseline
     }
     const generator = response()
+    const native = streamHandle(generator)
     onTestFinished(async () => { await generator.return(undefined) })
-    control.mockReturnValueOnce(generator)
+    control.mockReturnValueOnce(native)
     const overridden = mock.open('session/control', [], signal)
-    expect(overridden).toBe(generator)
+    expect(overridden).toBe(native)
     await expect(mock.streams.drained('session/control')).resolves.toBeUndefined()
     expect(consumed).toBe(false)
     expect(control.mock.calls).toEqual([[signal]])
@@ -304,7 +244,7 @@ describe('RemoteMock.remote stream proxies', () => {
     expect(consumed).toBe(true)
 
     control.mockReset()
-    await expect(drainValues(mock.rpc.stream!('/api', 'session/control', { args: [] }, signal))).resolves.toEqual([baseline])
+    await expect(drain(mock.rpc.open!('/api', 'session/control', { args: [] }, signal))).resolves.toEqual([baseline])
     await expect(mock.streams.opened('session/control', 1)).resolves.toBeUndefined()
     await expect(mock.streams.drained('session/control')).resolves.toBeUndefined()
     expect(mock.remote.session.control).toBe(control)

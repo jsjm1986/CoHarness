@@ -12,7 +12,7 @@ PDF 转换会丢失工作表导航以及公式与已保存值之间的关系。�
 
 ## 决策
 
-[文档预览](../../../../packages/client/ui-sidebar-documentpreview/README.zh.md#excel-preview)使用 FortuneSheet 与包内 ExcelJS、SheetJS CE 和 PapaParse 适配层打开 XLSX、XLS、CSV 和 TSV。适配层接收字节、格式和限制并返回工作表数据，不包含 React 状态设置器、计时器或组件引用。依赖库负责文件解析，适配层复用显示格式化和初始选区，不引入另一种工作簿模型。CSV/TSV 保留字面字符串和纯文本选项；隐式类型推断可能丢失前导零或把源文本解释为公式。共享文档读取器调用 `remote.workspaceFiles.readBytes(sessionId, path, {}, signal)`，并通过二进制 Remote 直接接收原生字节，保留 Session 授权、文件版本、重新载入和临时字节，无需 base64 解码。Workspace Files 负责有界文件读取，格式解析留在 Client。注册仅将 XLSX/XLS 标为 `binaryExtensions`，共享文档容器因此为 CSV/TSV 提供纯文本选项。每个渲染器以自己的 id 注册正文。
+文档预览使用 FortuneSheet 与包内 ExcelJS、SheetJS CE 和 PapaParse 适配层打开 XLSX、XLS、CSV 和 TSV。适配层接收字节、格式和限制并返回工作表数据，不包含 React 状态设置器、计时器或组件引用。依赖库负责文件解析，适配层复用显示格式化和初始选区，不引入另一种工作簿模型。CSV/TSV 保留字面字符串和纯文本选项；隐式类型推断可能丢失前导零或把源文本解释为公式。共享文档读取器调用 `remote.workspaceFiles.readBytes(sessionId, path, {}, signal)`，并通过二进制 Remote 直接接收原生字节，保留 Session 授权、文件版本、重新载入和临时字节，无需 base64 解码。Workspace Files 负责有界文件读取，格式解析留在 Client。注册仅将 XLSX/XLS 标为 `binaryExtensions`，共享文档容器因此为 CSV/TSV 提供纯文本选项。每个渲染器以自己的 id 注册正文。
 
 预览为只读，同时保留公式文本与已保存结果。它不重新计算，因此不受支持的函数不会用错误覆盖有效的已保存结果。没有已保存结果的公式保持为空。包含公式的工作簿会在公式图标旁显示紧凑提示，不再用整行提示占用工作表高度。该表格既不是编写工具，也不是完整的 Excel 渲染引擎。
 

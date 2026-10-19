@@ -9,16 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../client/connection/tsconfig.client.json"
-    },
-    {
-      "path": "../../host/apiproxy"
-    },
-    {
       "path": "../../typert/protocol"
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../client/connection/tsconfig.client.json"
     }
   ]
 }

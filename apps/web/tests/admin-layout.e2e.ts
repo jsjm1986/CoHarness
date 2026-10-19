@@ -41,6 +41,8 @@ it('keeps admin form controls aligned inside their sections', async () => {
   const root = await mkdtemp(join(tmpdir(), 'admin-layout-'))
   const cleanup: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
   try {
+    // gateway/ is an independent npm project; its dependencies' types are absent from this program.
+    // oxlint-disable-next-line typescript/no-unsafe-assignment, typescript/no-unsafe-call, typescript/no-unsafe-member-access
     const db = openDb(join(root, 'gateway.sqlite')); cleanup.push(() => db.close())
     const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_STATE_ROOT: join(root, 'state') })
     await mkdir(cfg.projectsRoot, { recursive: true })

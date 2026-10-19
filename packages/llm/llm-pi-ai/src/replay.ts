@@ -19,7 +19,7 @@ export type PiAiReplayBlock =
   | { type: 'tool-call'; thoughtSignature?: string; namespace?: string }
 
 /** Versioned response-level half of the pi-ai replay envelope. */
-export interface PiAiReplayResponse {
+export type PiAiReplayResponse = {
   kind: 'pi-ai'
   version: 2
   api: Api
@@ -35,7 +35,7 @@ export interface PiAiReplayResponse {
 }
 
 /** The validated halves of one pi-ai replay envelope. */
-interface PiAiReplayState {
+type PiAiReplayState = {
   response: PiAiReplayResponse
   blocks: PiAiReplayBlock[]
 }

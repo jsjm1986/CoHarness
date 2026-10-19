@@ -61,6 +61,33 @@ interface PendingModule {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxconfigeditor--configeditor"></a>
+
+### `ctx.configEditor` — `ConfigEditor`
+
+Persist complete raw configs and apply them through the normal Loader path.
+
+```ts cordis-catalog
+/** Addressable profile rows; nested Includes have independent configuration ownership.
+ * @returns Active entries with unique profile patch ids.
+ */
+entries(): Entry[]
+
+/** Read inherited and explicit profile values for the active entries.
+ * @returns Detached layer values alongside their Loader entries.
+ */
+configuration(): Array<{ entry: Entry; inherited: Record<string, unknown>; override: Record<string, unknown> }>
+
+/** Validate, persist, and reconcile a plugin's next config; ordinary fields keep normal lifecycle rules.
+ * @param entry Current Loader entry, also used to detect replacement during the write.
+ * @param change Derive a raw config from the current entry and its inherited layer.
+ * @returns Fulfillment after Loader reconciliation completes.
+ */
+async edit( entry: Entry, change: (current: Record<string, unknown>, inherited: Record<string, unknown>) => Record<string, unknown>, ): Promise<void>
+```
+
+Source: [`packages/boot/config-editor/src/index.ts`](../../packages/boot/config-editor/src/index.ts)
+
 <a id="ctxhmr--hmr"></a>
 
 ### `ctx.hmr` — `Hmr`

@@ -47,7 +47,7 @@ session 组让对话持久保存，恢复已发布的日志格式，并使已提
 | [`session-title/`](session-title/README.zh.md) | 负责标题状态、回退行为、提供方注册与刷新 | `ctx.sessionTitle` |
 | [`session-title-llm/`](session-title-llm/README.zh.md) | 提供共享的模型标题生成能力 | — |
 | [`session-title-first-prompt-llm/`](session-title-first-prompt-llm/README.zh.md) | 根据第一条合格的人类消息生成会话标题 | 注册到 `ctx.sessionTitle` |
-| [`session-title-all-prompts-llm/`](session-title-all-prompts-llm/README.zh.md) | 根据所有合格的人类消息生成会话标题 | 注册到 `ctx.sessionTitle` |
+| [`session-title-all-prompts-llm/`](../experimental/session-title-all-prompts-llm/README.zh.md) | 根据所有合格的人类消息生成会话标题 | 注册到 `ctx.sessionTitle` |
 
 部署可以注册一个模型驱动提供方；未注册时，服务仍保留确定性回退机制。
 

@@ -146,7 +146,6 @@ Host 擦除可擦除类型，在配置的执行世界中解析可执行文件与
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -156,7 +155,6 @@ Host 擦除可擦除类型，在配置的执行世界中解析可执行文件与
 
 不直接失效；具名消费方负责请求前缀的任何变更。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>

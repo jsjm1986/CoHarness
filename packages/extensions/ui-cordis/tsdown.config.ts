@@ -1,3 +1,4 @@
 import { clientBundle } from '../../client/tsdown.client.ts'
 
-export default clientBundle(import.meta.dirname, ['lib/types/index.js'])
+export default clientBundle(
+  '@deepseek-ai/dsh-client-ui-cordis', ['lib/types/index.js'])

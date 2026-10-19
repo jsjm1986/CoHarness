@@ -9,7 +9,10 @@
   ],
   "references": [
     {
-      "path": "../../context/execution-authority"
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/cordis"
     },
     {
       "path": "../../core/agent"
@@ -21,22 +24,10 @@
       "path": "../../core/system-prompt"
     },
     {
-      "path": "../../core/tools"
+      "path": "../../session/session-projection"
     },
     {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../session/working-directory"
-    },
-    {
-      "path": "../subagent"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../bundle/web-app"
     }
   ]
 }

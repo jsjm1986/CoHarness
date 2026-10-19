@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../boot/cmdline"
     },
     {
@@ -30,13 +39,7 @@
       "path": "../../session-query/session-query"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../../subagent/subagent"
     }
   ]
 }

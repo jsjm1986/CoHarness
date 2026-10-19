@@ -57,6 +57,7 @@ export const sessionEventSchema = z.object({
 /** SessionSummary row of session.list (`projections` reuses the history block's shape and schema). */
 export const sessionSummarySchema: z.ZodType<Wire<SessionSummary>> = z.object({
   sessionId: sessionIdSchema,
+  agentAvailable: z.boolean(),
   updatedAt: z.number(),
   running: z.boolean(),
   blank: z.boolean(),

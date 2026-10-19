@@ -17,9 +17,13 @@ Archived: 2026-09-30
 
 继续执行管理器自己投递这份记账，就在结束 Activation 的那笔 dispose 事务内部完成。
 
-当驻留 Activation 结算时，`notifySettlement()` 解析该 child 持久化的直接父级，并向它发送一条用户角色消息：先是父级可据以行动的一句结果说明，然后是 child 的最终 assistant 内容，或一句说明它没有产出内容。对每个调用方真正拿到过 id 的 child，投递都是无条件的。它不查询 child 是否上报过，也不保留任何可能让这项承诺变成有条件的记账——正是这种无条件性，才让 `tool-subagent` 能够承诺一条包含结局与可能存在的最终 assistant 消息的运行时通知。在第一条消息被接受之前就回滚的物化保持静默，因为调用方已被告知该 child 未建立。
+当驻留 Activation 结算时，`notifySettlement()` 解析该 child 持久化的直接父级，并向它发送一条用户角色消息：先是父级可据以行动的一句结果说明，然后是 child 最终 assistant 输出中的文本，或一句说明它没有产出收尾文本。对每个调用方真正拿到过 id 的 child，投递都是无条件的。它不查询 child 是否上报过，也不保留任何可能让这项承诺变成有条件的记账——正是这种无条件性，才让 `tool-subagent` 能够承诺一条包含 `its outcome and any final assistant message` 的运行时通知。在第一条消息被接受之前就回滚的物化保持静默，因为调用方已被告知该 child 未建立。
 
-### 来源类型
+### 收尾文本
+
+[`createSettlementMessage()`](../../../../packages/subagent/subagent/src/continuation-messages.ts) 在创建用户角色通知前，将选中的 assistant 输出投影为非空文本块。它保留文本字节与块顺序，排除所有非文本块，并在没有剩余非空文本时使用 `It left no closing message.`。纯文本通知适用于不同的父级提供方，不依赖它们对特定内容类型的支持。例如，推理与工具调用不能出现在 DeepSeek Messages 的用户消息中；Messages 接受图片，但并非每个父级模型都支持图片。这项转换归通知构建所有；`AssistantOutputFold`、`SubagentResult.output` 与 `subagent/end.lastAssistantMessage` 为 SDK 和 UI 消费方保留完整的子级输出。
+
+### 来源信息
 
 该通知携带 `{ kind: 'subagent-settled', form: 'notice', summary, senderSessionId }`，刻意不复用 `send_message` 使用的 `agent-message` kind。Agent 消息是 child 选择的内容；这条消息则是运行时在陈述这个 child 后来怎样了。把两者合并会把 child 从未写过的话算到它头上，也会让持久化日志无法区分「child 说它做完了」和「harness 观察到它停下了」。`notice` 形态还为 UI 提供了这条消息想要的折叠单行呈现，而 `relay` 会把 Agent 往来消息呈现为通信。
 
@@ -27,11 +31,15 @@ Archived: 2026-09-30
 
 外部 `ctx.on('subagent/end')` listener 看起来更解耦，但它是错的。`SubagentRunEndInfo` 不指名父级；该边触发时 child handle 已被 dispose，因此无法从中恢复父级；而唤醒父级自身结算 watcher 的所有权释放也已经执行过了。管理器在整个 dispose 过程中都持有父级引用，因此这些障碍对它都不存在。
 
-**发送发生在 `releaseOwnership` 之前。** 此刻父级仍然计入这个 child，因此 `stateOf(parent)` 为 `waiting`，父级在结构上不可能被判定为已结算。改在释放之后投递，则会与一个在下一个 microtask 恢复的 watcher 竞争：它会发现自己没有 child 且处于静止，于是 dispose 一个 Agent，而该 Agent 的 `cancel()` 会清空正装着这条通知的那个 inbox。失效表现是一条静默丢失的消息，任何地方都不会报错。
+**发送发生在 `releaseOwnership` 之前。** 此刻 parent 的 owned-child set 仍然包含这个 child，因此结算判据不可能成立。改在释放之后投递，则会与一个在下一个 microtask 恢复的 watcher 竞争：它会发现自己没有 child 且处于静止，于是 dispose 一个 Agent，而该 Agent 的 `cancel()` 会清空正装着这条通知的那个 inbox。失效表现是一条静默丢失的消息，任何地方都不会报错。
 
-**驻留父级通过 `admitWaking` 接收它。** 在同步发送之前登记消息 id，正是让 `followup()` 与承认它的那个 microtask 之间的窗口不被读作静止的原因。这不是对第一条规则的多余保险：`Agent.status` 会把上下文维护折叠成 `idle`，而维护期间的唤醒发送只会预置一次延后唤醒，因此正在压缩上下文的父级，在所有权释放落地的那一刻会同时被 `status` 与已拥有 child 集合判定为静止。
+**驻留 parent 通过私有 `SubagentInbox` 接收它。** 包装层会在同步唤醒发送前立即检查 Activation 的 closing promise，manager 则会在返回前更新 wake generation。最终结算决策会在 child lock 内重新检查该 generation、Session 序号、待处理 Inbox 与 owned-child set，再通过 `runMaintenance()` 占用 Agent 的 idle 阶段，然后关闭准入。这并非对第一条规则的重复保护：`Agent.status` 会把 context maintenance 折叠成 `idle`，而 maintenance 期间的唤醒发送只会预置一次延后唤醒。
 
 两条规则都有测试固定：把顺序反转或去掉记账，测试就会失败。
+
+### 建立期间保持所有权敞开
+
+被持有子代的记账同样守护创建侧：`holdOwnership()` 会在建立或恢复的各个 await（持久化 stat、提供方准备、实体化）之前，把子代 id 预先登记进由续接管理的父代持有集合，因此当调用方仍在创建或恢复某个子代时，空闲的父代不会被判定为已结算——若在结算之后才接纳投递，将会遇到过期的父代身份。返回的释放器只服务失败路径：它只移除本次调用添加的持有；一旦该子代存在活跃 Activation，所有权边就归属于该 Activation 与 `finishDisposal` 的 `releaseOwnership`。没有 Activation 的父代不需要持有（只有本管理器会结算父代），而自身 dispose 事务已经打开的父代会以 `ACTIVATION_CLOSING` 拒绝，而不是建立一个永远无法收到投递的子代。
 
 ### 调度
 
@@ -59,7 +67,7 @@ Archived: 2026-09-30
 
 三个整体组装的 ACP 场景覆盖该通知：一个不发送消息的 child、一个先发送消息的 child，以及一个被多轮 Agent 消息驱动的 child。三者都需要显式栅栏。通知在 child 拆卸完成后才到达，会与父级当时正在做的事竞争，因此每个场景都会把 child 保持到父级启动轮次结束，再等待该通知开启的那个父级轮次（先 `waitForTurnStart` 到该轮次，再 `waitForTurnEnd`），然后脚本才继续。等待一个运行并未被栅栏保证会产生的轮次不算覆盖：一旦通知落进已经在跑的那个轮次，它就是一次超时。
 
-`subagent-continuable` 是其中固定失败结局的那个。它的 child 最后一个轮次在被强制的持久化检查点上死亡，且未进入任何 step，因此该 transcript 正是上面那条终止原因规则的端到端可见之处：通知说该 child **失败**，把此前的 `SECOND_OK` 作为它最后产出的内容而非结果携带，而父级自己的确认轮次会到达 ACP 客户端。
+`subagent-continuable` 固定了 SDK 中已完成的结算：父级通知包含 `SECOND_OK`，但不含子级推理；子级在第 1 轮结束，因此未覆盖已配置的第 3 轮检查点失败。
 
 另有一个无密钥的 headless Loader 快照端到端覆盖用户可见路径。其重放父级省略 `run_in_background` 以覆盖可继续后台默认路径，从不调用 `list_agents`、`send_message` 或 Task 工具，消费管理器写入的 `subagent-settled` 通知，并给出最终答案。child 不发送 Agent 消息，因此该 transcript 只依赖运行时通知。一个仅用于测试的 Loader 栅栏会把父级启动后的请求保持到真实管理器通知进入其 inbox 为止，从 transcript 中排除平台调度差异，但不会伪造该通知。
 
@@ -80,6 +88,10 @@ Archived: 2026-09-30
 **修改 `subagent/end` 让它携带父级，由插件负责投递。** 那会为一个包内消费者拓宽已发布的 payload，保留全部顺序风险，并让返回通道重新变成可选插件。以 `terminal(failure)` 扩展包私有的 `ActivationObserver`，则只保留一处终止事实的计算，且不改动任何公开面。
 
 **始终使用 `followup`。** 更简单也更统一，但一批同时结算的 child 会各自消耗一个父级轮次。step 边界的批量语义本来就存在，用它是免费的。
+
+**过滤规范的子级输出。** 在 `AssistantOutputFold` 中删除非文本块，会丢弃 SDK 和 UI 消费方需要的 assistant 内容。只有父级通知需要文本投影。
+
+**依赖序列化器容错来构建通知。** 通知构建提供每种父级提供方都能表示的文本；适配器过滤不能替代生产方的责任。[已保存输入兼容决策](../bug-fix/2026-09-18-messages-input-history-compatibility.zh.md)取代了对已记录通知进行 Messages 输入过滤的拒绝，因为生产方修复无法改变这些通知。
 
 ## 后果
 

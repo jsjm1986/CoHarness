@@ -51,6 +51,26 @@ export function shallowEqual(a: unknown, b: unknown): boolean {
   return shallow(a, b)
 }
 
+/**
+ * Notify an observer set without allowing one callback to starve the rest.
+ * @param listeners - current observer callbacks; copied before dispatch.
+ * @param label - diagnostic owner prefix.
+ * @param args - callback arguments.
+ */
+export function notifySubscribers<Args extends readonly unknown[]>(
+  listeners: Iterable<(...args: Args) => void>,
+  label: string,
+  ...args: Args
+): void {
+  for (const listener of [...listeners]) {
+    try {
+      listener(...args)
+    } catch (error) {
+      console.error(`${label} subscriber failed:`, error)
+    }
+  }
+}
+
 /** Batches subscriber notification into one flush per animation frame. */
 function rafBatch(notify: () => void): () => void {
   // Fall back to microtask batching where rAF is absent (node unit tests);

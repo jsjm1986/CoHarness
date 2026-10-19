@@ -64,6 +64,6 @@ The existing [3,000-Session corpus lane](../testing/2026-09-28-session-corpus-pe
 
 ## Consequences
 
-[Controlled-clock tests](../../../../packages/api/session-controller/tests/list-scheduling.host.spec.ts) require cheap rows to remain in one synchronous slice, budget exhaustion and post-wait reset to govern yields, and cancellation to stop work even when no yield is due. They also preserve stable ties and attachment/removal/status interleavings. The time-based benchmark guard rejects unyielded or first-only-yield heavy work without forbidding efficient batches.
+Controlled-clock tests require cheap rows to remain in one synchronous slice, budget exhaustion and post-wait reset to govern yields, and cancellation to stop work even when no yield is due. They also preserve stable ties and attachment/removal/status interleavings. The time-based benchmark guard rejects unyielded or first-only-yield heavy work without forbidding efficient batches.
 
 A single row, provider enumeration, GC, final sorting and serialization can exceed the target. Concurrent lists and operating-system scheduling also affect latency. The budget is not a hard global bound, and these measurements do not claim browser paint or model/network latency improvements.

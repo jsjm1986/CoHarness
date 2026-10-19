@@ -16,6 +16,7 @@ import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS, PendingWait,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { RpcId } from '@deepseek-ai/dsh-client-connection/client'
+import { SessionRequestId } from '@deepseek-ai/dsh-session/types'
 import type {
   ChatNode, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -747,7 +748,7 @@ describe('ChatView', () => {
   })
 
   it('renders a pending submission once and hides it when the durable rpcId arrives', () => {
-    const requestId = RpcId('pending-chat')
+    const requestId = SessionRequestId('pending-chat')
     const h = makeHarness({
       pendingSubmissions: [{
         requestId,
@@ -769,9 +770,9 @@ describe('ChatView', () => {
   it('keeps queued submission echoes out of Chat while retaining transcript and steering placements', () => {
     const h = makeHarness({
       pendingSubmissions: [
-        { requestId: RpcId('queued-echo'), placement: 'queued', time: 1, text: 'queued echo', images: [] },
-        { requestId: RpcId('steering-echo'), placement: 'steering', time: 2, text: 'steering echo', images: [] },
-        { requestId: RpcId('transcript-echo'), placement: 'transcript', time: 3, text: 'transcript echo', images: [] },
+        { requestId: SessionRequestId('queued-echo'), placement: 'queued', time: 1, text: 'queued echo', images: [] },
+        { requestId: SessionRequestId('steering-echo'), placement: 'steering', time: 2, text: 'steering echo', images: [] },
+        { requestId: SessionRequestId('transcript-echo'), placement: 'transcript', time: 3, text: 'transcript echo', images: [] },
       ],
     })
     const view = render(<h.ChatView {...h.props} />)
@@ -782,7 +783,7 @@ describe('ChatView', () => {
   })
 
   it('keeps a transcript echo mounted while the Host queue still holds its row', () => {
-    const requestId = RpcId('queued-transcript')
+    const requestId = SessionRequestId('queued-transcript')
     const h = makeHarness({
       queue: [{
         id: 'occ-q' as never, messageId: 'msg-q' as never,
@@ -799,7 +800,7 @@ describe('ChatView', () => {
   })
 
   it('suppresses a Host steering row while the local echo for its rpcId still renders', () => {
-    const requestId = RpcId('steer-echo-held')
+    const requestId = SessionRequestId('steer-echo-held')
     const h = makeHarness({
       queue: [{
         id: 'occ-s' as never, messageId: 'msg-s' as never,

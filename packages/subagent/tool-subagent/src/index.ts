@@ -24,6 +24,12 @@ import {
 } from '@deepseek-ai/dsh-subagent'
 import type { SubagentProvider, SubagentResult, SubagentRun } from '@deepseek-ai/dsh-subagent'
 import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
+
+declare module '@deepseek-ai/dsh-jobs' {
+  interface JobKindMap {
+    subagent: 'subagent'
+  }
+}
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import {
   assertAllowedModelSelection,

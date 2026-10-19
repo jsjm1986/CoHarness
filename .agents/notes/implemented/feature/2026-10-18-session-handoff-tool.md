@@ -10,7 +10,7 @@ English | [中文](2026-10-18-session-handoff-tool.zh.md)
 
 ## Decision
 
-[handoff.ts](../../../../packages/session-query/tool-session-query/src/handoff.ts) adds a sixth model-facing tool, `session_handoff`, on the same authorization and timeout rails as the existing five. The local projection reads the authorized session's current surface once, keeps direct user and assistant conversation plus compact checkpoints, drops tool calls, reasoning, injected context, and other surfaces, then serializes the newest-first tail under a `handoffChars` budget so the briefing always opens at the latest state.
+handoff.ts adds a sixth model-facing tool, `session_handoff`, on the same authorization and timeout rails as the existing five. The local projection reads the authorized session's current surface once, keeps direct user and assistant conversation plus compact checkpoints, drops tool calls, reasoning, injected context, and other surfaces, then serializes the newest-first tail under a `handoffChars` budget so the briefing always opens at the latest state.
 
 When an `llm` service and a routing target both resolve and `handoffExtraction` is on, the serialized conversation under `handoffExtractChars` goes to one auxiliary `session-handoff` request whose prompt asks for goal, decisions, files, state, and next step. Every failure mode — extraction disabled, oversized surface, missing service, empty capsule, request failure — returns the bounded local tail instead, so the tool never depends on the auxiliary path. `handoffTimeoutMs` covers projection and extraction together; the target session id revalidates after the read like every other operation.
 

@@ -9,19 +9,10 @@
   ],
   "references": [
     {
-      "path": "../locale"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../runtime"
-    },
-    {
-      "path": "../ui-conversation"
-    },
-    {
-      "path": "../ui-primitives"
-    },
-    {
-      "path": "../ui-slots"
+      "path": "../../api/session-controller/tsconfig.client.json"
     },
     {
       "path": "../../core/session"
@@ -33,7 +24,27 @@
       "path": "../../workflow/workflow"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../locale"
+    },
+    {
+      "path": "../runtime"
+    },
+
+    {
+      "path": "../ui-conversation"
+    },
+    {
+      "path": "../ui-primitives"
+    },
+    {
+      "path": "../ui-renderer"
+    },
+
+    {
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../ui-workspace"
     }
   ]
 }

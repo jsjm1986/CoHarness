@@ -12,7 +12,7 @@ Status: implemented
 
 随附 headless 组合包禁用 base 中的 `credentials`、`authorization` 和 `deepseek-account` 行。API 密钥适配器已经支持不挂载凭据服务的组合，按启动快照解析：进程环境、运行命令的目录 `.env`、Harness home `.env`。该 profile 不读取、迁移、写入或删除 `.credentials.yaml`。显式禁用依赖它的 authorization 和 account 行，避免普通任务输出等待服务的警告。
 
-这部分取代了已保存凭据优先级中针对随附 headless profile 的单次覆盖策略。其他 profile，以及显式恢复存储的 headless，仍按已保存凭据优先解析。headless [README](../../../../packages/bundle/headless/README.zh.md#credentials)负责恢复 patch 的用法。
+这部分取代了已保存凭据优先级中针对随附 headless profile 的单次覆盖策略。其他 profile，以及显式恢复存储的 headless，仍按已保存凭据优先解析。headless [README](../../../../packages/bundle/headless/README.zh.md)负责恢复 patch 的用法。
 
 ## 考虑过的替代方案
 

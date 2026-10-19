@@ -22,10 +22,6 @@ kind: "package-reference"
 
 -----
 
-控制器将窗格带 runtime 限定的 Session 键解码为原始 Host ID 和显式 runtime 目标。`HEAD` 预检与浏览器保存使用同一个固定账号的 URL，其他标签页切换账号或作用域不能重定向待执行的下载。
-
-Host 下载端点会在 `readRaw` 前 flush 活动的根 Session，因此斜杠命令触发的 ZIP 会包含启动下载的 `command/run` 与 `command/done` 事件对。冷持久化 Session 不需要 flush。
-
 <a id="use-this-package"></a>
 ## 使用本包
 
@@ -81,7 +77,7 @@ Web bundle 将本包与 Connection、`dsh-commands`、`dsh-client-ui-commands` �
 
 ### 设计拆分
 
-本包分为两部分。Host 半包（[`src/index.ts`](src/index.ts)）注册 `/export` 命令；有界 ZIP 流及其 `GET`/`HEAD /api/session.export` 路由由 API 层持有。浏览器半包（[`src/client/index.ts`](src/client/index.ts)）提供共享下载控制器和 UI，并观察 `command/executed`，因此只有提交命令的浏览器会启动下载。
+本包分为两部分。Host 半包（[`src/index.ts`](src/index.ts)）注册 `/export` 命令，并在 [`src/routes.ts`](src/routes.ts) 中持有共享的 `/api/session.export` 路径常量；Host API Proxy（[`apiproxy`](../../host/apiproxy/README.zh.md)）提供该路由并构建有界 ZIP 流。浏览器半包（[`src/client/index.ts`](src/client/index.ts)）提供共享下载控制器和 UI，并观察 `command/executed`，因此只有提交命令的浏览器会启动下载。
 
 Header 的更多操作入口使用公共紧凑 Button，点击区域为 28px 正方形，与右侧栏展开控件共用圆角和 hover 底色。
 
@@ -124,8 +120,10 @@ Host 路由是由该功能拥有的精确 Fetch 路由贡献。Connection 应用
 
 无。仅日志命令生命周期与浏览器下载不会改变派生请求前缀。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
+
+<a id="known-limitations-and-deferred-work"></a>
+
 
 这些限制说明本包何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是任务积压。
 

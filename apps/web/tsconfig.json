@@ -27,6 +27,13 @@
     "tests/server-restart.e2e.ts",
     "tests/default-product-isolation.e2e.ts",
     "tests/scaffold.ts",
+    "tests/notice-wake-tail.e2e.ts",
+    "tests/chat-flow-layout.e2e.ts",
+    "tests/aria-normalize.spec.ts",
+    "tests/schedule-header.e2e.ts",
+    "tests/layout-bottom.e2e.ts",
+    "tests/jobs-menu-layering.e2e.ts",
+
     "tests/expected.ts",
     "tests/scaffold-hermetic.e2e.ts",
     "tests/startup-rpc-budget.e2e.ts",

@@ -192,7 +192,7 @@ const activeTabId = globalThis.__activeTabId   // every tab reads the same value
 展示资源的元素经注入的 `useResource` hook 读取它，地址由资源的协议与地址给出。领域包装——一个 Tab、一个面板——在 `useResource` 之上组合自己的 hook，返回结构自由，但底下的取数、缓存与订阅不得重做。每个协议各来一条读取路径会把缓存与失效策略劈成两半，同一个地址可能在一处是活的、在另一处是旧的。
 
 - 判定方式：读取路径。`useResource<Protocol>(address)`，或内部调用它的业务 hook，合格；自建订阅加缓存、复制提供方的流处理、或 `useTabStream` 这类压平式通用 hook 不合格。
-- 不在范围内：与资源无关的局部 UI 状态——折叠、悬停、草稿——留在 `useState`，不给它资源地址。[客户端资源](../subsystems/client-resources.zh.md) 正家负责各个 status 的含义以及什么让资源保持打开。
+- 不在范围内：与资源无关的局部 UI 状态——折叠、悬停、草稿——留在 `useState`，不给它资源地址。[客户端资源](../../packages/client/runtime/README.zh.md) 正家负责各个 status 的含义以及什么让资源保持打开。
 - 例外：重塑快照自由，但把协议差异藏进条件分支的包装要在 review 中说明归属；新协议的 hook 由该协议的拥有者提供。
 - 修法：在领域 hook 内调用 `useResource`，把结果映射成组件要渲染的内容，删掉自建缓存。
 

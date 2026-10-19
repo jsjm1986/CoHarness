@@ -30,6 +30,9 @@
       "path": "../../session/working-directory"
     },
     {
+      "path": "../../subagent/subagent"
+    },
+    {
       "path": "../../shell/shell"
     },
     {

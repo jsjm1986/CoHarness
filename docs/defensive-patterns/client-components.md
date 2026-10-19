@@ -190,7 +190,7 @@ The wrong form makes instances cross-talk, and ownership of state becomes unaudi
 An element that shows a resource reads it through the injected `useResource` hook, addressed by the resource's protocol and address. A domain wrapper — a Tab, a panel — composes its own hook over `useResource`, and its return structure is free, but the fetch, cache, and subscription underneath are not rebuilt. A second read path per protocol splits cache and invalidation policy, so one address can be live in one place and stale in another.
 
 - Judged by: the read path. `useResource<Protocol>(address)`, or a business hook whose body calls it, passes; a hand-built subscribe-and-cache, a copy of a provider's stream handling, or a flat generic hook such as `useTabStream` fails.
-- Not covered: non-resource local UI state — a collapse, a hover, a draft — stays `useState` and gets no resource address. [Client resources](../subsystems/client-resources.md) owns the status values and what holds a resource open.
+- Not covered: non-resource local UI state — a collapse, a hover, a draft — stays `useState` and gets no resource address. [Client resources](../../packages/client/runtime/README.md) owns the status values and what holds a resource open.
 - Exception: reshaping the snapshot is free, but a wrapper that hides protocol differences behind conditional branches states its ownership in review, and a new protocol's hook comes from that protocol's owner.
 - Fix: call `useResource` inside the domain hook, map its result onto what the component renders, and delete the bespoke cache.
 

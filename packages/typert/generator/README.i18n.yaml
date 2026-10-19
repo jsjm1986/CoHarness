@@ -3,38 +3,65 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/typert/generator/README.md
 /:
-  en: 8beedff947acac51
-  zh: 0a51af1cad6486b4
+  en: 3fe330c4d51197ec
+  zh: 5874f3bcd419dbbc
 /deepseek-ai-dsh-typert-generator:
-  en: 6e829c0da0a0bf61
-  zh: ffc0b0f548309053
+  en: 572884e8456e3876
+  zh: 766da5ce0943f314
 /deepseek-ai-dsh-typert-generator/summary:
   en: c481285bb066ad9f
   zh: b5d9e32c7747f04a
 /deepseek-ai-dsh-typert-generator/table-of-contents:
-  en: 9cc88b0a61cf31ef
-  zh: e439612a5f040854
-/deepseek-ai-dsh-typert-generator/analysis-model:
-  en: 9ba7f7bba8555d2d
-  zh: 37fd56c2c93a457a
-/deepseek-ai-dsh-typert-generator/emission-and-opt-in-publication:
-  en: d0c07968aceb3508
-  zh: f234e6c216e28571
-/deepseek-ai-dsh-typert-generator/repository-specific-cordis-projection:
-  en: 7eee571694af672d
-  zh: d1922320c67f59d8
-/deepseek-ai-dsh-typert-generator/invariants:
-  en: da3a24f7f381a949
-  zh: cc73ac5e08655cb8
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-typert-generator/use-this-package:
+  en: 949dec3bb987644a
+  zh: 0ed333a6067465dc
+/deepseek-ai-dsh-typert-generator/use-this-package/publishing-typert-artifacts-from-a-package:
+  en: c7078becc8f12609
+  zh: 4b8838b559ecb677
+/deepseek-ai-dsh-typert-generator/use-this-package/ordinary-remote-metadata:
+  en: 6bb456bb03fc6617
+  zh: 029407c373b8e6a6
+/deepseek-ai-dsh-typert-generator/use-this-package/analyzing-a-workspace-statically:
+  en: 8227097859169cdf
+  zh: 249790ed62e8558a
+/deepseek-ai-dsh-typert-generator/use-this-package/running-generation-inside-a-tsdown-build:
+  en: ebcb4850a5620d93
+  zh: 55f6f54265830f28
+/deepseek-ai-dsh-typert-generator/use-this-package/generating-without-a-bundler:
+  en: e1afb26aea87fe46
+  zh: ed3cdfde78d87825
+/deepseek-ai-dsh-typert-generator/understand-the-implementation:
+  en: b90762df7a978580
+  zh: 123ab225a2b5df2a
+/deepseek-ai-dsh-typert-generator/understand-the-implementation/design-concept:
+  en: 0a515742229bf442
+  zh: dfd2c5eddd943af9
+/deepseek-ai-dsh-typert-generator/understand-the-implementation/source-map:
+  en: 89d9205446b496a6
+  zh: d7bcae876c1905ec
+/deepseek-ai-dsh-typert-generator/understand-the-implementation/analysis-and-faces:
+  en: a844aafcafbc27b6
+  zh: 8efe7d472361bbc2
+/deepseek-ai-dsh-typert-generator/understand-the-implementation/emission-and-publication-contract:
+  en: 2f6f72eecffc33c2
+  zh: ded33dbc1d9a4ea5
+/deepseek-ai-dsh-typert-generator/understand-the-implementation/catalog-projection:
+  en: e85b521a1e01ab2c
+  zh: 4416dca569de0f61
+/deepseek-ai-dsh-typert-generator/further-exploration:
+  en: 6df514142eaad512
+  zh: e1ca60bd9fa30096
 /deepseek-ai-dsh-typert-generator/model-experience:
   en: e6641e8b5e5f42ca
   zh: 2fdc0d3fde7e9216
 /deepseek-ai-dsh-typert-generator/model-experience/kv-cache-effect:
   en: 09310605f7d136d4
-  zh: be1897b8a12a5389
+  zh: 3535ec7eba83b90f
 /deepseek-ai-dsh-typert-generator/known-limitations-and-deferred-work:
-  en: 115ecd0c51bcbf0b
-  zh: e29b99c2066e693b
+  en: fdc6707a82ceb4c3
+  zh: 91fb8cab9fcf56bc
 /deepseek-ai-dsh-typert-generator/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

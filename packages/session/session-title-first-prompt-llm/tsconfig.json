@@ -9,15 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../session-title"
-    },
-    {
-      "path": "../session-title-llm"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -25,6 +16,18 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../session-title"
+    },
+    {
+      "path": "../session-title-llm"
     }
   ]
 }

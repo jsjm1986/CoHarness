@@ -1,7 +1,7 @@
 import { clientBundle } from '../../client/tsdown.client.ts'
 
 export default clientBundle(
-  import.meta.dirname,
+  '@deepseek-ai/dsh-api-terminal-controller',
   ['lib/types/index.js'],
   { hostPhase: true, codeSplitting: false },
 )

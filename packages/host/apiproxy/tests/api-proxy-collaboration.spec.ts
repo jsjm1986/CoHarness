@@ -481,7 +481,7 @@ describe('project collaboration streams', () => {
       done: false,
       value: {
         payload: {
-          type: 'host/session-added',
+          type: 'host/session-added', agentAvailable: false,
           sessionId: session.id,
         },
       },
@@ -680,7 +680,7 @@ describe('project collaboration streams', () => {
     try {
       await vi.waitFor(() => {
         expect(frames).toContainEqual(expect.objectContaining({
-          type: 'host/session-added',
+          type: 'host/session-added', agentAvailable: false,
           sessionId: added.id,
         }))
       })

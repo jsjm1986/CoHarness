@@ -24,5 +24,5 @@ CLI 与 Python 运行时的安装依赖不再包含 hook 桥接，CLI 也不再�
          name: '@deepseek-ai/dsh-skill-badge'
    ```
 
-3. GitHub review 使用适配器随附的示例，替代已删除的 CLI 示例。遵循[安装版 profile 说明](../../../user/guide/github-review.zh.md)；将定制规则模块保留在 profile 内，使其导入能解析该 profile 安装的包。
+3. GitHub review 使用适配器随附的示例，替代已删除的 CLI 示例。遵循安装版 profile 说明；将定制规则模块保留在 profile 内，使其导入能解析该 profile 安装的包。
 4. 启动 profile，确认配置的插件激活时没有缺包、缺 peer 或缺行错误。确认预期工具或技能在目标 Agent 预设中可用。

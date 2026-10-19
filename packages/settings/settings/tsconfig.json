@@ -9,6 +9,21 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../boot/config-editor"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     },
     {
@@ -19,15 +34,6 @@
     },
     {
       "path": "../../util/values"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

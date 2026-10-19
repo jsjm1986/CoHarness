@@ -3,7 +3,10 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "lib/types",
-    "types": ["client-build-environment", "node"]
+    "types": [
+      "client-build-environment",
+      "node"
+    ]
   },
   "include": [
     "src"
@@ -13,10 +16,10 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/loader"
+      "path": "../../../vendor/include"
     },
     {
-      "path": "../../../vendor/include"
+      "path": "../../../vendor/loader"
     },
     {
       "path": "../../api/gateway/tsconfig.client.json"
@@ -25,10 +28,16 @@
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
+      "path": "../../api/session-controller/tsconfig.client.json"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
       "path": "../../client/connection/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/hmr"
     },
     {
       "path": "../../client/modules"
@@ -37,16 +46,28 @@
       "path": "../../client/runtime"
     },
     {
+      "path": "../../client/ui-layout"
+    },
+    {
       "path": "../../client/ui-renderer"
     },
     {
       "path": "../../client/ui-slots"
     },
     {
+      "path": "../../client/ui-workspace"
+    },
+    {
       "path": "../../client/web"
     },
     {
-      "path": "../../host/apiproxy"
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../host/apiproxy/tsconfig.api.json"
+    },
+    {
+      "path": "../../subagent/subagent"
     },
     {
       "path": "../../typert/protocol"

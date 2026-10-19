@@ -56,7 +56,6 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { authContextFrom, credentialStoreFrom } from './auth.ts'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { assertUsableApiKey, LlmEndpointResolutionCache, LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
@@ -258,7 +257,7 @@ function directoryEntries(
   // whose own posture — no key, credentials discovered by the provider — fails
   // every request. Catalog *membership* is unaffected, so `declare` above still
   // answers what pi-ai ships.
-  for (const provider of catalog) declare(provider, provider)
+  for (const provider of catalogProviderIds()) declare(provider, provider)
   for (const [provider, profile] of profiles) {
     if (!provider.startsWith(ORGANIZATION_PROVIDER_PREFIX)) {
       declare(provider, profile.displayName, profile.catalogError)

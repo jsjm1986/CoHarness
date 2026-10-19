@@ -9,13 +9,16 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../core/agent"
     },
     {
       "path": "../../core/session"
-    },
-    {
-      "path": "../goal"
     },
     {
       "path": "../../llm/llm"
@@ -24,10 +27,10 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../subagent/subagent"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../goal"
     }
   ]
 }

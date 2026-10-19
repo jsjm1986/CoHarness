@@ -9,15 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../vendor/cordis"
-    },
-    {
-      "path": "../../vendor/loader"
-    },
-    {
-      "path": "../../vendor/include"
-    },
-    {
       "path": "../../packages/boot/app-boot"
     },
     {
@@ -36,13 +27,7 @@
       "path": "../../packages/bundle/web-app"
     },
     {
-      "path": "../../packages/host/apiproxy"
-    },
-    {
-      "path": "../../packages/host/webserver"
-    },
-    {
-      "path": "../../packages/host/frontend-static"
+      "path": "../../packages/context/gateway-execution"
     },
     {
       "path": "../../packages/core/session"
@@ -54,19 +39,19 @@
       "path": "../../packages/core/tools"
     },
     {
-      "path": "../../packages/util/launch-environment"
+      "path": "../../packages/host/apiproxy/tsconfig.api.json"
     },
     {
-      "path": "../../packages/util/home-paths"
+      "path": "../../packages/host/frontend-static"
     },
     {
-      "path": "../../packages/util/http-proxy"
+      "path": "../../packages/host/webserver"
     },
     {
       "path": "../../packages/mcp/mcp-client"
     },
     {
-      "path": "../../packages/test-support/loader-smoke"
+      "path": "../../packages/session-query/session-query"
     },
     {
       "path": "../../packages/session-query/session-query-sqlite"
@@ -78,7 +63,28 @@
       "path": "../../packages/shell/tool-bash"
     },
     {
-      "path": "../../packages/context/gateway-execution"
+      "path": "../../packages/test-support/loader-smoke"
+    },
+    {
+      "path": "../../packages/util/atomic-write"
+    },
+    {
+      "path": "../../packages/util/home-paths"
+    },
+    {
+      "path": "../../packages/util/http-proxy"
+    },
+    {
+      "path": "../../packages/util/launch-environment"
+    },
+    {
+      "path": "../../vendor/cordis"
+    },
+    {
+      "path": "../../vendor/include"
+    },
+    {
+      "path": "../../vendor/loader"
     }
   ]
 }

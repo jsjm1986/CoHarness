@@ -10,7 +10,7 @@ An installation dependency can remain dormant indefinitely. Its presence in the 
 
 ## Decision
 
-Nonexperimental packages have effective product use or an explicit entry in the [package policy](../../../../scripts/product-package-policy.ts). The policy distinguishes optional integrations, SDKs, build tools, test tools, Web distribution packages, and declaration-only infrastructure. Each exception records its maintained role. [Experimental status](../../../../packages/experimental/README.md#status) describes maturity and support, independently of installation, optional selection, and Official discovery.
+Nonexperimental packages have effective product use or an explicit entry in the [package policy](../../../../scripts/product-package-policy.ts). The policy distinguishes optional integrations, SDKs, build tools, test tools, Web distribution packages, and declaration-only infrastructure. Each exception records its maintained role. [Experimental status](../../../../packages/experimental/README.md) describes maturity and support, independently of installation, optional selection, and Official discovery.
 
 The [product-use check](../../../../scripts/verify-product-use.ts) follows effective shipped profiles, preset children, runtime source imports, and explicit dynamic mounts. It preserves disabled state through groups and Includes and applies patches before counting use. Manifest dependencies and type-only references do not create runtime use. Optional-bundle reachability remains separate from default reachability. Unknown packages and invalid or stale policy entries fail static CI and package hygiene.
 

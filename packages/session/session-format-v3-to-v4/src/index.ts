@@ -4,3 +4,4 @@ export { releasedV3SessionFormatCodec } from '@deepseek-ai/dsh-session-format-v2
 export * from './codec.ts'
 export * from './migration.ts'
 export * from './validation.ts'
+export { historicalChildCatalogSource } from './facts.ts'

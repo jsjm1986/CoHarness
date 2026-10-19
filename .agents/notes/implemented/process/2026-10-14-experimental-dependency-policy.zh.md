@@ -32,7 +32,7 @@ Status: implemented
 
 - 发布的实验包清单只把浏览器和类型关系列为 dev 依赖，通过 npm 单独安装这些包的用户得到的 peer 提示更少。
 - verifier 看不到 tsdown `banner` 注入的导入，例如 inspector worker 的 `@deepseek-ai/dsh-app-boot/worker/profile-resolution-bootstrap`。这类依赖只因为已经声明而被保留；如果被误删，verifier 发现不了。
-- `readHostBuildEntries` 会 import 每个受覆盖、带 Host face 的包的 `tsdown.config.ts`，并在两个构建 face 下求值其默认导出，所以门禁依赖每个这样的配置模块都能干净地 import，这些模块的 import 副作用也会在门禁进程里执行；例如 inspector 的配置会 import 包内的 [`scripts/build-devtools.ts`](../../../../packages/experimental/inspector/scripts/build-devtools.ts)。
+- `readHostBuildEntries` 会 import 每个受覆盖、带 Host face 的包的 `tsdown.config.ts`，并在两个构建 face 下求值其默认导出，所以门禁依赖每个这样的配置模块都能干净地 import，这些模块的 import 副作用也会在门禁进程里执行；例如 inspector 的配置会 import 包内的 `scripts/build-devtools.ts`。
 - 实测：新增的 127 个 tsdown 配置加载约 2 s，全量耗时基本不变（不扫描时 4:27，扫描时 4:21）。
 
 ## 测试

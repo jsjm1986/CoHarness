@@ -1,6 +1,4 @@
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
-import type { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
-import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import type { ToolEventView } from '@deepseek-ai/dsh-api-remotes/client'
 
 /* oxlint-disable typescript/no-duplicate-type-constituents, typescript/no-redundant-type-constituents --
@@ -13,20 +11,8 @@ import type { ToolEventView } from '@deepseek-ai/dsh-api-remotes/client'
  * `assistant/message` or `assistant/attempt` event settles the attempt's
  * transient rows. `seq` orders the row between durable Session seqs.
  */
-export interface AssistantLiveChunkEvent {
-  readonly type: 'assistant/live-chunk'
-  readonly seq: number
-  readonly time: number
-  readonly data: {
-    readonly attemptId: LlmAttemptId
-    readonly turn: number
-    readonly step: number
-    readonly chunk: StreamChunk
-  }
-}
-
-/** A durable Session event or one client-only live chunk presentation. */
-export type SessionEventLike = SessionEvent | AssistantLiveChunkEvent
+export type { AssistantLiveChunkEvent, SessionEventLike } from './events.ts'
+import type { SessionEventLike } from './events.ts'
 
 /** One raw log event plus its optional envelope-level presentation view. */
 export interface ConversationEventInput {

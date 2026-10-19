@@ -1,5 +1,5 @@
 ---
-description: "Endpoint-named mock for the Client's wire traffic: a table of unary answers and stream scripts, live stream control, a log, and the Connection api/rpc carrier faces, for test authors booting a real browser client without a Host."
+description: "Endpoint-named mock for Typert Remote traffic: a table of unary answers and stream scripts, live stream control, a log, and the Connection carrier face, for test authors booting a real browser client without a Host."
 kind: "package-library"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-remote-mock` lets tests configure Host responses through `mock.remote.<namespace>.<method>` using native Vitest mock methods. The same functions answer direct calls and real Connection traffic; reusable tables supply default responses, and explicitly declared streams support test-driven frames and cancellation. Missing responses fail the call and are reported again by `assertNoUnmatched()` at teardown. `mock.rpc` is the `ClientConnectionRpc` face and `mock.api` the `IApiClient` face a whole-client spec passes to `installConnection` through `ClientTransportHooks`; `mock.transports` supplies the account-preferences and project-model-settings handles. It runs without a business Host and is `devDependencies`-only.
+`dsh-remote-mock` lets tests configure Host responses through `mock.remote.<namespace>.<method>` using native Vitest mock methods. The same functions answer direct calls and real Connection traffic; reusable tables supply default responses, and explicitly declared streams support test-driven frames and cancellation. Missing responses fail the call and are reported again by `assertNoUnmatched()` at teardown. The package runs without a business Host in Node or a browser page, imports no DOM, React, or Node modules, and is consumed from `devDependencies` only.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ English | [中文](README.zh.md)
 
 ### When to use it
 
-Use it when a spec boots real client plugins that talk to `ctx.remote` and wants to script the Host side by endpoint name: whole-client specs hand `mock.api` / `mock.rpc` / `mock.transports` to the Connection installer, while unit specs may call `mock.remote`, `dispatch`, or `open` directly. Gateway Remote endpoints carry their wire names (`session/page`, `settings/describe`); the handwritten API domains expose the client's method names (`sessions.list`, `settings.describe`, `events.mux`); `args` is the caller's positional argument list with a trailing `AbortSignal` removed; a value is whatever the test registers and is answered unchanged. The only declaration is whether an endpoint is unary (`unary`) or a stream (`stream`).
+Use it when a spec boots real client plugins that talk to `ctx.remote` and wants to script the Host side by endpoint name: whole-client specs bind `mock.rpc` to their Connection instance, while unit specs may call `mock.remote`, `dispatch`, or `open` directly. Endpoints are the Gateway's wire names (`session/page`, `settings/describe`); `args` is the caller's positional argument list with a trailing `AbortSignal` removed; a value is whatever the test registers and is answered unchanged. The only declaration is whether an endpoint is unary (`unary`) or a stream (`stream`).
 
 <a id="remote-proxy"></a>
 ### Use the Remote proxy
@@ -73,22 +73,22 @@ mock.streams.fail('session/follow', new Error('gone'))
 await mock.streams.drained('session/follow')
 ```
 
-A failed stream rejects the consumer's next read with the given `Error`. Consumer cancellation (the opening signal or an early iterator `return()`) aborts `StreamHandle.signal`, ends the iteration without throwing, and logs the stream as `cancelled`. Local generated stream methods return a plain `AsyncIterable`, so there is no client-to-host uplink on this carrier.
+A failed stream rejects the consumer's next read with the given `Error`. Consumer cancellation (the opening signal or an early iterator `return()`) aborts `StreamHandle.signal`, ends the iteration without throwing, and logs the stream as `cancelled`. `StreamHandle.uplink` is what the script reads as the Client's uplink: through `rpc.open` it is the carrier's iterable; for a direct `mock.remote.<namespace>.<method>(...)` call it is fed by the returned handle, which is the `RemoteStreamHandle` a generated method returns (iterate it for the downlink, `send()` and `end()` feed the uplink, `dispose()` cancels the stream); `send()` rejects a non-lossless JSON item as the real handle does, and the uplink it owns closes once the stream settles, is cancelled, or the consumer leaves, so a later `send()` throws. The mock function is called with the method's own arguments only, so the uplink never appears in call assertions or logged args.
 
-A fake that stands in for a generated stream method returns an `AsyncIterable` — already the generated signature, so no handle wrapper is needed. `streamMethod<M>(generator)` lifts an async generator function written for the method's arguments into the method's own signature, for `vi.fn<M>()` and `mockImplementation`.
+A fake that stands in for a generated stream method returns the `RemoteStreamHandle` the generated method does. `streamHandle(source)` types an `AsyncIterable` as that handle with inert `send`, `end`, and `dispose`; `streamMethod<M>(generator)` lifts an async generator function written for the method's arguments into the method's own signature, for `vi.fn<M>()` and `mockImplementation`.
 
 ### Connect a client
 
-`mock.api` is the `IApiClient` face and `mock.rpc` the `ClientConnectionRpc` face (`call` for unary, `stream` for opens). Hand `{ api: mock.api, rpc: mock.rpc, ...mock.transports }` to `installConnection` — or let `TestClient` bind them — so every domain call reaches `dispatch` and every generated stream method reaches `open` with no envelopes in between. Payloads carry `{ args }` as the whole-client proxies send them (an array) or as the Gateway's own endpoints send them (one object, delivered as one positional arg); a call whose signal aborts rejects with the abort reason. `RemoteMock.create()` answers the boot-time `host.describe` read (`host` from `RemoteMockOptions.host`, default `/home/mock`) and holds `events.mux` / `events.host` open, which is what lets the assembled client reach `connected`; a spec overrides or fails any of them like other rules.
+`mock.rpc` is the `ClientConnectionRpc` face. Pass it as `{ transport: { rpc: mock.rpc } }` to the Connection installer, or let `TestClient` bind it to its instance, so every Remote call reaches `dispatch` and every stream reaches `open` with no envelopes in between. Payloads carry `{ args }` as the whole-client proxies send them (an array) or as the Gateway's own endpoints send them (one object, delivered as one positional arg); a call whose signal aborts rejects with the abort reason. `RemoteMock.create()` registers one stream, `$events`, that answers the Gateway client's opening with `{ type: 'ready', clientId, host: { home } }` (host from `RemoteMockOptions.host`, default `/home/mock`) and stays open, which is what lets the assembled client reach `connected`; a spec overrides or fails it like any other stream.
 
 ### Observe and assert
 
-`mock.log.calls(endpoint?)` lists unary calls through `dispatch` or `rpc.call` (`args`, `seq`, a live `state` of `pending` / `answered` / `failed`, and the answer or thrown error as `result`), `streams(endpoint?)` lists scripted opens with their live `state` and `pushed` count, `requests(endpoint?)` lists the first positional arg of calls and opens in order (without an endpoint, excluding `$`-prefixed internal endpoints and the connection pump's `events.mux` / `events.host`), and `unmatched()` lists requests that found no rule. Native `.mock.calls` additionally includes direct proxy calls; carrier stream mocks receive their final cancellation signal. `assertNoUnmatched()` reports misses at teardown. `modeOf(endpoint)` reports explicit registrations; `endpoints()` also includes accessed proxy methods so assembly can provide their namespaces.
+`mock.log.calls(endpoint?)` lists unary calls through `dispatch` or `rpc.call` (`args`, `seq`, a live `state` of `pending` / `answered` / `failed`, and the answer or thrown error as `result`), `streams(endpoint?)` lists scripted opens with their live `state` and `pushed` count, `requests(endpoint?)` lists the first positional arg of calls and opens in order (without an endpoint, excluding the Gateway's own `$`-prefixed endpoints), and `unmatched()` lists requests that found no rule. Native `.mock.calls` additionally includes direct proxy calls; carrier stream mocks receive their final cancellation signal. `assertNoUnmatched()` reports misses at teardown. `modeOf(endpoint)` reports explicit registrations; `endpoints()` also includes accessed proxy methods so assembly can provide their namespaces.
 
 ### What can go wrong
 
 - **A request has no rule** — `dispatch` rejects and `open` throws `remote-mock: no rule for <endpoint>; registered: …`, and the log records the miss; register the endpoint.
-- **A payload is not `{ args: unknown[] | object }`** — `rpc.call` rejects and `rpc.stream` throws a `TypeError`; the whole-client proxies send the array form and the Gateway's own endpoints the object form, so a hand-written call is at fault.
+- **A payload is not `{ args: unknown[] | object }`** — `rpc.call` rejects and `rpc.open` throws a `TypeError`; the whole-client proxies send the array form and the Gateway's own endpoints the object form, so a hand-written call is at fault.
 - **A second concurrent read on one stream** — the read rejects; the Gateway reads streams sequentially, so this names a test-side misuse.
 
 -----
@@ -101,7 +101,7 @@ A fake that stands in for a generated stream method returns an `AsyncIterable` �
 
 ### Design
 
-`dispatch` and `open` take the endpoint and positional args; `api` exposes the same core through the `IApiClient` domain names, and `rpc` through Connection's decoded carrier interface. Each mock owns its native functions and queued overrides; shared tables supply defaults without copying handlers or answer objects. Each scripted stream owns its queue, its single pending read, and its log entry; the first of `end`, `fail`, or consumer cancellation settles it.
+`dispatch` and `open` take the endpoint and positional args; `rpc` exposes the same core through Connection's decoded carrier interface. Each mock owns its native functions and queued overrides; shared tables supply defaults without copying handlers or answer objects. Each scripted stream owns its queue, its single pending read, and its log entry; the first of `end`, `fail`, or consumer cancellation settles it.
 
 ### Source map
 
@@ -110,11 +110,8 @@ A fake that stands in for a generated stream method returns an `AsyncIterable` �
 | [`src/index.ts`](src/index.ts) | Public face re-exports |
 | [`src/remote-mock.ts`](src/remote-mock.ts) | `RemoteMock`: default responses, native mocks, Connection dispatch, controlled streams and missing-response checks; `ok` |
 | [`src/remote-proxy.ts`](src/remote-proxy.ts) | Namespace/method lookup and generated-map mock types |
-| [`src/api-client.ts`](src/api-client.ts) | `IApiClient` facade: domain/method name table checked against `RpcMethodMap`, `events.mux` / `events.host` readers, `respond` |
 | [`src/streams.ts`](src/streams.ts) | `frames` / `openStream` scripts, `streamHandle` / `streamMethod` fake typing, and `MockStream` (handle + `AsyncIterable`) |
 | [`src/log.ts`](src/log.ts) | Log store with the shared `seq` counter |
-| [`src/transports.ts`](src/transports.ts) | `MockAccountPreferences` / `MockProjectModelSettings` seed transports |
-| — | No runtime invariant companion is published; this test-support library owns no production event stream or mutable process state, and its behavior is exercised by its package tests. |
 
 </details>
 
@@ -134,7 +131,7 @@ None; this package neither assembles nor sends a provider request.
 <a id="known-limitations-and-deferred-work"></a>
 
 - **In-process carrier only** — `rpc` serves a Connection instance in the same realm; no HTTP or WebSocket carrier for browser-lane specs is provided.
-- **Values cross by reference** — answers and downlink items reach the client unserialized, so a non-JSON downlink value that the real wire would reject passes through unchanged.
+- **Values cross by reference** — answers and downlink items reach the client unserialized, so a non-JSON downlink value that the real wire would reject passes through unchanged; only the handle's `send()` applies the real uplink check.
 - **Values are not checked** — a unary answer must be the result the caller reads (`{ ok, value }` or `{ ok: false, error }`); the mock passes it through unchanged and does not check those fields.
 - **No payload matching** — rules match on endpoint only; discriminate on business arguments inside a handler.
 - **Native stream overrides own their iterable** — an override returning its own iterable bypasses scripted-stream logs, `requests`, `opened`, `drained`, and `push` / `end` / `fail`; the caller also owns cancellation. Native call assertions still work. Use a registered stream script when a scenario needs those controls.

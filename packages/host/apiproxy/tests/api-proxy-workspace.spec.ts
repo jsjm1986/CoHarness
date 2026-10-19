@@ -441,7 +441,7 @@ describe('Host Workspace increments', () => {
 
     expect(await pending).toMatchObject({
       payload: {
-        type: 'host/session-added',
+        type: 'host/session-added', agentAvailable: false,
         sessionId: childId,
         parentSessionId: 'session-parent',
         origin: 'subagent',
@@ -479,7 +479,7 @@ describe('Host Workspace increments', () => {
     }
     expect(increments.find(increment => increment.type === 'host/session-added')).toMatchObject({
       // A just-created session has no events: the frame constantly carries blank:true.
-      type: 'host/session-added', sessionId, blank: true, cwd: workspace.path,
+      type: 'host/session-added', agentAvailable: false, sessionId, blank: true, cwd: workspace.path,
     })
     const workspaceChanged = increments.find(
       (increment): increment is Extract<HostFrame, { type: 'host/workspace-changed' }> =>

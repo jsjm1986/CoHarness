@@ -15,6 +15,7 @@ import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { JsonValue, SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools/presentation'
 import type { RpcError, RpcId, RpcRequest } from './rpc.ts'
+import type { SessionRequestId } from '@deepseek-ai/dsh-session/types'
 import type { JobView } from './jobs.ts'
 import type { WorkspaceView } from './workspace.ts'
 
@@ -39,7 +40,7 @@ export interface QueuedInboxItem {
   /** Message identity used by inbox mutations. */
   id: MessageId
   /** Prompt identity for a browser-submitted occurrence, when present on the message source. */
-  rpcId?: RpcId
+  rpcId?: SessionRequestId
   /** Agent-resolved FIFO placement; queued and steering items render on different surfaces, context items stay invisible until claimed. */
   placement: 'queued' | 'steering' | 'context'
   /** Complete pending message; it is not durable until the Agent claims it. */
@@ -215,6 +216,8 @@ export type HostFrame =
   | {
     type: 'host/session-added'
     sessionId: SessionId
+    /** Whether this Session currently owns a live Agent (same rule as {@link SessionSummary.agentAvailable}). */
+    agentAvailable: boolean
     blank: boolean
     parentSessionId?: SessionId
     origin?: 'subagent'

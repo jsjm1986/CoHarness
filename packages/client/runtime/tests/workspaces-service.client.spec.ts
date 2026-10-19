@@ -59,7 +59,7 @@ it.each(['plain', 'encoded-looking'] as const)('keeps %s draft reservations in w
     expect(api.callsOf('session.create')).toHaveLength(2)
     expect(api.callsOf('session.create').map(call => callField(call, 'sessionId'))).toEqual([raw, raw])
     expect(JSON.parse(storage.get('dsh.workspace.drafts.v1')!)).toMatchObject({ alpha: { sessionId: raw } })
-    api.onList = async () => ok({ items: [{ sessionId: raw, updatedAt: 2, running: false, blank: false, cwd: '/w/alpha' }] })
+    api.onList = async () => ok({ items: [{ sessionId: raw, updatedAt: 2, running: false, blank: false, agentAvailable: true, cwd: '/w/alpha' }] })
     await base.refresh()
     expect(JSON.parse(storage.get('dsh.workspace.drafts.v1')!)).toEqual({})
   } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
@@ -346,7 +346,7 @@ describe('WorkspaceRuntime', () => {
     expect(workspaces.list.getSnapshot()).toMatchObject({ baselinesReady: false, recentWorkspaceId: undefined })
 
     api.onList = () => Promise.resolve(ok({
-      items: [{ sessionId: sid('s-active'), updatedAt: Date.parse('2026-02-01'), running: false, blank: false }] as never[],
+      items: [{ sessionId: sid('s-active'), updatedAt: Date.parse('2026-02-01'), running: false, blank: false, agentAvailable: true }] as never[],
     }))
     await sessions.refresh()
     await Promise.resolve()
@@ -371,17 +371,17 @@ describe('WorkspaceRuntime', () => {
         // Stray blank at alpha's path but NOT accounted under alpha (a CLI
         // session birthed at the host cwd), sorted before the member blank:
         // the scan must skip it and keep looking for a member hit.
-        { sessionId: sid('s-stray-alpha'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha' },
+        { sessionId: sid('s-stray-alpha'), updatedAt: 1, running: false, blank: true, agentAvailable: true, cwd: '/w/alpha' },
         // Blank session parked in alpha (cwd == workspace path canon AND
         // accounted under alpha): the reuse hit.
-        { sessionId: sid('s-blank'), updatedAt: 2, running: false, blank: true, cwd: '/w/alpha' },
+        { sessionId: sid('s-blank'), updatedAt: 2, running: false, blank: true, agentAvailable: true, cwd: '/w/alpha' },
         // Non-blank sibling in beta must never be reused.
-        { sessionId: sid('s-active'), updatedAt: 3, running: false, blank: false, cwd: '/w/beta' },
+        { sessionId: sid('s-active'), updatedAt: 3, running: false, blank: false, agentAvailable: true, cwd: '/w/beta' },
         // Stray blank at gamma's path but NOT accounted under gamma (a CLI
         // session birthed at the host cwd): cwd alone must not hijack it —
         // reuse would open a session gamma cannot show, so New Session mints
         // a fresh accounted one instead.
-        { sessionId: sid('s-stray'), updatedAt: 4, running: false, blank: true, cwd: '/w/gamma' },
+        { sessionId: sid('s-stray'), updatedAt: 4, running: false, blank: true, agentAvailable: true, cwd: '/w/gamma' },
       ] as never[],
     }))
     api.onCreate = payload => Promise.resolve(ok({
@@ -449,11 +449,11 @@ describe('WorkspaceRuntime', () => {
       archivedSessionIds: [sid('s-archived')],
     }) as never)
     api.onList = () => Promise.resolve(ok({ items: [
-      { sessionId: sid('s-old'), updatedAt: 4, running: false, blank: false, cwd: '/w/alpha' },
-      { sessionId: sid('s-blank'), updatedAt: 10, running: false, blank: true, cwd: '/w/alpha' },
-      { sessionId: sid('s-newest'), updatedAt: 9, running: false, blank: false, cwd: '/w/alpha' },
-      { sessionId: sid('s-child'), updatedAt: 12, running: false, blank: false, origin: 'subagent', cwd: '/w/alpha' },
-      { sessionId: sid('s-archived'), updatedAt: 11, running: false, blank: false, cwd: '/w/alpha' },
+      { sessionId: sid('s-old'), updatedAt: 4, running: false, blank: false, agentAvailable: true, cwd: '/w/alpha' },
+      { sessionId: sid('s-blank'), updatedAt: 10, running: false, blank: true, agentAvailable: true, cwd: '/w/alpha' },
+      { sessionId: sid('s-newest'), updatedAt: 9, running: false, blank: false, agentAvailable: true, cwd: '/w/alpha' },
+      { sessionId: sid('s-child'), updatedAt: 12, running: false, blank: false, agentAvailable: true, origin: 'subagent', cwd: '/w/alpha' },
+      { sessionId: sid('s-archived'), updatedAt: 11, running: false, blank: false, agentAvailable: true, cwd: '/w/alpha' },
     ] as never[] }))
     await Promise.all([workspaces.refresh(), sessions.refresh()])
     await Promise.resolve()
@@ -479,9 +479,9 @@ describe('WorkspaceRuntime', () => {
     }))
     api.onList = () => Promise.resolve(ok({
       items: [
-        { sessionId: sid('s-project'), updatedAt: 3, running: false, blank: true, cwd: '/w/alpha' },
-        { sessionId: sid('s-private'), updatedAt: 2, running: false, blank: true, cwd: '/w/alpha' },
-        { sessionId: sid('s-beta-project'), updatedAt: 1, running: false, blank: true, cwd: '/w/beta' },
+        { sessionId: sid('s-project'), updatedAt: 3, running: false, blank: true, agentAvailable: true, cwd: '/w/alpha' },
+        { sessionId: sid('s-private'), updatedAt: 2, running: false, blank: true, agentAvailable: true, cwd: '/w/alpha' },
+        { sessionId: sid('s-beta-project'), updatedAt: 1, running: false, blank: true, agentAvailable: true, cwd: '/w/beta' },
       ] as never[],
     }))
     ctx.on('sessions/prepare-create', async (_options, next) => ({
@@ -530,7 +530,7 @@ describe('WorkspaceRuntime', () => {
     }))
     api.onList = () => Promise.resolve(ok({
       items: [
-        { sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, cwd: '/w/alpha' },
+        { sessionId: sid('s-blank'), updatedAt: 1, running: false, blank: true, agentAvailable: true, cwd: '/w/alpha' },
       ] as never[],
     }))
     ctx.on('sessions/prepare-create', async (_options, next) => {
@@ -551,7 +551,7 @@ describe('WorkspaceRuntime', () => {
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('alpha', [sid('s-blank')])] as never[] }))
     api.onList = () => Promise.resolve(ok({
-      items: [{ sessionId: sid('s-blank'), updatedAt: 2, running: false, blank: true, cwd: '/w/alpha' }] as never[],
+      items: [{ sessionId: sid('s-blank'), updatedAt: 2, running: false, blank: true, agentAvailable: true, cwd: '/w/alpha' }] as never[],
     }))
     api.onCreate = payload => Promise.resolve(ok({
       sessionId: (payload as { sessionId?: SessionId }).sessionId ?? sid('s-unexpected'),
@@ -686,8 +686,8 @@ describe('WorkspaceRuntime', () => {
       ] as never[],
     }))
     api.onList = () => Promise.resolve(ok({ items: [
-      { sessionId: sid('current'), updatedAt: 1, running: false, blank: false },
-      { sessionId: sid('recent'), updatedAt: 2, running: false, blank: false },
+      { sessionId: sid('current'), updatedAt: 1, running: false, blank: false, agentAvailable: true },
+      { sessionId: sid('recent'), updatedAt: 2, running: false, blank: false, agentAvailable: true },
     ] as never[] }))
     await Promise.all([workspaces.refresh(), sessions.refresh()])
     await Promise.resolve()
@@ -725,7 +725,7 @@ describe('WorkspaceRuntime', () => {
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('target')] as never[] }))
     api.onList = () => Promise.resolve(ok({ items: ['old', 'late', 'new'].map(id => ({
-      sessionId: sid(id), updatedAt: 1, running: false, blank: false,
+      sessionId: sid(id), updatedAt: 1, running: false, blank: false, agentAvailable: true,
     })) }))
     try {
       await Promise.all([workspaces.refresh(), sessions.refresh()])
@@ -760,7 +760,7 @@ describe('WorkspaceRuntime', () => {
     }))
     api.onList = () => Promise.resolve(ok({
       items: [{
-        sessionId: sid('draft'), updatedAt: 1, running: false, blank: true,
+        sessionId: sid('draft'), updatedAt: 1, running: false, blank: true, agentAvailable: true,
       }] as never[],
     }))
     await Promise.all([workspaces.refresh(), sessions.refresh()])
@@ -785,8 +785,8 @@ describe('WorkspaceRuntime', () => {
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onList = () => Promise.resolve(ok({
       items: [
-        { sessionId: sid('s-open'), updatedAt: 2, running: false, blank: false },
-        { sessionId: sid('s-idle'), updatedAt: 1, running: false, blank: false },
+        { sessionId: sid('s-open'), updatedAt: 2, running: false, blank: false, agentAvailable: true },
+        { sessionId: sid('s-idle'), updatedAt: 1, running: false, blank: false, agentAvailable: true },
       ],
     }) as never)
     await sessions.refresh()
@@ -832,8 +832,8 @@ describe('WorkspaceRuntime', () => {
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onList = () => Promise.resolve(ok({
       items: [
-        { sessionId: sid('s-arch'), updatedAt: 1, running: false, blank: false },
-        { sessionId: sid('s-live'), updatedAt: 2, running: false, blank: false },
+        { sessionId: sid('s-arch'), updatedAt: 1, running: false, blank: false, agentAvailable: true },
+        { sessionId: sid('s-live'), updatedAt: 2, running: false, blank: false, agentAvailable: true },
       ],
     }) as never)
     await sessions.refresh()
@@ -872,7 +872,7 @@ describe('WorkspaceRuntime', () => {
     const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onList = () => Promise.resolve(ok({
-      items: [{ sessionId: sid('s-open'), updatedAt: 1, running: false, blank: false }],
+      items: [{ sessionId: sid('s-open'), updatedAt: 1, running: false, blank: false, agentAvailable: true }],
     }) as never)
     await sessions.refresh()
     sessions.open(sid('s-open'))
@@ -1006,7 +1006,7 @@ describe('startInitialSelection', () => {
       items: [workspace('recent', [sid('s-history')], '2026-01-02T00:00:00.000Z')] as never[],
     }))
     b.api.onList = () => Promise.resolve(ok({
-      items: [{ sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, cwd: '/w/recent' }] as never[],
+      items: [{ sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, agentAvailable: true, cwd: '/w/recent' }] as never[],
     }))
     await b.workspaces.refresh()
     await b.sessions.refresh()
@@ -1028,9 +1028,9 @@ describe('startInitialSelection', () => {
     }))
     b.api.onList = () => Promise.resolve(ok({
       items: [
-        { sessionId: sid('s-blank'), updatedAt: 100, running: false, blank: true, cwd: '/w/newer-blank' },
-        { sessionId: sid('s-history'), updatedAt: 4, running: false, blank: false, cwd: '/w/older-history' },
-        { sessionId: sid('s-child'), updatedAt: 200, running: false, blank: false, origin: 'subagent', cwd: '/w/newer-child' },
+        { sessionId: sid('s-blank'), updatedAt: 100, running: false, blank: true, agentAvailable: true, cwd: '/w/newer-blank' },
+        { sessionId: sid('s-history'), updatedAt: 4, running: false, blank: false, agentAvailable: true, cwd: '/w/older-history' },
+        { sessionId: sid('s-child'), updatedAt: 200, running: false, blank: false, agentAvailable: true, origin: 'subagent', cwd: '/w/newer-child' },
       ] as never[],
     }))
     const stop = b.workspaces.startInitialSelection()
@@ -1063,7 +1063,7 @@ describe('startInitialSelection', () => {
   it('stays idle when a session is already current or no recent Workspace exists', async () => {
     const withCurrent = bench()
     withCurrent.api.onList = () => Promise.resolve(ok({
-      items: [{ sessionId: sid('s1'), updatedAt: 1, running: false, blank: false }] as never[],
+      items: [{ sessionId: sid('s1'), updatedAt: 1, running: false, blank: false, agentAvailable: true }] as never[],
     }))
     await withCurrent.sessions.refresh()
     withCurrent.sessions.open(sid('s1'))
@@ -1110,7 +1110,7 @@ describe('startInitialSelection', () => {
       items: [workspace('recent', [sid('s-history')], '2026-01-02T00:00:00.000Z')] as never[],
     }))
     b.api.onList = () => Promise.resolve(ok({
-      items: [{ sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, cwd: '/w/recent' }] as never[],
+      items: [{ sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, agentAvailable: true, cwd: '/w/recent' }] as never[],
     }))
     b.api.onHistory = () => historyGate.promise
     const stop = b.workspaces.startInitialSelection()

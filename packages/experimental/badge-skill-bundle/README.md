@@ -46,14 +46,14 @@ The switch adds or removes a Host-wide skill provider for existing and new Agent
 <a id="further-exploration"></a>
 ## Further Exploration
 
-[Capability implementation](../skill-badge/README.md)
+[Capability implementation](../../skill/skill-badge/README.md)
 
 -----
 
 <a id="model-experience"></a>
 ## Model Experience
 
-Indirectly, through the [capability implementation](../skill-badge/README.md), which owns model context and results.
+Indirectly, through the [capability implementation](../../skill/skill-badge/README.md), which owns model context and results.
 
 #### KV Cache effect
 

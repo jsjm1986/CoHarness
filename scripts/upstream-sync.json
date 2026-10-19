@@ -553,7 +553,7 @@
     },
     "experimental/schedule-bundle": {
       "sovereignty": "owned",
-      "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
+      "note": ".agents/notes/implemented/architecture/2026-09-21-experimental-capabilities-as-optional-bundles.md"
     },
     "experimental/speech-to-text": {
       "sovereignty": "adapted",
@@ -627,26 +627,11 @@
     "guard/timeout-policy": {
       "sovereignty": "adapted"
     },
-    "hooks/hook-protocol": {
-      "sovereignty": "owned",
-      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
-    },
-    "hooks/hooks-claude-code": {
-      "sovereignty": "owned",
-      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
-    },
-    "hooks/hooks-codex": {
-      "sovereignty": "owned",
-      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
-    },
     "host/apiproxy": {
       "sovereignty": "owned"
     },
     "host/directory-picker": {
-      "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/host/directory-picker/src/types.ts"
-      ]
+      "sovereignty": "adapted"
     },
     "host/directory-picker-auto": {
       "sovereignty": "adapted"
@@ -763,8 +748,7 @@
       "sovereignty": "owned"
     },
     "plan/plan-mode": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md"
+      "sovereignty": "adapted"
     },
     "preset/agent-presets": {
       "sovereignty": "owned",
@@ -820,10 +804,6 @@
     },
     "session-query/session-query-sqlite": {
       "sovereignty": "adapted"
-    },
-    "session-query/tool-session-query": {
-      "sovereignty": "owned",
-      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "session/session-checkpoint-policy": {
       "sovereignty": "tracked"
@@ -893,10 +873,6 @@
     },
     "session/session-title": {
       "sovereignty": "adapted"
-    },
-    "session/session-title-all-prompts-llm": {
-      "sovereignty": "owned",
-      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-rc.2.md"
     },
     "session/session-title-first-prompt-llm": {
       "sovereignty": "adapted",
@@ -1144,7 +1120,7 @@
     },
     "util/package-manifest": {
       "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
+      "note": ".agents/notes/archived/architecture/2026-09-05-package-manifest-types.md"
     },
     "util/time": {
       "sovereignty": "tracked"
@@ -1201,42 +1177,100 @@
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
+    },
+    "api/account-controller": {
+      "sovereignty": "adapted"
+    },
+    "api/job-controller": {
+      "sovereignty": "adapted"
+    },
+    "api/session-controller": {
+      "sovereignty": "adapted"
+    },
+    "api/settings-controller": {
+      "sovereignty": "adapted"
+    },
+    "api/workspace-controller": {
+      "sovereignty": "adapted"
+    },
+    "boot/config-editor": {
+      "sovereignty": "adapted"
+    },
+    "credentials/deepseek-account": {
+      "sovereignty": "adapted"
+    },
+    "credentials/deepseek-account-platform": {
+      "sovereignty": "adapted"
+    },
+    "host/product-telemetry-otel": {
+      "sovereignty": "adapted"
+    },
+    "llm/llm-deepseek-account": {
+      "sovereignty": "adapted"
+    },
+    "telemetry/otel": {
+      "sovereignty": "adapted"
+    },
+    "experimental/hook-protocol": {
+      "sovereignty": "adapted"
+    },
+    "experimental/hooks-claude-code": {
+      "sovereignty": "adapted"
+    },
+    "experimental/hooks-codex": {
+      "sovereignty": "adapted"
+    },
+    "experimental/tool-session-query": {
+      "sovereignty": "adapted"
+    },
+    "experimental/session-title-all-prompts-llm": {
+      "sovereignty": "adapted"
+    },
+    "experimental/badge-skill-bundle": {
+      "sovereignty": "adapted"
+    },
+    "experimental/ralph-bundle": {
+      "sovereignty": "adapted"
+    },
+    "experimental/terminal-bundle": {
+      "sovereignty": "adapted"
+    },
+    "experimental/session-titles-bundle": {
+      "sovereignty": "adapted"
+    },
+    "context/harness-dev-context": {
+      "sovereignty": "adapted"
+    },
+    "experimental/claude-code-mods": {
+      "sovereignty": "adapted"
+    },
+    "experimental/client-ui-claude-code-mods": {
+      "sovereignty": "adapted"
+    },
+    "experimental/cua": {
+      "sovereignty": "adapted"
+    },
+    "experimental/cua-macos": {
+      "sovereignty": "adapted"
+    },
+    "experimental/session-search": {
+      "sovereignty": "adapted"
+    },
+    "experimental/translator": {
+      "sovereignty": "adapted"
+    },
+    "ssh/ssh-helper-runtime": {
+      "sovereignty": "adapted"
+    },
+    "web/web-deepseek-api": {
+      "sovereignty": "adapted"
     }
   },
   "upstreamOnly": [
     {
-      "package": "api/account-controller",
-      "reason": "official account lane excluded; CoHarness owns auth/quota governance",
-      "replacedBy": "host/apiproxy"
-    },
-    {
-      "package": "api/job-controller",
-      "reason": "job RPC surface folds into the single BFF per locked decision",
-      "replacedBy": "host/apiproxy"
-    },
-    {
-      "package": "api/session-controller",
-      "reason": "CoHarness dispatches through host/apiproxy bound to Gateway principal and project ACL; the rc.1 ClientSessions/Session client type surface is rewritten onto client/runtime per adopted package, never carried",
-      "replacedBy": "host/apiproxy"
-    },
-    {
-      "package": "api/settings-controller",
-      "reason": "settings flow through host/apiproxy under the same principal/ACL dispatch",
-      "replacedBy": "host/apiproxy"
-    },
-    {
-      "package": "api/workspace-controller",
-      "reason": "workspace operations are served by host/apiproxy and the Workbench runtime targets",
-      "replacedBy": "host/apiproxy"
-    },
-    {
       "package": "api/workspace-files",
       "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
       "replacedBy": "host/apiproxy"
-    },
-    {
-      "package": "boot/config-editor",
-      "reason": "upstream profile-patch editor excluded; settings stays on settings.yaml governance (revisit only if the settings port needs atomic patch editing)"
     },
     {
       "package": "client/file-upload",
@@ -1315,14 +1349,6 @@
       "replacedBy": "client/ui-plugin-manager"
     },
     {
-      "package": "credentials/deepseek-account",
-      "reason": "official account credentials excluded"
-    },
-    {
-      "package": "credentials/deepseek-account-platform",
-      "reason": "official account credentials excluded"
-    },
-    {
       "package": "experimental/inspector",
       "reason": "experimental prototype with no cloud consumer"
     },
@@ -1335,15 +1361,6 @@
       "reason": "experimental prototype with no cloud consumer"
     },
     {
-      "package": "host/product-telemetry-otel",
-      "reason": "product telemetry lane excluded; session telemetry stays on the self-contained session-telemetry-otel",
-      "replacedBy": "session/session-telemetry-otel"
-    },
-    {
-      "package": "llm/llm-deepseek-account",
-      "reason": "account provider excluded; the API-key provider split is carried without it"
-    },
-    {
       "package": "preset/agent-preset",
       "reason": "slated for P5 adoption in the two-package preset migration",
       "replacedBy": "preset/agent-presets"
@@ -1352,51 +1369,6 @@
       "package": "preset/agent-preset-registry",
       "reason": "slated for P5 adoption in the two-package preset migration",
       "replacedBy": "preset/agent-presets"
-    },
-    {
-      "package": "telemetry/otel",
-      "reason": "excluded; session telemetry stays on the self-contained session-telemetry-otel",
-      "replacedBy": "session/session-telemetry-otel"
-    },
-    {
-      "package": "experimental/hook-protocol",
-      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
-      "replacedBy": "hooks/hook-protocol"
-    },
-    {
-      "package": "experimental/hooks-claude-code",
-      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
-      "replacedBy": "hooks/hooks-claude-code"
-    },
-    {
-      "package": "experimental/hooks-codex",
-      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
-      "replacedBy": "hooks/hooks-codex"
-    },
-    {
-      "package": "experimental/skill-badge",
-      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
-      "replacedBy": "skill/skill-badge"
-    },
-    {
-      "package": "experimental/tool-ralph",
-      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
-      "replacedBy": "workflow/tool-ralph"
-    },
-    {
-      "package": "experimental/tool-terminal",
-      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
-      "replacedBy": "terminal/tool-terminal"
-    },
-    {
-      "package": "experimental/tool-session-query",
-      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
-      "replacedBy": "session-query/tool-session-query"
-    },
-    {
-      "package": "experimental/session-title-all-prompts-llm",
-      "reason": "upstream re-mount of in-place carriage; demotion decision pending per UPGRADE-MANIFEST experimental-demotions row",
-      "replacedBy": "session/session-title-all-prompts-llm"
     },
     {
       "package": "experimental/webhook",
@@ -1434,22 +1406,6 @@
       "reason": "upstream plugin distribution lane; carry decision deferred per UPGRADE-MANIFEST plugin-market-lane row"
     },
     {
-      "package": "experimental/badge-skill-bundle",
-      "reason": "bundle wrapper for the skill-badge demotion lane; pending demotion decision"
-    },
-    {
-      "package": "experimental/ralph-bundle",
-      "reason": "bundle wrapper for the tool-ralph demotion lane; pending demotion decision"
-    },
-    {
-      "package": "experimental/terminal-bundle",
-      "reason": "bundle wrapper for the tool-terminal demotion lane; pending demotion decision"
-    },
-    {
-      "package": "experimental/session-titles-bundle",
-      "reason": "bundle wrapper for the session-title demotion lane; pending demotion decision"
-    },
-    {
       "package": "client/ui-deepseek-model-label-1017",
       "reason": "new upstream client surface; carry decision deferred to client phase"
     },
@@ -1458,31 +1414,11 @@
       "reason": "new upstream client surface; carry decision deferred to client phase"
     },
     {
-      "package": "context/harness-dev-context",
-      "reason": "new upstream context lane; carry decision deferred"
-    },
-    {
-      "package": "experimental/claude-code-mods",
-      "reason": "new experimental lane; carry decision deferred to experimental phase"
-    },
-    {
-      "package": "experimental/client-ui-claude-code-mods",
-      "reason": "new experimental lane; carry decision deferred to experimental phase"
-    },
-    {
       "package": "experimental/client-ui-cot-translation",
       "reason": "new experimental lane; carry decision deferred to experimental phase"
     },
     {
       "package": "experimental/cot-translation-bundle",
-      "reason": "new experimental lane; carry decision deferred to experimental phase"
-    },
-    {
-      "package": "experimental/cua",
-      "reason": "new experimental lane; carry decision deferred to experimental phase"
-    },
-    {
-      "package": "experimental/cua-macos",
       "reason": "new experimental lane; carry decision deferred to experimental phase"
     },
     {
@@ -1494,15 +1430,7 @@
       "reason": "new experimental lane; carry decision deferred to experimental phase"
     },
     {
-      "package": "experimental/session-search",
-      "reason": "new experimental lane; carry decision deferred to experimental phase"
-    },
-    {
       "package": "experimental/tool-worktree",
-      "reason": "new experimental lane; carry decision deferred to experimental phase"
-    },
-    {
-      "package": "experimental/translator",
       "reason": "new experimental lane; carry decision deferred to experimental phase"
     },
     {
@@ -1510,12 +1438,19 @@
       "reason": "new experimental lane; carry decision deferred to experimental phase"
     },
     {
-      "package": "ssh/ssh-helper-runtime",
-      "reason": "new upstream lane; carry decision deferred to ssh phase"
+      "package": "experimental/skill-badge",
+      "reason": "retained in-place under its product group; upstream demoted copy swept",
+      "replacedBy": "skill/skill-badge"
     },
     {
-      "package": "web/web-deepseek-api",
-      "reason": "new upstream lane; carry decision deferred to web phase"
+      "package": "experimental/tool-ralph",
+      "reason": "retained in-place under its product group; upstream demoted copy swept",
+      "replacedBy": "workflow/tool-ralph"
+    },
+    {
+      "package": "experimental/tool-terminal",
+      "reason": "retained in-place under its product group; upstream demoted copy swept",
+      "replacedBy": "terminal/tool-terminal"
     }
   ],
   "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json"

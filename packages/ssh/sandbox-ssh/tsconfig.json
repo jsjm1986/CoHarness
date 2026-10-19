@@ -12,10 +12,13 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../ssh"
+      "path": "../../../vendor/schemastery"
     },
     {
       "path": "../../sandbox/sandbox"
+    },
+    {
+      "path": "../ssh"
     }
   ]
 }

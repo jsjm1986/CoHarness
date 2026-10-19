@@ -33,7 +33,7 @@ describe('SessionRuntimePool', () => {
     const baseApi = new FakeApiClient()
     const projectApi = new FakeApiClient()
     projectApi.onList = () => Promise.resolve(ok({ items: [{
-      sessionId: 'project-session' as SessionId,
+      agentAvailable: true, sessionId: 'project-session' as SessionId,
       updatedAt: 10,
       running: false,
       blank: false,
@@ -96,7 +96,7 @@ describe('SessionRuntimePool', () => {
     const baseApi = new FakeApiClient(), projectApi = new FakeApiClient()
     const id = 'shared' as SessionId
     const key = clientSessionKey({ kind: 'project', projectId: 7 }, id)
-    projectApi.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    projectApi.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false, agentAvailable: true }] })
     const description = { version: 'fixture', cwd: '/project', attachedSessions: 0, home: '/fixture', canOpenPath: true }
     const host = createSnapshotStore<typeof description | undefined>(undefined)
     const rootRead = vi.fn(() => Promise.reject(new Error('A withdrawn project cannot read the root catalog')))
@@ -144,7 +144,9 @@ describe('SessionRuntimePool', () => {
     const baseApi = new FakeApiClient()
     const projectApi = new FakeApiClient()
     const id = 'project-owned' as SessionId
-    projectApi.onList = () => Promise.resolve(ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: true }] }))
+    projectApi.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: id, updatedAt: 1, running: false, blank: true, agentAvailable: true }],
+    }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
     const stop = vi.fn()
     const targetConnection: ConnectionHandle = {
@@ -183,7 +185,7 @@ describe('SessionRuntimePool', () => {
     await ctx.plugin(() => {}).await()
     const baseApi = new FakeApiClient(), projectApi = new FakeApiClient()
     const id = 'joining' as SessionId
-    projectApi.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    projectApi.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false, agentAvailable: true }] })
     const directory = Promise.withResolvers<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
     projectApi.onWorkspaceList = () => directory.promise
     let sinks: Parameters<ConnectionHandle['start']>[0] | undefined
@@ -247,7 +249,7 @@ describe('SessionRuntimePool', () => {
     const baseApi = new FakeApiClient()
     const projectApi = new FakeApiClient()
     projectApi.onList = () => Promise.resolve(ok({ items: [{
-      sessionId: 'project-session' as SessionId,
+      agentAvailable: true, sessionId: 'project-session' as SessionId,
       updatedAt: 10, running: false, blank: false, cwd: '/projects/demo',
     }] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
@@ -334,7 +336,7 @@ describe('SessionRuntimePool', () => {
     const ctx = new Context()
     const baseApi = new FakeApiClient()
     baseApi.onList = () => Promise.resolve(ok({ items: [{
-      sessionId: 'base-session' as SessionId,
+      agentAvailable: true, sessionId: 'base-session' as SessionId,
       updatedAt: 1, running: false, blank: false, cwd: '/home/test',
     }] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
@@ -354,7 +356,7 @@ describe('SessionRuntimePool', () => {
     const baseApi = new FakeApiClient()
     const id = 'archived-session' as SessionId
     baseApi.onList = () => Promise.resolve(ok({ items: [{
-      sessionId: id, updatedAt: 1, running: false, blank: false, cwd: '/home/test',
+      sessionId: id, updatedAt: 1, running: false, blank: false, agentAvailable: true, cwd: '/home/test',
     }] }))
     baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [id] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
@@ -371,7 +373,7 @@ describe('SessionRuntimePool', () => {
     const id = 'archived-session' as SessionId
     const key = clientSessionKey({ kind: 'personal' }, id)
     baseApi.onList = () => Promise.resolve(ok({ items: [{
-      sessionId: id, updatedAt: 1, running: false, blank: false, cwd: '/home/test',
+      sessionId: id, updatedAt: 1, running: false, blank: false, agentAvailable: true, cwd: '/home/test',
     }] }))
     baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [id] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
@@ -393,7 +395,7 @@ describe('SessionRuntimePool', () => {
     const id = 'session-1' as SessionId
     const key = clientSessionKey({ kind: 'personal' }, id)
     baseApi.onList = () => Promise.resolve(ok({ items: [{
-      sessionId: id, updatedAt: 1, running: false, blank: false, cwd: '/home/test',
+      sessionId: id, updatedAt: 1, running: false, blank: false, agentAvailable: true, cwd: '/home/test',
     }] }))
     baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
@@ -416,7 +418,7 @@ describe('SessionRuntimePool', () => {
     const projectApi = new FakeApiClient()
     const projectSession = 'project-hit' as SessionId
     projectApi.onList = () => Promise.resolve(ok({ items: [{
-      sessionId: projectSession, updatedAt: 1, running: false, blank: false, cwd: '/projects/demo',
+      sessionId: projectSession, updatedAt: 1, running: false, blank: false, agentAvailable: true, cwd: '/projects/demo',
     }] }))
     baseApi.onSearch = () => Promise.resolve(ok({ items: [{ sessionId: 'base-hit' as SessionId, snippet: 'b' }], hasMore: false }))
     projectApi.onSearch = () => Promise.resolve(ok({ items: [{ sessionId: projectSession, snippet: 'p' }], hasMore: true }))
@@ -445,7 +447,7 @@ describe('SessionRuntimePool Workspace resources', () => {
     const api = new FakeApiClient()
     const id = 'private' as SessionId
     const key = clientSessionKey({ kind: 'project', projectId: 7 }, id)
-    api.onList = async () => ok({ items: [{ sessionId: id, title: 'Private content', updatedAt: 1, running: false, blank: false }] })
+    api.onList = async () => ok({ items: [{ sessionId: id, title: 'Private content', updatedAt: 1, running: false, blank: false, agentAvailable: true }] })
     const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
     const invalidate = vi.fn(() => {
       expect(pool.list.getSnapshot().ids).toEqual([])
@@ -485,7 +487,7 @@ describe('SessionRuntimePool Workspace resources', () => {
     const baseApi = new FakeApiClient()
     const projectApi = new FakeApiClient()
     projectApi.onList = () => Promise.resolve(ok({ items: [{
-      sessionId: 'project-session' as SessionId,
+      agentAvailable: true, sessionId: 'project-session' as SessionId,
       updatedAt: 10, running: false, blank: false, cwd: '/projects/demo',
     }] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
@@ -542,7 +544,7 @@ it('retains four colliding Host IDs with independent scopes, payloads, holds, an
   const targets = [{ kind: 'personal' as const }, ...[7, 8, 9].map(projectId => ({ kind: 'project' as const, projectId }))]
   const apis = targets.map((_target, index) => {
     const api = new FakeApiClient()
-    api.onList = () => Promise.resolve(ok({ items: [{ sessionId: id, title: `runtime ${index}`, updatedAt: 1, blank: false, running: false }] }))
+    api.onList = () => Promise.resolve(ok({ items: [{ sessionId: id, title: `runtime ${index}`, updatedAt: 1, blank: false, agentAvailable: true, running: false }] }))
     return api
   })
   const dispatch = vi.fn()
@@ -588,7 +590,7 @@ it('forwards pooled job reads and kills to the owner runtime under the original 
   const baseApi = new FakeApiClient()
   const projectApi = new FakeApiClient()
   projectApi.onList = () => Promise.resolve(ok({ items: [{
-    sessionId: 'project-session' as SessionId,
+    agentAvailable: true, sessionId: 'project-session' as SessionId,
     updatedAt: 10,
     running: false,
     blank: false,

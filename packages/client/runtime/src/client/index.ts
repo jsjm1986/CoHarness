@@ -6,6 +6,7 @@ import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/c
 // project sits in the Host build graph.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { TypertContext } from '@deepseek-ai/dsh-typert-protocol'
+import { typertOwnedValue } from '@deepseek-ai/dsh-typert-protocol'
 import type { MaybeSnapshotSelectorHook, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from './slots.ts'
 import { SessionRuntime } from './sessions/service.ts'
@@ -28,6 +29,7 @@ export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-ho
 
 export { NavigationController, commitSessionNavigation } from './navigation.ts'
 export { SlotRegistry } from './slots.ts'
+export { ConversationDefinitionRegistry } from './conversation/definition-registry.ts'
 export { ConversationEventRegistry } from './conversation/event-registry.ts'
 export { ConversationViewRegistry } from './conversation/view-registry.ts'
 export { ConversationNodeAssembler } from './sessions/conversation-assembler.ts'
@@ -46,7 +48,7 @@ export type {
 } from './contract/conversation.ts'
 export type { ConversationRuntime } from './sessions/conversation-assembler.ts'
 export type { RootOwnerProps } from './slots.ts'
-export { SessionCreateError, SessionRuntime, scopeOf, workspaceTitleOf } from './sessions/service.ts'
+export { SessionCreateError, SessionForkError, SessionRuntime, scopeOf, workspaceTitleOf } from './sessions/service.ts'
 export { SessionRuntimePool } from './sessions/pool.ts'
 export { indexSubagentDescendants } from './sessions/subagent-lineage.ts'
 export type { SubagentDescendantSummary } from './sessions/subagent-lineage.ts'
@@ -54,6 +56,11 @@ export type { SubagentDescendantSummary } from './sessions/subagent-lineage.ts'
 // materialization/projection implementation; no test-side mirror to drift).
 export { SessionProvideChannel } from './sessions/provide.ts'
 export type { SessionProvideChannelHost } from './sessions/provide.ts'
+export { MutableSessionEventSource } from './contract/events.ts'
+export type {
+  SessionAssistantSettlementEntry, SessionEventChange, SessionEventLikeEntry, SessionEventSource,
+  SessionEventWindow, SessionLiveEventEntry, SessionTransientEventEntry,
+} from './contract/events.ts'
 export { createScope, scopeIdentityOf } from './scope.ts'
 export type { AgentScopeHandle } from './scope.ts'
 export { DirectoryBrowseError, WorkspaceArchiveError, WorkspaceCreateError, WorkspaceRuntime } from './workspaces/service.ts'
@@ -114,7 +121,7 @@ export type {
   DirectoryEntry, DirectoryListing, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-connection/client'
 // Runtime owns the snapshot store; ui-renderer only binds it to React.
-export { createSnapshotStore, defineStore, shallowEqual } from './contract/store.ts'
+export { createSnapshotStore, defineStore, notifySubscribers, shallowEqual } from './contract/store.ts'
 export type {
   EngineStoreHandle, EngineStoreInstance, ObservableSnapshot, SnapshotStore,
 } from './contract/store.ts'
@@ -328,6 +335,10 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => { permissionCatalog.dispose() }, 'runtime: permission catalog directory')
   ctx.typert.contexts.registerClient('agent', {
     identity: candidate => sessions.sessionOf(candidate)?.sessionId,
+    resolve: (sessionId) => {
+      const reference = sessions.retain(sessionId, { source: 'controllerOperation' })
+      return typertOwnedValue(reference.binding.ctx, () => { reference.release() })
+    },
   })
   const workspaces = new WorkspaceRuntime(ctx, connection.api, sessions)
   ctx.effect(

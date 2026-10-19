@@ -14,7 +14,7 @@ DSH 只能从用户已知的 spec 安装第三方组合包（bundle）：npm 包
 
 ## 决策
 
-**索引**与**索引生成器**相互分离。DSH 定义并读取一种 JSON 索引格式。索引如何生成、基于哪份源列表生成，由生成器负责。[`dsh-plugin-market-index`](../../../../packages/util/plugin-market-index/README.zh.md) 是可执行的规则集；[发现 Agent Note](2026-10-02-plugin-market-discover.zh.md) 记录 DSH 如何读取和展示索引。索引列出[profile 插件组合包](../../implemented/architecture/2026-08-05-profile-plugin-bundles.zh.md)，并通过[引导式插件安装](../../implemented/architecture/2026-09-15-guided-plugin-installation.zh.md)安装它们。
+**索引**与**索引生成器**相互分离。DSH 定义并读取一种 JSON 索引格式。索引如何生成、基于哪份源列表生成，由生成器负责。`dsh-plugin-market-index` 是可执行的规则集；[发现 Agent Note](2026-10-02-plugin-market-discover.zh.md) 记录 DSH 如何读取和展示索引。索引列出[profile 插件组合包](../../implemented/architecture/2026-08-05-profile-plugin-bundles.zh.md)，并通过[引导式插件安装](../../implemented/architecture/2026-09-15-guided-plugin-installation.zh.md)安装它们。
 
 市场复用 npm 的包名、版本、范围、发布标签和 person 声明。读取器与生成器使用维护中的 npm 解析器和校验器。新增字段或改变含义需要 npm 无法满足的插件市场需求。
 

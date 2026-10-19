@@ -48,8 +48,8 @@
   en: 48922e284adddd1b
   zh: 9956dcc57e027d77
 /deepseek-ai-dsh-session-query/further-exploration:
-  en: e2ba4c0b94d31d3b
-  zh: 74ec90f71b923d68
+  en: be59d6143c8daa60
+  zh: 4ee0009b370770b6
 /deepseek-ai-dsh-session-query/model-experience:
   en: dff12da8d1e64e66
   zh: e054b0d54e29f899
@@ -63,5 +63,5 @@
   en: d2f0d68fe29fb750
   zh: 323d21ee73a9e3f6
 /deepseek-ai-dsh-session-query/known-limitations-and-deferred-work/dev-note/future-extractor-and-search-provider-registries:
-  en: 605a72e65297c6cf
-  zh: 6b20da6aa73742ea
+  en: a02f189af688d9ff
+  zh: c2575a9a626c4b2b

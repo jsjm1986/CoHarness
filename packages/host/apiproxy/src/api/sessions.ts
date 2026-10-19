@@ -8,12 +8,13 @@ import type { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { ModelModality } from '@deepseek-ai/dsh-llm'
 import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
-import type { SessionDraftId, SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionDraftId, SessionEvent, SessionId, SessionRequestId } from '@deepseek-ai/dsh-session/types'
+import type { Principal } from '@deepseek-ai/dsh-typert-protocol'
 export type { SessionDraftId } from '@deepseek-ai/dsh-session/types'
 // The pure-type outlet: api/ is browser-importable, and the package root's
 // cordis Context merge (via dsh-agent) must not enter client aggregates.
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
-import type { RpcId, RpcRequest, RpcResponse } from './rpc.ts'
+import type { RpcRequest, RpcResponse } from './rpc.ts'
 import type { QueuedInboxItem, ToolEventView } from './events.ts'
 import type { WorkspaceId } from './workspace.ts'
 import type { UserDocIdType, UserDocPromptAttachment } from '@deepseek-ai/dsh-userdoc'
@@ -96,8 +97,10 @@ declare module '@deepseek-ai/dsh-llm' {
      */
     'user-rpc': {
       kind: 'user'
-      rpcId: RpcId
+      rpcId: SessionRequestId
       clientTimeZone?: string
+      /** Wire principal for a caller other than the owner; absent means the owner. */
+      principal?: Principal
       /** Authenticated project participant permanently attributed to this prompt. */
       participant?: AuthenticatedParticipant
       /** Host-admitted snapshots; never accepted from a client as paths or text. */
@@ -279,6 +282,8 @@ export type QueueAction =
 
 /** One Session list entry. */
 export interface SessionSummary {
+  /** Whether this Session currently owns a live Agent. */
+  agentAvailable: boolean
   sessionId: SessionId
   /**
    * The later of creation and the latest human-authored prompt. Attached
@@ -522,7 +527,7 @@ export interface SessionsApi {
     content: PromptContentPart[]
     clientTimeZone?: string
     /** Optional browser-owned identity used to reconcile an optimistic submission echo. */
-    requestId?: RpcId
+    requestId?: SessionRequestId
   }>):
   Promise<RpcResponse<{ accepted: true }>>
 

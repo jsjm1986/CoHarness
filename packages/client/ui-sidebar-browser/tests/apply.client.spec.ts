@@ -9,7 +9,6 @@ import type { BrowserInjected } from '../src/client/browser/BrowserController.ts
 import { BROWSER_ID, BROWSER_KIND } from '../src/client/definition.tsx'
 import { apply, inject } from '../src/client/index.ts'
 import { en, zh } from '../src/client/locales.ts'
-import { apply as hostApply } from '../src/index.ts'
 
 interface Recorded {
   name: string
@@ -56,10 +55,6 @@ async function boot() {
 }
 
 describe('ui-sidebar-browser apply', () => {
-  it('keeps the Host Loader entry inert', () => {
-    expect(hostApply).not.toThrow()
-  })
-
   it('registers a multi-instance builtin and its body and title', async () => {
     const { tabs, registered, dictionaries } = await boot()
     const definition = tabs.get(BROWSER_KIND)

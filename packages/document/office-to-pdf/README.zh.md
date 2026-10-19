@@ -31,9 +31,7 @@ kind: "package-reference"
 
 此 provider 依赖独立发布的 [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-ai/dsh-libreoffice-kit) npm API，kit 版本为 `^0.1.5`。应用打包选择 kit 的 `optionalDependencies` 中声明的匹配原生包；目标没有声明原生包时选择 WASM。已声明的原生引擎缺失时拒绝打包，不会选择 WASM。[发布归属决策](../../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.zh.md)定义独立 kit 与 Harness 各自的职责。
 
-Linux WASM 部署需要 kit 默认目录或 `fontDirectories` 中存在可用字体；没有字体的镜像会以 `unavailable` 失败。发行版的 DejaVu、Noto CJK 等字体包可提供拉丁文字及中日韩渲染支持。仅安装引擎并不能证明具备文档渲染能力。
-
-浏览器通过现有 [ApiProxy](../../host/apiproxy/README.zh.md) 调用 `workspaceFiles.renderOffice`。该入口在查询转换缓存前授权会话及相对路径，队列准入后通过有界且受版本保护的 FS 窗口读取，并在返回前复核权限和源身份。响应包含源相对路径、版本、base64 PDF、缺失字体和转换代次。转换器不提供另一套 Remote 文件服务；进程内 `convert()` 接受已授权的延迟读取。
+浏览器通过 `officeToPdf.render` Remote 方法请求 PDF，参数为 Session 标识、Office 路径和优先级。此入口使用 `workspaceFiles` 完成授权和源版本检查，再通过 `fs.readBytes` 在转换预留容量内读取原始字节。进程内 `convert()` 不要求这些服务。响应保留源文件路径与版本，通过二进制 Remote 的 multipart 传输携带原生 PDF 字节，并携带缺失字体和转换 generation。`officeToPdf.generation` Remote 方法返回当前提供方 generation；`api/remotes` 负责挂载生成的 Client 描述符。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -52,7 +50,7 @@ Linux WASM 部署需要 kit 默认目录或 `fontDirectories` 中存在可用字
 
 准入在调用源读取前限制排队元数据、未完成读取方、活动源字节预留和转换。未知源大小预留 `maxInputBytes`；已知大小预留 stat 字节数。读取收到该容量，最多额外读取一个超限哨兵字节。`maxSourceBytes` 必须覆盖 `maxInputBytes`。最后一个读取方额度预留给前台。`maxBackgroundConversions` 设为零时，拒绝后台读取方加入排队或运行中的工作；仍可命中已完成的别名缓存。只要仍有前台任务排队，后台任务就继续等待，包括前台正在等待源容量的情况。前台加入会提升排队预热；最后一个前台读取方离开后，排队任务恢复后台优先级，符合条件的工作可立即开始。前台准入也可移除排队推测工作。总并发大于一时，后台并发为前台保留一个槽位。正在运行的预热即使被提权，也保留后台准入槽位直至结束。最后一个读取方取消共享工作。移除排队的前台阻塞任务后，其他符合条件的工作立即准入；实际读取、转换和清理完成前仍保留活动预留容量。
 
-默认保留 8 个 PDF、128 MiB 和 64 个源别名，准入 32 个读取方与 8 个排队任务，最多预留 100 MiB 源字节，并允许一个后台转换。这些限制约束拥有的请求和二进制载荷，不约束引擎 RSS、base64 传输膨胀、调用方保留的结果或 PDF.js 页面渲染。
+默认保留 8 个 PDF、128 MiB 和 64 个源别名，准入 32 个读取方与 8 个排队任务，最多预留 100 MiB 源字节，并允许一个后台转换。这些限制约束拥有的请求和二进制载荷，不约束引擎 RSS、multipart 封装、调用方保留的结果或 PDF.js 页面渲染。
 
 -----
 
@@ -66,7 +64,7 @@ Linux WASM 部署需要 kit 默认目录或 `fontDirectories` 中存在可用字
 
 每个并发槽按需创建并复用一个 kit 转换器。提供方将已授权输入写入私有临时目录，读取有大小上限的普通 PDF 文件，并在完成前删除目录。取消已准入的读取方不会阻塞后续排队工作。读取方取消只会释放该读取方；最后一个读取方和提供方卸载会取消共享工作。卸载向未完成读取方报告 `unavailable`，并等待转换及转换器清理结束。
 
-ApiProxy 文件读取器负责请求授权与取消；转换器负责已准入读取、转换、缓存及引擎清理。源读取失败直接传递，转换失败仅暴露分类原因，不暴露引擎诊断。
+Remote 文件读取在查询转换缓存前重新检查内容读取授权和源版本。延迟读取在取得转换容量后执行，并在读取后验证源版本。源读取失败直接传递；转换失败返回 `document-render/failed` 及分类原因，不暴露引擎诊断。卸载会取消并等待授权读取、Remote 请求和转换工作全部结束。
 
 </details>
 
@@ -76,10 +74,8 @@ ApiProxy 文件读取器负责请求授权与取消；转换器负责已准入�
 ## 延伸阅读
 
 - [Office 转 PDF](../../../docs/subsystems/office-to-pdf.zh.md) — 组合与输入、结果所有权。
-- [工作区文件](../../host/apiproxy/README.zh.md) — Session 文件授权与有界读取。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -90,7 +86,6 @@ ApiProxy 文件读取器负责请求授权与取消；转换器负责已准入�
 
 无；转换不会构造或修改模型请求。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>

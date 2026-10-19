@@ -16,6 +16,12 @@
     },
     {
       "path": "../../util/brand"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../fs/fs"
     }
   ]
 }

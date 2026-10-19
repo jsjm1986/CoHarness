@@ -6,7 +6,7 @@ English | [中文](2026-10-14-webworker-preview-profile-parity.zh.md)
 
 ## Problem
 
-The browser Preview ([webworker-runtime](../../../../packages/experimental/webworker-runtime/README.md), [webworker-packer](../../../../packages/experimental/webworker-packer/README.md)) can receive its boot configuration at pack time: the packer runs `dsh --profile web --dump-config` against a temporary home and writes the output to the image's `config/cordis.yml`; the Worker then inserts the whole configuration back as the profile's own patch (one `insert`). Measured on such an image, this has three consequences:
+The browser Preview (webworker-runtime, webworker-packer) can receive its boot configuration at pack time: the packer runs `dsh --profile web --dump-config` against a temporary home and writes the output to the image's `config/cordis.yml`; the Worker then inserts the whole configuration back as the profile's own patch (one `insert`). Measured on such an image, this has three consequences:
 
 | Symptom | Cause |
 |---|---|
@@ -97,9 +97,9 @@ The trade-off costs:
 
 ## Testing
 
-- [profile-image.spec.ts](../../../../packages/experimental/webworker-packer/tests/profile-image.spec.ts) pins the roster (template bundles, every optional bundle, and the packages their patch rows name) and an image that records the profile and installation and carries only the installation manifest.
-- [lazy-chunks.spec.ts](../../../../packages/experimental/webworker-packer/tests/lazy-chunks.spec.ts) pins one archive per `require.async` chunk, identical archive names and bytes across packs, refusal of an unpublished chunk, and `./client` export targets kept in the base image.
-- [lazy-archive.spec.ts](../../../../packages/experimental/webworker-runtime/tests/storage/lazy-archive.spec.ts) pins registration answers, `ERR_DSH_VFS_DEFERRED` refusals, the unchanged rename destination, removal and seeding, one shared fetch, retry after a failed fetch, and the waiting `node:fs` faces.
-- [require-builtin.spec.ts](../../../../packages/experimental/webworker-runtime/tests/node/require-builtin.spec.ts) pins the provided internal modules, refusal of other ids with the platform code, the cascaded loader, the members HMR replaces, and the reported Node version; [fs-watch-context.spec.ts](../../../../packages/experimental/webworker-runtime/tests/node/fs-watch-context.spec.ts) pins watcher listeners running in the watcher's creation context.
-- [bootstrap-route.host.spec.ts](../../../../packages/experimental/inspector/tests/bootstrap-route.host.spec.ts) pins Inspector degradation; [transport.client.spec.ts](../../../../packages/client/hmr/tests/transport.client.spec.ts) pins the page-transport event stream; [node-half.client.spec.ts](../../../../packages/client/modules/tests/node-half.client.spec.ts) pins the chunk read retry.
-- [preview-boot.e2e.ts](../../../../apps/web/tests/preview-boot.e2e.ts) boots the packed Worker deployment, requests a lazy chunk through the tunnel, switches every optional bundle on and off, checks the session-titles and inspector-profile rows, and mounts an enabled bundle's Client plugin without a reload. The image sizes are measured, not pinned by a test.
+- profile-image.spec.ts pins the roster (template bundles, every optional bundle, and the packages their patch rows name) and an image that records the profile and installation and carries only the installation manifest.
+- lazy-chunks.spec.ts pins one archive per `require.async` chunk, identical archive names and bytes across packs, refusal of an unpublished chunk, and `./client` export targets kept in the base image.
+- lazy-archive.spec.ts pins registration answers, `ERR_DSH_VFS_DEFERRED` refusals, the unchanged rename destination, removal and seeding, one shared fetch, retry after a failed fetch, and the waiting `node:fs` faces.
+- require-builtin.spec.ts pins the provided internal modules, refusal of other ids with the platform code, the cascaded loader, the members HMR replaces, and the reported Node version; fs-watch-context.spec.ts pins watcher listeners running in the watcher's creation context.
+- bootstrap-route.host.spec.ts pins Inspector degradation; [transport.client.spec.ts](../../../../packages/client/hmr/tests/transport.client.spec.ts) pins the page-transport event stream; [node-half.client.spec.ts](../../../../packages/client/modules/tests/node-half.client.spec.ts) pins the chunk read retry.
+- preview-boot.e2e.ts boots the packed Worker deployment, requests a lazy chunk through the tunnel, switches every optional bundle on and off, checks the session-titles and inspector-profile rows, and mounts an enabled bundle's Client plugin without a reload. The image sizes are measured, not pinned by a test.

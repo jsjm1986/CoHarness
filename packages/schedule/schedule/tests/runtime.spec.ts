@@ -7,6 +7,7 @@ import {
   createAfterScheduleRecord, createAtScheduleRecord, createDailyScheduleRecord, createEveryScheduleRecord, ScheduleId,
 } from '../src/domain.ts'
 import type { ScheduleTask } from '../src/storage.ts'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { harness, agentFor } from './harness.ts'
 
 const tests: Awaited<ReturnType<typeof harness>>[] = []
@@ -113,11 +114,7 @@ describe('Host Schedule timer', () => {
     const start = Date.now()
     const tasks = [task(createAfterScheduleRecord(ScheduleId('rollback-failure'), 'Later', 2, start, 'Later'))]
     const test = await setup(tasks)
-    const error = {
-      code: 'session-not-found' as const,
-      message: 'Session unavailable',
-      details: { sessionId: SessionId('original') },
-    }
+    const error = new RemoteError('session/not-found', 'Session unavailable', { sessionId: SessionId('original') })
     test.resolve.mockImplementationOnce(async () => {
       vi.setSystemTime(start)
       if (mode === 'rejected') throw error

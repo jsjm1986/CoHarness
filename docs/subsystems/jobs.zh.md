@@ -395,6 +395,51 @@ type JobEventFilter =
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxjobcontroller--jobcontroller"></a>
+
+### `ctx.jobController` — `JobController`
+
+Host service backing the generated `ctx.remote.job` namespace.
+
+```ts cordis-catalog
+/**
+ * Stream the jobs one session can see — its own plus every unowned job —
+ * as whole-set frames: one on open, then one after each coalesced burst of
+ * lifecycle commits. The stream has no natural end; the carrier closes it.
+ * @param request - the session whose visible set to mirror.
+ * @param signal - cancellation owned by the Remote stream carrier.
+ * @returns the roster frames.
+ */
+@Remote({ mode: 'stream' }) list(request: JobListRequest, signal: AbortSignal): AsyncIterable<JobListFrame>
+
+/**
+ * Stream one job's retained output from an absolute byte offset, then its
+ * terminal projection once settled and drained. Non-consuming: the
+ * model-facing cursor and notice state never observe these reads. The
+ * request's session is the fenced read's caller; the registry rejects a
+ * job the session cannot see and an unknown job.
+ * @param request - target job, owning session, and optional resume offset.
+ * @param signal - cancellation owned by the Remote stream carrier.
+ * @returns anchor, coalesced output frames, and the terminal status.
+ */
+@Remote({ mode: 'stream' }) follow(request: JobFollowRequest, signal: AbortSignal): AsyncIterable<JobFollowFrame>
+
+/**
+ * Kill one background job on a human's behalf. The request's session is
+ * the fenced read's caller, so the job must be one that session can see:
+ * the registry's owner fence is the only access rule, and a child session's
+ * own jobs are killable from its list like any other. The kill records
+ * `cancelled by the user` as its reason; it is not one the model requested,
+ * so the owning agent still receives the completion notice, and a shell
+ * tool waiting on that job reads the reason in its own result.
+ * @param request - Session whose job list carries the job, and the job id.
+ * @returns the registry's admission of the kill request.
+ */
+@Remote('kill') kill(request: JobKillRequest): JobKillValue
+```
+
+Source: [`packages/api/job-controller/src/index.ts`](../../packages/api/job-controller/src/index.ts)
+
 <a id="ctxjobs--jobregistry-abstract-seam"></a>
 
 ### `ctx.jobs` — `JobRegistry` (abstract seam)

@@ -9,25 +9,28 @@
   ],
   "references": [
     {
-      "path": "../../ptc-runtime/ptc-runtime"
-    },
-    {
-      "path": "../../util/timeout"
-    },
-    {
-      "path": "../../util/values"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../ptc-runtime/ptc-runtime"
     },
     {
       "path": "../../sandbox/sandbox"
     },
     {
       "path": "../../sandbox/sandbox-policy"
+    },
+    {
+      "path": "../../util/timeout"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

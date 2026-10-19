@@ -9,13 +9,13 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
 import { initProfile, mountRootInclude, readProfilePatches, type ProfileContext } from '@deepseek-ai/dsh-app-boot'
 import ConfigEditor from '@deepseek-ai/dsh-config-editor'
-import Settings from '@deepseek-ai/dsh-settings'
+import FileSettingsProvider from '@deepseek-ai/dsh-settings-file'
 import Hmr from '@deepseek-ai/dsh-hmr'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import ComputerUseRegistry from '@deepseek-ai/dsh-computer-use'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
-import FileSystem from '@deepseek-ai/dsh-fs-local'
 import UserQuestions from '@deepseek-ai/dsh-user-questions'
+import FileSystem from '@deepseek-ai/dsh-fs-local'
 import NodeRuntime from '@deepseek-ai/dsh-ptc-runtime-node'
 import Sandbox from '@deepseek-ai/dsh-sandbox-local'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
@@ -654,7 +654,7 @@ it('stores signed application consent in the current profile and refuses unavail
   native.request.mockResolvedValue({ appHandle: 'task-app', pid: 17, name: 'Fixture',
     authorization: { id: 'a'.repeat(64), name: 'Fixture', executablePath: '/fixture/app', persistable: true } })
   expect((await f.execute('getApp', { selector: 'Fixture' })).isError).toBe(false)
-  await f.ctx.plugin(Settings)
+  await f.ctx.plugin(FileSettingsProvider, { path: join(dir, 'settings.yaml'), watch: false })
   await f.ctx.plugin(Timer)
   await f.ctx.plugin(Hmr, { root: [], ignored: [], debounce: 0 })
   await f.ctx.hmr.runExclusive(async () => {})

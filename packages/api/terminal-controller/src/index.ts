@@ -275,7 +275,7 @@ export class TerminalController extends TypertRemoteService {
     const combined = AbortSignal.any([signal, authority.signal, owner.lifetime.signal])
     const key = `${this.ownerKey(agent.id, authority.creator)}${id}${attachmentId}`
     const channel = this.attachmentChannel(key)
-    combined.addEventListener('abort', () => channel.end(), { once: true })
+    combined.addEventListener('abort', () => { channel.end() }, { once: true })
     try {
       for await (const frame of terminal.attach(channel.iterable, this.config, combined)) {
         combined.throwIfAborted()
@@ -284,25 +284,6 @@ export class TerminalController extends TypertRemoteService {
     } finally {
       this.attachments.delete(key)
     }
-  }
-
-  /**
-   * Retain an existing terminal for a window without activating its Agent or taking input control.
-   * @param sessionId - owning Session identity, including an inactive saved layout.
-   * @param id - retained Host terminal identity.
-   * @param signal - physical Remote stream cancellation.
-   * @returns a hold acknowledgement followed by an open lifetime stream.
-   */
-  @Remote({ mode: 'stream' })
-  retain(sessionId: SessionId, id: WebTerminalId, signal: AbortSignal): AsyncIterable<TerminalRetentionFrame> {
-    for (const owner of this.owners.values()) {
-      if (owner.sessionId !== sessionId) continue
-      const terminal = owner.terminals.get(id)
-      if (terminal !== undefined && owner.closedIds.has(id) !== true && owner.lifetime.signal.aborted !== true) {
-        return terminal.retain(signal)
-      }
-    }
-    throw new RemoteError('terminal/unavailable', 'Terminal is closing or unavailable', {})
   }
 
   /**
@@ -511,21 +492,26 @@ export class TerminalController extends TypertRemoteService {
   }
 
   /** Per-attachment ordered input channel feeding one attach stream. */
-  private attachmentChannel(key: string): { iterable: AsyncIterable<TerminalInput>; push(item: TerminalInput): void; end(): void; sequence: number } {
+  private attachmentChannel(key: string): {
+    iterable: AsyncIterable<TerminalInput>
+    push(item: TerminalInput): void
+    end(): void
+    sequence: number
+  } {
     const queue: TerminalInput[] = []
     let notify: (() => void) | undefined
-    let done = false
+    const state = { done: false }
     const bridge = {
       sequence: 0,
       iterable: (async function* (): AsyncIterable<TerminalInput> {
         for (;;) {
-          while (queue.length === 0 && !done) await new Promise<void>(resolve => { notify = resolve })
+          while (queue.length === 0 && !state.done) await new Promise<void>((resolve) => { notify = resolve })
           if (queue.length === 0) return
           yield queue.shift() as TerminalInput
         }
       })(),
       push(item: TerminalInput) { queue.push(item); notify?.(); notify = undefined },
-      end() { done = true; notify?.() },
+      end() { state.done = true; notify?.() },
     }
     this.attachments.set(key, bridge)
     return bridge

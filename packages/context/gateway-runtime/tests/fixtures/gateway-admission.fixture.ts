@@ -172,6 +172,7 @@ export async function loadGatewayComposition(): Promise<GatewayComposition> {
     throw error
   }
   const port = ctx.webServer.port
+  if (port === undefined) throw new Error('gateway fixture webserver did not bind a port')
   return {
     ctx,
     credential,

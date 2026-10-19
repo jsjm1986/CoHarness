@@ -46,14 +46,14 @@ Enabling or disabling the bundle registers or removes its global tools in the ru
 <a id="further-exploration"></a>
 ## Further Exploration
 
-[Capability implementation](../tool-terminal/README.md)
+[Capability implementation](../../terminal/tool-terminal/README.md)
 
 -----
 
 <a id="model-experience"></a>
 ## Model Experience
 
-Indirectly, through the [capability implementation](../tool-terminal/README.md), which owns model context and results.
+Indirectly, through the [capability implementation](../../terminal/tool-terminal/README.md), which owns model context and results.
 
 #### KV Cache effect
 

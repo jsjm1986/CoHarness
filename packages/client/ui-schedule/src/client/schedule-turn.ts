@@ -10,7 +10,6 @@
  * only the Turn-level card.
  */
 import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
-import { PartialArguments } from '@deepseek-ai/dsh-util-values'
 import type {
   ConversationMatch, ConversationNodeDefinition, ToolResultNode, TurnLocation,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -113,8 +112,6 @@ function createdTask(match: ConversationMatch, call: ScheduleCall): ToolResultNo
     seq: match.event.seq,
     time: match.event.time,
     callId: String(match.event.data.message.source.callId),
-    name: call.name,
-    args: PartialArguments.fromText(call.argsRaw),
     call: { name: call.name, argsRaw: call.argsRaw },
     callTime: call.time,
     content: message.content,

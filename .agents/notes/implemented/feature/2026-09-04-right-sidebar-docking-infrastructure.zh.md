@@ -12,7 +12,7 @@ Agent 产出的文件是最尖锐的案例。产出文件 chip 或 `read` 行的
 
 ## Decision
 
-右列是每会话一份的停靠面（分栏 pane、tab、浮动面板与可撤销的操作序列），由 `ui-sidebar-right` 基于 `ui-dockkit` 引擎持有，取代原来的 Detail 面板。本篇只管这个面：引擎、框架的右列、面板的两种呈现与控件、每会话的状态。面里放什么由别处决定：插件如何声明 tab 类型、打开内容、拿到 props 见[tab 类型与导航](../../../../packages/client/ui-sidebar-right/README.zh.md)；地址背后的活数据见[客户端资源模型](../architecture/2026-09-05-client-resource-model.zh.md)；读工作区文件见[工作区文件服务](../architecture/2026-09-05-workspace-files-service.zh.md)；引导页、文本预览与文件树见[随包类型](../../../../packages/client/ui-sidebar-documentpreview/README.zh.md)。
+右列是每会话一份的停靠面（分栏 pane、tab、浮动面板与可撤销的操作序列），由 `ui-sidebar-right` 基于 `ui-dockkit` 引擎持有，取代原来的 Detail 面板。本篇只管这个面：引擎、框架的右列、面板的两种呈现与控件、每会话的状态。面里放什么由别处决定：插件如何声明 tab 类型、打开内容、拿到 props 见[tab 类型与导航](../../../../packages/client/ui-sidebar-right/README.zh.md)；地址背后的活数据见[客户端资源模型](../architecture/2026-09-05-client-resource-model.zh.md)；读工作区文件见[工作区文件服务](../architecture/2026-09-05-workspace-files-service.zh.md)；引导页、文本预览与文件树见随包类型。
 
 ### 包拓扑
 

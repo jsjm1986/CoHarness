@@ -24,7 +24,7 @@ description: "受管理的子 agent activation 替代前台与 Job 后台委派�
        toolName: subagent
    ```
 
-   本地工具委派需要 Session 持久化。将其与[子 agent 服务及提供方](../../../../packages/subagent/subagent/README.zh.md#use-this-package)一起组合。
+   本地工具委派需要 Session 持久化。将其与[子 agent 服务及提供方](../../../../packages/subagent/subagent/README.zh.md#capabilities)一起组合。
 
 2. 从工具调用中删除 `run_in_background`，并将结果消费方改为读取 `subagentId`。收集完成通知，替代前台输出或 Job 结果。组合了相应控制工具时，使用 `interrupt_agent` 停止当前执行；`send_message` 仅用于本地子级。
 

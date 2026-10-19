@@ -53,7 +53,7 @@ export default defineConfig([
     // it to the shim that re-exports just the fold's leaf modules.
     deps: { ...shared.deps, neverBundle: [/^@deepseek-ai\/(?!dsh-client-runtime)/] },
     alias: {
-      '@deepseek-ai/dsh-client-runtime/client': new URL('./conversation-fold/runtime-client-shim.ts', import.meta.url).pathname,
+      '@deepseek-ai/dsh-client-runtime/client': new URL('./conversation-fold/runtime-client-shim.client.ts', import.meta.url).pathname,
     },
     entry: {
       'session-corpus.worker': 'session-corpus/session-corpus.worker.ts',

@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
@@ -27,6 +30,9 @@
       "path": "../../client/ui-primitives"
     },
     {
+      "path": "../../client/ui-renderer"
+    },
+    {
       "path": "../../client/ui-sidebar"
     },
     {
@@ -36,10 +42,10 @@
       "path": "../../client/ui-tool"
     },
     {
-      "path": "../cordis-client-runner"
+      "path": "../../core/session"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../cordis-client-runner"
     }
   ]
 }

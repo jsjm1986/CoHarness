@@ -287,7 +287,7 @@ describe('createFixtureApi', () => {
     const added = seen[0]
     if (added?.type !== 'host/session-added') throw new Error('session-added frame missing')
     expect(added).toEqual({
-      type: 'host/session-added', sessionId: createdId, blank: true, cwd: '/tmp/fixture',
+      type: 'host/session-added', agentAvailable: true, sessionId: createdId, blank: true, cwd: '/tmp/fixture',
     })
     const list = await api.sessions.list(req({}))
     if (!list.result.ok) throw new Error('list failed')
@@ -802,7 +802,7 @@ describe('createFixtureApi', () => {
     const added = seen[0]
     if (added?.type !== 'host/session-added') throw new Error('session-added frame missing')
     expect(added).toEqual({
-      type: 'host/session-added', sessionId: id, blank: true, cwd: '/tmp/fixture',
+      type: 'host/session-added', agentAvailable: true, sessionId: id, blank: true, cwd: '/tmp/fixture',
     })
     expect(seen[1]).toMatchObject({
       type: 'host/workspace-changed',
@@ -835,7 +835,7 @@ describe('createFixtureApi', () => {
     const added = frames[1]
     if (added?.type !== 'host/session-added') throw new Error('session-added frame missing')
     expect(added).toEqual({
-      type: 'host/session-added', sessionId: preallocated, blank: true,
+      type: 'host/session-added', agentAvailable: true, sessionId: preallocated, blank: true,
       cwd: made.result.value.workspace.path,
     })
 

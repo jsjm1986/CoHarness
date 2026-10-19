@@ -55,11 +55,27 @@
 - `81484f4`：`release/publish.ts`、`publish-npm-baseline.ts` 直取（dist-tag 校验 + 通道核验）；根 devDeps 加 `semver@^7.8.5`/`@types/semver@^7.8.0`，pnpm→11.28.5、smol-toml→^1.9.0；pyproject 吸收 Pillow==12.3.0 + core-metadata 2.4（ruff 保留——我方 ci.yml 仍跑 quality 组；license 保 Apache-2.0 不回退 MIT）。
 - `651c4da`：timeout 注入路径切换为上游语义——`coverageTestTimeoutOptions`/`parseCoverageTestTimeout` 进 config 内联 project（CLI 不转发 hookTimeout/poll），`coverageTestTimeoutArgs` 及其三个调用点（run-gates 双道、run-coverage-partitions）移除；vitest 根道挂 `localWorkerBudget`（本地 maxWorkers≤48，CI 保 Vitest 默认）。我方 `coverage-policy.ts`/`coverage-scoped.ts`/`test-invariants.ts` 抽象层保留——上游内联重构不覆盖。
 
-P1 剩余：
+P1 剩余项核销（随合成合并对账完成）：
 
-- `coverage-partitions.ts` 剩余：`vitest list` 改 JSON 清单（我方 parseListOutput 仍解析文本行）、`.coverage-times.json` 时长史 reporter——我方已有自有 `COVERAGE_TIMINGS_FILE`/`coverageTimingCacheKey`/`readFileDurations` 实现，需对账是否等价或上游新增独有逻辑。
-- `vitest.config.ts` 剩余：`resolvePwshPath` 探测接入（上游用其实现 pwshCoverageExclusions）；`test-invariants.ts` 上游已删但我方有 +14 行自有不变量——保留决策；`sourcePlaneAliases`→`claudeCodeTestingAliases` 改名跟随与否。
-- `run-gates.ts`/`.spec`：加 `ci-unit` 模式、`ConcurrencyDefault` 导出（带诊断来源）、parallelism default 接入 `defaultConcurrency`、sharedHygieneGates；我方 +191 行 CoHarness 车道逐条保留。
-- `ci.yml`：`.coverage-times.json` restore/save 缓存步骤（先核对——我方时长史系统已存在，ci.yml 可能已有等价缓存）；`sandbox.yml`：check:ci:unit 道（依赖 run-gates ci-unit）。
-- `package.json` scripts / `tsconfig.base.json`：上游 ±200 行别名面改动多数挂在未携带包上，随各包携带相位吸收。
-- `gen-third-party-notices.ts`：inspector devtools 披露 import 依赖 P8 的 inspector 携带决策；examples//yao-pkg/ruff 条目上游删除均不适用于我方现状。
+- `coverage-partitions.ts`：JSON 清单已吸收（`vitest list --filesOnly --json` 由 `parseListJson` 解析）；`.coverage-times.json` 时长史经我方 `COVERAGE_TIMINGS_FILE`/`coverageTimingCacheKey` 实现等价覆盖，ci.yml 已带 restore/save 缓存步骤。
+- `vitest.config.ts`：pwsh 豁免经我方 `coverage-policy.ts` 的 `probePwshAvailable`/`resolveCoveragePolicy` 等价覆盖（同一 `resolvePwshPath` 探针、同一排除集，且为可测策略函数——不直取上游内联版）；`test-invariants.ts` +14 行自有不变量保留；别名沿用 `sourcePlaneAliases`，不跟随 `claudeCodeTestingAliases` 改名。
+- `run-gates.ts`：`ci-unit` 模式与 `ConcurrencyDefault` 已在 `b880c436cb5` 落地，`sandbox.yml` 挂 `check:ci:unit`；上游无 `sharedHygieneGates` 符号，等价机制 `hygieneLeafGates` 已在；我方 CoHarness 车道逐条保留。
+- `gen-third-party-notices.ts`：inspector 包不携带（upstreamOnly），devtools 披露段不适用。
+
+## P2–P8 执行记录
+
+- 合成三方合并 `9221e43aee9`（chore(upstream): synthetic three-way merge of dsh-v0.2.1-rc.2）一次性归并全窗口；其后对账逐项修复单侧覆盖损伤：
+  - 依赖段/exports/`dsh` 块被上游版整段覆盖的包（workspace-controller、token-meter、session、cordis-client-runner、ui-layout、ui-settings-plugins、api/gateway、terminal-controller、client-ui-voice-input 等）按 HEAD~1 依赖段 + 上游有效新增条目恢复并集，`verify-package-dependencies` 66 包通过。
+  - `packages/schedule/tool-schedule` 为上游独有重复包——我方 `dsh-schedule` 已自注册 schedule 工具，摘除目录、依赖与目录条目；`dsh-client-ui-chat`/`dsh-client-store` 引用改指我方 `ui-conversation`/`client-runtime`。
+  - 12 个 experimental 降级包按业主决策分流：webhook×2、invariants、in-process-driver、skill-badge、tool-ralph、tool-terminal 原位保留（上游增量移植回 `skill/`、`tool/` 原位目录，摘除 experimental 副本）；hook-protocol、hooks-×2、tool-session-query、session-title-all-prompts-llm 跟随降级。
+  - `tsconfig.base.json` 契约注释与生成区标记重建，`pnpm run gen-tsconfig-paths` 重生成别名面；聚合 tsconfig 摘除失效 reference；`ui-conversation/tsconfig.client.json` 空对象残留修复。
+  - `api/session-controller`、`api/workspace-controller` README 中上游 `remoteAccess`/`typert.resources` ACL 描述改写为我方 `remote-session-routing.ts` 策略表模型；`defensive-patterns` 同步摘除失效机制引用。
+  - 合并误删恢复：119 个我方独有一文件（含 archived Agent Notes 1542 个上游归档三元组整批恢复）、`llm-retry` spec、`agent/scope` invariant 文件、`.oxlintrc` gateway e2e 豁免、`no-unknown-casts.baseline.json` 三方合并重建。
+  - `apiproxy` api 面拆分：`ctx.apiProxy` merge 保留在 `api/index.ts` 契约面 + `index.ts`，connection 侧局部断言取服务槽。
+- 版本面：release 提交统一 bump 策略不变，吸收包随 rc.2 基线（`0.2.1-rc.2.coharness.1`）。
+
+## P9 执行记录
+
+- 矩阵覆盖行核销：删除 `api/session-controller`、`boot/config-editor` 的过期 `not-carried` 覆盖行，`telemetry/otel` 改 adapt（原位保留 + 上游 byte-bounded batching 移植）；矩阵重生成 395 行 / 9,323 文件 / 30 replay。
+- 门禁终验（本分支）：`verify-upgrade-records` 22 份通过、`verify-upstream-sovereignty` 通过（44 tracked / 252 adapted / 51 owned / 2 replaced / 41 upstream-only）、`verify-package-dependencies` 66 包、`verify-cordis-config` 392 项、`verify-md-links` 3,998 文件、`typecheck` run-gates 5/5、`lint` 清零、变更面聚焦测试 763 通过。
+- 生产验收（快照重录/healthz）沿用既有 ACCEPTANCE-RUNBOOK 口径，随发布流程执行。

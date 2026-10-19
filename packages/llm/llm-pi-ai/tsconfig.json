@@ -9,6 +9,18 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
@@ -21,16 +33,16 @@
       "path": "../../fs/fs"
     },
     {
-      "path": "../llm"
-    },
-    {
-      "path": "../model-provider-config"
+      "path": "../../llm/llm"
     },
     {
       "path": "../../settings/settings"
     },
     {
       "path": "../../util/brand"
+    },
+    {
+      "path": "../../util/http-proxy"
     },
     {
       "path": "../../util/launch-environment"
@@ -42,13 +54,10 @@
       "path": "../../util/values"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../llm"
     },
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../model-provider-config"
     }
   ]
 }

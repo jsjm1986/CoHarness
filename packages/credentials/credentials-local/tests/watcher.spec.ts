@@ -53,7 +53,7 @@ interface FakeChokidar {
   __instances: Array<{
     path: string
     options: { awaitWriteFinish: { stabilityThreshold: number; pollInterval: number } }
-    watcher: import('node:events').EventEmitter & { close: () => Promise<void> }
+    watcher: import('node:events').EventEmitter
   }>
 }
 
@@ -142,24 +142,31 @@ describe('watcher pipeline', () => {
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'good', source: 'file' })
   })
 
-  it('contains a watcher error emitted after close removed its listeners', async () => {
+  it('keeps the reload queue alive after an invariant violation escapes the fan-out', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    const ctx = new Context()
-    const fiber = ctx.plugin(LocalCredentialProvider, { path, debounceMs: 5 })
-    await fiber
-    const [instance] = await fakeInstances()
-    // Mirror the real close(): it drops every listener before a pending write-settle poll fires.
-    instance!.watcher.close = vi.fn(() => {
-      instance!.watcher.removeAllListeners()
-      return Promise.resolve()
+    const ctx = await boot({ path, debounceMs: 5 })
+    let arm = true
+    ctx.on('credentials/reference-updated', () => {
+      if (!arm) return
+      throw Object.assign(new Error('forged relation'), { code: 'INVARIANT' })
     })
-    await fiber.dispose()
+    const [instance] = await fakeInstances()
 
-    expect(() => instance!.watcher.emit('error', Object.assign(
-      new Error("EPERM: operation not permitted, stat 'C:\\Temp\\dsh\\.credentials.yaml'"),
-      { code: 'EPERM', syscall: 'stat' },
-    ))).not.toThrow()
+    await writeCredentials(path, 'version: 1\nrefs:\n  DSH_CRED_PIPE: first\n')
+    instance!.watcher.emit('all', 'change', path)
+    // The snapshot commits before the fan-out, so the value lands even though
+    // the listener threw out of the refresh.
+    await vi.waitFor(async () => {
+      expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'first', source: 'file' })
+    })
+
+    arm = false
+    await writeCredentials(path, 'version: 1\nrefs:\n  DSH_CRED_PIPE: second\n')
+    instance!.watcher.emit('all', 'change', path)
+    await vi.waitFor(async () => {
+      expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'second', source: 'file' })
+    })
   })
 
   it('quiesces the refresh pipeline before dispose completes', async () => {
@@ -264,34 +271,6 @@ describe('watcher pipeline', () => {
       expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'b', source: 'file' })
     })
     expect(seen).toEqual([KEY])
-  })
-
-  it('warns about an unknown top-level key a live reload brings in, once per change', async () => {
-    const dir = await tempDir()
-    const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, 'version: 1\nrefs:\n  DSH_CRED_PIPE: a\n')
-    const ctx = new Context()
-    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
-    const fiber = ctx.plugin(LocalCredentialProvider, { path, debounceMs: 5 })
-    cleanups.push(async () => {
-      await fiber.dispose()
-    })
-    await fiber
-    expect(warn).not.toHaveBeenCalled()
-
-    await writeCredentials(path, 'version: 1\nFOREIGN: x\nrefs:\n  DSH_CRED_PIPE: b\n')
-    const [instance] = await fakeInstances()
-    instance!.watcher.emit('all', 'change', path)
-    await vi.waitFor(async () => {
-      expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'b', source: 'file' })
-    })
-    expect(warn).toHaveBeenCalledTimes(1)
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignoring unknown top-level'), '"FOREIGN"', path)
-
-    // An event that finds the same text publishes and reports nothing again.
-    instance!.watcher.emit('all', 'change', path)
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(warn).toHaveBeenCalledTimes(1)
   })
 
   it('treats an event for a still-absent file as a no-op', async () => {

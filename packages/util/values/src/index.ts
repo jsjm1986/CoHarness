@@ -240,3 +240,4 @@ export function deepFreeze<T>(value: T): T {
   }
   return value
 }
+export { PartialArguments, type LengthReadOptions } from './partial-json.ts'

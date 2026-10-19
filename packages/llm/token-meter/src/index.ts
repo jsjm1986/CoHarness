@@ -31,6 +31,12 @@ import { foldSurfaceTokens } from './surface-fold.ts'
 import { priceSurface } from './route-pricing.ts'
 
 export type * from './types.ts'
+// Module-edge re-export: forces the emitted index.d.ts to import the
+// augmentation modules, so consumers loading this package's types activate
+// the SessionProjectionStateMap members these files declare.
+export type * from './usage-projection.ts'
+export type * from './breakdown-projection.ts'
+export type * from './projection.ts'
 
 /**
  * Raw anchor facts captured at the latest successful call; the baseline is

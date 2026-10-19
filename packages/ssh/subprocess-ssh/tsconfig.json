@@ -12,13 +12,16 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../ssh"
+      "path": "../../../vendor/schemastery"
     },
     {
       "path": "../../subprocess/subprocess"
     },
     {
       "path": "../../subprocess/subprocess-local"
+    },
+    {
+      "path": "../ssh"
     }
   ]
 }

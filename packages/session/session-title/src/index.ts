@@ -15,7 +15,7 @@ import type {
 } from '@deepseek-ai/dsh-session'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
-import type {} from '@deepseek-ai/dsh-session-projection'
+import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 // The `title` projection-key declaration lives in src/types.ts (its one home);
 // this re-export projects the type face onto the package root AND keeps the
 // module edge in the emitted index.d.ts, so aggregate programs consuming the
@@ -24,6 +24,21 @@ export type * from './types.ts'
 import { fallbackSessionTitle, normalizeSessionTitle } from './normalize.ts'
 
 export { fallbackSessionTitle, normalizeSessionTitle, truncateTitleUtf8 } from './normalize.ts'
+
+const titleViewSchema: zod.ZodType<string | null> = zod.string().min(1).nullable()
+
+/** Latest logged title text and its client view. */
+export const titleProjectionDefinition = {
+  key: 'title',
+  stateVersion: 1,
+  stateSchema: titleViewSchema,
+  init: () => null,
+  apply: (state: string | null, event: SessionEvent) => (event.type === 'session/title' ? event.data.title : state),
+  wire: {
+    viewSchema: titleViewSchema,
+    view: (state: string | null) => state,
+  },
+} satisfies ProjectionDefinition<'title', string | null>
 
 /** Identifies one session-title provider registration. */
 export type SessionTitleProviderId = Branded<'SessionTitleProviderId'>
@@ -131,6 +146,12 @@ export interface SessionTitleProviderRequest {
   readonly messages: readonly SessionTitleUserMessage[]
   /** Exact current logged main-request route, when one has been recorded. */
   readonly route?: SessionTitleModelIdentity
+  /**
+   * Latest accepted title captured at invocation, including an accepted
+   * fallback whose event may follow the last eligible message. Absent before
+   * any title is accepted. The provider decides whether and how to use it.
+   */
+  readonly currentTitle?: SessionTitleSnapshot
   /** Cancellation for supersession, disposal, timeout composition, or the explicit caller. */
   readonly signal: AbortSignal
 }
@@ -369,15 +390,7 @@ export class SessionTitleService extends Service {
     // string clients list rows read. The unit child activates only when a
     // projection registry is composed (headless assemblies stay unaffected).
     ctx.inject(['sessionProjections'], (projectionCtx) => {
-      const titleSchema = zod.union([zod.string().min(1), zod.null()])
-      projectionCtx.sessionProjections.register<'title', string | null>({
-        key: 'title',
-        stateSchema: titleSchema,
-        init: () => null,
-        apply: (state, event) => (event.type === 'session/title' ? event.data.title : state),
-        wire: { viewSchema: titleSchema, view: state => state },
-        stateVersion: 1,
-      })
+      projectionCtx.sessionProjections.register(titleProjectionDefinition)
     })
 
     // A session announced with events was restored or seeded; backfill its
@@ -642,12 +655,17 @@ export class SessionTitleService extends Service {
       this.assertCurrent(session, work)
       await this.ensureFallback(session)
       this.assertCurrent(session, work)
+      // One snapshot supplies both inputs: messages stop at the scheduled
+      // watermark, while the current title is not bounded by that watermark.
       // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-      const messages = eligibleTitleMessages(session.snapshotEvents(), work.throughSeq)
+      const events = session.snapshotEvents()
+      const messages = eligibleTitleMessages(events, work.throughSeq)
+      const currentTitle = foldSessionTitle(events)
       const result = await work.registration.provider.generate({
         session,
         messages,
         ...route === undefined ? {} : { route },
+        ...currentTitle === undefined ? {} : { currentTitle },
         signal: work.signal,
       })
       this.assertCurrent(session, work)

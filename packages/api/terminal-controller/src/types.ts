@@ -19,6 +19,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 /** A terminal identity scoped to one Session and one Host lifetime. */
 export type WebTerminalId = Branded<'WebTerminalId'>
 
+/** Exclusive input-attachment identity scoped to one Web terminal, assigned by the attaching Client. */
+export type TerminalAttachmentId = Branded<'TerminalAttachmentId'>
+
 /** Acknowledges one physical window hold without taking screen or input control. */
 export interface TerminalRetentionFrame {
   readonly type: 'retained'

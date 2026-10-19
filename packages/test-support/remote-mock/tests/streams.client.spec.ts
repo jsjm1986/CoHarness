@@ -1,6 +1,7 @@
-/** Stream scripts, live stream control, cancellation, and the create() handshake defaults. */
+/** Stream scripts, live stream control, cancellation, and the built-in `$events` opening. */
 import { describe, expect, it } from 'vitest'
-import { RemoteMock, frames, openStream, streamMethod } from '../src/index.ts'
+import type { RemoteStreamHandle } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteMock, frames, openStream, streamHandle, streamMethod } from '../src/index.ts'
 
 const idle = (): AbortSignal => new AbortController().signal
 
@@ -25,7 +26,7 @@ describe('RemoteMock streams', () => {
     await expect(drain(mock.open('s/f', [{ id: 'a' }], idle()))).resolves.toEqual([{ n: 1 }, { n: 2 }])
     expect(mock.log.streams('s/f')).toEqual([{ endpoint: 's/f', args: [{ id: 'a' }], state: 'ended', pushed: 2, seq: 1 }])
     expect(mock.log.streams('other')).toEqual([])
-    expect(() => mock.open('s/g', [], idle())).toThrow('remote-mock: no rule for s/g; registered: events.host, events.mux, host.describe, s/f')
+    expect(() => mock.open('s/g', [], idle())).toThrow('remote-mock: no rule for s/g; registered: $events, s/f')
     expect(mock.log.unmatched()).toEqual([{ endpoint: 's/g', mode: 'stream' }])
   })
 
@@ -40,7 +41,7 @@ describe('RemoteMock streams', () => {
     expect(mock.streams.end('s/f')).toBe(1)
     await expect(drain(b)).resolves.toEqual(['hello', 'only-b', 'both'])
     await expect(drain(a)).rejects.toThrow('gone')
-    expect(mock.log.streams('s/f').map(entry => [entry.state, entry.pushed])).toEqual([['failed', 2], ['ended', 3]])
+    expect(mock.log.streams().map(entry => [entry.state, entry.pushed])).toEqual([['failed', 2], ['ended', 3]])
     expect(mock.streams.push('s/f', 'late')).toBe(0)
   })
 
@@ -65,7 +66,7 @@ describe('RemoteMock streams', () => {
     mock.streams.end('s/f')
     settled.abort()
     await expect(drain(ended)).resolves.toEqual([])
-    expect(mock.log.streams('s/f').map(entry => entry.state)).toEqual(['ended', 'failed', 'ended'])
+    expect(mock.log.streams().map(entry => entry.state)).toEqual(['ended', 'failed', 'ended'])
   })
 
   it('lets a consumer that returns after the producer ended drop the rest, so drained() settles', async () => {
@@ -92,7 +93,7 @@ describe('RemoteMock streams', () => {
     aborted.abort()
     await expect(drain(mock.open('s/f', [], aborted.signal))).resolves.toEqual([])
     await expect(take(mock.open('s/f', [], idle()), 1)).resolves.toEqual(['queued'])
-    expect(mock.log.streams('s/f').map(entry => entry.state)).toEqual(['cancelled', 'cancelled', 'cancelled'])
+    expect(mock.log.streams().map(entry => entry.state)).toEqual(['cancelled', 'cancelled', 'cancelled'])
   })
 
   it('aborts the stream handle signal when the consumer returns', async () => {
@@ -177,15 +178,24 @@ describe('RemoteMock streams', () => {
   it('declares a stream without a script: modeOf answers stream and an open is a stream miss', () => {
     const mock = RemoteMock.create().load({ streams: ['s/declared'] })
     expect(mock.modeOf('s/declared')).toBe('stream')
-    expect(mock.endpoints()).toEqual(['events.host', 'events.mux', 'host.describe', 's/declared'])
-    expect(() => mock.open('s/declared', [], idle())).toThrow('remote-mock: no rule for s/declared; registered: events.host, events.mux, host.describe, s/declared')
+    expect(mock.endpoints()).toEqual(['$events', 's/declared'])
+    expect(() => mock.open('s/declared', [], idle())).toThrow('remote-mock: no rule for s/declared; registered: $events, s/declared')
     expect(mock.log.unmatched()).toEqual([{ endpoint: 's/declared', mode: 'stream' }])
     mock.stream('s/declared', frames(['now']))
     expect(mock.modeOf('s/declared')).toBe('stream')
   })
 
-  it('types a fake stream method with the generated signature', async () => {
-    const method = streamMethod<(prefix: string, signal?: AbortSignal) => AsyncIterable<string>>(
+  it('types a fake stream as the generated handle, with inert uplink members', async () => {
+    const handle = streamHandle<string, string>((async function* () {
+      yield 'a'
+      yield 'b'
+    })())
+    handle.send('ignored')
+    handle.end()
+    handle.dispose()
+    await expect(drain(handle)).resolves.toEqual(['a', 'b'])
+
+    const method = streamMethod<(prefix: string, signal?: AbortSignal) => RemoteStreamHandle<string, never>>(
       async function* (prefix, signal) {
         yield `${prefix}:${String(signal?.aborted ?? 'none')}`
       },
@@ -193,20 +203,15 @@ describe('RemoteMock streams', () => {
     await expect(drain(method('hi'))).resolves.toEqual(['hi:none'])
   })
 
-  it('waits for opens with opened(), and keeps the handshake streams open without frames', async () => {
+  it('waits for opens with opened(), and answers $events with one ready frame per generation', async () => {
     const mock = RemoteMock.create({ host: { home: '/home/me' } })
-    const second = mock.streams.opened('events.mux', 2)
-    const first = mock.open('events.mux', [{}], idle())
-    const again = mock.open('events.mux', [{}], idle())
+    const second = mock.streams.opened('$events', 2)
+    const first = mock.open('$events', [{}], idle())
+    await expect(take(first, 1)).resolves.toEqual([{ type: 'ready', clientId: 'mock-client-1', host: { home: '/home/me' } }])
+    const again = mock.open('$events', [{}], idle())
     await expect(second).resolves.toBeUndefined()
-    await expect(mock.streams.opened('events.mux', 1)).resolves.toBeUndefined()
-    mock.streams.push('events.mux', { type: 'ready' })
-    await expect(take(first, 1)).resolves.toEqual([{ type: 'ready' }])
-    await expect(take(again, 1)).resolves.toEqual([{ type: 'ready' }])
-    mock.streams.end('events.mux')
-    await expect(drain(first)).resolves.toEqual([])
-    expect(RemoteMock.create().modeOf('events.mux')).toBe('stream')
-    expect(RemoteMock.create().modeOf('events.host')).toBe('stream')
-    expect(RemoteMock.create().modeOf('host.describe')).toBe('unary')
+    await expect(mock.streams.opened('$events', 1)).resolves.toBeUndefined()
+    await expect(take(again, 1)).resolves.toEqual([{ type: 'ready', clientId: 'mock-client-2', host: { home: '/home/me' } }])
+    expect(RemoteMock.create().modeOf('$events')).toBe('stream')
   })
 })

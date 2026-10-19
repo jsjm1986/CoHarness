@@ -253,7 +253,7 @@ export class TestClient {
           ...connection,
           apply: (connectionCtx) => {
             installConnection(connectionCtx, {
-              transport: mock.transport,
+              transport: { rpc: mock.rpc },
               ...(pageLocation === undefined ? {} : { location: pageLocation }),
             })
           },

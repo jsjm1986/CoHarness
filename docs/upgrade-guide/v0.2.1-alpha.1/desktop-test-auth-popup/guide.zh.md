@@ -13,6 +13,6 @@ description: "桌面测试包需要在本地显式开启后，才能显示飞书
 
 ## 迁移
 
-1. 启动更新后的应用一次，在 `app.getPath('userData')/desktop/settings.json` 缺失时生成该文件。已有文件会保留，字段缺失时默认为 `false`。平台路径和错误恢复方法见[本地桌面设置](../../../../apps/desktop/README.zh.md#local-desktop-settings)。
+1. 启动更新后的应用一次，在 `app.getPath('userData')/desktop/settings.json` 缺失时生成该文件。已有文件会保留，字段缺失时默认为 `false`。平台路径和错误恢复方法见本地桌面设置。
 2. 如需允许飞书登录，在文件中将 `updates.allowTestAuthPopupWindow` 设为 `true`，然后完全退出并重启 Desktop。此时测试策略的未鉴权响应可以提供登录入口。不需要登录弹窗时保持默认值即可。
 3. 如需再次关闭弹窗，将字段设为 `false` 并重启。启动和手动检查均不得显示飞书鉴权弹窗。更新仍会查询策略，鉴权失败不会解除已知强更阻塞。

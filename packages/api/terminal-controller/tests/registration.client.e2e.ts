@@ -13,6 +13,7 @@ const remoteArtifact = fileURLToPath(new URL('../lib/typert.remote-client.js', i
 
 function services(ctx: Context): void {
   ctx.provide('connection', { rpc: { call: async () => { throw new Error('No RPC expected during registration') } },
+    state: createSnapshotStore('connected'),
     hostDescription: createSnapshotStore({ executionAuthorityRequired: false }),
   } as never)
   ctx.provide('sessions', { list: createSnapshotStore({ byId: {} }) } as never)

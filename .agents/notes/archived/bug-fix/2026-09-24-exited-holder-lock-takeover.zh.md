@@ -7,7 +7,7 @@ Archived: 2026-09-30
 
 ## 问题
 
-[dsh-atomic-write](../../../../packages/util/atomic-write/README.zh.md) 的 `withFileLock` 以独占创建方式创建 `<file>.lock`，并在 `finally` 中移除它。进程若未执行该 `finally` 就结束，锁会留在原地，该文件后续的每个写入方都会超时，直到有人手动删除它。[原始决策](../architecture/2026-07-30-settings-write-path-integrity.zh.md)接受了这一点，因为文件存续时间无法区分已崩溃的持有者与暂停的持有者。
+[dsh-atomic-write](../../../../packages/util/atomic-write/README.zh.md) 的 `withFileLock` 以独占创建方式创建 `<file>.lock`，并在 `finally` 中移除它。进程若未执行该 `finally` 就结束，锁会留在原地，该文件后续的每个写入方都会超时，直到有人手动删除它。[原始决策](../../archived/architecture/2026-07-30-settings-write-path-integrity.md)接受了这一点，因为文件存续时间无法区分已崩溃的持有者与暂停的持有者。
 
 profile 包锁（`<profile>/package.json.lock`）让这个代价显现出来。`dsh plugin` 不安装信号处理器，因此在 pnpm 运行期间按 Ctrl-C、发送 SIGTERM 或关闭其终端都会结束进程，锁随之留下。`dsh` 与 `dsh web` 在应用销毁完成后立即退出，而此时被取消的安装仍在恢复文件，尚未释放锁。崩溃、SIGKILL 或内存不足被杀也有同样效果。发生上述任一情况后，该 profile 上的每个插件操作都会在 `lockWaitMs`（默认两分钟）后失败，且不说明持有者已不存在。
 

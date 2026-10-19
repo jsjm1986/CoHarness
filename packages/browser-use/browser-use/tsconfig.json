@@ -9,10 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../util/brand"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../util/brand"
     }
   ]
 }

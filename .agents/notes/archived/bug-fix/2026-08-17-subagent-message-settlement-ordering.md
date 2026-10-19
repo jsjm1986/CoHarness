@@ -7,7 +7,7 @@ English | [中文](2026-08-17-subagent-message-settlement-ordering.zh.md)
 
 ## Problem
 
-A continuable child can send selected content and later produce an unconditional manager-authored settlement notice. If those two messages enter queues with different claim priority, the later settlement notice can reach the parent model before the earlier child message. The first step of a turn claims the complete `next-step` batch before one `next-turn` message, so mixing a FIFO later-turn send with a next-step settlement reverses causal order. [Issue #2600](https://github.com/deepseek-ai/deepseek-harness/issues/2600) records the defect.
+A continuable child can send selected content and later produce an unconditional manager-authored settlement notice. If those two messages enter queues with different claim priority, the later settlement notice can reach the parent model before the earlier child message. The first step of a turn claims the complete `next-step` batch before one `next-turn` message, so mixing a FIFO later-turn send with a next-step settlement reverses causal order. Issue #2600 records the defect.
 
 The child instruction says to send a finding whenever it changes what the parent should do next. Deferring that message to a later turn contradicts its scheduling meaning and separates causally ordered messages across queues with different claim priority.
 
@@ -15,7 +15,7 @@ The child instruction says to send a finding whenever it changes what the parent
 
 Every model-authored adjacent-Agent message uses fixed Steer delivery through `SubagentRuntime.sendMessage()`. A running parent reads the child message at its nearest safe step boundary and an idle parent starts a turn. There is no quiet or next-turn model delivery option.
 
-The continuation manager retains `sendWaking()` and `admitWaking()` around messages delivered to resident continuable parents. Their purpose is waking-send admission accounting: the receiving Activation remains live between synchronous inbox insertion and the microtask that observes the wake.
+The continuation manager retains `sendWaking()` around messages delivered to resident continuable parents and routes the synchronous send through the parent's private `SubagentInbox`. The wrapper accepts the send before its closing promise is installed or rejects it afterwards, and an accepted attempt renews the Activation's wake generation before returning. The receiving Activation therefore cannot settle over an accepted waking send.
 
 ### Ordering across parent states
 

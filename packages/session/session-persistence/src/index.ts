@@ -105,6 +105,8 @@ export interface SessionPersistenceSnapshot {
   header: SessionHeader
   /** Opaque source-qualified token that changes whenever this stored log changes. */
   revision: SessionPersistenceRevision
+  /** Header-only format classification; absent without versioned artifact metadata. */
+  readonly formatStatus?: 'current' | 'migration-required'
   /** Optional backend-authoritative content metadata for cold list projections. */
   content?: SessionContentMetadata
   /** Logical event count, when the backend can provide it cheaply from metadata; otherwise absent. */
@@ -333,6 +335,9 @@ declare module '@deepseek-ai/cordis' {
  * rewriting committed events.
  */
 export abstract class SessionPersistence extends Service {
+  /** Process-local instance identity, stable through Context proxies and distinct after service replacement. */
+  readonly identity: symbol = Symbol('sessionPersistence')
+
   private readonly writeHandles = new Map<SessionId, PersistenceSessionHandle | ContractSessionHandle>()
   /** Synchronously claimed write ids, held until the lazy `open` resolves. */
   private readonly syncWriteClaims = new Set<SessionId>()

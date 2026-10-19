@@ -2,7 +2,7 @@
 
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import { deepFreeze } from '@deepseek-ai/dsh-util-values'
+import { deepFreeze, type JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { MessageId, ToolCallId } from './brand.ts'
 import type { ContentBlock } from './types.ts'
 
@@ -17,7 +17,7 @@ export interface AssistantProviderMetadata {
    * `LlmRuntime` exposes it to a target adapter only when that adapter instance
    * currently owns both this historical provider and the target provider.
    */
-  replayState?: unknown
+  replayState?: JsonValue
 }
 
 /** Required source of an assistant message produced by a routed model. */

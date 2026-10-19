@@ -29,8 +29,8 @@ export async function runNodeMain(stream: Duplex, maxMessageBytes: number, proce
   let started = false
   let failed = false
   let terminalSent = false
-  const hostClosed = Promise.withResolvers<undefined>()
-  const onClose = (): void => { hostClosed.resolve(undefined) }
+  const hostClosed = Promise.withResolvers<void>()
+  const onClose = (): void => { hostClosed.resolve() }
   stream.once('close', onClose)
   const channel = new JsonChannel(stream, maxMessageBytes, (raw) => {
     if (!started) {
@@ -51,7 +51,7 @@ export async function runNodeMain(stream: Duplex, maxMessageBytes: number, proce
       channel.close()
       processState.exitCode = 1
     }
-    hostClosed.resolve(undefined)
+    hostClosed.resolve()
   })
   const pending = new Set<Promise<void>>()
   const send = (message: ProgramToHost): void => {
@@ -61,7 +61,7 @@ export async function runNodeMain(stream: Duplex, maxMessageBytes: number, proce
       failed = true
       channel.close()
       processState.exitCode = 1
-      hostClosed.resolve(undefined)
+      hostClosed.resolve()
     }).finally(() => { pending.delete(task) })
     pending.add(task)
   }

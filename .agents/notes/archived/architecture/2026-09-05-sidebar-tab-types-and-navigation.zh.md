@@ -1,6 +1,7 @@
 # Agent Note: 右侧 Sidebar 的 tab 类型与导航
 
 Status: implemented
+Archived: 2026-09-30
 
 [English](2026-09-05-sidebar-tab-types-and-navigation.md) | 中文
 
@@ -36,17 +37,17 @@ interface SidebarRightTabDefinition {
 
 `priority` 是三个字面量档位之一，写成字符串，好让别的包的类型不需要任何运行时引入：`extension` 是来自产品之外的类型的档位也是最高档，所以什么都不声明的类型压过这里随包交付的每个查看器；`builtin` 是随包类型的常规档；`fallback` 是任何更具体的东西都应压过的纯内容位置，VS Code 的文本编辑器隐含地占据它，我们的文本预览明确地占据它。`candidates(address)` 返回 glob 命中且 `canOpen` 未否决的每个类型，按档位、再按命中的最长 pattern 长度、再按注册顺序排序。`claim(address, kind?)` 取最佳候选，或在调用方指定时取该 kind 生效的类型（不查它的 glob；点名即决定），对无人愿开的地址抛错——这是接线错误，不是用户错误。`get(kind)` 返回生效类型；`entries()` 与 `guide()` 列出生效类型及其引导入口；`subscribe` 观察变化。
 
-`title(address)`、`guide[].title()` 与可选的 `guide[].description()` 都是每次使用时重读的 thunk，语言切换无需重新注册。[引导起始页与统计 pill 的细化](../feature/2026-09-10-guide-start-page-and-stat-pill-refinements.zh.md)负责当前的描述显示与兜底图标规则。注册表本身是 `apply` 顶层提供的普通对象，**不带** `Service.tracker`：tracker 会把 `this.ctx` 重绑到调用方上下文，跨包 `register()` 就会在调用方 fiber 仍是活动作用域时往它上加 effect，浏览器启动会无声卡死。
+`title(address)`、`guide[].title()` 与可选的 `guide[].description()` 都是每次使用时重读的 thunk，语言切换无需重新注册。[Sidebar README](../../../../packages/client/ui-sidebar-right/README.zh.md#the-guide)定义描述显示与兜底图标规则。注册表本身是 `apply` 顶层提供的普通对象，**不带** `Service.tracker`：tracker 会把 `this.ctx` 重绑到调用方上下文，跨包 `register()` 就会在调用方 fiber 仍是活动作用域时往它上加 effect，浏览器启动会无声卡死。
 
 ### 正文与标题：按定义 `id` keyed 的 Slot 坑位
 
-类型注册表说类型是什么；Slot 系统说它长什么样。类型把正文注册进 keyed、session 作用域的坑位 `sidebar.right.pane.tab`，键是自己的 `id`，并可把标题组件注册进 `sidebar.right.pane.tab.title`，键相同。画 tab 的座位经注册表把 tab 的 `kind` 解析成生效类型，再派发到该类型的 `id`，于是 extension 接管 builtin 的 kind 时两个包互不知晓也能正确渲染，且没有任何优先级数字跨过包边界。没有生效类型的 kind 渲染属主的「没有东西能查看它」提示；没注册标题的类型得到注册表在打开时捕获的 `title(address)` 文本。[右侧边栏标签芯片自有语义化标题呈现](../feature/2026-10-12-sidebar-tab-chips-own-semantic-titles.zh.md)负责内置标题渲染器画什么、标题如何解析实时事实。
+类型注册表说类型是什么；Slot 系统说它长什么样。类型把正文注册进 keyed、session 作用域的坑位 `sidebar.right.pane.tab`，键是自己的 `id`，并可把标题组件注册进 `sidebar.right.pane.tab.title`，键相同。画 tab 的座位经注册表把 tab 的 `kind` 解析成生效类型，再派发到该类型的 `id`，于是 extension 接管 builtin 的 kind 时两个包互不知晓也能正确渲染，且没有任何优先级数字跨过包边界。没有生效类型的 kind 渲染属主的「没有东西能查看它」提示；没注册标题的类型得到注册表在打开时捕获的 `title(address)` 文本。
 
 另有两个坑位扩展引导与菜单：`sidebar.right.tab.guide` 是 chain，第一个不拒绝的条目在不替换 tab 的前提下替换随包引导正文；`sidebar.right.tab.menu.item` 是 list，追加在库自身布局动作之后，放与 tab 内容有关的动作。类型自己的控件——重载、换行开关——住在自己正文里；tab 条属于面板，只放面板的控件。类型自己的状态是正文注册上普通的 Slot store 与 inject 面；框架不给组件模型添任何东西。
 
 ### 标签实例信息
 
-[响应式 Sidebar 与标签信息](2026-09-07-sidebar-responsive-tab-info.zh.md)取代本记录中以平铺 owner props 传递实例信息的选择。正文、标题与引导页替换项接收框架注入的 `useTabInfo()`，以 `{ sidebar, panel, tab }` 读取所属 Sidebar、窗格与标签。实例的记录、导航、可见性、signal 与绑定动作均在 `tab` 内；精确字段见 [Sidebar 参考](../../../../packages/client/ui-sidebar/README.zh.md)。
+[响应式 Sidebar 与标签信息](2026-09-07-sidebar-responsive-tab-info.zh.md)取代本记录中以平铺 owner props 传递实例信息的选择。正文、标题与引导页替换项接收框架注入的 `useTabInfo()`，以 `{ sidebar, panel, tab }` 读取所属 Sidebar、窗格与标签。实例的记录、导航、可见性、signal 与绑定动作均在 `tab` 内；精确字段见 [Sidebar 参考](../../../../docs/subsystems/sidebar-right.zh.md)。
 
 标签域仍为每个已提交记录拥有一个实例，包括 `AbortController`、导航快照和绑定到所属 Session 的动作。记录存活期间，其地址被钉在[资源模型](2026-09-05-client-resource-model.zh.md)中；隐藏与切换 Session 不结束实例，关闭记录则中止并释放它。框架已有的存储与导航钩子提供实时读取，类型不自行订阅。
 
@@ -72,7 +73,7 @@ interface SidebarRightTabParamsMap {}        // key: kind — a page type declar
 
 `openResource` 接受所有已声明资源形状的联合，`openTab<K>` 接受为 `K` 声明的形状；正文按自己所服务的协议或 kind 收窄 `navigation.params`。参数属于资源类型而非查看器，因为行号是关于文件位置的事实，不是关于文本预览的，任何认领 `file` 地址的类型收到同一形状。值必须可 JSON 序列化，一条记录必须只凭地址与参数就能重建，因为撤销、重做、刷新与 HMR 都在开启方已不在时重建 tab。
 
-除两种打开外，该面还有 `close(tabId)`、`active()`、`isExpanded()`、`toggleExpanded()`，以及四个操作型方法——`focus(tabId)`、`split(paneId?)`（返回新格，预算或宽度规则不允许分栏时返回 `undefined` 且不记账）、`float(tabId, rect?)` 与 `dock(paneId)`——每个记一条历史，目标不存在或已在目标态时为 no-op。没有布局快照、没有订阅、没有按地址查找：该面给的是对布局的控制权，不是布局的视图。插件依据会话选择确定屏上会话——选中的会话——并在 React 渲染该变化之前将其发布为 `mounted`；公开面上的命令经该会话被收养的 store 作用于它，没有会话在屏上或其 store 尚未铸出时抛错。座位只上报其停靠套件测得的空间。tab 自己的动作则到达其会话自己的 store：slot 运行时每个会话铸一个 store，插件在铸出时逐个收养，控制器按会话 id 路由，因此用户切换会话之后触发的动作照样落地，而 store 从未铸出的会话什么也不做。
+除两种打开外，该面还有 `close(tabId)`、`active()`、`isExpanded()`、`toggleExpanded()`，以及四个操作型方法——`focus(tabId)`、`split(paneId?)`（返回新格，预算或宽度规则不允许分栏时返回 `undefined` 且不记账）、`float(tabId, rect?)` 与 `dock(paneId)`——每个记一条历史，目标不存在或已在目标态时为 no-op。没有布局快照、没有订阅、没有按地址查找：该面给的是对布局的控制权，不是布局的视图。插件依据会话选择与主面板确定屏上会话——Conversation 占据主栏时的选中会话——并在 React 渲染这两者的变化之前将其发布为 `mounted`；公开面上的命令经该会话被收养的 store 作用于它，没有会话在屏上或其 store 尚未铸出时抛错。座位只上报它渲染时依据的事实：停靠套件测得的空间，以及框架宽度是否让面板自动全屏。tab 自己的动作则到达其会话自己的 store：slot 运行时每个会话铸一个 store，插件在铸出时逐个收养，控制器按会话 id 路由，因此用户切换会话之后触发的动作照样落地，而 store 从未铸出的会话什么也不做。
 
 ### 地址
 
@@ -100,7 +101,7 @@ interface SidebarRightTabParamsMap {}        // key: kind — a page type declar
 
 **用 Slot 优先级表达 extension 接管 builtin，随后是注册表铸造的坑位键。** 第一次尝试让覆盖方经一个导出常量以更低的 Slot 优先级注册正文——这是动态插件间的值引用，也是拿第二套规则（Slot 优先级）替注册表的规则站台。第二次尝试让注册表为每次注册铸一个键并从 `register()` 返回，这把注册变成了两步且顺序敏感的舞步。让实现自己声明 `id`——必填、唯一、与它注册坑位所用的同一个串——既不需要常量，也不需要铸键与顺序，还给了注册表拒绝重复所需的身份。
 
-**由座位在自己的 effect 里发布绑定。** 最初的形式由已挂载的座位在每次提交后发布自己的会话、action 与面，离开时释放。React 按树序运行一次提交的被动 effect，而框架先渲染 Conversation 列、后渲染右栏，于是在切换会话的那次提交里，从自己 effect 打开内容的 Conversation 组件运行时没有任何座位已绑定——在离开的座位释放之后、到来的座位绑定之前——打开随之抛错。会话选择在 React 渲染之前变化，从它推导屏上会话便消除了这一顺序依赖。分栏空间仍由座位测量，因为只有它渲染出的套件能测。
+**由座位在自己的 effect 里发布绑定。** 最初的形式由已挂载的座位在每次提交后发布自己的会话、action 与面，离开时释放。React 按树序运行一次提交的被动 effect，而框架先渲染 Conversation 列、后渲染右栏，于是在切换会话或从全局面板返回的那次提交里，从自己 effect 打开内容的 Conversation 组件运行时没有任何座位已绑定——在离开的座位释放之后、到来的座位绑定之前——打开随之抛错。会话选择与主面板都在 React 渲染之前变化，从它们推导屏上会话便消除了这一顺序依赖。分栏空间仍由座位测量，因为只有它渲染出的套件能测。
 
 ## Consequences
 

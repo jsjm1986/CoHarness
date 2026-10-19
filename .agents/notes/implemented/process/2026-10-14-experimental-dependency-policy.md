@@ -32,7 +32,7 @@ The trade-off costs:
 
 - Published experimental manifests list browser and type relationships only as dev dependencies, so users who install these packages individually from npm receive fewer peer hints.
 - The verifier cannot see imports injected by a tsdown `banner`, such as the inspector worker's `@deepseek-ai/dsh-app-boot/worker/profile-resolution-bootstrap`. Such a dependency stays only because it is declared; if it is removed by mistake, the verifier does not detect it.
-- `readHostBuildEntries` imports the `tsdown.config.ts` of every covered package with a Host face and evaluates its default export under both build faces, so the gate depends on every such config module importing cleanly, and the modules' import side effects run in the gate process; for example, the inspector's config imports its package-local [`scripts/build-devtools.ts`](../../../../packages/experimental/inspector/scripts/build-devtools.ts).
+- `readHostBuildEntries` imports the `tsdown.config.ts` of every covered package with a Host face and evaluates its default export under both build faces, so the gate depends on every such config module importing cleanly, and the modules' import side effects run in the gate process; for example, the inspector's config imports its package-local `scripts/build-devtools.ts`.
 - Measured: loading the 127 additional tsdown configurations takes about 2 s, and the full-run duration stays essentially the same (4:27 without the scan, 4:21 with it).
 
 ## Testing

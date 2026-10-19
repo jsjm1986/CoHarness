@@ -447,7 +447,7 @@ describe('Client Typert API', () => {
     await expect(create()).rejects.toThrow('expected 1–2 business argument(s)')
     await create('agent-1')
     expect(call).toHaveBeenLastCalledWith('/api', 'probe/create', { args: { agentId: 'agent-1' } }, expect.any(AbortSignal))
-    ctx.typert.contexts.registerClient('fixture', { identity: () => 'scoped-agent' })
+    ctx.typert.contexts.registerClient('fixture', { identity: () => 'scoped-agent', resolve: () => ctx })
     const scoped = (ctx as FixtureContext).remote.probe.create as unknown as (...args: unknown[]) => Promise<unknown>
     await scoped()
     expect(call).toHaveBeenLastCalledWith('/api', 'probe/create', { args: { agentId: 'scoped-agent' } }, expect.any(AbortSignal))
@@ -461,6 +461,7 @@ describe('Client Typert API', () => {
     const agentCtx = ctx.extend({ fixtureId: 'agent-2' }) as FixtureContext
     ctx.typert.contexts.registerClient('fixture', {
       identity: candidate => (candidate as Context & { fixtureId?: string }).fixtureId,
+      resolve: id => (agentCtx as Context & { fixtureId?: string }).fixtureId === id ? agentCtx : undefined,
     })
     const assembly = ctx.plugin(Object.assign(
       (scope: Context) => scope.remote.$mount({ package: '@fixture/probe', descriptors: [directDescriptor()] }),
@@ -491,6 +492,7 @@ describe('Client Typert API', () => {
     const agentCtx = ctx.extend({ fixtureId: 'agent-2' }) as FixtureContext
     ctx.typert.contexts.registerClient('fixture', {
       identity: candidate => (candidate as Context & { fixtureId?: string }).fixtureId,
+      resolve: id => (agentCtx as Context & { fixtureId?: string }).fixtureId === id ? agentCtx : undefined,
     })
     const assembly = ctx.plugin(Object.assign(
       (scope: Context) => scope.remote.$mount({ package: '@fixture/probe', descriptors: [contextDescriptor()] }),
@@ -536,6 +538,7 @@ describe('Client Typert API', () => {
     const agentCtx = ctx.extend({ fixtureId: 'agent-remounted' }) as FixtureContext
     ctx.typert.contexts.registerClient('fixture', {
       identity: candidate => (candidate as Context & { fixtureId?: string }).fixtureId,
+      resolve: id => (agentCtx as Context & { fixtureId?: string }).fixtureId === id ? agentCtx : undefined,
     })
     const direct = directDescriptor()
     const context = contextDescriptor()
@@ -1215,6 +1218,7 @@ it('routes an unscoped roster-style call through its actual Agent Context withou
   const scoped = ctx.extend({ fixtureSessionKey: 'project-session' })
   ctx.typert.contexts.registerClient('agent', {
     identity: candidate => (candidate as Context & { fixtureSessionKey?: SessionId }).fixtureSessionKey,
+    resolve: id => id === 'project-session' ? scoped : undefined,
   })
   const forSession = vi.fn(() => ({ rpc: { call: targetCall } } as unknown as ConnectionHandle))
   Object.assign(ctx.get('connection') as ConnectionHandle, { forSession })

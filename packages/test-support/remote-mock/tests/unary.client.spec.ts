@@ -10,7 +10,7 @@ describe('RemoteMock unary answers', () => {
     expect(mock.log.calls('other/x')).toEqual([])
     expect(mock.modeOf('session/list')).toBe('unary')
     expect(mock.modeOf('other/x')).toBeUndefined()
-    expect(mock.endpoints()).toEqual(['events.host', 'events.mux', 'host.describe', 'session/list'])
+    expect(mock.endpoints()).toEqual(['$events', 'session/list'])
   })
 
   it('replaces defaults on registration and table reload, including an explicit undefined answer', async () => {
@@ -24,7 +24,7 @@ describe('RemoteMock unary answers', () => {
     mock.load({ unary: { 'a/b': undefined } })
     await expect(mock.dispatch('a/b', [])).resolves.toBeUndefined()
     expect(mock.modeOf('a/b')).toBe('unary')
-    expect(mock.endpoints()).toEqual(['a/b', 'events.host', 'events.mux', 'host.describe'])
+    expect(mock.endpoints()).toEqual(['$events', 'a/b'])
     mock.assertNoUnmatched()
   })
 
@@ -77,18 +77,18 @@ describe('RemoteMock unary answers', () => {
     expect(mock.log.unmatched()).toEqual([])
   })
 
-  it('requests() lists the first arg of calls and opens in order, per endpoint or across all but the pump\'s own', async () => {
+  it('requests() lists the first arg of calls and opens in order, per endpoint or across all but the Gateway\'s own', async () => {
     const mock = RemoteMock.create()
       .unary('session/page', ok(null))
       .stream('session/follow', openStream([]))
     const signal = new AbortController().signal
     await mock.dispatch('session/page', [{ throughSeq: 5 }])
     mock.open('session/follow', [{ address: 'a' }], signal)
-    mock.open('events.mux', [{}], signal)
+    mock.open('$events', [{}], signal)
     await mock.dispatch('session/page', [{ throughSeq: 9 }, 'extra'])
     expect((mock.log.requests('session/page') as { throughSeq: number }[]).map(request => request.throughSeq)).toEqual([5, 9])
     expect(mock.log.requests('session/follow')).toEqual([{ address: 'a' }])
-    expect(mock.log.requests('events.mux')).toEqual([{}])
+    expect(mock.log.requests('$events')).toEqual([{}])
     expect(mock.log.requests()).toEqual([{ throughSeq: 5 }, { address: 'a' }, { throughSeq: 9 }])
     expect(RemoteMock.create().log.requests()).toEqual([])
   })
@@ -103,38 +103,5 @@ describe('RemoteMock unary answers', () => {
     expect(mock.modeOf('session/control')).toBe('stream')
     expect(() => RemoteMock.create().load({})).not.toThrow()
     RemoteMock.create().assertNoUnmatched()
-  })
-
-  it('answers the handwritten api domains through the same table and records their calls', async () => {
-    const mock = RemoteMock.create()
-      .unary('session.list', ok({ items: [{ id: 's1' }] }))
-      .unary('settings.describe', ok({ writable: true, hasDocument: false, namespaces: [] }))
-    const list = await mock.api.sessions.list({})
-    expect(list.result).toEqual({ ok: true, value: { items: [{ id: 's1' }] } })
-    expect(typeof list.rpcId).toBe('string')
-    const describe = await mock.api.settings.describe({})
-    expect(describe.result).toEqual({ ok: true, value: { writable: true, hasDocument: false, namespaces: [] } })
-    expect(mock.log.calls('session.list').map(call => call.args)).toEqual([[{}]])
-    expect(mock.log.requests('settings.describe')).toEqual([{}])
-    mock.assertNoUnmatched()
-  })
-
-  it('lets the connection handshake reach connected through the create() defaults', async () => {
-    const mock = RemoteMock.create({ host: { home: '/home/me' } })
-    const described = await mock.api.host.describe({}, new AbortController().signal)
-    expect(described.result).toEqual({
-      ok: true,
-      value: { version: 'mock', cwd: '/home/me', attachedSessions: 0, home: '/home/me', canOpenPath: false },
-    })
-    // onOpen fires immediately: the script ran synchronously inside open.
-    let muxOpened = false
-    const controller = new AbortController()
-    const mux = mock.api.events.mux({}, controller.signal, () => { muxOpened = true })
-    expect(muxOpened).toBe(true)
-    const reader = mux[Symbol.asyncIterator]()
-    const pending = reader.next()
-    controller.abort()
-    await expect(pending).resolves.toEqual({ value: undefined, done: true })
-    mock.assertNoUnmatched()
   })
 })

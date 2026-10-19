@@ -145,6 +145,7 @@
       config:
         host: !!js ctx.webStartup.host ?? '127.0.0.1'
         port: !!js ctx.webStartup.port ?? 3080
+        tls: !!js ctx.webStartup.tls
         compression: gzip
         compressionLevel: 1
         compressionThresholdBytes: 1024
@@ -166,6 +167,7 @@
         printUrl: true
         surfaceContext: true
         trustedHosts: !!js ctx.webStartup.trustedHosts
+        publicUrl: !!js ctx.webStartup.publicUrl
 
     # Live graph delivery keeps open pages aligned with Loader changes.
     # Only development rebuilds require recurring artifact stat polls.
@@ -349,9 +351,6 @@
     # Model selection: the /model popupSelect + composer seat over session.models.
     - id: ui-model-selection
       name: '@deepseek-ai/dsh-client-ui-model-selection'
-
-    - id: ui-deepseek-model-label-1017
-      name: '@deepseek-ai/dsh-client-ui-deepseek-model-label-1017'
 
     - id: ui-permission
       name: '@deepseek-ai/dsh-client-ui-permission-presets'

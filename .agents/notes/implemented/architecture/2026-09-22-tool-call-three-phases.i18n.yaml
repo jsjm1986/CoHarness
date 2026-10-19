@@ -12,11 +12,11 @@
   en: a15c7c13f167e5ac
   zh: 63bcc2ef60c2f344
 /agent-note-tool-calls-own-preparation-dispatch-and-results-by-callid/decision/one-tool-owns-three-stages:
-  en: c4bac1088a4fd3bc
-  zh: 549348deae5485c1
+  en: 70d29f8786c20764
+  zh: fa68e13bbb6ff8d5
 /agent-note-tool-calls-own-preparation-dispatch-and-results-by-callid/decision/start-marks-an-initialization-candidate:
-  en: 7771032e6ad227e7
-  zh: 313d32ab5312d965
+  en: 36ad17f2d87f6e32
+  zh: 8d6656aa4aa489cf
 /agent-note-tool-calls-own-preparation-dispatch-and-results-by-callid/decision/converge-on-final-state-without-replaying-preparation:
   en: 603cbcf3379ad4f7
   zh: e34d87ea348c756b

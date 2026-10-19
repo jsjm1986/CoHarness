@@ -12,7 +12,7 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../ssh"
+      "path": "../../../vendor/schemastery"
     },
     {
       "path": "../../fs/fs"
@@ -22,6 +22,9 @@
     },
     {
       "path": "../../sandbox/sandbox-policy"
+    },
+    {
+      "path": "../ssh"
     }
   ]
 }

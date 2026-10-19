@@ -31,7 +31,7 @@ Node 按文件 URL 缓存已求值的模块。profile 使用 pnpm 的 hoisted �
 
 `reconcileProfile()` 返回 `pending`，即每个只有重启后才能加载的陈旧模块及其原因（`host-module`、`unmanaged-plugin`，规划失败时为 `module-comparison`）。待处理模块保持陈旧，包括在上次记录之后才首次加载的模块，因此下一次重新组合会重试它们。在重新组合期间首次加载、且其文件在比较之后被修改的模块同样保持陈旧：激活可能在该写入之前已对其求值。列出或比较模块时发生的失败会保留原有记录，并设置 profile 级 `restartReason: module-comparison`，即使无法确定模块 URL。两种情况都不会阻止重新组合。激活失败（包括替换版本导入失败）会连同 Loader 的导入错误一起抛出；未变化的失败在后续重新组合中作为警告返回。Plugin Manager 把抛出的失败报告为带该诊断的 `failed`，把 `pending` 转为带其 `restartReason` 的 `restart-required`，除非操作报告 `overridden`。Web 页面本地化该原因，agent 工具据此生成一句 `nextStep`，因此没有任何界面解析诊断字符串。
 
-[打包 worker loader](../../../../packages/experimental/webworker-runtime/src/module-system/module-loader.ts) 在私有映射中保存已求值模块，其 `require` 不暴露缓存。HMR 无法通过 Node API 替换它们，因此报告需要重启。原生 Node 使用异步模块 hook 时仍暴露其缓存。
+打包 worker loader 在私有映射中保存已求值模块，其 `require` 不暴露缓存。HMR 无法通过 Node API 替换它们，因此报告需要重启。原生 Node 使用异步模块 hook 时仍暴露其缓存。
 
 ### Plugin Manager 与 runtime resolution
 

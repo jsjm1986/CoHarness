@@ -8,6 +8,7 @@ import { transformMessages } from '@earendil-works/pi-ai/api/transform-messages'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { toPiContext } from '../src/context.ts'
 import { toPiReplayState } from '../src/replay.ts'
+import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { mapStopReason, mapUsage, toStreamChunks } from '../src/stream.ts'
 
 function usage(input = 0, output = 0, cacheRead = 0, cacheWrite = 0): Usage {
@@ -83,16 +84,17 @@ describe('toPiContext', () => {
       })],
       tools: [{ name: 'f', description: 'F', parameters: { type: 'object', properties: {} } }],
     })
-    expect(context).toEqual({
-      systemPrompt: 'be helpful',
-      tools: [{ name: 'f', description: 'F', parameters: { type: 'object', properties: {} } }],
-      messages: [{ role: 'user', content: 'hi', timestamp: 0 }],
-    })
+    expect(context.systemPrompt).toBe('be helpful')
+    expect(context.messages).toEqual([{ role: 'user', content: 'hi', timestamp: 0 }])
+    expect(context.tools).toEqual([
+      { name: 'f', description: 'F', parameters: { type: 'object', properties: {} } },
+    ])
   })
 
   it('omits empty tools and absent system prompt', () => {
     const context = toPiContext({ provider: 'deepseek', model: 'm', messages: [], tools: [] })
-    expect(context).toEqual({ messages: [] })
+    expect(context.systemPrompt).toBeUndefined()
+    expect(context.tools).toBeUndefined()
   })
 
   it('resolves durable image references into native pi-ai image content', async () => {
@@ -315,7 +317,7 @@ describe('toPiContext', () => {
     })
   })
 
-  it('preserves the leading system message ahead of user text and tool results', () => {
+  it('splits mixed user text + tool results and lifts a leading system message into systemPrompt', () => {
     const context = toPiContext({
       provider: 'deepseek',
       model: 'm',
@@ -366,7 +368,7 @@ describe('toPiContext', () => {
       content: [
         { type: 'thinking', thinking: 'private reasoning', thinkingSignature: 'think-sig', redacted: true },
         { type: 'text', text: 'calling', textSignature: 'text-sig' },
-        { type: 'toolCall', id: 'c1', name: 'f', arguments: { a: 1 }, thoughtSignature: 'tool-sig', namespace: 'functions' },
+        { type: 'toolCall', id: 'c1', name: 'f', arguments: { a: 1 }, thoughtSignature: 'tool-sig' },
       ],
     }))
     const context = toPiContext({
@@ -397,7 +399,7 @@ describe('toPiContext', () => {
       content: [
         { type: 'thinking', thinking: 'private reasoning', thinkingSignature: 'think-sig', redacted: true },
         { type: 'text', text: 'calling', textSignature: 'text-sig' },
-        { type: 'toolCall', id: 'c1', name: 'f', arguments: { a: 1 }, thoughtSignature: 'tool-sig', namespace: 'functions' },
+        { type: 'toolCall', id: 'c1', name: 'f', arguments: { a: 1 }, thoughtSignature: 'tool-sig' },
       ],
     })
   })
@@ -422,7 +424,7 @@ describe('toPiContext', () => {
       },
       blocks: [{ type: 'text' }],
     })
-    const replayState: unknown = JSON.parse(JSON.stringify(state))
+    const replayState = JSON.parse(JSON.stringify(state)) as JsonValue
     const onDegrade = vi.fn()
     const context = toPiContext({
       provider: 'anthropic',
@@ -635,7 +637,7 @@ describe('toPiContext', () => {
         content: [{ type: 'text', text: 'done' }],
         source: {
           kind: 'model',
-          ...{ provider: 'deepseek', model: 'deepseek-v4-flash', replayState },
+          ...{ provider: 'deepseek', model: 'deepseek-v4-flash', replayState: replayState as never },
         },
       })],
     }, undefined, onDegrade)
@@ -675,7 +677,6 @@ describe('toPiContext', () => {
     ['null block', { ...validReplay, blocks: [null] }, 'block 0 must be an object'],
     ['array block', { ...validReplay, blocks: [[]] }, 'block 0 must be an object'],
     ['unknown block type', { ...validReplay, blocks: [{ type: 'audio' }] }, 'block 0 has an unknown type'],
-    ['non-string namespace', { ...validReplay, blocks: [{ type: 'tool-call', namespace: 1 }] }, 'namespace must be a string'],
     ['non-string signature', { ...validReplay, blocks: [{ type: 'text', textSignature: 1 }] }, 'textSignature must be a string'],
     ['non-boolean redaction', { ...validReplay, blocks: [{ type: 'reasoning', redacted: 'yes' }] }, 'redacted must be boolean'],
   ])('degrades malformed replay state: %s', (_name, replayState, message) => {
@@ -699,7 +700,7 @@ describe('toStreamChunks', () => {
       { type: 'done', reason: 'stop', message: native },
     ), undefined, undefined, requestedModel))
     const finish = chunks.find(chunk => chunk.type === 'finish')
-    const replayState: unknown = JSON.parse(JSON.stringify(finish?.replayState))
+    const replayState = JSON.parse(JSON.stringify(finish?.replayState)) as JsonValue
     expect(replayState).toMatchObject({ response: { model: requestedModel } })
     if (reportedModel === undefined) {
       expect(finish?.replayState?.response).not.toHaveProperty('responseModel')

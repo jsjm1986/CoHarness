@@ -1,9 +1,9 @@
-/** Deterministic execution and cleanup outcomes for parent-notification snapshots. */
+/** Deterministic provider for model-visible foreground and Job diagnostic snapshots. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import {
   NO_START_CAPABILITIES,
-  type SubagentStartRequest,
+  type ResolvedSubagentStartRequest,
   type SubagentProvider,
 } from '@deepseek-ai/dsh-subagent'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -40,27 +40,18 @@ class DiagnosticProvider implements SubagentProvider {
   readonly inheritsParentContext = false
   private starts = 0
 
-  async start(request: SubagentStartRequest) {
+  async start(request: ResolvedSubagentStartRequest) {
     if (request.signal.aborted) {
       throw new Error('snapshot diagnostic provider start aborted')
     }
     const index = this.starts++
-    if (index === RESULTS.length) {
-      return {
-        id: SessionId('00000000-0000-4000-8000-0000000000d5'),
-        result: Promise.resolve({
-          output: [{ type: 'text' as const, text: 'ANSWER_SURVIVES_CLEANUP_FAILURE' }],
-          stopReason: 'completed' as const,
-        }),
-        dispose: async () => { throw new Error('snapshot cleanup failed') },
-      }
-    }
     const fixture = RESULTS[index]
     if (fixture === undefined) {
-      throw new Error('snapshot diagnostic provider expected exactly five starts')
+      throw new Error('snapshot diagnostic provider expected exactly four starts')
     }
     return {
       id: SessionId(fixture.id),
+      localAgent: undefined,
       result: Promise.resolve({
         output: [...fixture.output],
         diagnostic: fixture.diagnostic,

@@ -17,7 +17,7 @@ async function bench() {
   roots.push(ctx)
   await ctx.plugin(() => {}).await()
   const api = new FakeApiClient()
-  api.onList = () => Promise.resolve(ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: true }] }))
+  api.onList = () => Promise.resolve(ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: true, agentAvailable: true }] }))
   const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
   await sessions.refresh()
   return { ctx, api, sessions }

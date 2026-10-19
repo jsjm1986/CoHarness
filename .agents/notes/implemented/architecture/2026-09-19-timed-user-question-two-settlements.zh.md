@@ -101,7 +101,7 @@ Client 计算 `Date.now() + remainingMs`。手动聚焦未编辑的回答区会�
 - [服务测试](../../../../packages/interaction/user-questions/tests/user-questions.spec.ts)与[等待测试](../../../../packages/interaction/user-questions/tests/timed-wait.spec.ts)覆盖有人与无人接手、最后接手方断开、取消、超时错误映射、仅接受已继续问题的回答，以及答案 id 的精确校验。
 - [投影测试](../../../../packages/interaction/user-questions/tests/projection.spec.ts)区分 legacy 与 timed schema，并覆盖原生及 PTC pending 调用、其他失败、恢复修复、排队回复取消和准入后结算。
 - [Client 监听器测试](../../../../packages/client/ui-user-questions/tests/browser-plugin.client.spec.ts)与[composer 测试](../../../../packages/client/ui-user-questions/tests/user-questions-composer.client.spec.tsx)覆盖接手保留到 Host 接受结果、握手前聚焦、无限期等待、草稿保留、RPC 重提及面板操作。
-- [分组测试](../../../../packages/client/ui-chat/tests/process-groups.client.spec.ts)与[浏览器回放](../../../../apps/web/tests/question-composer.e2e.ts)覆盖普通折叠位置、折叠控件顺序，以及原工具行的迟到答案只读面板。
+- 分组测试与[浏览器回放](../../../../apps/web/tests/question-composer.e2e.ts)覆盖普通折叠位置、折叠控件顺序，以及原工具行的迟到答案只读面板。
 - legacy 问答往返、取消、计划评审意图及 Session 重新挂载的回归仍由各自测试覆盖。真实多 Client 投递竞争与真实 Host 重启仍是独立生命周期和投影测试之外的集成覆盖缺口。
 
 ## Consequences

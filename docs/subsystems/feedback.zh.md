@@ -328,4 +328,30 @@ Storage-domain sidecar service. It inspects persisted Session history and never 
 ```
 
 Source: [`packages/feedback/message-feedback/src/index.ts`](../../packages/feedback/message-feedback/src/index.ts)
+
+<a id="feedback-events"></a>
+
+### `feedback/*` events
+
+<a id="feedbackcommitted--parallel"></a>
+
+#### `feedback/committed` — parallel
+
+Observe a durable cold feedback mutation without publishing a live Session. Observers run before write ownership is released and must not await another message-feedback operation for this Session. The payload is borrowed read-only; deep-clone it before transferring ownership (for example, to Session.fromRestore).
+
+```ts cordis-catalog
+/**
+ * Observe a durable cold feedback mutation without publishing a live Session.
+ * Observers run before write ownership is released and must not await
+ * another message-feedback operation for this Session. The payload is borrowed
+ * read-only; deep-clone it before transferring ownership (for example, to Session.fromRestore).
+ * @param inspection - committed canonical prefix, including the feedback as its last event.
+ * @mode parallel
+ */
+'feedback/committed'(inspection: SessionInspection): void
+```
+
+Types: [SessionInspection](persistence.zh.md)
+
+Source: [`packages/feedback/message-feedback/src/index.ts`](../../packages/feedback/message-feedback/src/index.ts)
 <!-- END GENERATED cordis-surface -->

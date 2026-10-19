@@ -10,7 +10,7 @@ Debugging a Session requires its raw log, Chat structures, and rendered conversa
 
 ## Decision
 
-`experimental/session-inspector` registers the `session-inspector-log` Sidebar page and its Session-scoped body. The existing Sidebar owns the Session reference. The Inspector adds no resource provider, Conversation header slot, composer, or product-package navigation API. The [Session Inspector README](../../../../packages/experimental/session-inspector/README.md) owns the table controls and presentation behavior.
+`experimental/session-inspector` registers the `session-inspector-log` Sidebar page and its Session-scoped body. The existing Sidebar owns the Session reference. The Inspector adds no resource provider, Conversation header slot, composer, or product-package navigation API. The Session Inspector README owns the table controls and presentation behavior.
 
 - Session Controller and Chat retain ownership of the data. Only the selected table subscribes; the log uses the existing loaded window and pagination, without another Session stream or persistence format.
 - The virtual table groups Turn → Step → event → Assistant block/delta. Open blocks expand and closed blocks fold. Automatic folding preserves the visible row or retained ancestor through trailing space; manual folding anchors the clicked header and pauses following. Sticky ancestors are chosen below the table header and earlier sticky rows.
@@ -25,7 +25,7 @@ Debugging a Session requires its raw log, Chat structures, and rendered conversa
 
 The default-off `inspector-profile` optional bundle enables Session inspection and the NodeJS debugging Worker with unredacted Host fetch capture. Enabling the bundle requires no debugging argument or user override. The implementation and explicit source/built overlays remain available; Web startup accepts no new argument and Settings gains no debugging button.
 
-The Host owns the debugging URL, Worker, and capture lifetime. When the composition supplies `--inspect`, the Host attempts to open Chrome; failure leaves the printed link usable. Closing the debugging window does not stop capture. Explicit activation permits local code execution and unredacted network capture, as disclosed in the [Inspector security section](../../../../packages/experimental/inspector/README.md#security).
+The Host owns the debugging URL, Worker, and capture lifetime. When the composition supplies `--inspect`, the Host attempts to open Chrome; failure leaves the printed link usable. Closing the debugging window does not stop capture. Explicit activation permits local code execution and unredacted network capture, as disclosed in the Inspector security section.
 
 A Client loaded after the page obtains current ingest parameters through an authenticated document-relative Connection route. Initial injection still supports early connections. Connection resets refresh parameters; replacement releases the previous source, and disposal aborts and waits for outstanding work. The Client never receives or launches the debugging URL.
 

@@ -1,12 +1,10 @@
 /**
- * REAL-composition tier: boot the examples-owned telemetry Loader fixture as
- * a subprocess (per testing policy, through the same app/boot path a
- * deployment uses), run mocked-model turns with a real bash round trip, and
- * assert against what the mock OTLP collector actually received on the
- * wire: the feedback-authorized prefix, the deployment-mounted redact rule
- * applied to the exported copy, and the untouched canonical log.
+ * REAL-composition tier: explicit feedback through the shipped headless
+ * Loader profile with a mock model and real shell. The collector observes
+ * only the redacted authorized prefix; the canonical log keeps every event.
  */
 
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,11 +12,11 @@ import { describe, expect, it } from 'vitest'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
 
 const driver = fileURLToPath(new URL(
-  '../../../../examples/headless-agent/tests/fixtures/session-telemetry-otel-driver.ts',
+  './fixtures/driver.ts',
   import.meta.url,
 ))
 const configPath = fileURLToPath(new URL(
-  '../../../../examples/headless-agent/tests/fixtures/session-telemetry-otel.cordis.yml',
+  './fixtures/telemetry.patch.yml',
   import.meta.url,
 ))
 const repoTsconfig = fileURLToPath(new URL('../../../../tsconfig.json', import.meta.url))
@@ -27,6 +25,7 @@ const FIXTURE_SECRET = 'sk-e2efixture1234567890'
 const FIXTURE_PLACEHOLDER = '[E2E-REDACTED]'
 
 interface OtlpLogRecord {
+  eventName: string
   attributes?: { key: string; value: Record<string, unknown> }[]
   body?: unknown
 }
@@ -75,7 +74,7 @@ function eventTypes(captures: OtlpCapture[]): string[] {
         : []) ?? [])
 }
 
-describe('session-telemetry-otel through a real headless cordis.yml', () => {
+describe('session-telemetry-otel through the production headless profile', () => {
   it('continues the headless task without telemetry when FULL is rejected', async () => {
     const { stdout, stderr } = await runLoaderSmoke({
       label: 'session-telemetry-otel rejected FULL loader smoke',
@@ -105,6 +104,17 @@ describe('session-telemetry-otel through a real headless cordis.yml', () => {
 
     const records = allRecords(output.captures)
     expect(records.length).toBeGreaterThan(0)
+    for (const { record } of records) {
+      expect(record.eventName).toBe('session-log')
+      expect(record.attributes?.find(attribute => attribute.key === 'sessionId')?.value.stringValue).toBeTypeOf('string')
+      const content = record.attributes?.find(attribute => attribute.key === 'content')?.value.stringValue
+      expect(typeof content).toBe('string')
+      const event = JSON.parse(content as string) as SessionEvent
+      expect(event.type).toBeTypeOf('string')
+      expect(event.seq).toBeTypeOf('number')
+      expect(event.time).toBeTypeOf('number')
+      expect(event).toHaveProperty('data')
+    }
 
     const types = eventTypes(output.captures)
     for (const expected of ['turn/start', 'user/message', 'tool/call', 'tool/result', 'assistant/message', 'turn/end']) {
@@ -119,9 +129,6 @@ describe('session-telemetry-otel through a real headless cordis.yml', () => {
     expect(types.at(-1)).toBe('feedback/record')
     expect(records.some(({ scope }) => scope.endsWith('/ops'))).toBe(false)
 
-    // The deployment-mounted rule on the wire: the fixture credential never
-    // leaves the process, its surrounding prose does, and the placeholder
-    // marks the spot — the seam itself ships no rules.
     const wire = JSON.stringify(output.captures)
     expect(wire).not.toContain(FIXTURE_SECRET)
     expect(wire).toContain(FIXTURE_PLACEHOLDER)
@@ -131,7 +138,6 @@ describe('session-telemetry-otel through a real headless cordis.yml', () => {
     expect(wire).not.toContain('private operational error')
     expect(wire).not.toContain('telemetry.op')
 
-    // The canonical session log is never rewritten.
     expect(output.logContent).toContain('post-feedback private suffix')
     expect(output.logContent).toContain(FIXTURE_SECRET)
     expect(output.logContent).not.toContain(FIXTURE_PLACEHOLDER)

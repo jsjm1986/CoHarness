@@ -48,13 +48,6 @@ export {
 export { DEFAULT_WORKSPACE_FILE_MAX_BYTES, DEFAULT_WORKSPACE_FILE_MAX_ENTRIES, DEFAULT_WORKSPACE_FILE_MAX_LINES, DEFAULT_WORKSPACE_FILE_MAX_RESOURCES } from './workspace-files.ts'
 export type { ApiProxyDefaults } from './api-proxy.ts'
 
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    /** The host-side ApiProxy implementation (the transport-agnostic gateway face). */
-    apiProxy: ApiProxy
-  }
-}
-
 /** Gateway plugin configuration. */
 export interface Config {
   /**
@@ -172,3 +165,10 @@ export class ApiProxyService extends Service implements ApiProxy {
 export default ApiProxyService
 
 export type { HostSessionLifecycle } from './session-lifecycle.ts'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** The host-side ApiProxy implementation (the transport-agnostic gateway face). */
+    apiProxy: ApiProxy
+  }
+}

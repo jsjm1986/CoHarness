@@ -33,7 +33,7 @@ import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-model-access'
 import type {} from '@deepseek-ai/dsh-model-provider-config'
-import { isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId, SessionLogOffset, SessionRequestId } from '@deepseek-ai/dsh-session'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type {
   JsonValue,
@@ -235,6 +235,24 @@ export const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
   'pluginRegistryProbe/fastest',
   'speech/catalog',
   'speech/follow',
+  // Session rosters, model choice, and the live control stream are
+  // participant-wide reads; the session payloads are the shared project surface.
+  'session/list',
+  'session/search',
+  'session/modelCatalog',
+  'session/canOpenWorkspacePath',
+  'session/workspacePathApplications',
+  'session/control',
+  'workspace/follow',
+  // Deployment account state is shared server truth, not per-member data.
+  'account/getState',
+  'account/getProfile',
+  'account/getBalance',
+  'account/getUnnotifiedBonuses',
+  'account/hasRunningAccountTasks',
+  'account/watch',
+  'account/watchExpiry',
+  'settings/describe',
 ])
 
 /**
@@ -247,6 +265,19 @@ export const PROJECT_TYPERT_PROCESS_WIDE_OPERATIONS: ReadonlySet<string> = new S
   'speech/prepare',
   'speech/cancelPreparation',
   'speech/transcribe',
+  // Session and Workspace lifecycle are shared project operations.
+  'session/create',
+  'session/initializeDefaultModel',
+  'workspace/create',
+  'workspace/initializeDefault',
+  'workspace/rename',
+  'workspace/delete',
+  'workspace/insertBefore',
+  // Account sign-in mutates deployment-global state that every participant shares.
+  'account/startSignIn',
+  'account/cancelSignIn',
+  'account/signOut',
+  'account/ackBonusNotified',
 ])
 
 /**
@@ -255,7 +286,7 @@ export const PROJECT_TYPERT_PROCESS_WIDE_OPERATIONS: ReadonlySet<string> = new S
  * enforces its Session ACL or deployment management policy itself; this table
  * only admits the call after principal capture has verified project membership.
  */
-export const USER_TERMINAL_ENDPOINTS = new Set(['environment', 'shells', 'list', 'create', 'retain', 'follow', 'write', 'resize', 'rename', 'close'].map(method => `terminal/${method}`))
+export const USER_TERMINAL_ENDPOINTS = new Set(['environment', 'shells', 'list', 'create', 'retain', 'follow', 'attach', 'write', 'resize', 'rename', 'close'].map(method => `terminal/${method}`))
 
 /** Administrative terminal operations; the controller's own grant check runs inside the handler. */
 export const ADMIN_TERMINAL_ENDPOINTS: ReadonlySet<string> = new Set(['terminal/adminList', 'terminal/adminClose'])
@@ -299,6 +330,20 @@ export const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set
   // Speech provider selection is shared mutable state; participants without
   // manage rights must not reconfigure the voice path for other members.
   'speech/configure',
+  // Host settings writes change shared deployment configuration.
+  'settings/update',
+  'settings/replace',
+  'settings/mutate',
+  'settings/openSettingsDocument',
+  // Credential secrets and host filesystem dialogs are manager-scoped host state.
+  'credentials/describe',
+  'credentials/set',
+  'credentials/unset',
+  'directoryPicker/pick',
+  'directoryPicker/list',
+  'directoryPicker/createDirectory',
+  // Opening a path targets the Host desktop, not the calling participant.
+  'session/openWorkspacePath',
 ])
 
 /**
@@ -1163,11 +1208,12 @@ function sessionListFields(header: SessionHeader, events: readonly SessionEvent[
 }
 
 /** SessionSummary projection for attached (in-memory) sessions. */
-function summarize(session: Session, running: boolean): SessionSummary {
+function summarize(session: Session, running: boolean, agentAvailable: boolean): SessionSummary {
   // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   const metadata = sessionListMetadata(session.snapshotEvents())
   return {
     sessionId: session.id,
+    agentAvailable,
     updatedAt: sessionListUpdatedAt(session.header, metadata),
     running,
     blank: metadata.blank,
@@ -1230,6 +1276,7 @@ async function summarizeCold(
   const resolvedMetadata = probed ?? metadata
   return {
     sessionId: meta.id,
+    agentAvailable: false,
     updatedAt: sessionListUpdatedAt(meta, resolvedMetadata),
     running: false,
     // A still-draft artifact is an implementation detail until its content is
@@ -3438,7 +3485,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       const agent = ctx.agents.get(session.id)
       const projections = listProjectionsFor(ctx, session.header, session)
       return {
-        ...summarize(session, agent?.status === 'running'),
+        ...summarize(session, agent?.status === 'running', agent?.session === session),
         ...projections === undefined ? {} : { projections },
       }
     }
@@ -4794,7 +4841,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const participant = projectParticipant(authorized.authority)
         const source = {
           kind: 'user',
-          rpcId: requestId ?? request.rpcId,
+          rpcId: requestId ?? SessionRequestId(request.rpcId),
           ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
           ...(participant === undefined ? {} : { participant }),
         } satisfies MessageSource
@@ -6247,6 +6294,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             queue.push(frame({
               type: 'host/session-added',
               sessionId: session.id,
+              agentAvailable: ctx.agents.get(session.id)?.session === session,
               blank: sessionBlank(session),
               // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
               ...sessionListFields(session.header, session.snapshotEvents()),

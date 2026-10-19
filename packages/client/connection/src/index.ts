@@ -1,14 +1,14 @@
 /** Host HTTP bridge for browser-client RPC. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingHttpHeaders } from 'node:http'
+import { STATUS_CODES } from 'node:http'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-attachment'
 // Activates the webServer Context merge used below.
 import type { IndexInjection, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
-import {
-  DEFAULT_HISTORY_PAGE_TARGET_BYTES,
-  toFetchHandler,
-} from '@deepseek-ai/dsh-host-apiproxy'
+import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { DEFAULT_HISTORY_PAGE_TARGET_BYTES } from '@deepseek-ai/dsh-host-apiproxy/fetch/history-wire'
+import { toFetchHandler } from '@deepseek-ai/dsh-host-apiproxy/fetch/handler'
 import { API_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from './api-path.ts'
 import type { ConnectionAuthenticationRequest } from './rpc.ts'
 import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
@@ -46,6 +46,12 @@ export interface ConnectionRequestBoundary {
   method?: string
   /** URL pathname before any RPC dispatch. */
   pathname?: string
+  /**
+   * Refuse the request and end the exchange without calling `next()`. The
+   * carrier writes the status body itself, so a listener that calls `deny`
+   * must not also delegate.
+   */
+  deny?(status: number, message: string): void
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -282,7 +288,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
             headers: { connection: 'Upgrade', upgrade: 'websocket' },
           })
         }
-        const apiProxy = ctx.get('apiProxy')
+        const apiProxy = ctx.get('apiProxy') as ApiProxy | undefined
         if (apiProxy === undefined) return new Response('not found', { status: 404 })
         // Keep the inner Fetch parser on the same budget as the outer node:http
         // bridge. Otherwise a valid aggregate image body would be buffered by
@@ -313,6 +319,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           headers: req.headers,
           ...(req.method === undefined ? {} : { method: req.method }),
           pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+          deny: (status, message) => { res.writeHead(status); res.end(message) },
         }, async () => {
           if (await connection.dispatchHttp(req, res)) return
           await bridge(req, res, fetchHandler, maxRequestBodyBytes)
@@ -323,7 +330,8 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   })
   ctx.inject(['apiProxy', 'webServer'], (apiCtx) => {
     assertImageBodyCapacity(apiCtx, maxRequestBodyBytes)
-    const downlinks = new WebSocketDownlinks(apiCtx.apiProxy, websocketHeartbeatIntervalMs)
+    // apiProxy's Context merge lives on the apiproxy host face; the contract face binds the injected slot explicitly.
+    const downlinks = new WebSocketDownlinks((apiCtx as Context & { apiProxy: ApiProxy }).apiProxy, websocketHeartbeatIntervalMs)
     const registerDownlink = (
       path: string,
       handle: WebUpgradeRoute['handler'],
@@ -340,6 +348,9 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
             headers: req.headers,
             ...(req.method === undefined ? {} : { method: req.method }),
             pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+            deny: (status, message) => {
+              socket.end(`HTTP/1.1 ${status} ${STATUS_CODES[status] ?? 'Error'}\r\nContent-Length: ${Buffer.byteLength(message)}\r\n\r\n${message}`)
+            },
           }, async () => {
             await handle(req, socket, head)
           })

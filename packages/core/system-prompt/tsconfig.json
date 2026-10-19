@@ -9,7 +9,16 @@
   ],
   "references": [
     {
-      "path": "../scope"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../core/scope"
     },
     {
       "path": "../../llm/llm"
@@ -18,13 +27,7 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../scope"
     }
   ]
 }

@@ -9,9 +9,6 @@
   ],
   "references": [
     {
-      "path": "../webserver"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -19,6 +16,15 @@
     },
     {
       "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../client/connection/tsconfig.host.json"
+    },
+    {
+      "path": "../../util/launch-environment"
+    },
+    {
+      "path": "../webserver"
     }
   ]
 }

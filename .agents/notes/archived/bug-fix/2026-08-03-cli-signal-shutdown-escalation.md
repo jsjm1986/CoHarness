@@ -9,7 +9,7 @@ English | [中文](2026-08-03-cli-signal-shutdown-escalation.zh.md)
 
 The default telemetry mount added SIGINT/SIGTERM handlers to `dsh web` and the headless command (now `dsh --profile headless`) so process exit could drain the Cordis tree instead of dropping queued telemetry. Each handler used a one-way boolean latch and exited only after `ctx.fiber.dispose()` settled. Headless normal completion also awaited that disposal without a bound.
 
-A user then reproduced the headless command hanging immediately after the observation URL and ignoring repeated `Ctrl+C`; `DSH_TELEMETRY_DISABLED=1` removed the hang, while a standalone Node handler in the same Linux sandbox received SIGINT. This isolated the pending disposer to telemetry rather than terminal signal forwarding. The telemetry pipeline's shutdown awaits `exporter.forceFlush()` behind the byte-bounded processor's drain, and the OTLP exporter's `forceFlush()` waits directly on its in-flight HTTP Promise. A proxy/sandbox connection that never obtains a socket can therefore leave provider shutdown pending despite both configured SDK timeouts.
+A user then reproduced the headless command hanging immediately after the observation URL and ignoring repeated `Ctrl+C`; `DSH_TELEMETRY_DISABLED=1` removed the hang, while a standalone Node handler in the same Linux sandbox received SIGINT. This isolated the pending disposer to telemetry rather than terminal signal forwarding. OTel's `BatchLogRecordProcessor.shutdown()` awaits `exporter.forceFlush()` before the `exportTimeoutMillis`-bounded completion promise, and the OTLP exporter's `forceFlush()` waits directly on its in-flight HTTP Promise. A proxy/sandbox connection that never obtains a socket can therefore leave provider shutdown pending despite both configured SDK timeouts.
 
 The latch then turned that telemetry defect into an unkillable CLI: normal completion was already awaiting the single-shot root disposal; the first SIGINT joined the same pending disposal and set the signal latch; later SIGINTs returned at the latch, so the process had no remaining escape. A signal received before normal completion had the same unbounded wait. Web used the same latch shape.
 
@@ -30,7 +30,7 @@ Normal completion deliberately avoids `process.exit()`: an immediately forced ex
 
 Headless preserves exit 0 for a completed turn, exit 1 for another turn-end reason or API business error, 130 for SIGINT, and 143 for SIGTERM. Web preserves its existing SIGTERM exit 0 and SIGINT exit 130 behavior.
 
-This supersedes the [telemetry deployment Note's](../feature/2026-07-31-web-telemetry-default-mount.md) assumption that SDK exporter/processor timeouts bound complete provider shutdown, and its earlier decision to defer a process-level backstop. The backend owns its export loss/latency policy and closes the known SDK `forceFlush()` gap; the launcher owns the outer guarantee that no plugin can trap the process indefinitely.
+This supersedes the [telemetry deployment Note's](../../archived/feature/2026-07-31-web-telemetry-default-mount.md) assumption that SDK exporter/processor timeouts bound complete provider shutdown, and its earlier decision to defer a process-level backstop. The backend owns its export loss/latency policy and closes the known SDK `forceFlush()` gap; the launcher owns the outer guarantee that no plugin can trap the process indefinitely.
 
 ## Alternatives considered
 

@@ -23,6 +23,7 @@ import type {
   TypertGateway,
   TypertGatewayAuthorizationRequest,
   TypertGatewayErrorCode,
+  TypertGatewayWireStream,
 } from './types.ts'
 
 export type { TypertGatewayFaultDetails } from './remote-error-codes.ts'
@@ -31,6 +32,7 @@ export type {
   TypertGateway,
   TypertGatewayAuthorizationRequest,
   TypertGatewayErrorCode,
+  TypertGatewayWireStream,
 } from './types.ts'
 
 interface GatewayErrorOptions {
@@ -113,6 +115,32 @@ export class TypertGatewayService extends Service implements TypertGateway {
         { authority: 'trusted-host' },
       )
     })
+  }
+
+  /**
+   * In-process stream carrier for embedded transports (worker trees, packed
+   * runtimes). Shares `invoke`'s validation and authorization; the Peer is
+   * identity metadata — authorization observes the endpoint and arguments.
+   */
+  get wireStream(): TypertGatewayWireStream {
+    return {
+      open: async (endpoint, payload, _uplink, _peer, signal) => {
+        const segments = endpoint.split('/')
+        if (segments.length !== 2 || segments.some(segment => segment === '')
+          || !isObject(payload) || !isPlainObject(payload)
+          || Reflect.ownKeys(payload).length !== 1 || !isObject(payload.args) || !isPlainObject(payload.args)) {
+          throw new TypertGatewayError('gateway/protocol', endpoint, 'Remote stream payload must contain exactly one plain-object args field')
+        }
+        const [namespace, method] = segments as [string, string]
+        return await this.invoke({ namespace, method, args: payload.args, signal, mode: 'stream' }) as AsyncIterable<unknown>
+      },
+      failure: (error) => {
+        const failure = rpcFailure(error)
+        return !failure.ok
+          ? failure.error
+          : { code: 'gateway/internal', message: String(error), details: {} }
+      },
+    }
   }
 
   private claimsEndpoint(endpoint: string): boolean {

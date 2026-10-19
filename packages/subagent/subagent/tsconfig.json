@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
@@ -27,6 +36,9 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../core/system-prompt"
+    },
+    {
       "path": "../../core/tools"
     },
     {
@@ -43,6 +55,9 @@
     },
     {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../preset/agent-presets"
     },
     {
       "path": "../../preset/agent-presets"
@@ -97,15 +112,6 @@
     },
     {
       "path": "../../workspace/workspace"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

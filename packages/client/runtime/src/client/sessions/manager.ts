@@ -679,6 +679,7 @@ export class SessionManager {
         }
         this.recordMutation({ kind: 'upsert', summary: {
           sessionId: result.value.sessionId, updatedAt: Date.now(), running: false, blank: true,
+          agentAvailable: true,
           ...(opts.cwd !== undefined ? { cwd: opts.cwd } : {}),
           ...(opts.workspaceId === undefined ? {} : { workspaceId: opts.workspaceId }),
           ...(result.value.agentPreset !== undefined ? { agentPreset: result.value.agentPreset } : {}),
@@ -698,6 +699,7 @@ export class SessionManager {
             updatedAt: Date.now(),
             running: false,
             blank: true,
+            agentAvailable: true,
             ...(opts.workspaceId === undefined ? {} : { workspaceId: opts.workspaceId }),
           } })
         }
@@ -732,6 +734,7 @@ export class SessionManager {
       if (childId !== undefined) {
         this.recordMutation({ kind: 'upsert', summary: {
           sessionId: childId, updatedAt: Date.now(), running: false, blank: false,
+          agentAvailable: true,
           parentSessionId: opts.sessionId,
           ...(source?.cwd !== undefined ? { cwd: source.cwd } : {}),
         } })
@@ -760,6 +763,7 @@ export class SessionManager {
   noteAgentPreset(sessionId: SessionId, agentPreset: string): void {
     this.recordMutation({ kind: 'upsert', summary: {
       sessionId, updatedAt: Date.now(), running: false, blank: true, agentPreset,
+      agentAvailable: true,
     } })
   }
 
@@ -971,6 +975,7 @@ export class SessionManager {
       case 'host/session-added': {
         this.mergeSummary({
           sessionId: frame.sessionId, updatedAt: Date.now(), running: false, blank: frame.blank,
+          agentAvailable: frame.agentAvailable,
           ...(frame.parentSessionId !== undefined ? { parentSessionId: frame.parentSessionId } : {}),
           ...(frame.origin !== undefined ? { origin: frame.origin } : {}),
           ...(frame.cwd !== undefined ? { cwd: frame.cwd } : {}),

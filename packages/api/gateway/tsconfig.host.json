@@ -13,7 +13,19 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../attachment/attachment"
+    },
+    {
+      "path": "../../boot/cmdline"
     },
     {
       "path": "../../client/connection/tsconfig.host.json"
@@ -22,13 +34,16 @@
       "path": "../../fs/fs"
     },
     {
+      "path": "../../host/webserver"
+    },
+    {
       "path": "../../typert/protocol"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../util/deque"
     },
     {
-      "path": "../../../vendor/cosmokit"
-    }
+      "path": "../../util/timeout"
+    },
   ]
 }

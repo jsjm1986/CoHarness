@@ -33,6 +33,8 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     await writeFile(join(bundle, 'package.json'), JSON.stringify({ name: '@fixture/admin-install', version: '1.0.0', description: 'Administrative installation acceptance', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
     await writeFile(join(bundle, 'cordis.patch.yml'), '[]\n')
     const pair = generateKeyPairSync('ed25519')
+    // gateway/ is an independent npm project; its dependencies' types are absent from this program.
+    // oxlint-disable-next-line typescript/no-unsafe-assignment, typescript/no-unsafe-call, typescript/no-unsafe-member-access
     const db = openDb(join(root, 'gateway.sqlite')); cleanup.push(() => { db.close() })
     const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_UPSTREAM_TIMEOUT_MS: '120000' })
     const instances = new InstanceManager(db, cfg)

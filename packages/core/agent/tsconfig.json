@@ -9,13 +9,19 @@
   ],
   "references": [
     {
-      "path": "../scope"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../session"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../system-prompt"
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/system-prompt"
     },
     {
       "path": "../../llm/llm"
@@ -33,10 +39,13 @@
       "path": "../../util/values"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../scope"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../session"
+    },
+    {
+      "path": "../system-prompt"
     }
   ]
 }

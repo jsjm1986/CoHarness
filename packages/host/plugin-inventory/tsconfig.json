@@ -9,13 +9,19 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
       "path": "../../boot/app-boot"
     },
     {
       "path": "../../preset/agent-presets"
     },
     {
-      "path": "../../util/package-manifest"
+      "path": "../../preset/agent-presets"
     },
     {
       "path": "../../typert/protocol"
@@ -24,10 +30,7 @@
       "path": "../../util/brand"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
+      "path": "../../util/package-manifest"
     }
   ]
 }

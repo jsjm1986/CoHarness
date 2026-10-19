@@ -100,8 +100,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagents/interruptByParent over th
     const parent = scaffold.ctx.agents.get(parentId)
     if (parent === undefined) throw new Error('created parent session did not publish a live Agent')
 
-    const started = await scaffold.ctx.subagents.startActivation({
-      delivery: 'parent',
+    const started = await scaffold.ctx.subagents.startContinuable({
       provider: 'spawn',
       label: 'event-sourcing researcher',
       signal: new AbortController().signal,

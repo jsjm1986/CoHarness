@@ -54,6 +54,8 @@ export interface SkillInvocationPolicy {
 
 /** Invocation-neutral skill metadata returned by `ctx.skills.list()`. */
 export interface SkillSummary {
+  /** Absolute instruction file path when supplied by the provider; absent for virtual skills. */
+  readonly path?: string
   /** Kebab-case identifier used to address the skill. */
   readonly name: string
   /** Short routing description shown by discovery consumers. */

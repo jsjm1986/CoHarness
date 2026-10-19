@@ -368,6 +368,7 @@ describe('TypertRegistry', () => {
     })
     const disposeClient = ctx.typert.contexts.registerClient('registryFixture', {
       identity: candidate => candidate === scoped ? object.id : undefined,
+      resolve: id => id === object.id ? scoped : undefined,
     })
 
     expect(ctx.typert.lookups.get('fixture')?.resolve('agent-1')).toBe(object)
@@ -473,7 +474,10 @@ describe('TypertRegistry', () => {
       wireTypeSymbol: '@fixture#AgentId',
       resolve: () => undefined,
     }
-    const client = { identity: () => undefined }
+    const client = {
+      identity: (_candidate: Context) => undefined,
+      resolve: () => undefined,
+    }
     const disposeLookup = ctx.typert.lookups.register('fixture', lookup)
     const disposeHost = ctx.typert.contexts.registerHost('registryFixture', host)
     const disposeClient = ctx.typert.contexts.registerClient('registryFixture', client)

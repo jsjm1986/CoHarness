@@ -24,14 +24,6 @@ Google 在 form POST 请求体中接收原文，Bing 在 JSON POST 请求体中�
 
 付费缓存未命中时要求内置账号或官方 API 所有者处于活动状态、凭据已配置，且目录包含 ID 恰好为 `deepseek-flash` 的模型；名称和版本标签不参与匹配，pi-ai 路由被排除。每次未命中准备一次关闭思考的独立纯文本查询。精确配置、系统指令和唯一原文片段保存在同一请求记录的可选 `metadata.modelRequest` 中。读取保存结果先于此项准入，因此凭据缺失不会使既有译文失效。原生请求扩展不接收主 Session 身份，不能上传其完整日志。
 
-## 思考内容展示
-
-[可选 Bundle](../../packages/experimental/cot-translation-bundle/README.zh.md) 将 translator 与 [GUI 消费者](../../packages/experimental/client-ui-cot-translation/README.zh.md) 组合。其 `cotTranslation` Remote 为经过身份验证的浏览器调用提供服务。Session 未激活且没有已保存结果时，Host 等待 Session controller 的正常激活，再重试一次。激活保留正常的 preset 钩子、恢复标记和中断轮次修复；取消会结束调用者的等待并阻止随后调用翻译，不取消共享激活。Bundle 设置选择翻译服务及目标语言；`auto` 跟随当前界面语言。
-
-`CotTranslationPreferences` 包含已接受的翻译服务和目标语言。`CotTranslationSnapshot` 将这些偏好与 translator 当前的 `maxTextChars` 及可用服务 ID 一起返回。浏览器在注册翻译控件前读取此 Host 快照，本地设置存储不可用时也如此。接受的设置更新及重新连接会刷新这两项值；请求长度限制变化时，展开内容的请求被取消并重新分片。
-
-GUI 向 Session 作用域的 `conversation.chat.reasoning.body` single Slot 注册，替换 Chat 的默认条目。两个条目均复用官方 `conversation.chat.reasoning.content` Factory；翻译包装选择显示文本，自行维护工具栏和视图状态，传入自己的本地化 labels，不重复实现 Markdown 渲染。启用后，GUI 只在展开后翻译完整段落和流式长段落中达到请求长度的前缀，并从当前 Session 恢复已完成结果；本地缓存只优化当前展开区域。未完成的末尾片段保留原文。原文始终可访问。关闭展开内容、切换 Provider 或语言、卸载插件都会取消未完成调用并忽略迟到的结果。Provider 失败时保留原文，必须显式重试；译文从不替换原始 Session 事件或模型输入。
-
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -39,33 +31,6 @@ GUI 向 Session 作用域的 `conversation.chat.reasoning.body` single Slot 注�
 ## Cordis API
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
-
-<a id="ctxcottranslation--cottranslationcontroller"></a>
-
-### `ctx.cotTranslation` — `CotTranslationController`
-
-Optional reasoning translation delegates Session-bound storage to the translator.
-
-```ts cordis-catalog
-/**
- * Read accepted translation preferences and the current request limit without sending text.
- * @param signal - browser query cancellation or Remote contribution withdrawal.
- * @returns authoritative preferences, eligible routes, and maximum UTF-16 text length per request.
- */
-@Remote async limits(signal: AbortSignal): Promise<CotTranslationSnapshot>
-
-/**
- * Translate one displayed fragment through the reader's selected provider.
- * @param request - original text and Session identity supplied by the Client; provider and explicit
- * target language match accepted preferences, while auto uses the browser locale.
- * @param signal - browser cancellation or Remote contribution withdrawal.
- * @returns translated text; an uncached inactive Session joins ordinary GUI activation before retry.
- * Failures omit the source and provider response. Cancellation stops this caller's wait, not shared activation.
- */
-@Remote async translate(request: TranslationRequest, signal: AbortSignal): Promise<string>
-```
-
-Source: [`packages/experimental/client-ui-cot-translation/src/index.ts`](../../packages/experimental/client-ui-cot-translation/src/index.ts)
 
 <a id="ctxtranslator--translator"></a>
 

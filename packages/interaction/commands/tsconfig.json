@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
@@ -24,6 +30,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../runtime-diagnostics/invariants"
+    },
+    {
       "path": "../../typert/protocol"
     },
     {
@@ -31,12 +40,6 @@
     },
     {
       "path": "../../util/crypto"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
     }
   ]
 }

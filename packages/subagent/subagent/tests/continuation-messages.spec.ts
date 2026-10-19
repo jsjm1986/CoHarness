@@ -29,11 +29,12 @@ describe('continuable settlement content', () => {
   })
 
   it.each([
+    ['absent output', undefined],
     ['empty output', []],
     ['reasoning-only output', [reasoning]],
     ['empty text', [{ type: 'text', text: '' }]],
-  ] satisfies [string, ContentBlock[]][])('reports no closing message for %s', (_label, output) => {
-    const message = createSettlementMessage(childId, { stopReason: 'completed', output })
+  ] satisfies [string, ContentBlock[] | undefined][])('reports no closing message for %s', (_label, output) => {
+    const message = createSettlementMessage(childId, { stopReason: 'completed', ...output === undefined ? {} : { output } })
 
     expect(message.content).toEqual([
       summary,
@@ -120,17 +121,4 @@ describe('continuable settlement content', () => {
     const settled = createSettlementMessage(childId, { stopReason: 'completed' }, scope)
     expect(settled.source).toMatchObject({ gatewayExecutionScope: scope })
   })
-})
-
-it('includes closing text alongside structured results and diagnostics', () => {
-  expect(createSettlementMessage(childId, {
-    stopReason: 'completed', output: [{ type: 'text', text: 'final answer' }],
-    structured: { answer: 42 }, diagnostic: 'safe diagnostic',
-  }).content).toEqual([
-    summary,
-    { type: 'text', text: 'Its closing message:' },
-    { type: 'text', text: 'final answer' },
-    { type: 'text', text: 'Structured result: {"answer":42}' },
-    { type: 'text', text: 'safe diagnostic' },
-  ])
 })

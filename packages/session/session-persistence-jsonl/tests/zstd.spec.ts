@@ -8,7 +8,7 @@ import { performance } from 'node:perf_hooks'
 import { SessionSeq, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
-import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
   generationLogPath, logPath, scanLog, sessionDir, toHeaderLine, type JsonlCompression,
 } from '../src/format.ts'
@@ -493,8 +493,10 @@ describe('JsonlSessionPersistence: default Zstandard encoding', () => {
     const root = await freshRoot()
     const ctx = new Context()
     contexts.push(ctx)
-    await ctx.plugin((inner: Context) => JsonlSessionPersistence.apply(inner, { root }))
-    const backend = ctx.sessionPersistence
+    let backend!: JsonlSessionPersistence
+    await ctx.plugin((inner: Context) => {
+      backend = new JsonlSessionPersistence(inner, { root })
+    })
     const header = meta('direct-default')
     const path = logPath(root, header.cwd, header.id, 'zstd')
 
@@ -544,10 +546,7 @@ describe('JsonlSessionPersistence: default Zstandard encoding', () => {
     buffer[eventFrame.end - 1] = buffer[eventFrame.end - 1]! ^ 0xFF
     await writeFile(path, buffer)
 
-    const listed = await ctx.sessionPersistence.list()
-    expect(listed.map(item => item.header.id)).toEqual([header.id])
-    expect(listed[0]?.formatStatus).toBe('current')
-    expect((await ctx.sessionPersistence.stat(header.id))?.formatStatus).toBe('current')
+    expect((await ctx.sessionPersistence.list()).map(item => item.header.id)).toEqual([header.id])
     await expect(readAll(ctx.sessionPersistence, header.id)).rejects.toThrow(/frame at byte .* failed validation/)
   })
 

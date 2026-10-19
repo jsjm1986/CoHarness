@@ -33,6 +33,8 @@ export interface SettingsSecretView {
 export interface SettingsNamespaceView {
   /** Namespace key (`llm-deepseek`, `llm-pi-ai`, …). */
   ns: string
+  /** Whether the UI may generate a page when no custom page exists. */
+  autoGenerate: boolean
   /** Serialized schemastery schema envelope (`schema.toJSON()`); rehydrate with `new Schema(json)`. */
   schema: JsonValue
   /** Redacted resolved value (schema defaults → composition base → user layer). */

@@ -9,21 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../compaction/compaction"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../llm"
-    },
-    {
-      "path": "../llm-retry"
-    },
-    {
-      "path": "../../session/session-projection"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -31,6 +16,30 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../compaction/compaction"
+    },
+    {
+      "path": "../../compaction/compaction-image-offload"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../llm/llm-retry"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../llm"
+    },
+    {
+      "path": "../llm-retry"
     }
   ]
 }

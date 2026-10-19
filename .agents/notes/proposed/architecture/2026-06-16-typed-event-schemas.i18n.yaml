@@ -6,8 +6,8 @@
   en: 4c43e20267c063a5
   zh: 3aaf14457b121e24
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern/problem:
-  en: 559a6e75ad237b24
-  zh: dd43fd01163de64d
+  en: 15f4adf3c274b95d
+  zh: dde95af3e88a0477
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern/why-this-is-not-a-persistence-change:
   en: 42d48e48d694d3de
   zh: f556f4624b55a480
@@ -36,5 +36,5 @@
   en: 79e720cfffe60257
   zh: b4aea0d52f3ee072
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern/open-questions:
-  en: afc8275e1598eb34
-  zh: f3684ee3aba33cf1
+  en: 2c9095d05efbd00f
+  zh: c18fca57a4600284

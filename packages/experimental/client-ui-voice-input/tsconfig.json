@@ -12,10 +12,13 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../api/gateway/tsconfig.client.json"
+    },
+    {
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
-      "path": "../../api/gateway/tsconfig.client.json"
+      "path": "../../api/session-controller/tsconfig.client.json"
     },
     {
       "path": "../../client/locale"
@@ -30,13 +33,13 @@
       "path": "../../client/ui-input-trigger"
     },
     {
+      "path": "../../client/ui-plugin-manager/tsconfig.client.json"
+    },
+    {
       "path": "../../client/ui-primitives"
     },
     {
       "path": "../../client/ui-renderer"
-    },
-    {
-      "path": "../../client/ui-plugin-manager/tsconfig.client.json"
     },
     {
       "path": "../../client/ui-slots"

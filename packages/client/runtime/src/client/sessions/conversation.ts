@@ -12,7 +12,7 @@ import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { LlmRetryEventData } from '@deepseek-ai/dsh-llm-retry/types'
 import type { TodoItem } from '@deepseek-ai/dsh-session/types'
 import type {
-  RpcError, RpcId, SessionId, SubagentAddress, ToolCallView, ToolResultView,
+  RpcError, SessionId, SessionRequestId, SubagentAddress, ToolCallView, ToolResultView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionPendingEntry } from './pending.ts'
@@ -372,7 +372,7 @@ export interface QueuedMessage {
   /** Stable message identity used for transient-to-durable steering handoff. */
   readonly messageId: MessageId
   /** Prompt identity for a browser-submitted occurrence, when present. */
-  readonly rpcId?: RpcId
+  readonly rpcId?: SessionRequestId
   /** Agent-resolved placement; only queued rows accept queue mutations. */
   readonly placement: 'queued' | 'steering' | 'context'
   /** Complete content used to render pending steering before it becomes durable. */
@@ -400,7 +400,7 @@ export type PendingSubmissionPlacement = 'transcript' | 'queued' | 'steering'
 /** One local prompt-submission echo awaiting durable event or queue observation. */
 export interface PendingSubmission {
   /** Prompt identity carried through the host source metadata. */
-  readonly requestId: RpcId
+  readonly requestId: SessionRequestId
   /** Surface fixed at submission time; queue acceptance does not move a Chat echo into the dock. */
   readonly placement: PendingSubmissionPlacement
   /** Client wall-clock ms when the submission began. */
@@ -644,6 +644,10 @@ export interface ConversationSnapshot {
   /** Lightweight full-session turn index; absent only in older external fixtures. */
   historyNavigation?: HistoryNavigationSnapshot
   promptError: PromptError | null
+  /** A prompt was initiated on this session object. */
+  promptAttempted?: boolean
+  /** No completed turn yet and the first prompt is still in flight. */
+  awaitingFirstTurn?: boolean
   /**
    * Whether this session still has no visible conversation message.
    * Mirrors the host summary's derived blank bit: seeded from `session.list`

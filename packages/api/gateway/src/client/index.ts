@@ -67,6 +67,12 @@ export interface ClientRemote extends TypertClientRemote {
    * @returns a cancellable single-consumer stream; mutations are never replayed.
    */
   $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item>
+  /**
+   * Deliver one forwarded Host event to matching `$on` registrations.
+   * @param event - forwarded event name; aliases of the same family dispatch together.
+   * @param args - Client-projected event arguments.
+   */
+  $dispatch(event: string, args: readonly unknown[]): void
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -179,7 +185,7 @@ class ClientRemoteService extends Service implements TypertClientRemote {
   /**
    * Deliver one forwarded event in registration order, isolating a listener
    * that fails either synchronously or by rejecting a returned promise; see
-   * {@link TypertClientRemote.$dispatch} for the caller contract.
+   * {@link ClientRemote.$dispatch} for the caller contract.
    */
   $dispatch(event: string, args: readonly unknown[]): void {
     const acceptedNames = new Set(remoteEventNames(event))

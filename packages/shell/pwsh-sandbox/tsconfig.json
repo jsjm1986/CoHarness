@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../llm/llm"
     },
     {
@@ -18,19 +24,19 @@
       "path": "../../sandbox/sandbox-policy"
     },
     {
-      "path": "../pwsh-local"
+      "path": "../../shell/pwsh-local"
     },
     {
-      "path": "../shell"
+      "path": "../../shell/shell"
     },
     {
       "path": "../../util/brand"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../pwsh-local"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../shell"
     }
   ]
 }

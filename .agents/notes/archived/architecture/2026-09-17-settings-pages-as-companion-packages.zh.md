@@ -38,4 +38,4 @@ Archived: 2026-09-30
 
 ## 测试
 
-每个伴生包的 `tests/apply.client.spec.ts` 在 Host 服务命名空间时注册页面、停止服务时注销、teardown 时收拢；其 card 与 controller 用例延续原包里的页面行为。`ui-primitives` 中的 settings-form 用例钉住套件，`ui-settings` 中的 while-served 用例钉住注册规则。`apps/web/tests/plugin-config.e2e.ts` 走真实链路验证终端页与 Subagent 页。
+每个伴生包的 `tests/apply.client.spec.ts` 在 Host 服务命名空间时注册页面、停止服务时注销、teardown 时收拢；其 card 与 controller 用例延续原包里的页面行为。`packages/client/ui-primitives/tests/settings-form-model.client.spec.ts`、`packages/client/ui-primitives/tests/settings-form.client.spec.tsx` 与 `packages/client/ui-primitives/tests/settings-fields.client.spec.tsx` 钉住套件；`packages/client/ui-settings/tests/while-served.client.spec.ts` 钉住注册规则。`apps/web/tests/plugin-config.e2e.ts` 走真实链路验证终端页与 Subagent 页。

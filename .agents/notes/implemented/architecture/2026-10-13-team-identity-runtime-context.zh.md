@@ -14,7 +14,7 @@ Status: implemented
 
 Loop 负责日志记录、保留快照比较和压缩后的重新接纳。角色变化会在继承历史之后追加当前完整 runtime-context 快照；保留的 context 未变化时不追加消息。不引入 Team 专属的保留状态、事件类型或日志迁移。已有身份提醒仍作为历史消息保留。
 
-本决策仅取代 [Agent Teams](../feature/2026-08-05-agent-teams.zh.md#team-identity) 中的初始任务身份决策；其 roster、mailbox 和 task 决策仍然有效。
+本决策仅取代 [Agent Teams](../feature/2026-08-05-agent-teams.zh.md) 中的初始任务身份决策；其 roster、mailbox 和 task 决策仍然有效。
 
 ## Alternatives considered
 

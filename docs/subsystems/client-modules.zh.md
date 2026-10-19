@@ -84,7 +84,7 @@ interface WebBootGraph {
 
 首次发布与 HMR 都从入口的 mtime、ctime 和大小派生每个 row 的 `rev`，不对可执行字节求哈希。相同产物会跨 Host 重启保持 revision。初始 descriptor 把 row 划入 bootstrap 与 application 两个调度阶段，每个阶段都可以包含多条 descriptor。URL 只含有序 package 资源列表和从这些 row revision 派生的 revision，阶段名不会进入路由。图组合保持 row 顺序，并在 map 形式 URL 超过 3 KiB 前贪心切分，不拼接脚本，也不读取 map。图 revision 对 entry 与 batch descriptor 求哈希。`immediately` 标记第一阶段的 registration barrier；同一 combo 中的 row 共享脚本传输，不同 combo 则独立加载。
 
-`release` 把本包版本与 client 构建固化进 Host 构建产物的源码 commit 配成一对，不计入图 revision。只有 Host 提供页面启动时的 release，页面才应用图和 rebuilt 帧；其他 release 要等页面刷新（[Host release 变化](../../packages/client/modules/README.zh.md#host-release-changes)）。
+`release` 把本包版本与 client 构建固化进 Host 构建产物的源码 commit 配成一对，不计入图 revision。只有 Host 提供页面启动时的 release，页面才应用图和 rebuilt 帧；其他 release 要等页面刷新（[Host release 变化](../../packages/client/modules/README.zh.md)）。
 
 ## 扫描
 

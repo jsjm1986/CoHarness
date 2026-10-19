@@ -9,22 +9,25 @@
   ],
   "references": [
     {
-      "path": "../../util/brand"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../context/execution-authority"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../../core/tools"
+      "path": "../../context/execution-authority"
     },
     {
       "path": "../../core/agent"
     },
     {
       "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../util/brand"
     }
   ]
 }

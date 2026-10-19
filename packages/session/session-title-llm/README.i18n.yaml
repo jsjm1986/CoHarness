@@ -3,26 +3,44 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-title-llm/README.md
 /:
-  en: 6184e467da62f0c8
-  zh: 0a51af1cad6486b4
+  en: 129d1901a10435e8
+  zh: ac0143c8ea8b82ee
 /deepseek-ai-dsh-session-title-llm:
-  en: 1c56063916d08b7d
-  zh: d99d72dcd6e55803
+  en: 7ef6dbec913fd508
+  zh: 87c2448be60fb88e
 /deepseek-ai-dsh-session-title-llm/summary:
-  en: 741cd917e857bd99
-  zh: 43c290b6baf222e6
+  en: 6cc16d88b07242a4
+  zh: 76208dee63c2fcda
 /deepseek-ai-dsh-session-title-llm/table-of-contents:
-  en: 5c327cb51d492dee
-  zh: 1bb6e148e00b460d
-/deepseek-ai-dsh-session-title-llm/route-and-failure-contract:
-  en: 7431d3f954179fe8
-  zh: 81b3861aed670ab3
-/deepseek-ai-dsh-session-title-llm/configuration:
-  en: c0045003bb9354fd
-  zh: 2f281532c60f8086
-/deepseek-ai-dsh-session-title-llm/invariants:
-  en: eda0961d8863c725
-  zh: 03b01f61e76b9254
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-session-title-llm/use-this-package:
+  en: 1a4681db86d285e2
+  zh: 7a95a65b85afdb52
+/deepseek-ai-dsh-session-title-llm/use-this-package/executing-a-provider-request:
+  en: d50165ad16f078f4
+  zh: b22c2bd7964c05a2
+/deepseek-ai-dsh-session-title-llm/use-this-package/route-and-failure-contract:
+  en: 9b9251b3acc75bcf
+  zh: a508ebd71ec9c227
+/deepseek-ai-dsh-session-title-llm/use-this-package/configuration:
+  en: b317338d2d5335c6
+  zh: b21543c2f97c7694
+/deepseek-ai-dsh-session-title-llm/understand-the-implementation:
+  en: aa0fd15305df90bb
+  zh: d28e3a28bb324167
+/deepseek-ai-dsh-session-title-llm/understand-the-implementation/design-concept:
+  en: c7bb70f9f785bfca
+  zh: ad0b375fb2de6dfa
+/deepseek-ai-dsh-session-title-llm/understand-the-implementation/source-map:
+  en: ee1ac7a50e65d430
+  zh: 2c97dd5cc71e8f22
+/deepseek-ai-dsh-session-title-llm/understand-the-implementation/request-flow:
+  en: b3f23a8c2c8b38e3
+  zh: de612ea07796fe9d
+/deepseek-ai-dsh-session-title-llm/further-exploration:
+  en: d9844c0fc3e16c5c
+  zh: 1e0c0b4b5d566972
 /deepseek-ai-dsh-session-title-llm/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -30,17 +48,17 @@
   en: 7dcc6f74474f78e7
   zh: 64cffa0b4d94c69d
 /deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/what-the-model-sees:
-  en: 65a72db46b8c2df3
-  zh: 3f93c653efbc1aa8
+  en: 7295cce9bf6e7008
+  zh: 40d63f0f772f15ad
 /deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/token-effect:
-  en: 4d59f31ebbff4d31
-  zh: 6104f3b7a4c690af
+  en: 37b7841dcd3d25e9
+  zh: 1ad3050728315b49
 /deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/kv-cache-effect:
-  en: 5d3b5b7c8d8b4b67
-  zh: 587eb6cadf03490d
+  en: ebf780cb08ebf13d
+  zh: 0b92c06fb1ca0640
 /deepseek-ai-dsh-session-title-llm/known-limitations-and-deferred-work:
-  en: f52e8fc0c45d3d40
-  zh: 7e75c73412cef4e3
+  en: 892839ae7a4a0d99
+  zh: a10c8cfdc300c178
 /deepseek-ai-dsh-session-title-llm/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

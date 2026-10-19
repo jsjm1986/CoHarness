@@ -46,9 +46,9 @@ export interface MockLog {
    */
   streams(endpoint?: string): readonly LoggedStream[]
   /**
-   * The first positional arg of every unary call and stream open, oldest first: the request object of the API
-   * domain's one-parameter endpoints. Without `endpoint`, every endpoint the client asked the Host for, except
-   * `$`-prefixed mock-internal ones and the connection pump's own `events.mux` / `events.host` opens.
+   * The first positional arg of every unary call and stream open, oldest first: the request object of the Gateway's
+   * one-parameter endpoints. Without `endpoint`, every endpoint the client asked the Host for, except the Gateway's
+   * own `$`-prefixed ones (`$events`).
    * @param endpoint - restrict to one endpoint.
    * @returns the requests.
    */
@@ -87,7 +87,7 @@ export class MockLogStore implements MockLog {
   requests(endpoint?: string): readonly unknown[] {
     const entries: (LoggedCall | LoggedStream)[] = [...this.calls(endpoint), ...this.streams(endpoint)]
     return entries
-      .filter(entry => endpoint !== undefined || !entry.endpoint.startsWith('$') && entry.endpoint !== 'events.mux' && entry.endpoint !== 'events.host')
+      .filter(entry => endpoint !== undefined || !entry.endpoint.startsWith('$'))
       .sort((a, b) => a.seq - b.seq)
       .map(entry => entry.args[0])
   }

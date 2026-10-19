@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
@@ -24,10 +33,10 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../mcp-resources"
+      "path": "../../subprocess/subprocess"
     },
     {
-      "path": "../../subprocess/subprocess"
+      "path": "../../util/http-proxy"
     },
     {
       "path": "../../util/timeout"
@@ -36,13 +45,7 @@
       "path": "../../util/values"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../mcp-resources"
     }
   ]
 }

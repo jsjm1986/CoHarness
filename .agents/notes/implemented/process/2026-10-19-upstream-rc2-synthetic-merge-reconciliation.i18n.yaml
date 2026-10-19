@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-19-upstream-rc2-synthetic-merge-reconciliation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-19-upstream-rc2-synthetic-merge-reconciliation.md
+/agent-note-upstream-rc-2-synthetic-merge-reconciliation-closeout:
+  en: 1edc682c2236f011
+  zh: d4225a86b379705b
+/agent-note-upstream-rc-2-synthetic-merge-reconciliation-closeout/problem:
+  en: fff40f68b0278e06
+  zh: c294725c20d0b3a7
+/agent-note-upstream-rc-2-synthetic-merge-reconciliation-closeout/decision:
+  en: fc32f8722a54aca1
+  zh: a01b457fc53023c1
+/agent-note-upstream-rc-2-synthetic-merge-reconciliation-closeout/alternatives-considered:
+  en: 0b63ee29e4e74914
+  zh: 9eaa5a65d5b148f3
+/agent-note-upstream-rc-2-synthetic-merge-reconciliation-closeout/consequences:
+  en: e10bbaedaed8e902
+  zh: d31d1cb10e3e6ae9

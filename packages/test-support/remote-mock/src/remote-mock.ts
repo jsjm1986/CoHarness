@@ -1,18 +1,10 @@
-/** `RemoteMock`: an endpoint table (unary answers or stream scripts), live stream control, a log, and the Connection carrier faces. */
+/** `RemoteMock`: an endpoint table (unary answers or stream scripts), live stream control, a log, and the Connection carrier face. */
 
-import type {
-  ClientTransportHooks,
-  ClientConnectionRpc,
-  ConnectionRpcResult,
-  HostDescription,
-  IApiClient,
-} from '@deepseek-ai/dsh-client-connection/client'
+import type { ClientConnectionRpc, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection/client'
 import { fn, type Mock } from '@vitest/spy'
 import { MockLogStore, type MockLog } from './log.ts'
-import { MockStream, openStream, toError, type StreamScript } from './streams.ts'
+import { HandleUplink, MockClientStream, MockStream, toError, type StreamScript } from './streams.ts'
 import { createRemoteProxy, type MockedRemote } from './remote-proxy.ts'
-import { createMockApi } from './api-client.ts'
-import { MockAccountPreferences, MockProjectModelSettings } from './transports.ts'
 
 /** A unary handler receives the caller's positional arguments, without its trailing `AbortSignal`. */
 export type UnaryRuleFn<Args extends readonly unknown[] = readonly unknown[], Result = unknown> = (...args: Args) => Result
@@ -27,7 +19,7 @@ export interface RemoteTable {
 
 /** Construction options. */
 export interface RemoteMockOptions {
-  /** Host facts the default `host.describe` answer carries; default `{ home: '/home/mock' }`. */
+  /** Host facts the built-in `$events` ready frame carries; default `{ home: '/home/mock' }`. */
   readonly host?: { readonly home: string }
 }
 
@@ -76,9 +68,10 @@ export interface OpenStreams {
   drained(endpoint: string, where?: StreamFilter): Promise<void>
 }
 
+const EVENTS_ENDPOINT = '$events'
+
 /**
- * The success envelope the Client's Remote and API callers read: `{ ok: true, value }` —
- * `RpcResult`/`ConnectionRpcResult`/`RemoteResult` share the same pair.
+ * The success envelope the Client's Remote callers read: `{ ok: true, value }`.
  * @param value - success value.
  * @returns the envelope.
  */
@@ -95,38 +88,25 @@ interface OpenWaiter {
 /** A missing default answer is an unmatched request, not a selected rule that failed. */
 class MissingUnaryRule extends Error {}
 
-/** An item that already is a result envelope passes through the `rpc.stream` wrap unchanged. */
-function isResultEnvelope(item: unknown): item is ConnectionRpcResult<unknown> {
-  return typeof item === 'object' && item !== null && typeof (item as { ok?: unknown }).ok === 'boolean'
-}
-
 /**
- * Endpoint-named Remote/API mock. `dispatch` / `open` are the core; `rpc` and
- * `api` are the same core behind the decoded carrier faces the Connection
- * installer accepts (`rpc` for Gateway remote traffic, `api` for the
- * handwritten domain methods; both share the endpoint table, the log, and
- * the stream controls).
+ * Endpoint-named Remote mock. `dispatch` / `open` are the core; `rpc` is the
+ * same core as the decoded carrier accepted by the Connection installer.
  */
 export class RemoteMock {
   /**
-   * Create a mock answering the Connection handshake: `host.describe`
-   * describes `options.host`, and `events.mux`/`events.host` stay open without
-   * frames, so the assembled client connects and stays connected.
-   * @param options - host facts for the describe answer.
+   * Create a mock whose `$events` stream answers the Gateway client's opening
+   * with one ready frame and then stays open, so the assembled client connects.
+   * @param options - host facts for the ready frame.
    * @returns the mock.
    */
   static create(options: RemoteMockOptions = {}): RemoteMock {
+    const mock = new RemoteMock()
     const host = options.host ?? { home: '/home/mock' }
-    return new RemoteMock()
-      .unary('host.describe', () => ok<HostDescription>({
-        version: 'mock',
-        cwd: host.home,
-        attachedSessions: 0,
-        home: host.home,
-        canOpenPath: false,
-      }))
-      .stream('events.mux', openStream())
-      .stream('events.host', openStream())
+    let generation = 0
+    return mock.stream(EVENTS_ENDPOINT, (_args, stream) => {
+      generation += 1
+      stream.push({ type: 'ready', clientId: `mock-client-${String(generation)}`, host })
+    })
   }
 
   private readonly unaryDefaults = new Map<string, unknown>()
@@ -136,6 +116,8 @@ export class RemoteMock {
   private readonly logStore = new MockLogStore()
   private readonly unaryMocks = new Map<string, Mock<UnaryRuleFn>>()
   private readonly streamMocks = new Map<string, Mock<UnaryRuleFn>>()
+  /** The carrier's uplink for the open in progress through {@link open}; a direct call has none. */
+  private carrierUplink: AsyncIterable<unknown> | undefined
   private readonly proxy = createRemoteProxy(endpoint => this.modeOf(endpoint) === 'stream'
     ? this.streamMock(endpoint)
     : this.unaryMock(endpoint))
@@ -148,15 +130,6 @@ export class RemoteMock {
    */
   // oxlint-disable-next-line typescript/no-unsafe-assignment -- Only this test proxy becomes any without generated namespaces.
   readonly remote: MockedRemote = this.proxy as MockedRemote
-
-  /** The handwritten domain API the runtime's object layer calls directly. */
-  readonly api: IApiClient = createMockApi(this)
-
-  /** In-memory account-preference carrier (absent carrier disables account scopes, which boots also exercise). */
-  readonly accountPreferences = new MockAccountPreferences()
-
-  /** In-memory project-Provider carrier for project settings surfaces. */
-  readonly projectModelSettings = new MockProjectModelSettings()
 
   /** Everything observed so far. */
   readonly log: MockLog = this.logStore
@@ -174,11 +147,9 @@ export class RemoteMock {
   }
 
   /**
-   * The Connection carrier face: `call` dispatches, `stream` opens. Payloads
-   * carry `{ args }` — the positional array the namespace proxies send, or the
-   * one object API-domain endpoints send — and a call aborted by its signal
-   * rejects. `stream` yields `{ ok: true, value }` envelopes per script item;
-   * an item already carrying a boolean `ok` passes through as the wire result.
+   * The Connection carrier face: `call` dispatches, `open` opens; payloads carry
+   * `{ args }` as the whole-client proxies (an array) or the Gateway's own
+   * endpoints (one object) send them, and a call aborted by its signal rejects.
    */
   readonly rpc: ClientConnectionRpc = {
     call: async (_channel, endpoint, payload, signal) => {
@@ -187,34 +158,21 @@ export class RemoteMock {
       // The carrier contract names the result envelope; the registered value is taken as that envelope unchecked.
       return value as ConnectionRpcResult<unknown>
     },
-    stream: (_channel, endpoint, payload, signal) => this.streamResults(endpoint, argsOf(endpoint, payload), signal),
-  }
-
-  /**
-   * The `ClientTransportHooks` half a test supplies to `installConnection`:
-   * this mock's api, RPC, account, and project carriers.
-   */
-  get transport(): ClientTransportHooks {
-    return {
-      createApiClient: () => this.api,
-      rpc: this.rpc,
-      createAccountPreferencesTransport: () => this.accountPreferences,
-      createProjectModelSettingsTransport: () => this.projectModelSettings,
-    }
+    open: (_channel, endpoint, payload, signal, uplink) => this.open(endpoint, argsOf(endpoint, payload), signal, uplink),
   }
 
   private constructor() {}
 
   /**
    * Set the endpoint's default positional-argument handler without changing its native mock overrides.
-   * @param endpoint - `<namespace>/<method>` or `<domain>.<method>`.
+   * @param endpoint - `<namespace>/<method>`.
    * @param rule - handler computing the answer.
    * @returns this.
    */
   unary<Args extends readonly unknown[]>(endpoint: string, rule: UnaryRuleFn<Args>): this
   /**
    * Set the endpoint's default answer, including explicit `undefined`, without changing its native mock overrides.
-   * @param endpoint - `<namespace>/<method>` or `<domain>.<method>`.
+   * @param endpoint - `<namespace>/<method>`.
    * @param rule - default answer.
    * @returns this.
    */
@@ -227,7 +185,7 @@ export class RemoteMock {
   /**
    * Declare `endpoint` as a stream and replace its default script when supplied. A declaration without a script
    * preserves any existing script; an endpoint declared without one fails an open as a stream miss.
-   * @param endpoint - `<namespace>/<method>` or `<domain>.<method>`.
+   * @param endpoint - `<namespace>/<method>`.
    * @param script - script (`frames` / `openStream` build the common ones).
    * @returns this.
    */
@@ -328,6 +286,8 @@ export class RemoteMock {
    * @param endpoint - endpoint.
    * @param args - positional args.
    * @param signal - consumer cancellation.
+   * @param uplink - the carrier's uplink for this open, which the script reads as `StreamHandle.uplink`;
+   *   absent for a direct call, whose returned handle owns the uplink.
    * @returns the controlled script stream or the native override's caller-owned iterable.
    * @throws {Error} when the default runs without a registered script (logged as unmatched).
    */
@@ -335,8 +295,14 @@ export class RemoteMock {
     endpoint: string,
     args: readonly unknown[],
     signal: AbortSignal,
+    uplink?: AsyncIterable<unknown>,
   ): AsyncIterable<unknown> {
-    return this.streamMock(endpoint)(...args, signal) as AsyncIterable<unknown>
+    this.carrierUplink = uplink
+    try {
+      return this.streamMock(endpoint)(...args, signal) as AsyncIterable<unknown>
+    } finally {
+      this.carrierUplink = undefined
+    }
   }
 
   private streamMock(endpoint: string): Mock<UnaryRuleFn> {
@@ -345,24 +311,37 @@ export class RemoteMock {
       mock = fn((...values: readonly unknown[]) => {
         const args = [...values]
         const signal = args.at(-1) instanceof AbortSignal ? args.pop() as AbortSignal : new AbortController().signal
-        return this.openScript(endpoint, args, signal)
+        return this.openScript(endpoint, args, signal, this.carrierUplink)
       })
       this.streamMocks.set(endpoint, mock)
     }
     return mock
   }
 
-  private openScript(endpoint: string, args: readonly unknown[], signal: AbortSignal): MockStream {
+  private openScript(
+    endpoint: string,
+    args: readonly unknown[],
+    signal: AbortSignal,
+    carrierUplink: AsyncIterable<unknown> | undefined,
+  ): MockClientStream {
     const script = this.scripts.get(endpoint)
     if (script === undefined) {
       this.logStore.miss(endpoint, 'stream')
       throw new Error(this.noRuleMessage(endpoint))
     }
-    const stream = new MockStream(this.logStore.stream(endpoint, args), signal)
+    let uplink: AsyncIterable<unknown>
+    let owned: HandleUplink | undefined
+    if (carrierUplink === undefined) {
+      owned = new HandleUplink()
+      uplink = owned
+    } else {
+      uplink = carrierUplink
+    }
+    const stream = new MockStream(this.logStore.stream(endpoint, args), signal, uplink, () => { owned?.close() })
     this.live.push(stream)
     this.wakeOpened(endpoint)
     stream.run(script, args)
-    return stream
+    return new MockClientStream(stream, owned)
   }
 
   /** Throw when any request found no rule, naming the endpoints and the registered ones. */
@@ -375,17 +354,6 @@ export class RemoteMock {
 
   private noRuleMessage(endpoint: string): string {
     return `remote-mock: no rule for ${endpoint}; registered: ${this.endpoints().join(', ')}`
-  }
-
-  /** Wrap one opened item stream in per-item result envelopes for the `rpc.stream` carrier contract. */
-  private async *streamResults(
-    endpoint: string,
-    args: readonly unknown[],
-    signal: AbortSignal,
-  ): AsyncIterable<ConnectionRpcResult<unknown>> {
-    for await (const item of this.open(endpoint, args, signal)) {
-      yield isResultEnvelope(item) ? item : { ok: true, value: item }
-    }
   }
 
   /** Streams on `endpoint` still open or still holding items their consumer has not pulled; the rest are forgotten. */
@@ -421,7 +389,7 @@ function answerOf(rule: UnaryRuleFn, args: readonly unknown[]): unknown {
   }
 }
 
-/** Positional args from a carrier payload: the array the namespace proxies send, or the one object API endpoints send. */
+/** Positional args from a carrier payload: the array the whole-client proxies send, or the one object the Gateway's own endpoints send. */
 function argsOf(endpoint: string, payload: unknown): readonly unknown[] {
   if (typeof payload === 'object' && payload !== null && 'args' in payload) {
     const { args } = payload

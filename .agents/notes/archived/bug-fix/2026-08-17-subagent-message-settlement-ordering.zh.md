@@ -7,7 +7,7 @@ Archived: 2026-09-30
 
 ## 问题
 
-可继续 child 可以发送选中内容，之后还会产生一条由管理器编写且无条件投递的结算通知。如果这两条消息进入领取优先级不同的队列，较晚的结算通知可能先于较早的 child 消息到达 parent 模型。一个轮次的第一个 step 会先领取完整 `next-step` 批次，再领取一条 `next-turn` 消息，因此混用 FIFO 后续轮次发送与 next-step 结算会颠倒因果顺序。[Issue #2600](https://github.com/deepseek-ai/deepseek-harness/issues/2600)记录了该缺陷。
+可继续 child 可以发送选中内容，之后还会产生一条由管理器编写且无条件投递的结算通知。如果这两条消息进入领取优先级不同的队列，较晚的结算通知可能先于较早的 child 消息到达 parent 模型。一个轮次的第一个 step 会先领取完整 `next-step` 批次，再领取一条 `next-turn` 消息，因此混用 FIFO 后续轮次发送与 next-step 结算会颠倒因果顺序。Issue #2600记录了该缺陷。
 
 child 指令要求在发现会改变 parent 下一步动作时发送该发现。把这条消息推迟到后续轮次既违背其调度含义，也会把具有因果顺序的消息拆到领取优先级不同的队列。
 
@@ -15,7 +15,7 @@ child 指令要求在发现会改变 parent 下一步动作时发送该发现。
 
 每条模型编写的相邻 Agent 消息都通过 `SubagentRuntime.sendMessage()` 使用固定 Steer 投递。运行中的 parent 在最近安全 step 边界读取 child 消息，空闲 parent 则启动一个轮次。模型没有静默或 next-turn 投递选项。
 
-继续执行管理器在投递到驻留可继续 parent 的消息周围保留 `sendWaking()` 与 `admitWaking()`。它们负责唤醒发送准入记账：接收方 Activation 会在同步 inbox 插入与观察到唤醒的微任务之间保持在线。
+继续执行管理器会在投递到驻留可继续 parent 的消息周围保留 `sendWaking()`，并通过 parent 的私有 `SubagentInbox` 执行同步发送。包装层会在安装 closing promise 前接受发送，并在安装后拒绝发送；被接受的尝试会在返回前更新 Activation 的 wake generation。因此，接收方 Activation 不会越过一条已接受的唤醒发送完成结算。
 
 ### 不同 parent 状态下的顺序
 

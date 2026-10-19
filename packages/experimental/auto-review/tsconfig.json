@@ -9,10 +9,19 @@
   ],
   "references": [
     {
-      "path": "../../context/execution-authority"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../compaction/compaction"
     },
     {
       "path": "../../context/agent-instructions"
+    },
+    {
+      "path": "../../context/execution-authority"
     },
     {
       "path": "../../core/agent"
@@ -27,19 +36,19 @@
       "path": "../../interaction/permission-presets"
     },
     {
+      "path": "../../interaction/user-approval"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session/working-directory"
     },
     {
       "path": "../../subagent/subagent"
     },
     {
       "path": "../../util/values"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../session/working-directory"
     }
   ]
 }

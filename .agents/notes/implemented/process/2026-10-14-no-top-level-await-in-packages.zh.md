@@ -42,4 +42,4 @@ Status: implemented
 
 - [verify-no-top-level-await.spec.ts](../../../../scripts/verify-no-top-level-await.spec.ts) 锁定每一种纳入和排除的形式、语料防护和当前的排除清单；[run-gates.spec.ts](../../../../scripts/run-gates.spec.ts) 锁定门禁的注册。若上述三个入口的异步启动放在模块顶层，门禁报出 4 处（sensevoice 1 处、ssh 1 处、inspector 2 处）并失败。
 - [worker-entry.spec.ts](../../../../packages/experimental/speech-to-text-sensevoice/tests/worker-entry.spec.ts) 启动 sensevoice 入口，锁定就绪前失败时退出码为 1、stdout 为空、stderr 给出原因且不带堆栈。
-- [helper-boundaries.spec.ts](../../../../packages/ssh/ssh/tests/helper-boundaries.spec.ts) 启动 ssh helper 入口，[integration.host.spec.ts](../../../../packages/experimental/inspector/tests/integration.host.spec.ts) 经 `startInspector` 启动 inspector Worker；没有 spec 触发 inspector worker 入口的启动失败帧。
+- [helper-boundaries.spec.ts](../../../../packages/ssh/ssh/tests/helper-boundaries.spec.ts) 启动 ssh helper 入口，integration.host.spec.ts 经 `startInspector` 启动 inspector Worker；没有 spec 触发 inspector worker 入口的启动失败帧。

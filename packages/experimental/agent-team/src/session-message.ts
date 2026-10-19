@@ -1,4 +1,4 @@
-/** Durable Session-message acceptance checks for teammate provisioning. */
+/** Durable Session-message acceptance checks shared by provisioning and mailbox recovery. */
 
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'

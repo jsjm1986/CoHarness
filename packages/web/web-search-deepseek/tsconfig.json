@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -18,22 +27,19 @@
       "path": "../../credentials/credentials"
     },
     {
+      "path": "../../credentials/deepseek-account"
+    },
+    {
       "path": "../../settings/settings"
+    },
+    {
+      "path": "../../util/http-proxy"
     },
     {
       "path": "../../util/launch-environment"
     },
     {
       "path": "../web"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

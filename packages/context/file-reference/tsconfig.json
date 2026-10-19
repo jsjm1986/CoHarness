@@ -9,13 +9,10 @@
   ],
   "references": [
     {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../typert/protocol"
-    },
-    {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../core/agent"
     }
   ]
 }

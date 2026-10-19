@@ -166,7 +166,7 @@ Business rules never enter the grouping engine, and a business requirement never
 - Judged condition: does the engine contain a business condition? A diff that adds a `ProcessState` field, adds or removes a group level, or changes group semantics for one business fails; the placement decision belongs to the caller that computes the enum value.
 - Boundary: the layering, its cost, and existing business expectations are the reason a business does not rework the grouping design.
 - Boundary: a new enum value carrying a new placement meaning is the supported extension, wherever the caller computes it.
-- Exception and approver: none by default. A change to this infrastructure needs the corresponding domain expert's confirmation. [conversation.md](../subsystems/conversation.md#group-definitions) owns the group Definition types.
+- Exception and approver: none by default. A change to this infrastructure needs the corresponding domain expert's confirmation. [conversation.md](../subsystems/conversation.md#definition-and-typed-chat-payload) owns the group Definition types.
 
 The caller decides the business meaning and passes the placement enum the engine places by:
 
@@ -207,7 +207,7 @@ A business package that declares its kind and registers its renderer leaves the 
 
 ```tsx
 // The business declares its kind and registers its renderer; the shared list is untouched.
-declare module '@deepseek-ai/dsh-client-ui-chat/client' {
+declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ChatNodeDataMap { handoff: HandoffData }
 }
 

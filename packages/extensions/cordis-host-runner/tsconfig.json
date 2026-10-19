@@ -9,13 +9,31 @@
   ],
   "references": [
     {
-      "path": "../../context/collaboration"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../core/agent"
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../../vendor/timer"
     },
     {
       "path": "../../api/gateway/tsconfig.host.json"
+    },
+    {
+      "path": "../../boot/plugin-manager"
+    },
+    {
+      "path": "../../context/collaboration"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../core/agent"
     },
     {
       "path": "../../core/scope"
@@ -34,24 +52,6 @@
     },
     {
       "path": "../../util/brand"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../../vendor/timer"
-    },
-    {
-      "path": "../../context/execution-authority"
-    },
-    {
-      "path": "../../boot/plugin-manager"
     }
   ]
 }

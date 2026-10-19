@@ -43,13 +43,13 @@
   zh: c512261b9a3bca74
 /deepseek-ai-dsh-cmdline/further-exploration:
   en: 6ea3c827c59aff4c
-  zh: 2977b4cfa7f73942
+  zh: 6df123601fa31721
 /deepseek-ai-dsh-cmdline/model-experience:
   en: f9f5061b618b962a
   zh: 75c6de06b1d981a0
 /deepseek-ai-dsh-cmdline/model-experience/kv-cache-effect:
   en: ca75c51c89c2c9b0
-  zh: f57cc48a1b5cbfa9
+  zh: ae5eece628147ab8
 /deepseek-ai-dsh-cmdline/known-limitations-and-deferred-work:
   en: ff2d1068ce4ac0cd
   zh: 6ab1d54e99c58285
@@ -58,4 +58,4 @@
   zh: 323d21ee73a9e3f6
 /deepseek-ai-dsh-cmdline/known-limitations-and-deferred-work/dev-note/open-parser-surface:
   en: a82e0020f6f2eb84
-  zh: 66b1f97dc6f15370
+  zh: e39c35d3d1fb808b

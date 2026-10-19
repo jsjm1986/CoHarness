@@ -9,21 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../../session/session-persistence"
-    },
-    {
-      "path": "../../boot/app-boot"
-    },
-    {
-      "path": "../shell"
-    },
-    {
-      "path": "../../util/home-paths"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -31,6 +16,24 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../boot/app-boot"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../session/session-persistence"
+    },
+    {
+      "path": "../../shell/shell"
+    },
+    {
+      "path": "../../util/home-paths"
+    },
+    {
+      "path": "../shell"
     }
   ]
 }

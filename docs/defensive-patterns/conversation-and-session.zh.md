@@ -166,7 +166,7 @@ function onChunk(chunk: AssistantLiveChunk): void {
 - 判定条件：引擎内部是否存在业务条件？新增 `ProcessState` 字段、增删分组产物层级、为某个业务改变分组语义，都属违规；落位判定归算出枚举值的调用方。
 - 边界：架构分层、其开销与既有业务预期，就是业务不得重做分组设计的原因。
 - 边界：携带新落位含义的新枚举值才是受支持的扩展，无论调用方在哪里算出它。
-- 例外与批准人：无默认例外。改动该基础设施须经对应领域专家确认。分组 Definition 类型归 [conversation.zh.md](../subsystems/conversation.zh.md#group-definitions)。
+- 例外与批准人：无默认例外。改动该基础设施须经对应领域专家确认。分组 Definition 类型归 [conversation.zh.md](../subsystems/conversation.zh.md#definition-and-typed-chat-payload)。
 
 调用方决定业务含义，并把引擎据以落位的枚举值传进去：
 
@@ -207,7 +207,7 @@ function placeProcessNode(node: ChatConversationViewNode): GroupPlacement {
 
 ```tsx
 // The business declares its kind and registers its renderer; the shared list is untouched.
-declare module '@deepseek-ai/dsh-client-ui-chat/client' {
+declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ChatNodeDataMap { handoff: HandoffData }
 }
 

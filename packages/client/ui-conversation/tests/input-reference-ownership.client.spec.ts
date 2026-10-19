@@ -24,7 +24,7 @@ async function bench() {
   await ctx.plugin(() => {}).await()
   const api = new FakeApiClient()
   api.onList = () => Promise.resolve(ok({ items: [first, second].map(sessionId => ({
-    sessionId, updatedAt: 1, running: false, blank: true,
+    sessionId, updatedAt: 1, running: false, blank: true, agentAvailable: true,
   })) }))
   const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
   const hub = new InputHub(ctx, makeTranslate(zh, {}))

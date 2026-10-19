@@ -10,7 +10,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type {
   HistoryEntry, HistoryOmittedSpan, IApiClient, MessageId, MuxFrame, PromptContentPart, QueueAction, RpcError,
-  RpcId, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame, SessionId,
+  RpcId, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame, SessionId, SessionRequestId,
   SubagentAddress, SubagentPromptRequestId, ToolEventView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
@@ -23,6 +23,8 @@ import { ClientAssistantStream } from './assistant-stream.ts'
 import { ConversationNodeAssembler } from './conversation-assembler.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import type { ConversationEventInput, ConversationPublication } from '../contract/conversation.ts'
+import { MutableSessionEventSource } from '../contract/events.ts'
+import type { SessionEventLikeEntry } from '../contract/events.ts'
 import type {
   ChatSnapshot, ComposerPhase, ConversationSnapshot, HistoryDetailState, HistoryNavigationSnapshot, HistoryWindowMode,
   OpenState, PendingSubmission, PromptError,
@@ -187,6 +189,8 @@ export class Session implements SessionFace {
   private subscribedLastSeq: number | null = null
   /** Fold joining transient assistant-stream frames to their durable settlement; owns the visible window. */
   private readonly assistantStream = new ClientAssistantStream()
+  /** Raw event-window feed shared with log viewers; publishes with the same commit points as the conversation window. */
+  readonly eventSource = new MutableSessionEventSource()
   /** Latest `session/subscribed` assistant baseline, consumed by the next window install. */
   private pendingStreamBaseline: SessionAssistantStreamBaseline | undefined
   /** Views of durable assistant settlements the fold stages until their `end` frame. */
@@ -194,7 +198,7 @@ export class Session implements SessionFace {
   /** Local submission echoes retained until their durable event or queue occurrence is observed. */
   private pendingSubmissions: readonly PendingSubmission[] = []
   /** Settlement latches prevent queue and durable observations retiring one echo twice. */
-  private readonly submissionSettlements = new Map<RpcId, {
+  private readonly submissionSettlements = new Map<SessionRequestId, {
     readonly placement: PendingSubmission['placement']
     /** Inbox list carrying this identity at last observation. */
     queueTarget?: InboxTarget
@@ -355,7 +359,7 @@ export class Session implements SessionFace {
    * @returns prompt identity plus a pre-admission abandon operation.
    */
   beginSubmission(input: BeginSubmissionInput): SubmissionHandle {
-    const requestId = randomUUID() as RpcId
+    const requestId = randomUUID() as SessionRequestId
     const placement = this.running ? input.mode === 'steer' ? 'steering' : 'queued' : 'transcript'
     this.pendingSubmissions = [...this.pendingSubmissions, {
       requestId,
@@ -383,7 +387,7 @@ export class Session implements SessionFace {
     content: PromptContentPart[],
     mode: 'queue' | 'steer',
     signal?: AbortSignal,
-    requestId?: RpcId,
+    requestId?: SessionRequestId,
   ): Promise<RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>> {
     this.promptError = null
     this.lastAgentError = null
@@ -910,6 +914,7 @@ export class Session implements SessionFace {
     this.views = []
     this.omittedSpans = []
     this.baseSeq = 0
+    this.eventSource.replace([], false)
   }
 
   /** Requested-frame arrival: the wait enters the pending map under its own key. */
@@ -1115,7 +1120,9 @@ export class Session implements SessionFace {
     if (visible !== undefined) this.markConversationContent(visible.seq)
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
     for (const event of this.events) this.observeSubmissionEvent(event)
-    this.conversation.replaceWindow(this.rebuildWindowInputs(), hasMore)
+    const installed = this.rebuildWindowInputs()
+    this.conversation.replaceWindow(installed, hasMore)
+    this.eventSource.replace(this.eventEntries(installed), hasMore)
     if (projections !== undefined) {
       this.projections.seed(projections)
       // A new follow baseline replaces confirmed optimistic inputs with
@@ -1137,6 +1144,13 @@ export class Session implements SessionFace {
     this.liveBuffer = []
     for (const item of buffered) this.stitchBuffered(item)
     this.notifier.markDirty()
+  }
+
+  /** Wrap assembler inputs as event-source entries; live-chunk rows are transient. */
+  private eventEntries(inputs: readonly ConversationEventInput[]): SessionEventLikeEntry[] {
+    return inputs.map(input => input.event.type === 'assistant/live-chunk'
+      ? { type: 'transient', event: input.event }
+      : { type: 'event', event: input.event })
   }
 
   /** Rebuild the stream fold over the durable spine and return its visible window as assembler inputs. */
@@ -1164,6 +1178,7 @@ export class Session implements SessionFace {
     if (tailSeq !== null && event.seq <= tailSeq) return 'none' // replay overlap, drop
     this.events.push(event)
     this.views.push(view)
+    this.eventSource.append({ type: 'event', event })
     if (hasConversationContent(event)) this.markConversationContent(event.seq)
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
     if (event.type === 'turn/end') this.scheduleHistoryNavigationRefresh()
@@ -1188,6 +1203,7 @@ export class Session implements SessionFace {
         if (folded?.type === 'publish' && folded.retireAttemptId !== undefined) {
           // A successful message published at stream end keeps its transient
           // rows until the Step boundary; this publication is that boundary.
+          this.eventSource.settleAssistant(folded.retireAttemptId)
           const retired = this.conversation.settleAssistant(folded.retireAttemptId)
           if (retired === 'immediate') publication = 'immediate'
         }
@@ -1211,9 +1227,14 @@ export class Session implements SessionFace {
   private applyStreamFrame(frame: SessionAssistantStreamFrame): void {
     const result = this.assistantStream.acceptFrame(frame)
     switch (result?.type) {
-      case 'transient':
+      case 'transient': {
+        const arriving = result.entry.event
+        this.eventSource.append(arriving.type === 'assistant/live-chunk'
+          ? { type: 'transient', event: arriving }
+          : { type: 'event', event: arriving })
         this.scheduleConversation(this.conversation.append({ event: result.entry.event, view: undefined }))
         return
+      }
       case 'publish': {
         const view = this.stagedViews.get(result.entry.event.seq)
         this.stagedViews.delete(result.entry.event.seq)
@@ -1224,10 +1245,14 @@ export class Session implements SessionFace {
         const view = this.stagedViews.get(result.entry.event.seq)
         this.stagedViews.delete(result.entry.event.seq)
         const pub = this.conversation.settleAssistant(result.attemptId, { event: result.entry.event, view })
+        const settled = result.entry.event
+        if (this.events.some(event => event.seq === settled.seq)) this.eventSource.settleAssistant(result.attemptId)
+        else this.eventSource.settleAssistant(result.attemptId, { type: 'event', event: settled })
         this.scheduleConversation(pub)
         return
       }
       case 'abandonment':
+        this.eventSource.settleAssistant(result.attemptId)
         this.scheduleConversation(this.conversation.settleAssistant(result.attemptId))
         return
       case 'rebaseline':
@@ -1244,7 +1269,9 @@ export class Session implements SessionFace {
    * tail so the attempt's durable settlement lands through the append path.
    */
   private rebaselineAssistantStream(): void {
-    this.conversation.replaceWindow(this.rebuildWindowInputs(), this.hasMore)
+    const inputs = this.rebuildWindowInputs()
+    this.conversation.replaceWindow(inputs, this.hasMore)
+    this.eventSource.replace(this.eventEntries(inputs), this.hasMore)
     this.notifier.markDirty()
     void this.repairGap()
   }
@@ -1328,14 +1355,14 @@ export class Session implements SessionFace {
   /** Observe queue publications that carry or drop a browser submission identity. */
   private observeSubmissionQueue(
     items: readonly {
-      readonly rpcId?: RpcId
+      readonly rpcId?: SessionRequestId
       readonly placement: 'queued' | 'steering' | 'context'
       readonly message: { readonly content: unknown }
     }[],
     seq: number,
   ): void {
     if (this.submissionSettlements.size === 0) return
-    const positions = new Map<RpcId, { target: InboxTarget; index: number; item: (typeof items)[number] }>()
+    const positions = new Map<SessionRequestId, { target: InboxTarget; index: number; item: (typeof items)[number] }>()
     const counts: Record<InboxTarget, number> = { 'next-turn': 0, 'next-step': 0 }
     for (const item of items) {
       const target = item.placement === 'queued' ? 'next-turn' : 'next-step'
@@ -1365,7 +1392,7 @@ export class Session implements SessionFace {
   }
 
   /** Retire an admitted echo once no queue publication can still surface its row. */
-  private retireAdmittedSubmission(requestId: RpcId): void {
+  private retireAdmittedSubmission(requestId: SessionRequestId): void {
     const settlement = this.submissionSettlements.get(requestId)
     if (settlement?.admitted === undefined) return
     if (settlement.queueIndex !== undefined && settlement.queueIndex !== null) return
@@ -1373,7 +1400,7 @@ export class Session implements SessionFace {
   }
 
   /** Latch an observed settlement and retire one frame later. */
-  private scheduleObservedRetirement(requestId: RpcId, attachments: readonly ImageAttachmentRef[]): void {
+  private scheduleObservedRetirement(requestId: SessionRequestId, attachments: readonly ImageAttachmentRef[]): void {
     const settlement = this.submissionSettlements.get(requestId)
     if (settlement === undefined || settlement.retiring) return
     settlement.retiring = true
@@ -1381,7 +1408,7 @@ export class Session implements SessionFace {
   }
 
   /** Retire one local echo immediately after a failed prompt or pre-admission abort. */
-  private retireFailedSubmission(requestId: RpcId): void {
+  private retireFailedSubmission(requestId: SessionRequestId): void {
     const settlement = this.submissionSettlements.get(requestId)
     if (settlement === undefined || settlement.retiring || settlement.admitted !== undefined) return
     settlement.retiring = true
@@ -1389,7 +1416,7 @@ export class Session implements SessionFace {
   }
 
   /** Single removal point for local submission echoes. */
-  private finishSubmission(requestId: RpcId, retirement: PendingSubmissionRetirement): void {
+  private finishSubmission(requestId: SessionRequestId, retirement: PendingSubmissionRetirement): void {
     const settlement = this.submissionSettlements.get(requestId)
     if (settlement === undefined) return
     this.submissionSettlements.delete(requestId)
@@ -1546,6 +1573,7 @@ export class Session implements SessionFace {
     this.dropCoveredSpans()
     this.hasMore = hasMore
     this.conversation.prepend(fresh.map(conversationInput), this.hasMore)
+    this.eventSource.prepend(fresh.map(entry => ({ type: 'event', event: entry.event }) as const), this.hasMore)
   }
 
   /**
@@ -1707,13 +1735,18 @@ export class Session implements SessionFace {
       // the resident rows keep their node identity and only new rows assemble.
       for (const entry of fresh) this.appendLive(entry.event, entry.view)
       this.omittedSpans = [...this.omittedSpans, ...page.omittedSpans]
-      if (this.hasMore !== previousHasMore) this.conversation.prepend([], this.hasMore)
+      if (this.hasMore !== previousHasMore) {
+        this.conversation.prepend([], this.hasMore)
+        this.eventSource.prepend([], this.hasMore)
+      }
     } else {
       this.mergeHistoryEntries(page.entries)
       this.omittedSpans = [...this.omittedSpans, ...page.omittedSpans]
       this.dropCoveredSpans()
       this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? this.baseSeq
-      this.conversation.replaceWindow(this.rebuildWindowInputs(), this.hasMore)
+      const repaired = this.rebuildWindowInputs()
+      this.conversation.replaceWindow(repaired, this.hasMore)
+      this.eventSource.replace(this.eventEntries(repaired), this.hasMore)
     }
     const buffered = this.liveBuffer
     this.liveBuffer = []
@@ -1771,6 +1804,8 @@ export class Session implements SessionFace {
       historyDetail: this.historyDetail,
       historyNavigation: this.historyNavigation,
       promptError: this.promptError,
+      promptAttempted: this.promptAttempted,
+      awaitingFirstTurn: this.firstPromptPendingTurn,
       blank: this.blankBit,
       lastAgentError: this.lastAgentError,
     }

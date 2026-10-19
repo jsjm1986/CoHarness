@@ -34,7 +34,7 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../../host/apiproxy"
+      "path": "../../host/apiproxy/tsconfig.api.json"
     },
     {
       "path": "../../interaction/commands"

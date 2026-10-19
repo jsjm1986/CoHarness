@@ -16,14 +16,14 @@
   "include": [
     // Source-subpath test imports can arrive through workspace links whose
     // realpath semantics vary by host. Load package CSS declarations directly.
-    "packages/client/*/src/css-modules.d.ts",
-    "packages/client/*/tests/**/*.ts",
-    "packages/client/*/tests/**/*.tsx",
-    "packages/*/*/tests/**/*.client.spec.ts",
-    "packages/*/*/tests/**/*.client.e2e.ts",
-    "packages/*/*/tests/**/*.client.spec.tsx",
-    "packages/*/*/tests/**/*.client.tsx",
-    "packages/*/*/tests/**/*.client.ts",
+
+
+
+
+
+
+
+
     // Client package outside packages/client with a local CSS module face.
     "packages/extensions/ui-cordis/src/css-modules.d.ts",
     "packages/client/tsdown.client.ts",
@@ -32,111 +32,100 @@
     "scripts/experimental-package-policy.ts",
     "scripts/*.client.spec.ts",
     "scripts/client-bundle-css.spec.ts",
-    "scripts/client-bundle-purity.spec.ts"
+    "scripts/client-bundle-purity.spec.ts",
+    "packages/client/*/src/css-modules.d.ts",
+    "packages/client/*/tests/**/*.ts",
+    "packages/client/*/tests/**/*.tsx",
+    "packages/*/*/tests/**/*.client.spec.ts",
+    "packages/*/*/tests/**/*.client.e2e.ts",
+    "packages/*/*/tests/**/*.client.spec.tsx",
+    "packages/*/*/tests/**/*.client.tsx",
+    "packages/*/*/tests/**/*.client.ts"
   ],
-  // Host unit tests (`*.host.spec.ts`), e2e tests (`*.host.e2e.ts`), and fixtures
-  // (`*.host.ts`) belong to the host aggregate, which excludes `*.client.*`
+  // A `*.host.spec.ts` covers the Host half of a split client package and
+  // belongs to the host aggregate, which excludes this program's `*.client.*`
   // in turn. `exclude` wins over `include`, so the test glob above stays broad.
   "exclude": [
-    "packages/client/*/tests/**/*.host.spec.ts",
-    "packages/client/*/tests/**/*.host.e2e.ts",
-    "packages/client/*/tests/**/*.host.ts"
+    "packages/client/*/tests/**/*.host.spec.ts"
   ],
   "references": [
-    { "path": "./packages/experimental/client-ui-cot-translation/tsconfig.client.json" },
     { "path": "./packages/util/atomic-write" },
     { "path": "./packages/experimental/client-ui-voice-input" },
     { "path": "./packages/experimental/client-ui-claude-code-mods" },
     { "path": "./packages/client/ui-sidebar-terminal" },
     { "path": "./packages/api/terminal-controller/tsconfig.client.json" },
-    { "path": "./packages/util/crypto" },
-    { "path": "./packages/util/values" },
-    { "path": "./packages/util/workspace-path" },
-    // Shared leaf: web e2e boots the real host webserver (fixture + real-host
-    // smoke policy). webserver has zero workspace deps and no cordis merge,
-    // so it cannot drag host-side Context augmentation into this program.
+    { "path": "./packages/ptc-runtime/ptc-runtime" },
     { "path": "./packages/host/webserver" },
-    // Compaction seam: the client-runtime pin test value-imports the canonical
-    // checkpoint const from the cordis-free dsh-compaction/checkpoint leaf and
-    // deliberately never loads the dsh-compaction package root or the host-side
-    // Context merges reachable through it. The client package pins the same
-    // leaf through a type-only import in transcript-adapter.ts; composite
-    // rootDir rules make both paths depend on this runtime project reference.
     { "path": "./packages/compaction/compaction" },
     { "path": "./packages/client/ui-slots" },
-    { "path": "./packages/client/userdoc-upload" },
     { "path": "./packages/client/ui-attachment" },
     { "path": "./packages/client/ui-primitives" },
-    { "path": "./packages/client/ui-dockkit" },
-    { "path": "./packages/client/ui-sidebar-right" },
-    { "path": "./packages/client/ui-sidebar-browser" },
-    { "path": "./packages/client/ui-sidebar-terminal" },
     { "path": "./packages/client/modules" },
-    { "path": "./packages/experimental/session-inspector" },
     { "path": "./packages/client/hmr" },
     { "path": "./packages/client/connection/tsconfig.client.json" },
     { "path": "./packages/typert/registry" },
     { "path": "./packages/api/gateway/tsconfig.client.json" },
-    { "path": "./packages/api/remote-access/tsconfig.client.json" },
+    { "path": "./packages/api/session-controller/tsconfig.client.json" },
     { "path": "./packages/api/remotes/tsconfig.client.json" },
-    { "path": "./packages/client/runtime" },
     { "path": "./packages/extensions/cordis-client-runner" },
     { "path": "./packages/extensions/ui-cordis" },
     { "path": "./packages/test-support/client-runtime" },
     { "path": "./packages/test-support/remote-mock" },
+    { "path": "./packages/client/shortcuts/tsconfig.client.json" },
+    { "path": "./packages/client/ui-shortcuts" },
     { "path": "./packages/client/ui-layout" },
-    { "path": "./packages/client/ui-usage-alert" },
     { "path": "./packages/client/ui-sidebar" },
     { "path": "./packages/client/ui-brand-official" },
-    { "path": "./packages/client/ui-conversation" },
-    { "path": "./packages/client/ui-collaboration" },
-    { "path": "./packages/client/ui-documents" },
+    { "path": "./packages/client/ui-conversation/tsconfig.client.json" },
     { "path": "./packages/client/ui-tool" },
-    { "path": "./packages/client/ui-deliverables" },
+    { "path": "./packages/client/ui-deliverables/tsconfig.client.json" },
     { "path": "./packages/client/ui-workflow-run" },
     { "path": "./packages/client/ui-workspace" },
-    { "path": "./packages/client/ui-workbench" },
-    { "path": "./packages/client/ui-open-in-app" },
     { "path": "./packages/client/ui-input-trigger" },
     { "path": "./packages/client/ui-commands" },
     { "path": "./packages/client/ui-skill" },
     { "path": "./packages/client/ui-reference" },
-    { "path": "./packages/client/ui-secret-mask" },
     { "path": "./packages/client/ui-subagent" },
+    { "path": "./packages/experimental/client-ui-agent-team" },
+    { "path": "./packages/client/ui-dockkit" },
+    { "path": "./packages/client/ui-sidebar-right" },
+    { "path": "./packages/client/ui-sidebar-browser/tsconfig.client.json" },
     { "path": "./packages/client/ui-jobs" },
     { "path": "./packages/client/ui-schedule" },
     { "path": "./packages/client/ui-directory-picker-browse" },
     { "path": "./packages/client/ui-directory-picker-native" },
     { "path": "./packages/client/ui-goal" },
-    { "path": "./packages/client/ui-project-activity" },
-    { "path": "./packages/client/ui-memory" },
     { "path": "./packages/client/ui-message-feedback" },
     { "path": "./packages/client/ui-model-selection" },
-    { "path": "./packages/client/ui-deepseek-model-label-1017" },
     { "path": "./packages/client/ui-agent-preset" },
     { "path": "./packages/client/ui-permission-presets" },
     { "path": "./packages/client/ui-plan" },
-    { "path": "./packages/client/ui-plugin-manager/tsconfig.client.json" },
     { "path": "./packages/client/ui-settings-plugins" },
     { "path": "./packages/client/ui-user-questions" },
     { "path": "./packages/client/ui-trajectory" },
-    { "path": "./packages/session-query/session-log-export" },
-    { "path": "./packages/client/ui-theme" },
-    { "path": "./packages/client/ui-settings" },
-    { "path": "./packages/client/ui-settings-general" },
+    { "path": "./packages/session-query/session-log-export/tsconfig.client.json" },
+    { "path": "./packages/client/ui-open-in-app" },
+    { "path": "./packages/client/ui-theme/tsconfig.client.json" },
+    { "path": "./packages/client/ui-settings/tsconfig.client.json" },
+    { "path": "./packages/client/ui-settings-general/tsconfig.client.json" },
     { "path": "./packages/client/ui-settings-models" },
-    { "path": "./packages/client/ui-settings-unarchive-sessions" },
-    { "path": "./packages/client/locale" },
-    { "path": "./packages/client/shortcuts/tsconfig.client.json" },
-    { "path": "./packages/client/ui-shortcuts" },
     { "path": "./packages/client/ui-plugin-manager/tsconfig.client.json" },
-    { "path": "./packages/client/ui-plugin-market" },
-    { "path": "./packages/client/ui-settings-plugin-inventory" },
+    { "path": "./packages/client/locale/tsconfig.client.json" },
     { "path": "./packages/client/ui-renderer" },
     { "path": "./packages/client/web" },
-    { "path": "./packages/experimental/client-ui-agent-team" },
-    { "path": "./packages/experimental/client-ui-voice-input" },
-    { "path": "./packages/experimental/speech-to-text" },
-    { "path": "./apps/web" }
-  ]
-}
+    { "path": "./packages/context/file-reference" },
+    { "path": "./apps/web" },
+    { "path": "./packages/util/crypto" },
+    { "path": "./packages/util/values" },
+    { "path": "./packages/util/workspace-path" },
+    { "path": "./packages/client/userdoc-upload" },
+    { "path": "./packages/client/runtime" },
+    { "path": "./packages/client/ui-usage-alert" },
+    { "path": "./packages/client/ui-collaboration" },
+    { "path": "./packages/client/ui-documents" },
+    { "path": "./packages/client/ui-workbench" },
+    { "path": "./packages/client/ui-project-activity" },
+    { "path": "./packages/client/ui-memory" },
+    { "path": "./packages/client/ui-settings-unarchive-sessions" },
+    { "path": "./packages/experimental/speech-to-text" }
+  ]}

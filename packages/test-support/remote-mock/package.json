@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-remote-mock",
   "description": "Endpoint-named mock for Typert Remote traffic: unary answers and stream scripts per <namespace>/<method>, live stream control, a log, and the Connection carrier face whole-client specs install",
-  "version": "0.2.1-rc.2.coharness.1",
+  "version": "0.2.1-rc.2",
   "publishConfig": {
     "access": "public"
   },
@@ -21,7 +21,7 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "license": "Apache-2.0",
+  "license": "MIT",
   "dependencies": {
     "@vitest/spy": "^4.1.11"
   },
@@ -33,6 +33,8 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-api-settings-controller": "workspace:*",
     "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-commands": "workspace:*",
+    "@deepseek-ai/dsh-host-apiproxy": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "typescript": "^6.0.3"
   },

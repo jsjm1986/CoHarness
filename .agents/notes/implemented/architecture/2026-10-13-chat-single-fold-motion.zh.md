@@ -6,7 +6,7 @@ Status: implemented
 
 ## Problem
 
-「何时收起工作详情」选「下条消息时收起」时，上一个交互段的过程行在下一条人类输入到来时收起。滚动层原本有两条折叠路径，按 `ownInput`（[use-chat-scroll.ts](../../../../packages/client/ui-chat/src/client/chat/use-chat-scroll.ts)）二选一：
+「何时收起工作详情」选「下条消息时收起」时，上一个交互段的过程行在下一条人类输入到来时收起。滚动层原本有两条折叠路径，按 `ownInput`（use-chat-scroll.ts）二选一：
 
 - **输入折叠路径**：折叠开始时测量收起行，算出最终落点和所需的底部补白，收起与滚动在同一个帧时钟上推进，一次落定。
 - **通用路径**：scrollTop 不动，把收起的高度整块预留为底部补白，折叠结束后再按跟随状态补滚一次。它只对折叠发生在读者下方的情况成立。折叠区在读者上方时，读者正在看的内容整体上移，视口里只剩补白。
@@ -21,13 +21,13 @@ Status: implemented
 | 右侧栏子会话输入框发送 | 无（composer 跳过 `beginSubmission`） | 整屏空白 | 整屏空白 |
 | 子会话里父消息唤醒多轮后人类发送 | 无 | 整屏空白（补白约 6000 px） | — |
 
-通知唤醒的 Turn 已不再触发折叠（[分组树位置与交互段](2026-10-11-chat-group-tree-exchanges.zh.md)）；上表是仍经由通用路径折叠的人类输入。数据来自 [fold-blank-matrix.e2e.ts](../../../../apps/web/tests/fold-blank-matrix.e2e.ts)。
+通知唤醒的 Turn 已不再触发折叠（[分组树位置与交互段](2026-10-11-chat-group-tree-exchanges.zh.md)）；上表是仍经由通用路径折叠的人类输入。数据来自 fold-blank-matrix.e2e.ts。
 
 子会话不显示本地回显，是因为引入回显时 `subagents.prompt` 不携带 request id，回显无法与子会话写回的消息对应。此后子 agent 控制迁到 Remote，`SubagentPromptRequest.requestId` 已被 Host 写入子会话用户消息的 `source.rpcId`；客户端 `Session.prompt` 却仍另行生成 id。
 
 ## Decision
 
-「下条消息时收起」只保留一条折叠动画：[flow-motion.ts](../../../../packages/client/ui-chat/src/client/chat/flow-motion.ts) 把每一批收起交给 viewport 提供的 `InputFoldDriver`，[use-chat-viewport.ts](../../../../packages/client/ui-chat/src/client/chat/use-chat-viewport.ts) 在批次开始时选择两种落点之一。
+「下条消息时收起」只保留一条折叠动画：flow-motion.ts 把每一批收起交给 viewport 提供的 `InputFoldDriver`，use-chat-viewport.ts 在批次开始时选择两种落点之一。
 
 ### 批次
 
@@ -73,7 +73,7 @@ Status: implemented
 
 ## Testing
 
-[fold-blank-matrix.e2e.ts](../../../../apps/web/tests/fold-blank-matrix.e2e.ts) 覆盖主会话 19 例与右侧栏子会话 8 例，维度包括读者位置（底部、正文中段、正文开头、步骤中间、上一轮）、输入来源（输入框、回合在写入消息前失败、另一个标签页、排队投递、steer、父消息、一次折叠多轮）、正文长短，以及 Standard 与「完成时收起」对照。布局空洞指视口顶部到输入框之间没有任何可见行的盒子覆盖的最大连续高度：落定后不超过 120 px，动画中至多 1 帧超过。它按盒子计算，已经淡出但尚未收完的收起行仍算作覆盖。「到底部」的用例断言落到底部；「内容不动」的用例断言读者锚定行的屏幕位置变化不超过 2 px。正文很短的用例只断言回复到达后不再留空。
+fold-blank-matrix.e2e.ts 覆盖主会话 19 例与右侧栏子会话 8 例，维度包括读者位置（底部、正文中段、正文开头、步骤中间、上一轮）、输入来源（输入框、回合在写入消息前失败、另一个标签页、排队投递、steer、父消息、一次折叠多轮）、正文长短，以及 Standard 与「完成时收起」对照。布局空洞指视口顶部到输入框之间没有任何可见行的盒子覆盖的最大连续高度：落定后不超过 120 px，动画中至多 1 帧超过。它按盒子计算，已经淡出但尚未收完的收起行仍算作覆盖。「到底部」的用例断言落到底部；「内容不动」的用例断言读者锚定行的屏幕位置变化不超过 2 px。正文很短的用例只断言回复到达后不再留空。
 
 ## Alternatives considered
 

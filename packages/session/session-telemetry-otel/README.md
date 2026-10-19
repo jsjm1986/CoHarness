@@ -1,5 +1,5 @@
 ---
-description: "OpenTelemetry backend for the DeepSeek Harness telemetry seam: hands captured session records to the OTel JS SDK's log pipeline"
+description: "OpenTelemetry session-telemetry backend for deployments choosing a mode, configuring the exporter, or tracing what leaves the machine."
 kind: "package-reference"
 ---
 
@@ -7,69 +7,119 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The OpenTelemetry backend for [the telemetry seam](../session-telemetry/) — the only entry a deployment loads. Its `mode` decides whether the seam follows session events live, replays the canonical log only at recorded feedback, or keeps telemetry local. Uploading modes compose a `LoggerProvider` with the package's byte/count-bounded processor and an OTLP/HTTP log exporter, mapping each handed-over record onto `logger.emit()`, under two instrumentation scopes: ledger records on `@deepseek-ai/dsh-session-sessionTelemetry-otel`, operational records on `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops`. Resource identity contains `service.name`/`service.version` from `dsh-llm`'s `APP_IDENTITY` plus this package's anonymous `user.id` (`$DSH_HOME/.anonymous-user-id`, a random UUID created on first use and reset by deleting the file), carried once per export batch rather than per record.
-
 ## Summary
 
-`dsh-session-telemetry-otel` exports session records through the OTel JS SDK only after new explicit feedback, for all users and providers, including `deepseek-official`. `FEEDBACK_ONLY` releases the canonical prefix through that feedback, including context; later records wait for the next explicit feedback. `DISABLED` constructs no transport. The bounded queue can finish an authorized upload without another user interaction or model call. Deployments own their redaction rules.
+The adapter injects `otel`; the [shared OTel plugin](../../telemetry/otel/README.md) creates its independent Session-log channel. Authorization, redaction, identity, scope version, configuration, and the shutdown deadline remain owned here.
+
+`dsh-session-telemetry-otel` exports session records through the OTel JS SDK only after new explicit feedback, for all users and providers, including `deepseek-official`. `FEEDBACK_ONLY` releases the canonical prefix through that feedback, including context; later records wait for the next explicit feedback. `DISABLED` constructs no transport. Scheduled batching can finish an authorized upload without another user interaction or model call. Deployments own their redaction rules.
 
 ## Table of Contents
 
-- [Config](#config)
-- [What leaves the machine](#what-leaves-the-machine)
-- [Field mapping](#field-mapping)
-- [Invariants](#invariants)
+- [Use this package](#use-this-package)
+- [Understand the implementation](#understand-the-implementation)
+- [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
-<a id="config"></a>
-## Config
+<a id="use-this-package"></a>
+## Use this package
 
-```yaml
-- id: sessionTelemetry-otel
-  name: '@deepseek-ai/dsh-session-sessionTelemetry-otel'
-  config:
-    mode: FULL                # explicit opt-in; default: DISABLED
-    shutdownTimeoutMillis: 3000 # optional; defaults to 3000
-    exporter:                # passed verbatim to the SDK's OTLP/HTTP log exporter
-      url: https://collector.example.com/v1/logs
-      headers:
-        authorization: !!js `Bearer ${process.env.OTLP_TOKEN}`
-    maxRequestBytes: 4000000 # optional; uncompressed request ceiling, never above 4,000,000
-    processor: {}            # optional; count/queue/cadence/watchdog knobs of the bounded processor
-```
+Mount this plugin when a deployment should export session records through OpenTelemetry logs. Choose a mode, give the exporter an endpoint, and decide whether to mount redaction rules on the seam.
+
+### Modes
 
 | `mode` | Behavior |
 |---|---|
-| `FULL` | Each projected record, including lifecycle ops records, is handed to the OTel SDK immediately. |
-| `FEEDBACK_ONLY` | Each `feedback/record` replays, projects, and redacts the canonical session-log suffix through that event. Later records wait for another feedback event and remain local if none arrives. |
-| `DISABLED` | Default. No coordinator, provider, processor, or exporter is constructed. No telemetry record leaves the process. A `feedback/record` logs `session sessionTelemetry is DISABLED; nothing will be shared and this feedback remains local`; the event remains in the local session log. |
+| `FEEDBACK_ONLY` | Default. Text feedback, rating creation/edit, note edit, and withdrawal release the unhanded prefix through that canonical feedback event; later records wait |
+| `DISABLED` | No coordinator, provider, processor, or exporter is constructed; no telemetry record leaves the process. Live feedback warns locally; cold mutations stay silent |
 
-Programmatic TypeScript configuration uses the exported `SessionTelemetryMode` enum (`SessionTelemetryMode.FULL`, `SessionTelemetryMode.FEEDBACK_ONLY`, or `SessionTelemetryMode.DISABLED`); raw string literals are not assignable. Serialized Cordis configuration continues to use the string values shown above.
+Programmatic TypeScript configuration uses the exported `SessionTelemetryMode` enum; raw string literals are not assignable. `FULL` is rejected, not an alias. The [`sharing` property](../session-telemetry/README.md#the-sharing-disclosure) reports `feedback-only` or `disabled`, not a delivery receipt. The `/feedback` acknowledgement confirms recording only.
 
-Upload authorization is positive and fail-closed. An unknown direct-construction mode fails before transport configuration is read. Only `FULL` accepts direct `ctx.sessionTelemetry.emit()` calls. `FEEDBACK_ONLY` gives its on-demand coordinator a private backend capability and treats only the exact `feedback/record` object already stored in the log (`session.eventAt(event.seq) === event`) as consent; an independently emitted bus value is ignored. `DISABLED` never constructs the SDK pipeline, even when exporter options are present.
+### Minimal configuration
 
-The mounted service discloses the resolved mode through the seam's [`SessionTelemetrySharingStatus`](../session-telemetry/README.md#the-sharing-disclosure) `sharing` property (`full` / `feedback-only` / `disabled`), so the `/feedback` acknowledgement can report whether and how the session is shared. The disclosure is set in the constructor and is independent of capture: even `DISABLED` discloses `disabled`.
+Uploading modes require an exporter URL. Processor settings control the independent Session-log queue; routing headers are explicit `exporter.headers` values.
 
-`exporter.url` is required in `FULL` and `FEEDBACK_ONLY`, has no default, and must parse as `http(s)`; it is optional and unused in `DISABLED`. In uploading modes, `shutdownTimeoutMillis` is a positive finite DSH-owned outer deadline that defaults to 3000 ms. `maxRequestBytes` bounds each OTLP request in uncompressed UTF-8 bytes, envelope included, and may lower but never exceed the collector ceiling of 4,000,000; every `processor` knob (`maxQueueSize`, `maxExportBatchSize`, `scheduledDelayMillis`, `exportTimeoutMillis`) must be a positive integer no greater than 2,147,483,647, and `maxExportBatchSize` must not exceed `maxQueueSize` — all of these fail at plugin load. The processor measures each record once through the SDK's own request serializer and packs requests greedily under the byte and count limits; a single oversized record is diagnosed once through `ctx.logger.warn` and dropped rather than truncated, never blocking later records, and a full queue rejects new records the same way. One HTTP request owns the transport slot until settlement: `processor.exportTimeoutMillis` is a watchdog warning, not an abort. Both SDK option blocks pass through whole except self-observability metering (`selfObsMeterProvider`, which has no owning MeterProvider) and `exporter.httpAgentOptions`, which this package wraps so every transport agent is tracked for shutdown teardown; every other `OTLPExporterNodeConfigBase` field (`headers`, `timeoutMillis`, `compression`, `keepAlive`, …) reaches the exporter, and transport retry and socket behavior under sustained failure remain the SDK exporter's. The backend implements no `flush()`: the processor owns ordinary flushing. During shutdown the provider awaits the drain plus `exporter.forceFlush()`, which can remain pending when the transport never obtains a socket; if it does not settle by `shutdownTimeoutMillis`, the queued records are dropped, the contained shutdown failure is logged through the coordinator, and application teardown continues. Either way — deadline or clean completion — every tracked transport agent is then destroyed, so a hung in-flight request fails instead of lingering and the idle keepAlive sockets the SDK's no-op transport shutdown leaves behind cannot hold the process open.
+```yaml
+- id: sessionTelemetry-otel
+  name: '@deepseek-ai/dsh-session-telemetry-otel'
+  config:
+    mode: FEEDBACK_ONLY       # optional; defaults to FEEDBACK_ONLY
+    shutdownTimeoutMillis: 3000 # optional; defaults to 3000
+    exporter:                # explicit SDK transport settings
+      url: https://collector.example.com/v1/logs
+      headers:
+        authorization: !!js `Bearer ${process.env.OTLP_TOKEN}`
+    processor: {}            # optional; byte/count batching and per-request watchdog
+```
 
-<a id="what-leaves-the-machine"></a>
-## What leaves the machine
+| Field | Default | Meaning |
+|---|---|---|
+| `mode` | `FEEDBACK_ONLY` | Sharing policy: `FEEDBACK_ONLY` or `DISABLED` |
+| `exporter.url` | required in uploading modes | Full OTLP logs endpoint; must parse as `http(s)` |
+| `exporter`, `processor` | — | SDK transport plus byte/count batching; headers/TLS identity are not inherited from the environment. Agent factories own their returned agent settings, including keepAlive |
+| `shutdownTimeoutMillis` | `3,000` | Outer deadline for all queued HTTP requests; remaining queued sends stop at expiry |
+| `maxRequestBytes` | `4,000,000` | Maximum complete OTLP JSON request bytes before gzip; may only be lowered |
 
-In uploading modes, records carry the complete `event.data` as the seam's `sessionTelemetry/record` waterfall returns it — user and assistant message content, tool arguments and results (command output, file contents), the full system prompt and tool schemas (`request/header`), todo text, compaction summaries, hook `stderrSummary`, feedback text, and the session `cwd` (a local path). The seam ships no redaction rules: with no `sessionTelemetry/record` listener mounted, that is the raw captured copy, so a deployment exporting beyond a trusted boundary mounts its own rules (see [the seam README](../session-telemetry/README.md#the-redact-waterfall)). `FULL` runs redaction at append time; `FEEDBACK_ONLY` retains no telemetry copy and runs the currently mounted rules when feedback triggers canonical-log replay. Provider credentials never appear regardless: adapter API keys are constructor parameters, not session events, so they are structurally absent from the log and therefore from telemetry. `DISABLED` does not construct the SDK pipeline or hand any capture to a backend.
+Direct `ctx.sessionTelemetry.emit()` calls are no-ops in every mode and cannot bypass feedback authorization. Inherited parent feedback does not authorize a child export: the child needs new feedback of its own. Its authorized prefix then includes inherited context.
 
-<a id="field-mapping"></a>
-## Field mapping
+Model requests, request headers, Session creation or adoption, restoration, and plugin mount or HMR do not authorize capture. Stored feedback alone triggers nothing. Scheduled flush and shutdown may finish batches authorized earlier, but never capture new records.
 
-Seam record → SDK log record: `time` → `timestamp`/`observedTimestamp`; `severity` → `severityNumber`/`severityText` (INFO 9 / WARN 13 / ERROR 17); `body` → the structured log body; `attributes` verbatim. Receivers dedupe on `(session.id, event.seq)` and alert on severity. In `FULL`, they may also detect crashes by `shutdown`-record absence: the marker is emitted at the session's own disposal or application teardown, and a marker followed by more events is a telemetry reload. In `FEEDBACK_ONLY`, a released prefix normally has no later `shutdown` marker, so its absence is not a crash signal. Streams are not self-contained across lineage: a resumed session continues its own id's stream from where the previous process left off, and a forked session's stream starts at its inherited boundary — its prefix lives in the parent's stream, stitched via `session.parent_id` + `session.seed_length`. A resumed local log may contain synthetic closers that were never exported; the wire stream stays faithful to records actually handed to the SDK.
+### What leaves the machine
 
-<a id="invariants"></a>
-## Invariants
+Each Session event becomes one `eventName: "session-log"` record. `attributes.sessionId` is the collector Session identity; `attributes.content` encodes the complete event envelope with redacted `event.data`. JSON values are preserved, not the original JSONL bytes or key ordering. Legacy `session.id`, `event.seq`, and `event.type` metadata remain for existing consumers. Resources carry application and anonymous-user identity; scope carries the backend package name and version. The base profile uses `https://dsh-otel-collector.deepseeksvc.com/v1/logs`; `DSH_TELEMETRY_OTLP_URL` overrides it. No channel header is added implicitly.
 
-**Runtime invariant:** No companion is published. The bounded queue holds records exactly as emitted; no second projection exists to compare.
+The shared OTel channel measures each record once with the SDK OTLP JSON serializer, including its resource/scope envelope, then greedily packs requests using those conservative sizes. A single oversized event produces one rejection diagnostic without truncation. Session logs never mix with product analytics in a request. Capture handoff and shutdown are not collector acknowledgements.
+
+### Failures and shutdown
+
+Invalid byte limits, non-positive queue/timer values, `maxExportBatchSize > maxQueueSize`, invalid endpoints, and invalid shutdown deadlines fail at load. Processor defaults are 2,048 queued records, 512 records per request, a 1,000 ms scheduling delay, and a 30,000 ms request watchdog. Byte limits may split a count batch into multiple serial HTTP requests. Each request waits for SDK export-queue cleanup after its callback before the next starts. `exportTimeoutMillis` warns per request but never frees an unsettled transport slot; the SDK transport owns network timeout/retry. Shutdown drains these requests until `shutdownTimeoutMillis`; expiry discards the remaining queue and prevents further sends, while an active request may still settle. Large prefixes can therefore remain partially unsent at CLI exit.
+
+-----
+
+<a id="understand-the-implementation"></a>
+## Understand the implementation
+
+<details>
+<summary>Implementation internals — click to expand</summary>
+
+This section explains the backend's composition; the observable behavior is fully covered in [Use this package](#use-this-package).
+
+### Design concept
+
+The backend owns feedback authorization, identity, and shutdown. The shared OTel service owns channel creation, byte/count scheduling, record construction, JSON transport, compression, and retries. Resource identity carries `service.name`/`service.version` from `APP_IDENTITY` and anonymous `user.id`; the scope retains this package’s name and version.
+
+### Source map
+
+| File | Role |
+|---|---|
+| [`src/index.ts`](src/index.ts) | Plugin entry: mode resolution, fail-closed validation, SDK pipeline wiring, coordinator composition, shutdown deadline |
+
+### Capture wiring
+
+The backend captures history on demand through new own feedback events or committed cold snapshots. Its private reporter serializes queued HTTP requests even after a watchdog fires; an outer shutdown deadline stops the remaining queue. It exposes no extra flush entry point.
+
+### Field mapping
+
+Each capture record supplies a separately copied event envelope and redacted payload to `SessionLogReporter`; serialization retains optional surface metadata and the event sequence/time. Feedback authorizes the complete unhanded prefix, not only the feedback payload.
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## Further Exploration
+
+Read these pages when the backend contract is not enough. They move from the seam it implements to the subsystem reference and the identity it reports.
+
+- [Session telemetry seam](../session-telemetry/README.md) — the capture contract, record vocabulary, and redaction waterfall.
+- [Session telemetry subsystem](../../../docs/subsystems/session-telemetry.md) — the capability split and type declarations.
+- [Anonymous user identity](../../identity/anonymous-user-id/README.md) — the id reported as the OTel Resource `user.id`.
+- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-telemetry-otel) — every accepted config field and its source declaration.
+
+-----
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -82,9 +132,16 @@ None; the package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **Upstream experimental tree** — `@opentelemetry/sdk-logs` is still published from the upstream experimental tree; SDK API churn lands here and only here — the seam contract does not move.
+<a id="known-limitations-and-deferred-work"></a>
+
+
+These limits define where SDK behavior governs and where export guarantees end. They are current package constraints.
+
+- **Upstream experimental tree** — `@opentelemetry/sdk-logs` is published from the upstream experimental tree; SDK API churn lands in the [shared OTel plugin](../../telemetry/otel/README.md), while the seam contract does not move.
 - **Live-collector behavior belongs to the SDK exporter** — authentication, TLS, throttling, and other real OTLP deployment behavior follow the upstream SDK rather than a package-owned compatibility layer.
-- **Feedback-time snapshot** — `FEEDBACK_ONLY` retains no telemetry-owned copy before feedback. It reads and redacts the current canonical log when feedback is recorded; a crash before feedback uploads nothing, and policy changes before feedback affect what that replay exports.
+- **Best-effort handoff** — new cold snapshots and a new feedback submission after restart can repeat prefixes; receivers deduplicate by Session id, format version, and event seq. There is no durable outbox, delivery watermark, automatic retry promise, or collector-acceptance guarantee. OTel and the opt-in DeepSeek API path can overlap. Withdrawal exports a deletion event, not remote erasure.
+
+- **Backend availability** — feedback submitted while this plugin is disabled or unloaded is recorded locally but not automatically replayed when it returns. Capture requires the subscriber to remain mounted until it observes the submission; unloading during a pending cold write can miss its post-flush notification.
 
 <a id="dev-note"></a>
 ### Dev Note

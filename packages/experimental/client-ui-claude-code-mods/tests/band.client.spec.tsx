@@ -2,7 +2,7 @@
 /** The band draws a serialized mod tree and sends a button press to the Host with the generation it saw. */
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SurfaceSnapshot } from '@deepseek-ai/dsh-experimental-claude-code-mods/types'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Band, type BandProps } from '../src/client/Band.tsx'
@@ -49,7 +49,7 @@ const HOLD: SurfaceSnapshot = {
 function fixture(initial: SurfaceSnapshot | undefined) {
   const state = createSnapshotStore<SurfaceSnapshot | undefined>(initial)
   const press = vi.fn<(generation: number, actionId: string) => Promise<void>>(() => Promise.resolve())
-  const props = { t: makeTranslate(zh), press, useBand: bindSnapshotSelector(state) } as BandProps
+  const props = { t: makeTranslate(zh), press, useBand: bindSnapshotSelector(state) } as unknown as BandProps
   render(<Band {...props} />)
   return { press, publish(next: SurfaceSnapshot | undefined) { act(() => { state.set(next) }) } }
 }

@@ -9,7 +9,13 @@
   ],
   "references": [
     {
-      "path": "../scope"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../core/scope"
     },
     {
       "path": "../../llm/llm"
@@ -30,10 +36,7 @@
       "path": "../../util/values"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
+      "path": "../scope"
     }
   ]
 }

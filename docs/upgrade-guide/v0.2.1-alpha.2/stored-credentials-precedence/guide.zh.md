@@ -21,5 +21,5 @@ description: "挂载存储时，已保存凭据现在优先于环境后备；随
 
 1. 将 `$DSH_HOME/.credentials.yaml` 中 `refs` 下的名字，与 shell、CI 作业或容器导出的变量进行比较。只出现在其中一处的名字无需处理。
 2. 对同时出现在两处的名字，如果存储的密钥正是你要使用的账户，就保留它。否则，删除 `refs` 下该名字所在的行。运行中的 harness 会重新加载该文件，因此下一次请求无需重启即可读取导出的变量。
-3. 对 headless 任务，导出所需密钥并运行 `dsh headless "<task>"`。要继续使用已保存密钥或登录凭据，请应用三行配置的 [headless 恢复 patch](../../../../packages/bundle/headless/README.zh.md#credentials)；恢复存储也恢复已保存凭据优先。现有 profile、home 或命令覆盖可以覆盖随附行，因此核对有效组合时请查看 `dsh headless --dump-config`。
+3. 对 headless 任务，导出所需密钥并运行 `dsh headless "<task>"`。要继续使用已保存密钥或登录凭据，请应用三行配置的 [headless 恢复 patch](../../../../packages/bundle/headless/README.zh.md)；恢复存储也恢复已保存凭据优先。现有 profile、home 或命令覆盖可以覆盖随附行，因此核对有效组合时请查看 `dsh headless --dump-config`。
 4. 确认请求使用预期账户，并在需要时确认启动进程导出了非空值。只检查名字和是否存在，不要打印凭据值。仅依赖已保存凭据的 headless 运行现在会失败；恢复存储或提供受支持的环境认证即可解决。

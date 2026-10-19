@@ -10,7 +10,7 @@ Moving a capability into the experimental directory changes its ownership and su
 
 ## Decision
 
-The moved packages retain the published names declared by the [experimental naming policy](../../../../scripts/experimental-package-policy.ts). That typed directory-to-name map is the sole maintained inventory of naming exceptions. Package manifests, consumers, installation checks, and bundler checks agree with it; a missing, moved, or duplicated exception is rejected. [Experimental status](../../../../packages/experimental/README.md#status) remains independent of spelling, Official discovery, and explicit selection.
+The moved packages retain the published names declared by the [experimental naming policy](../../../../scripts/experimental-package-policy.ts). That typed directory-to-name map is the sole maintained inventory of naming exceptions. Package manifests, consumers, installation checks, and bundler checks agree with it; a missing, moved, or duplicated exception is rejected. [Experimental status](../../../../packages/experimental/README.md) remains independent of spelling, Official discovery, and explicit selection.
 
 Existing badge, Ralph, and native delegation row IDs remain valid Host row selectors. New isolation groups and newly introduced capabilities retain their new IDs. Later user layers still replace configuration or disable rows. Selecting an optional bundle is still explicit: a patch targeting an absent row does not select its bundle.
 

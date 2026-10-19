@@ -15,6 +15,7 @@ import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/t
 import type { SessionCreateOptions } from '../contract/session-create.ts'
 import type { SessionReferenceSource } from '../index.ts'
 import type { ObservableSnapshot } from '../contract/store.ts'
+import type { SessionEventSource } from '../contract/events.ts'
 import type { SessionReference, SessionTarget, SessionRetainOptions, SessionRetainInfo } from '../contract/sessions.ts'
 import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
@@ -155,6 +156,8 @@ export interface SessionBinding {
   readonly sessionId: SessionId
   /** The outward session face only — feature code never sees the concrete class. */
   readonly session: SessionFace
+  /** Contiguous event window reserved for log viewers; absent on this runtime's bindings. */
+  readonly eventSource?: SessionEventSource
   readonly ctx: AgentContext
   /** Description of the exact connection that owns this Session. */
   readonly hostDescription?: HostDescriptionSource

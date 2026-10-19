@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-[Manager](../../../../packages/api/session-controller/src/client/sessions/manager.ts) 使用按 Session id 索引的私有集合，保留已观察到的受理/运行。列表行与既有 Session blank 更新使用 `summary.blank && !engagedSessions.has(sessionId)`，其上仍叠加 `sessionListMetadata` 提示。既有摘要变更、Session 快照字段、构造函数和投影存储保留原有职责。
+Manager 使用按 Session id 索引的私有集合，保留已观察到的受理/运行。列表行与既有 Session blank 更新使用 `summary.blank && !engagedSessions.has(sessionId)`，其上仍叠加 `sessionListMetadata` 提示。既有摘要变更、Session 快照字段、构造函数和投影存储保留原有职责。
 
 每个成功的提示词响应都会调用既有 `onEngaged` 回调，包括来自已被替换的 Session 对象的响应。Manager 按 id 更新其保留的观察、列表行和当前驻留 Session。拒绝不会记录受理/运行。`running: true` 状态、添加事件或列表基线也会记录运行；早于移除的基线不能恢复该观察，即使该行在拉取期间重新加入。
 

@@ -14,7 +14,7 @@ Creating tool nodes only at `tool/call` presents that interval as no tool activi
 
 ### One Tool owns three stages
 
-The [Tool Definition](../../../../packages/client/ui-chat/src/client/conversation-nodes/tool.ts) groups calls by callId and supplies explicit stage data to tool components.
+The Tool Definition groups calls by callId and supplies explicit stage data to tool components.
 
 | Stage | Creation or update evidence | Available data and presentation |
 |---|---|---|
@@ -26,7 +26,7 @@ An argument block ending does not trigger dispatch presentation. Showing prepara
 
 ### Start marks an initialization candidate
 
-The [Conversation Definition](../../../../packages/client/ui-conversation/src/client/contract/conversation.ts) retains its match/start/update interface and existing roles. Durable events and transient deltas may both match as start. The earliest start in the current event sequence initializes State; every later Match, including another start for the same ID, goes through update.
+The Conversation Definition retains its match/start/update interface and existing roles. Durable events and transient deltas may both match as start. The earliest start in the current event sequence initializes State; every later Match, including another start for the same ID, goes through update.
 
 Every tool delta and `tool/call` are initialization candidates. A named live delta creates the preparing row; a historical `tool/call` creates the dispatched stage directly. Matching still reads only the current event, without Context lookup, additional roles, registries, or separate caches.
 

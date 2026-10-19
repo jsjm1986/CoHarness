@@ -8,7 +8,7 @@ import type { SessionId, SessionSummary } from '@deepseek-ai/dsh-api-remotes/cli
 import { flattenLineage, MAX_LINEAGE_DEPTH } from '../src/client/sessions/lineage.ts'
 
 const s = (id: string, updatedAt: number, parent?: string): SessionSummary => ({
-  sessionId: id as SessionId, updatedAt, running: false, blank: false,
+  sessionId: id as SessionId, updatedAt, running: false, blank: false, agentAvailable: true,
   ...(parent !== undefined ? { parentSessionId: parent as SessionId } : {}),
 })
 

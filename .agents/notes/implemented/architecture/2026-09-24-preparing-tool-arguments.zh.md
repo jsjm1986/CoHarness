@@ -33,7 +33,7 @@ Status: implemented
 
 ### 解析在 Tool Definition 层，不在 React
 
-[Tool Definition](../../../../packages/client/ui-chat/src/client/conversation-nodes/tool.ts) 把每个带 id 的 `tool-call-delta` 都匹配为 start 候选：最早的一个打开 Context（无论是否带名），后续折叠为 update。带名 delta 创建 preparing 根并挂上一个新的流式视图；每个 delta 只做 `args.append(delta)`。在 `animation-frame` 发布点，`buildViewNode()` 刷新已观察答案，仅在变化时替换根块，否则复用当前已发布根块。Context 和已发布 Node 持有这些身份，不另建准备阶段缓存。参数在名字之前到达的流不扫描：迟开的视图看到非对象前缀即 invalid、零字段。
+Tool Definition 把每个带 id 的 `tool-call-delta` 都匹配为 start 候选：最早的一个打开 Context（无论是否带名），后续折叠为 update。带名 delta 创建 preparing 根并挂上一个新的流式视图；每个 delta 只做 `args.append(delta)`。在 `animation-frame` 发布点，`buildViewNode()` 刷新已观察答案，仅在变化时替换根块，否则复用当前已发布根块。Context 和已发布 Node 持有这些身份，不另建准备阶段缓存。参数在名字之前到达的流不扫描：迟开的视图看到非对象前缀即 invalid、零字段。
 
 三个阶段的块都提供 `name` 和 `args`，原有 `argsRaw` 和 result 的 `call: { name, argsRaw } | null` 仍可使用。`block-end` 和 `tool/call` 通过长度及逐分片精确比较，将流式参数与权威全文核对。文本一致时封存原读器并保留字段索引，分片缺失或冲突时创建新的 `fromText()` 视图。不需要累加字符串或概率性 hash。PTC 读器使用 `fromObject(payload)`，结果复用已派发读器，未配对结果使用共享空视图。卡片模型继续读取最终 `argsRaw`。
 

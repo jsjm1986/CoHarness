@@ -24,14 +24,6 @@ Session-bound calls use `plugin:translator/request` and `plugin:translator/resul
 
 Paid cache misses require an active built-in Account or Official owner, configured credentials and exact `deepseek-flash` catalog membership; names and version labels are irrelevant, and pi-ai is excluded. Each miss prepares a separate text-only query with thinking off. Its exact config, system and unique user fragment occupy optional `metadata.modelRequest` in the same request record. Saved results are read before this admission, so missing credentials do not invalidate existing translations. Native request extensions receive no main Session identity and cannot upload its full log.
 
-## Reasoning display
-
-The [optional bundle](../../packages/experimental/cot-translation-bundle/README.md) composes the translator with the [GUI consumer](../../packages/experimental/client-ui-cot-translation/README.md). Its `cotTranslation` Remote serves authenticated browser calls. When a Session is inactive and has no saved result, the Host joins normal Session controller activation and retries once. Activation retains normal preset hooks, resume markers, and interrupted-turn repair; cancellation stops the caller's wait and prevents a later translation call without cancelling shared activation. Bundle settings select a translation service and target language; `auto` follows the active interface language.
-
-`CotTranslationPreferences` contains the accepted provider and target language. `CotTranslationSnapshot` pairs these preferences with the translator's current `maxTextChars` and eligible provider IDs. The browser reads this Host snapshot before registering translation controls, including when local settings storage is unavailable. Accepted settings updates and reconnects refresh both values; a changed request limit cancels and splits the expanded text again.
-
-The GUI registers in the session-scoped `conversation.chat.reasoning.body` single Slot, replacing Chat's default entry. Both entries reuse the official `conversation.chat.reasoning.content` Factory; the translation wrapper selects display text, owns its toolbar and view state, and supplies its localized labels without duplicating Markdown rendering. While enabled, the GUI translates completed paragraphs and request-sized prefixes of long streaming paragraphs only after expansion, and restores completed results from the current Session. Its local cache only optimizes that disclosure. The unfinished tail remains original. Original remains accessible. Closing the disclosure, switching provider or language, and unloading cancel outstanding calls and exclude late results. Provider failure preserves the original and requires an explicit retry; translated text never replaces original Session events or model input.
-
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -39,33 +31,6 @@ The GUI registers in the session-scoped `conversation.chat.reasoning.body` singl
 ## Cordis API
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
-
-<a id="ctxcottranslation--cottranslationcontroller"></a>
-
-### `ctx.cotTranslation` — `CotTranslationController`
-
-Optional reasoning translation delegates Session-bound storage to the translator.
-
-```ts cordis-catalog
-/**
- * Read accepted translation preferences and the current request limit without sending text.
- * @param signal - browser query cancellation or Remote contribution withdrawal.
- * @returns authoritative preferences, eligible routes, and maximum UTF-16 text length per request.
- */
-@Remote async limits(signal: AbortSignal): Promise<CotTranslationSnapshot>
-
-/**
- * Translate one displayed fragment through the reader's selected provider.
- * @param request - original text and Session identity supplied by the Client; provider and explicit
- * target language match accepted preferences, while auto uses the browser locale.
- * @param signal - browser cancellation or Remote contribution withdrawal.
- * @returns translated text; an uncached inactive Session joins ordinary GUI activation before retry.
- * Failures omit the source and provider response. Cancellation stops this caller's wait, not shared activation.
- */
-@Remote async translate(request: TranslationRequest, signal: AbortSignal): Promise<string>
-```
-
-Source: [`packages/experimental/client-ui-cot-translation/src/index.ts`](../../packages/experimental/client-ui-cot-translation/src/index.ts)
 
 <a id="ctxtranslator--translator"></a>
 

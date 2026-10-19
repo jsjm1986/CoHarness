@@ -39,10 +39,10 @@
   en: e1b1ac62e94ce535
   zh: 5fa7a0353fbf777d
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/source-map:
-  en: 8963005b41bfc3c6
-  zh: 7df1436563c10a19
+  en: 26647c231bf1d3f6
+  zh: b7b203f042a18682
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/main-flow:
-  en: 731878f592fa79c6
+  en: 59fa1cf69b515274
   zh: 3187f4c6907a13c2
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/invariants:
   en: 0b6c6d7e216e1d23
@@ -88,10 +88,10 @@
   zh: 8a7ae8a2bdb4c01a
 /deepseek-ai-dsh-bash-sandbox/model-experience/bash-tool-error-indirectly/kv-cache-effect:
   en: f5d5f97a153f7c70
-  zh: f681f89596f500f5
+  zh: 003f251b4beef2b9
 /deepseek-ai-dsh-bash-sandbox/known-limitations-and-deferred-work:
-  en: 056f7e09b6ad03f9
-  zh: 2996d78fbe0c70e1
+  en: df9479620972651e
+  zh: d36168cbfbf8771a
 /deepseek-ai-dsh-bash-sandbox/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

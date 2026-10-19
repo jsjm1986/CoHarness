@@ -146,6 +146,10 @@ export interface InvocationModel extends DocumentationModel {
     readonly wire: string
   }
   readonly parameters: readonly InvocationParameterModel[]
+  /** Per-item boundary of the Client uplink, from the `In` type argument of `RemoteStream<Out, In>`; absent when the method reads none. */
+  readonly uplink?: {
+    readonly boundary: RemoteBoundaryModel
+  }
   readonly cancellation?: {
     readonly parameter: 'signal'
   }

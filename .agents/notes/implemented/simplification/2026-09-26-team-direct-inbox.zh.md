@@ -12,7 +12,7 @@ Status: implemented
 
 新的 Team 发送返回获准 inbox 的 `MessageId` 或抛出错误。它们使用 live Lead Steer 或 host-only subagent Steer adapter，通过现有 `agent-message` source 保留真实发送者，并在正文中保留成员名称。接收遵循普通 Agent 的持久化策略，既不确认模型已处理，也不增加同步 flush 保证。Team 不保留尚未接收的发送意图，不在重启后重试，也不对显式重发去重。
 
-历史 mailbox 记录继续可解码并参与投影，使现有 Lead 日志能够回放，但 Team 不再投递或确认它们。该包是实验性的，没有稳定性承诺；另设一条带回执检查、同目标排序和独立 dispose 等待的投递路径，其代价高于它能补回的未投递旧消息。这部分取代了 [Agent Teams](../feature/2026-08-05-agent-teams.zh.md) 的 mailbox 决策；roster 和任务决策仍由原记录负责。[包参考](../../../../packages/experimental/agent-team/README.zh.md#understand-the-implementation)定义由此产生的限制。
+历史 mailbox 记录继续可解码并参与投影，使现有 Lead 日志能够回放，但 Team 不再投递或确认它们。该包是实验性的，没有稳定性承诺；另设一条带回执检查、同目标排序和独立 dispose 等待的投递路径，其代价高于它能补回的未投递旧消息。这部分取代了 [Agent Teams](../feature/2026-08-05-agent-teams.zh.md) 的 mailbox 决策；roster 和任务决策仍由原记录负责。[包参考](../../../../packages/experimental/agent-team/README.zh.md)定义由此产生的限制。
 
 ## 考虑过的替代方案
 

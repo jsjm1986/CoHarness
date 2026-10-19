@@ -41,8 +41,8 @@ class HelperChild extends EventEmitter {
 }
 
 const base = {
-  host: 'hermetic-test', node: '/usr/bin/node', helper: '/opt/dsh/helper.js',
-  helperHash: 'a'.repeat(64), workspace: '/workspace',
+  host: 'hermetic-test', launch: { kind: 'node-script' as const, node: '/usr/bin/node' },
+  helper: '/opt/dsh/helper.js', helperHash: 'a'.repeat(64), workspace: '/workspace',
 }
 
 function harness(config: Record<string, unknown>) {
@@ -50,8 +50,9 @@ function harness(config: Record<string, unknown>) {
   const helper = new SshRpcPeer(child.stdin, child.stdout, 4096, 8, async (method) => {
     if (method !== 'hello') throw new Error(`unexpected helper operation: ${method}`)
     return {
-      protocol: 1, hash: 'a'.repeat(64), platform: 'linux', nodeVersion: 'v24.19.0',
-      node: '/usr/bin/node', root: '/tmp/remote-helper', workspace: '/workspace',
+      protocol: 2, hash: 'a'.repeat(64), platform: 'linux' as const, nodeVersion: 'v24.19.0',
+      kind: 'node-script' as const, executable: '/usr/bin/node',
+      root: '/tmp/remote-helper', workspace: '/workspace',
     }
   })
   transport.spawn.mockReturnValue(child)

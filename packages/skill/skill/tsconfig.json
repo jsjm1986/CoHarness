@@ -9,12 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../core/scope"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -22,6 +16,15 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

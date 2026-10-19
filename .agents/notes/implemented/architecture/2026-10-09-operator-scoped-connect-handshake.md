@@ -44,7 +44,7 @@ Non-page Clients supply HTTP and WebSocket transports using the same API Cookie 
 
 ## Verification
 
-Connection tests cover API publication, Cookie verification, idle retention, socket ownership, and unchanged browser admission. The [Loader tests](../../../../packages/api/gateway/tests/operator-connect.host.spec.ts) cover HTTP before WebSocket, duplicate attachment, prompt removal during slow cleanup, unary cancellation independence, and event refusal/ownership. [Node Client tests](../../../../packages/api/gateway/tests/authenticated-node.client.spec.ts) cover authenticated transports, delayed socket establishment, and raw streams without passive recovery.
+Connection tests cover API publication, Cookie verification, idle retention, socket ownership, and unchanged browser admission. The Loader tests cover HTTP before WebSocket, duplicate attachment, prompt removal during slow cleanup, unary cancellation independence, and event refusal/ownership. Node Client tests cover authenticated transports, delayed socket establishment, and raw streams without passive recovery.
 
 The [recorded approval scenario](../../../../apps/web/tests/approval-composer.e2e.ts) adds a passive caller alongside the answering browser. Full replay requires a usable command sandbox for its file-writing operation; local environments without one cannot validate that final step. No Session format or model-visible input changes.
 

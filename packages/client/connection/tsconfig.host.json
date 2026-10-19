@@ -27,7 +27,7 @@
       "path": "../../credentials/credentials"
     },
     {
-      "path": "../../host/apiproxy"
+      "path": "../../host/apiproxy/tsconfig.api.json"
     },
     {
       "path": "../../host/webserver"

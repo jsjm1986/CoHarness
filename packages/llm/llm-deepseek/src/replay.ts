@@ -4,7 +4,7 @@ import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { Message, ReplayEnvelope } from '@deepseek-ai/dsh-llm'
 
 /** Index-aligned metadata retained alongside each emitted Harness block. */
-export interface ReplayBlock {
+export type ReplayBlock = {
   type: 'text' | 'reasoning' | 'tool-call'
   signature?: string
 }

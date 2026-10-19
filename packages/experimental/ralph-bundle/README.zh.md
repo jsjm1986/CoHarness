@@ -46,14 +46,14 @@ kind: "package-bundle"
 <a id="further-exploration"></a>
 ## 进一步探索
 
-[能力实现](../tool-ralph/README.zh.md)
+[能力实现](../../workflow/tool-ralph/README.zh.md)
 
 -----
 
 <a id="model-experience"></a>
 ## 模型体验
 
-间接影响，通过[能力实现](../tool-ralph/README.zh.md) 贡献模型上下文和结果。
+间接影响，通过[能力实现](../../workflow/tool-ralph/README.zh.md) 贡献模型上下文和结果。
 
 #### KV Cache 影响
 

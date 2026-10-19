@@ -57,7 +57,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); disconnect.mockClear(); measure = undefined })
 
 const info = { id: 'terminal' as WebTerminalId, title: 'bash', shell: { path: '/bin/bash', name: 'bash', args: ['-i'] }, cwd: '/workspace', cols: 80, rows: 24, state: 'running' as const, exitCode: null }
-const environment = { cwd: '/workspace', maxCols: 200, maxRows: 100, scrollback: 1000, maxInputBytes: 1000 }
+const environment = { cwd: '/workspace', maxCols: 200, maxRows: 100, scrollback: 1000, maxInputBytes: 1000, maxBufferedBytes: 65536 }
 const idle: TerminalViewState = { phase: 'idle', writable: false, environment }
 const titleSurfaces = [
   {
@@ -134,7 +134,7 @@ it('shows only the terminal screen while connected and detaches on unmount', () 
 })
 
 it('keeps one emulator across rename and locale updates, applies snapshots and output once, and releases listeners', () => {
-  const snapshot: TerminalViewState = { ...idle, info, phase: 'connected', writable: true, render: { revision: 1, frame: { type: 'snapshot', sequence: 0, info, screen: 'restored' } } }
+  const snapshot: TerminalViewState = { ...idle, info, phase: 'connected', writable: true, render: { revision: 1, frame: { type: 'snapshot', sequence: 0, info, screen: 'restored', writable: true } } }
   const h = mount(snapshot)
   const terminal = fake.terminals[0]!
   expect(terminal.reset).toHaveBeenCalledOnce()
@@ -427,7 +427,7 @@ it('offers a new terminal after process exit while preserving its final output f
 })
 
 it('destroys the private emulator when permission or account invalidation clears its model', () => {
-  const h = mount({ ...idle, info, phase: 'connected', writable: true, render: { revision: 1, frame: { type: 'snapshot', sequence: 0, info, screen: 'private output' } } })
+  const h = mount({ ...idle, info, phase: 'connected', writable: true, render: { revision: 1, frame: { type: 'snapshot', sequence: 0, info, screen: 'private output', writable: true } } })
   const terminal = fake.terminals[0]!
   expect(terminal.write).toHaveBeenCalledWith('private output', expect.any(Function))
   h.update({ phase: 'failed', writable: false, error: 'Terminal qualification revoked' })

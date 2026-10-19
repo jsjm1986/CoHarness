@@ -294,6 +294,8 @@ Chat 与 Details 通过纯 helper 复用同一 block 的解析。未来缓存必
 
 Generic Host `presentCall` 的 title、kind、rawInput、content 与 locations 当前并不驱动普通 Web 行；Generic `presentResult.content` 也不驱动 Web 输出，因此无需把这些未消费值复制到 Client。
 
+<a id="terminal-card"></a>
+
 ### Terminal 卡片
 
 Client terminal model 从工具名称、调用参数、结果 content、error 与 Session cwd 派生现有 `TerminalBlock` props，不依赖 `parentCallId`。

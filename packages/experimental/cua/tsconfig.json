@@ -42,6 +42,9 @@
       "path": "../../ptc-runtime/ptc-runtime"
     },
     {
+      "path": "../../boot/config-editor"
+    },
+    {
       "path": "../../settings/settings"
     },
     {

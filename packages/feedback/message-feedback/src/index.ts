@@ -10,7 +10,8 @@ import s from '@deepseek-ai/schemastery'
 import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEventMap } from '@deepseek-ai/dsh-session'
 import { deriveEventMessage, isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
-import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionSeq } from '@deepseek-ai/dsh-session/types'
+import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
@@ -65,6 +66,17 @@ declare module '@deepseek-ai/dsh-session/types' {
 declare module '@deepseek-ai/cordis' {
   interface Context {
     messageFeedback: MessageFeedbackService
+  }
+  interface Events {
+    /**
+     * Observe a durable cold feedback mutation without publishing a live Session.
+     * Observers run before write ownership is released and must not await
+     * another message-feedback operation for this Session. The payload is borrowed
+     * read-only; deep-clone it before transferring ownership (for example, to Session.fromRestore).
+     * @param inspection - committed canonical prefix, including the feedback as its last event.
+     * @mode parallel
+     */
+    'feedback/committed'(inspection: SessionInspection): void
   }
 }
 
@@ -144,6 +156,14 @@ function rowSnapshot(
 function nextVersion(): MessageFeedbackVersion {
   return randomUUID() as MessageFeedbackVersion
 }
+
+/** Canonical log record of one accepted feedback mutation. */
+type FeedbackLogEvent = SessionEvent<'feedback/message-put' | 'feedback/message-delete'>
+
+/** The type/data pair of one feedback log event, distributed over the union. */
+type FeedbackLogMutation = {
+  [K in FeedbackLogEvent['type']]: Pick<Extract<FeedbackLogEvent, { type: K }>, 'type' | 'data'>
+}[FeedbackLogEvent['type']]
 
 /** Session inspection result that keeps absence inside the business union. */
 type KnownSession =
@@ -278,7 +298,10 @@ export class MessageFeedbackService extends TypertRemoteService {
         request.sessionId,
         rowSnapshot(identityOf(durable.meta), nextItems),
       )
-      this.appendLogEvent(durable.meta.id, 'feedback/message-put', { sessionId: durable.meta.id, item })
+      await this.commitLogEvent(durable.meta.id, {
+        type: 'feedback/message-put',
+        data: { sessionId: durable.meta.id, item },
+      })
       return success(snapshotItem(item))
     })
   }
@@ -311,8 +334,9 @@ export class MessageFeedbackService extends TypertRemoteService {
         request.sessionId,
         rowSnapshot(identityOf(known.value.meta), items.filter(item => item !== existing)),
       )
-      this.appendLogEvent(known.value.meta.id, 'feedback/message-delete', {
-        sessionId: known.value.meta.id, messageId: existing.messageId, version: existing.version,
+      await this.commitLogEvent(known.value.meta.id, {
+        type: 'feedback/message-delete',
+        data: { sessionId: known.value.meta.id, messageId: existing.messageId, version: existing.version },
       })
       return success<MessageFeedbackDeleteValue>(Object.freeze({ absent: true }))
     })
@@ -416,15 +440,38 @@ export class MessageFeedbackService extends TypertRemoteService {
     return this.table
   }
 
-  /** Record an accepted feedback mutation when its Session is live. */
-  private appendLogEvent(
-    sessionId: SessionId,
-    type: 'feedback/message-put' | 'feedback/message-delete',
-    data: { sessionId: SessionId; item: MessageFeedbackItem } | { sessionId: SessionId; messageId: string; version: string },
-  ): void {
-    const session = this.ctx.sessions.get(sessionId)
-    if (session === undefined) return
-    appendFeedbackEvent(session, type, data)
+  /**
+   * Record an accepted feedback mutation in the canonical log. A live Session
+   * appends through its own event feed; for a cold log this holds a persistence
+   * write handle across read, append, and flush, then notifies `feedback/committed`
+   * observers with the committed prefix before write ownership is released.
+   * @param sessionId - Session whose canonical log records the mutation.
+   * @param event - the `feedback/message-put`/`feedback/message-delete` type/data pair.
+   */
+  private async commitLogEvent(sessionId: SessionId, event: FeedbackLogMutation): Promise<void> {
+    const live = this.ctx.sessions.get(sessionId)
+    if (live !== undefined) {
+      appendFeedbackEvent(live, event.type, event.data)
+      return
+    }
+    const handle = await this.ctx.sessionPersistence.open(sessionId, 'write')
+    try {
+      const { events } = await handle.read()
+      const entry: FeedbackLogEvent = { ...event, seq: SessionSeq(events.length), time: Date.now() }
+      await handle.append([entry])
+      await handle.flush()
+      try {
+        await this.ctx.parallel('feedback/committed', {
+          meta: handle.header,
+          inheritedEventCount: handle.inheritedEventCount,
+          events: [...events, entry],
+        })
+      } catch (error) {
+        this.ctx.logger.warn('message-feedback: committed feedback observer failed', error)
+      }
+    } finally {
+      await handle.close()
+    }
   }
 }
 

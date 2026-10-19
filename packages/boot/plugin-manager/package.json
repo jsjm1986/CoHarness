@@ -63,6 +63,7 @@
     "@deepseek-ai/dsh-app-boot": "workspace:*",
     "@deepseek-ai/dsh-atomic-write": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
+    "@pnpm/building.policy": "1100.1.6",
     "execa": "^10.0.1",
     "yaml": "^2.9.0",
     "zod": "4.4.3",
@@ -107,6 +108,7 @@
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-projection": "workspace:*",
     "@deepseek-ai/dsh-sandbox": "workspace:*",
-    "@deepseek-ai/dsh-user-approval": "workspace:*"
+    "@deepseek-ai/dsh-user-approval": "workspace:*",
+    "pnpm": "11.28.4"
   }
 }

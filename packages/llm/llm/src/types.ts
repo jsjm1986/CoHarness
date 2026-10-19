@@ -7,6 +7,7 @@
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { MessageId, ToolCallId, ProviderRequestId, ReasoningEffortId } from './brand.ts'
+import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { Message, UserMessage } from './message.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -452,9 +453,9 @@ export interface LlmResolvedModelInfo extends LlmModelInfo {
  * split is shared vocabulary, so assembly can keep stored metadata aligned
  * with stored content without reading either half.
  */
-export interface ReplayEnvelope {
+export type ReplayEnvelope = {
   /** Response-level adapter-private metadata (ids, native stop reason). */
-  response: unknown
+  response: JsonValue
   /**
    * Per-block adapter-private metadata, one entry per emitted block in
    * first-seen stream order. When assembly drops a block it drops the entry at
@@ -463,7 +464,7 @@ export interface ReplayEnvelope {
    * of block structure omits this field and the envelope passes through
    * assembly unchanged.
    */
-  blocks?: readonly unknown[]
+  blocks?: JsonValue[]
 }
 
 /**

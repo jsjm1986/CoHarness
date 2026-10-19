@@ -9,6 +9,27 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/group"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../../vendor/timer"
+    },
+    {
+      "path": "../../boot/app-boot"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -24,22 +45,13 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../cordis-host-runner"
-    },
-    {
       "path": "../../llm/llm"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../util/values"
     },
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../../vendor/timer"
+      "path": "../cordis-host-runner"
     }
   ]
 }

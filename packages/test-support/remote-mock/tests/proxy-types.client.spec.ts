@@ -5,7 +5,7 @@ import ts from 'typescript'
 import type { MaybeMockedDeep } from '@vitest/spy'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { TypertRemoteNamespace, TypertRemoteNamespaceMap } from '@deepseek-ai/dsh-typert-protocol'
-import type {} from '@deepseek-ai/dsh-commands/remote'
+import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
 import type { RemoteMock } from '../src/index.ts'
 
 const root = resolve(import.meta.dirname, '../../../..')
@@ -142,18 +142,18 @@ void known
   })
 
   // Ordinary built Client tsc checks these generated business types; Vitest itself remains build-free.
-  it('derives real commands mocks from the generated namespace map and native deep mapping', () => {
-    type Commands = RemoteMock['remote']['commands']
-    type Generated = TypertRemoteNamespace<'commands'>
+  it('derives real settings mocks from the generated namespace map and native deep mapping', () => {
+    type Settings = RemoteMock['remote']['settings']
+    type Generated = TypertRemoteNamespace<'settings'>
     expectTypeOf<RemoteMock['remote']>().toEqualTypeOf<MaybeMockedDeep<TypertRemoteNamespaceMap>>()
-    expectTypeOf<ReturnType<Commands['list']>>().not.toBeAny()
-    expectTypeOf<ReturnType<Commands['execute']>>().not.toBeAny()
-    expectTypeOf<Parameters<Commands['execute']>>().toEqualTypeOf<Parameters<Generated['execute']>>()
-    expectTypeOf<Parameters<Commands['execute']>[1]>().not.toBeAny()
-    expectTypeOf<Parameters<Commands['list']>>().toEqualTypeOf<Parameters<Generated['list']>>()
-    expectTypeOf<[number, boolean, string]>().not.toExtend<Parameters<Commands['execute']>>()
-    expectTypeOf<{ ok: true; value: number }>().not.toExtend<Awaited<ReturnType<Commands['list']>>>()
-    expectTypeOf<Commands>().not.toHaveProperty('missing')
+    expectTypeOf<ReturnType<Settings['describe']>>().not.toBeAny()
+    expectTypeOf<ReturnType<Settings['update']>>().not.toBeAny()
+    expectTypeOf<Parameters<Settings['update']>>().toEqualTypeOf<Parameters<Generated['update']>>()
+    expectTypeOf<Parameters<Settings['update']>[1]>().not.toBeAny()
+    expectTypeOf<Parameters<Settings['mutate']>>().toEqualTypeOf<Parameters<Generated['mutate']>>()
+    expectTypeOf<[number, boolean, string]>().not.toExtend<Parameters<Settings['update']>>()
+    expectTypeOf<{ ok: true; value: number }>().not.toExtend<Awaited<ReturnType<Settings['update']>>>()
+    expectTypeOf<Settings>().not.toHaveProperty('missing')
   })
 
   it('retains the native/generated type dependencies only in the proxy declaration', () => {

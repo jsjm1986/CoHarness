@@ -22,10 +22,6 @@ English | [中文](README.zh.md)
 
 -----
 
-The controller decodes the pane’s runtime-qualified Session key into its original Host ID and explicit runtime target. The `HEAD` preflight and browser save use the same account-pinned URL, so another tab’s account or scope change cannot redirect a pending download.
-
-The Host download endpoint flushes a live root Session before `readRaw`, so a slash-triggered ZIP includes the `command/run` and `command/done` pair whose acknowledgment started the download. Cold persisted Sessions require no flush.
-
 <a id="use-this-package"></a>
 ## Use this package
 
@@ -81,7 +77,7 @@ This section explains how the package wires the export control and points at the
 
 ### Design split
 
-The package has two halves. The Host half ([`src/index.ts`](src/index.ts)) registers the `/export` command; the bounded ZIP stream and its `GET`/`HEAD /api/session.export` route are owned by the API layer. The browser half ([`src/client/index.ts`](src/client/index.ts)) provides the shared download controller and UI, and observes `command/executed` so only the submitting browser starts a download.
+The package has two halves. The Host half ([`src/index.ts`](src/index.ts)) registers the `/export` command and owns the shared `/api/session.export` path constants in [`src/routes.ts`](src/routes.ts); the Host API Proxy ([`apiproxy`](../../host/apiproxy/README.md)) serves the route and builds the bounded ZIP stream. The browser half ([`src/client/index.ts`](src/client/index.ts)) provides the shared download controller and UI, and observes `command/executed` so only the submitting browser starts a download.
 
 The Header’s More action uses the shared compact Button, with a 28px square target and the same radius and hover fill as the right-sidebar expand control.
 

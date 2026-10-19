@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-`experimental/session-inspector` 注册 `session-inspector-log` Sidebar 页面及其 Session 作用域正文。已有 Sidebar 管理 Session 引用。检查器不增加资源提供方、Conversation header slot、composer 或产品包导航 API。[Session Inspector README](../../../../packages/experimental/session-inspector/README.zh.md) 描述表格操作与展示行为。
+`experimental/session-inspector` 注册 `session-inspector-log` Sidebar 页面及其 Session 作用域正文。已有 Sidebar 管理 Session 引用。检查器不增加资源提供方、Conversation header slot、composer 或产品包导航 API。Session Inspector README 描述表格操作与展示行为。
 
 - Session Controller 和 Chat 保留数据所有权。只有当前选中的表格订阅；日志使用现有已加载窗口和分页，不增加 Session 流或持久化格式。
 - 虚拟表格按 Turn → Step → 事件 → Assistant block/delta 分组。未闭合 block 展开，闭合后折叠。自动折叠通过尾部留白保留可见行或仍存在的祖先位置；手动折叠锚定被点击组头并暂停跟随。吸顶祖先在表头和前面吸顶行之下选择。
@@ -25,7 +25,7 @@ Status: implemented
 
 默认关闭的可选组合包 `inspector-profile` 启用会话检查能力、NodeJS 调试 Worker 和未脱敏的 Host fetch 采集。启用组合包不需要调试参数或用户覆盖配置。实现及显式源码／构建产物 overlay 保持可用；Web startup 不接受新参数，设置区不增加调试按钮。
 
-Host 管理调试 URL、Worker 和采集生命周期。组合配置提供 `--inspect` 时，Host 尝试打开 Chrome；打开失败后打印的链接仍可使用。关闭调试窗口不会停止采集。显式启用允许执行本地代码并采集未脱敏网络数据，风险说明见 [Inspector 安全部分](../../../../packages/experimental/inspector/README.zh.md#security)。
+Host 管理调试 URL、Worker 和采集生命周期。组合配置提供 `--inspect` 时，Host 尝试打开 Chrome；打开失败后打印的链接仍可使用。关闭调试窗口不会停止采集。显式启用允许执行本地代码并采集未脱敏网络数据，风险说明见 Inspector 安全部分。
 
 页面加载后启用的 Client 通过已鉴权、文档相对的 Connection 路由获取当前 ingest 参数。初始注入仍支持早期建联。连接重置会刷新参数；替换先释放旧 source，卸载会取消并等待未完成操作。Client 不接收也不打开调试 URL。
 

@@ -4,6 +4,8 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 /** A Remote operation's Session address, access check, and explicit execution attribution owner. */
 export type RemoteSessionPolicy = {
   readonly path: readonly string[]
+  /** Second identity path for union addresses (subagent address authorizes on the parent Session). */
+  readonly altPath?: readonly string[]
 } & ({ readonly action: 'read' } | {
   readonly action: 'write' | 'approve'
   /** Request starts human execution; operation owns mixed commands/callbacks; none changes no execution origin. */
@@ -48,6 +50,27 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'sessionFeedback/record': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
   'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'request' },
   'userQuestions/attachWait': { action: 'read', path: ['agentId'] },
+  'session/selectModel': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'session/rename': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'session/fork': { action: 'write', path: ['request', 'sessionId'], execution: 'request' },
+  'session/prompt': { action: 'write', path: ['request', 'sessionId'], execution: 'request' },
+  'session/updateQueue': { action: 'write', path: ['request', 'sessionId'], execution: 'request' },
+  'session/cancel': { action: 'write', path: ['request', 'sessionId'], execution: 'request' },
+  'session/attachment': { action: 'read', path: ['request', 'sessionId'] },
+  'session/projections': { action: 'read', path: ['request', 'sessionId'] },
+  'session/page': { action: 'read', path: ['request', 'address', 'sessionId'], altPath: ['request', 'address', 'parentSessionId'] },
+  'session/follow': { action: 'read', path: ['request', 'address', 'sessionId'], altPath: ['request', 'address', 'parentSessionId'] },
+  'skills/list': { action: 'read', path: ['request', 'sessionId'] },
+  'job/list': { action: 'read', path: ['request', 'sessionId'] },
+  'job/follow': { action: 'read', path: ['request', 'sessionId'] },
+  'job/kill': { action: 'write', path: ['request', 'sessionId'], execution: 'operation' },
+  'workspace/archiveSession': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'workspace/unarchiveSession': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'workspace/pinSession': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'workspace/unpinSession': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'workspace/insertSessionBefore': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'claudeCodeMods/watchBand': { action: 'read', path: ['agentId'] },
+  'claudeCodeMods/pressBand': { action: 'write', path: ['agentId'], execution: 'none' },
 })
 
 /**
@@ -59,12 +82,18 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
 export function remoteSessionId(endpoint: string, args: Readonly<Record<string, unknown>>): SessionId | undefined {
   const policy = REMOTE_SESSION_POLICIES[endpoint]
   if (policy === undefined) return undefined
-  let value: unknown = args
-  for (const field of policy.path) {
-    if (value === null || typeof value !== 'object' || Array.isArray(value) || !Object.hasOwn(value, field)) return undefined
-    value = Reflect.get(value, field)
+  for (const path of [policy.path, ...(policy.altPath === undefined ? [] : [policy.altPath])]) {
+    let value: unknown = args
+    for (const field of path) {
+      if (value === null || typeof value !== 'object' || Array.isArray(value) || !Object.hasOwn(value, field)) {
+        value = undefined
+        break
+      }
+      value = Reflect.get(value, field)
+    }
+    if (typeof value === 'string' && value.length > 0) return value as SessionId
   }
-  return typeof value === 'string' && value.length > 0 ? value as SessionId : undefined
+  return undefined
 }
 
 /** Rewrite only declared Session address fields for a browser transport.
@@ -82,11 +111,12 @@ export function mapRemoteSessionIds(
 ): Readonly<Record<string, unknown>> {
   const policy = REMOTE_SESSION_POLICIES[endpoint]
   const paths: readonly (readonly string[])[] = [
-    ...(policy === undefined ? [] : [policy.path]),
+    ...(policy === undefined ? [] : [policy.path, ...(policy.altPath === undefined ? [] : [policy.altPath])]),
     ...(scopeWire === undefined ? [] : [[scopeWire]]),
     ...(endpoint.startsWith('terminal/') ? [['sessionId']] : []),
     ...(endpoint === 'subagents/prompt' ? [['request', 'childSessionId']] : []),
     ...(endpoint === 'subagents/interruptByParent' ? [['childSessionId']] : []),
+    ...(endpoint === 'session/page' || endpoint === 'session/follow' ? [['request', 'address', 'childSessionId']] : []),
   ]
   let result = args
   for (const path of paths) {

@@ -11,9 +11,9 @@ Status: implemented
 技术原因：
 
 - 重连后，[client-hmr](../../../../packages/client/hmr/src/client/index.ts) 会收到新 Host 的完整 graph，[ClientEntries](../../../../packages/client/modules/src/client/entries.ts) 按每行的 `rev`（bundle 的 mtime、ctime 和大小）热替换插件。Vite shell、静态库和 bootstrap 在页面生命周期内从不替换。
-- API 连接按精确键集合校验 ready 帧（[remote-events.ts](../../../../packages/api/gateway/src/client/remote-events.ts)），协议一变，旧页面无法自行恢复。
+- API 连接按精确键集合校验 ready 帧（remote-events.ts），协议一变，旧页面无法自行恢复。
 - 页面没有任何途径得知 Host 已换成另一个 release。
-- Desktop 不受影响：Host 被替换后，main 进程会重新导航窗口（[main.ts](../../../../apps/desktop/src/main.ts)）。
+- Desktop 不受影响：Host 被替换后，main 进程会重新导航窗口（main.ts）。
 
 [client plugin loading model](../architecture/2026-07-23-client-plugin-loading-model.zh.md) 负责加载链与热替换，它写明静态库和 shell 需要刷新页面；本 Note 负责页面如何得知 Host 的 release 变了，以及之后怎么处理。
 
@@ -65,7 +65,7 @@ BootManifest { ...; release?: WebBootRelease }
 
 ### 页面侧
 
-release 比较在 [release-change.ts](../../../../packages/client/modules/src/client/release-change.ts)；`ClientEntries` 在 `sync` 和 `reload` 中调用它。
+release 比较在 release-change.ts；`ClientEntries` 在 `sync` 和 `reload` 中调用它。
 
 ```
 interface ClientReleaseChange {

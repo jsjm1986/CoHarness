@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -30,6 +39,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../preset/agent-presets"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     },
     {
@@ -40,15 +52,6 @@
     },
     {
       "path": "../subagent"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

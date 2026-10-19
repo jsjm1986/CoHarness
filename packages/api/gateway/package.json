@@ -20,9 +20,7 @@
     },
     "./client": {
       "types": "./lib/types/client/index.d.ts",
-      "node": "./lib/client.node.js",
-      "browser": "./lib/client.browser.js",
-      "default": "./lib/client.browser.js"
+      "default": "./lib/client.js"
     },
     "./types": {
       "types": "./lib/types/types.d.ts",
@@ -30,10 +28,6 @@
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json",
-    "./stream-protocol": {
-      "types": "./lib/types/stream-protocol.d.ts",
-      "default": "./lib/types/stream-protocol.js"
-    },
     "./locale/*.json": "./locale/*.json"
   },
   "dsh": {
@@ -43,7 +37,10 @@
         "@deepseek-ai/dsh-client-connection"
       ],
       "platform": "web",
-      "immediately": true
+      "immediately": true,
+      "external": [
+        "@deepseek-ai/dsh-client-connection/client"
+      ]
     }
   },
   "scripts": {
@@ -53,33 +50,45 @@
   "files": [
     "locale/*.json",
     "lib/index.js",
-    "lib/client.browser.js",
-    "lib/client.node.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/client.js"
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@deepseek-ai/dsh-deque": "workspace:*",
     "@deepseek-ai/dsh-timeout": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
-    "ws": "^8.21.3",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:*"
+    "mime-types": "^3.0.2",
+    "ws": "^8.21.3"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:~"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-attachment": "workspace:*",
+    "@deepseek-ai/dsh-brand": "workspace:*",
+    "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-deque": "workspace:*",
+    "@deepseek-ai/dsh-fs": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
+    "@deepseek-ai/dsh-typert-registry": "workspace:*"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-api-remote-access": "workspace:*",
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-attachment": "workspace:*",
     "@deepseek-ai/dsh-brand": "workspace:*",
-    "@deepseek-ai/dsh-cmdline": "workspace:*",
     "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-cmdline": "workspace:*",
+    "@deepseek-ai/dsh-deque": "workspace:*",
+    "@deepseek-ai/dsh-fs": "workspace:*",
+    "@deepseek-ai/dsh-fs-local": "workspace:*",
     "@deepseek-ai/dsh-host-webserver": "workspace:*",
     "@deepseek-ai/dsh-remote-mock": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/dsh-typert-registry": "workspace:*",
     "@deepseek-ai/dsh-util-crypto": "workspace:*",
+    "@types/mime-types": "^3.0.1",
     "@types/ws": "^8.18.1",
-    "@deepseek-ai/cordis": "workspace:~",
     "zod": "4.4.3"
   }
 }

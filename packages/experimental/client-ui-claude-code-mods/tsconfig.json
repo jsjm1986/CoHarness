@@ -30,9 +30,6 @@
       "path": "../../client/ui-renderer"
     },
     {
-      "path": "../../client/ui-session"
-    },
-    {
       "path": "../../client/ui-slots"
     },
     {

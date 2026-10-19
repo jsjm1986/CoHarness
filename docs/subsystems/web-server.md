@@ -60,13 +60,76 @@ A request whose handling throws (a malformed %-escape hitting `decodeURIComponen
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxconnection--hostconnectionhandle"></a>
+
+### `ctx.connection` — `HostConnectionHandle`
+
+Host `ctx.connection` shape consumed by transport-independent adapters.
+
+```ts cordis-catalog
+/**
+ * Apply Connection's Host/Origin fence and browser authentication to one
+ * `/api` request. Registered `loopback` subtrees and endpoints keep their
+ * machine-caller fence as the complete admission.
+ * @param request - request headers and URL from the HTTP or upgrade request.
+ * @param kind - carrier the request arrived on; defaults to the `Upgrade`
+ *   header when the calling carrier cannot name itself.
+ * @returns rejection status, or undefined when the route may accept the request.
+ */
+requestRejection(request: ConnectionIndexRequest, kind?: 'http' | 'upgrade'): ConnectionRequestRejection
+
+/**
+ * Authenticate one frontend index request, owning a token redirect, 403, or
+ * 401. A mounted `connection/authenticate` provider answers first; its
+ * `'allow'` still passes the Host/Origin fence and its `'deny'` refuses
+ * before any token exchange.
+ * @param request - root or configured-index HTTP request.
+ * @param response - response owned when the result is false.
+ * @returns true only when the frontend may serve index.html.
+ */
+authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean
+
+/**
+ * Add the fresh process token to an ordinary Web application URL.
+ * @param baseUrl - clean application URL whose authority and mount are preserved.
+ * @returns tokenized URL for initial login.
+ */
+authenticatedUrl(baseUrl: string): string
+```
+
+Source: [`packages/client/connection/src/rpc-host.ts`](../../packages/client/connection/src/rpc-host.ts)
+
+<a id="ctxwebapp--webapp"></a>
+
+### `ctx.webApp` — `WebApp`
+
+The Web GUI this process serves, provided by the `web-runtime` row.
+
+```ts cordis-catalog
+/**
+ * The URL this GUI advertises, also used for `DSH_WEB_URL` and the startup URL line.
+ * @returns the configured `publicUrl`, otherwise the listener origin.
+ */
+getAdvertisedUrl(): string
+```
+
+Source: [`packages/bundle/web-app/src/index.ts`](../../packages/bundle/web-app/src/index.ts)
+
 <a id="ctxwebserver--webserver"></a>
 
 ### `ctx.webServer` — `WebServer`
 
-The browser HTTP carrier service. Activation listens immediately. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers. A listen failure rejects initialization, and the boot process reports the failed fiber.
+The browser HTTP carrier service. Activation loads any configured TLS material, then listens immediately; a material or listen failure rejects initialization, and the boot process reports the failed fiber. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers.
 
 ```ts cordis-catalog
+/**
+ * The root URL local clients use to reach the bound listener: the protocol,
+ * the {@link bindUrlHost} form of the bind address, and the listening port.
+ * @returns the origin, for example `http://127.0.0.1:3080`.
+ * @throws before `listen` binds a port, or when the bind address has no URL form.
+ */
+getOrigin(): string
+
 /**
  * Register a named route. Duplicate (kind, path) throws — route patterns are
  * a composition-level contract, so a collision is a misconfiguration.
@@ -94,8 +157,9 @@ registerUpgrade(route: WebUpgradeRoute): () => void
 registerFallback(handler: WebRoute['handler']): () => void
 
 /**
- * Register an index.html transform, applied by the fallback owner to every
- * index response ({@link applyIndexTaps}) in registration order.
+ * Register a raw-HTML index transform, the escape hatch for markup no
+ * {@link IndexInjection} row expresses: {@link renderIndex} applies taps in
+ * registration order after rendering the structured rows.
  * @param transform - pure html-to-html function.
  * @returns the disposer removing the transform.
  */
@@ -110,20 +174,73 @@ tapIndex(transform: (html: string) => string): () => void
 applyIndexTaps(html: string): string
 
 /**
- * Collect live structured index rows in listener activation order.
- * @returns the fresh mutable row table after all listeners have appended.
+ * Gather the structured injection table: one `webserver/index-inject` emit,
+ * every subscriber pushes its current rows. Fresh per call, so subscribers
+ * read live state (module graph, theme preference) at emit time.
+ * @returns rows in subscriber activation order.
  */
 collectIndexInjections(): IndexInjection[]
 
 /**
- * Render structured rows first, then legacy raw HTML transforms.
+ * Render one index.html body: the structured injection table first, then
+ * the raw `tapIndex` transforms over the result.
  * @param html - the raw index.html body.
- * @returns the rendered body with current injections and transforms applied.
+ * @returns the transformed body.
  */
 renderIndex(html: string): string
 ```
 
 Source: [`packages/host/webserver/src/index.ts`](../../packages/host/webserver/src/index.ts)
+
+<a id="connection-events"></a>
+
+### `connection/*` events
+
+<a id="connectionauthenticate--bail"></a>
+
+#### `connection/authenticate` — bail
+
+Authenticate one index, `/api`, or upgrade request through a deployment provider. The first defined answer replaces the direct-browser token exchange and cookie entirely: `'allow'` admits the request without minting a runtime cookie, `'deny'` refuses it even when a cookie or launch token is present, and `undefined` defers to the direct-browser flow. `loopback` subtrees and endpoints keep their declared machine fence and never consult this event. A listener must only allow requests whose credentials it verified itself — a header seen but not verified is not an identity.
+
+```ts cordis-catalog
+/**
+ * Authenticate one index, `/api`, or upgrade request through a deployment
+ * provider. The first defined answer replaces the direct-browser token
+ * exchange and cookie entirely: `'allow'` admits the request without
+ * minting a runtime cookie, `'deny'` refuses it even when a cookie or
+ * launch token is present, and `undefined` defers to the direct-browser
+ * flow. `loopback` subtrees and endpoints keep their declared machine
+ * fence and never consult this event. A listener must only allow requests
+ * whose credentials it verified itself — a header seen but not verified
+ * is not an identity.
+ * @param request - request headers, method, URL, and arrival carrier.
+ * @mode bail
+ * @returns the provider's admission decision, or undefined to defer.
+ */
+'connection/authenticate'( request: ConnectionAuthenticationRequest, ): 'allow' | 'deny' | undefined
+```
+
+Source: [`packages/client/connection/src/index.ts`](../../packages/client/connection/src/index.ts)
+
+<a id="connectionrequest--waterfall"></a>
+
+#### `connection/request` — waterfall
+
+Wrap an accepted Connection request before any RPC dispatch or event-stream opening. Listeners must call `next()` so later authentication and request-context plugins run.
+
+```ts cordis-catalog
+/**
+ * Wrap an accepted Connection request before any RPC dispatch or event-stream opening.
+ * Listeners must call `next()` so later authentication and request-context plugins run.
+ * @param request - request kind and immutable-at-entry HTTP headers.
+ * @mode waterfall
+ */
+'connection/request'(request: ConnectionRequestBoundary, next: () => Promise<void>): Promise<void>
+```
+
+Types: [ConnectionRequestBoundary](collaboration.md)
+
+Source: [`packages/client/connection/src/index.ts`](../../packages/client/connection/src/index.ts)
 
 <a id="webserver-events"></a>
 
@@ -133,14 +250,14 @@ Source: [`packages/host/webserver/src/index.ts`](../../packages/host/webserver/s
 
 #### `webserver/index-inject` — emit
 
-Collect structured index rows for one fresh index render. Listeners append JSON-safe rows to the mutable table; the fallback owner renders the completed table before applying legacy raw HTML transforms.
+Collect the structured index injection table. Emitted on every index render and every worker boot-payload request; listeners push their current rows, so a row's data is read fresh at emit time.
 
 ```ts cordis-catalog
 /**
- * Collect structured index rows for one fresh index render. Listeners append
- * JSON-safe rows to the mutable table; the fallback owner renders the
- * completed table before applying legacy raw HTML transforms.
- * @param table - the fresh row table for this index response.
+ * Collect the structured index injection table. Emitted on every index
+ * render and every worker boot-payload request; listeners push their
+ * current rows, so a row's data is read fresh at emit time.
+ * @param table - Mutable row table; listeners append in activation order.
  * @mode emit
  */
 'webserver/index-inject'(table: IndexInjection[]): void

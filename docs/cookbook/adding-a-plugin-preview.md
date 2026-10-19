@@ -33,7 +33,7 @@ import examplePreviewZh from './assets/example-preview.zh.svg'
 ['@deepseek-ai/dsh-example-bundle', { en: examplePreview, zh: examplePreviewZh }]
 ```
 
-Keep the map's required `en` and `zh` type. Do not add package metadata, a Host read method, exported preview resources, or a third-party declaration path. Use the [badge skill](../../packages/client/ui-plugin-manager/src/client/assets/badge-skill-preview.svg) and [voice input](../../packages/client/ui-plugin-manager/src/client/assets/voice-input-preview.svg) illustrations as examples. The voice transcript is explanatory sample content, not a recording result.
+Keep the map's required `en` and `zh` type. Do not add package metadata, a Host read method, exported preview resources, or a third-party declaration path. Use the badge skill and voice input illustrations in the map as examples. The voice transcript is explanatory sample content, not a recording result.
 
 ## 4. Keep the page contract
 

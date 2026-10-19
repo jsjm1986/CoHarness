@@ -104,7 +104,7 @@ describe('TerminalController', () => {
   it('creates the environment default shell and keeps an existing identity when that default changes', async () => {
     const { controller, agent, subprocess } = fixture({ shell: undefined })
     subprocess.terminalEnvironment.mockResolvedValue({ platform: 'posix', defaultShell: '/usr/local/bin/zsh' })
-    expect(await controller.environment(agent, signal())).toEqual({ cwd: '/workspace', maxCols: 200, maxRows: 100, maxInputBytes: 1000, scrollback: 100 })
+    expect(await controller.environment(agent, signal())).toEqual({ cwd: '/workspace', maxCols: 200, maxRows: 100, maxInputBytes: 1000, maxBufferedBytes: 100_000, scrollback: 100 })
     expect(subprocess.terminalEnvironment).not.toHaveBeenCalled()
     const created = await controller.create(agent, request, signal())
     expect(created.shell.path).toBe('/usr/local/bin/zsh')
@@ -121,13 +121,14 @@ describe('TerminalController', () => {
     subprocess.resolveExecutable.mockRejectedValue(new SubprocessExecutableNotFoundError('default shell was removed'))
     expect(await controller.environment(agent, signal())).toMatchObject({ cwd: '/workspace', maxInputBytes: 1000 })
     expect(await controller.list(agent.id)).toMatchObject([{ id, state: 'running' }])
-    const stream = controller.follow(agent, id, 'restored' as TerminalAttachmentId, signal())[Symbol.asyncIterator]()
+    const abort = new AbortController()
+    const stream = controller.follow(agent, id, 'restored' as TerminalAttachmentId, abort.signal)[Symbol.asyncIterator]()
     try {
       expect(await stream.next()).toMatchObject({ done: false, value: { type: 'snapshot', info: { id, state: 'running' } } })
       expect(subprocess.resolveExecutable).toHaveBeenCalledOnce()
       await expect(controller.create(agent, { ...request, id: 'new-terminal' as WebTerminalId }, signal())).rejects.toThrow('default shell was removed')
       expect(subprocess.spawnTerminal).toHaveBeenCalledOnce()
-    } finally { await stream.return?.() }
+    } finally { abort.abort(); await stream.return?.() }
   })
 
   it('honors cancellation before reading environment limits', async () => {
@@ -288,17 +289,23 @@ describe('TerminalController', () => {
     const { controller, agent, handle } = fixture({ maxInputBytes: 6 })
     await controller.create(agent, request, signal())
     const attachmentId = 'writer' as TerminalAttachmentId
-    const stream = controller.follow(agent, id, attachmentId, signal())[Symbol.asyncIterator]()
+    const abort = new AbortController()
+    const stream = controller.follow(agent, id, attachmentId, abort.signal)[Symbol.asyncIterator]()
     await stream.next()
     try {
       await controller.write(agent, id, attachmentId, '终端')
+      expect(await stream.next()).toMatchObject({ done: false, value: { type: 'ack', sequence: 1 } })
       expect(handle.write).toHaveBeenCalledWith('终端')
       await expect(controller.write(agent, id, attachmentId, '终端!')).rejects.toThrow('input exceeds')
       await controller.resize(agent, id, attachmentId, 200, 100)
+      for (;;) {
+        const frame = await stream.next()
+        if (frame.done !== true && frame.value.type === 'ack' && frame.value.sequence === 2) break
+      }
       expect(handle.resize).toHaveBeenCalledWith(200, 100)
       await controller.rename(agent, id, '  server logs  ')
       expect(await controller.list(agent.id)).toMatchObject([{ title: 'server logs', cols: 200, rows: 100 }])
-    } finally { await stream.return?.() }
+    } finally { abort.abort(); await stream.return?.() }
   })
 
   it.each([{ cols: 1.5, rows: 24 }, { cols: 201, rows: 24 }, { cols: 80, rows: 1.5 }, { cols: 80, rows: 0 }, { cols: 80, rows: 101 }])('rejects dimensions $cols × $rows before allocation or resize', async (dimensions) => {

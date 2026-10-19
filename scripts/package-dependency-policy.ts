@@ -57,15 +57,43 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
 
 /** Runtime exports that require every consumer to resolve the provider's shared peer instance. */
 const PEER_REQUIRED_HOST_EXPORTS = {
+  '@deepseek-ai/dsh-agent': ['installModelSelection'],
   '@deepseek-ai/dsh-agent-presets': ['environmentForAgent'],
-  '@deepseek-ai/dsh-fs': ['FsError'],
+  '@deepseek-ai/dsh-attachment': ['AttachmentError'],
   '@deepseek-ai/dsh-client-connection': ['createRpcStreamHttpHandler', 'RPC_STREAM_PATH'],
   '@deepseek-ai/dsh-commands/brand': ['CommandDefinitionId'],
-  '@deepseek-ai/dsh-host-apiproxy': ['DEFAULT_HISTORY_PAGE_TARGET_BYTES', 'toFetchHandler'],
+  '@deepseek-ai/dsh-credentials': ['credentialRef'],
+  '@deepseek-ai/dsh-fs': ['FsError'],
   '@deepseek-ai/dsh-host-apiproxy/api': ['RpcId', 'clientRequestSchema', 'serverRequestJson'],
+  '@deepseek-ai/dsh-host-apiproxy/fetch/handler': ['toFetchHandler'],
+  '@deepseek-ai/dsh-host-apiproxy/fetch/history-wire': ['DEFAULT_HISTORY_PAGE_TARGET_BYTES'],
+  '@deepseek-ai/dsh-llm': [
+    'AssistantStreamAccumulator',
+    'assistantStreamChunks',
+    'createUserMessage',
+    'errorChain',
+    'freezeMessage',
+    'ReasoningEffortId',
+  ],
+  '@deepseek-ai/dsh-native-command': [
+    'canOpenNativePath',
+    'nativeFileApplications',
+    'nativeFileManager',
+    'openNativeAssociatedPath',
+    'openNativeFileApplication',
+    'revealNativePath',
+  ],
   '@deepseek-ai/dsh-scope': ['scopeOf', 'scopeTarget'],
+  '@deepseek-ai/dsh-session': ['isAppendSurfaceEvent', 'SessionLogOffset', 'SessionSeq'],
+  '@deepseek-ai/dsh-session-query': ['SessionQueryError'],
+  '@deepseek-ai/dsh-session-title': ['SessionTitleInvalidError'],
+  '@deepseek-ai/dsh-session/fork': ['buildForkSeed'],
+  '@deepseek-ai/dsh-session/surface': ['hasConversationContent'],
   '@deepseek-ai/dsh-session-format/surface': ['SESSION_SURFACE_EVENT_TYPES'],
   '@deepseek-ai/dsh-settings': ['settingsNamespace'],
+  '@deepseek-ai/dsh-skill': ['isUserInvocable'],
+  '@deepseek-ai/dsh-userdoc-context': ['prepareUserDocAttachments', 'renderUserDocAttachment'],
+  '@deepseek-ai/dsh-util-time': ['canonicalClientTimeZone'],
 } as const satisfies HostDependencyExports
 
 /** Exact import specifier to reviewed runtime exports. */

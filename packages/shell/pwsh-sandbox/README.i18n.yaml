@@ -36,13 +36,13 @@
   en: 05e2abe4a25886fd
   zh: 3f7f1326dc3c1d3f
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/design-concept:
-  en: 0209cfdeae41c9b5
-  zh: f968694c21c96ec2
+  en: 0f27ab842e04e736
+  zh: ce8856021a062d27
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/source-map:
-  en: e7af8c5552806441
-  zh: 2ad6a90d828bbd73
+  en: 6402cfb4f2b02e71
+  zh: ffc728a5216e566c
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/main-flow:
-  en: 93f0842800cb0e52
+  en: da3574d1ebc253d7
   zh: cfde2946230560ee
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/invariants:
   en: 56b6b8d45b5fc463
@@ -64,7 +64,7 @@
   zh: da79315a26df214b
 /deepseek-ai-dsh-pwsh-sandbox/model-experience/confinement-works-denial-surfaces-as-command-failure/kv-cache-effect:
   en: 796af37d6f6add68
-  zh: 7975ff2a21c1b4f3
+  zh: ec4031df149581fe
 /deepseek-ai-dsh-pwsh-sandbox/known-limitations-and-deferred-work:
   en: 9afb663f40e5b8fd
   zh: 76ceb6bfb2a5148e

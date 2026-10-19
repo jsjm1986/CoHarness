@@ -33,6 +33,7 @@ export {
   SCHEDULE_CHANGE_VERSION,
   MIN_EVERY_INTERVAL_SECONDS,
   MAX_TITLE_LENGTH,
+  REQUIRED_TITLE_MESSAGE,
   ScheduleId,
   ScheduleInputError,
   ScheduleLogError,
