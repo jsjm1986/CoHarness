@@ -32,19 +32,22 @@ import {
   renderTranslationPairingRecord,
   translationPairPathsFromMeta,
   type TranslationPairPaths,
-  type TranslationPairingRecord,
 } from './translation-pairing-record.ts'
 
 const UNMERGED_ENTRY = /^(\d+) ([0-9a-f]+) ([123])\t([\s\S]+)$/
 
 /** A mechanically composed record and the exact merged owner contents it names. */
-export interface TranslationPairingMergeResult extends TranslationPairingRecord {
+export interface TranslationPairingMergeResult {
   /** Canonical generated sidecar text. */
   record: string
   /** Clean three-way merge of the English owner. */
   sourceContent: Buffer
+  /** Git blob object id of `sourceContent`, for staged-merge verification. */
+  sourceHash: string
   /** Clean three-way merge of the Simplified Chinese owner. */
   zhContent: Buffer
+  /** Git blob object id of `zhContent`, for staged-merge verification. */
+  zhHash: string
 }
 
 interface UnmergedStages {
