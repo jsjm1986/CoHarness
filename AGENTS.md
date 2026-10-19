@@ -132,7 +132,7 @@ Real-API tests and demos read `DEEPSEEK_API_KEY`, optional `DEEPSEEK_BASE_URL`, 
 
 ## Defensive patterns
 
-Read [docs/defensive-patterns.md](docs/defensive-patterns.md) before lifecycle, concurrency, subprocess, or teardown work.
+Read [docs/defensive-patterns/general.md](docs/defensive-patterns/general.md) before lifecycle, concurrency, subprocess, or teardown work.
 
 ## Type safety and documentation
 

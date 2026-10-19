@@ -46,7 +46,7 @@ Codex 有意重新实现了 Claude Code hook 协议的一个*子集*，包括相
 - **`runHook(bash, hook, options, now)`**：要求并转发调用方拥有的 `options.signal`，将 `options.payload` 序列化到 hook stdin（当且仅当 `options.trailingNewline` 时添加尾随换行符），在执行器凭证清理后合并 `options.env`（`dsh-shell` 受信任插件接口），遵循 hook 的 `timeoutSec`（否则使用 `options.defaultTimeoutMs`；默认值属于桥接，其配置默认为 lib 的 `DEFAULT_HOOK_TIMEOUT_MS` 10 分钟参考值），再解码结果（将 `options.expectedEventName` 传递给 codec）。因此取消会到达执行器的进程组终止与 join 边界。它绝不抛出异常：执行器拒绝（基础设施故障）会变为 `HookOutput`，其 `exitCode: undefined`（非阻塞错误）。`now` 会被注入，以便测试持续时间。
 - **`parseHookOutput(exitCode, stdout, stderr, expectedEventName?)`** 解码退出状态与结构化 stdout。退出码为 2 时，会以 stderr 内容阻止执行；其他失败不阻塞。匹配的 hook 特定权限决策会覆盖遗留顶层决策；事件判别字段不匹配或缺失只会抑制事件特定字段。顶层字段仍与事件无关，成功但非 JSON 的输出会留给桥接处理。
 - **`mergeHookOutputs(outputs)`**：折叠在一个点上匹配的每个 hook 结果：权限优先级为 **deny > ask > allow**，从首个 `continue:false` 起，halt 状态保持不变，阻塞原因用 `\n\n` 连接，`additionalContext`／`systemMessages` 按顺序累积。
-- **`createDetachedRuns()`**：跟踪以 emit 形式脱离运行的点是否完全停稳（没有扩展点等待它们）。桥接会跟踪每条运行链，包括 hook 运行及其 continuation，并将 `drain()` 注册为 effect disposer。drain 会触发 tracker 的 abort `signal`（因此仍在运行的 hook 进程会通过 `runHook` 终止，而不是等待到超时），随后在所有已跟踪链结算后 resolve。因此 `fiber.dispose()` resolve 时，不会遗留任何可能作用于已 dispose（资源释放）的上下文的脱离 hook 工作（见 [防御模式](../../../docs/defensive-patterns.zh.md)：dispose 必须达到完全停稳）。
+- **`createDetachedRuns()`**：跟踪以 emit 形式脱离运行的点是否完全停稳（没有扩展点等待它们）。桥接会跟踪每条运行链，包括 hook 运行及其 continuation，并将 `drain()` 注册为 effect disposer。drain 会触发 tracker 的 abort `signal`（因此仍在运行的 hook 进程会通过 `runHook` 终止，而不是等待到超时），随后在所有已跟踪链结算后 resolve。因此 `fiber.dispose()` resolve 时，不会遗留任何可能作用于已 dispose（资源释放）的上下文的脱离 hook 工作（见 [防御模式](../../../docs/defensive-patterns/general.zh.md)：dispose 必须达到完全停稳）。
 
 <a id="hook-session-events"></a>
 ## `hook/*` 会话事件

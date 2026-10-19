@@ -10,7 +10,7 @@ The install-lefthook and translation-pairing fixtures junction the repository's 
 
 ## Decision
 
-`scripts/test-fixture-cleanup.ts` owns junction-safe fixture teardown: `unlinkFixtureLinks` walks a tree and unlinks every reparse point before `removeFixtureSafely` removes the now link-free tree (with Windows async-handle retries). Every affected `afterEach` and the pre-`worktree remove` hook call it. The general rule lives in `docs/defensive-patterns.md`: remove link-shaped paths with unlink, reserve recursive `rmSync` for known real directories.
+`scripts/test-fixture-cleanup.ts` owns junction-safe fixture teardown: `unlinkFixtureLinks` walks a tree and unlinks every reparse point before `removeFixtureSafely` removes the now link-free tree (with Windows async-handle retries). Every affected `afterEach` and the pre-`worktree remove` hook call it. The general rule lives in `docs/defensive-patterns/general.md`: remove link-shaped paths with unlink, reserve recursive `rmSync` for known real directories.
 
 ## Alternatives considered
 

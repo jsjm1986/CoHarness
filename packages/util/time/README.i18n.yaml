@@ -4,7 +4,7 @@
 #   pnpm run verify-translation-pairing --write packages/util/time/README.md
 document:
   en: 40f6b4d9ef50f0f35eb9b143ed31cccce352647c
-  zh: d2926e09acbbbc9e7a3301d8077026c791177938
+  zh: 6aab63e55657fdfa1620d864c4bb9f3adb202240
 /:
   en: 1816778111548561
   zh: 460c67cc44e59372
@@ -19,7 +19,7 @@ document:
   zh: a51334d7e055a030
 /dsh-util-time/use-this-package:
   en: 1485e3ff508a8960
-  zh: 76fcb5d992e68f40
+  zh: 47ba622434bd2625
 /dsh-util-time/api:
   en: cbb4b726e939fc03
   zh: e9df4a7487433146

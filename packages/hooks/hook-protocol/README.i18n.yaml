@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/hooks/hook-protocol/README.md
 document:
-  en: d53c71df115a26a718620e6eb2eebe1b872f507c
-  zh: 7294404e3ba51d11e532a32e96c7f29fc6cc2688
+  en: 133f86fbce9a5fde3a66c3ca7d873585a008badf
+  zh: 08e498200ee5c9a88f593153c303288c1c4226c7
 /:
   en: 3e8a2282afaf885d
   zh: 0a51af1cad6486b4
@@ -21,8 +21,8 @@ document:
   en: 6768cd89854c253e
   zh: c9731ee2f96e607f
 /deepseek-ai-dsh-hook-protocol/primitives:
-  en: 2148d89416a3d6f4
-  zh: 411246b1ea954853
+  en: a86f538d00e8d0dc
+  zh: 6dd27ec021da4634
 /deepseek-ai-dsh-hook-protocol/hook-session-events:
   en: 48f770482ad1e4aa
   zh: 2e4332931c6b6172

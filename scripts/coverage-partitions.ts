@@ -98,7 +98,7 @@ export function parseCoveragePartitionCount(raw: string | undefined): number | u
  * @returns the budget in milliseconds, or undefined when unset.
  * @throws when the value is set and is not a positive integer.
  */
-export function parseCoverageTestTimeout(raw: string | undefined): number | undefined {
+function parseCoverageTestTimeout(raw: string | undefined): number | undefined {
   if (raw === undefined || raw === '') return undefined
   const parsed = Number.parseInt(raw, 10)
   if (!Number.isSafeInteger(parsed) || parsed < 1 || String(parsed) !== raw) {

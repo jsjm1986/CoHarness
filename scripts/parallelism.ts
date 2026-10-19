@@ -11,7 +11,7 @@
 import { availableParallelism } from 'node:os'
 
 /** Largest default worker count outside CI. */
-export const LOCAL_PARALLELISM_CAP = 12
+const LOCAL_PARALLELISM_CAP = 12
 
 /** Largest default Vitest fork count outside CI, for unit and coverage runs. */
 export const LOCAL_TEST_PARALLELISM_CAP = 48

@@ -22,7 +22,7 @@ This proposal can land independently of [a generic long-running tool runtime](..
 - `OutputCollector` keeps bounded buffers only and deletes the temp-file machinery.
 - `renderResult()` reports truncation without a filesystem path.
 - Tests cover tail truncation and no longer assert full-output file contents.
-- Security guidance in [docs/defensive-patterns.md](../../../../docs/defensive-patterns.md) stops treating private spill files as a model-visible interface.
+- Security guidance in [docs/defensive-patterns/general.md](../../../../docs/defensive-patterns/general.md) stops treating private spill files as a model-visible interface.
 
 ## What we give up
 

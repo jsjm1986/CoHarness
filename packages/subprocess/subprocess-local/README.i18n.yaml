@@ -4,7 +4,7 @@
 #   pnpm run verify-translation-pairing --write packages/subprocess/subprocess-local/README.md
 document:
   en: e04b4bbae62d2e4a3cfe35757288bdd58d45f21c
-  zh: 59e74bec5788049767bc2f409275036b667c5dc9
+  zh: 6f9c56e4092c64a4a35b1edda31a9d938be9b911
 /:
   en: 6569fcd132144a11
   zh: 2f632189747feb07
@@ -66,8 +66,8 @@ document:
   en: e290ccc9b3c92c08
   zh: e7633834bd22a05d
 /deepseek-ai-dsh-subprocess-local/known-limitations-and-deferred-work:
-  en: 91fe5a10b6b7b7b4
-  zh: 7a3f1c1db6c42ae9
+  en: 4b45e4e4ca67af72
+  zh: 16ee37f903854282
 /deepseek-ai-dsh-subprocess-local/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

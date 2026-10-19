@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/defensive-patterns/README.md
+document:
+  en: df2a79bd8c8f1324379a972ef927ec5701d0f97d
+  zh: e707c00a1cfc78bec3ff9c1be6bee562539073ca
+/defensive-patterns:
+  en: 7229c49e920aa5b3
+  zh: 1dd52db6b4d84952
+/defensive-patterns/why-these-rules:
+  en: 9837c76dfc15cb75
+  zh: 6ada7eec691a87ce

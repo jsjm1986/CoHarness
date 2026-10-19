@@ -22,7 +22,7 @@ Status: rejected — 完整输出恢复是真实的 bash 行为。未来的产�
 - `OutputCollector` 仅保留有界缓冲区，删除临时文件机制。
 - `renderResult()` 报告截断时不包含文件系统路径。
 - 测试覆盖尾部截断，不再断言完整输出文件的内容。
-- [docs/defensive-patterns.md](../../../../docs/defensive-patterns.zh.md) 中的安全指导不再将私有 spill 文件视为面向模型的接口。
+- [docs/defensive-patterns/general.md](../../../../docs/defensive-patterns/general.zh.md) 中的安全指导不再将私有 spill 文件视为面向模型的接口。
 
 ## 放弃的能力
 
