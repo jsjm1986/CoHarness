@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/remote-desktop/remote-desktop/README.md
+/:
+  en: 4e7bf01791ff8c58
+  zh: 2b4bcd9c3e6b9de9
+/deepseek-ai-dsh-remote-desktop:
+  en: f90d4eeffd4b4dc4
+  zh: 364e11e8f28892ee
+/deepseek-ai-dsh-remote-desktop/summary:
+  en: 506465374a16046b
+  zh: 5db8ac08457c63f4
+/deepseek-ai-dsh-remote-desktop/table-of-contents:
+  en: 53ea7b5fdd44fffc
+  zh: 8912cb230a25cb12
+/deepseek-ai-dsh-remote-desktop/service-api-ctx-remotedesktop:
+  en: d9d3a43f600fb9b0
+  zh: 4b8dff5f014a034e
+/deepseek-ai-dsh-remote-desktop/the-remote-desktop-events:
+  en: 73ca8283f81ffb81
+  zh: 33685234b2df40c3
+/deepseek-ai-dsh-remote-desktop/grant-model:
+  en: 4f81b5dd0744864c
+  zh: 93d5c14dd44731d6
+/deepseek-ai-dsh-remote-desktop/vocabulary:
+  en: ebcc61a4435d075d
+  zh: a5c0cb76050c3017
+/deepseek-ai-dsh-remote-desktop/model-experience:
+  en: 1bbe3e1c977ef074
+  zh: 37eeeb04d68ad0cb
+/deepseek-ai-dsh-remote-desktop/known-limitations-and-deferred-work:
+  en: b592e9b7d568ed6d
+  zh: 706613a7fbad0bbd
+/deepseek-ai-dsh-remote-desktop/dev-note:
+  en: 1fe9a0fdecf55d6e
+  zh: c14e781b41d07dc3
