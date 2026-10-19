@@ -1995,7 +1995,7 @@ export type PiAiThinkingTokenBudgetField = NonNullable<OpenAICompletionsCompat['
 
 - `inject`: `llm`
 - `refs`: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · [`SystemPromptUpdate`](../packages/llm/llm/src/index.ts) · [`ToolUpdate`](../packages/llm/llm/src/index.ts)
-- `source`: [`packages/test-support/llm-replay/src/index.ts:1154`](../packages/test-support/llm-replay/src/index.ts)
+- `source`: [`packages/test-support/llm-replay/src/index.ts:1227`](../packages/test-support/llm-replay/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the {@link ReplayConfig} inputs, each defaulting to its `DSH_SNAPSHOT_*` env var in `apply`. */
@@ -2203,6 +2203,91 @@ export interface ReconnectConfig {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-mcp-client -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-memory -->
+<a id="deepseek-aidsh-memory"></a>
+
+## `@deepseek-ai/dsh-memory`
+
+- `inject`: `storageDomain`
+- `source`: [`packages/memory/memory/src/index.ts:87`](../packages/memory/memory/src/index.ts)
+
+```ts config-catalog
+/** Validated service configuration; field docs are the model-facing meaning. */
+export interface Config {
+  /** `personal` offers personal+workspace scopes, `project` one shared scope. */
+  space: 'personal' | 'project'
+  /** Content bound in UTF-8 bytes, inclusive. */
+  entryMaxBytes: number
+  /** Summary bound in Unicode code points, inclusive. */
+  summaryMaxChars: number
+  /** Entry cap per scope; creates refuse at the limit, replaces and deletes never do. */
+  maxEntriesPerScope: number
+  /** Search result cap. */
+  searchMaxResults: number
+  /** Enable the background extraction curation pass; default off. */
+  extraction: boolean
+  /** Enable the scheduled consolidation curation pass; default off. */
+  consolidation: boolean
+  /** Enable per-question recall injection in `memory-context`; default off. */
+  recall: boolean
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-memory-context -->
+<a id="deepseek-aidsh-memory-context"></a>
+
+## `@deepseek-ai/dsh-memory-context`
+
+- `inject`: `memory` · `tools`
+- `source`: [`packages/memory/memory-context/src/index.ts:80`](../packages/memory/memory-context/src/index.ts)
+
+```ts config-catalog
+/** Model-facing saved-memory catalog configuration. */
+export interface Config {
+  /** UTF-8 byte bound of the complete catalog message text, inclusive. */
+  catalogMaxBytes: number
+  /** Publish the catalog and run recall inside delegated sessions too. */
+  delegatedSessions: boolean
+  /** UTF-8 byte bound of one injected recall message, inclusive. */
+  recallMaxBytes: number
+  /** UTF-8 byte bound of one recalled entry's injected content, inclusive. */
+  recallEntryMaxBytes: number
+  /** UTF-8 byte bound of the human-message text shown to the selector, inclusive. */
+  recallInputMaxBytes: number
+  /** UTF-8 byte bound of all recall text injected into one session, inclusive. */
+  recallSessionMaxBytes: number
+  /** Maximum entries one recall may select (selector cap is the same value). */
+  recallMaxSelections: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory-context -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-memory-curation -->
+<a id="deepseek-aidsh-memory-curation"></a>
+
+## `@deepseek-ai/dsh-memory-curation`
+
+- `inject`: `memory`
+- `source`: [`packages/memory/memory-curation/src/index.ts:54`](../packages/memory/memory-curation/src/index.ts)
+
+```ts config-catalog
+/** Curation scheduling and write budgets. Feature switches live in the `memory` settings namespace. */
+export interface Config {
+  /** Maximum `memory_save`/`memory_delete` calls one extraction pass may commit. */
+  extractionMaxWrites: number
+  /** Model-request bound for either pass: one request plus tool rounds. */
+  maxToolRounds: number
+  /** Maximum `memory_save`/`memory_delete` calls one consolidation run may commit. */
+  consolidationMaxWrites: number
+  /** Committed writes in a scope that make it consolidation-eligible. */
+  consolidationMinChanges: number
+  /** Minimum milliseconds between consolidation runs of one scope. */
+  consolidationIntervalMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory-curation -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-message-feedback -->
 <a id="deepseek-aidsh-message-feedback"></a>
@@ -2787,7 +2872,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-session-persistence-jsonl`
 
-- `source`: [`packages/session/session-persistence-jsonl/src/index.ts:90`](../packages/session/session-persistence-jsonl/src/index.ts)
+- `source`: [`packages/session/session-persistence-jsonl/src/index.ts:94`](../packages/session/session-persistence-jsonl/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config for the JSONL backend's root and physical encoding. */
@@ -2802,6 +2887,8 @@ export interface Config {
   root: string
   /** Physical encoding; defaults to checksummed Zstandard frames. */
   compression?: JsonlCompression
+  /** Maximum concurrent filesystem reads while enumerating sessions; defaults to {@link DEFAULT_LIST_CONCURRENCY}. */
+  listConcurrency?: number
 }
 
 /** Physical encoding selected for JSONL session artifacts. */
@@ -3635,7 +3722,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:260`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:261`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */
@@ -4078,7 +4165,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tool-session-query`
 
 - `inject`: `tools` · `systemPrompt` · `sessionQuery`
-- `source`: [`packages/session-query/tool-session-query/src/index.ts:29`](../packages/session-query/tool-session-query/src/index.ts)
+- `source`: [`packages/session-query/tool-session-query/src/index.ts:41`](../packages/session-query/tool-session-query/src/index.ts)
 
 ```ts config-catalog
 /** Deployment-owned search count and timeout bounds. */
@@ -4087,6 +4174,14 @@ export interface Config {
   maxSearchResults?: number
   /** Cooperative full-text search deadline in milliseconds. Defaults to 30000. */
   searchTimeoutMs?: number
+  /** Character budget for a handoff briefing's local tail. Defaults to 24000. */
+  handoffChars?: number
+  /** Whether an auxiliary model may compress the surface into a capsule. Defaults to true. */
+  handoffExtraction?: boolean
+  /** Serialized-conversation cap beyond which extraction is skipped. Defaults to 60000. */
+  handoffExtractChars?: number
+  /** Cooperative deadline for one handoff call in milliseconds. Defaults to 120000. */
+  handoffTimeoutMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-session-query -->
@@ -4792,6 +4887,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-api-remotes` | — | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
 | `@deepseek-ai/dsh-authorization` | `credentials` | [`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts) |
 | `@deepseek-ai/dsh-browser-use` | — | [`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts) |
+| `@deepseek-ai/dsh-client-file-upload` | `agents` · `attachments` · `commands` · `connection` | [`packages/client/file-upload/src/index.ts`](../packages/client/file-upload/src/index.ts) |
 | `@deepseek-ai/dsh-client-locale` | — | [`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts) |
 | `@deepseek-ai/dsh-client-modules` | `loader` | [`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts) |
 | `@deepseek-ai/dsh-client-runtime` | — | [`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts) |
@@ -4810,12 +4906,14 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-input-trigger` | — | [`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-jobs` | — | [`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-layout` | — | [`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-memory` | — | [`packages/client/ui-memory/src/index.ts`](../packages/client/ui-memory/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-message-feedback` | — | [`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-model-selection` | — | [`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-open-in-app` | — | [`packages/client/ui-open-in-app/src/index.ts`](../packages/client/ui-open-in-app/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-permission-presets` | — | [`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-plan` | — | [`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-plugin-market` | — | [`packages/client/ui-plugin-market/src/index.ts`](../packages/client/ui-plugin-market/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-project-activity` | — | [`packages/client/ui-project-activity/src/index.ts`](../packages/client/ui-project-activity/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-reference` | — | [`packages/client/ui-reference/src/index.ts`](../packages/client/ui-reference/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-renderer` | — | [`packages/client/ui-renderer/src/index.ts`](../packages/client/ui-renderer/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-schedule` | — | [`packages/client/ui-schedule/src/index.ts`](../packages/client/ui-schedule/src/index.ts) |
@@ -4882,6 +4980,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-terminal` | — | [`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts) |
 | `@deepseek-ai/dsh-tool-call-timeout-policy` | `tools` | [`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts) |
 | `@deepseek-ai/dsh-tool-cordis` | `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` | [`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts) |
+| `@deepseek-ai/dsh-tool-memory` | `memory` · `tools` · `systemPrompt` | [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts) |
 | `@deepseek-ai/dsh-tool-schedule` | `tools` | [`packages/schedule/tool-schedule/src/index.ts`](../packages/schedule/tool-schedule/src/index.ts) |
 | `@deepseek-ai/dsh-tool-subagent-control` | `tools` · `subagents` | [`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts) |
 | `@deepseek-ai/dsh-tool-working-directory` | `tools` · `workingDirectory` | [`packages/session/tool-working-directory/src/index.ts`](../packages/session/tool-working-directory/src/index.ts) |

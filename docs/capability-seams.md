@@ -63,6 +63,9 @@ flowchart LR
   svc_userDocs["ctx.userDocs<br/>User-uploaded document storage"]
   pkg_userdoc_local["userdoc-local"]
   pkg_tool_userdoc["tool-userdoc"]
+  pkg_client_file_upload["client-file-upload"]
+  svc_fileUploads["ctx.fileUploads<br/>Session-scoped staged upload receipts"]
+  pkg_commands["commands"]
   pkg_llm["llm"]
   svc_llm["ctx.llm<br/>LLM adapter registry"]
   pkg_llm_deepseek["llm-deepseek"]
@@ -162,7 +165,6 @@ flowchart LR
   svc_planMode["ctx.planMode<br/>Plan collaboration state"]
   pkg_agent_preset_registry["agent-preset-registry"]
   svc_agentPresets["ctx.agentPresets<br/>Per-session agent composition"]
-  pkg_commands["commands"]
   svc_commands["ctx.commands<br/>Human command registry"]
   pkg_session_projection["session-projection"]
   svc_sessionProjections["ctx.sessionProjections<br/>Session projection units"]
@@ -324,6 +326,7 @@ flowchart LR
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
   pkg_browser_use --> svc_browserUse
+  pkg_client_file_upload --> svc_fileUploads
   pkg_collaboration --> svc_collaboration
   pkg_collaboration_gateway --> svc_collaboration
   pkg_commands --> svc_commands
@@ -502,6 +505,7 @@ flowchart LR
   svc_executionAuthority --> pkg_host_apiproxy
   svc_executionAuthority --> pkg_subagent
   svc_executionAuthority --> pkg_subagent_in_process_driver
+  svc_fileUploads --> pkg_commands
   svc_fs --> pkg_tool_fs
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
@@ -674,6 +678,7 @@ flowchart LR
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | One provider-owned name per service instance. Each provider also owns its model tools; the service has no common action API, runtime selection, or Session workflow lock. |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content. |
 | `ctx.userDocs` | `seam` | [`userdoc`](../packages/attachment/userdoc) | [`userdoc-local`](../packages/attachment/userdoc-local) | [`tool-userdoc`](../packages/attachment/tool-userdoc) | - | Uploads land as real named files inside a directory the tool authorization policy already grants. The personal-document Consumer adds bounded discovery and text reads without exposing host paths; ordinary filesystem tools remain available for attached documents. |
+| `ctx.fileUploads` | `core` | [`client-file-upload`](../packages/client/file-upload) | - | [`commands`](../packages/interaction/commands) | - | Accepts streamed browser bytes and encoded Remote uploads, stages per-Session receipts, binds them to prompt requests, and retires them on delivery observation. |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | Adapters register provider implementations; the loop and compaction call the provider-neutral stream service. |
 | `ctx.deepseekLlmApiExtensions` | `seam` | [`deepseek-llm-api-extensions`](../packages/llm/deepseek-llm-api-extensions) | - | [`llm-deepseek`](../packages/llm/llm-deepseek), [`session-log-deepseek`](../packages/session/session-log-deepseek), [`plugin-package-inventory-deepseek`](../packages/llm/plugin-package-inventory-deepseek) | - | The registry owns additive provider-specific request fields and their post-acceptance callbacks; the official adapter prepares them, while extension plugins own field semantics. |
 | `ctx.modelAccess` | `seam` | [`model-access`](../packages/llm/model-access) | - | `apiproxy` | - | An optional deployment-owned policy decides exact provider/model routes; the gateway instance supplies the implementation, while apiproxy uses the decision for catalog and selection checks. |

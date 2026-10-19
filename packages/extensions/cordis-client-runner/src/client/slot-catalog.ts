@@ -2655,6 +2655,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-plugin-manager PluginRefreshToast id \'plugin-manager.refresh-toast\'',
       'client-ui-schedule ScheduleDeleteToast id \'schedule.delete-toast\'',
+      'client-ui-settings-general HostReleasePrompt id \'host-release-change\'',
       'client-ui-shortcuts ShortcutReference id \'shortcuts\'',
       'client-ui-sidebar-terminal TerminalCleanup',
       'client-ui-usage-alert UsageAlert id \'usage-alert\'',

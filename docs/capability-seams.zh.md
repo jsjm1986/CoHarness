@@ -65,6 +65,9 @@ flowchart LR
   svc_userDocs["ctx.userDocs<br/>User-uploaded document storage"]
   pkg_userdoc_local["userdoc-local"]
   pkg_tool_userdoc["tool-userdoc"]
+  pkg_client_file_upload["client-file-upload"]
+  svc_fileUploads["ctx.fileUploads<br/>Session-scoped staged upload receipts"]
+  pkg_commands["commands"]
   pkg_llm["llm"]
   svc_llm["ctx.llm<br/>LLM adapter registry"]
   pkg_llm_deepseek["llm-deepseek"]
@@ -164,7 +167,6 @@ flowchart LR
   svc_planMode["ctx.planMode<br/>Plan collaboration state"]
   pkg_agent_preset_registry["agent-preset-registry"]
   svc_agentPresets["ctx.agentPresets<br/>Per-session agent composition"]
-  pkg_commands["commands"]
   svc_commands["ctx.commands<br/>Human command registry"]
   pkg_session_projection["session-projection"]
   svc_sessionProjections["ctx.sessionProjections<br/>Session projection units"]
@@ -326,6 +328,7 @@ flowchart LR
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
   pkg_browser_use --> svc_browserUse
+  pkg_client_file_upload --> svc_fileUploads
   pkg_collaboration --> svc_collaboration
   pkg_collaboration_gateway --> svc_collaboration
   pkg_commands --> svc_commands
@@ -504,6 +507,7 @@ flowchart LR
   svc_executionAuthority --> pkg_host_apiproxy
   svc_executionAuthority --> pkg_subagent
   svc_executionAuthority --> pkg_subagent_in_process_driver
+  svc_fileUploads --> pkg_commands
   svc_fs --> pkg_tool_fs
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
@@ -676,6 +680,7 @@ flowchart LR
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | 每个服务实例对应一个提供方拥有的名称。各提供方也拥有自己的模型工具；服务没有通用操作 API、运行时选择或 Session 工作流锁。 |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | 宿主会在会话事件之前提交已接受的图片；提供方适配器将已授权的持久引用解析为提供方原生内容。 |
 | `ctx.userDocs` | `seam` | [`userdoc`](../packages/attachment/userdoc) | [`userdoc-local`](../packages/attachment/userdoc-local) | [`tool-userdoc`](../packages/attachment/tool-userdoc) | - | 上传落成真实的命名文件，且位于工具授权策略已经放行的目录内。个人文档 Consumer 增加有界发现和文本读取，不暴露主机路径；已附加文档仍可使用常规文件系统工具。 |
+| `ctx.fileUploads` | `core` | [`client-file-upload`](../packages/client/file-upload) | - | [`commands`](../packages/interaction/commands) | - | 接受流式浏览器字节与经编码的 Remote 上传，按会话暂存回执，将其绑定到提示词请求，并在送达确认后退役。 |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | 适配器注册提供方实现；agent loop（智能体循环）与压缩功能调用提供方无关的流服务。 |
 | `ctx.deepseekLlmApiExtensions` | `seam` | [`deepseek-llm-api-extensions`](../packages/llm/deepseek-llm-api-extensions) | - | [`llm-deepseek`](../packages/llm/llm-deepseek), [`session-log-deepseek`](../packages/session/session-log-deepseek), [`plugin-package-inventory-deepseek`](../packages/llm/plugin-package-inventory-deepseek) | - | 注册表负责附加的、特定于提供方的请求字段及其接受后回调；官方适配器负责准备这些字段，而扩展插件负责字段语义。 |
 | `ctx.modelAccess` | `seam` | [`model-access`](../packages/llm/model-access) | - | `apiproxy` | - | 可选的部署侧策略决定精确的提供方／模型路由；网关实例提供实现，而 apiproxy 使用该决策检查目录和模型选择。 |
