@@ -1,28 +1,29 @@
 - banner:
   - navigation "Session hierarchy":
-    - button "Read the attached file with" [disabled]
-  - img
+    - "button \"Uploaded document \\\"poem.txt\\\" at \\\"{{documents}}\" [disabled]"
   - text: Standard mode
-  - button "More actions":
-    - img
-  - button "Open right sidebar":
-    - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
+  - button "Open right sidebar":
+    - img
 - button "System prompt":
   - img
   - img
   - text: System prompt
-- text: poem.txt TXT 16B
 - button "reference-1.png, click to view original":
   - img "reference-1.png"
-- text: Read the attached file with the read tool, reply with exactly the single word it contains, and stop. {{clock}}
+- text: "Uploaded document \"poem.txt\" at \"{{documents}}/poem.txt\"; contents inlined verbatim: UPLOAD_ROUND_OK Read the attached file with the read tool, reply with exactly the single word it contains, and stop."
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "1 tool call":
-  - text: 1 tool call
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
   - img
+- button "Read files"
 - paragraph: UPLOAD_ROUND_OK
 - button "Copy":
   - img
@@ -32,25 +33,33 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Usage 17.3K tok":
+- button "Usage 17.3K tok · Cache hit 50.7%":
   - img
-  - text: Usage 17.3K tok
-- button "Ran for {{duration}}":
+  - text: Usage 17.3K tok · Cache hit 50.7%
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- textbox "Message the agent"
+- button "Add images or documents":
   - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
-- textbox "Message or run a task, / commands, @ files or sessions"
-- button "Add files or run commands":
+- button "Choose from Documents":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash-Vision-Exp, reasoning effort high":
   - text: DeepSeek-V4-Flash-Vision-Exp high
   - img
-- button "Send message" [disabled]
-- button "1 turns 2 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns 2 steps{{throughput}} tok/s
-- button "17.3K tok · Cache hit 51%":
-  - img
-  - text: 17.3K tokCache hit 51%
 - button "1% of context used": 1%
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "17.3K tok · Cache hit 51%":
+    - img
+    - text: 17.3K tokCache hit 51%
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

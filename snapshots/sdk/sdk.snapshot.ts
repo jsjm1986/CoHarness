@@ -1,7 +1,7 @@
 /**
  * Keyless snapshot coverage for the TypeScript SDK path: each scenario spawns
  * the real `dsh --profile sdk` runtime through
- * `@deepseek-ai/dsh-sdk-client`, drives one turn over stdio JSON-RPC,
+ * `@deepseek-ai/dsh-sdk-client`, drives recorded turns over stdio JSON-RPC,
  * and pins the SDK `RunResult`, the complete notification stream, and the
  * persisted session logs. Replay serves recorded model
  * responses via `llm-replay` (`cordis.snapshot.yml`); `DSH_SNAPSHOT=record`
@@ -133,6 +133,9 @@ interface SdkAssertions {
 }
 
 const SDK_ASSERTIONS: Readonly<Record<string, SdkAssertions>> = {
+  'tool-scheduler-recovery': {
+    patches: [fileURLToPath(new URL('./tool-scheduler-recovery/runtime.cordis.yml', import.meta.url))],
+  },
   'tool-error-details': {
     patches: [fileURLToPath(new URL('./tool-error-details/runtime.cordis.yml', import.meta.url))],
     expectedFinalResponse: 'ERROR_DETAILS_OK',
@@ -926,6 +929,36 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
         }
         console.error(`SDK snapshot evidence: ${evidence}`)
       })
+      if (scenario.name === 'tool-scheduler-recovery') {
+        expect(results).toHaveLength(2)
+        const events = results.flatMap(result => result.events)
+        expect(results[1]?.finalResponse).toBe('SCHEDULER_RECOVERY_OK')
+        const turnEnds = events.filter(event => event.type === 'turn/end')
+        expect(turnEnds.map(event => event.data['reason'])).toEqual([
+          { kind: 'error', error: { message: 'Snapshot scheduler preparation failed', code: 'UNKNOWN' } },
+          { kind: 'completed' },
+        ])
+        expect(events.filter(event => event.type === 'tool/call').map(event => event.data['callId']))
+          .toEqual(['scheduler-complete', 'scheduler-fail'])
+        const outcomes = events.filter(event => event.type === 'tool/result')
+        expect(outcomes.map(event => event.data['message'])).toMatchObject([
+          { role: 'tool', toolCallId: 'scheduler-complete', isError: false },
+          { role: 'tool', toolCallId: 'scheduler-fail', isError: true },
+          { role: 'tool', toolCallId: 'scheduler-unstarted', isError: true },
+        ])
+        expect(outcomes.slice(1).map(event => event.data['error'])).toMatchObject([
+          { code: 'TOOL_OUTCOME_UNKNOWN' },
+          { code: 'TOOL_NOT_STARTED' },
+        ])
+        expect(events.filter(event => event.type === 'todo/write')).toHaveLength(1)
+        expect(notifications.filter(notification => notification.method === 'session.status')
+          .map(notification => notification.params.status))
+          .toEqual(['running', 'idle', 'running', 'idle'])
+        expect(notifications.flatMap(notification => {
+          const event = notificationEvent(notification)
+          return event?.type === 'turn/end' ? [event.data] : []
+        })).toEqual(turnEnds.map(event => event.data))
+      }
       if (scenario.name === 'subagent-activation-limit') {
         expect(ordered).toHaveLength(2)
         const denied = records(ordered[0]!.content).find(record => record.type === 'tool/result'

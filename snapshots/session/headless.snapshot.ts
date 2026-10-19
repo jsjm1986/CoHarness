@@ -701,7 +701,10 @@ async function verifyBackgroundConfinementFailure(log: string, cwd: string): Pro
     ? [event.data.message] : [])
   const started = results.find(result => result.toolCallId === 'async-confinement-start')
   const inspected = results.find(result => result.toolCallId === 'async-confinement-result')
-  expect(started).toMatchObject({ isError: false, content: [{ type: 'text', text: 'started background job bash-1' }] })
+  expect(started).toMatchObject({
+    isError: false,
+    content: [{ type: 'text', text: expect.stringMatching(/^started background job bash-[0-9a-f]{16}$/) }],
+  })
   expect(inspected?.isError).toBe(false)
   const text = inspected?.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')
   expect(text).toContain('[status: failed,')
