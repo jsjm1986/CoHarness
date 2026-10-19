@@ -415,7 +415,6 @@ function escapeText(value: string): string {
 function catalogHistory(agent: Agent): { visibleDigest?: string; published: boolean } {
   const visible = new Set(agent.session.surface.nodes)
   let published = false
-  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of agent.session.snapshotEvents().toReversed()) {
     if (event.type !== 'user/message' || event.data.source.kind !== 'memory-catalog') continue
     const parsed = readCatalog(event.data.source)
@@ -573,11 +572,9 @@ async function runRecall(
     if (entry === undefined) continue
     selected.push({ row, address, content: truncateBytes(entry.content, config.recallEntryMaxBytes) })
   }
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- Abort can land during the awaited reads above.
   if (selected.length === 0 || signal.aborted) return
 
   const text2 = fitRecall(selected, Math.min(config.recallMaxBytes, remaining))
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- Abort can land during the awaited reads above.
   if (text2 === undefined || signal.aborted) return
   agent.inject(createUserMessage({
     content: [{ type: 'text', text: text2 }],
@@ -620,7 +617,6 @@ function recallState(agent: Agent): { keys: Set<string>; read: Set<string>; byte
   const keys = new Set<string>()
   const read = new Set<string>()
   let bytes = 0
-  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of agent.session.snapshotEvents().toReversed()) {
     if (event.type === 'tool/call' && event.data.name === 'memory_read') {
       const key = readKeyOf(event.data.arguments)

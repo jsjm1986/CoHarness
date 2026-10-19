@@ -1650,7 +1650,6 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
     },
   ])('fails generic when inspecting $name is unsafe', async ({ secrets, diagnostic, failure }) => {
     const mounted = await mount()
-    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- hostile unknown rejection is the scenario
     FakeQuery.sessionSearch = () => Promise.reject(failure())
     const warn = vi.spyOn(mounted.ctx.logger, 'warn').mockImplementation(() => undefined)
 

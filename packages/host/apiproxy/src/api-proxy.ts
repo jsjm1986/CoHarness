@@ -1120,7 +1120,6 @@ function isConversationContentEvent(event: SessionEvent): boolean {
  * @returns true while no visible conversation event has been recorded.
  */
 function sessionBlank(session: Session): boolean {
-  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   return !session.snapshotEvents().some(isConversationContentEvent)
 }
 
@@ -1173,7 +1172,6 @@ function sessionListFields(header: SessionHeader, events: readonly SessionEvent[
 
 /** SessionSummary projection for attached (in-memory) sessions. */
 function summarize(session: Session, running: boolean): SessionSummary {
-  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   const metadata = sessionListMetadata(session.snapshotEvents())
   return {
     sessionId: session.id,
@@ -1181,7 +1179,6 @@ function summarize(session: Session, running: boolean): SessionSummary {
     running,
     blank: metadata.blank,
     ...(metadata.visibleContentSeq === null ? {} : { visibleContentSeq: metadata.visibleContentSeq }),
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     ...sessionListFields(session.header, session.snapshotEvents()),
   }
 }
@@ -1609,7 +1606,6 @@ const HISTORY_TAIL_CACHE_MAX_ENTRIES = 16
 const HISTORY_TAIL_CACHE_MAX_BYTES = 2 * 1024 * 1024
 
 function historySourceEvents(source: HistorySource): readonly SessionEvent[] {
-  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   return source.kind === 'attached' ? source.session.snapshotEvents() : source.events
 }
 
@@ -2807,7 +2803,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       // request's event is therefore the newest asked event that is still
       // undecided, unclaimed by another pending entry, and — when the ask
       // names a call — carries the same callId.
-      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const events = req.agent.session.snapshotEvents()
       const claimed = new Set<ApprovalRequestId>()
       for (const entry of pendingApprovals.values()) claimed.add(entry.approvalId)
@@ -2882,7 +2877,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       return {
         id: attached.id,
         header: attached.header,
-        // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
         events: [...attached.snapshotEvents()],
       }
     }
@@ -3159,7 +3153,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   ): Promise<SessionHistoryIndex | undefined> {
     const attached = ctx.sessions.get(sessionId)
     if (attached !== undefined) {
-      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const events = attached.snapshotEvents()
       const index = historyIndexFromEvents(events, `attached:${String(events.at(-1)?.seq ?? -1)}`, maxItems)
       return {
@@ -3246,7 +3239,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     if (source.kind === 'detached') {
       return { header: source.header, events: source.presenterEvents ?? source.events }
     }
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     return { header: source.session.header, events: source.session.snapshotEvents() }
   }
 
@@ -3278,7 +3270,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         : undefined
       return { events: source.events, ...projections === undefined ? {} : { projections } }
     }
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const events = [...source.session.snapshotEvents()]
     const projections = includeProjections ? projectionsFor(ctx, source.session) : undefined
     return { events, ...projections === undefined ? {} : { projections } }
@@ -6219,7 +6210,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
             const view = viewFor(
               ctx, event,
-              // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
               callId => openCalls.get(session.id)?.get(callId) ?? backscanArgs(session.snapshotEvents(), callId),
               ctx.agents.get(session.id),
             )
@@ -6399,7 +6389,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               type: 'host/session-added',
               sessionId: session.id,
               blank: sessionBlank(session),
-              // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
               ...sessionListFields(session.header, session.snapshotEvents()),
             }))
           }
