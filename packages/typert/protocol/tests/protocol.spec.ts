@@ -321,8 +321,10 @@ describe('typert-protocol Remote declarations', () => {
     expect(() => Remote('bad name')).toThrow('export name')
     expect(() => Remote('.')).toThrow('export name')
     expect(() => Remote('..')).toThrow('export name')
-    expect(() => Remote({ mode: 'unary' } as unknown as { mode: 'stream' })).toThrow('Remote options require')
-    expect(() => Remote({ mode: 'stream', extra: true } as unknown as { mode: 'stream' })).toThrow('Remote options require')
+    const unaryMode: string = 'unary'
+    expect(() => Remote({ mode: unaryMode } as { mode: 'stream' })).toThrow('Remote options require')
+    const extraOptions: object = { mode: 'stream', extra: true }
+    expect(() => Remote(extraOptions as { mode: 'stream' })).toThrow('Remote options require')
     const bogusMode: string = 'duplex'
     expect(() => Remote({ mode: bogusMode } as { mode: 'stream' }))
       .toThrow('Remote options require name, mode: "stream", or resources')

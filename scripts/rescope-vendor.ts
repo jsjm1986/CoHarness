@@ -158,6 +158,13 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/host/apiproxy/tests/api-proxy-config.spec.ts', upstream: ['cordis'] },
   { file: 'packages/typert/protocol/src/types.ts', upstream: ['cordis'] },
   { file: 'scripts/gen-cordis-catalog.ts', upstream: ['cordis'] },
+  // The inspector bridge protocol names its own topics and ops `cordis/tree`
+  // and `cordis-tree/*`; they are wire ids on the bridge channel, not package
+  // specifiers, and both ends of the bridge live in this repository.
+  { file: 'packages/experimental/inspector/src/shared/bridge/messages/cordis.ts', upstream: ['cordis'] },
+  { file: 'packages/experimental/inspector/tests/cordis-query.host.spec.ts', upstream: ['cordis'] },
+  { file: 'packages/experimental/inspector/tests/cordis-tree.host.spec.ts', upstream: ['cordis'] },
+  { file: 'packages/experimental/inspector/tests/plugin.client.spec.ts', upstream: ['cordis'] },
   // The UI locale namespace and input-trigger source id are product keys.
   { file: 'packages/extensions/ui-cordis/src/client/CordisActionRow.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/CordisDefineRow.tsx', upstream: ['cordis'] },

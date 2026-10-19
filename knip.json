@@ -188,6 +188,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
       ]
     },
     "packages/client/ui-primitives": {
@@ -1700,6 +1703,16 @@
         "src/**/*.ts",
         "src/**/*.tsx",
         "tests/**/*.tsx"
+      ]
+    },
+    "packages/typert/protocol": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ]
     }
   }

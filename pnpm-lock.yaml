@@ -2821,6 +2821,10 @@ importers:
         version: 8.18.1
 
   packages/client/file-upload:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~

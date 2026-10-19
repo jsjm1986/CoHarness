@@ -2569,9 +2569,6 @@
     "2f2c5a76501f35183d9708040f1f79cc30c8c9da5278823aa19ece7af67f5812": 1,
     "ec229b2914993fe3b9cabeffe88aaca92dac0aed964d27a4704cd64202044127": 2
   },
-  "packages/typert/protocol/src/index.ts": {
-    "35e98b658709d2dead42b6fc80150e0cac9075c55ea512cae80951983bd1f69c": 1
-  },
   "packages/typert/protocol/src/remote-error.ts": {
     "6fe9024d30e0d4757a348b83d246925b3f5aeaf2e79a0eff4bf12f3c9fb5826b": 1
   },

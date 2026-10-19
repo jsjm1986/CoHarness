@@ -106,9 +106,9 @@ const REPLAY_PROVIDERS = [{
 // Mirrored from packages/client/ui-settings-models/src/onboarding-copy.ts; the
 // scaffold inlines them so the test harness stays independent of the client
 // package graph.
-export const WELCOME_NOTICE_SETTINGS_NAMESPACE = 'ui-onboarding'
-export const WELCOME_NOTICE_ACK_FIELD = 'welcomeNoticeVersion'
-export const WELCOME_NOTICE_VERSION = '2026-09-28.1'
+const WELCOME_NOTICE_SETTINGS_NAMESPACE = 'ui-onboarding'
+const WELCOME_NOTICE_ACK_FIELD = 'welcomeNoticeVersion'
+const WELCOME_NOTICE_VERSION = '2026-09-28.1'
 
 /**
  * The routes a shipped composition always has, with no ability to stream.
