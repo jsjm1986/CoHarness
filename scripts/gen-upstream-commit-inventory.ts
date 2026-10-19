@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { loadUpstreamSyncManifest, resolveTagCommit } from './verify-upstream-sovereignty.ts'
+import { readUpstreamCommitInventory } from './upstream-commit-inventory.ts'
 
 const root = resolve(import.meta.dirname, '..')
 
@@ -25,24 +26,6 @@ function git(args: string[]): string {
   return run.stdout
 }
 
-const PACKAGE_DIR = /^packages\/([0-9A-Za-z._-]+\/[0-9A-Za-z._-]+)\//
-
-/** One upstream commit and the manifest bucket its touched packages fall in. */
-interface InventoryCommit {
-  sha: string
-  subject: string
-  /** `<group>/<pkg>` keys the commit touches; empty when none. */
-  packages: string[]
-  /**
-   * `carried` when any touched package is tracked/adapted/replaced on disk,
-   * `newUpstream` when some touched package is absent from the manifest
-   * entirely (added upstream after the synced tag), `upstreamOnly` when all
-   * touched packages are registered not-carried, `owned` when all touched
-   * packages are owned, `none` when the commit touches no package.
-   */
-  bucket: 'carried' | 'newUpstream' | 'upstreamOnly' | 'owned' | 'none'
-}
-
 function main(args: string[]): number {
   const tagIndex = args.indexOf('--tag')
   const tag = tagIndex >= 0 ? args[tagIndex + 1] : undefined
@@ -52,31 +35,10 @@ function main(args: string[]): number {
   if (toCommit === null) fail(`tag "${tag}" is not fetched locally`)
   const fromIndex = args.indexOf('--from')
   const fromArg = fromIndex >= 0 ? args[fromIndex + 1] : undefined
-  const baselineCommit = fromArg ?? manifest.syncedCommit
+  const baselineCommit = git(['rev-parse', '--verify', '--end-of-options', `${fromArg ?? manifest.syncedCommit}^{commit}`]).trim()
   const baselineTag = fromArg === undefined ? manifest.syncedTag : fromArg
 
-  const upstreamOnly = new Set(manifest.upstreamOnly.map(item => item.package))
-  const log = git(['log', '--no-merges', '--format=%H%x00%s%x00', `${baselineCommit}..${toCommit}`])
-  const commits: InventoryCommit[] = []
-  for (const record of log.split('\0\n')) {
-    const line = record.replace(/\0$/, '')
-    if (line.trim() === '') continue
-    const [sha, subject] = line.split('\0')
-    if (sha === undefined) continue
-    const files = git(['diff-tree', '--no-commit-id', '--name-only', '-r', sha]).split('\n').filter(Boolean)
-    const keys = [...new Set(files.map(f => PACKAGE_DIR.exec(f)?.[1]).filter((k): k is string => k !== undefined))].sort()
-    const sovereignties = keys.map(k => manifest.packages[k]?.sovereignty)
-    const bucket: InventoryCommit['bucket'] = keys.length === 0
-      ? 'none'
-      : sovereignties.some(s => s === 'tracked' || s === 'adapted' || s === 'replaced')
-        ? 'carried'
-        : keys.some(k => manifest.packages[k] === undefined && !upstreamOnly.has(k))
-          ? 'newUpstream'
-          : keys.every(k => upstreamOnly.has(k))
-            ? 'upstreamOnly'
-            : 'owned'
-    commits.push({ sha, subject: subject ?? '', packages: keys, bucket })
-  }
+  const commits = readUpstreamCommitInventory(root, baselineCommit, toCommit, manifest)
 
   const out = {
     schemaVersion: 1,

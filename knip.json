@@ -7,7 +7,10 @@
     "adb",
     "bwrap",
     "icacls",
+    "lipo",
+    "otool",
     "pwsh",
+    "readelf",
     "sandbox-exec",
     "uv",
     "where.exe"
@@ -46,6 +49,9 @@
       ],
       "ignoreUnresolved": [
         "client-build-environment"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-ssh-helper-runtime"
       ],
       "project": [
         "scripts/**/*.ts",
@@ -174,6 +180,15 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/client/file-upload": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/client/ui-primitives": {
       "entry": [
         "tests/**/*.spec.tsx"
@@ -296,6 +311,18 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ]
+    },
+    "packages/core/session": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignore": [
+        "tests/plugin-records.type-test.ts"
       ]
     },
     "packages/typert/generator": {
@@ -496,6 +523,7 @@
     },
     "packages/ptc-runtime/ptc-runtime-node": {
       "entry": [
+        "src/persistent-process-entry.ts",
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"
       ],
@@ -512,6 +540,42 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ]
+    },
+    "packages/experimental/claude-code-mods": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/fixtures/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "claude-code"
+      ]
+    },
+    "packages/experimental/client-ui-claude-code-mods": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    },
+    "packages/experimental/plugin-market-bundle": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/experimental/agent-team": {
@@ -550,6 +614,18 @@
     "packages/experimental/voice-input-bundle": {
       "project": [
         "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/tool-worktree": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ],
       "ignoreDependencies": [
         "@deepseek-ai/.+"
@@ -640,6 +716,16 @@
     "packages/util/home-paths": {
       "entry": [
         "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/web/web-deepseek-api": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -1071,6 +1157,16 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/session/session-projection-cache": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/client/ui-brand-official": {
       "entry": [
         "tests/**/*.spec.tsx"
@@ -1291,6 +1387,16 @@
         "zod"
       ]
     },
+    "packages/boot/plugin-market": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/context/gateway-execution": {
       "entry": [
         "tests/**/*.spec.ts",
@@ -1370,6 +1476,26 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/ssh/ssh-helper-runtime": {
+      "entry": [
+        "tests/fixtures/direct-helper.ts",
+        "tests/fixtures/driver.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/cosmokit",
+        "@deepseek-ai/dsh-lazy-require",
+        "@deepseek-ai/dsh-sandbox-windows-acl",
+        "@deepseek-ai/dsh-skill",
+        "@deepseek-ai/dsh-util-crypto",
+        "@deepseek-ai/dsh-win32-process",
+        "@deepseek-ai/node-addon-system",
+        "@deepseek-ai/schemastery"
+      ]
+    },
     "packages/client/ui-settings-unarchive-sessions": {
       "entry": [
         "tests/**/*.spec.tsx"
@@ -1441,6 +1567,138 @@
       ],
       "ignoreDependencies": [
         "zod"
+      ]
+    },
+    "packages/experimental/badge-skill-bundle": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/cot-translation-bundle": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/inspector-profile": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/ralph-bundle": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/session-search": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/session-titles-bundle": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/terminal-bundle": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/client-ui-cot-translation": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ],
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
+    "packages/experimental/inspector": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx",
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx",
+        "scripts/**/*.ts"
+      ]
+    },
+    "packages/experimental/session-inspector": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ]
+    },
+    "packages/experimental/translator": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts",
+        "tests/account-adapter.ts",
+        "tests/*-fixture.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/client/ui-sidebar-files": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ]
+    },
+    "packages/client/ui-settings-plugin-inventory": {
+      "entry": [
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.tsx"
       ]
     }
   }

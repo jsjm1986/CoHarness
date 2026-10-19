@@ -43,7 +43,6 @@
     "3792cef28b1c506a01ffbad7d6b427e954da97968139610db14ac260df70c630": 1
   },
   "apps/web/tests/shipped-composition.e2e.ts": {
-    "b2def0b3b454c0ec221ad44faa663f941032cc45334ac72eec66a0f556890234": 1,
     "c0a4d4dd9b52881eb8190c56fb8ea5a25a70590b78b1e4a0996defab767699f0": 1
   },
   "apps/web/tests/startup-auto-selection.e2e.ts": {
@@ -531,7 +530,6 @@
     "1937078ee96167833461a23ea5b5cc1be19b0f64810158eebc1961b47cd84b50": 1,
     "1f1a5f63ee0fb5ade11d826f8c65e37ff1c83244b0da08448ca18b17193ffe17": 1,
     "4777453719b1a12ac03d7405a7cc1662ac1873b8eb0016a08ccd11f27076e803": 1,
-    "63f26f299825abf2d4eaef48b60a4b3764975ac5157a4abef283c4e382530427": 1,
     "725e7a77df72b352924c371e857a04157363644ea8afbb33d35132fc1ab521ef": 1,
     "b49c9527dfde22794644ddb97de25fb0b3813702f4ac663b64d85f34f8a9901e": 1,
     "f84b471ab9875071d5e6f4b17304b3ae3339ea3d8bd8a824c9cae77e72a26b7b": 1
@@ -579,13 +577,8 @@
     "56c7f5efeca0875ba0cf966491542bbf2cc8506d4fb4f07a473a31a32d58a0ef": 1
   },
   "packages/client/ui-conversation/tests/chat-view.client.spec.tsx": {
-    "0d6d110e7c6bff06aa68e175105009e824cf7d74cff70aa0de4468c4fd7474b4": 1,
     "19bd9f34bd0abe1902c19420967ccfd067279542f7e59a74fb77c540ed1149b8": 1,
-    "29db4cdeab767dad215fce4af4771583f0c240bbbc3636ca1c04303013624e00": 1,
-    "4f8d5ffd8e765e789774276d9910cf5226276c59bd7db0941bc687ce684c94e1": 1,
-    "5e81d253ded2bb3e281d730022707bacaa131618fcdfc55faa04be9a22f32956": 1,
     "6061de0a1e01547eb1abf9d4e1b5fa79fda112fa35dda980775491123413dcce": 1,
-    "c84f9ac26a501f3a8191d95155ca8522e2e24ec9702e3fc02af26bbec2491c1c": 1,
     "effc640c659132aaf43fcbcf13833772ee1240198b7f8491d75a58c6b0f4c21e": 1
   },
   "packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts": {
@@ -629,7 +622,6 @@
     "efa50c94a1619079ff0b390cd44f74c0b6c979db86a17e895e9d03e990429578": 1
   },
   "packages/client/ui-deliverables/tests/review-tab.client.spec.tsx": {
-    "52e0f8e51efd9a65974af6ad6868c7e01fff0d6faeb669e9da1bf91de8a2d422": 1,
     "56f9870142343b23a01725140b72d040d1b9071dd30227271518f50cfa614b6c": 1
   },
   "packages/client/ui-documents/src/client/DocumentPreview.tsx": {
@@ -653,7 +645,8 @@
   },
   "packages/client/ui-goal/tests/browser-plugin.client.spec.tsx": {
     "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 1,
-    "434a6267a444f7aa1745daf28c17606df674e9490d372abac243dae1c08a3a60": 1
+    "5f1a0867b42cf35dac7fdf5839e3a39c2384c5b3b03142e799a36733ad96b9da": 1,
+    "8342608ac37fdc653b6e751e7192472328c9d1baecf1f66d79a65529db5c4d6a": 1
   },
   "packages/client/ui-input-trigger/tests/apply.client.spec.ts": {
     "fc590cb703f599e5bb15f23909cedddeb2a77cb2cad0d4b9b8e664a62c46f44e": 1
@@ -853,8 +846,7 @@
     "bfee6284a08554239b870447b240303caab12f2caa5f597b76df30ffea0833eb": 1
   },
   "packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx": {
-    "7a789576c83cba62b7296d6e85b457657b973b0c43fc10e3aca76c3eec2ca631": 1,
-    "f83bd7979ecde5c251b35aaf4ab5f468b2ce7fe9813d37378cfaf4f677b2de62": 1
+    "7a789576c83cba62b7296d6e85b457657b973b0c43fc10e3aca76c3eec2ca631": 1
   },
   "packages/client/ui-tool/tests/tool-details-render.client.tsx": {
     "98e49e1c41b469d5c3fa8210e7774ada6535721810f60de4108d67fe2fb955f7": 1,
@@ -907,7 +899,6 @@
     "bc8d8eb7a29c5b7d76334e1326ac3c7b0184398b472f082286348a71869d6134": 1
   },
   "packages/client/ui-workbench/tests/workspace-file-tab.client.spec.tsx": {
-    "09fd3c43c9f8fdd9c7c03c575c41bf14d38c8bec1dc6636b2d7ee8ec50f238fc": 1,
     "19fa2e51ffcf120fe93298e1e3602fc75e4028f5a69ce6e147c75d597c08e9ba": 2
   },
   "packages/client/ui-workbench/tests/workspace-html.client.spec.tsx": {
@@ -968,11 +959,6 @@
   "packages/context/archive-gateway/tests/archive-gateway.spec.ts": {
     "6cc32bbd9510cb7c4cdae7f0db4774b2f12a200cabdb022ebcd9d7c7a74b6e73": 5,
     "d690feb2980e68b3a5c5a8ec4a9c1708e01d7e84053ebb2007f0bd287504a8e5": 1
-  },
-  "packages/context/collaboration-gateway/tests/collaboration-gateway.spec.ts": {
-    "5c00683689c9aa5be358f97c5a13b88dcf2c58711a93973b37a3406a5d90b5da": 1,
-    "b7212f39cf20dad531ddf4fbe8ec3caf7e22ddbf7dc70c4f23ab53023d37be56": 1,
-    "bed281f7996a9eb8ecb643a193eba5bfbe6f98283c783f3679c3da0940ea38d4": 2
   },
   "packages/context/file-reference-local/tests/service.spec.ts": {
     "61caffd9649919d30152e7f8b7835d1b6f6c97e20bcdae05b442cf2d2c250afb": 1
@@ -2300,12 +2286,7 @@
     "c09156ebe0e8eaa23eac06d9cf5549b67ee038f2bf2e4fa77a5f9ca63e0416ec": 1
   },
   "packages/subagent/subagent-acp/tests/subagent-acp.spec.ts": {
-    "7f8d86b28f8d58460ec0a1efc0dc3b2333a3dce0bddbfb5461761258795bb87f": 1,
-    "b1eb8cf60e80ab0aaed7dae202d2a8c485b23d5797bf9162209d666182d6c703": 1,
-    "bf51b161c3c9ca3603b93db55b2c5721bab63a993fef808f2e6cdd619aacc190": 1,
-    "e9268866f334d91a368f51e3098654a280b0eb2dc2b5a072aa198eb3ddd7424c": 4,
-    "ea9ae2bf5224204cbf222eccd26cd385ed84a3843e48c47452597d36a616ae65": 1,
-    "f77e5cbd2d2d911087f7faecc4b0b5bffdfb44ca5d0bcf7823ba9777feca7799": 2
+    "e9268866f334d91a368f51e3098654a280b0eb2dc2b5a072aa198eb3ddd7424c": 4
   },
   "packages/subagent/subagent-claude-code/tests/member.spec.ts": {
     "07a5c9847d4b3cf5a7a969353f1905f800ada1037806d7c6e6d39ac2332ccc96": 1,
@@ -2317,39 +2298,18 @@
     "e8b1ee15c333c589be9f08e0558110b71dc17dbb142681682306a9abe48b8d2e": 1,
     "ecca47886cd459f9d7384fad6e7050593542c9a84efcadd29609babbb2d71857": 1
   },
-  "packages/subagent/subagent-claude-code/tests/real-product.spec.ts": {
-    "09bd38f3fe818937752cd9aa5f114b6ad07df4bbdd36b0ab157324f17a37e4d6": 1,
-    "16e23fc6935a393d65fd17ab0741b83cb2f51ab7bac2ea0c2685de96ccde5a06": 1,
-    "aad5b2980d1298aaa4157a4ac9e28040f53fb95be1ccee67bfa105c9ed626b3f": 1
-  },
   "packages/subagent/subagent-claude-code/tests/subagent-claude-code.spec.ts": {
-    "101af668daf0fb9a7df21757c781ed58f7cf6770a1f5021a5da4ce58080c1f5f": 1,
     "2cedee48f4fb8ce4bbd10567fdfbee69e8dd11dbc85af9b824de33c2b77abfbf": 1,
     "4e94c461ab08f535e20f71ebe8bb9a8c911a936c7068f24e259956c06d17c05d": 2,
     "87c02601d70d11c9d435d653767f37d287f57be16f703968d319ee720d88c92e": 1,
-    "aa1a9402165afaeb270967390b13cae2a59916bc52f13b4f600315d7a0fe2032": 1,
     "cdcbd6cc73a09b6613864cdfb5b14d0cf66dc2484d26916cb32929deca1032de": 3,
-    "f85c96616fff1bb1e21886bd2fad64e9e34d89d090ab96ab7804f702278cd23d": 2,
-    "fa05a5e504ed74b5a07cb6281c787b507eb6c44db768803f4dad034dd69cb3b9": 1
+    "f85c96616fff1bb1e21886bd2fad64e9e34d89d090ab96ab7804f702278cd23d": 2
   },
   "packages/subagent/subagent-codex/src/rollout.ts": {
     "e3b3858336ae260253abe549d2b763f5087ab4e8650f4eb5b323339eff0a6ce4": 1
   },
   "packages/subagent/subagent-codex/tests/member.spec.ts": {
     "0df9ce961f91bd4fc22c73c9a5f947b99fd3e9ac8575d295052252e2ec51eb69": 1
-  },
-  "packages/subagent/subagent-codex/tests/real-product.spec.ts": {
-    "09bd38f3fe818937752cd9aa5f114b6ad07df4bbdd36b0ab157324f17a37e4d6": 1,
-    "16e23fc6935a393d65fd17ab0741b83cb2f51ab7bac2ea0c2685de96ccde5a06": 1,
-    "aad5b2980d1298aaa4157a4ac9e28040f53fb95be1ccee67bfa105c9ed626b3f": 1
-  },
-  "packages/subagent/subagent-codex/tests/subagent-codex.spec.ts": {
-    "101af668daf0fb9a7df21757c781ed58f7cf6770a1f5021a5da4ce58080c1f5f": 1,
-    "aa1a9402165afaeb270967390b13cae2a59916bc52f13b4f600315d7a0fe2032": 1,
-    "fa05a5e504ed74b5a07cb6281c787b507eb6c44db768803f4dad034dd69cb3b9": 1
-  },
-  "packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts": {
-    "f77e5cbd2d2d911087f7faecc4b0b5bffdfb44ca5d0bcf7823ba9777feca7799": 1
   },
   "packages/subagent/subagent-in-process-driver/tests/structured.spec.ts": {
     "647bbba1ee35ea6acd23faa1e2988e24c49f0284be571ab3e716ab36a11cc38c": 1,
@@ -2413,9 +2373,6 @@
     "4000017f1f3dabd4bdf8eb91120cf4ff0dd09bad89d4683151f4785974d204a5": 5,
     "7e54d975081d3d36b6aad19f5254b18c4c898df1424af33e283363ba37a11691": 1,
     "9a362ded6cf17e795dc9cb0c88a672eb17c03d90ae87987f53dbb3a3f6bcc467": 1
-  },
-  "packages/subagent/tool-subagent/tests/scripted-provider.spec.ts": {
-    "e770821c1f637aca0a346d5f6e6f0873ca4d7e3b070b557cddf773c160ec599a": 1
   },
   "packages/subagent/tool-subagent/tests/tool-subagent.spec.ts": {
     "1a2098d6ff345b66d13f9822385af407ac03acdabeb607c2bd18a75987c410a5": 1,

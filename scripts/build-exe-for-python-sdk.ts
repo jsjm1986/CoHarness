@@ -8,7 +8,7 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
-import { chmod, copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -16,6 +16,7 @@ import { resolveLinuxNodePtyAddon, resolveWindowsNodePtyAddons } from './executa
 import { pnpmInvocation, restoreLegacyHoists } from './executable-packaging.ts'
 import { deduplicateStagedWorkspacePackages, materializeStagedLinks } from './build-exe-for-python-sdk-staging.ts'
 import { copyOfficeSidecar, OFFICE_ASSET_IGNORES } from './build-exe-for-python-sdk-office.ts'
+import { syncPythonRuntimeProduct } from './build-exe-for-python-sdk-resources.ts'
 import { preparePrimaryRuntime, smokePrimaryRuntime, type PrimaryRuntimeTarget } from './primary-runtime/prepare.ts'
 
 const root = resolve(import.meta.dirname, '..')
@@ -52,6 +53,11 @@ const ASSET_GLOBS = [
   'node_modules/**/*.json',
   // Package-owned Markdown includes runtime skill instructions and badge content.
   'node_modules/**/*.md',
+  // Plugin display metadata resolves these package-owned images at runtime. The
+  // shipped agent-preset root lives in the un-suffixed @deepseek-ai/dsh app
+  // package, and legacy deploy nests peer-specialized copies under dependents.
+  'node_modules/**/@deepseek-ai/dsh/**/*.{svg,png,jpg,jpeg,webp}',
+  'node_modules/**/@deepseek-ai/dsh-*/**/*.{svg,png,jpg,jpeg,webp}',
   'node_modules/**/*.dylib',
   'node_modules/**/*.dll',
   'node_modules/**/*.node',
@@ -515,11 +521,7 @@ class SingleExeBuild {
     await mkdir(destDir, { recursive: true })
     for (const path of products) {
       const destination = join(destDir, basename(path))
-      if (statSync(path).isDirectory()) {
-        await rm(destination, { recursive: true, force: true })
-        await cp(path, destination, { recursive: true })
-      } else await copyFile(path, destination)
-      await chmod(destination, statSync(path).mode & 0o777)
+      await syncPythonRuntimeProduct(path, destination)
       console.log(`build-exe-for-python-sdk: synced ${destination}`)
     }
   }

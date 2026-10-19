@@ -90,6 +90,9 @@
         "packages/client/connection/src/rpc-schema.ts"
       ]
     },
+    "client/file-upload": {
+      "sovereignty": "adapted"
+    },
     "client/hmr": {
       "sovereignty": "adapted"
     },
@@ -191,9 +194,7 @@
     },
     "client/ui-goal": {
       "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/client/ui-goal/src/client/activation-source.ts"
-      ]
+      "note": ".agents/notes/implemented/bug-fix/2026-09-03-user-owned-goal-pause-activation.md"
     },
     "client/ui-input-trigger": {
       "sovereignty": "adapted"
@@ -238,10 +239,7 @@
     },
     "client/ui-plugin-manager": {
       "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/feature/2026-10-03-user-side-plugin-manager-page.md",
-      "removedUpstreamPaths": [
-        "packages/client/ui-plugin-manager/src/client/sanitize-install-input.ts"
-      ]
+      "note": ".agents/notes/implemented/feature/2026-10-18-ui-plugin-manager-rc2-parity.md"
     },
     "client/ui-plugin-market": {
       "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
@@ -292,12 +290,12 @@
       "removedUpstreamPaths": [
         "packages/client/ui-settings-models/src/client/ModelInputTypes.tsx",
         "packages/client/ui-settings-models/src/client/ModelRow.tsx",
-        "packages/client/ui-settings-models/src/client/WelcomeNotice.module.css",
-        "packages/client/ui-settings-models/src/client/WelcomeNotice.tsx",
-        "packages/client/ui-settings-models/src/client/operations.ts",
-        "packages/client/ui-settings-models/src/client/welcome-store.ts",
-        "packages/client/ui-settings-models/src/onboarding-copy.ts"
+        "packages/client/ui-settings-models/src/client/operations.ts"
       ]
+    },
+    "client/ui-settings-plugin-inventory": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-10-18-settings-surface-increment.md"
     },
     "client/ui-settings-plugins": {
       "sovereignty": "adapted",
@@ -320,6 +318,10 @@
     },
     "client/ui-sidebar-browser": {
       "sovereignty": "adapted"
+    },
+    "client/ui-sidebar-files": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-10-19-sidebar-files-tab-port.md"
     },
     "client/ui-sidebar-right": {
       "sovereignty": "adapted"
@@ -516,6 +518,10 @@
     "experimental/auto-review": {
       "sovereignty": "adapted"
     },
+    "experimental/badge-skill-bundle": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
+    },
     "experimental/browser-use-chrome-devtools-mcp": {
       "sovereignty": "adapted"
     },
@@ -529,8 +535,20 @@
     "experimental/browser-use-stagehand-native": {
       "sovereignty": "tracked"
     },
+    "experimental/claude-code-mods": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/architecture/2026-10-17-experimental-claude-code-mods-extraction.md"
+    },
     "experimental/client-ui-agent-team": {
       "sovereignty": "adapted"
+    },
+    "experimental/client-ui-claude-code-mods": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-10-17-experimental-claude-code-mods-extraction.md"
+    },
+    "experimental/client-ui-cot-translation": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-10-18-cot-translation-port.md"
     },
     "experimental/client-ui-voice-input": {
       "sovereignty": "adapted",
@@ -542,6 +560,18 @@
     "experimental/computer-use-cua-driver-native": {
       "sovereignty": "adapted"
     },
+    "experimental/cot-translation-bundle": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/feature/2026-10-18-cot-translation-port.md"
+    },
+    "experimental/inspector": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-10-18-experimental-inspector-port.md"
+    },
+    "experimental/inspector-profile": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/feature/2026-10-18-experimental-inspector-port.md"
+    },
     "experimental/plugin-market-bundle": {
       "note": ".agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md",
       "sovereignty": "tracked"
@@ -549,9 +579,25 @@
     "experimental/ptc-runtime-python": {
       "sovereignty": "adapted"
     },
+    "experimental/ralph-bundle": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
+    },
     "experimental/schedule-bundle": {
       "sovereignty": "owned",
       "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
+    },
+    "experimental/session-inspector": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-10-18-experimental-inspector-port.md"
+    },
+    "experimental/session-search": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
+    },
+    "experimental/session-titles-bundle": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
     },
     "experimental/speech-to-text": {
       "sovereignty": "adapted",
@@ -561,12 +607,26 @@
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
+    "experimental/terminal-bundle": {
+      "sovereignty": "tracked",
+      "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
+    },
     "experimental/tool-agent-team": {
       "sovereignty": "adapted"
+    },
+    "experimental/tool-worktree": {
+      "sovereignty": "tracked"
+    },
+    "experimental/translator": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-10-18-cot-translation-port.md"
     },
     "experimental/voice-input-bundle": {
       "sovereignty": "tracked",
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/worktree": {
+      "sovereignty": "tracked"
     },
     "extensions/cordis-client-runner": {
       "sovereignty": "adapted"
@@ -752,7 +812,7 @@
     },
     "preset/agent-preset-registry": {
       "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-10-22-preset-two-package-migration.md"
+      "note": ".agents/notes/implemented/architecture/2026-10-18-preset-two-package-migration.md"
     },
     "preset/persona": {
       "sovereignty": "tracked"
@@ -966,6 +1026,9 @@
     "ssh/ssh": {
       "sovereignty": "adapted"
     },
+    "ssh/ssh-helper-runtime": {
+      "sovereignty": "tracked"
+    },
     "ssh/subprocess-ssh": {
       "sovereignty": "tracked"
     },
@@ -1171,23 +1234,6 @@
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
-    },
-    "experimental/claude-code-mods": {
-      "sovereignty": "tracked",
-      "note": ".agents/notes/implemented/architecture/2026-10-21-experimental-claude-code-mods-extraction.md"
-    },
-    "experimental/client-ui-claude-code-mods": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-10-21-experimental-claude-code-mods-extraction.md"
-    },
-    "experimental/tool-worktree": {
-      "sovereignty": "tracked"
-    },
-    "experimental/worktree": {
-      "sovereignty": "tracked"
-    },
-    "ssh/ssh-helper-runtime": {
-      "sovereignty": "tracked"
     }
   },
   "upstreamOnly": [
@@ -1224,10 +1270,6 @@
     {
       "package": "boot/config-editor",
       "reason": "upstream profile-patch editor excluded; settings stays on settings.yaml governance (revisit only if the settings port needs atomic patch editing)"
-    },
-    {
-      "package": "client/file-upload",
-      "reason": "attachment/userdoc-local plus host/userdoc-http provide resumable chunked upload with SHA-256 resume; the upstream transient file-upload receipt surface is deferred"
     },
     {
       "package": "client/product-analytics",
@@ -1289,17 +1331,8 @@
     },
     {
       "package": "client/ui-sidebar-documentpreview",
-      "reason": "document preview is part of the rejected upstream sidebar tree; the Workbench document surface owns previews, including the Markdown and HTML bodies registered upstream",
+      "reason": "Upstream right-sidebar preview chain; fork carries previews in ui-workbench (WorkspaceFile/Document/Excel/Html/Markdown/Pdf bodies + workspaceResources change invalidation via host/workspace-file-changed).",
       "replacedBy": "client/ui-workbench"
-    },
-    {
-      "package": "client/ui-sidebar-files",
-      "reason": "the desktop file sidebar is part of the rejected upstream ui-package tree; workspace browsing is owned by the cloud Workbench"
-    },
-    {
-      "package": "client/ui-settings-plugin-inventory",
-      "reason": "the inventory tab duplicated install, removal, and enablement already owned by the sidebar Plugins panel; it is not carried",
-      "replacedBy": "client/ui-plugin-manager"
     },
     {
       "package": "credentials/deepseek-account",
@@ -1308,10 +1341,6 @@
     {
       "package": "credentials/deepseek-account-platform",
       "reason": "official account credentials excluded"
-    },
-    {
-      "package": "experimental/inspector",
-      "reason": "experimental prototype with no cloud consumer"
     },
     {
       "package": "experimental/webworker-packer",
@@ -1342,7 +1371,8 @@
     },
     {
       "package": "client/ui-secret-mask",
-      "reason": "deferred: credential-masking display lane queued with the remaining UI completion items"
+      "reason": "Credential masking is integrated into client/ui-primitives through the credential scanner, masks, and SecretText consumed by ui-conversation; this implementation replaces the separate upstream plugin.",
+      "replacedBy": "client/ui-primitives"
     },
     {
       "package": "client/ui-deepseek-model-label-1017",
@@ -1355,46 +1385,6 @@
     {
       "package": "experimental/cua-macos",
       "reason": "macOS computer-use provider; no fork consumer"
-    },
-    {
-      "package": "experimental/inspector-profile",
-      "reason": "deferred: requires the excluded api/session-controller surface"
-    },
-    {
-      "package": "experimental/session-inspector",
-      "reason": "deferred: requires the excluded api/session-controller surface"
-    },
-    {
-      "package": "experimental/client-ui-cot-translation",
-      "reason": "deferred: requires the excluded deepseek-account provider surface"
-    },
-    {
-      "package": "experimental/cot-translation-bundle",
-      "reason": "deferred: requires the excluded deepseek-account provider surface"
-    },
-    {
-      "package": "experimental/translator",
-      "reason": "deferred: requires the excluded deepseek-account provider surface"
-    },
-    {
-      "package": "experimental/badge-skill-bundle",
-      "reason": "experimental bundle wrapper not carried; the fork composes skill-badge through its own preset/bundle surface"
-    },
-    {
-      "package": "experimental/ralph-bundle",
-      "reason": "experimental bundle wrapper not carried; the fork composes tool-ralph through its own preset/bundle surface"
-    },
-    {
-      "package": "experimental/session-titles-bundle",
-      "reason": "experimental bundle wrapper not carried; the fork composes session-title providers through its own preset/bundle surface"
-    },
-    {
-      "package": "experimental/terminal-bundle",
-      "reason": "experimental bundle wrapper not carried; the fork composes tool-terminal through its own preset/bundle surface"
-    },
-    {
-      "package": "experimental/session-search",
-      "reason": "experimental session-search lane not carried; pending decision on the workspace session-search tool surface"
     },
     {
       "package": "experimental/hook-protocol",

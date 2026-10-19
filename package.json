@@ -82,6 +82,7 @@
     "gen-module-graph": "tsx scripts/gen-module-graph.ts",
     "gen-persistence-catalog": "tsx scripts/gen-persistence-catalog.ts",
     "gen-plugin-packages": "tsx scripts/gen-plugin-packages.ts",
+    "gen-provider-data": "tsx packages/llm/llm-pi-ai/scripts/gen-provider-data.ts",
     "gen-session-format-catalog": "tsx scripts/gen-session-format-catalog.ts",
     "gen-third-party-notices": "tsx scripts/gen-third-party-notices.ts",
     "gen-tool-catalog": "tsx scripts/gen-tool-catalog.ts",
@@ -200,6 +201,7 @@
     "verify-persistence-releases": "tsx scripts/persistence-releases.ts",
     "verify-plugin-packages": "tsx scripts/gen-plugin-packages.ts --check",
     "verify-plugin-surfaces": "tsx scripts/verify-plugin-surfaces.ts",
+    "verify-provider-data": "tsx packages/llm/llm-pi-ai/scripts/gen-provider-data.ts --check",
     "verify-public-repository-links": "tsx scripts/verify-public-repository-links.ts",
     "verify-repository-references": "tsx scripts/verify-repository-references.ts",
     "verify-runtime-closure": "tsx scripts/verify-runtime-closure.ts",
@@ -281,6 +283,7 @@
     "typescript": "^6.0.3",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.11",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "vite": "8.2.2"
   }
 }

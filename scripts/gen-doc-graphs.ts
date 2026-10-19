@@ -105,6 +105,21 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'cotTranslation',
+    pkg: 'experimental-client-ui-cot-translation',
+    title: 'Reasoning translation Remote',
+    mode: 'service',
+    note: 'Serves reasoning translations, reuses saved results, and joins ordinary Session activation for uncached inactive Sessions.',
+  },
+  {
+    key: 'translator',
+    pkg: 'experimental-translator',
+    title: 'Anonymous text translation',
+    mode: 'service',
+    consumers: ['experimental-client-ui-cot-translation'],
+    note: 'Resolves Google or Bing requests and retains shared experimental records through the active Session writer.',
+  },
+  {
     key: 'hostSessionLifecycle',
     pkg: 'host-apiproxy',
     title: 'Host ownership and idle release of Session handles',
@@ -176,6 +191,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Authorized deferred source reads feed a bounded Host converter using the declared native engine or Node WASM.',
   },
   {
+    key: 'inspector',
+    pkg: 'experimental-inspector',
+    title: 'Cross-realm runtime inspection',
+    mode: 'core',
+    note: 'Owns the Worker-hosted CDP target and the transport-independent Host and Client observation and Cordis-tree query API.',
+  },
+  {
     key: 'worktrees',
     pkg: 'experimental-worktree',
     title: 'Git worktree creation',
@@ -237,6 +259,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['userdoc-local'],
     consumers: ['tool-userdoc'],
     note: 'Uploads land as real named files inside a directory the tool authorization policy already grants. The personal-document Consumer adds bounded discovery and text reads without exposing host paths; ordinary filesystem tools remain available for attached documents.',
+  },
+  {
+    key: 'fileUploads',
+    pkg: 'client-file-upload',
+    title: 'Session-scoped staged upload receipts',
+    mode: 'core',
+    consumers: ['commands'],
+    note: 'Accepts streamed browser bytes and encoded Remote uploads, stages per-Session receipts, binds them to prompt requests, and retires them on delivery observation.',
   },
   {
     key: 'llm',

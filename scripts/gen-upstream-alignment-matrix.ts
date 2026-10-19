@@ -142,7 +142,7 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
   'packages/jobs/jobs': {
     status: 'adapt',
     targetAssessment: 'increment-review-required',
-    localDisposition: 'Owner decision: ring-buffer output rewrite adopted (JobChunk/lossy/spillPath/owner: SessionId/JobView) as an independent P4 milestone touching durable semantics, wire protocol, completion reporting, and bounded reads. maxConsecutiveWakes stays bounded at 10 per the multi-tenant safety decision — never unbounded.',
+    localDisposition: 'Owner decision: ring-buffer output rewrite adopted (JobChunk/lossy/spillPath/owner: SessionId/JobView) as an independent P4 milestone touching durable semantics, wire protocol, completion reporting, and bounded reads. maxConsecutiveWakes stays unset — no cap; the optional field remains configurable.',
   },
   'packages/client/ui-schedule': {
     status: 'adapt',

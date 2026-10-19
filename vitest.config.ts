@@ -85,9 +85,24 @@ const processBoundTests = [
   'packages/workflow/workflow-ptc/tests/session.spec.ts',
 ]
 
+// Claude Code's test-kit module names, served by the mods bridge's test
+// support so the example mods' published tests import them unchanged. Test
+// lane only: tsconfig.base.json keeps these out so doc-typecheck maps them to
+// the built declarations.
+const claudeCodeTestingAliases = [
+  {
+    find: /^claude-code\/testing$/,
+    replacement: fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code-testing.ts', import.meta.url)),
+  },
+  {
+    find: /^claude-code$/,
+    replacement: fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code.ts', import.meta.url)),
+  },
+]
+
 export default defineConfig({
   plugins: [pathsPlugin(), standardDecoratorPlugin()],
-  resolve: { alias: sourcePlaneAliases },
+  resolve: { alias: [...sourcePlaneAliases, ...claudeCodeTestingAliases] },
   test: {
     setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-dom-environment.ts'],
     // .tsx: client component specs (jsdom via per-file @vitest-environment pragma).
@@ -98,7 +113,7 @@ export default defineConfig({
     projects: [
       {
         plugins: [pathsPlugin(), standardDecoratorPlugin()],
-        resolve: { alias: sourcePlaneAliases },
+        resolve: { alias: [...sourcePlaneAliases, ...claudeCodeTestingAliases] },
         test: {
           name: 'thread-safe',
           execArgv: vitestExecArgv,
@@ -117,7 +132,7 @@ export default defineConfig({
       },
       {
         plugins: [pathsPlugin(), standardDecoratorPlugin()],
-        resolve: { alias: sourcePlaneAliases },
+        resolve: { alias: [...sourcePlaneAliases, ...claudeCodeTestingAliases] },
         test: {
           name: 'process-bound',
           execArgv: vitestExecArgv,

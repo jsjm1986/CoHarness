@@ -212,8 +212,8 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-experimental-speech-to-text-sensevoice': ['runtime/assets.json'],
   // Node execution modes each launch a separately bundled bootstrap.
   '@deepseek-ai/dsh-ptc-runtime-node': ['lib/process.js', 'lib/persistent-process.js'],
-  // The Host entry starts its sibling Worker by URL rather than a package export.
-  '@deepseek-ai/dsh-experimental-inspector': ['lib/worker.js'],
+  // The Inspector owns a Worker and a mirrored frontend outside package export paths.
+  '@deepseek-ai/dsh-experimental-inspector': ['lib/client.*.js', 'lib/worker.js', 'lib/devtools/**'],
   // TODO(alpha.2): restore 'presets' when the shipped compositions move from
   // apps/cli/config into the roster package.
   '@deepseek-ai/dsh-agent-preset-registry': [],

@@ -5,7 +5,8 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { checkInventoryCoverage, checkManifest, checkMatrix, checkCurrentPackageDispositions } from './verify-upgrade-records.ts'
+import { checkActiveInventory, checkInventoryCoverage, checkManifest, checkMatrix, checkMatrixFileInventories, checkCurrentPackageDispositions, requireCurrentSchema } from './verify-upgrade-records.ts'
+import { readUpstreamCommitInventory } from './upstream-commit-inventory.ts'
 
 const SHA = 'a'.repeat(40)
 
@@ -179,10 +180,18 @@ it('the record CLI verifies identities and the exact raw cumulative and incremen
     write(matrixPath, currentMatrix)
     write(manifestPath, currentManifest)
     write('upgrades/plans/UPGRADE-PLAN-fixture.md', '# Fixture plan\n')
-    write('scripts/upstream-sync.json', { syncedTag: 'fixture', syncedCommit: commit, gateReplayRecord: matrixPath, packages: { 'core/fixture': { sovereignty: 'tracked' } } })
+    write('scripts/upstream-sync.json', { syncedTag: 'fixture', syncedCommit: commit, gateReplayRecord: matrixPath, packages: { 'core/fixture': { sovereignty: 'tracked' } }, upstreamOnly: [] })
     write('scripts/verify-upgrade-records.ts', readFileSync(new URL('./verify-upgrade-records.ts', import.meta.url), 'utf8'))
-    const run = () => {
-      const result = spawnSync(process.execPath, ['--import', pathToFileURL(createRequire(import.meta.url).resolve('tsx/esm')).href, join(root, 'scripts/verify-upgrade-records.ts')], {
+    write('scripts/upstream-commit-inventory.ts', readFileSync(new URL('./upstream-commit-inventory.ts', import.meta.url), 'utf8'))
+    const inventoryPath = 'upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-fixture.json'
+    const inventoryCommit = { sha: commit, subject: 'source fixture', packages: [], bucket: 'none' }
+    const inventory = {
+      schemaVersion: 1, generatedFrom: { baselineCommit: baseline, targetCommit: commit, target: 'fixture' },
+      commitCount: 1, commits: [inventoryCommit],
+    }
+    write(inventoryPath, inventory)
+    const run = (script = 'scripts/verify-upgrade-records.ts', args: string[] = []) => {
+      const result = spawnSync(process.execPath, ['--import', pathToFileURL(createRequire(import.meta.url).resolve('tsx/esm')).href, join(root, script), ...args], {
         cwd: root, encoding: 'utf8', timeout: 30_000,
       })
       expect(result.error).toBeUndefined()
@@ -191,62 +200,152 @@ it('the record CLI verifies identities and the exact raw cumulative and incremen
     }
     const accepted = run()
     expect(accepted.status, accepted.output).toBe(0)
-    write(matrixPath, { ...currentMatrix, rows: [row, { ...row, status: 'required', gateReplays: undefined }] })
-    const duplicateArea = run()
-    expect(duplicateArea.status, duplicateArea.output).toBe(1)
-    expect(duplicateArea.output).toContain('duplicate area "session-format"')
-    write(matrixPath, currentMatrix)
-    const carriedRow = { ...row, area: 'packages/core/fixture', localSovereignty: 'tracked' }
-    write(matrixPath, { ...currentMatrix, rows: [carriedRow] })
-    const carried = run()
-    expect(carried.status, carried.output).toBe(0)
-    for (const patch of [{ localSovereignty: 'upstreamOnly' }, { targetAssessment: 'not-carried' }, { upstreamOnly: { reason: 'obsolete exclusion' } }]) {
-      write(matrixPath, { ...currentMatrix, rows: [{ ...carriedRow, ...patch }] })
-      const rejected = run()
-      expect(rejected.status, rejected.output).toBe(1)
-      expect(rejected.output).toContain('packages/core/fixture')
+    const syncManifest: unknown = JSON.parse(readFileSync(join(root, 'scripts/upstream-sync.json'), 'utf8'))
+    for (const patch of [
+      { commits: null },
+      { commitCount: 0, commits: [] },
+      { commitCount: 2 },
+      { commitCount: 2, commits: [inventoryCommit, inventoryCommit] },
+      { commits: [{ ...inventoryCommit, sha: baseline }] },
+      { commits: [{ ...inventoryCommit, bucket: 'carried' }] },
+      { commits: [{ ...inventoryCommit, packages: ['core/fixture'] }] },
+      { commits: [{ ...inventoryCommit, subject: 'a different commit' }] },
+      { generatedFrom: { ...inventory.generatedFrom, targetCommit: baseline } },
+    ]) {
+      expect(() => {
+        checkActiveInventory(root, inventoryPath, { ...inventory, ...patch }, currentMatrix, syncManifest)
+      }).toThrow(inventoryPath)
     }
-    write(matrixPath, currentMatrix)
+    write('.git/shallow', `${baseline}\n`)
+    expect(() => {
+      checkActiveInventory(root, inventoryPath, inventory, currentMatrix, syncManifest)
+    }).toThrow('shallow ancestry')
+    rmSync(join(root, '.git/shallow'))
+    expect(() => {
+      checkMatrix(matrixPath, { ...currentMatrix, rows: [row, { ...row, status: 'required', gateReplays: undefined }] })
+    }).toThrow('duplicate area "session-format"')
+    const carriedRow = { ...row, area: 'packages/core/fixture', localSovereignty: 'tracked' }
+    expect(() => {
+      checkMatrix(matrixPath, { ...currentMatrix, rows: [carriedRow] })
+    }).not.toThrow()
+    for (const patch of [{ localSovereignty: 'upstreamOnly' }, { targetAssessment: 'not-carried' }, { upstreamOnly: { reason: 'obsolete exclusion' } }]) {
+      expect(() => {
+        checkCurrentPackageDispositions(matrixPath, { ...currentMatrix, rows: [{ ...carriedRow, ...patch }] },
+          (syncManifest as Record<string, unknown>).packages)
+      }).toThrow('packages/core/fixture')
+    }
     const decisions = currentManifest.decisions as Record<string, unknown>[]
-    write(manifestPath, { ...currentManifest, decisions: [...decisions, ...decisions] })
-    const duplicateId = run()
-    expect(duplicateId.status, duplicateId.output).toBe(1)
-    expect(duplicateId.output).toContain('duplicate id "session-core"')
-    write(manifestPath, currentManifest)
+    expect(() => {
+      checkManifest(manifestPath, { ...currentManifest, decisions: [...decisions, ...decisions] })
+    }).toThrow('duplicate id "session-core"')
     for (const field of ['cumulativeFiles', 'incrementFiles'] as const) {
-      write(matrixPath, { ...currentMatrix, rows: [{ ...row, [field]: changedFiles.filter(path => path !== 'legacy/说明.txt') }] })
-      const missing = run()
-      expect(missing.status, missing.output).toBe(1)
-      expect(missing.output).toContain(`${field} does not match the raw Git diff`)
-      expect(missing.output).toContain('legacy/说明.txt')
+      const missing = { ...currentMatrix, rows: [{ ...row, [field]: changedFiles.filter(path => path !== 'legacy/说明.txt') }] }
+      expect(() => {
+        checkMatrixFileInventories(root, matrixPath, missing)
+      }).toThrow(`${field} does not match the raw Git diff`)
+      expect(() => {
+        checkMatrixFileInventories(root, matrixPath, missing)
+      }).toThrow('legacy/说明.txt')
     }
     for (const patch of [
       { cumulativeFiles: [...changedFiles, 'normalized/说明.txt'] },
       { cumulativeFiles: [...changedFiles, 'current/说明.txt'] },
       { cumulativeFiles: changedFiles.filter(path => path !== 'legacy/说明.txt'), historicalPathAliases: [{ sourcePath: 'legacy/说明.txt' }] },
     ]) {
-      write(matrixPath, { ...currentMatrix, rows: [{ ...row, ...patch }] })
-      expect(run().status).toBe(1)
+      expect(() => {
+        checkMatrixFileInventories(root, matrixPath, { ...currentMatrix, rows: [{ ...row, ...patch }] })
+      }).toThrow()
     }
-    write(matrixPath, { ...currentMatrix, summary: { rows: 1, cumulativeChangedFiles: 2, incrementChangedFiles: 3 } })
-    const wrongSummary = run()
-    expect(wrongSummary.status, wrongSummary.output).toBe(1)
-    expect(wrongSummary.output).toContain('summary.cumulativeChangedFiles')
-    write(matrixPath, { ...currentMatrix, schemaVersion: 2 })
-    const downgradedMatrix = run()
-    expect(downgradedMatrix.status, downgradedMatrix.output).toBe(1)
-    expect(downgradedMatrix.output).toContain('active upgrade record requires schemaVersion: 3')
-    write(matrixPath, currentMatrix)
-    write(manifestPath, { ...currentManifest, schemaVersion: 2 })
-    const downgradedManifest = run()
-    expect(downgradedManifest.status, downgradedManifest.output).toBe(1)
-    expect(downgradedManifest.output).toContain('active upgrade record requires schemaVersion: 3')
+    expect(() => {
+      checkMatrixFileInventories(root, matrixPath,
+        { ...currentMatrix, summary: { rows: 1, cumulativeChangedFiles: 2, incrementChangedFiles: 3 } })
+    }).toThrow('summary.cumulativeChangedFiles')
+    expect(() => {
+      requireCurrentSchema(matrixPath, { ...currentMatrix, schemaVersion: 2 })
+    }).toThrow('active upgrade record requires schemaVersion: 3')
+    expect(() => {
+      requireCurrentSchema(manifestPath, { ...currentManifest, schemaVersion: 2 })
+    }).toThrow('active upgrade record requires schemaVersion: 3')
     write(manifestPath, currentManifest)
-    write('upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-historical.json', {
-      ...currentMatrix, schemaVersion: 2, rows: [{ ...row, cumulativeFiles: ['historical-normalized-path'] }],
+    expect(() => {
+      checkInventoryCoverage('upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-historical.json',
+        { schemaVersion: 1, commitCount: 0, commits: [] },
+        { ...currentMatrix, schemaVersion: 2, rows: [{ ...row, cumulativeFiles: ['historical-normalized-path'] }] },
+        'historical')
+    }).not.toThrow()
+    write('scripts/upstream-sync.json', { version: 2, syncedTag: 'fixture', syncedCommit: commit, packages: {}, upstreamOnly: [] })
+    for (const file of ['gen-upstream-commit-inventory.ts', 'verify-upstream-sovereignty.ts']) {
+      write(`scripts/${file}`, readFileSync(new URL(`./${file}`, import.meta.url), 'utf8'))
+    }
+    execFileSync('git', ['-c', 'tag.gpgsign=false', 'tag', 'fixture', commit], { cwd: root })
+    execFileSync('git', ['-c', 'tag.gpgsign=false', 'tag', 'baseline', baseline], { cwd: root })
+    const before = readFileSync(join(root, inventoryPath), 'utf8')
+    write('.git/shallow', `${baseline}\n`)
+    const refusedGeneration = run('scripts/gen-upstream-commit-inventory.ts', ['--tag', 'fixture', '--from', 'baseline'])
+    expect(refusedGeneration.status, refusedGeneration.output).toBe(1)
+    expect(refusedGeneration.output).toContain('shallow ancestry')
+    expect(readFileSync(join(root, inventoryPath), 'utf8')).toBe(before)
+    rmSync(join(root, '.git/shallow'))
+    const generated = run('scripts/gen-upstream-commit-inventory.ts', ['--tag', 'fixture', '--from', 'baseline'])
+    expect(generated.status, generated.output).toBe(0)
+    const generatedInventory: unknown = JSON.parse(readFileSync(join(root, inventoryPath), 'utf8'))
+    expect(generatedInventory).toEqual({
+      ...inventory, generatedFrom: { ...inventory.generatedFrom, baseline: 'baseline' },
     })
-    const historical = run()
-    expect(historical.status, historical.output).toBe(0)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+it('reads Unicode package paths, includes root commits, and checks both endpoint ancestries without requiring unrelated refs', () => {
+  const root = mkdtempSync(join(tmpdir(), 'upstream-commit-range-'))
+  const git = (...args: string[]): string => execFileSync('git', [
+    '-c', 'user.name=Inventory fixture', '-c', 'user.email=inventory@example.invalid',
+    '-c', 'commit.gpgsign=false', '-c', `core.hooksPath=${join(root, '.hooks')}`, ...args,
+  ], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  const sources = { packages: { 'core/sample': { sovereignty: 'tracked' } }, upstreamOnly: [] }
+  try {
+    git('init', '-q')
+    const source = join(root, 'packages/core/sample/说明.ts')
+    mkdirSync(dirname(source), { recursive: true })
+    const commit = (content: string): string => {
+      writeFileSync(source, content)
+      git('add', '.')
+      git('commit', '-qm', content)
+      return git('rev-parse', 'HEAD')
+    }
+    const initial = commit('initial')
+    const baseline = commit('baseline')
+    const target = commit('target')
+    expect(readUpstreamCommitInventory(root, initial, target, sources)).toEqual([
+      { sha: target, subject: 'target', packages: ['core/sample'], bucket: 'carried' },
+      { sha: baseline, subject: 'baseline', packages: ['core/sample'], bucket: 'carried' },
+    ])
+    const shallow = join(root, '.git/shallow')
+    writeFileSync(shallow, `${baseline}\n`)
+    expect(git('rev-list', `${baseline}..${target}`)).toBe(target)
+    expect(() => readUpstreamCommitInventory(root, baseline, target, sources)).toThrow('shallow ancestry')
+    rmSync(shallow)
+    const unrelated = git('commit-tree', 'HEAD^{tree}', '-p', target, '-m', 'unrelated')
+    writeFileSync(shallow, `${unrelated}\n`)
+    expect(readUpstreamCommitInventory(root, baseline, target, sources)).toEqual([
+      { sha: target, subject: 'target', packages: ['core/sample'], bucket: 'carried' },
+    ])
+    const orphan = git('commit-tree', 'HEAD^{tree}', '-m', 'orphan')
+    expect(readUpstreamCommitInventory(root, initial, orphan, sources)).toEqual([
+      { sha: orphan, subject: 'orphan', packages: ['core/sample'], bucket: 'carried' },
+    ])
+    expect(() => readUpstreamCommitInventory(root, baseline, target, {
+      ...sources, packages: { 'core/sample': { sovereignty: ['owned'] } },
+    })).toThrow('invalid sovereignty')
+    rmSync(shallow)
+    const side = git('commit-tree', 'HEAD^{tree}', '-p', baseline, '-m', 'side')
+    const merge = git('commit-tree', 'HEAD^{tree}', '-p', target, '-p', side, '-m', 'merge')
+    expect(readUpstreamCommitInventory(root, baseline, merge, sources).map(row => row.sha).sort())
+      .toEqual([target, side].sort())
+    writeFileSync(shallow, `${merge}\n`)
+    expect(git('log', '--no-merges', '--format=%H', `${baseline}..${merge}`)).toBe(merge)
+    expect(() => readUpstreamCommitInventory(root, baseline, merge, sources)).toThrow('shallow ancestry')
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

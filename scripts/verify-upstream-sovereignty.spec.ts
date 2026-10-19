@@ -17,7 +17,7 @@ import {
 
 const root = resolve(import.meta.dirname, '..')
 
-const SYNCED_COMMIT = '4878cdabd87d4041bdaff61d04c966883b9fd07a'
+const SYNCED_COMMIT = '687f282e8625c6b8d11ff58211a90524be2e4317'
 
 function sourceFixture(run: (directory: string, commit: string, git: (...args: string[]) => string) => void): void {
   const directory = mkdtempSync(resolve(tmpdir(), 'dsh-sovereignty-test-'))
@@ -235,7 +235,7 @@ describe('checked-in manifest', () => {
 
   it('loads scripts/upstream-sync.json pinned at the mirrored release tag', () => {
     expect(manifest.version).toBe(2)
-    expect(manifest.syncedTag).toBe('dsh-v0.2.0-rc.1')
+    expect(manifest.syncedTag).toBe('dsh-v0.2.1-rc.2')
     expect(manifest.syncedCommit).toBe(SYNCED_COMMIT)
   })
 

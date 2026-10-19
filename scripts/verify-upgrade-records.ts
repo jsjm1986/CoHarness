@@ -25,6 +25,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { isAbsolute, relative, resolve } from 'node:path'
+import { readUpstreamCommitInventory } from './upstream-commit-inventory.ts'
 
 const root = resolve(import.meta.dirname, '..')
 
@@ -186,7 +187,7 @@ function checkUniqueIdentities(path: string, rows: unknown[], field: 'area' | 'i
   }
 }
 
-function requireCurrentSchema(path: string, raw: unknown): void {
+export function requireCurrentSchema(path: string, raw: unknown): void {
   if (!isRecord(raw) || typeof raw.schemaVersion !== 'number' || raw.schemaVersion < 3) {
     fail(`${path} active upgrade record requires schemaVersion: 3 or newer`)
   }
@@ -243,7 +244,7 @@ function recordsIn(dir: string, prefix: string, suffix: string): string[] {
 }
 
 /** Compare current inventories with raw paths, including both sides of upstream renames. */
-function checkMatrixFileInventories(path: string, raw: unknown): void {
+export function checkMatrixFileInventories(repoRoot: string, path: string, raw: unknown): void {
   if (!isRecord(raw) || typeof raw.schemaVersion !== 'number' || raw.schemaVersion < 3) return
   if (!isRecord(raw.target) || !COMMIT_ID.test(String(raw.target.commit))) fail(`${path} target.commit must be a commit id`)
   if (!Array.isArray(raw.rows)) fail(`${path} requires rows for file inventory verification`)
@@ -261,7 +262,7 @@ function checkMatrixFileInventories(path: string, raw: unknown): void {
       fail(`${path} ${range.field} requires a baseline commit id`)
     }
     const changed = execFileSync('git', ['diff', '--no-ext-diff', '--no-textconv', '--no-renames', '--name-only', '-z',
-      String(range.baseline.commit), target, '--'], { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+      String(range.baseline.commit), target, '--'], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
     const expected = new Set(changed.split('\0').filter(Boolean))
     const claimed = new Set<string>()
     for (const row of raw.rows) {
@@ -323,6 +324,45 @@ export function checkInventoryCoverage(path: string, inventory: unknown, matrix:
   }
 }
 
+/**
+ * Match an active inventory to complete Git history and current package ownership.
+ * @param repoRoot - checkout containing the recorded commits.
+ * @param path - inventory path used in diagnostics.
+ * @param inventory - parsed current inventory.
+ * @param matrix - current matrix declaring the interval.
+ * @param sync - parsed sovereignty manifest.
+ */
+export function checkActiveInventory(repoRoot: string, path: string, inventory: unknown, matrix: unknown, sync: unknown): void {
+  if (!isRecord(matrix) || !isRecord(matrix.baseline) || !isRecord(matrix.target)) fail(`${path} requires matrix endpoints`)
+  if (!isRecord(inventory) || inventory.schemaVersion !== 1 || !isRecord(inventory.generatedFrom) || !Array.isArray(inventory.commits)) {
+    fail(`${path} requires a schemaVersion: 1 commit inventory`)
+  }
+  const baseline = requireString(path, matrix.baseline.commit, 'baseline.commit')
+  const target = requireString(path, matrix.target.commit, 'target.commit')
+  if (!isRecord(sync) || matrix.target.tag !== sync.syncedTag || target !== sync.syncedCommit
+    || inventory.generatedFrom.baselineCommit !== baseline || inventory.generatedFrom.targetCommit !== target
+    || inventory.generatedFrom.target !== matrix.target.tag) {
+    fail(`${path} endpoints differ from the active matrix or sovereignty manifest`)
+  }
+  const expected = readUpstreamCommitInventory(repoRoot, baseline, target, sync)
+  const bySha = new Map(expected.map(commit => [commit.sha, commit]))
+  const seen = new Set<string>()
+  for (const raw of inventory.commits as unknown[]) {
+    if (!isRecord(raw) || typeof raw.sha !== 'string') fail(`${path} requires commit objects with full ids`)
+    if (seen.has(raw.sha)) fail(`${path} repeats commit ${raw.sha}`)
+    seen.add(raw.sha)
+    const source = bySha.get(raw.sha)
+    if (source === undefined) fail(`${path} commit ${raw.sha} is outside the complete non-merge Git interval`)
+    if (raw.subject !== source.subject || raw.bucket !== source.bucket
+      || JSON.stringify(raw.packages) !== JSON.stringify(source.packages)) {
+      fail(`${path} commit ${raw.sha} differs from Git paths or current package sovereignty`)
+    }
+  }
+  if (seen.size !== expected.length || inventory.commitCount !== expected.length) {
+    fail(`${path} commitCount or membership differs from the complete non-merge Git interval (${String(expected.length)} commits)`)
+  }
+}
+
 function main(): number {
   const sync = JSON.parse(readFileSync(resolve(root, 'scripts/upstream-sync.json'), 'utf8')) as {
     syncedTag: string
@@ -340,16 +380,19 @@ function main(): number {
       checkCurrentPackageDispositions(rel, parsed, sync.packages)
     }
     checkMatrix(rel, parsed)
-    checkMatrixFileInventories(rel, parsed)
+    checkMatrixFileInventories(root, rel, parsed)
     matrices.set(name.replace('UPSTREAM-ALIGNMENT-MATRIX-', '').replace('.json', ''), parsed)
     checked += 1
   }
+  const currentInventoryPath = `${ALIGNMENT_DIR}/UPSTREAM-COMMIT-INVENTORY-${sync.syncedTag}.json`
+  if (!existsSync(resolve(root, currentInventoryPath))) fail(`active upgrade requires ${currentInventoryPath}`)
   for (const name of recordsIn(ALIGNMENT_DIR, 'UPSTREAM-COMMIT-INVENTORY-', '.json')) {
     const rel = `${ALIGNMENT_DIR}/${name}`
     const parsed: unknown = JSON.parse(readFileSync(resolve(root, rel), 'utf8'))
     const tag = name.replace('UPSTREAM-COMMIT-INVENTORY-', '').replace('.json', '')
     const matrix = matrices.get(tag)
     if (matrix === undefined) fail(`${rel} has no matching UPSTREAM-ALIGNMENT-MATRIX-${tag}.json`)
+    if (tag === sync.syncedTag) checkActiveInventory(root, rel, parsed, matrix, sync)
     checkInventoryCoverage(rel, parsed, matrix, tag === sync.syncedTag ? 'segments' : 'historical')
     checked += 1
   }

@@ -1055,7 +1055,9 @@ def smoke_sdk_office(executable: Path) -> None:
         environment = {key: value for key, value in os.environ.items()
                        if not key.startswith("DSH_") and not any(part in key.upper() for part in ("KEY", "SECRET", "TOKEN", "PASSWORD"))}
         environment.update(PATH="")
-        node = office / "node/bin" / ("node.exe" if native.startswith("win32-") else "node")
+        # The bundled sidecar ships node_modules only; the carrier's Node comes
+        # from the primary runtime, matching the product's office node fallback.
+        node = root / resources.name / "primary-runtime/dependencies/node/bin" / ("node.exe" if native.startswith("win32-") else "node")
         cli = adapter.parent / "lib/cli.js"
         checks["render_cli"](
             [str(node), str(cli)], documents, root, expected_backend, environment,
