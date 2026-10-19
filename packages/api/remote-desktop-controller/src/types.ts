@@ -10,6 +10,12 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'remote-desktop/forbidden': Record<string, never>
     /** The remote desktop endpoint is unreachable. */
     'remote-desktop/unavailable': Record<string, never>
+    /**
+     * The capability rejected the operation; `code` is the stable
+     * `RemoteDesktopErrorCode` (forbidden, unavailable, grant/expiry,
+     * consent-required, transport, stale-target).
+     */
+    'remote-desktop/failure': { code: string }
   }
 }
 
@@ -43,19 +49,25 @@ export interface RemoteDesktopGrantView {
 /** Attach result: spec summary plus the stream endpoint to open. */
 export interface RemoteDesktopAttachView {
   readonly id: string
-  readonly spec: {
-    readonly target: RemoteDesktopTargetView
-    readonly level: RemoteDesktopLevelView
-    readonly recording: boolean
-  }
+  readonly spec: RemoteDesktopSpecView
   readonly stream: { readonly path: string; readonly token: string }
 }
 
-/** Live endpoint state for the `status` call. */
+/** Resolved spec summary shared by `confirm` and `attach` results. */
+export interface RemoteDesktopSpecView {
+  readonly target: RemoteDesktopTargetView
+  readonly level: RemoteDesktopLevelView
+  readonly recording: boolean
+}
+
+/** Live endpoint state plus the caller's grant summary for the `status` call. */
 export interface RemoteDesktopStatusView {
   readonly target: RemoteDesktopTargetView
   readonly available: boolean
   readonly attachments: number
+  readonly level: RemoteDesktopLevelView
+  readonly recording: boolean
+  readonly consented: boolean
 }
 
 /** Fields supplied when issuing a grant. */
@@ -69,12 +81,13 @@ export interface RemoteDesktopGrantInputView {
 
 /** Flattened audit event over the wire. */
 export interface RemoteDesktopAuditEventView {
-  readonly kind: 'grant' | 'revoke' | 'set-level' | 'attach' | 'detach' | 'level-escalate'
+  readonly kind: 'consent' | 'grant' | 'revoke' | 'set-level' | 'attach' | 'detach' | 'level-escalate'
   readonly at: number
   readonly principal: string
   readonly target?: RemoteDesktopTargetView
   readonly grantId?: string
   readonly sessionId?: string
+  readonly level?: RemoteDesktopLevelView
   readonly from?: RemoteDesktopLevelView
   readonly to?: RemoteDesktopLevelView
 }

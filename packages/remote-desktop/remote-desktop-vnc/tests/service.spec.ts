@@ -22,19 +22,19 @@ const FB_UPDATE_REQUEST = Buffer.from([2, 0, 0, 0, 0, 0, 4, 0, 3, 0])
 class Loopback extends Duplex {
   peer!: Loopback
 
-  _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
+  override _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
     this.peer.push(chunk)
     callback()
   }
 
-  _read(_size: number): void {}
+  override _read(_size: number): void {}
 
-  _final(callback: (error?: Error | null) => void): void {
+  override _final(callback: (error?: Error | null) => void): void {
     this.peer.push(null)
     callback()
   }
 
-  _destroy(error: Error | null, callback: (error?: Error | null) => void): void {
+  override _destroy(error: Error | null, callback: (error?: Error | null) => void): void {
     if (!this.peer.destroyed) this.peer.destroy()
     callback(error)
   }
@@ -111,7 +111,9 @@ describe('VncRemoteDesktop', () => {
 
   it('drops input frames on a view attachment and records the lifecycle', async () => {
     await svc.grant(grantInput(), ADMIN)
-    const session = await svc.attach({ principal: 'alice', target: { nodeId: 'n1' }, level: 'view' })
+    const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
+    await svc.confirm(request)
+    const session = await svc.attach(request)
     const [browserEnd, clientEnd] = duplexPair()
     const done = svc.serveStream(session.stream.token, clientEnd)
     await new Promise(resolve => setImmediate(resolve))
@@ -123,13 +125,15 @@ describe('VncRemoteDesktop', () => {
     browserEnd.destroy()
     await done
     const kinds = (await svc.audit(ADMIN)).map(e => e.kind)
-    expect(kinds).toEqual(['detach', 'attach', 'grant'])
+    expect(kinds).toEqual(['detach', 'attach', 'consent', 'grant'])
     expect((await svc.status({ principal: 'alice', admin: false }, { nodeId: 'n1' })).attachments).toBe(0)
   })
 
   it('passes input frames through on a control attachment', async () => {
     await svc.grant(grantInput({ level: 'control' }), ADMIN)
-    const session = await svc.attach({ principal: 'alice', target: { nodeId: 'n1' }, level: 'control' })
+    const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'control' as const }
+    await svc.confirm(request)
+    const session = await svc.attach(request)
     const [browserEnd, clientEnd] = duplexPair()
     const done = svc.serveStream(session.stream.token, clientEnd)
     await new Promise(resolve => setImmediate(resolve))
@@ -144,7 +148,9 @@ describe('VncRemoteDesktop', () => {
 
   it('consumes attach tokens exactly once', async () => {
     await svc.grant(grantInput(), ADMIN)
-    const session = await svc.attach({ principal: 'alice', target: { nodeId: 'n1' }, level: 'view' })
+    const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
+    await svc.confirm(request)
+    const session = await svc.attach(request)
     const [browserEnd, clientEnd] = duplexPair()
     const done = svc.serveStream(session.stream.token, clientEnd)
     const [otherBrowserEnd, otherClientEnd] = duplexPair()
@@ -165,24 +171,45 @@ describe('VncRemoteDesktop', () => {
 
   it('revokes access and audits set-level escalation over a live attachment', async () => {
     const row = await svc.grant(grantInput(), ADMIN)
-    const session = await svc.attach({ principal: 'alice', target: { nodeId: 'n1' }, level: 'view' })
+    const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
+    await svc.confirm(request)
+    const session = await svc.attach(request)
     await svc.setLevel(row.id, 'control', ADMIN)
     const events = await svc.audit(ADMIN)
-    expect(events.map(e => e.kind)).toEqual(['level-escalate', 'set-level', 'attach', 'grant'])
+    expect(events.map(e => e.kind)).toEqual(['level-escalate', 'set-level', 'attach', 'consent', 'grant'])
     await svc.revoke(row.id, ADMIN)
     await expect(svc.resolve({ principal: 'alice', target: { nodeId: 'n1' }, level: 'view' })).rejects.toThrow(RemoteDesktopError)
     await session.detach()
   })
 
-  it('reports endpoint availability through status', async () => {
+  it('reports endpoint availability and grant summary through status', async () => {
     await svc.grant(grantInput(), ADMIN)
-    const status = await svc.status({ principal: 'alice', admin: false }, { nodeId: 'n1' })
-    expect(status).toEqual({ target: { nodeId: 'n1' }, available: true, attachments: 0 })
+    const actor = { principal: 'alice', admin: false }
+    const target = { nodeId: 'n1' }
+    const pending = await svc.status(actor, target)
+    expect(pending).toEqual({ target, available: true, attachments: 0, level: 'view', recording: false, consented: false })
+    await svc.confirm({ principal: 'alice', target, level: 'view' })
+    expect((await svc.status(actor, target)).consented).toBe(true)
+  })
+
+  it('requires an explicit consent covering the resolved grant set', async () => {
+    const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
+    await svc.grant(grantInput(), ADMIN)
+    await expect(svc.attach(request)).rejects.toThrowError(/confirm/)
+    const spec = await svc.confirm(request)
+    expect(spec.recording).toBe(false)
+    await svc.attach(request)
+    const extra = await svc.grant(grantInput(), ADMIN)
+    await expect(svc.attach(request)).rejects.toThrowError(/confirm/)
+    await svc.revoke(extra.id, ADMIN)
+    await svc.attach(request)
   })
 
   it('fails a stream when the grant requires recording without a sink', async () => {
     await svc.grant(grantInput({ recording: true }), ADMIN)
-    const session = await svc.attach({ principal: 'alice', target: { nodeId: 'n1' }, level: 'view' })
+    const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
+    await svc.confirm(request)
+    const session = await svc.attach(request)
     const [, clientEnd] = duplexPair()
     await expect(svc.serveStream(session.stream.token, clientEnd)).rejects.toThrow(RemoteDesktopError)
   })

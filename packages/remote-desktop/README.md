@@ -12,7 +12,8 @@ The remote-desktop stack lets an authenticated human view and operate a remote n
 | Package | Role | ctx key |
 |---|---|---|
 | `remote-desktop/` | Service Definition: grant model and scopes, the `RemoteDesktop` service (`resolve → attach → serveStream`), and the `remote-desktop/*` event/audit vocabulary | `ctx.remoteDesktop` |
-| `remote-desktop-vnc/` | VNC/RFB provider: JSONL grant store, endpoint dialing, token-scoped attach, and the view-only `RfbClientFilter` inside the pump | (registers `ctx.remoteDesktop`) |
+| `remote-desktop-vnc/` | VNC/RFB provider: JSONL grant store, endpoint dialing, consent-covered token attach, the view-only `RfbClientFilter` inside the pump, and the append-only audit log | (registers `ctx.remoteDesktop`) |
+| `remote-desktop-stream/` | Web transport mount: one WebSocket upgrade route on `ctx.webServer`, the `?token=` handshake, and the ws→Duplex adapter feeding `serveStream` | (mounts `ctx.remoteDesktop`) |
 | `api/remote-desktop-controller/` | BFF controller: the `remoteDesktop/*` Remote namespace mapping authenticated human authority onto service calls | `ctx.remoteDesktopController` |
 
 The Service Definition lives at `remote-desktop/remote-desktop/`. A different transport (RDP, WebRTC) can replace `remote-desktop-vnc` without touching the grant model or the controller: level enforcement lives inside the provider's stream path, so a replacement must carry the same guarantee (a `view` attachment cannot inject input). Access never defaults open — every level requires an administrator grant, and session-scoped grants always carry an expiry.

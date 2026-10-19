@@ -10,7 +10,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { RemoteDesktopGrantId } from '@deepseek-ai/dsh-remote-desktop'
+import { RemoteDesktopError, RemoteDesktopGrantId } from '@deepseek-ai/dsh-remote-desktop'
 import type { RemoteDesktopActor, RemoteDesktopAuditEvent, RemoteDesktopGrant } from '@deepseek-ai/dsh-remote-desktop'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { RemoteDesktopAccess } from './authorization.ts'
@@ -20,6 +20,7 @@ import type {
   RemoteDesktopGrantInputView,
   RemoteDesktopGrantView,
   RemoteDesktopLevelView,
+  RemoteDesktopSpecView,
   RemoteDesktopStatusView,
   RemoteDesktopTargetView,
 } from './types.ts'
@@ -37,8 +38,18 @@ function grantView(grant: RemoteDesktopGrant): RemoteDesktopGrantView {
   return { ...grant, id: String(grant.id) }
 }
 
+/** Translate capability rejections into typed wire errors clients can branch on. */
+function translate(error: unknown): never {
+  if (error instanceof RemoteDesktopError) {
+    throw new RemoteError('remote-desktop/failure', error.message, { code: error.code })
+  }
+  throw error
+}
+
 function auditView(event: RemoteDesktopAuditEvent): RemoteDesktopAuditEventView {
   switch (event.kind) {
+    case 'consent':
+      return { kind: 'consent', at: event.at, principal: event.principal, target: event.target, level: event.level }
     case 'grant':
     case 'revoke':
     case 'set-level':
@@ -96,7 +107,31 @@ export class RemoteDesktopController extends TypertRemoteService {
   async status(agent: Agent, request: RemoteDesktopTargetView, signal: AbortSignal): Promise<RemoteDesktopStatusView> {
     using authority = await this.access.authorize(agent.id, signal)
     const actor: RemoteDesktopActor = { principal: String(authority.creator), admin: false }
-    return await this.ctx.remoteDesktop.status(actor, request)
+    return await this.ctx.remoteDesktop.status(actor, request, { sessionId: agent.id }).catch(translate)
+  }
+
+  /**
+   * Record the caller's explicit consent for a resolved spec; the returned
+   * summary is what the operator acknowledged (level plus recording flag).
+   * @param agent - caller's Session owner; session-scoped grants match its id.
+   * @param request - target plus the level being consented to.
+   * @param signal - request cancellation.
+   * @returns the resolved spec the consent now covers.
+   */
+  @Remote
+  async confirm(
+    agent: Agent,
+    request: RemoteDesktopTargetView & { level: RemoteDesktopLevelView },
+    signal: AbortSignal,
+  ): Promise<RemoteDesktopSpecView> {
+    using authority = await this.access.authorize(agent.id, signal)
+    const spec = await this.ctx.remoteDesktop.confirm({
+      principal: String(authority.creator),
+      target: { nodeId: request.nodeId, ...(request.desktop === undefined ? {} : { desktop: request.desktop }) },
+      sessionId: agent.id,
+      level: request.level,
+    }).catch(translate)
+    return { target: spec.target, level: spec.level, recording: spec.recording }
   }
 
   /**
@@ -118,7 +153,7 @@ export class RemoteDesktopController extends TypertRemoteService {
       target: { nodeId: request.nodeId, ...(request.desktop === undefined ? {} : { desktop: request.desktop }) },
       sessionId: agent.id,
       level: request.level,
-    })
+    }).catch(translate)
     return {
       id: String(session.id),
       spec: { target: session.spec.target, level: session.spec.level, recording: session.spec.recording },
@@ -232,7 +267,7 @@ export class RemoteDesktopController extends TypertRemoteService {
     const events = await this.ctx.remoteDesktop.audit(actor, {
       ...(request.principal === undefined ? {} : { principal: request.principal }),
       ...(request.target === undefined ? {} : { target: request.target }),
-    })
+    }).catch(translate)
     return events.map(auditView)
   }
 

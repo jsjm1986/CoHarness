@@ -409,6 +409,7 @@
       "@deepseek-ai/dsh-ptc-runtime-node": ["./packages/ptc-runtime/ptc-runtime-node/src"],
       "@deepseek-ai/dsh-pwsh-sandbox": ["./packages/shell/pwsh-sandbox/src"],
       "@deepseek-ai/dsh-remote-desktop": ["./packages/remote-desktop/remote-desktop/src"],
+      "@deepseek-ai/dsh-remote-desktop-stream": ["./packages/remote-desktop/remote-desktop-stream/src"],
       "@deepseek-ai/dsh-remote-desktop-vnc": ["./packages/remote-desktop/remote-desktop-vnc/src"],
       "@deepseek-ai/dsh-remote-mock": ["./packages/test-support/remote-mock/src"],
       "@deepseek-ai/dsh-repeat-tool-reminder": ["./packages/guard/repeat-tool-reminder/src"],

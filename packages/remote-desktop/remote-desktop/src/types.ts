@@ -15,6 +15,7 @@ export type RemoteDesktopErrorCode =
   | 'REMOTE_DESKTOP_GRANT_EXPIRED'
   | 'REMOTE_DESKTOP_STALE_TARGET'
   | 'REMOTE_DESKTOP_TRANSPORT'
+  | 'REMOTE_DESKTOP_CONSENT_REQUIRED'
 
 /** Access level an attachment may use; `control` strictly exceeds `view`. */
 export type RemoteDesktopLevel = 'view' | 'control'
@@ -50,13 +51,19 @@ export interface RemoteDesktopGrant {
 /** Fields an administrator supplies when issuing a grant. */
 export type RemoteDesktopGrantInput = Omit<RemoteDesktopGrant, 'id' | 'createdAt' | 'revokedAt'>
 
-/** Live remote state of one desktop endpoint. */
+/** Live remote state of one desktop endpoint plus the caller's authorization summary. */
 export interface RemoteDesktopTargetStatus {
   readonly target: RemoteDesktopTarget
   /** The node's desktop transport is reachable. */
   readonly available: boolean
   /** Current attachments on this desktop. */
   readonly attachments: number
+  /** Highest level the caller's live grants authorize. */
+  readonly level: RemoteDesktopLevel
+  /** Any matching grant requires screen recording. */
+  readonly recording: boolean
+  /** A recorded consent already covers the caller's current grant set at `level`. */
+  readonly consented: boolean
 }
 
 /** Explicit resolve outcome — the enforced attachment contract. */
@@ -112,6 +119,16 @@ export interface RemoteDesktopActor {
 
 /** Audit events owned by this capability; consumers record them in the audit domain. */
 export type RemoteDesktopAuditEvent =
+  | {
+    /** Explicit human consent covering a grant set at a level, recorded before attach. */
+    readonly kind: 'consent'
+    readonly principal: string
+    readonly target: RemoteDesktopTarget
+    readonly level: RemoteDesktopLevel
+    /** The grant ids the consent covers; attach requires its spec grants ⊆ this set. */
+    readonly grants: readonly RemoteDesktopGrantId[]
+    readonly at: number
+  }
   | { readonly kind: 'grant'; readonly grant: RemoteDesktopGrant; readonly actor: RemoteDesktopActor; readonly at: number }
   | { readonly kind: 'revoke' | 'set-level'; readonly grant: RemoteDesktopGrant; readonly actor: RemoteDesktopActor; readonly at: number }
   | { readonly kind: 'attach' | 'detach'; readonly session: RemoteDesktopSessionId; readonly spec: RemoteDesktopSpec; readonly principal: string; readonly at: number }

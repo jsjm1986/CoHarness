@@ -1,5 +1,5 @@
 ---
-description: "VNC/RFB provider for ctx.remoteDesktop — JSONL-backed grant store, enforced resolve → attach → serveStream attachment flow, and an RFB pump that drops input frames on view-only attachments"
+description: "VNC/RFB provider for ctx.remoteDesktop — JSONL grant store, consent-covered resolve → confirm → attach → serveStream flow, append-only audit log, and an RFB pump that drops input frames on view-only attachments"
 kind: "package-reference"
 ---
 
@@ -11,7 +11,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Install this provider when the harness serves human remote-desktop access to machines running a VNC server (macOS Screen Sharing, UltraVNC, KasmVNC, x11vnc). Administrators manage grants through the service's `grant`/`revoke`/`setLevel`; users attach through `attach` and open the returned stream path with a one-time token.
+Install this provider when the harness serves human remote-desktop access to machines running a VNC server (macOS Screen Sharing, UltraVNC, KasmVNC, x11vnc). Administrators manage grants through the service's `grant`/`revoke`/`setLevel`; users `confirm` once per grant set, then `attach` and open the returned stream path with a one-time token.
 
 ## Table of Contents
 
@@ -32,14 +32,16 @@ Install this provider when the harness serves human remote-desktop access to mac
 | `endpoints` | `{ nodeId, desktop?, host, port }` rows; duplicate target keys fail at load. |
 | `grantsFile` | JSONL grant-store path, rewritten atomically per mutation; `':memory:'` selects a volatile store. |
 | `recordingDir` | Directory receiving `<sessionId>.rfb` raw stream captures for grants flagged `recording`; empty disables it and a flagged `serveStream` fails. |
+| `streamPath` | Pathname the stream mount serves; clients append `?token=`; default `/remote-desktop/stream`. |
 | `attachTokenTtlMs` | Attach-token validity window; default `60000`. |
-| `auditCapacity` | In-memory audit events retained for `audit()`; default `1024`. |
+| `auditFile` | Append-only JSONL audit path; `':memory:'` selects a volatile window. |
+| `auditCapacity` | Audit events retained for `audit()` queries and reloaded from the file tail; default `1024`. |
 | `probeTimeoutMs` | `status` endpoint-probe timeout; default `3000`. |
 
 <a id="attachment-flow"></a>
 ## Attachment flow
 
-`attach` resolves grants, mints a one-time branded token, and returns `{ path, token }`. The API layer upgrades the client socket at `path` and calls `serveStream(token, socket)`; the provider consumes the token exactly once, dials the configured endpoint, and pumps until either side closes. `detach` and pump teardown share one commit path that records the `detach` audit event and emits `remote-desktop/attached`.
+`confirm` resolves the caller's grants, records consent covering the resolved grant set at the requested level (a `consent` audit event), and returns the spec so the caller learns its recording flag. `attach` then resolves again, requires a covering consent (`REMOTE_DESKTOP_CONSENT_REQUIRED` otherwise — a new grant in the set, a level raise, or a restart all demand a fresh `confirm`), mints a one-time branded token, and returns `{ path, token }`. The transport mount upgrades the client socket at `path` and calls `serveStream(token, socket)`; the provider consumes the token exactly once, dials the configured endpoint, and pumps until either side closes. `detach` and pump teardown share one commit path that records the `detach` audit event and emits `remote-desktop/attached`.
 
 <a id="view-only-enforcement"></a>
 ## View-only enforcement
@@ -55,7 +57,7 @@ No model-visible surface; nothing here enters prompts, tool schemas, or model re
 ## Known Limitations and Deferred Work
 
 - The view-only filter frames security types `None` and `VNC authentication`; other types (Tight, VeNCrypt, Apple DH) pass under `control` attachments but refuse `view` ones.
-- Audit events are an in-memory ring; durable audit storage is the `remote-desktop-audit` follow-up.
+- Consents are in-memory: a restart requires one fresh `confirm` per grant set; `auditFile` makes the audit trail itself durable.
 - Recordings capture the raw RFB stream; playback/transcoding is out of scope.
 - Endpoint reachability goes through the protected `dial` seam; routing it over the remote-session reverse tunnel is the integration follow-up.
 - `':memory:'` grants are correct for tests and development; production deployments must set `grantsFile`.

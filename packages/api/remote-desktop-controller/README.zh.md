@@ -27,8 +27,9 @@ kind: "package-reference"
 
 | 方法 | 会话作用域 | 角色 | 语义 |
 |---|---|---|---|
-| `status(agent, target)` | 调用者会话 | 任一授权持有者 | 端点可达性与附件数。 |
-| `attach(agent, target, level)` | 调用者会话 | 匹配的授权 | 返回 `{ id, spec, stream }`；客户端用一次性 token 打开 `stream.path`。 |
+| `status(agent, target)` | 调用者会话 | 任一授权持有者 | 端点可达性、附件数，以及调用者的授权摘要（`level`/`recording`/`consented`）。 |
+| `confirm(agent, target, level)` | 调用者会话 | 匹配的授权 | 记录覆盖已解析授权集的同意；返回被确认的 spec（含 `recording`）。 |
+| `attach(agent, target, level)` | 调用者会话 | 匹配的授权 + 覆盖同意 | 返回 `{ id, spec, stream }`；无前置 `confirm` 则以 `remote-desktop/failure` `REMOTE_DESKTOP_CONSENT_REQUIRED` 失败。 |
 | `listGrants(agent, filter)` | 调用者会话 | admin 见全部；其他见本人 principal | 授权行，可选包含已撤销。 |
 | `grant(agent, input)` | 管理员会话 | admin | 签发归属调用者的授权。 |
 | `setLevel(agent, grantId, level)` | 管理员会话 | admin | 修改授权级别。 |
@@ -48,6 +49,7 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
-- `serveStream` 由能力层暴露而非本命名空间；挂载 RFB-over-WebSocket 路径（`stream.path`）属于传输集成工作。
+- `serveStream` 由能力层暴露而非本命名空间；`dsh-remote-desktop-stream` 挂载 WebSocket 路径（`stream.path` + `?token=`）。
+- 能力层拒绝以 `remote-desktop/failure` 呈现，`code` 字段携带稳定的 `RemoteDesktopErrorCode`；`remote-desktop/forbidden` 仍是控制器侧管理员检查的线缆码。
 - detach 是隐式的（流关闭）；显式强制 detach 管理方法延后。
 - 会话作用域授权以调用者会话做授权匹配；代表其他会话的授予通过管理员权限下的 `scope.sessionId` 载荷完成。

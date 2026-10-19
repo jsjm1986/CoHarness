@@ -27,8 +27,9 @@ The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `r
 
 | Method | Session scope | Role | Semantics |
 |---|---|---|---|
-| `status(agent, target)` | caller's session | any grant holder | Endpoint availability and attachment count. |
-| `attach(agent, target, level)` | caller's session | matching grant | Returns `{ id, spec, stream }`; the client opens `stream.path` with the one-time token. |
+| `status(agent, target)` | caller's session | any grant holder | Endpoint availability, attachment count, and the caller's grant summary (`level`/`recording`/`consented`). |
+| `confirm(agent, target, level)` | caller's session | matching grant | Records consent covering the resolved grant set; returns the spec acknowledged (including `recording`). |
+| `attach(agent, target, level)` | caller's session | matching grant + covering consent | Returns `{ id, spec, stream }`; fails `remote-desktop/failure` `REMOTE_DESKTOP_CONSENT_REQUIRED` without a prior `confirm`. |
 | `listGrants(agent, filter)` | caller's session | admin sees all; others own principal | Grant rows, optionally including revoked. |
 | `grant(agent, input)` | administrator's session | admin | Issues a grant attributed to the caller. |
 | `setLevel(agent, grantId, level)` | administrator's session | admin | Changes a grant's level. |
@@ -48,6 +49,7 @@ No model-visible surface; human-facing BFF only.
 <a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
-- `serveStream` is exposed by the capability, not this namespace; mounting the RFB-over-WebSocket path (`stream.path`) is the transport integration's job.
+- `serveStream` is exposed by the capability, not this namespace; `dsh-remote-desktop-stream` mounts the WebSocket path (`stream.path` + `?token=`).
+- Capability rejections surface as `remote-desktop/failure` with the stable `RemoteDesktopErrorCode` in `code`; `remote-desktop/forbidden` remains the wire code for controller-side administrator checks.
 - Detach is implicit (stream close); an explicit force-detach admin method is deferred.
 - Session-scoped grants use the caller's session for grant matching; granting on behalf of a different session happens through the `scope.sessionId` payload under administrator authority.

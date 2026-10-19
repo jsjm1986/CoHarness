@@ -7,6 +7,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Duplex } from 'node:stream'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteDesktopGrantId, RemoteDesktopToken } from './brand.ts'
 import type {
   RemoteDesktopActor,
@@ -103,8 +104,20 @@ export abstract class RemoteDesktop extends Service {
   abstract resolve(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSpec>
 
   /**
-   * Open one attachment. Implementations resolve first, then establish the
-   * transport and stream endpoint; the returned session owns detach.
+   * Record the caller's explicit consent for a resolved spec. Implementations
+   * resolve the request first (rejecting unauthorized targets), persist the
+   * consent against the resolved grant set and requested level, record a
+   * `consent` audit event, and return the spec so the caller learns the
+   * effective level and recording flag it acknowledged.
+   */
+  abstract confirm(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSpec>
+
+  /**
+   * Open one attachment. Implementations resolve first — and require a
+   * consent recorded by {@link confirm} that covers the resolved grant set
+   * at the requested level, throwing `REMOTE_DESKTOP_CONSENT_REQUIRED`
+   * otherwise — then establish the transport and stream endpoint; the
+   * returned session owns detach.
    */
   abstract attach(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSession>
 
@@ -118,10 +131,16 @@ export abstract class RemoteDesktop extends Service {
 
   /**
    * Read the live remote state of one desktop endpoint.
-   * Requires at least one live grant for `actor.principal` on the target.
-   * @returns availability and attachment count.
+   * Requires at least one live grant for `actor.principal` on the target;
+   * `options.sessionId` admits session-scoped grants into the summary.
+   * @returns availability, attachment count, and the caller's grant summary.
    */
-  abstract status(actor: RemoteDesktopActor, target: RemoteDesktopTarget, signal?: AbortSignal): Promise<RemoteDesktopTargetStatus>
+  abstract status(
+    actor: RemoteDesktopActor,
+    target: RemoteDesktopTarget,
+    options?: { sessionId?: SessionId },
+    signal?: AbortSignal,
+  ): Promise<RemoteDesktopTargetStatus>
 
   /**
    * List grants, optionally filtered; revoked rows need `includeRevoked`.

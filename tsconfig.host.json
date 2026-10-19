@@ -394,6 +394,7 @@
     { "path": "./packages/browser-use/browser-use" },
     { "path": "./packages/computer-use/computer-use" },
     { "path": "./packages/remote-desktop/remote-desktop" },
+    { "path": "./packages/remote-desktop/remote-desktop-stream" },
     { "path": "./packages/remote-desktop/remote-desktop-vnc" },
     { "path": "./packages/webhook/webhook" },
     { "path": "./packages/webhook/webhook-github" },

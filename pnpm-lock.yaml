@@ -9732,6 +9732,28 @@ importers:
         specifier: workspace:*
         version: link:../../core/session
 
+  packages/remote-desktop/remote-desktop-stream:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      ws:
+        specifier: ^8.21.3
+        version: 8.21.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: workspace:*
+        version: link:../../host/webserver
+      '@deepseek-ai/dsh-remote-desktop':
+        specifier: workspace:*
+        version: link:../remote-desktop
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+
   packages/remote-desktop/remote-desktop-vnc:
     dependencies:
       '@deepseek-ai/schemastery':
