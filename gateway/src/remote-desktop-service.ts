@@ -11,6 +11,7 @@
 
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { hostname } from 'node:os'
 import { randomUUID } from 'node:crypto'
 
 /** Failure of validation or file access in the remote-desktop service. */
@@ -85,12 +86,22 @@ export class RemoteDesktopService {
     this.auditFile = join(dir, 'audit.jsonl')
   }
 
-  /** The configured endpoint list; an absent file means none configured. */
+  /** The configured endpoint list; an absent file seeds this host's own
+   * screen-sharing endpoint since deployments serve the gateway machine
+   * by default. */
   async endpoints(): Promise<RemoteDesktopEndpointRow[]> {
     const text = await readFile(this.endpointsFile, 'utf8').catch(() => undefined)
-    if (text === undefined) return []
+    if (text === undefined) return this.seed()
     const parsed = JSON.parse(text) as { endpoints?: RemoteDesktopEndpointRow[] }
     return parsed.endpoints ?? []
+  }
+
+  /** Persist and return the default endpoint: the machine the gateway runs on. */
+  private async seed(): Promise<RemoteDesktopEndpointRow[]> {
+    const nodeId = hostname().split('.')[0]?.toLowerCase().replace(/[^a-z0-9-]+/g, '-') ?? ''
+    const rows: RemoteDesktopEndpointRow[] = [{ nodeId: nodeId === '' ? 'this-machine' : nodeId, host: '127.0.0.1', port: 5900 }]
+    await this.writeAtomic(this.endpointsFile, JSON.stringify({ endpoints: rows }, null, 2) + '\n')
+    return rows
   }
 
   /** Validate and atomically replace the endpoint list. */
