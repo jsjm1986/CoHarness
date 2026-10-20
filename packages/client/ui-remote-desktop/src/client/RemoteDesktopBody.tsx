@@ -156,6 +156,8 @@ function RfbSurface({ openScreen, url, viewOnly, t }: Pick<RemoteDesktopInjected
   useEffect(() => {
     const host = container.current
     if (host === null) return
+    setClosed(false)
+    setChallenge(undefined)
     const next = openScreen(host, url, {
       viewOnly,
       onCredentialsRequired: types => setChallenge(types),
