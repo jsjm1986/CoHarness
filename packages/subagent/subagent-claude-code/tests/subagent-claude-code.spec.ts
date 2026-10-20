@@ -509,7 +509,7 @@ describe('named persistent member routes', () => {
 })
 
 describe('task admission and package contracts', () => {
-  it('ships one independently installable provider-only Bundle patch', () => {
+  it('ships one independently installable Bundle patch', () => {
     const root = fileURLToPath(new URL('..', import.meta.url))
     const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
@@ -565,8 +565,15 @@ describe('task admission and package contracts', () => {
     expect(rows).toEqual([{
       id: 'subagent-claude-code',
       name: '@deepseek-ai/dsh-subagent-claude-code',
+    }, {
+      id: 'tool-subagent-claude-code',
+      name: '@deepseek-ai/dsh-tool-subagent',
+      config: {
+        provider: 'claude-code',
+        toolName: 'subagent_claude_code',
+        maxDepth: 'provider-managed',
+      },
     }])
-    expect(JSON.stringify(rows)).not.toContain('tool-subagent')
   })
 
   it('preserves text sequences and rejects empty, blank, and non-text tasks', () => {

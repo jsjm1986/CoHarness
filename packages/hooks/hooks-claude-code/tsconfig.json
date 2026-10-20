@@ -9,40 +9,37 @@
   ],
   "references": [
     {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../hook-protocol"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../session/session-persistence"
-    },
-    {
-      "path": "../../session/working-directory"
-    },
-    {
-      "path": "../../shell/shell"
-    },
-    {
-      "path": "../../subagent/subagent"
+      "path": "../../../vendor/cosmokit"
     },
     {
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../hook-protocol"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../shell/shell"
+    },
+    {
+      "path": "../../session/working-directory"
     }
   ]
 }

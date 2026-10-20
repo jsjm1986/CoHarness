@@ -147,7 +147,10 @@ describe('SDK persisted session resume', () => {
       await restoring
       await prompting
       await server.wait({ sessionId: 'saved' })
-      expect(open).toHaveBeenCalledTimes(1)
+      // resume owns both opens: the write claim, then the read open inside the
+      // cold-recovery load. The prompt joined the pending creation and opened
+      // nothing of its own.
+      expect(open).toHaveBeenCalledTimes(2)
       expect(ctx.agents.list()).toHaveLength(1)
       await server.shutdown()
       expect(ctx.agents.list()).toHaveLength(0)

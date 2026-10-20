@@ -55,7 +55,7 @@
 
 .helpButton:hover,
 .helpButton[aria-expanded='true'] {
-  background: var(--dsw-alias-bg-layer-4);
+  background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
 }
 

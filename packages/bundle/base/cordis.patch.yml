@@ -272,10 +272,6 @@
     - id: skill-filesystem
       name: '@deepseek-ai/dsh-skill-filesystem'
 
-    - id: skill-badge
-      name: '@deepseek-ai/dsh-skill-badge'
-      disabled: true
-
     - id: tool-skill
       name: '@deepseek-ai/dsh-tool-skill'
 
@@ -411,16 +407,6 @@
     # domain, driver, and `/goal` command are above.
     - id: tool-goal
       name: '@deepseek-ai/dsh-tool-goal'
-
-    # Fresh-agent Ralph iteration over a build-time-fixed script. The tool is
-    # mounted but disabled by default; a deployment patch or preset enables it
-    # by removing `disabled`.
-    - id: tool-ralph
-      name: '@deepseek-ai/dsh-tool-ralph'
-      disabled: true
-      config:
-        subagentProvider: spawn
-        maxRounds: 64
 
     - id: tool-str-replace-editor
       name: '@deepseek-ai/dsh-tool-str-replace-editor'

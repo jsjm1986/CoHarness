@@ -23,10 +23,13 @@
       "default": "./lib/types/types.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./examples/*": "./examples/*"
   },
   "files": [
     "lib/index.js",
+    "examples/github-review/cordis.yml",
+    "examples/github-review/github-ready-review-rule.mjs",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts"
   ],

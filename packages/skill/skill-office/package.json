@@ -43,7 +43,7 @@
   },
   "dependencies": {
     "yaml": "^2.4.2",
-    "@deepseek-ai/libreoffice-kit": "^0.1.1",
+    "@deepseek-ai/libreoffice-kit": "^0.1.5",
     "@deepseek-ai/schemastery": "workspace:~"
   }
 }

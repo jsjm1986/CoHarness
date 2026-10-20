@@ -87,7 +87,7 @@ This matrix shows which packages dispatch each declared event and which packages
 | `typert-gateway/authorize` | `serial` | [`packages/typert/protocol/src/types.ts:982`](../packages/typert/protocol/src/types.ts) | `gateway` (`serial`) | `apiproxy` |
 | `typert-gateway/invoke` | `waterfall` | [`packages/typert/protocol/src/types.ts:975`](../packages/typert/protocol/src/types.ts) | `gateway` (`waterfall`) | `apiproxy` |
 | `user-questions/request` | `waterfall` | [`packages/interaction/user-questions/src/types.ts:160`](../packages/interaction/user-questions/src/types.ts) | [`user-questions`](../packages/interaction/user-questions) (`waterfall`) | `apiproxy` |
-| `webserver/index-inject` | `emit` | [`packages/host/webserver/src/index.ts:39`](../packages/host/webserver/src/index.ts) | `webserver` (`emit`) | `connection`, `inspector`, `modules`, `shortcuts`, `ui-theme` |
+| `webserver/index-inject` | `emit` | [`packages/host/webserver/src/index.ts:39`](../packages/host/webserver/src/index.ts) | `webserver` (`emit`) | `connection`, `inspector`, `modules`, `shortcuts` |
 | `workflow/agent-end` | `emit` | [`packages/workflow/workflow/src/index.ts:79`](../packages/workflow/workflow/src/index.ts) | [`workflow`](../packages/workflow/workflow) (`events.dispatch`) | [`tool-workflow`](../packages/workflow/tool-workflow) |
 | `workflow/agent-start` | `emit` | [`packages/workflow/workflow/src/index.ts:68`](../packages/workflow/workflow/src/index.ts) | [`workflow`](../packages/workflow/workflow) (`events.dispatch`) | [`tool-workflow`](../packages/workflow/tool-workflow) |
 | `workflow/end` | `emit` | [`packages/workflow/workflow/src/index.ts:89`](../packages/workflow/workflow/src/index.ts) | [`workflow`](../packages/workflow/workflow) (`events.dispatch`) | - |
@@ -107,25 +107,12 @@ This matrix shows which packages dispatch each declared event and which packages
 | --- | --- | --- |
 | `connection/authenticate` | `connection` (`bail`) | [`gateway-runtime`](../packages/context/gateway-runtime) |
 | `connection/request` | `connection` (`waterfall`) | `connection`, [`gateway-runtime`](../packages/context/gateway-runtime) |
-| `connection/reset` | `runtime` (`emit`) | `ui-settings` |
-| `conversation/draft-initialize` | `runtime` (`emit`) | `ui-conversation` |
 | `internal/dispatch` | - | [`terminal-bash`](../packages/terminal/terminal-bash) |
 | `internal/plugin` | - | `computer-use-cua-driver-native`, `inspector`, `loader`, [`lsp-stdio`](../packages/lsp/lsp-stdio), [`mcp-client`](../packages/mcp/mcp-client), `modules` |
 | `internal/service` | - | `gateway` |
 | `internal/status` | - | [`agent`](../packages/core/agent), `inspector`, `translator` |
 | `internal/update` | - | [`app-boot`](../packages/boot/app-boot) |
 | `loader/volatile-update` | - | [`llm-deepseek`](../packages/llm/llm-deepseek), [`plugin-market`](../packages/boot/plugin-market), `speech-to-text` |
-| `locale/change` | `locale` (`emit`) | - |
-| `sessions/confirm-blank-reuse` | `runtime` (`waterfall`) | - |
-| `sessions/prepare-create` | `runtime` (`waterfall`) | - |
-| `slash/input-begin-command` | `ui-input-trigger` (`bail`) | `ui-conversation` |
-| `slash/input-consume-token` | - | `ui-conversation` |
-| `slash/input-insert-reference` | `ui-input-trigger` (`bail`) | `ui-conversation` |
-| `slash/input-insert-text` | `ui-input-trigger` (`bail`) | `ui-conversation` |
-| `slots/changed` | `runtime` (`emit`) | - |
-| `theme/change` | `ui-theme` (`emit`) | `ui-layout`, `ui-theme` |
-| `web/browser-open` | `ui-conversation` (`bail`) | - |
-| `workspace/resource-open` | `ui-conversation` (`bail`) | - |
 <!-- END GENERATED event-producer-consumer:undeclared -->
 
 Maintenance mode: generated: Cordis event declarations and producer/listener edges are resolved from the repository TypeScript Program.

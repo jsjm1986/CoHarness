@@ -1632,7 +1632,8 @@
     "packages/experimental/client-ui-cot-translation": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.spec.tsx"
+        "tests/**/*.spec.tsx",
+        "tests/remote-standin.ts"
       ],
       "project": [
         "src/**/*.ts",

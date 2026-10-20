@@ -38,6 +38,9 @@ export interface SettingsFieldProps {
   onReset: () => void
 }
 
+/* jscpd:ignore-start -- Controls adapted from
+   ui-settings-plugins/fields.tsx; client rules forbid importing another
+   plugin's internals across packages. */
 /**
  * A staged value field. `numeric` only hints the keypad: which drafts a field
  * accepts is decided by its spec, so the control never silently rewrites what
@@ -148,3 +151,4 @@ export function SettingsSecretField(props: Pick<SettingsFieldProps, 'id' | 'labe
     </div>
   )
 }
+/* jscpd:ignore-end */

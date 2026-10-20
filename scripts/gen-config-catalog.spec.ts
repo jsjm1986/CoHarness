@@ -189,7 +189,11 @@ describe('config catalog rendering', () => {
   })
 
   it('leaves the consistency record unchanged when only package data changes', () => {
-    expect(record(['jobs', 'typert'])).toEqual(record(['jobs']))
-    expect([...record(['jobs']).keys()].some(key => key.includes('dsh-demo'))).toBe(false)
+    const sections = (inject: string[]) => new Map([...record(inject)].filter(([key]) => key !== 'document'))
+    expect(sections(['jobs', 'typert'])).toEqual(sections(['jobs']))
+    expect([...sections(['jobs']).keys()].some(key => key.includes('dsh-demo'))).toBe(false)
+    // Section hashes exclude generated regions; the document entry stores
+    // whole-file blob IDs, so it moves with regenerated package data.
+    expect(record(['jobs', 'typert']).get('document')).not.toEqual(record(['jobs']).get('document'))
   })
 })

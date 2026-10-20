@@ -9,43 +9,40 @@
   ],
   "references": [
     {
-      "path": "../../compaction/compaction"
-    },
-    {
-      "path": "../../context/collaboration"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../../core/system-prompt"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../../context/collaboration"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../session-query"
-    },
-    {
-      "path": "../../util/timeout"
-    },
-    {
-      "path": "../../util/values"
+      "path": "../../../vendor/cosmokit"
     },
     {
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../session-query/session-query"
+    },
+    {
+      "path": "../../util/timeout"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../context/collaboration"
     }
   ]
 }

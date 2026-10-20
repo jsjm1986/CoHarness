@@ -1,7 +1,7 @@
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, chmodSync, existsSync, readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -761,12 +761,14 @@ export function defineCoverageCases(group: CoverageGroup): void {
     it('runs a SubagentStop hook in the CHILD session workspace, not the server cwd', async () => {
       const serverDir = dir()
       const childDir = dir()
-      const marker = join(childDir, 'stopwhere')
-      const payload = join(childDir, 'stoppayload')
+      const currentDir = join(childDir, 'current')
+      mkdirSync(currentDir)
+      const marker = join(currentDir, 'stopwhere')
+      const payload = join(currentDir, 'stoppayload')
       hooks(serverDir, { SubagentStop: [{ hooks: [{ type: 'command', command: 'cat > stoppayload.tmp; mv stoppayload.tmp stoppayload; pwd > stopwhere' }] }] })
       const ctx = new Context()
-      provideWorkingDirectoryFixture(ctx)
-      await mountAgentLoopTestDependencies(ctx)
+      contexts.push(ctx)
+      await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
       await ctx.plugin(AgentLoop, { agents: [] })
       // Executor default cwd = serverDir (deliberately NOT the child session cwd).
       await ctx.plugin(LocalSubprocessRuntime)
@@ -781,6 +783,7 @@ export function defineCoverageCases(group: CoverageGroup): void {
       // Start is the registry-backed capture edge; end deliberately follows
       // handle disposal, matching continuable Activation settlement.
       ctx.emit(subagentCarrier(ctx), 'subagent/start', identity)
+      await ctx.workingDirectory.set(childHandle.agent, currentDir)
       await childHandle.dispose()
       expect(ctx.agents.get(childHandle.agent.id)).toBeUndefined()
       ctx.emit(subagentCarrier(ctx), 'subagent/end', { ...identity, stopReason: 'completed' })
@@ -790,8 +793,19 @@ export function defineCoverageCases(group: CoverageGroup): void {
       const where = readFileSync(marker, 'utf8').trim()
       const input = JSON.parse(readFileSync(payload, 'utf8')) as { cwd: string; session_id: string }
       // `pwd` may resolve symlinks (/var → /private/var etc.), so compare basenames.
-      expect(where.endsWith(childDir.split('/').pop()!)).toBe(true)
-      expect(input).toMatchObject({ cwd: childDir, session_id: childHandle.agent.id })
+      expect(where.endsWith('/current')).toBe(true)
+      expect(input).toMatchObject({ cwd: ctx.workingDirectory.get(childHandle.agent.session), session_id: childHandle.agent.id })
+
+      const warn = vi.fn()
+      ctx.logger.warn = warn as never
+      const failed = await ctx.agents.create({ sessionId: SessionId('failed-stop-observation'), meta: { cwd: childDir } })
+      const failedIdentity = { ...identity, id: failed.agent.id, runId: SubagentRunId('failed-stop') }
+      ctx.emit(subagentCarrier(ctx), 'subagent/start', failedIdentity)
+      await failed.dispose()
+      vi.spyOn(ctx.workingDirectory, 'get').mockImplementationOnce(() => { throw new Error('directory observation failed') })
+      ctx.emit(subagentCarrier(ctx), 'subagent/end', { ...failedIdentity, stopReason: 'completed' })
+      await waitFor(() => warn.mock.calls.some(call => String(call[0]).includes('SubagentStop hook failed')))
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('directory observation failed'))
     })
   })
 

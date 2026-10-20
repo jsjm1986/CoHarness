@@ -521,9 +521,6 @@
 - id: tool-workflow
   disabled: true
 
-- id: tool-ralph
-  disabled: true
-
 - id: agent-instructions
   disabled: true
 

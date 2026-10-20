@@ -147,6 +147,9 @@ interface PlannedWrite {
   op?: SettingsFormPathOp
 }
 
+/* jscpd:ignore-start -- Field-model machinery adapted from
+   ui-settings-plugins/card-form.ts; client rules forbid importing another
+   plugin's internals across packages. */
 /**
  * A whole-number field. An empty draft clears the field; any other draft that
  * is not a finite number blocks the save.
@@ -391,3 +394,4 @@ export class SettingsFormModel<T> {
     for (const listener of this.listeners) listener()
   }
 }
+/* jscpd:ignore-end */

@@ -178,7 +178,7 @@ importers:
         version: 0.3.24
       smol-toml:
         specifier: ^1.7.1
-        version: 1.8.0
+        version: 1.9.1
       spdx-expression-parse:
         specifier: ^5.0.0
         version: 5.0.0
@@ -1890,8 +1890,8 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0
       pnpm:
-        specifier: 11.28.4
-        version: 11.28.4
+        specifier: 11.28.5
+        version: 11.28.5
 
   packages/boot/plugin-market:
     dependencies:
@@ -2177,9 +2177,6 @@ importers:
       '@deepseek-ai/dsh-skill':
         specifier: workspace:*
         version: link:../../skill/skill
-      '@deepseek-ai/dsh-skill-badge':
-        specifier: workspace:*
-        version: link:../../skill/skill-badge
       '@deepseek-ai/dsh-skill-filesystem':
         specifier: workspace:*
         version: link:../../skill/skill-filesystem
@@ -2234,9 +2231,6 @@ importers:
       '@deepseek-ai/dsh-tool-pwsh':
         specifier: workspace:*
         version: link:../../shell/tool-pwsh
-      '@deepseek-ai/dsh-tool-ralph':
-        specifier: workspace:*
-        version: link:../../workflow/tool-ralph
       '@deepseek-ai/dsh-tool-skill':
         specifier: workspace:*
         version: link:../../skill/tool-skill
@@ -8196,10 +8190,6 @@ importers:
         version: 5.3.0
 
   packages/experimental/session-inspector:
-    dependencies:
-      '@tanstack/react-virtual':
-        specifier: ^3.14.9
-        version: 3.14.9(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~
@@ -8234,6 +8224,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
+      '@tanstack/react-virtual':
+        specifier: ^3.14.9
+        version: 3.14.9(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -9309,6 +9302,9 @@ importers:
       '@deepseek-ai/dsh-bash-local':
         specifier: workspace:*
         version: link:../../shell/bash-local
+      '@deepseek-ai/dsh-fs-local':
+        specifier: workspace:*
+        version: link:../../fs/fs-local
       '@deepseek-ai/dsh-hook-protocol':
         specifier: workspace:*
         version: link:../hook-protocol
@@ -9318,9 +9314,6 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
-      '@deepseek-ai/dsh-session-persistence':
-        specifier: workspace:*
-        version: link:../../session/session-persistence
       '@deepseek-ai/dsh-session-persistence-jsonl':
         specifier: workspace:*
         version: link:../../session/session-persistence-jsonl
@@ -9373,9 +9366,6 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
-      '@deepseek-ai/dsh-session-persistence':
-        specifier: workspace:*
-        version: link:../../session/session-persistence
       '@deepseek-ai/dsh-session-persistence-jsonl':
         specifier: workspace:*
         version: link:../../session/session-persistence-jsonl
@@ -11494,6 +11484,9 @@ importers:
 
   packages/session-query/tool-session-query:
     dependencies:
+      '@deepseek-ai/dsh-brand':
+        specifier: workspace:*
+        version: link:../../util/brand
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -11504,12 +11497,12 @@ importers:
       '@deepseek-ai/dsh-agent':
         specifier: workspace:*
         version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
       '@deepseek-ai/dsh-collaboration':
         specifier: workspace:*
         version: link:../../context/collaboration
-      '@deepseek-ai/dsh-compaction':
-        specifier: workspace:*
-        version: link:../../compaction/compaction
       '@deepseek-ai/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm
@@ -11522,6 +11515,9 @@ importers:
       '@deepseek-ai/dsh-session-persistence-jsonl':
         specifier: workspace:*
         version: link:../../session/session-persistence-jsonl
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
       '@deepseek-ai/dsh-session-query':
         specifier: workspace:*
         version: link:../session-query
@@ -11543,9 +11539,6 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
-      '@deepseek-ai/dsh-util-values':
-        specifier: workspace:*
-        version: link:../../util/values
 
   packages/session/session-checkpoint-policy:
     devDependencies:
@@ -12128,6 +12121,9 @@ importers:
 
   packages/session/session-title-all-prompts-llm:
     dependencies:
+      '@deepseek-ai/dsh-util-values':
+        specifier: workspace:*
+        version: link:../../util/values
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -12853,8 +12849,8 @@ importers:
   packages/skill/skill-office:
     dependencies:
       '@deepseek-ai/libreoffice-kit':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.5
+        version: 0.1.5
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -14152,6 +14148,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
       '@deepseek-ai/dsh-subprocess-local':
         specifier: workspace:*
         version: link:../../subprocess/subprocess-local
@@ -15012,15 +15011,15 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
+      '@deepseek-ai/dsh-session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
       '@deepseek-ai/dsh-session-projection':
         specifier: workspace:*
         version: link:../../session/session-projection
       '@deepseek-ai/dsh-subagent':
         specifier: workspace:*
         version: link:../../subagent/subagent
-      '@deepseek-ai/dsh-subagent-in-process-driver':
-        specifier: workspace:*
-        version: link:../../subagent/subagent-in-process-driver
       '@deepseek-ai/dsh-subagent-spawn-in-process':
         specifier: workspace:*
         version: link:../../subagent/subagent-spawn-in-process
@@ -16307,8 +16306,20 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
+  '@deepseek-ai/libreoffice-kit-darwin-arm64@0.1.5':
+    resolution: {integrity: sha512-SjeXmyaTevEq2TxK7reb1rhCrQZ4QOXmXt/qEwfQD5Fx3odU0ILx2uiXN+nphSCQ95LFCzrElHGgv2c7a824yg==}
+    engines: {node: '>=22.19.0'}
+    cpu: [arm64]
+    os: [darwin]
+
   '@deepseek-ai/libreoffice-kit-darwin-x64@0.1.1':
     resolution: {integrity: sha512-VcAqzmzDbRySLBnpRNYSEd+fDmAtdgL1hQMjRf4sFnQuz7m1vipQ00DtlqFG/T+9uCc20bMIyiDWh8zfYObW3w==}
+    engines: {node: '>=22.19.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@deepseek-ai/libreoffice-kit-darwin-x64@0.1.5':
+    resolution: {integrity: sha512-vuz2tTpH1Edk75+DISwg/TXdQ3BNSNSHoVnWVqxqbGMgrrK9trLOw2+0X7mjT1naGO00Zc1qkyQ4if3kx5XjqQ==}
     engines: {node: '>=22.19.0'}
     cpu: [x64]
     os: [darwin]
@@ -16318,8 +16329,19 @@ packages:
     engines: {node: '>=22.19.0'}
     os: [linux]
 
+  '@deepseek-ai/libreoffice-kit-wasm@0.1.5':
+    resolution: {integrity: sha512-V+pu5xJsKhVD4AU1xbFlMWY91svK9ZIC2JsNOph9kWp/arF/KQcuytt76bcbozJqPbE8o0n04lyh0m3QW5RYSA==}
+    engines: {node: '>=22.19.0'}
+    os: [linux]
+
   '@deepseek-ai/libreoffice-kit-win32-arm64@0.1.1':
     resolution: {integrity: sha512-RR05Y9NQzPYRRo9vCydlp6HKv+0eR12A99Pw7bAuUmcagyGN3gtWZKaG6xrT8vccPf3mByP3Bi0Mo31D/lrySA==}
+    engines: {node: '>=22.19.0'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@deepseek-ai/libreoffice-kit-win32-arm64@0.1.5':
+    resolution: {integrity: sha512-Av3aFfNLaVxfffu0JXP5mqfmsCU3gQtlUH9UD+zdXl8ON06ukVAmu7LqNyuKAz/68WoOMTQ+YBlVQukgDRKd/A==}
     engines: {node: '>=22.19.0'}
     cpu: [arm64]
     os: [win32]
@@ -16330,8 +16352,19 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@deepseek-ai/libreoffice-kit-win32-x64@0.1.5':
+    resolution: {integrity: sha512-uKuDGZdofxuW4iRmUh8b3+XWU28JeOCYMTAONzo7tEHIq00DV2cARcgUYiTP7gUH49tH4A/RyPMOVEBzK7qjjw==}
+    engines: {node: '>=22.19.0'}
+    cpu: [x64]
+    os: [win32]
+
   '@deepseek-ai/libreoffice-kit@0.1.1':
     resolution: {integrity: sha512-vML+3Nh/159k/TWuxLfZU1O39BA0m+/jybfySu9dJaTHR2oAi+hHWud6iRhBaCie5N6ADfo4DNHajBk52pmRog==}
+    engines: {node: '>=22.19.0'}
+    hasBin: true
+
+  '@deepseek-ai/libreoffice-kit@0.1.5':
+    resolution: {integrity: sha512-H12xtUsAyl70zFeQ5pk5GGRc3N1+6zn+DVAcqwlguI6EvqopBGP3xkUmePU7g5f6ydYlDZLWedHT9lTSL7zLxA==}
     engines: {node: '>=22.19.0'}
     hasBin: true
 
@@ -21645,6 +21678,11 @@ packages:
     engines: {node: '>=22.13'}
     hasBin: true
 
+  pnpm@11.28.5:
+    resolution: {integrity: sha512-SEVj0wtMKtJ8tIqpT/KzAtvOvI/2vyiBbCWJiG4UbOf3bzVPO8GkOOb16XaMMCqgpvet2CMpA81M+BQmy8FNng==}
+    engines: {node: '>=22.13'}
+    hasBin: true
+
   points-on-curve@0.2.0:
     resolution: {integrity: sha512-0mYKnYYe9ZcqMCWhUjItv/oHjvgEsfKvnUTg8sAtnHr3GVy7rGkXCb6d5cSyqrWqL4k81b9CPg3urd+T7aop3A==}
 
@@ -22070,8 +22108,8 @@ packages:
     resolution: {integrity: sha512-qMCMfhY040cVHT43K9BFygqYbUPFZKHOg7K73mtTWJRb8pyP3fzf4Ixd5SzdEJQ6MRUg/WBnOLxghZtKKurENQ==}
     engines: {node: '>=10'}
 
-  smol-toml@1.8.0:
-    resolution: {integrity: sha512-kCZr2V3ch9i00x8zXRhjUNVcjG9ijES5dDudkXvUVCT5QlJNQWElSJdZqyPemffHoLNUYwOcou0Fy+ojN0uHSQ==}
+  smol-toml@1.9.1:
+    resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
     engines: {node: '>= 18'}
 
   source-map-js@1.2.1:
@@ -23497,16 +23535,31 @@ snapshots:
   '@deepseek-ai/libreoffice-kit-darwin-arm64@0.1.1':
     optional: true
 
+  '@deepseek-ai/libreoffice-kit-darwin-arm64@0.1.5':
+    optional: true
+
   '@deepseek-ai/libreoffice-kit-darwin-x64@0.1.1':
+    optional: true
+
+  '@deepseek-ai/libreoffice-kit-darwin-x64@0.1.5':
     optional: true
 
   '@deepseek-ai/libreoffice-kit-wasm@0.1.1':
     optional: true
 
+  '@deepseek-ai/libreoffice-kit-wasm@0.1.5':
+    optional: true
+
   '@deepseek-ai/libreoffice-kit-win32-arm64@0.1.1':
     optional: true
 
+  '@deepseek-ai/libreoffice-kit-win32-arm64@0.1.5':
+    optional: true
+
   '@deepseek-ai/libreoffice-kit-win32-x64@0.1.1':
+    optional: true
+
+  '@deepseek-ai/libreoffice-kit-win32-x64@0.1.5':
     optional: true
 
   '@deepseek-ai/libreoffice-kit@0.1.1':
@@ -23520,6 +23573,19 @@ snapshots:
       '@deepseek-ai/libreoffice-kit-wasm': 0.1.1
       '@deepseek-ai/libreoffice-kit-win32-arm64': 0.1.1
       '@deepseek-ai/libreoffice-kit-win32-x64': 0.1.1
+
+  '@deepseek-ai/libreoffice-kit@0.1.5':
+    dependencies:
+      fflate: 0.8.2
+      fontkit: 2.0.4
+      koffi: 3.1.1
+      saxes: 6.0.0
+    optionalDependencies:
+      '@deepseek-ai/libreoffice-kit-darwin-arm64': 0.1.5
+      '@deepseek-ai/libreoffice-kit-darwin-x64': 0.1.5
+      '@deepseek-ai/libreoffice-kit-wasm': 0.1.5
+      '@deepseek-ai/libreoffice-kit-win32-arm64': 0.1.5
+      '@deepseek-ai/libreoffice-kit-win32-x64': 0.1.5
 
   '@docsearch/css@3.8.2': {}
 
@@ -27635,7 +27701,7 @@ snapshots:
       oxc-parser: 0.147.0
       oxc-resolver: 11.24.2
       picomatch: 4.0.7
-      smol-toml: 1.8.0
+      smol-toml: 1.9.1
       strip-json-comments: 5.0.3
       tinyglobby: 0.2.17
       unbash: 4.0.11
@@ -28654,6 +28720,8 @@ snapshots:
 
   pnpm@11.28.4: {}
 
+  pnpm@11.28.5: {}
+
   points-on-curve@0.2.0: {}
 
   points-on-path@0.2.1:
@@ -29174,7 +29242,7 @@ snapshots:
       astral-regex: 2.0.0
       is-fullwidth-code-point: 3.0.0
 
-  smol-toml@1.8.0: {}
+  smol-toml@1.9.1: {}
 
   source-map-js@1.2.1: {}
 

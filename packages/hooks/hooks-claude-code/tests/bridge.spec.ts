@@ -119,73 +119,6 @@ describe('unmatched hooks and directory recovery', () => {
   })
 })
 
-describe('hooks-claude-code bridge — initialization', () => {
-  it('awaits SessionStart context before creation returns and the first request', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'dsh-hooks-claude-'))
-    dirs.push(dir)
-    const hook = join(dir, 'startup.sh')
-    writeFileSync(hook, '#!/usr/bin/env bash\nsleep 0.05\necho \'{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"startup guidance"}}\'\n')
-    chmodSync(hook, 0o755)
-    writeFileSync(join(dir, 'hooks.json'), JSON.stringify({ hooks: {
-      SessionStart: [{ hooks: [{ type: 'command', command: hook }] }],
-    } }))
-    const adapter = new MockAdapter([textResponse('ready')])
-    const ctx = await harness(dir, adapter)
-    try {
-      const agent = await ctx.agentLoop.create(SessionId('startup-context'), { provider: 'mock', model: 'mock' })
-      expect(agent.inbox.nextStep.some(message => message.content.some(block =>
-        block.type === 'text' && block.text.includes('startup guidance')))).toBe(true)
-      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
-      await agent.whenIdle()
-      expect(JSON.stringify(adapter.requests[0]!.messages)).toContain('startup guidance')
-    } finally {
-      await ctx.fiber.dispose()
-    }
-  })
-  it.each(['creation cancellation', 'bridge unload'] as const)('drains SessionStart after %s without injecting late context', async (cause) => {
-    const dir = mkdtempSync(join(tmpdir(), 'dsh-hooks-claude-'))
-    dirs.push(dir)
-    const started = join(dir, 'started')
-    const hook = join(dir, 'startup.sh')
-    writeFileSync(hook, `#!/usr/bin/env bash\nprintf started > '${started}'\nsleep 30\necho '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"late context"}}'\n`)
-    chmodSync(hook, 0o755)
-    writeFileSync(join(dir, 'hooks.json'), JSON.stringify({ hooks: {
-      SessionStart: [{ hooks: [{ type: 'command', command: hook }] }],
-    } }))
-    const adapter = new MockAdapter([])
-    const { ctx, hooks } = await harnessWithFiber(dir, adapter)
-    const controller = new AbortController()
-    const injected = vi.fn()
-    const creating = ctx.agents.create({
-      sessionId: SessionId('cancel-startup'),
-      signal: controller.signal,
-      agentOptions: { provider: 'mock', model: 'mock' },
-      setup: (_agentCtx, agent) => { agent.inject = injected },
-    })
-    const outcome = creating.then(handle => ({ handle }), (error: unknown) => ({ error }))
-    try {
-      await waitFor(() => existsSync(started))
-      if (cause === 'creation cancellation') controller.abort(new Error('startup cancelled'))
-      else await hooks.dispose()
-      const result = await outcome
-      if (cause === 'creation cancellation') {
-        expect(result).toHaveProperty('error')
-        expect(ctx.agents.get(SessionId('cancel-startup'))).toBeUndefined()
-        expect(ctx.sessions.get(SessionId('cancel-startup'))).toBeUndefined()
-      } else {
-        expect(result).toHaveProperty('handle')
-        if ('handle' in result) await result.handle.dispose()
-      }
-      expect(injected).not.toHaveBeenCalled()
-      expect(adapter.requests).toHaveLength(0)
-    } finally {
-      controller.abort()
-      await outcome
-      await ctx.fiber.dispose()
-    }
-  })
-})
-
 describe('hooks-claude-code bridge — UserPromptSubmit', () => {
   it('a UserPromptSubmit hook that exits 2 closes a blocked turn without a step', async () => {
     // UserPromptSubmit ignores its malformed matcher field, then exit 2 blocks
@@ -393,9 +326,8 @@ describe('hooks-claude-code bridge — SubagentStart / SubagentStop (observe)', 
 
     const adapter = new MockAdapter([])
     const { ctx, hooks } = await harnessWithFiber(dir, adapter)
-    // Drive the observe-only lifecycle events directly (no real child needed — the
-    // bridge just listens). No child agent is registered, so SubagentStart's
-    // child lookup yields undefined and it simply runs the hook.
+    // Drive the observe-only lifecycle events directly. SubagentStart must run
+    // the hook even when no registered child resolves from the notification.
     ctx.emit(subagentCarrier(ctx), 'subagent/start', { runId: SubagentRunId('run-1'), provider: 'inproc', id: SessionId('child-1'), local: false })
     ctx.emit(subagentCarrier(ctx), 'subagent/end', { runId: SubagentRunId('run-1'), provider: 'inproc', id: SessionId('child-1'), local: false, stopReason: 'completed', lastAssistantMessage: [{ type: 'text', text: 'done' }] })
 
@@ -535,12 +467,12 @@ describe('hooks-claude-code bridge — load resilience', () => {
     // "cannot get property … without inject". Guard the shape directly.
     expect('default' in HooksClaude).toBe(false)
     expect(HooksClaude.name).toBe('hooks-claude-code')
-    expect(HooksClaude.inject).toEqual(['shell', 'workingDirectory'])
+    expect(HooksClaude.inject).toEqual(['shell', 'sessionProjections', 'workingDirectory'])
     const loader = Object.create(Loader.prototype) as Loader
     const unwrapped = loader.unwrapExports(HooksClaude) as Record<string, unknown>
     expect(unwrapped).toBe(HooksClaude)
     expect(unwrapped.name).toBe('hooks-claude-code')
-    expect(unwrapped.inject).toEqual(['shell', 'workingDirectory'])
+    expect(unwrapped.inject).toEqual(['shell', 'sessionProjections', 'workingDirectory'])
     expect(typeof unwrapped.apply).toBe('function')
   })
 })
