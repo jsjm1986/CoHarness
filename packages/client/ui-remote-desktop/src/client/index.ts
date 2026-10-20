@@ -1,6 +1,5 @@
 /** Register the human remote-desktop tab type and its consent/RFB body. */
 import type { Context } from '@deepseek-ai/cordis'
-import { RFB } from './rfb.ts'
 import type {} from '@deepseek-ai/dsh-api-remote-desktop-controller/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -45,24 +44,29 @@ export function apply(ctx: Context): void {
         confirm: (target, level, signal) => ctx.remoteDesktops.confirm(sessionId, target, level, signal),
         attach: (target, level, signal) => ctx.remoteDesktops.attach(sessionId, target, level, signal),
         openScreen: (container, url, options) => {
-          const rfb = new RFB(container, url, {})
-          rfb.viewOnly = options.viewOnly
-          rfb.scaleViewport = true
-          rfb.focusOnClick = true
+          // noVNC stays out of the registration module: a stream pays the import
+          // only when it actually opens, so mounting the sidebar costs nothing.
           let localClose = false
-          rfb.addEventListener('credentialsrequired', (event) => {
-            const types = (event as CustomEvent<{ types?: string[] }>).detail.types
-            options.onCredentialsRequired?.(types ?? ['password'])
+          const ready = import('./rfb.ts').then(({ RFB }) => {
+            const rfb = new RFB(container, url, {})
+            rfb.viewOnly = options.viewOnly
+            rfb.scaleViewport = true
+            rfb.focusOnClick = true
+            rfb.addEventListener('credentialsrequired', (event) => {
+              const types = (event as CustomEvent<{ types?: string[] }>).detail.types
+              options.onCredentialsRequired?.(types ?? ['password'])
+            })
+            rfb.addEventListener('disconnect', () => { if (!localClose) options.onDisconnected?.() })
+            return rfb
           })
-          rfb.addEventListener('disconnect', () => { if (!localClose) options.onDisconnected?.() })
           return {
             sendCredentials: (credentials) => {
               const offer: Record<string, string> = {}
               if (credentials.username !== undefined) offer.username = credentials.username
               if (credentials.password !== undefined) offer.password = credentials.password
-              rfb.sendCredentials(offer)
+              void ready.then((rfb) => { rfb.sendCredentials(offer) })
             },
-            disconnect: () => { localClose = true; rfb.disconnect() },
+            disconnect: () => { localClose = true; void ready.then((rfb) => { rfb.disconnect() }) },
           }
         },
       }),
