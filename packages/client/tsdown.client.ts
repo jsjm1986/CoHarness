@@ -108,17 +108,20 @@ function browserSourcePath(source: string, sourcemapPath: string): string {
  * the package without lib/index.js and the host Loader cannot import its node
  * half. The Client build consumes `lib/types` and chains those tsc maps, with
  * original source content, into the standalone plugin map.
- * @param id - plugin id (package name), stamped into the __ModuleLoader__.load
- * handoff and onto the injected style tags.
+ * @param packageRef - plugin id (package name) or the package's own directory
+ * (`import.meta.dirname`); the directory form reads `package.json` for the name.
+ * The name is stamped into the __ModuleLoader__.load handoff and onto the
+ * injected style tags.
  * @param libEntry - node-half entries.
  * @param options - phase placement, lib overrides, companion Node configs, and optional per-file Client banner.
  * @returns ENV-selected tsdown config for the current build face.
  */
 export function clientBundle(
-  id: string,
+  packageRef: string,
   libEntry: readonly string[],
   options: ClientBundleOptions = {},
 ): BuildFaceConfig {
+  const id = packageId(packageRef)
   const lib = clientLibraryConfig(id, libEntry, options.lib)
   return ({ env }) => {
     const face = buildFace(env?.DSH_BUILD_FACE)
@@ -155,13 +158,15 @@ export function clientBundle(
  * 4. stylesheets ship with the package: a relative `.css` import survives as a
  *    relative external and the sheet is emitted under `lib/` at its
  *    `src`-relative path, so vite stays the only owner of class hashing.
- * @param id - package name, used in tsdown diagnostics.
+ * @param packageRef - package name or the package's own directory
+ * (`import.meta.dirname`); the directory form reads `package.json` for the name.
  * @param libEntry - emitted JavaScript entries consumed from `lib/types`, one
  * bundle each: a multi-entry build would emit a hash-named shared chunk that
  * the exact `files` list cannot publish.
  * @returns ENV-selected tsdown config for the Client build face.
  */
-export function staticLinked(id: string, libEntry: readonly string[]): BuildFaceConfig {
+export function staticLinked(packageRef: string, libEntry: readonly string[]): BuildFaceConfig {
+  const id = packageId(packageRef)
   // Each entry names its own output file, so two entries with the same basename
   // would overwrite one artifact instead of emitting two.
   const names = new Set(libEntry.map(entry => basename(entry, '.js')))
@@ -185,12 +190,13 @@ export function isStaticLinkedConfig(configs: readonly UserConfig[]): boolean {
 
 /**
  * Build a Client-only Node library during the Client pass.
- * @param id - Package name used in tsdown diagnostics.
+ * @param packageRef - Package name used in tsdown diagnostics, or the package's
+ * own directory (`import.meta.dirname`) whose `package.json` supplies it.
  * @param libEntry - Emitted JavaScript entries consumed from `lib/types`.
  * @returns ENV-selected tsdown config for the Client build face.
  */
-export function clientLibrary(id: string, libEntry: readonly string[]): BuildFaceConfig {
-  const lib = clientLibraryConfig(id, libEntry)
+export function clientLibrary(packageRef: string, libEntry: readonly string[]): BuildFaceConfig {
+  const lib = clientLibraryConfig(packageId(packageRef), libEntry)
   return clientOnly([lib])
 }
 
@@ -358,6 +364,24 @@ interface WorkspaceManifest {
 const manifestCache = new Map<string, WorkspaceManifest>()
 const productionExternalCache = new Map<string, readonly RegExp[]>()
 const clientExternalCache = new Map<string, ReadonlySet<string>>()
+
+/**
+ * Accept either spelling of the calling package's identity — its published name
+ * or its own directory (`import.meta.dirname`) — and resolve the package name.
+ * @param packageRef - package name, or a directory holding `package.json`.
+ * @returns the manifest's `name`.
+ * @throws {Error} when the directory's manifest declares no name.
+ */
+function packageId(packageRef: string): string {
+  if (packageRef.startsWith('@')) return packageRef
+  const parsed = JSON.parse(
+    readFileSync(resolvePath(packageRef, 'package.json'), 'utf8'),
+  ) as WorkspaceManifest
+  if (typeof parsed.name !== 'string' || parsed.name.length === 0) {
+    throw new Error(`tsdown: ${resolvePath(packageRef, 'package.json')} declares no package name`)
+  }
+  return parsed.name
+}
 
 /**
  * Read one workspace package's manifest. Located by package name rather than by
