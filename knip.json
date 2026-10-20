@@ -983,9 +983,6 @@
         "@deepseek-ai/.+",
         "ws",
         "@types/ws"
-      ],
-      "ignore": [
-        "tests/profiles/headless/tests/profile-resolution.ts"
       ]
     },
     "packages/client/modules": {
