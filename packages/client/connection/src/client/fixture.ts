@@ -3301,6 +3301,18 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           secrets: [],
           revision: 0,
           writable: true,
+        }, {
+          // The welcome notice steps down only when its exact copy version is
+          // acknowledged; this literal must track WELCOME_NOTICE_VERSION in
+          // dsh-client-ui-settings-models (an unacknowledged notice holds the
+          // app root inert and breaks every role query in this lane).
+          ns: 'ui-onboarding',
+          schema: {},
+          value: { welcomeNoticeVersion: '2026-09-28.1' },
+          applies: 'live',
+          secrets: [],
+          revision: 0,
+          writable: true,
         }],
       }),
       // Native opens are deterministic no-op successes in this fixture, as is host.openPath.

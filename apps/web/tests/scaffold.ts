@@ -654,7 +654,10 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     })
     await ctx.loader.await()
     await auditStartupEntries(ctx, 'web e2e scaffold')
-    if (options.welcomeNoticePending !== true) {
+    if (options.welcomeNoticePending !== true
+      // Overlays that omit the settings shell (e.g. goal-bar) leave the
+      // onboarding namespace unregistered; only ack when the owner mounted.
+      && ctx.settings.describe().some(descriptor => descriptor.ns === WELCOME_NOTICE_SETTINGS_NAMESPACE)) {
       await ctx.settings.mutate(WELCOME_NOTICE_SETTINGS_NAMESPACE, [{
         op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION,
       }])

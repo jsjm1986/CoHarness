@@ -59,7 +59,3 @@
             models:
               - id: deepseek-v4-flash
               - id: deepseek-v4-pro
-
-# The Python-only composition disables the JavaScript workflow provider.
-- id: tool-ralph
-  disabled: true

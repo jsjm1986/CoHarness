@@ -368,7 +368,7 @@ describe('PluginInventorySettingsTab', () => {
   it('marks a live phase with a dot on an untagged enabled row', async () => {
     await renderReady({
       entries: [
-        { entryId: 'booting' as PluginEntryId, moduleName: '@fixture/booting', enabled: true, fiberPhase: 'loading' },
+        { entryId: 'booting', moduleName: '@fixture/booting', enabled: true, fiberPhase: 'loading' },
         { entryId: 'waiting' as PluginEntryId, moduleName: '@fixture/waiting', enabled: true, fiberPhase: 'pending' },
         { entryId: 'running' as PluginEntryId, moduleName: '@fixture/running', enabled: true, fiberPhase: 'active' },
         { entryId: 'unobserved' as PluginEntryId, moduleName: '@fixture/unobserved', enabled: true, fiberPhase: null },
@@ -582,7 +582,7 @@ describe('PluginInventorySettingsTab', () => {
     const view = await renderReady({
       entries: [
         { entryId: 'hmr' as PluginEntryId, moduleName: '@deepseek-ai/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
-        { entryId: 'off' as PluginEntryId, moduleName: '@fixture/off', enabled: false, fiberPhase: null },
+        { entryId: 'off', moduleName: '@fixture/off', enabled: false, fiberPhase: null },
       ],
     } as Snapshot)
 

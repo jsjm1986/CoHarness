@@ -181,6 +181,7 @@ describe('SharedRead', () => {
   })
 
   it('wraps a non-Error scan failure so waiters always reject with Error', async () => {
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the non-Error rejection is the case under test.
     const read = new SharedRead<string>(() => Promise.reject('raw failure'))
     let reason: unknown
     await read.wait(new AbortController().signal).catch((error: unknown) => {

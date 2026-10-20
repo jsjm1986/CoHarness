@@ -42,7 +42,3 @@
       You are a coding assistant powered by the {{model}} model.
 
       Verify your work by running the code or tests. Keep answers brief and factual.
-
-# The Python-only composition disables the JavaScript workflow provider.
-- id: tool-ralph
-  disabled: true

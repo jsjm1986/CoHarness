@@ -26,10 +26,11 @@ export const ZH_BROWSER_LOCALE = 'zh-CN'
  * {@link ZH_BROWSER_LOCALE} instead.
  * @param browser - Playwright browser owning the page.
  * @param height - Viewport height; width is fixed to the lane baseline.
+ * @param timezoneId - Viewer's timezone; omitted keeps the host zone.
  * @returns the initialized page.
  */
-export async function newEnglishPage(browser: Browser, height = 1000): Promise<Page> {
-  return await browser.newPage({ viewport: { width: 1680, height }, locale: 'en-US' })
+export async function newEnglishPage(browser: Browser, height = 1000, timezoneId?: string): Promise<Page> {
+  return await browser.newPage({ viewport: { width: 1680, height }, locale: 'en-US', ...(timezoneId === undefined ? {} : { timezoneId }) })
 }
 
 /** Fail loud on a stale checkout instead of testing yesterday's bundle. */

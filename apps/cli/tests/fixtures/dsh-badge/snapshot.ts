@@ -1,39 +1,37 @@
 import { fileURLToPath } from 'node:url'
-import { Context } from '@deepseek-ai/cordis'
-import { agentEvents, type Agent, type Inbox } from '@deepseek-ai/dsh-agent'
+import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { boot, loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-tools'
+import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const overlayPath = process.argv[2]
 if (overlayPath === undefined) throw new Error('dsh-badge snapshot requires an overlay path')
 const rootConfigPath = fileURLToPath(new URL('../../../../../packages/bundle/base/tests/fixtures/root.cordis.yml', import.meta.url))
 const basePatchPath = fileURLToPath(new URL('../../../../../packages/bundle/base/cordis.patch.yml', import.meta.url))
+// The fixture owns the optional provider; the base bundle has no dependency on it.
+const overlays = loadOverlayPatches('dsh-badge-snapshot', overlayPath).map(patch => patch.insert === undefined ? patch : {
+  ...patch,
+  insert: patch.insert.map(row => row.name === '@deepseek-ai/dsh-skill-badge'
+    ? { ...row, name: import.meta.resolve('@deepseek-ai/dsh-skill-badge') }
+    : row),
+})
 const ctx = await boot('dsh-badge-snapshot', rootConfigPath, [
   ...loadOverlayPatches('dsh-badge-snapshot', basePatchPath),
-  ...loadOverlayPatches('dsh-badge-snapshot', overlayPath),
+  ...overlays,
 ])
 
 try {
   const agentId = SessionId('dsh-badge-snapshot')
   const session = ctx.sessions.create(agentId, { meta: { cwd: process.cwd() } })
   const agent: Agent = {
-    ctx: new Context(),
+    ctx,
     id: agentId,
     options: {},
     session,
-    inbox: {
-      nextTurn: [],
-      nextStep: [],
-      clear() { throw new Error('snapshot agent inbox is read-only') },
-      append() { throw new Error('snapshot agent inbox is read-only') },
-      prepend() { throw new Error('snapshot agent inbox is read-only') },
-      replace() { throw new Error('snapshot agent inbox is read-only') },
-      remove() { throw new Error('snapshot agent inbox is read-only') },
-      splice() { throw new Error('snapshot agent inbox is read-only') },
-    } satisfies Inbox,
+    inbox: unsupportedInbox(),
     status: 'idle',
     send: () => {},
     followup: () => {},

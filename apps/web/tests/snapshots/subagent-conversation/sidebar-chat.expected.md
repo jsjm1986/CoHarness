@@ -25,7 +25,7 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents" [disabled]:
   - img
 - button "Choose from Documents" [disabled]:
