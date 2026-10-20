@@ -27,20 +27,20 @@ id: 2026-10-19-fixture-message-source
 baseline: false
 changes:
   - root: "event:agent/inbox/spliced"
-    previous: "2026-10-13-working-directory"
-    after: "0d67f2faa274f1e3b3de3912cf334c2339eba8e8390b66dd8ec670da2405c09c"
+    previous: "2026-10-17-memory-recall-source"
+    after: "ca3082f98a92e7e28c5b50718c8e17285bf020e33c63c8489a4eac05ca7d6fc2"
     decision: same-version
   - root: "event:developer/message"
-    previous: "2026-10-13-working-directory"
-    after: "43ff3f950db94be7464519e7a18cda3d209c2576ebd1a678162b6afc06cfe5da"
+    previous: "2026-10-17-memory-recall-source"
+    after: "be178e721e3554ed94b1988b892f45a66d575d339518f0aa3d5ee3a8e80584ff"
     decision: same-version
   - root: "event:session/title-llm-request"
     previous: "2026-10-18-title-reasoning-effort"
-    after: "43c60544f929293b6138828ac02928d2714cfb0da033d0f52af7482656135a77"
+    after: "1ade73d8d275f25066d9b0ecd5d97563757021a0ab32cb20a436ef2b5a4aca8f"
     decision: same-version
   - root: "event:user/message"
-    previous: "2026-10-13-working-directory"
-    after: "f045679b240795217048f4ffab30175320d9b2af1995cfb05d130b461ba1b82c"
+    previous: "2026-10-17-memory-recall-source"
+    after: "081d62847eea7c2011b66be579949cd4fda0a6be75f3f566fc52c69ffc9e9e71"
     decision: same-version
 ```
 

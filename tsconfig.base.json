@@ -33,6 +33,7 @@
       "@deepseek-ai/dsh-api-terminal-controller/types": ["./packages/api/terminal-controller/src/types.ts"],
       "@deepseek-ai/dsh-api-terminal-controller/client": ["./packages/api/terminal-controller/src/client/index.ts"],
       "@deepseek-ai/dsh-permission-presets/client": ["./packages/interaction/permission-presets/src/client.ts"],
+      "@deepseek-ai/dsh-permission-presets/types": ["./packages/interaction/permission-presets/src/types.ts"],
       "@deepseek-ai/dsh-ssh/protocol": ["./packages/ssh/ssh/src/protocol.ts"],
       "@deepseek-ai/dsh-ssh/schemas": ["./packages/ssh/ssh/src/schemas.ts"],
       "@deepseek-ai/dsh-subprocess-local/output": ["./packages/subprocess/subprocess-local/src/output.ts"],

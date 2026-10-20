@@ -124,6 +124,7 @@ afterEach(() => {
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true })
 })
 
+// test-skip: disabled upstream in dsh-v0.2.1-rc.2 pending contract rework; https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.2
 describe.skip('gen-cordis-catalog collectEvents', { timeout: 60_000 }, () => {
   it('extracts a well-formed event with its @mode and JSDoc', () => {
     const events = collectEvents(make(
@@ -239,6 +240,7 @@ describe.skip('gen-cordis-catalog collectEvents', { timeout: 60_000 }, () => {
   })
 })
 
+// test-skip: disabled upstream in dsh-v0.2.1-rc.2 pending contract rework; https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.2
 describe.skip('gen-cordis-catalog collectServices', () => {
   const WELL_FORMED = `/** Fixture service. */
 export class FixService {

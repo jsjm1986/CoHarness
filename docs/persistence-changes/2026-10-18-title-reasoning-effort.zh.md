@@ -27,8 +27,8 @@ id: 2026-10-18-title-reasoning-effort
 baseline: false
 changes:
   - root: "event:session/title-llm-request"
-    previous: "2026-10-13-working-directory"
-    after: "e5cc624c414cd8936f004af6fd4617fd85c815a07f625602ef4427c716dbadb2"
+    previous: "2026-10-17-memory-recall-source"
+    after: "a2640afd2b4af7f37c8da37671c56c4bd36c58562949b3dbee8a058059d271b0"
     decision: same-version
 ```
 
