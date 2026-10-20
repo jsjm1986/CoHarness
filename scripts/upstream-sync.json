@@ -262,6 +262,9 @@
     "client/ui-reference": {
       "sovereignty": "adapted"
     },
+    "client/ui-remote-desktop": {
+      "sovereignty": "owned"
+    },
     "client/ui-renderer": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",

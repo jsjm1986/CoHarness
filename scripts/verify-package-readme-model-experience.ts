@@ -47,7 +47,6 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/api/remote-desktop-controller': { kind: 'none', reason: 'The BFF namespace serves human operators; no method result enters a model request.' },
-  'packages/client/ui-remote-desktop-admin': { kind: 'none', reason: 'The grant administration section is a human-operated settings surface.' },
   'packages/client/ui-remote-desktop': { kind: 'none', reason: 'The desktop viewer and attach flow are human-operated surfaces.' },
   'packages/remote-desktop/remote-desktop-stream': { kind: 'none', reason: 'The transport mount relays human screen and input frames.' },
   'packages/remote-desktop/remote-desktop-vnc': { kind: 'none', reason: 'The provider transports a human\'s screen and input frames only.' },

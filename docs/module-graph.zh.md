@@ -183,7 +183,6 @@ flowchart TD
     pkg_client_ui_project_activity["client-ui-project-activity"]
     pkg_client_ui_reference["client-ui-reference"]
     pkg_client_ui_remote_desktop["client-ui-remote-desktop"]
-    pkg_client_ui_remote_desktop_admin["client-ui-remote-desktop-admin"]
     pkg_client_ui_renderer["client-ui-renderer"]
     pkg_client_ui_schedule["client-ui-schedule"]
     pkg_client_ui_settings["client-ui-settings"]
@@ -563,6 +562,7 @@ flowchart TD
   pkg_ptc_runtime --> pkg_sandbox
   pkg_remote_desktop_stream --> pkg_host_webserver
   pkg_remote_desktop_stream --> pkg_remote_desktop
+  pkg_remote_desktop_vnc --> pkg_credentials
   pkg_remote_desktop_vnc --> pkg_remote_desktop
   pkg_remote_desktop_vnc --> pkg_session
   pkg_remote_desktop_vnc --> pkg_util_values
@@ -1662,12 +1662,6 @@ flowchart TD
   pkg_client_ui_input_trigger --> pkg_client_locale
   pkg_client_ui_input_trigger --> pkg_client_runtime
   pkg_client_ui_input_trigger --> pkg_file_reference
-  pkg_client_ui_remote_desktop_admin --> pkg_api_remote_desktop_controller
-  pkg_client_ui_remote_desktop_admin --> pkg_client_locale
-  pkg_client_ui_remote_desktop_admin --> pkg_client_runtime
-  pkg_client_ui_remote_desktop_admin --> pkg_client_ui_renderer
-  pkg_client_ui_remote_desktop_admin --> pkg_client_ui_settings
-  pkg_client_ui_remote_desktop_admin --> pkg_session
   pkg_client_ui_settings_general --> pkg_api_remotes
   pkg_client_ui_settings_general --> pkg_client_connection
   pkg_client_ui_settings_general --> pkg_client_locale
@@ -2132,7 +2126,7 @@ flowchart TD
 | [`experimental-speech-to-text`](../packages/experimental/speech-to-text) | `experimental` | [`settings`](../packages/settings/settings) |
 | [`ptc-runtime`](../packages/ptc-runtime/ptc-runtime) | `ptc-runtime` | [`sandbox`](../packages/sandbox/sandbox) |
 | [`remote-desktop-stream`](../packages/remote-desktop/remote-desktop-stream) | `remote-desktop` | [`host-webserver`](../packages/host/webserver), [`remote-desktop`](../packages/remote-desktop/remote-desktop) |
-| [`remote-desktop-vnc`](../packages/remote-desktop/remote-desktop-vnc) | `remote-desktop` | [`remote-desktop`](../packages/remote-desktop/remote-desktop), [`session`](../packages/core/session), [`util-values`](../packages/util/values) |
+| [`remote-desktop-vnc`](../packages/remote-desktop/remote-desktop-vnc) | `remote-desktop` | [`credentials`](../packages/credentials/credentials), [`remote-desktop`](../packages/remote-desktop/remote-desktop), [`session`](../packages/core/session), [`util-values`](../packages/util/values) |
 | [`sandbox-local`](../packages/sandbox/sandbox-local) | `sandbox` | [`llm`](../packages/llm/llm), [`sandbox`](../packages/sandbox/sandbox), [`session`](../packages/core/session) |
 | [`session-persistence`](../packages/session/session-persistence) | `session` | [`brand`](../packages/util/brand), [`session`](../packages/core/session), [`session-format`](../packages/session/session-format), [`session-format-catalog`](../packages/session/session-format-catalog), [`timeout`](../packages/util/timeout), [`util-values`](../packages/util/values) |
 | [`session-projection-cache`](../packages/session/session-projection-cache) | `session` | [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`storage-domain`](../packages/storage/storage-domain) |
@@ -2311,7 +2305,6 @@ flowchart TD
 | [`schedule`](../packages/schedule/schedule) | `schedule` | [`agent`](../packages/core/agent), [`api-remotes`](../packages/api/remotes), [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`storage-domain`](../packages/storage/storage-domain), [`subagent`](../packages/subagent/subagent), [`tools`](../packages/core/tools), [`typert-protocol`](../packages/typert/protocol), [`workspace`](../packages/workspace/workspace) |
 | [`api-terminal-controller`](../packages/api/terminal-controller) | `api` | [`agent`](../packages/core/agent), [`agent-presets`](../packages/preset/agent-presets), [`api-gateway`](../packages/api/gateway), [`brand`](../packages/util/brand), [`client-connection`](../packages/client/connection), [`client-runtime`](../packages/client/runtime), [`deque`](../packages/util/deque), [`execution-authority`](../packages/context/execution-authority), [`lazy-require`](../packages/util/lazy-require), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`session`](../packages/core/session), [`subprocess`](../packages/subprocess/subprocess), [`typert-protocol`](../packages/typert/protocol), [`util-crypto`](../packages/util/crypto), [`working-directory`](../packages/session/working-directory) |
 | [`client-ui-input-trigger`](../packages/client/ui-input-trigger) | `client` | [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`file-reference`](../packages/context/file-reference) |
-| [`client-ui-remote-desktop-admin`](../packages/client/ui-remote-desktop-admin) | `client` | [`api-remote-desktop-controller`](../packages/api/remote-desktop-controller), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-settings`](../packages/client/ui-settings), [`session`](../packages/core/session) |
 | [`client-ui-settings-general`](../packages/client/ui-settings-general) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-shortcuts`](../packages/client/shortcuts), [`client-ui-settings`](../packages/client/ui-settings), [`client-ui-sidebar`](../packages/client/ui-sidebar), [`settings`](../packages/settings/settings) |
 | [`client-ui-settings-models`](../packages/client/ui-settings-models) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-settings`](../packages/client/ui-settings) |
 | [`client-ui-settings-plugins`](../packages/client/ui-settings-plugins) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager), [`client-ui-settings`](../packages/client/ui-settings) |

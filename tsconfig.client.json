@@ -67,7 +67,6 @@
     { "path": "./packages/client/ui-sidebar-browser" },
     { "path": "./packages/client/ui-sidebar-terminal" },
     { "path": "./packages/client/ui-remote-desktop" },
-    { "path": "./packages/client/ui-remote-desktop-admin" },
     { "path": "./packages/client/modules" },
     { "path": "./packages/client/hmr" },
     { "path": "./packages/client/connection/tsconfig.client.json" },

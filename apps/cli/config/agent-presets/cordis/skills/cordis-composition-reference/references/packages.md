@@ -84,7 +84,6 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-project-activity` | no | Project member activity feed: attributed messages and question answers in the right Sidebar |
 | `@deepseek-ai/dsh-client-ui-reference` | no | Unified Web @file and @session reference source |
 | `@deepseek-ai/dsh-client-ui-remote-desktop` | no | Human remote-desktop tabs for the right sidebar: grant summary, explicit consent, attach, and the noVNC RFB screen |
-| `@deepseek-ai/dsh-client-ui-remote-desktop-admin` | no | Settings section administering remote-desktop grants: issue, change level, revoke, and audit |
 | `@deepseek-ai/dsh-client-ui-renderer` | no | Browser UI renderer: React slot bindings, ctx.uiRenderer, and the assembled application root |
 | `@deepseek-ai/dsh-client-ui-schedule` | no | Host task management page and Session reminder catalog |
 | `@deepseek-ai/dsh-client-ui-settings` | no | Settings domain base plugin: the settings-namespace scope service and the canonical settings slot-type contract |

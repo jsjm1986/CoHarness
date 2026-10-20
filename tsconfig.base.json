@@ -254,8 +254,6 @@
       "@deepseek-ai/dsh-client-ui-sidebar-terminal/client": ["./packages/client/ui-sidebar-terminal/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-remote-desktop": ["./packages/client/ui-remote-desktop/src"],
       "@deepseek-ai/dsh-client-ui-remote-desktop/client": ["./packages/client/ui-remote-desktop/src/client/index.ts"],
-      "@deepseek-ai/dsh-client-ui-remote-desktop-admin": ["./packages/client/ui-remote-desktop-admin/src"],
-      "@deepseek-ai/dsh-client-ui-remote-desktop-admin/client": ["./packages/client/ui-remote-desktop-admin/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-sidebar-browser": ["./packages/client/ui-sidebar-browser/src"],
       "@deepseek-ai/dsh-client-ui-sidebar-browser/client": ["./packages/client/ui-sidebar-browser/src/client"],
       "@deepseek-ai/dsh-client-ui-sidebar": ["./packages/client/ui-sidebar/src"],

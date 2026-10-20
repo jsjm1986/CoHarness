@@ -26,7 +26,6 @@ harness 需要受治理的人类远程桌面访问——查看和操作另一台
 - `dial` 缝接受替换传输；remote-session 反向隧道路由是集成后续工作。
 - view-only 成帧支持 `None` 与 `VNC authentication` 安全类型；其余类型拒绝 view 附件（control 直通）。
 - Origin 策略与外层请求拒绝属于 client-connection 层，而非流挂载。
-- 浏览器客户端包（`ui-remote-desktop`、`ui-remote-desktop-admin`）是下一增量。
 
 ## 备选方案
 

@@ -2408,7 +2408,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-remote-desktop-vnc`
 
-- `source`: [`packages/remote-desktop/remote-desktop-vnc/src/index.ts:84`](../packages/remote-desktop/remote-desktop-vnc/src/index.ts)
+- `source`: [`packages/remote-desktop/remote-desktop-vnc/src/index.ts:99`](../packages/remote-desktop/remote-desktop-vnc/src/index.ts)
 
 ```ts config-catalog
 type ResolvedConfig = Required<Config>
@@ -2428,6 +2428,18 @@ export interface Config {
     host: string
     /** VNC server TCP port (RFB; conventionally 5900 + display number). */
     port: number
+    /**
+     * Login user name for password-authenticated servers (Apple Remote
+     * Desktop type 30 requires it); meaningless without `passwordRef`.
+     */
+    username?: string
+    /**
+     * Credential reference — an environment-variable name — resolving to the
+     * endpoint's password through `ctx.credentials`. When set, the provider
+     * terminates the RFB security negotiation host-side and the browser
+     * handshake offers only `None`: the password never leaves the host.
+     */
+    passwordRef?: string
   }[]
   /**
    * JSON file `{endpoints: [...]}` maintained by the deployment's
@@ -4690,7 +4702,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-project-activity` | — | [`packages/client/ui-project-activity/src/index.ts`](../packages/client/ui-project-activity/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-reference` | — | [`packages/client/ui-reference/src/index.ts`](../packages/client/ui-reference/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-remote-desktop` | — | [`packages/client/ui-remote-desktop/src/index.ts`](../packages/client/ui-remote-desktop/src/index.ts) |
-| `@deepseek-ai/dsh-client-ui-remote-desktop-admin` | — | [`packages/client/ui-remote-desktop-admin/src/index.ts`](../packages/client/ui-remote-desktop-admin/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-renderer` | — | [`packages/client/ui-renderer/src/index.ts`](../packages/client/ui-renderer/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-schedule` | — | [`packages/client/ui-schedule/src/index.ts`](../packages/client/ui-schedule/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings` | — | [`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts) |
