@@ -577,6 +577,7 @@ function terminalLabels(t: Translate): TerminalBlockLabels {
   return {
     /* v8 ignore next -- the Host reports a killed pnpm as a null exit code, never a signal name; the label interface needs one */
     signal: signal => t('terminalSignal', { signal }),
+    commandLine: line => t('terminalCommandLine', { n: String(line) }),
     exitCode: code => t('terminalExitCode', { code: String(code) }),
     noExitCode: t('terminalNoExitCode'),
     running: t('terminalRunning'),
