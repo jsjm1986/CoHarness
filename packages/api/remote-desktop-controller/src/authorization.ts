@@ -1,73 +1,36 @@
 /** Human identity and administrator-role resolution for remote-desktop operations. */
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-execution-authority'
-import type { TerminalAuthority, TerminalCreatorId } from '@deepseek-ai/dsh-api-terminal-controller'
+import type {} from '@deepseek-ai/dsh-gateway-runtime'
+import type { RemoteDesktopActor } from '@deepseek-ai/dsh-remote-desktop'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 
 /**
  * Resolve the authenticated human for remote-desktop calls, retaining
- * standalone local permissions. Managed deployments delegate to the shared
- * `userTerminalAuthorization` policy — the same interactive-human seam the
- * terminal controller uses — and fail closed when it is absent.
+ * standalone local permissions. Managed deployments read the request's
+ * verified Gateway principal directly: the administrator-issued grant file is
+ * the product permission, so no user-terminal grant is required. Callers
+ * without an interactive principal — agent-driven or restricted-purpose
+ * requests — fail closed.
  */
 export class RemoteDesktopAccess {
   private managed = false
-  private readonly local: TerminalAuthority
 
-  constructor(private readonly ctx: Context, lifetime: AbortSignal) {
-    this.local = {
-      creator: 'local-operator' as TerminalCreatorId,
-      signal: lifetime,
-      retain: () => ({ [Symbol.dispose]() {} }),
-      [Symbol.dispose]() {},
-    }
-  }
+  constructor(private readonly ctx: Context) {}
 
   /**
-   * Verify the caller's human authority on one Session.
-   * @param sessionId - exact Session addressed by the operation.
+   * Resolve the caller's actor from the request's verified principal.
    * @param signal - cancellation before authorization completes.
-   * @returns a verified creator grant; absent managed policies fail closed.
+   * @returns the authenticated actor; the standalone local operator is an administrator.
    */
-  async authorize(sessionId: SessionId, signal: AbortSignal): Promise<TerminalAuthority> {
+  actor(signal: AbortSignal): RemoteDesktopActor {
     signal.throwIfAborted()
     this.managed ||= this.ctx.get('executionAuthorityRequired') === true || this.ctx.get('executionAuthority') !== undefined
-    const policy = this.ctx.get('userTerminalAuthorization')
-    if (this.managed && policy === undefined) {
-      throw new RemoteError('remote-desktop/forbidden', 'An active user authorization policy is required.', {})
+    if (!this.managed) return { principal: 'local-operator', admin: true }
+    const claims = this.ctx.get('gatewayRuntime')?.interactive()?.claims
+    if (claims === undefined || claims.purpose !== undefined || claims.expiresAt <= Date.now()) {
+      throw new RemoteError('remote-desktop/forbidden', 'Remote-desktop access requires an authenticated interactive user.', {})
     }
-    const authority = policy === undefined ? this.local : await policy.authorize(sessionId, signal)
-    try {
-      signal.throwIfAborted()
-      authority.signal.throwIfAborted()
-      return authority
-    } catch (error) {
-      authority[Symbol.dispose]()
-      throw error
-    }
-  }
-
-  /**
-   * Whether the current caller holds administrator authority. Standalone
-   * deployments treat the local operator as administrator; managed
-   * deployments delegate to `userTerminalAdministration`.
-   * @param signal - current request cancellation.
-   * @returns true when the administrator check succeeds.
-   */
-  async administrator(signal: AbortSignal): Promise<boolean> {
-    this.managed ||= this.ctx.get('executionAuthorityRequired') === true || this.ctx.get('executionAuthority') !== undefined
-    if (!this.managed) return true
-    const administration = this.ctx.get('userTerminalAdministration')
-    if (administration === undefined) {
-      throw new RemoteError('remote-desktop/forbidden', 'An active administrator policy is required.', {})
-    }
-    try {
-      await administration.administrator(signal)
-      return true
-    } catch (error) {
-      if (error instanceof RemoteError) return false
-      throw error
-    }
+    return { principal: claims.user.username, admin: claims.user.role === 'admin' }
   }
 }
