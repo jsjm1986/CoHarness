@@ -61,6 +61,9 @@
   border: 0;
   border-radius: var(--dsw-radius-xl);
   background: var(--dsw-specific-menu);
+  /* The menu fill is translucent by design; the blur is what keeps the chat
+     behind the panel from bleeding through (MenuSurface contract). */
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
   /* Drops from the header trigger: grow out of its bottom-left corner. */

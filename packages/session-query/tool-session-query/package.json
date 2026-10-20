@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-session-query",
   "description": "Workspace-authorized model-facing session history search, trace, and event read tools",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -25,14 +25,17 @@
     "lib/index.js",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
+    "@deepseek-ai/dsh-collaboration": "workspace:*",
+    "@deepseek-ai/dsh-compaction": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-query": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
     "@deepseek-ai/dsh-timeout": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~"
   },
   "dependencies": {
@@ -40,6 +43,8 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-collaboration": "workspace:*",
+    "@deepseek-ai/dsh-compaction": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-persistence": "workspace:*",
@@ -51,6 +56,7 @@
     "@deepseek-ai/dsh-timeout": "workspace:*",
     "@deepseek-ai/dsh-tool-call-timeout-policy": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~"
   }
 }

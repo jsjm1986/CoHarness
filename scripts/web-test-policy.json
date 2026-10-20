@@ -79,6 +79,7 @@
     "plugin-install-approve.e2e.ts": "settings",
     "produced-file-mentions.e2e.ts": "conversation",
     "produced-files.e2e.ts": "documents",
+    "project-activity.e2e.ts": "workbench",
     "project-collaboration.e2e.ts": "workbench",
     "ptc-round.e2e.ts": "conversation",
     "pwa-manifest.e2e.ts": "shell",
@@ -248,6 +249,10 @@
     "client/ui-input-trigger": "conversation",
     "client/ui-jobs": "workbench",
     "client/ui-layout": "all",
+    "client/ui-memory": [
+      "settings",
+      "workbench"
+    ],
     "client/ui-message-feedback": "conversation",
     "client/ui-model-selection": [
       "conversation",
@@ -262,6 +267,7 @@
     "client/ui-plan": "conversation",
     "client/ui-plugin-manager": "settings",
     "client/ui-primitives": "all",
+    "client/ui-project-activity": "workbench",
     "client/ui-reference": "conversation",
     "client/ui-renderer": "all",
     "client/ui-schedule": "conversation",
@@ -311,6 +317,10 @@
     "goal/goal": "conversation",
     "interaction/permission-presets": "settings",
     "llm/token-meter": "conversation",
+    "memory/memory": [
+      "settings",
+      "workbench"
+    ],
     "plan/plan-mode": "conversation",
     "schedule/schedule": "conversation",
     "session-query/session-log-export": "workbench",

@@ -855,6 +855,36 @@ describe('admin desktop coordination API', () => {
     expect((await fetch(`${url}?kind=user&id=1`, { headers: { cookie } })).status).toBe(503)
   })
 
+  it('restricts memory qualification reads and writes to administrators with request protection', async () => {
+    const { base, cookie, deps } = await setup()
+    const get = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: false, revision: '0' }))
+    const set = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: true, revision: '1' }))
+    deps.memoryAccess = { get, set }
+    const worker = await login(base, 'worker', 'pw-12345678')
+    const url = `${base}/admin/api/memory/permissions`
+    expect((await fetch(`${url}?kind=user&id=1`, { headers: { cookie: worker } })).status).toBe(403)
+    expect((await fetch(url, { method: 'POST', headers: { cookie: worker, origin: base }, body: '{}' })).status).toBe(403)
+    expect((await fetch(url, { method: 'POST', headers: { cookie, origin: 'https://untrusted.example' }, body: '{}' })).status).toBe(403)
+    expect(get).not.toHaveBeenCalled()
+    expect(set).not.toHaveBeenCalled()
+    const read = await fetch(`${url}?kind=user&id=1`, { headers: { cookie } })
+    expect(read.status).toBe(200)
+    expect(await read.json()).toMatchObject({ enabled: false, revision: '0' })
+    const saved = await fetch(url, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'user', id: 1, enabled: true, revision: '0' }),
+    })
+    expect(saved.status).toBe(200)
+    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 1 }, true, '0')
+    expect(await deps.audit.query({ action: 'admin.memorys.permission' })).toHaveLength(1)
+    set.mockRejectedValueOnce(new ResourceAccessError(409, 'memory policy changed'))
+    const stale = await fetch(url, { method: 'POST', headers: { cookie, origin: base }, body: JSON.stringify({ kind: 'user', id: 1, enabled: false, revision: '0' }) })
+    expect(stale.status).toBe(409)
+    expect((await fetch(`${url}?kind=all&id=1`, { headers: { cookie } })).status).toBe(400)
+    delete deps.memoryAccess
+    expect((await fetch(`${url}?kind=user&id=1`, { headers: { cookie } })).status).toBe(503)
+  })
+
   it('serves the steward overview and keeps steward writes admin-scoped', async () => {
     const { base, cookie, deps } = await setup()
     const entries = [{

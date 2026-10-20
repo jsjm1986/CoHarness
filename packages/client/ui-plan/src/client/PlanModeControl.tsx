@@ -58,7 +58,7 @@ export function PlanChip({ useProjection, locked, exitPlanMode, t }: PlanChipPro
         disabled={locked || leaving}
         onClick={off}
       >
-        {t('chip.label')}
+        <span data-clip-label>{t('chip.label')}</span>
         <span className={css.close} aria-hidden>
           <IconCloseFill14 size={12} />
         </span>

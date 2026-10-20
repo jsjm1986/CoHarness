@@ -14,7 +14,7 @@ export class ResourceAccessError extends Error {
 }
 
 /** Qualification lanes backed by a shared `<resource>_access_policies` table. */
-export type ResourceLane = 'desktop' | 'terminal' | 'ssh' | 'plugin' | 'steward'
+export type ResourceLane = 'desktop' | 'terminal' | 'ssh' | 'plugin' | 'steward' | 'memory'
 
 /**
  * Validate owner coordinates received from an administrative API.

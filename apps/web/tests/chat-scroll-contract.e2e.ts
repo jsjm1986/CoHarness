@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
-import type { ReplayEntry, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
+import type { ReplayEntry, ReplayHold, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { createChatScrollFixture, type ChatScrollFixture } from './chat-scroll-fixture.ts'
 import {
@@ -46,6 +46,7 @@ const LIVE_TOOL_FIRST = 'CHAT_SCROLL_TOOL_STREAM_FIRST'
 const LIVE_TOOL_DONE = 'CHAT_SCROLL_TOOL_STREAM_DONE'
 const TOOL_READY_FILE = '.chat-scroll-tool-ready'
 const TOOL_RELEASE_FILE = '.chat-scroll-tool-release'
+const STREAM_RELEASE_FILE = '.chat-scroll-stream-release'
 const INPUTS_SESSION_ID = 'chat-scroll-inputs-e2e'
 const FLING_SESSION_ID = 'chat-scroll-fling-e2e'
 const LIVE_FLING_PROMPT = 'CHAT_SCROLL_FLING_USER Keep streaming while I fling back through older output.'
@@ -146,8 +147,8 @@ function toolStream(): StreamChunk[] {
   ]
 }
 
-function replayEntry(chunks: StreamChunk[]): ReplayEntry {
-  return { kind: 'chunks', chunks }
+function replayEntry(chunks: StreamChunk[], hold?: ReplayHold): ReplayEntry {
+  return { kind: 'chunks', chunks, ...(hold === undefined ? {} : { hold }) }
 }
 
 async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWorld> {
@@ -498,9 +499,13 @@ describe('web e2e: long Chat scroll contract', () => {
   it.skipIf(MODE === 'record')('preserves the reader anchor when history and streaming arrive concurrently', async () => {
     await withScrollWorld({
       failureShot: 'web-e2e-chat-scroll-history-stream',
-      replay: [replayEntry(textStream(LIVE_TEXT_FIRST, LIVE_TEXT_DONE, 120))],
+      // The hold parks the stream near the end until the test releases it, so
+      // the anchor assertions never race a finite replay to exhaustion.
+      replay: [replayEntry(textStream(LIVE_TEXT_FIRST, LIVE_TEXT_DONE, 120), { after: 100, releaseFile: STREAM_RELEASE_FILE })],
       seeds: [{ fixture: HISTORY_FIXTURE, id: HISTORY_SESSION_ID }],
     }, async (world) => {
+      if (world.replayDir === undefined) throw new Error('held-stream replay requires replayDir')
+      const streamRelease = join(world.replayDir, STREAM_RELEASE_FILE)
       await openSeed(
         world.page,
         HISTORY_FIXTURE,
@@ -546,6 +551,7 @@ describe('web e2e: long Chat scroll contract', () => {
         await wheelTranscript(world.page, 420)
         const readerAnchor = await visibleFlowAnchor(world.page)
         const chunksAfterAnchor = world.assistantFrames.filter(frame => frame.type === 'chunk').length
+        await writeFile(streamRelease, 'release\n')
         await expect.poll(
           () => world.assistantFrames.filter(frame => frame.type === 'chunk').length,
           { timeout: 10_000 },
@@ -557,6 +563,7 @@ describe('web e2e: long Chat scroll contract', () => {
         await expectSameFlowTop(world.page, readerAnchor)
       } finally {
         releaseHistory()
+        await writeFile(streamRelease, 'release\n').catch(() => {})
       }
 
       await settled
@@ -854,16 +861,21 @@ describe('web e2e: long Chat scroll contract', () => {
       failureShot: 'web-e2e-chat-scroll-fling-stream',
       replay: [
         replayEntry(toolStream()),
-        replayEntry(textStream(LIVE_FLING_FIRST, LIVE_FLING_DONE, 240)),
+        // The hold keeps the text stream in flight through the repin, so the
+        // bottom-follow assertions never race a finite replay to exhaustion.
+        replayEntry(textStream(LIVE_FLING_FIRST, LIVE_FLING_DONE, 240), { after: 200, releaseFile: STREAM_RELEASE_FILE }),
       ],
       seeds: [{ fixture: INPUTS_FIXTURE, id: FLING_SESSION_ID }],
     }, async (world) => {
+      if (world.replayDir === undefined) throw new Error('held-stream replay requires replayDir')
+      const streamRelease = join(world.replayDir, STREAM_RELEASE_FILE)
       const readyPath = join(world.scaffold.workspaceCwd, TOOL_READY_FILE)
       const releasePath = join(world.scaffold.workspaceCwd, TOOL_RELEASE_FILE)
       await openSeed(world.page, INPUTS_FIXTURE, INPUTS_FIXTURE.markers.assistant(INPUTS_FIXTURE.turns))
       const backToBottom = world.page.getByRole('button', { name: 'Back to bottom', exact: true })
       const settled = world.scaffold.whenTurnSettled(60_000)
       let released = false
+      let streamReleased = false
       try {
         const composer = world.page.locator('textarea:enabled').last()
         await composer.fill(LIVE_FLING_PROMPT)
@@ -900,6 +912,8 @@ describe('web e2e: long Chat scroll contract', () => {
         await expectBottom(world.page)
         await expect.poll(() => backToBottom.count(), { timeout: 10_000 }).toBe(0)
         const chunksAtRepin = world.assistantFrames.filter(frame => frame.type === 'chunk').length
+        await writeFile(streamRelease, 'release\n')
+        streamReleased = true
         await expect.poll(
           () => world.assistantFrames.filter(frame => frame.type === 'chunk').length,
           { timeout: 15_000 },
@@ -907,6 +921,7 @@ describe('web e2e: long Chat scroll contract', () => {
         await expectBottom(world.page)
       } finally {
         if (!released) await writeFile(releasePath, 'release\n').catch(() => {})
+        if (!streamReleased) await writeFile(streamRelease, 'release\n').catch(() => {})
       }
 
       await settled

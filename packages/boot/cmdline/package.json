@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-cmdline",
   "description": "Immutable command-line handoff from a dsh launcher to any app plugin that injects cmdlineArgs",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -25,7 +25,7 @@
     "lib/index.js",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
     "@deepseek-ai/cordis": "workspace:~"

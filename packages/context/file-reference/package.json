@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-file-reference",
   "description": "File-reference discovery contract and shared @file grammar",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -46,7 +46,7 @@
     "lib/typert.remote-client.js",
     "lib/typert.remote-client.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "zod": "^4.4.3"
   },

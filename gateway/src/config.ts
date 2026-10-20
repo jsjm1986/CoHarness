@@ -59,6 +59,12 @@ export interface GatewayConfig {
   organizationModelCredentialKeyFile: string
   /** Owner-only AES-GCM master-key file for webhook endpoint signing secrets. */
   webhookSecretKeyFile: string
+  /** Owner-only AES-GCM master-key file for public-access tunnel credentials. */
+  tunnelCredentialKeyFile: string
+  /** Private state directory for the managed cloudflared binary (HGW_TUNNEL_STATE_DIR). */
+  tunnelStateDir: string
+  /** Explicit cloudflared binary path override (HGW_CLOUDFLARED); empty resolves PATH, managed, then well-known locations. */
+  cloudflaredBin?: string
   /** Owner-only one-time file for a newly generated bootstrap administrator password. */
   bootstrapAdminPasswordFile: string
   /** Deployment backup directory holding dumps plus managed-file snapshots. */
@@ -401,6 +407,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const webhookSecretKeyFile = resolve(
     env.HGW_WEBHOOK_SECRET_KEY_FILE ?? join(stateRoot, 'webhook-secrets.key'),
   )
+  const tunnelCredentialKeyFile = resolve(
+    env.HGW_TUNNEL_CREDENTIAL_KEY_FILE ?? join(stateRoot, 'tunnel-credentials.key'),
+  )
+  const tunnelStateDir = resolve(env.HGW_TUNNEL_STATE_DIR ?? join(stateRoot, 'tunnel'))
+  const cloudflaredBin = env.HGW_CLOUDFLARED === undefined || env.HGW_CLOUDFLARED === ''
+    ? undefined : normalizedAbsolutePath(env.HGW_CLOUDFLARED)
   const launcher = env.HGW_LAUNCHER === 'systemd' ? 'systemd' : 'local'
   const configuredProjectPathRoots = projectPathRoots(env.HGW_PROJECT_PATH_ROOTS)
   if (launcher === 'systemd' && configuredProjectPathRoots.length === 0) {
@@ -657,6 +669,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,
     webhookSecretKeyFile,
+    tunnelCredentialKeyFile,
+    tunnelStateDir,
+    ...(cloudflaredBin === undefined ? {} : { cloudflaredBin }),
     bootstrapAdminPasswordFile,
     backupDir: env.HGW_BACKUP_DIR ?? join(stateRoot, 'backups'),
     remoteDesktopDir: env.HGW_REMOTE_DESKTOP_DIR ?? join(stateRoot, 'remote-desktop'),

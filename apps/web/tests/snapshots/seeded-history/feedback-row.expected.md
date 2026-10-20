@@ -66,7 +66,7 @@
   - img
   - text: "feedback Feedback recorded for session {{seededId}} Anonymous user: {{userId}}. Session sharing is not configured."
 - text: "Feedback recorded for session {{seededId}} Anonymous user: {{userId}}. Session sharing is not configured."
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

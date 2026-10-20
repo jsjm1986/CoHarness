@@ -19,6 +19,8 @@ interface ViewState {
   paneIds: SessionId[]
   activePaneId?: SessionId
   paneRatios: number[]
+  /** Identity-strip posture; transient per mount, absent from SavedWorkbench. */
+  collapsedIds: SessionId[]
 }
 
 function validSession(sessions: ISessions, id: SessionId, workspaces?: IWorkspaces): boolean {
@@ -30,6 +32,23 @@ function validSession(sessions: ISessions, id: SessionId, workspaces?: IWorkspac
   // unpartitioned.
   return list.archivedById[id] === undefined
     && workspaces?.list.getSnapshot().archivedSessionIds.includes(id) !== true
+}
+
+/** Per-session pending reveal request consumed by that Session's chat surface. */
+class RevealRequestSource implements ObservableSnapshot<{ seq: number; nonce: number } | undefined> {
+  private value: { seq: number; nonce: number } | undefined
+  private readonly listeners = new Set<() => void>()
+  getSnapshot(): { seq: number; nonce: number } | undefined { return this.value }
+  subscribe(fn: () => void): () => void {
+    this.listeners.add(fn)
+    return () => { this.listeners.delete(fn) }
+  }
+  /** Replace the pending request; undefined acknowledges the last one. */
+  publish(value: { seq: number; nonce: number } | undefined): void {
+    if (this.value === value) return
+    this.value = value
+    for (const listener of [...this.listeners]) listener()
+  }
 }
 
 function normalizedRatios(count: number, ratios: readonly number[]): number[] {
@@ -53,7 +72,7 @@ type ViewActions = {
  */
 export function createConversationViewportStore(): EngineStoreHandle<ViewState, ViewActions> {
   return defineStore({
-    init: (): ViewState => ({ mode: 'single', paneIds: [], paneRatios: [] }),
+    init: (): ViewState => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }),
     actions: {
       replace: (draft, state: ViewState) => {
         draft.mode = state.mode
@@ -61,6 +80,7 @@ export function createConversationViewportStore(): EngineStoreHandle<ViewState, 
         else draft.pendingIdentity = state.pendingIdentity
         draft.paneIds = state.paneIds
         draft.paneRatios = state.paneRatios
+        draft.collapsedIds = state.collapsedIds
         if (state.activePaneId === undefined) delete draft.activePaneId
         else draft.activePaneId = state.activePaneId
       },
@@ -86,6 +106,8 @@ export class ConversationViewportController implements ConversationViewport {
   private keyVersion: 2 | 3 = 3
   private restorationPending = false
   private readonly unavailablePanes = new Set<SessionId>()
+  private readonly reveals = new Map<SessionId, RevealRequestSource>()
+  private revealNonce = 0
   private activeWorkbenchId = 'default'
   private readonly stopList: () => void
   private readonly stopView: () => void
@@ -100,12 +122,16 @@ export class ConversationViewportController implements ConversationViewport {
       getSnapshot: () => instance.getSnapshot(),
       update: (mutate) => {
         const state = instance.getSnapshot()
-        const next = { ...state, paneIds: [...state.paneIds], paneRatios: [...state.paneRatios] }
+        const next = { ...state, paneIds: [...state.paneIds], paneRatios: [...state.paneRatios], collapsedIds: [...state.collapsedIds] }
         mutate(next)
+        // Strips follow the pane set: a removed pane can never stay collapsed.
+        next.collapsedIds = next.collapsedIds.filter(id => next.paneIds.includes(id))
         if (next.mode !== state.mode || next.pendingIdentity !== state.pendingIdentity || next.activePaneId !== state.activePaneId
           || next.paneIds.length !== state.paneIds.length
           || next.paneIds.some((id, index) => id !== state.paneIds[index])
-          || next.paneRatios.some((ratio, index) => ratio !== state.paneRatios[index])) {
+          || next.paneRatios.some((ratio, index) => ratio !== state.paneRatios[index])
+          || next.collapsedIds.length !== state.collapsedIds.length
+          || next.collapsedIds.some((id, index) => id !== state.collapsedIds[index])) {
           instance.actions.replace(next)
         }
       },
@@ -224,8 +250,47 @@ export class ConversationViewportController implements ConversationViewport {
   focus(sessionId: SessionId): void {
     this.sessions.beginNavigation()
     if (!this.store.getSnapshot().paneIds.includes(sessionId)) return
-    this.store.update((draft) => { draft.activePaneId = sessionId })
+    this.store.update((draft) => {
+      draft.activePaneId = sessionId
+      draft.collapsedIds = draft.collapsedIds.filter(id => id !== sessionId)
+    })
     if (validSession(this.sessions, sessionId, this.workspaces)) this.select(sessionId)
+  }
+
+  setCollapsed(sessionId: SessionId, collapsed: boolean): void {
+    this.sessions.beginNavigation()
+    let nextActive: SessionId | undefined
+    this.store.update((draft) => {
+      const index = draft.collapsedIds.indexOf(sessionId)
+      if (collapsed) {
+        // One expanded pane must remain: parking the last one renders nothing.
+        if (index >= 0 || draft.paneIds.filter(id => !draft.collapsedIds.includes(id)).length <= 1) return
+        draft.collapsedIds.push(sessionId)
+        if (draft.activePaneId === sessionId) {
+          nextActive = draft.paneIds.find(id => !draft.collapsedIds.includes(id))
+          if (nextActive === undefined) delete draft.activePaneId
+          else draft.activePaneId = nextActive
+        }
+        return
+      }
+      if (index >= 0) draft.collapsedIds.splice(index, 1)
+    })
+    if (nextActive !== undefined && validSession(this.sessions, nextActive, this.workspaces)) this.select(nextActive)
+  }
+
+  soloPane(sessionId: SessionId): void {
+    this.sessions.beginNavigation()
+    const state = this.store.getSnapshot()
+    if (!state.paneIds.includes(sessionId)) return
+    const others = state.paneIds.filter(id => id !== sessionId)
+    if (others.length === 0) return
+    // Re-invoking on the already-soloed pane restores every pane.
+    const entering = others.some(id => !state.collapsedIds.includes(id))
+    this.store.update((draft) => {
+      draft.collapsedIds = entering ? others : []
+      if (entering) draft.activePaneId = sessionId
+    })
+    if (entering && validSession(this.sessions, sessionId, this.workspaces)) this.select(sessionId)
   }
 
   replaceActive(sessionId: SessionId): AddPaneResult {
@@ -251,15 +316,51 @@ export class ConversationViewportController implements ConversationViewport {
     return { ok: true }
   }
 
+  reveal(sessionId: SessionId, seq: number): void {
+    if (!this.replaceActive(sessionId).ok) return
+    this.revealSource(sessionId).publish({ seq, nonce: ++this.revealNonce })
+  }
+
+  revealTarget(sessionId: SessionId): ObservableSnapshot<{ seq: number; nonce: number } | undefined> {
+    return this.revealSource(sessionId)
+  }
+
+  ackReveal(sessionId: SessionId): void {
+    this.revealSource(sessionId).publish(undefined)
+  }
+
+  private revealSource(sessionId: SessionId): RevealRequestSource {
+    let source = this.reveals.get(sessionId)
+    if (source === undefined) {
+      source = new RevealRequestSource()
+      this.reveals.set(sessionId, source)
+    }
+    return source
+  }
+
   move(sessionId: SessionId, direction: 'previous' | 'next'): void {
     this.assertEditable()
     const state = this.store.getSnapshot()
     const index = state.paneIds.indexOf(sessionId)
     const target = index + (direction === 'previous' ? -1 : 1)
     if (index < 0 || target < 0 || target >= state.paneIds.length) return
+    this.reorderPane(index, target)
+  }
+
+  reorder(sessionId: SessionId, index: number): void {
+    this.assertEditable()
+    const state = this.store.getSnapshot()
+    const from = state.paneIds.indexOf(sessionId)
+    if (from < 0 || !Number.isFinite(index)) return
+    const target = Math.max(0, Math.min(Math.trunc(index), state.paneIds.length - 1))
+    if (target === from) return
+    this.reorderPane(from, target)
+  }
+
+  private reorderPane(from: number, target: number): void {
     this.store.update((draft) => {
-      const [id] = draft.paneIds.splice(index, 1)
-      const [ratio] = draft.paneRatios.splice(index, 1)
+      const [id] = draft.paneIds.splice(from, 1)
+      const [ratio] = draft.paneRatios.splice(from, 1)
       // The validated index addresses both normalized, equally sized arrays.
       // oxlint-disable-next-line typescript/no-non-null-assertion
       draft.paneIds.splice(target, 0, id!)

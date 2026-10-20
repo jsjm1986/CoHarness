@@ -37,7 +37,7 @@
       - img
     - button "Steer queued message" [disabled]:
       - img
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":

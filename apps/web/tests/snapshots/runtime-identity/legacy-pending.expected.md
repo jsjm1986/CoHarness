@@ -1,7 +1,9 @@
 - button "Select workbench":
   - text: Legacy layout
   - img
-- text: 0/4
+- img "0 of 4 panes in use"
+- button "Layout":
+  - img
 - button "Add conversation" [disabled]:
   - img
   - text: Add conversation

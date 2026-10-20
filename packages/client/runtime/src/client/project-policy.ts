@@ -19,6 +19,13 @@ export interface ProjectUiPolicySnapshot {
   canManage?: boolean
   /** Reserved maintenance-space marker while the active project is the steward space. */
   steward?: boolean
+  /**
+   * Account-roster projects flagged as the reserved maintenance space. Unlike
+   * `steward` — which describes the active scope — this list answers whether
+   * an arbitrary session belongs to a steward project, e.g. a workbench pane
+   * holding a conversation from another scope.
+   */
+  stewardProjectIds?: readonly number[]
 }
 
 /** Runtime-owned source consumed by UI features without importing collaboration. */
@@ -84,6 +91,20 @@ export class ProjectUiPolicyRuntime {
       ...details.projectName === undefined ? {} : { projectName: details.projectName },
       ...details.canManage === undefined ? {} : { canManage: details.canManage },
       ...details.steward === undefined ? {} : { steward: details.steward },
+      ...this.snapshot.stewardProjectIds === undefined ? {} : { stewardProjectIds: this.snapshot.stewardProjectIds },
+    })
+    for (const listener of [...this.listeners]) listener()
+  }
+
+  /** Publish the roster's steward project ids; scope-independent per-session fact.
+   * @param projectIds - projects whose kind marks the reserved maintenance space.
+   */
+  setStewardProjects(projectIds: readonly number[]): void {
+    const current = this.snapshot.stewardProjectIds ?? []
+    if (current.length === projectIds.length
+      && current.every((id, index) => id === projectIds[index])) return
+    this.snapshot = Object.freeze({
+      ...this.snapshot, stewardProjectIds: Object.freeze([...projectIds]), revision: this.snapshot.revision + 1,
     })
     for (const listener of [...this.listeners]) listener()
   }

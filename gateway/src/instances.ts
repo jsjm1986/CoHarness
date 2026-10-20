@@ -68,6 +68,9 @@ const PROJECT_RUNTIME_PATCH = `- id: session-persistence-jsonl
       danger-full-access:
         sandbox: danger-full-access
         approval: never
+- id: memory
+  config:
+    space: project
 `
 
 /**

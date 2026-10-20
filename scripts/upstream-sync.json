@@ -204,6 +204,9 @@
         "packages/client/ui-layout/src/client/DocumentTitle.tsx"
       ]
     },
+    "client/ui-memory": {
+      "sovereignty": "owned"
+    },
     "client/ui-message-feedback": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
@@ -251,6 +254,10 @@
         "packages/client/ui-primitives/src/darwin-desktop.ts",
         "packages/client/ui-primitives/src/file-size.ts"
       ]
+    },
+    "client/ui-project-activity": {
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/feature/2026-10-17-project-activity-feed.md"
     },
     "client/ui-reference": {
       "sovereignty": "adapted"
@@ -506,6 +513,10 @@
     "experimental/agent-team-profile": {
       "sovereignty": "tracked"
     },
+    "experimental/api-speech-to-text": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
     "experimental/auto-review": {
       "sovereignty": "adapted"
     },
@@ -525,6 +536,10 @@
     "experimental/client-ui-agent-team": {
       "sovereignty": "adapted"
     },
+    "experimental/client-ui-voice-input": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
     "experimental/computer-use-cua-driver-mcp": {
       "sovereignty": "adapted"
     },
@@ -534,8 +549,24 @@
     "experimental/ptc-runtime-python": {
       "sovereignty": "adapted"
     },
+    "experimental/schedule-bundle": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
+    },
+    "experimental/speech-to-text": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/speech-to-text-sensevoice": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
     "experimental/tool-agent-team": {
       "sovereignty": "adapted"
+    },
+    "experimental/voice-input-bundle": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "extensions/cordis-client-runner": {
       "sovereignty": "adapted"
@@ -711,6 +742,18 @@
     },
     "mcp/mcp-resources": {
       "sovereignty": "tracked"
+    },
+    "memory/memory": {
+      "sovereignty": "owned"
+    },
+    "memory/memory-context": {
+      "sovereignty": "owned"
+    },
+    "memory/memory-curation": {
+      "sovereignty": "owned"
+    },
+    "memory/tool-memory": {
+      "sovereignty": "owned"
     },
     "plan/plan-mode": {
       "sovereignty": "adapted",
@@ -1130,30 +1173,6 @@
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
-    },
-    "experimental/api-speech-to-text": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
-    },
-    "experimental/client-ui-voice-input": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
-    },
-    "experimental/schedule-bundle": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
-    },
-    "experimental/speech-to-text": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
-    },
-    "experimental/speech-to-text-sensevoice": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
-    },
-    "experimental/voice-input-bundle": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     }
   },
   "upstreamOnly": [

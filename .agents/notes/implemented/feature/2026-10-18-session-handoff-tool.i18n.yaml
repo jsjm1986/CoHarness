@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-session-handoff-tool.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-session-handoff-tool.md
+/agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule:
+  en: 45ef43ac1d1b686b
+  zh: 9a62821c4d8adf3c
+/agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule/problem:
+  en: 0e12a5a8d4c30ad6
+  zh: 7188c509bbfe49af
+/agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule/decision:
+  en: 95f22febfc1a525b
+  zh: 877a11ebf0cbcfc8
+/agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule/consequences:
+  en: e617d6f40bb40fb9
+  zh: bc2ed9c32c44e692
+/agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule/alternatives-considered:
+  en: 84a007ffbf25b489
+  zh: 28949167631dc90d
+/agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule/verification:
+  en: cccf79c62f54e485
+  zh: 5d0a02624222379a

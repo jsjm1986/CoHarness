@@ -90,7 +90,7 @@ describe('question response validation', () => {
     expect(await api.respond(answer(envelope, ['Yes']))).toEqual({ accepted: true })
     await expect(asked).resolves.toEqual({ answers: [{ id: 'decision', selected: ['Yes'] }] })
     expect(capture).toHaveBeenCalledOnce()
-    expect(claim).toHaveBeenCalledWith(target.session, envelope.rpcId, { answers: [{ id: 'decision', selected: ['Yes'] }] }, original)
+    expect(claim).toHaveBeenCalledWith(target.session, envelope.rpcId, { answers: [{ id: 'decision', selected: ['Yes'] }] }, original, undefined)
     abort.abort()
   })
 

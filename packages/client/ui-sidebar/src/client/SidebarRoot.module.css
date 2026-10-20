@@ -81,6 +81,12 @@
   animation: rail-in 150ms var(--ds-ease-in-out) backwards;
 }
 
+/* The rail-head toggle morphs in place from the wide header's control —
+   sliding it in like the other controls reads as a position jump. */
+.railIn .toggle {
+  animation-name: rail-fade-in;
+}
+
 .railIn .footArea {
   animation: rail-fade-in 150ms var(--ds-ease-in-out) backwards;
 }
@@ -142,17 +148,19 @@
 
 /* Expanded only: float the collapse toggle off the flow so the lockup
    centers on the full row width. The collapsed rail keeps the toggle in
-   flow — there it rests as the brand mark itself. */
+   flow — there it rests as the brand mark itself. Centering uses margin-block
+   auto rather than translateY: .iconButton transitions `transform` (for the
+   :active press scale), so a translateY → none flip would animate as a
+   visible vertical drift on collapse. */
 .toggle {
   position: absolute;
-  top: 50%;
+  inset-block: 0;
+  margin-block: auto;
   right: var(--dsw-space-1);
-  transform: translateY(-50%);
 }
 
 .collapsed .toggle {
   position: static;
-  transform: none;
 }
 
 /* Mark and name are independent slots; the shell owns their shared baseline,

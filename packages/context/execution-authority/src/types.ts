@@ -11,8 +11,13 @@ export type ExecutionScopeId = Branded<'ExecutionScopeId'>
 /** Host RPC identity of the pending human question claimed by the Gateway. */
 export type ExecutionQuestionId = Branded<'rpc-id'>
 
-/** Privilege checked against every current execution participant. */
-export type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop'
+/**
+ * Privilege checked against every current execution participant. `memory`
+ * writes shared project memory; it is granted only when every participant
+ * holds the memory qualification, the project enables it, and the
+ * conversation is project-visible.
+ */
+export type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop' | 'memory'
 
 /** Gateway-confirmed participant set, with bounded identity witnesses. */
 export interface ExecutionState {

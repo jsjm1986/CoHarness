@@ -36,7 +36,7 @@ export function TerminalRecovery({ restore, t }: PropsRuntime<'conversation.inpu
       title={t('recoveryFailed', { message: error })}
       onClick={() => { setError(undefined); setAttempt(value => value + 1) }}
     >
-      {t('retryRecovery')}
+      <span data-clip-label>{t('retryRecovery')}</span>
     </Button>
   )
 }

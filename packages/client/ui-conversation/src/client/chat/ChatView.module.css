@@ -18,6 +18,12 @@
   /* Sides = composer clearance + 16px: on narrow viewports the transcript
      stays exactly 32px narrower than the input card (the shared width rule). */
   padding: 16px calc(var(--dsh-composer-side-clearance) + 16px);
+  /* Top edge fade: scrolled content recedes under the header zone instead
+     of ending on a hard clip. The band ends exactly at the 16px top pad so
+     a scrolled-to-top first row stays fully opaque. The bottom stays
+     unfaded — streaming output lands there and must never sit under a
+     permanent dim. */
+  mask-image: linear-gradient(to bottom, transparent, black 16px);
 }
 
 :global([data-conversation-scroll]) .root {
@@ -30,6 +36,10 @@
   overflow: visible;
   flex: 0 0 auto;
   min-height: auto;
+  /* In resident-scroll mode this box does not scroll — a mask pinned to its
+     top edge would fade the transcript head permanently instead of tracking
+     the viewport edge. */
+  mask-image: none;
 }
 
 /* The composer is sticky inside the resident conversation scroll body. On a

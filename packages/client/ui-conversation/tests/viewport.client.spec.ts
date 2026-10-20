@@ -17,6 +17,7 @@ function harness() {
   const opened: SessionId[] = []
   const staged: SessionId[][] = []
   const navigation = new NavigationController()
+  const clear = vi.fn()
   const sessions = {
     beginNavigation: () => navigation.begin(),
     list,
@@ -24,10 +25,10 @@ function harness() {
       opened.push(sessionId)
       list.set({ ...list.getSnapshot(), current: sessionId })
     },
-    clear: vi.fn(),
+    clear,
     setAdditionalStaged: (ids: readonly SessionId[]) => { staged.push([...ids]) },
-  } as unknown as ISessions
-  return { list, sessions, opened, staged }
+  } as Partial<ISessions> as ISessions
+  return { list, sessions, opened, staged, clear }
 }
 
 beforeEach(() => { localStorage.clear() })
@@ -192,8 +193,7 @@ describe('ConversationViewportController', () => {
     viewport.remove(id('a'))
     viewport.remove(id('b'))
     expect(viewport.snapshot.getSnapshot()).not.toHaveProperty('activePaneId')
-    // oxlint-disable-next-line typescript/unbound-method -- the fixture's clear is a standalone spy.
-    expect(h.sessions.clear).toHaveBeenCalledOnce()
+    expect(h.clear).toHaveBeenCalledOnce()
     viewport.dispose()
     viewport.dispose()
     expect(viewport.add(id('a'))).toEqual({ ok: false, reason: 'unknown' })
@@ -219,7 +219,7 @@ describe('ConversationViewportController', () => {
   })
 
   it('keeps the persisted active pane when the saved workbench restores its pane set', () => {
-    localStorage.setItem('dsh.conversation.workbench.v1', JSON.stringify({ mode: 'workbench', paneIds: ['a', 'b', 'd'], activePaneId: 'd', paneRatios: [] }))
+    localStorage.setItem('dsh.conversation.workbench.v1', JSON.stringify({ mode: 'workbench', paneIds: ['a', 'b', 'd'], activePaneId: 'd', paneRatios: [], collapsedIds: [] }))
     localStorage.setItem('dsh.conversation.workbenches.v1', JSON.stringify({ activeId: 'default', workbenches: [{ id: 'default', name: '我的工作台', paneIds: ['a', 'b', 'd'], paneRatios: [], updatedAt: 1 }] }))
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
@@ -261,7 +261,7 @@ describe('ConversationViewportController', () => {
     expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
     expect(h.staged.at(-1)).toEqual([])
     viewport.setPersistenceScope('account:1')
-    expect(viewport.snapshot.getSnapshot()).toMatchObject({ paneIds: ['a', 'b'], activePaneId: 'b', paneRatios: [0.25, 0.75] })
+    expect(viewport.snapshot.getSnapshot()).toMatchObject({ paneIds: ['a', 'b'], activePaneId: 'b', paneRatios: [0.25, 0.75], collapsedIds: [] })
     expect(viewport.currentWorkbench().name).toBe('Private project')
     viewport.dispose()
   })
@@ -291,6 +291,75 @@ describe('ConversationViewportController', () => {
     expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
   })
 
+  it('reorders a pane to an absolute index while preserving its width ratio', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
+    viewport.setEnabled(true)
+    viewport.add(id('a')); viewport.add(id('b')); viewport.add(id('c'))
+    viewport.setPaneRatios([1, 2, 3])
+    viewport.reorder(id('c'), 0)
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([id('c'), id('a'), id('b')])
+    expect(viewport.snapshot.getSnapshot().paneRatios).toEqual([3 / 6, 1 / 6, 2 / 6])
+    viewport.reorder(id('c'), 99)
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([id('a'), id('b'), id('c')])
+    viewport.reorder(id('missing'), 0)
+    viewport.reorder(id('a'), Number.NaN)
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([id('a'), id('b'), id('c')])
+    viewport.dispose()
+  })
+
+  it('collapses panes to identity strips without persisting the posture', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
+    viewport.setEnabled(true)
+    viewport.add(id('a')); viewport.add(id('b')); viewport.add(id('c'))
+    viewport.setCollapsed(id('b'), true)
+    expect(viewport.snapshot.getSnapshot().collapsedIds).toEqual([id('b')])
+    // The last expanded pane cannot collapse.
+    viewport.setCollapsed(id('c'), true)
+    viewport.setCollapsed(id('a'), true)
+    expect(viewport.snapshot.getSnapshot().collapsedIds).toEqual([id('b'), id('c')])
+    // Collapsing the active pane moves focus to a still-expanded neighbor.
+    viewport.setCollapsed(id('b'), false)
+    viewport.focus(id('a'))
+    viewport.setCollapsed(id('a'), true)
+    expect(viewport.snapshot.getSnapshot().activePaneId).toBe(id('b'))
+    // Focusing a strip expands only that pane; the other strip stays parked.
+    viewport.focus(id('a'))
+    expect(viewport.snapshot.getSnapshot().collapsedIds).toEqual([id('c')])
+    viewport.setCollapsed(id('c'), false)
+    expect(viewport.snapshot.getSnapshot().collapsedIds).toEqual([])
+    // Collapse posture stays out of the durable record.
+    viewport.setCollapsed(id('b'), true)
+    const saved = JSON.parse(localStorage.getItem('dsh.conversation.workbenches.v2.local')!) as { workbenches: { paneIds: string[]; collapsedIds?: string[] }[] }
+    expect(saved.workbenches[0]?.collapsedIds).toBeUndefined()
+    // Removing a pane also removes its strip.
+    viewport.remove(id('b'))
+    expect(viewport.snapshot.getSnapshot().collapsedIds).toEqual([])
+    viewport.dispose()
+  })
+
+  it('solos one pane by collapsing the rest and restores them on repeat', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
+    viewport.setEnabled(true)
+    viewport.add(id('a')); viewport.add(id('b')); viewport.add(id('c'))
+    viewport.soloPane(id('b'))
+    expect(viewport.snapshot.getSnapshot().collapsedIds).toEqual([id('a'), id('c')])
+    expect(viewport.snapshot.getSnapshot().activePaneId).toBe(id('b'))
+    viewport.soloPane(id('b'))
+    expect(viewport.snapshot.getSnapshot().collapsedIds).toEqual([])
+    // Soloing a collapsed pane expands it and collapses the rest.
+    viewport.setCollapsed(id('c'), true)
+    viewport.soloPane(id('c'))
+    expect(viewport.snapshot.getSnapshot().collapsedIds).toEqual([id('a'), id('b')])
+    expect(viewport.snapshot.getSnapshot().activePaneId).toBe(id('c'))
+    viewport.dispose()
+  })
+
 })
 
 it('migrates only catalog-proven legacy identities and persists same-ID panes separately', async () => {
@@ -311,7 +380,7 @@ it('migrates only catalog-proven legacy identities and persists same-ID panes se
   try {
     view.setPersistenceScope('account:1')
     view.reconcileSessionKeys(value => value === id('unique') ? unique : undefined)
-    expect(view.snapshot.getSnapshot()).toMatchObject({ paneIds: [unique], activePaneId: unique, paneRatios: [1] })
+    expect(view.snapshot.getSnapshot()).toMatchObject({ paneIds: [unique], activePaneId: unique, paneRatios: [1], collapsedIds: [] })
     view.markCatalogReady()
     expect(view.add(personal)).toEqual({ ok: true })
     expect(view.add(project)).toEqual({ ok: true })

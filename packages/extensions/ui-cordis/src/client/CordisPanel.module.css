@@ -108,6 +108,9 @@
   border: 0;
   border-radius: 12px;
   background: var(--dsw-specific-menu);
+  /* The menu fill is translucent; the blur keeps the page behind the panel
+     from bleeding through (MenuSurface contract). */
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
   /* Only `.body` scrolls; the header remains fixed above it. */

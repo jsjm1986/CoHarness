@@ -40,7 +40,7 @@ export type {
   ConversationSessionHeaderInjected, ConversationSessionInjected, ConversationSlotProps, ConvViewOwnerProps,
   ConvViewProps, ConversationPaneOwnerProps, ConversationPaneSlotProps, ConversationWorkbenchDisplayOwnerProps,
   ConversationWorkbenchEmptyOwnerProps,
-  ConversationWorkbenchPaneHeaderOwnerProps, ConversationWorkbenchToolbarOwnerProps,
+  ConversationWorkbenchPaneHeaderOwnerProps, ConversationWorkbenchToolbarOwnerProps, WorkbenchLayoutPreset,
   DetailsInjected, DetailsSlotProps, DetailsToolOwnerProps, EmptyWorkspaceOwnerProps, HeroBrandMarkOwnerProps,
   MessageImageLoader, MessageImageSource, MessageImagesOwnerProps, MessageImagesProps,
   RenderMessageImages, TurnTailOwnerProps, UseChatNodeTurnData,

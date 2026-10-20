@@ -40,7 +40,7 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   })
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.provide('locale', locale)
-  runtime.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} } } as never)
+  runtime.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }), subscribe: () => () => {} } } as never)
   runtime.provide('shortcuts', {
     register: vi.fn(() => () => {}),
     catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },

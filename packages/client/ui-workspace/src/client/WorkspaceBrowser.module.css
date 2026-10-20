@@ -386,6 +386,12 @@
      above the gradient instead of under it. */
   padding-bottom: var(--dsw-space-4);
   scrollbar-gutter: stable;
+  /* Both ends fade into the panel surface so clipped rows read as
+     continuing past the edge rather than hitting a hard clip. The 8px top
+     band stays inside a row's own padding — a scrolled-to-top first row
+     keeps its icon fully opaque. The 14px bottom band rides inside the
+     space-4 pad, so a scrolled-to-end row still clears it. */
+  mask-image: linear-gradient(to bottom, transparent, black 8px, black calc(100% - 14px), transparent);
 }
 
 /* The compact drawer is a navigation surface, not a squeezed desktop tree.
@@ -397,6 +403,10 @@
   /* Keep momentum inside the drawer: end-of-list scrolls must not chain
      through the scrim to the transcript behind it. */
   overscroll-behavior: contain;
+  /* The compact drawer paints its own bottom fade overlay (.fade); the mask
+     keeps only its top band — 8px stays within the space-1 pad plus a row's
+     own padding — so the two do not double up. */
+  mask-image: linear-gradient(to bottom, transparent, black 8px);
 }
 
 /* Session cells sit contiguous; an inset hairline carries the rhythm a 2px

@@ -1,11 +1,14 @@
 import { nodeConfigurationAuthority } from './postgres/node-configuration-authority.ts'
 import { loadManagedNodeEnvironment, NodeConfigurationStore } from './node-config-store.ts'
 import { DesktopAccess } from './desktop-access.ts'
+import { MemoryAccess } from './memory-access.ts'
 import { PluginAccess } from './plugin-access.ts'
 import { PostgresPluginState } from './plugin-state.ts'
 import { SshAccess } from './ssh-access.ts'
 import { StewardAccess } from './steward-access.ts'
 import { TerminalAccess } from './terminal-access.ts'
+import { GatewayTunnelAccess } from './tunnel-access.ts'
+import { PostgresTunnelAccessStore, TunnelCredentialCipher } from './postgres/tunnel-access-service.ts'
 import { GatewayPluginManagement } from './plugin-management.ts'
 import { GatewayTerminalManagement } from './terminal-management.ts'
 import { randomBytes } from 'node:crypto'
@@ -225,6 +228,7 @@ const launcher = selectLauncher(cfg, () => ({
       cfg.principalKeyDir,
       cfg.organizationModelCredentialKeyFile,
       cfg.webhookSecretKeyFile,
+      cfg.tunnelCredentialKeyFile,
       cfg.bootstrapAdminPasswordFile,
     ],
     memoryMax: cfg.memoryMax,
@@ -389,6 +393,15 @@ heartbeatTimer.unref()
 const webhookDeliveries = new PostgresWebhookDeliveryService(context)
 const webhookEndpoints = new PostgresWebhookEndpointService(context,
   new WebhookSecretCipher(loadOrganizationModelCredentialKey(cfg.webhookSecretKeyFile)))
+const tunnelAccess = new GatewayTunnelAccess({
+  store: new PostgresTunnelAccessStore(context),
+  cipher: new TunnelCredentialCipher(loadOrganizationModelCredentialKey(cfg.tunnelCredentialKeyFile)),
+  organizationId: context.organizationId,
+  nodeId: context.nodeId,
+  target: `http://127.0.0.1:${String(cfg.port)}`,
+  stateDir: cfg.tunnelStateDir,
+  envBinaryPath: cfg.cloudflaredBin,
+})
 const pluginState = new PostgresPluginState(context)
 const stewardQuery = new StewardQueryService(context, cfg.steward.enabled)
 const deps: GatewayDeps = {
@@ -410,12 +423,14 @@ const deps: GatewayDeps = {
   terminalAccess: new TerminalAccess(context),
   sshAccess: new SshAccess(context),
   stewardAccess: new StewardAccess(context),
+  memoryAccess: new MemoryAccess(context),
   sshTargets: new PostgresSshTargetService(context),
   pluginManagement: new GatewayPluginManagement({ users, projects, instances, cfg, pluginState }, principalKeys.signer, context.nodeId),
   pluginState,
   terminalManagement: new GatewayTerminalManagement({ users, projects, instances, cfg }, principalKeys.signer, context.nodeId),
   webhookDeliveries,
   webhookEndpoints,
+  tunnelAccess,
   webhookIntake: new GatewayWebhookIntake({ cfg, users, instances, collaboration },
     webhookEndpoints, webhookDeliveries, principalKeys.signer),
   accessMonitor,
@@ -650,6 +665,10 @@ intake.listen(cfg.intakePort, '127.0.0.1', () => {
   console.log(`[gateway] usage intake listening on http://127.0.0.1:${cfg.intakePort}`)
 })
 
+// The tunnel must re-launch after a restart while its desired flag stays
+// 'running'; resume runs after the listener is up so the target port is serving.
+void tunnelAccess.resume()
+
 interface SingleFlightTask {
   run: () => void
   wait: () => Promise<void>
@@ -779,6 +798,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])
     await waitForWriters()
     await heartbeatInFlight
+    await tunnelAccess.shutdown()
     await deps.instances.stopAll()
     await pool.end()
     clearTimeout(forced)

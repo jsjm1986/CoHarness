@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-deliverables",
   "description": "Produced-files turn tail and clickable final-response file references for Web",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -41,7 +41,7 @@
     "bundle": "tsdown",
     "watch": "tsdown --watch"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-client-connection": "workspace:*",

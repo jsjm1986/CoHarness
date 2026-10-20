@@ -57,6 +57,11 @@
       config:
         backend: json
 
+    # Host plane: every session's agent-plane rows read this service, and the
+    # Gateway project runtime patch selects `space: project`.
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+
     - id: message-feedback
       name: '@deepseek-ai/dsh-message-feedback'
       config:
@@ -345,6 +350,16 @@
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'
+
+    # Shared-project activity feed: member messages and chosen answers in the
+    # right Sidebar; the tab type registers only while project scope is active.
+    - id: ui-project-activity
+      name: '@deepseek-ai/dsh-client-ui-project-activity'
+
+    # Durable memory browser: the right-Sidebar Memory tab listing scoped
+    # entries, and the `memory` card on the Plugins page.
+    - id: ui-memory
+      name: '@deepseek-ai/dsh-client-ui-memory'
 
     # Per-message feedback: Like/Dislike plus an optional note in the
     # assistant-message action strip, over the messageFeedback Remote.

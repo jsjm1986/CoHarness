@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-skill-office",
   "description": "Bundled Word, PowerPoint, and Excel workflows and structural checks",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -25,7 +25,7 @@
     "assets",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/dsh-skill": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~"

@@ -73,12 +73,14 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-input-trigger` | no | Input trigger pipeline: '/' and '@' detection, candidate menu, pick routing to registered sources |
 | `@deepseek-ai/dsh-client-ui-jobs` | no | Session-header background-job list: live registry state mirrored from session/jobs frames |
 | `@deepseek-ai/dsh-client-ui-layout` | no | Shell plugin: three-column AppFrame with drag handles, ctx.layout viewing-state service (navigation + panels) |
+| `@deepseek-ai/dsh-client-ui-memory` | no | Durable memory browser and settings card: scoped entries the member can read, search, and edit |
 | `@deepseek-ai/dsh-client-ui-message-feedback` | no | Per-message feedback controls contributed to the assistant-message action strip, backed by the messageFeedback Host Remote |
 | `@deepseek-ai/dsh-client-ui-model-selection` | no | Model selection: the /model popupSelect over session.models / session.selectModel |
 | `@deepseek-ai/dsh-client-ui-open-in-app` | no | Web Session-header "Open In..." split button opening the session workspace directory in a locally installed application |
 | `@deepseek-ai/dsh-client-ui-permission-presets` | no | Permission surfaces: a new-session default in General settings and a current-session /permission popup over the permissions projection |
 | `@deepseek-ai/dsh-client-ui-plan` | no | Plan-mode composer control, persistent submitted-plan cards, and Session-backed sidebar previews |
 | `@deepseek-ai/dsh-client-ui-plugin-manager` | yes | Plugin management for the dsh web client: the sidebar Plugins panel installs, enables, disables, retries, and composes installed plugin packages |
+| `@deepseek-ai/dsh-client-ui-project-activity` | no | Project member activity feed: attributed messages and question answers in the right Sidebar |
 | `@deepseek-ai/dsh-client-ui-reference` | no | Unified Web @file and @session reference source |
 | `@deepseek-ai/dsh-client-ui-renderer` | no | Browser UI renderer: React slot bindings, ctx.uiRenderer, and the assembled application root |
 | `@deepseek-ai/dsh-client-ui-schedule` | no | Host task management page and Session reminder catalog |
@@ -299,6 +301,15 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-mcp-client` | yes | MCP client bridge: connects to MCP servers and registers their tools on ctx.tools |
 | `@deepseek-ai/dsh-mcp-resources` | no | Scoped MCP resource discovery and reading through shared model tools |
+
+## memory
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-memory` | yes | Host-plane durable per-scope memory service: scoped facts that survive sessions |
+| `@deepseek-ai/dsh-memory-context` | yes | Agent-plane saved-memory catalog publication as durable user messages |
+| `@deepseek-ai/dsh-memory-curation` | yes | Background memory curation: turn-end extraction passes and interval-gated whole-scope consolidation |
+| `@deepseek-ai/dsh-tool-memory` | no | Model-facing memory_search/read/save/delete tools plus saved-memory system-prompt guidance |
 
 ## plan
 

@@ -137,7 +137,10 @@ async function bench() {
   const viewportState = { mode: 'single' as 'single' | 'workbench' }
   const replaceActive = vi.fn<(_id: SessionId) => AddPaneResult>(() => ({ ok: true }))
   ctx.provide('conversationViewport', {
-    snapshot: { getSnapshot: () => ({ mode: viewportState.mode, paneIds: [], paneRatios: [] }), subscribe: () => () => {} },
+    snapshot: {
+      getSnapshot: () => ({ mode: viewportState.mode, paneIds: [], paneRatios: [], collapsedIds: [] }),
+      subscribe: () => () => {},
+    },
     replaceActive, setMode: vi.fn(),
   } as never)
   ctx.provide('connection', {

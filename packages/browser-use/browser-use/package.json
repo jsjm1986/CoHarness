@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-browser-use",
   "description": "Exclusive named browser-use provider registration",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +30,7 @@
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-brand": "workspace:*"

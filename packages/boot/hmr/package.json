@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-hmr",
   "description": "Coordinated module and profile configuration hot reload",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -26,7 +26,7 @@
     "lib/types/**/*.d.ts"
   ],
   "author": "Shigma <shigma10826@gmail.com>",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-timer": "workspace:~",
     "@deepseek-ai/cordis": "workspace:~",

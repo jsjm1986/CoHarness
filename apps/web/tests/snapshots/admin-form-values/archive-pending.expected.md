@@ -1,6 +1,7 @@
+- paragraph: 该操作正在等待实例确认。实例长时间不可达时，可以结束等待、在服务端直接收尾。
 - term: 创建者
 - definition: Admin fixture
-- term: Workspace
+- term: 工作区
 - definition: 未分组
 - term: 项目
 - definition: 个人会话
@@ -8,9 +9,9 @@
 - definition:
   - time: 2026/09/27 08:00
 - term: 记录状态
-- definition: 已归档
-- term: 同步状态
-- definition: 等待实例确认
+- definition: 回收站
+- term: 同步
+- definition: 处理中·等待实例
 - region "对话记录":
   - heading "对话记录" [level=3]
   - paragraph: 以聊天方式显示用户、助手和工具交互；运行配置等内部事件已收起。

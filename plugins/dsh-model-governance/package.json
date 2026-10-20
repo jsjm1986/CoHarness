@@ -22,17 +22,17 @@
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-credentials": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-gateway-runtime": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-gateway-execution": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-archive-gateway": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-llm": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-model-access": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-model-provider-config": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-agent": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-settings": "0.1.5-alpha.1.coharness.1",
-    "@deepseek-ai/dsh-execution-authority": "0.1.5-alpha.1.coharness.1"
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-credentials": "*",
+    "@deepseek-ai/dsh-gateway-runtime": "*",
+    "@deepseek-ai/dsh-gateway-execution": "*",
+    "@deepseek-ai/dsh-archive-gateway": "*",
+    "@deepseek-ai/dsh-llm": "*",
+    "@deepseek-ai/dsh-model-access": "*",
+    "@deepseek-ai/dsh-model-provider-config": "*",
+    "@deepseek-ai/dsh-agent": "*",
+    "@deepseek-ai/dsh-settings": "*",
+    "@deepseek-ai/dsh-execution-authority": "*"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-archive-gateway": "workspace:*",

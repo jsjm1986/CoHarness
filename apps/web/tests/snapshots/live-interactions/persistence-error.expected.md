@@ -23,7 +23,7 @@
   - img
   - text: Context injection runtime-context
 - status: This turn failedThe session could not be saved. Please try again; contact an administrator if the problem continues.
-- textbox "Message the agent"
+- textbox "Message COHARNESS"
 - button "Add images or documents":
   - img
 - button "Choose from Documents":
