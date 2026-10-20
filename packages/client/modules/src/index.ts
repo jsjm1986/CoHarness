@@ -215,10 +215,15 @@ function artifactRevision(baseline: ClientArtifactBaseline): string {
   return framedHash('plugin-artifact', [String(baseline.mtimeMs), String(baseline.ctimeMs), String(baseline.size)])
 }
 
-/** Absolute response key for one ordered plugin-file list on the shared combo route. */
+/**
+ * Absolute response key for one ordered plugin-file list on the shared combo route.
+ * The `combo.js` filename places the path under CDN static-extension caching;
+ * the resource list and revision live in the query, and the map variant shares
+ * the filename so its trailer stays a sibling of the script.
+ */
 function comboPath(ids: readonly string[], rev: string, sourceMap = false): string {
   const resources = ids.map(id => `${id}/client.js${sourceMap ? '.map' : ''}`).join(',')
-  return `/plugins/??${resources}&rev=${rev}`
+  return `/plugins/combo.js??${resources}&rev=${rev}`
 }
 
 /**
@@ -428,8 +433,8 @@ function buildCombo(
     rev,
     entries,
     sourceMapUrl,
-    // `??...` resolves against the loaded script's /plugins/ directory, so a
-    // mounted document reaches the same absolute map key.
+    // `combo.js??...` resolves against the loaded script's /plugins/ directory,
+    // so a mounted document reaches the same absolute map key.
     scriptBody: lazyBody(() => buildComboScript(resources, sourceMapUrl.slice('/plugins/'.length))),
     sourceMapBody: lazyBody(() => buildComboSourceMap(resources, sourceMapOf)),
   }
