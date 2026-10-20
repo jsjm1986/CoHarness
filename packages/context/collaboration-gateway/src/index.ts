@@ -212,6 +212,7 @@ class GatewayAuthority implements CollaborationAuthority {
     kind: CollaborationInteractionKind,
     interactionId: string,
     outcome: unknown,
+    callId?: string,
   ): Promise<boolean> {
     this.assertActive()
     if (this.participant.scope.kind === 'personal') return true
@@ -220,6 +221,7 @@ class GatewayAuthority implements CollaborationAuthority {
       kind,
       interactionId,
       outcome,
+      callId,
     }))
     if (typeof value?.claimed !== 'boolean') {
       throw new CollaborationError('gateway-unavailable', 'Gateway returned an invalid interaction claim')

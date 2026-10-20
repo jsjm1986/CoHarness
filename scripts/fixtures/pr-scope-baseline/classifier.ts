@@ -1,7 +1,7 @@
 /**
  * Frozen migration oracle from the Git identity in inputs.json.
  * Source: https://github.com/jsjm1986/CoHarness/blob/master/scripts/ci-pr-scope.ts
- * Copyright (c) 2026 DeepSeek. MIT License; see the repository LICENSE.
+ * Copyright (c) 2026 DeepSeek. Apache-2.0 License; see the repository LICENSE.
  * Remove this comparison implementation after two reviewed shadow batches authorize candidate selection.
  */
 import type { CiPrScope as CurrentCiPrScope } from '../../ci-pr-scope.ts'

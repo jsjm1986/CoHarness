@@ -75,7 +75,7 @@ composer 中的文档控件会打开同一个管理器，因此从输入栏发�
 <a id="license"></a>
 ## 许可证
 
-MIT
+Apache-2.0
 
 
 <a id="model-experience"></a>

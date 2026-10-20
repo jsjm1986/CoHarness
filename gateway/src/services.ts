@@ -155,7 +155,38 @@ export interface GatewayCollaborationService {
     kind: 'approval' | 'question',
     interactionId: string,
     outcome: unknown,
+    callId?: string,
   ): Awaitable<boolean>
+  /** ACL-filtered member-activity rows for one project, newest first, keyset-paginated. */
+  listActivity(
+    userId: number,
+    projectId: number,
+    options: { limit: number; before?: string },
+  ): Awaitable<ProjectActivityPage>
+}
+
+/** One member-visible feed row: a signed message or a claimed question answer. */
+export interface ProjectActivityItem {
+  readonly kind: 'message' | 'answer'
+  readonly sessionId: string
+  readonly conversationTitle: string | null
+  readonly actorUserId: number
+  readonly actorLabel: string
+  readonly occurredAt: string
+  /** Log anchor for reveal: message event seq, or the answer's tool/result seq. NULL for claims that predate call_id. */
+  readonly seq: number | null
+  /** Message rows: the member's text. Answer rows: the responder's selected answer summary. */
+  readonly text: string
+  /** Answer rows only: originating tool-call question text, when the claim carried a callId. */
+  readonly questionText?: string
+  /** Answer rows only: raw selected-answer payload for client rendering. */
+  readonly outcome?: unknown
+}
+
+/** Keyset page of activity rows; `nextBefore` resumes after the last returned row. */
+export interface ProjectActivityPage {
+  readonly items: readonly ProjectActivityItem[]
+  readonly nextBefore?: string
 }
 
 /** Audit operations consumed by request handlers and policy application. */

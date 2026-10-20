@@ -2,9 +2,12 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write README.md
+/:
+  en: 634fb8e1b79aea56
+  zh: 634fb8e1b79aea56
 /coharness:
-  en: 6ec8d5e05ed84e04
-  zh: 6e31de68db791e4d
+  en: 3dc4b4cec473ef73
+  zh: 19f5017da7af3668
 /coharness/collaboration-philosophy:
   en: c78aaabd5b8124a7
   zh: f96a4b358896eabc
@@ -18,11 +21,11 @@
   en: 530b265113d9bc00
   zh: 68b29d48cd339c8e
 /coharness/use-it-as-a-team:
-  en: 1443194b727ab071
-  zh: c04eee99f1c38af2
+  en: 93a20887c13065c4
+  zh: 5567366f9fd610fb
 /coharness/what-it-provides:
-  en: e28de1e719960e73
-  zh: a7a41e02383eb059
+  en: e6d1ce3161b191e0
+  zh: 1a938e7d68f5b44a
 /coharness/dsh-relationship-and-naming:
   en: 94dc0ea69abec0f9
   zh: 4fa48c2d2c4b0c81
@@ -36,8 +39,8 @@
   en: c45bf0001f70c1c6
   zh: 92aa11cd54460745
 /coharness/repository-map:
-  en: ad9fedf4ac8d66a9
-  zh: e0eb2920d9839fe9
+  en: 3b71ec159a9b1f92
+  zh: 57e89a9ba9e82e73
 /coharness/development-and-verification:
   en: 757ee20111333769
   zh: e43dcb5d894d32fe
@@ -45,8 +48,8 @@
   en: abc3503fc336a48a
   zh: 1aafe5a78475233f
 /coharness/contributing-and-support:
-  en: a70fb89dd2ea80b8
-  zh: 0063fa2216aa35e0
+  en: 63a1593ef5847c7d
+  zh: 7e8823d089cc2bc3
 /coharness/license-and-attribution:
-  en: f493868fcc82810c
-  zh: 542ec5e4c70614ce
+  en: 3dc994514d12696a
+  zh: cdeeb983a30c8ba9

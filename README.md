@@ -1,6 +1,20 @@
+<p align="center"><img src="apps/web/public/favicon-coharness.svg" alt="CoHarness" width="88"></p>
+
 # CoHarness
 
 English | [中文](README.zh.md)
+
+<p align="center">
+  <a href="https://github.com/jsjm1986/CoHarness/actions/workflows/ci.yml"><img src="https://github.com/jsjm1986/CoHarness/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+  <a href="https://jsjm1986.github.io/CoHarness/"><img src="https://img.shields.io/badge/official%20site-jsjm1986.github.io%2FCoHarness-f59e0b.svg" alt="Official site"></a>
+</p>
+
+<p align="center">
+  <a href="https://jsjm1986.github.io/CoHarness/">Official site</a> · <a href="docs/user/guide/index.md">User guide</a> · <a href="SAFETY.md">Safety notice</a>
+</p>
+
+<p align="center"><img src="https://jsjm1986.github.io/CoHarness/assets/demo-conversation.gif" alt="The CoHarness workbench in a live session" width="860"></p>
 
 **CoHarness is a fully pluginized harness for teams to build, validate, and strengthen their own patterns for people-and-agent work.**
 
@@ -60,11 +74,13 @@ The [Web user guide](docs/user/guide/index.md) covers the first session, model c
 
 ## Use it as a team
 
-The Gateway turns the collaboration model into an authenticated project boundary. Each account has a personal space, while a shared project uses one project-scoped runtime and persistence; members do not receive disconnected copies of the same conversation. Project members receive `ro` or `rw` access, and a root conversation can be project-visible or creator-private with visibility inherited by its descendants. Permissions are enforced by the host and Gateway, not trusted to the browser.
+The Gateway turns the collaboration model into an authenticated project boundary. Each account has a personal space, while a shared project uses one project-scoped runtime and persistence — including project-scoped memory — so members do not receive disconnected copies of the same conversation. Project members receive `ro` or `rw` access, and a root conversation can be project-visible or creator-private with visibility inherited by its descendants. Permissions are enforced by the host and Gateway, not trusted to the browser.
 
 A team can let one person start an investigation, another add context, a specialist agent inspect code or tests, and an authorized participant decide whether a waiting action may proceed. The shared history records those contributions and decisions, while selected child-agent reports keep the main task useful without importing every internal detail. A member can return to the project later and continue work from the same durable state.
 
 Administrators manage users, projects, invitations, model-route authorization, quotas, usage summaries, audit records, and runtime health. Organization-managed model routes can be authorized per role, user, and project. Personal users may use their own BYOK routes; shared project runtimes remain catalog-controlled. Usage records attribute activity without storing API keys, prompts, or responses in the ledger. Linux deployments add systemd and mount-namespace confinement; macOS deployments do not provide that kernel boundary and should be treated accordingly.
+
+<p align="center"><img src="https://jsjm1986.github.io/CoHarness/assets/admin-users.jpg" alt="CoHarness admin center: users and runtime instances" width="860"></p>
 
 Read the [Gateway reference](gateway/README.md) for the control-plane behavior and the [deployment runbook](gateway/deploy/README.md) for PostgreSQL, releases, isolation, TLS, backups, upgrades, and rollback.
 
@@ -72,15 +88,17 @@ Read the [Gateway reference](gateway/README.md) for the control-plane behavior a
 
 | Area | Current capability |
 | --- | --- |
-| Agent runtime | Cordis profiles and bundles, event-sourced sessions, durable resume/fork, prompt and tool composition, model requests, approvals, questions, plans, goals, todos, jobs, workflows, compaction, telemetry, and session projections. |
+| Agent runtime | Cordis profiles and bundles, event-sourced sessions, durable resume/fork, prompt and tool composition, model requests, approvals, questions, plans, goals, todos, jobs, durable scheduled reminders, workflows, compaction, telemetry, and session projections. |
 | Tools and execution | Workspace filesystem tools, image reading, shell and persistent terminal sessions, LSP, web search/fetch providers, skills, structured attachments, user documents, and sandbox or directory policies. |
 | Models | DeepSeek and pi-ai adapters, catalog and custom Providers, OpenAI-compatible and other supported protocols, per-user BYOK routes, organization-managed routes, model selection, reasoning controls, image admission/canonicalization, Files uploads with fallback, and credential references that keep secrets out of logs. |
-| Web UI | Responsive browser application for sessions, live conversation history, model selection, command and `@` suggestions, image/document attachments, document management, workspace selection, permission controls, goals, subagents, jobs, settings, localization, themes, and feedback. |
+| Web UI | Responsive browser application for sessions, live conversation history, model selection, command and `@` suggestions, image/document attachments, document management, a Memory panel, workspace selection, permission controls, goals, subagents, jobs, settings, localization, themes, and feedback. |
 | Projects | Personal and shared project scopes, one shared runtime per project, `ro`/`rw` membership, invitations, project or creator-private conversations, participant attribution, root-inherited visibility, directory grants, administrator authority, and project-level default authorization for organization models. |
 | Documents | Named user documents, uploads and downloads, attach-to-conversation workflows, scope-aware browsing, cross-scope copies, snapshot lineage, operation history, collision-safe targets, and PostgreSQL metadata reconciliation while file bytes stay in runtime-owned directories. The default has no per-document size cap; transport, filesystem, and deployment storage limits still apply. |
-| Gateway and Admin | PostgreSQL-backed authentication, users, projects, instances, collaboration, model Providers and catalog, quotas, usage, audit records, document catalog, HTTP/WebSocket proxying, runtime principals, health diagnostics, and a separate Admin SPA. |
+| Memory | Durable agent memory scoped to personal, workspace, or project space: profile, guidance, background, and resource entries; a bounded per-session catalog shown to the model; `memory_search`/`memory_read`/`memory_save`/`memory_delete` tools; opt-in extraction and consolidation curation; and Web UI management. |
+| Session retrieval | Authorized queries over live and durable session history, independent of compaction: exact logs, filtered lists, relationship traces, SQLite full-text search, five workspace-authorized model tools, and the Web `/export` command for session ZIP downloads. |
+| Gateway and Admin | PostgreSQL-backed authentication, users, projects, personal and project runtime instances, collaboration, plugin management, model Providers and catalog, quotas, usage, audit records, document catalog, webhook endpoints and delivery, SSH targets, terminals, managed desktops, conversation archives, deployment control, a reserved steward space, push notifications, HTTP/WebSocket proxying, runtime principals, health diagnostics, and a separate Admin SPA. |
 | Security and deployment | Linux systemd mount namespaces, `dsh-directory-guard`, sandbox policies, Landlock/native launchers, macOS local/launchd operation, Nginx or tunnel frontends, owner-only credential files, immutable production releases, and SQLite-to-PostgreSQL import/rollback tooling. |
-| Integrations | TypeScript SDK, Python SDK and bundled runtime, JSON-RPC, Agent Client Protocol (ACP), Codex and Claude Code hook bridges, optional Codex/Claude subagent providers, and a Capacitor Android shell with optional FCM/JPush/vendor notifications. |
+| Integrations | TypeScript SDK, Python SDK and bundled runtime, JSON-RPC, Agent Client Protocol (ACP), an MCP client with resources, Codex and Claude Code hook bridges, optional Codex/Claude subagent providers, and a Capacitor Android shell with optional FCM/JPush/vendor notifications. |
 
 ## DSH relationship and naming
 
@@ -152,6 +170,7 @@ Follow [gateway/deploy/README.md](gateway/deploy/README.md) for database prepara
 | [`python/`](python/README.md) | Python SDK and bundled runtime carriers. |
 | [`native/`](native/README.md) | Native launchers, including Landlock-based process confinement. |
 | [`docs/`](docs) | Architecture, user, developer, protocol, testing, and generated reference documentation. |
+| [`website/`](website) | VitePress projection of selected `docs/` sources into the public documentation site. |
 | [`examples/`](examples) | Runnable Cordis compositions and integration examples. |
 
 ## Development and verification
@@ -185,12 +204,13 @@ The project targets teams that want to run the complete workspace themselves. A 
 ## Contributing and support
 
 - Report CoHarness issues and product questions in [GitHub Issues](https://github.com/jsjm1986/CoHarness/issues).
+- The project website is [jsjm1986.github.io/CoHarness](https://jsjm1986.github.io/CoHarness/).
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before preparing a change.
 - Use the [developer documentation](docs/user/develop/basic/index.md) for plugins, tools, services, and LLM adapters.
 - For upstream DSH contracts, ecosystem packages, and upstream discussions, consult [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
 ## License and attribution
 
-CoHarness is distributed under the [MIT License](LICENSE). The repository is an independent derivative of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), which is also distributed under the MIT License; the upstream copyright and license notice is retained in this repository. You may use, copy, modify, publish, distribute, sublicense, and sell the software under the MIT terms, subject to retaining the required notices.
+CoHarness is distributed under the [Apache License 2.0](LICENSE). The repository is an independent derivative of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), with upstream copyright and license notices retained as required.
 
-Third-party dependencies, vendored sources, and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Do not treat the MIT license for this repository as permission to remove third-party notices or provider, platform, and service terms that apply outside the source tree.
+Third-party dependencies, vendored sources, and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The repository license does not replace third-party notices or provider, platform, and service terms that apply outside the source tree.

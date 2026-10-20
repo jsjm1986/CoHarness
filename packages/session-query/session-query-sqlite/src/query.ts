@@ -20,6 +20,14 @@ export const FTS_HIGHLIGHT_START = '\uFDD0'
 /** Collision-free marker inserted after an FTS5 match by `highlight()`. */
 export const FTS_HIGHLIGHT_END = '\uFDD1'
 
+/**
+ * Zero-width space inserted between adjacent token characters when at least
+ * one is Han, so unicode61 emits every CJK character as its own token and ordinary
+ * phrase matching gains substring semantics (`记忆` matches inside `记忆系统`).
+ * Stripped back out of presented snippets, restoring the original text.
+ */
+export const FTS_HAN_JOIN = '\u200B'
+
 /** Largest page size whose internal lookahead remains an exact SQLite integer binding. */
 export const SQLITE_MAX_PAGE_LIMIT = Number.MAX_SAFE_INTEGER - 1
 
@@ -230,10 +238,27 @@ export function quoteFtsData(query: string): string {
  * @returns text with reserved noncharacters mapped to replacement characters.
  */
 export function sanitizeFtsText(text: string): string {
-  return text
+  const clean = text
     .replaceAll('\0', '\uFFFD')
     .replaceAll(FTS_HIGHLIGHT_START, '\uFFFD')
     .replaceAll(FTS_HIGHLIGHT_END, '\uFFFD')
+    .replaceAll(FTS_HAN_JOIN, '\uFFFD')
+  return clean.replace(/[\p{L}\p{N}]+/gu, splitHanBoundaries)
+}
+
+const HAN_CHAR = /\p{Script=Han}/u
+
+function splitHanBoundaries(run: string): string {
+  if (!HAN_CHAR.test(run) || run.length < 2) return run
+  const characters = Array.from(run)
+  let out = characters[0] as string
+  for (let index = 1; index < characters.length; index += 1) {
+    if (HAN_CHAR.test(characters[index - 1] as string) || HAN_CHAR.test(characters[index] as string)) {
+      out += FTS_HAN_JOIN
+    }
+    out += characters[index] as string
+  }
+  return out
 }
 
 /**
@@ -302,6 +327,7 @@ function normalizeMarkedText(markedText: string): { text: string; matchStart: nu
       continue
     }
     if (character === FTS_HIGHLIGHT_END) continue
+    if (character === FTS_HAN_JOIN) continue
     if (/\s/u.test(character)) {
       if (characters.length > 0 && characters.at(-1) !== ' ') characters.push(' ')
     } else {

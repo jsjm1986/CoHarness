@@ -25,4 +25,4 @@ Do not use CoHarness as the sole security control for untrusted workloads. Prefe
 
 ## No warranty
 
-Use CoHarness at your own risk. The software is provided under the MIT License without warranty. To the maximum extent permitted by law, the authors and contributors are not responsible for damage, data loss, credential disclosure, or other harm arising from use of the project.
+Use CoHarness at your own risk. The software is provided under the Apache License 2.0 without warranty. To the maximum extent permitted by law, the authors and contributors are not responsible for damage, data loss, credential disclosure, or other harm arising from use of the project.

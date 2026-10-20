@@ -34,6 +34,23 @@ function validSession(sessions: ISessions, id: SessionId, workspaces?: IWorkspac
     && workspaces?.list.getSnapshot().archivedSessionIds.includes(id) !== true
 }
 
+/** Per-session pending reveal request consumed by that Session's chat surface. */
+class RevealRequestSource implements ObservableSnapshot<{ seq: number; nonce: number } | undefined> {
+  private value: { seq: number; nonce: number } | undefined
+  private readonly listeners = new Set<() => void>()
+  getSnapshot(): { seq: number; nonce: number } | undefined { return this.value }
+  subscribe(fn: () => void): () => void {
+    this.listeners.add(fn)
+    return () => { this.listeners.delete(fn) }
+  }
+  /** Replace the pending request; undefined acknowledges the last one. */
+  publish(value: { seq: number; nonce: number } | undefined): void {
+    if (this.value === value) return
+    this.value = value
+    for (const listener of [...this.listeners]) listener()
+  }
+}
+
 function normalizedRatios(count: number, ratios: readonly number[]): number[] {
   if (count === 0) return []
   if (count === 1) return [1]
@@ -89,6 +106,8 @@ export class ConversationViewportController implements ConversationViewport {
   private keyVersion: 2 | 3 = 3
   private restorationPending = false
   private readonly unavailablePanes = new Set<SessionId>()
+  private readonly reveals = new Map<SessionId, RevealRequestSource>()
+  private revealNonce = 0
   private activeWorkbenchId = 'default'
   private readonly stopList: () => void
   private readonly stopView: () => void
@@ -295,6 +314,28 @@ export class ConversationViewportController implements ConversationViewport {
     })
     if (validSession(this.sessions, sessionId, this.workspaces)) this.select(sessionId)
     return { ok: true }
+  }
+
+  reveal(sessionId: SessionId, seq: number): void {
+    if (!this.replaceActive(sessionId).ok) return
+    this.revealSource(sessionId).publish({ seq, nonce: ++this.revealNonce })
+  }
+
+  revealTarget(sessionId: SessionId): ObservableSnapshot<{ seq: number; nonce: number } | undefined> {
+    return this.revealSource(sessionId)
+  }
+
+  ackReveal(sessionId: SessionId): void {
+    this.revealSource(sessionId).publish(undefined)
+  }
+
+  private revealSource(sessionId: SessionId): RevealRequestSource {
+    let source = this.reveals.get(sessionId)
+    if (source === undefined) {
+      source = new RevealRequestSource()
+      this.reveals.set(sessionId, source)
+    }
+    return source
   }
 
   move(sessionId: SessionId, direction: 'previous' | 'next'): void {

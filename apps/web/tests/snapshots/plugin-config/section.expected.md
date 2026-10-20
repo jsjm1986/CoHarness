@@ -10,7 +10,7 @@
   - button "选择添加插件方式" [disabled]
 - status: 本部署没有可管理的 profile，无法安装或启停插件。
 - heading "插件配置" [level=3]
-- text: "5"
+- text: "6"
 - list:
   - listitem:
     - button "查看 终端": 终端
@@ -27,3 +27,6 @@
   - listitem:
     - button "查看 网页搜索": 网页搜索
     - text: DeepSeek 搜索提供方。
+  - listitem:
+    - button "查看 记忆": 记忆
+    - text: 跨会话保留的持久记忆

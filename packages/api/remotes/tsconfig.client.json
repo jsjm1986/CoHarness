@@ -66,6 +66,9 @@
       "path": "../../schedule/schedule"
     },
     {
+      "path": "../../memory/memory"
+    },
+    {
       "path": "../../settings/settings"
     },
     {

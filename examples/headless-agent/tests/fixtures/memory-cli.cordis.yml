@@ -1,0 +1,53 @@
+- id: memory-mock-llm
+  name: './memory-mock-llm.ts'
+
+- id: base
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ../../cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@deepseek-ai/dsh-llm-deepseek-api-key'
+        disabled: true
+      - id: agent-spine
+        name: '@deepseek-ai/dsh-agent-spine-demo'
+        config:
+          agents:
+            - id: main
+              provider: memory-mock
+              model: memory-mock
+              cwd: !!js process.cwd()
+          workspaceContext: false
+          dshHome: './.dsh-home'
+          skills:
+            filesystem:
+              agentsHome: './.agents-home'
+          persona: 'Keyless headless-agent memory smoke.'
+      - id: persistence
+        name: '@deepseek-ai/dsh-session-persistence-jsonl'
+        config:
+          root: './.sessions'
+      - insert:
+          # Host plane: JSON per-record backend + domain + the durable service;
+          # the store lives under the scenario workspace so the test inspects it.
+          - id: storage
+            name: '@deepseek-ai/dsh-storage'
+          - id: storage-json
+            name: '@deepseek-ai/dsh-storage-json'
+            config:
+              root: !!js process.cwd() + '/.memory-store'
+          - id: storage-domain
+            name: '@deepseek-ai/dsh-storage-domain'
+            config:
+              backend: json
+          - id: memory
+            name: '@deepseek-ai/dsh-memory'
+
+          # Agent plane: the catalog listener, the four model-facing tools,
+          # and the opt-in post-turn curation passes.
+          - id: memory-context
+            name: '@deepseek-ai/dsh-memory-context'
+          - id: tool-memory
+            name: '@deepseek-ai/dsh-tool-memory'
+          - id: memory-curation
+            name: '@deepseek-ai/dsh-memory-curation'

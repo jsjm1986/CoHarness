@@ -770,6 +770,8 @@ export function apply(ctx: Context): void {
           },
           read: () => chatScrollPositions.get(sessionId) ?? null,
         },
+        hooks: { revealTarget: viewport.revealTarget(sessionId) },
+        ackReveal: () => { viewport.ackReveal(sessionId) },
         forkAt: (seq) => {
           const navigation = AbortSignal.any([sessions.beginNavigation(), lifetime.signal])
           sessions.fork({ sessionId, atSeq: seq, increaseTitle: true })

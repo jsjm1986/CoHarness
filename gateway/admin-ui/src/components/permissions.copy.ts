@@ -13,6 +13,9 @@ export const zh = {
   pluginName: '插件管理',
   pluginDescription: '默认不授权。项目空间同时需要用户资格与项目授权；个人空间仅需用户资格。授权不替代插件本身的管理约束与运行时确认。',
   pluginSaved: '插件管理授权已保存；项目空间仍需同时具备用户资格与项目授权。',
+  memoryName: '记忆写入',
+  memoryDescription: '允许 agent 在已开启的项目中保存、修改和删除共享项目记忆；成员读取项目记忆不受此限，私有对话始终只读。',
+  memorySaved: '记忆写入授权已保存；项目空间仍需同时具备用户资格与项目授权。',
 } satisfies Record<string, string>
 
 /** Resource permission wrapper locale key union. */
@@ -32,4 +35,7 @@ export const en = {
   pluginName: 'Plugin management',
   pluginDescription: 'Denied by default. A project space additionally requires the user qualification and the project grant; a personal space only requires the user qualification. The grant does not replace the plugin\'s own management constraints or runtime confirmations.',
   pluginSaved: 'The plugin-management grant was saved; project spaces still require the user qualification and the project grant.',
+  memoryName: 'memory writing',
+  memoryDescription: 'Lets agents save, change, and delete shared project memory in projects that enable it. Members can always read project memory; private conversations stay read-only.',
+  memorySaved: 'The memory-writing grant was saved; project spaces still require the user qualification and the project grant.',
 } satisfies Record<PermissionsCopyKey, string>

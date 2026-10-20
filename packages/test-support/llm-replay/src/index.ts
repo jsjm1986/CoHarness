@@ -9,7 +9,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { delimiter as pathDelimiter } from 'node:path'
+import { delimiter as pathDelimiter, dirname, isAbsolute, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction'
 import type {} from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
@@ -49,13 +49,29 @@ import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, expandAssistantSt
  * an override sidecar can supply any variant.
  */
 export type ReplayEntry =
-  | { kind: 'chunks'; chunks: StreamChunk[] }
+  | { kind: 'chunks'; chunks: StreamChunk[]; hold?: ReplayHold }
   | { kind: 'throw'; chunks: StreamChunk[]; message: string; code: string; accepted?: boolean }
   | {
     kind: 'hang'
     /** Optional marker written after the prefix chunks are consumed and before the stream waits for cancellation. */
     readyFile?: string
   }
+
+/**
+ * A mid-stream rendezvous inside a `chunks` entry: the replay yields
+ * {@link after} chunks, then waits for the scenario to create
+ * {@link releaseFile} before yielding the rest — a deterministic barrier for
+ * tests that must observe the stream still in flight at a chosen moment.
+ * Aborting the request aborts the wait. A relative {@link releaseFile}
+ * resolves against the override file's directory, so the release marker can
+ * live beside the sidecar and be removed with it.
+ */
+export interface ReplayHold {
+  /** 0-based chunk index at which the stream pauses; must be below the chunk count. */
+  after: number
+  /** Path whose creation releases the hold; polled until it appears or the request aborts. */
+  releaseFile: string
+}
 
 /** One model exposed by a replay-only provider catalog. */
 export interface ReplayModelConfig {
@@ -705,12 +721,30 @@ function readChunks(value: unknown, file: string, location: string): StreamChunk
   return value as StreamChunk[]
 }
 
+function readReplayHold(value: unknown, chunkCount: number, file: string, location: string): ReplayHold {
+  if (!isRecord(value) || !hasExactKeys(value, ['after', 'releaseFile'])) {
+    invalidOverride(file, location, 'must contain exactly after and releaseFile')
+  }
+  const { after, releaseFile } = value
+  if (typeof after !== 'number' || !Number.isSafeInteger(after) || after < 0 || after >= chunkCount) {
+    invalidOverride(file, `${location}.after`, 'must be a safe integer below the chunk count')
+  }
+  if (typeof releaseFile !== 'string' || releaseFile.length === 0) {
+    invalidOverride(file, `${location}.releaseFile`, 'must be a non-empty string')
+  }
+  return { after, releaseFile: isAbsolute(releaseFile) ? releaseFile : resolve(dirname(file), releaseFile) }
+}
+
 function readReplayEntry(value: unknown, file: string, location: string): ReplayEntry {
   if (!isRecord(value)) invalidOverride(file, location, 'must be an object')
   switch (value['kind']) {
     case 'chunks': {
-      if (!hasExactKeys(value, ['kind', 'chunks'])) invalidOverride(file, location, 'has invalid chunks-entry fields')
-      return { kind: 'chunks', chunks: readChunks(value['chunks'], file, location) }
+      const hold = value['hold']
+      const keys = hold === undefined ? ['kind', 'chunks'] : ['kind', 'chunks', 'hold']
+      if (!hasExactKeys(value, keys)) invalidOverride(file, location, 'has invalid chunks-entry fields')
+      const chunks = readChunks(value['chunks'], file, location)
+      if (hold === undefined) return { kind: 'chunks', chunks }
+      return { kind: 'chunks', chunks, hold: readReplayHold(hold, chunks.length, file, `${location}.hold`) }
     }
     case 'throw': {
       const accepted = value['accepted']
@@ -981,11 +1015,50 @@ function paceDelay(paceMs: number, signal: AbortSignal | undefined): Promise<voi
   })
 }
 
+/** Interval between `releaseFile` existence checks while a chunks entry is held. */
+const RELEASE_POLL_MS = 20
+
+/**
+ * Wait for `releaseFile` to appear, aborting the wait (and the stream) the
+ * moment the signal fires — a held replay must cancel as promptly as a paced
+ * one.
+ */
+function awaitReleaseFile(releaseFile: string, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let poll: ReturnType<typeof setInterval> | undefined
+    const settle = (error?: Error): void => {
+      if (poll !== undefined) clearInterval(poll)
+      poll = undefined
+      signal?.removeEventListener('abort', onAbort)
+      if (error === undefined) resolve()
+      else reject(error)
+    }
+    const onAbort = (): void => {
+      settle(new Error('aborted'))
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted === true) {
+      settle(new Error('aborted'))
+      return
+    }
+    if (existsSync(releaseFile)) {
+      settle()
+      return
+    }
+    poll = setInterval(() => {
+      if (existsSync(releaseFile)) settle()
+    }, RELEASE_POLL_MS)
+  })
+}
+
 /** Yield a recorded stream back, honoring abort like a real adapter. */
 async function* replayEntry(entry: ReplayEntry, signal: AbortSignal | undefined, paceMs: number): AsyncIterable<StreamChunk> {
   switch (entry.kind) {
     case 'chunks':
-      for (const chunk of entry.chunks) {
+      for (const [index, chunk] of entry.chunks.entries()) {
+        if (entry.hold !== undefined && index === entry.hold.after) {
+          await awaitReleaseFile(entry.hold.releaseFile, signal)
+        }
         if (signal?.aborted) throw new Error('aborted')
         if (paceMs > 0) await paceDelay(paceMs, signal)
         yield chunk

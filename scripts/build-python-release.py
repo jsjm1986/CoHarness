@@ -304,9 +304,9 @@ def verify_wheel(
             raise RuntimeError(
                 f"{wheel} has distribution name {metadata.get('Name')}, expected {expected_distribution}"
             )
-        if metadata.get("License-Expression") != "MIT":
+        if metadata.get("License-Expression") != "Apache-2.0":
             raise RuntimeError(
-                f"{wheel} has license expression {metadata.get('License-Expression')}, expected MIT"
+                f"{wheel} has license expression {metadata.get('License-Expression')}, expected Apache-2.0"
             )
         expected_license_files = ["LICENSE"] if package == "sdk" else ["LICENSE", "THIRD_PARTY_NOTICES.md"]
         license_files = [Path(name).name for name in metadata.get_all("License-File") or []]
