@@ -113,10 +113,6 @@ export interface MessageSourceMap {
   tool: ToolMessageSource
   'system-prompt': SystemPromptMessageSource
   /** Demo-session fixture producer kind; exists only inside the browser
-   * fixture transport (`packages/client/connection/src/client/fixture.ts`).
-   * @persistenceAttribution
-   */
-  /** Demo-session fixture producer kind; exists only inside the browser
    * fixture transport (`packages/client/connection/src/client/fixture.ts`)
    * and the seeded-history web fixtures.
    * @persistenceAttribution

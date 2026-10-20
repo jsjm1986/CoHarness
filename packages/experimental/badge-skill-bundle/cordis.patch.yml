@@ -1,3 +1,7 @@
+# Experimental DSH badge skill over the shipped composition. The bundle
+# inserts its own `skill-badge` row, so the feature composes identically on
+# every profile layer list; deselecting drops the row again.
+
 - insert:
     - id: skill-badge
       name: '@deepseek-ai/dsh-skill-badge'
