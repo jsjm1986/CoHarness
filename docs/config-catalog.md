@@ -3943,6 +3943,14 @@ export interface Config {
 ```ts config-catalog
 /** Plugin config (all optional — `Config` supplies the defaults). */
 export interface Config {
+  /** Register `read` and its guidance. Defaults to true. */
+  read?: boolean
+  /** Register `read_image` while an attachment store is mounted. Defaults to true. */
+  readImage?: boolean
+  /** Register `write` and its guidance. Defaults to true. */
+  write?: boolean
+  /** Register `edit` and its guidance. Defaults to true. */
+  edit?: boolean
   /** Default and maximum number of lines returned by one `read` call. */
   readLimit?: number
   /** Maximum characters returned for a single line before truncation. */

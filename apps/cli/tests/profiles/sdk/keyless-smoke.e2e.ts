@@ -305,6 +305,7 @@ describe('Python SDK dsh profile keyless smoke', () => {
       const tools = modelRequests[0]?.tools as { name?: string }[]
       expect(tools.map(tool => tool.name)).toEqual([
         process.platform === 'win32' ? 'pwsh' : 'bash',
+        'read_image',
         ...(editorEnabled ? ['str_replace_editor'] : []),
         'working_directory',
       ])

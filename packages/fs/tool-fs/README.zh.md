@@ -54,16 +54,22 @@ kind: "package-reference"
 
 ### 配置
 
-所有键均为可选；默认值是随产品交付的读取上限。
+所有键均为可选。`read`、`readImage`、`write` 和 `edit` 开关默认为 `true`；将开关设为 `false` 可省略对应工具及其指导文本。允许关闭全部四个工具。启用 `readImage` 仍需要附件存储和支持图片输入的模型。关闭 `read` 时仍会校验读取上限。
 
 | 键 | 默认值 | 含义 |
 |---|---|---|
+| `read` | `true` | 注册 `read` 及其指导文本 |
+| `readImage` | `true` | 附件存储挂载时注册 `read_image` |
+| `write` | `true` | 注册 `write` 及其指导文本 |
+| `edit` | `true` | 注册 `edit` 及其指导文本 |
 | `readLimit` | `2000` | 一次 `read` 调用返回的默认和最大行数 |
 | `readMaxLineLength` | `2000` | 每行截断前保留的字符数 |
 | `readMaxBytes` | `51200` | 一次 `read` 调用所选行的字节上限；溢出时以「已达上限」footer 结束窗口 |
 | `readStreamMinSize` | `10485760` | 大于等于该大小或大小未知的文件采用流式读取，而不是整体加载到内存 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-fs)是每个受支持字段及其 JSDoc 的穷尽式真源。
+
+挂载 `fs-observation-policy` 且关闭 `read` 时，`write` 仍可创建文件，成功写入或编辑会记录本会话后续修改所需的版本。未观察过的已有文件仍受保护；关闭 `read` 不会放宽策略。其他文件系统读取方必须发出 `fs/observed`，已有文件才会成为已观察状态。
 
 ### 策略与沙箱行为
 

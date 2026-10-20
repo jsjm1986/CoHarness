@@ -54,16 +54,22 @@ Field names are snake_case to match Claude Code and existing harness tool schema
 
 ### Configuration
 
-All keys are optional; the defaults are the shipped read caps.
+All keys are optional. The `read`, `readImage`, `write`, and `edit` switches default to `true`; set a switch to `false` to omit that tool and its guidance. All four may be disabled. Enabling `readImage` still requires an attachment store and an image-capable model. Read caps remain validated when `read` is disabled.
 
 | Key | Default | Meaning |
 |---|---|---|
+| `read` | `true` | Register `read` and its guidance |
+| `readImage` | `true` | Register `read_image` while an attachment store is mounted |
+| `write` | `true` | Register `write` and its guidance |
+| `edit` | `true` | Register `edit` and its guidance |
 | `readLimit` | `2000` | Default and maximum lines returned by one `read` call |
 | `readMaxLineLength` | `2000` | Characters kept per line before truncation |
 | `readMaxBytes` | `51200` | Byte cap on one `read` call's selected lines; overflow ends the window with a capped footer |
 | `readStreamMinSize` | `10485760` | Files at or above this size (or of unknown size) stream instead of loading whole into memory |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-fs) is the exhaustive source for every accepted field and its JSDoc.
+
+With `fs-observation-policy` mounted and `read` disabled, `write` can still create files, and successful writes or edits record the versions needed for later mutations in that session. Existing unobserved files remain protected; disabling `read` does not relax the policy. Another filesystem reader must emit `fs/observed` for an existing file to become observed.
 
 ### Policy and sandbox behavior
 
