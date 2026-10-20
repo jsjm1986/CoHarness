@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-21-dev-web-skip-build-artifact-isolation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-21-dev-web-skip-build-artifact-isolation.md
+/agent-note-hmr-live-isolates-dev-web-from-the-lane-s-client-artifacts:
+  en: 8ae352e0a9968e36
+  zh: c8880c4a1010d48c
+/agent-note-hmr-live-isolates-dev-web-from-the-lane-s-client-artifacts/problem:
+  en: d766ed9fb4e77bb0
+  zh: d0e47a51e29a0b76
+/agent-note-hmr-live-isolates-dev-web-from-the-lane-s-client-artifacts/decision:
+  en: a5817713005c1aa9
+  zh: 6720213e7e8b2485
+/agent-note-hmr-live-isolates-dev-web-from-the-lane-s-client-artifacts/alternatives-considered:
+  en: 279400632bfd09a5
+  zh: 5ed6cd8ad0225f69
+/agent-note-hmr-live-isolates-dev-web-from-the-lane-s-client-artifacts/consequences:
+  en: 1a9782ab26524c30
+  zh: 9b161c27aac6c529

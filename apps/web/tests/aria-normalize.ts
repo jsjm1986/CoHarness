@@ -84,6 +84,9 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
       // The compaction badge's ~N tokens is priced from seeded content that
       // embeds the workspace path, whose length varies by platform tmpdir.
       value = value.replace(/~\d[\d,]* tokens/g, '~{{tokens}} tokens')
+      // The settings footer prints the build's product version; keep the
+      // label, redact the value that changes with every release.
+      value = value.replace(/(当前版本：|Current version: )\S+/g, '$1{{version}}')
       value = normalizeMeasurement(value, scope)
       if (value !== node.value) {
         if (node.range == null) throw new Error('ARIA scalar has no source range')
