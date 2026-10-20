@@ -13,7 +13,7 @@ function claims(overrides: Partial<GatewayPrincipalClaims['user']> = {}, extra: 
   return {
     version: 1, issuer: 'harness-gateway', audience: 'dsh-runtime', organization: 'org',
     user: { id: 1, username: 'alice', displayName: 'Alice', role: 'user', ...overrides },
-    scope: { kind: 'personal' }, runtime: { kind: 'user', id: 1 },
+    scope: { kind: 'personal' }, runtime: { kind: 'user', id: 1, generation: 1 },
     issuedAt: Date.now() - 1000, expiresAt: Date.now() + 60_000, nonce: 'n', ...extra,
   }
 }
