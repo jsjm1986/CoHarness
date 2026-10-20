@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/releases/dsh-v0.1.0-rc.8.md
 document:
-  en: c52f050b820b08ce96230e6a92042801a1f0bccc
-  zh: b4fd283ede61a70ad2e0d95981439801f68c3670
+  en: 83170d8295c37fadab375620cab82d8fc9e70130
+  zh: a18e26f5fd9e77435c881de1a4d8c0c8c929751b
 /:
   en: b1b7c72c7d191c74
   zh: b047337f23d0b97f
@@ -24,8 +24,8 @@ document:
   en: af9cea43334ee692
   zh: c6c8bd0d6a17718a
 /persistence-release-dsh-v0-1-0-rc-8/structural-changes:
-  en: 6c7808df4fdcbf70
-  zh: 8b6d83a8adec7f51
+  en: 1909dc1b62eef347
+  zh: 010e53d396fc675c
 /persistence-release-dsh-v0-1-0-rc-8/verification:
   en: 8ccca317964523b1
   zh: 2c8b3e70a3320778
