@@ -44,7 +44,21 @@ export function apply(ctx: Context): void {
           rfb.viewOnly = options.viewOnly
           rfb.scaleViewport = true
           rfb.focusOnClick = true
-          return rfb
+          let localClose = false
+          rfb.addEventListener('credentialsrequired', (event) => {
+            const types = (event as CustomEvent<{ types?: string[] }>).detail?.types
+            options.onCredentialsRequired?.(types ?? ['password'])
+          })
+          rfb.addEventListener('disconnect', () => { if (!localClose) options.onDisconnected?.() })
+          return {
+            sendCredentials: (credentials) => {
+              const offer: Record<string, string> = {}
+              if (credentials.username !== undefined) offer.username = credentials.username
+              if (credentials.password !== undefined) offer.password = credentials.password
+              rfb.sendCredentials(offer)
+            },
+            disconnect: () => { localClose = true; rfb.disconnect() },
+          }
         },
       }),
     },
