@@ -12,6 +12,7 @@ import {
 import { API_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from './api-path.ts'
 import type { ConnectionAuthenticationRequest } from './rpc.ts'
 import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
+import './fixture-message-source.ts'
 import { assertTrustedAuthority } from './api-request-trust.ts'
 import { bindRequestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/request-scope'
 import { BrowserAuth } from './browser-auth.ts'
