@@ -28,8 +28,6 @@
   },
   "files": [
     "lib/index.js",
-    "examples/github-review/cordis.yml",
-    "examples/github-review/github-ready-review-rule.mjs",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts"
   ],

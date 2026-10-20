@@ -9,6 +9,7 @@
     "src/api-path.ts",
     "src/api-request-trust.ts",
     "src/browser-auth.ts",
+    "src/fixture-message-source.ts",
     "src/http-bridge.ts",
     "src/index.ts",
     "src/loopback-hostname.ts",
@@ -31,6 +32,9 @@
     },
     {
       "path": "../../host/webserver"
+    },
+    {
+      "path": "../../llm/llm"
     },
     {
       "path": "../../../vendor/cordis"

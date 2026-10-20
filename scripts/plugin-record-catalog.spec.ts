@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS } from './experimental-package-policy.ts'
+import { EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS, EXPERIMENTAL_PACKAGE_NAME_PREFIX } from './experimental-package-policy.ts'
 import { collectPluginRecords } from './plugin-record-catalog.ts'
 import { persistenceCatalogArtifacts, render, renderPluginRecordCatalog } from './gen-persistence-catalog.ts'
 import { extractPersistenceSchema } from './persistence-schema.ts'
@@ -44,7 +44,7 @@ function augmentation(members: string, heritage = ''): string {
 const ENTRY = "    /** Retains a bridge entry. */\n    'plugin:bridge/entry': SavedEntry"
 
 describe('plugin record declarations', () => {
-  it.each(Object.entries(EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS))('retains the persisted namespace for %s', (directory, owner) => {
+  it.each(Object.entries({ 'packages/experimental/example': `${EXPERIMENTAL_PACKAGE_NAME_PREFIX}example`, ...EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS }))('retains the persisted namespace for %s', (directory, owner) => {
     const namespace = directory.split('/').at(-1)!
     const source = `${directory}/src/records.ts`
     const root = fixture({

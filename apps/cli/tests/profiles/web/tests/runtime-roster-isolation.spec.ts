@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { expect, it, onTestFinished } from 'vitest'
-import { EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS } from '../../../../../../scripts/experimental-package-policy.ts'
+import { EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS, EXPERIMENTAL_PACKAGE_NAME_PREFIX } from '../../../../../../scripts/experimental-package-policy.ts'
 import { experimentalRuntimeReferences } from './runtime-roster-isolation.ts'
 import type { RuntimeRoster } from './runtime-roster.ts'
 
-it.each(Object.values(EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS))('finds retained experimental package %s in real roster fields', (name) => {
+it.each([`${EXPERIMENTAL_PACKAGE_NAME_PREFIX}example`, ...Object.values(EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS)])('finds retained experimental package %s in real roster fields', (name) => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-runtime-roster-policy-'))
   onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
   const directory = join(root, 'node_modules/ordinary-alias')
@@ -31,7 +31,7 @@ it.each(Object.values(EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS))('finds retained exp
     },
   }
   expect(experimentalRuntimeReferences(roster)).toEqual([name, subpath, module, external, injected, batched].sort())
-  writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: `${name}-unrelated` }))
+  writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-unrelated' }))
   expect(experimentalRuntimeReferences({
     entries: [], plugins: [], modules: [module], client: { rev: 'fixture', entries: [], batches: [] },
   })).toEqual([])
