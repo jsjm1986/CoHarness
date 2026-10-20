@@ -229,7 +229,7 @@ describe('createFixtureApi', () => {
       writable: true,
     }, {
       ns: 'ui-onboarding',
-      value: { welcomeNoticeVersion: expect.any(String) as unknown },
+      value: { welcomeNoticeVersion: expect.any(String) as string },
       secrets: [],
       writable: true,
     }])
