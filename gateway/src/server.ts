@@ -607,6 +607,12 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (!(error instanceof BodyTooLargeError)) console.error('[gateway] request failed:', error)
     }).finally(() => { writerReleases.get(res)?.(); writerReleases.delete(res) })
   })
+  // Idle keep-alive connections must outlive the front proxy's origin pool
+  // (cloudflared 90s default): a shorter timeout lets the proxy reuse a socket
+  // the server is already closing, which surfaces as EOF/502. Node requires
+  // headersTimeout to exceed keepAliveTimeout.
+  server.keepAliveTimeout = cfg.keepAliveTimeoutMs
+  server.headersTimeout = cfg.keepAliveTimeoutMs + 5_000
 
   /**
    * Maintenance-mode write gate: mutating requests consult the shared
