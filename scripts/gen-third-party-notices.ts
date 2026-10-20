@@ -63,6 +63,11 @@ const LIBREOFFICE_PACKAGES = new Set([
   '@deepseek-ai/libreoffice-kit-win32-arm64',
   '@deepseek-ai/libreoffice-kit-win32-x64',
 ])
+const NOVNC_PACKAGE = '@novnc/novnc'
+/** Browser RFB client package shipped unmodified; the distribution decision is in the linked Agent Note. */
+const NOVNC_PACKAGES = new Set([NOVNC_PACKAGE])
+/** Package identities individually reviewed and accepted at MPL-2.0 terms only. */
+const MPL_ACCEPTED_PACKAGES = new Set([...LIBREOFFICE_PACKAGES, ...NOVNC_PACKAGES])
 
 /**
  * Whether a non-permissive runtime declaration has an identity-scoped owner
@@ -717,7 +722,7 @@ export function isPermissive(license: string): boolean {
 export function assertRuntimeLicenses(dependencies: readonly { name: string; license: string }[]): void {
   const rejected = dependencies.filter(dep => !isPermissive(dep.license)
     && !isOwnerAuthorizedRuntime(dep.name)
-    && !(LIBREOFFICE_PACKAGES.has(dep.name) && dep.license === 'MPL-2.0'))
+    && !(MPL_ACCEPTED_PACKAGES.has(dep.name) && dep.license === 'MPL-2.0'))
   if (rejected.length > 0) {
     throw new Error(`gen-third-party-notices: runtime ${rejected.map(dep => `${dep.name} (${dep.license})`).join(', ')} is not a permissive license; review the distribution terms and record the decision before regenerating.`)
   }
@@ -778,6 +783,7 @@ export async function render(): Promise<string> {
   const runtimeDeps = npm.filter(dep => dep.runtime)
   const devDeps = npm.filter(dep => !dep.runtime)
   const kitRuntime = runtimeDeps.some(dep => dep.name === LIBREOFFICE_KIT_PACKAGE)
+  const novncRuntime = runtimeDeps.some(dep => dep.name === NOVNC_PACKAGE)
   const vendored = collectVendored()
   const python = collectPython()
   const bundledPython = collectBundledPythonDependencies(primaryRuntimeLock.pythonPackages)
@@ -827,6 +833,13 @@ ${kitRuntime ? `
 ${[...LIBREOFFICE_PACKAGES].map(name => `\`${name}\``).join(', ')} declare MPL-2.0, which remains outside the permissive-license allowlist; the notices check accepts only these package identities at those terms. The [distribution decision](.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md) records the source obligations.
 
 The [kit repository](https://github.com/deepseek-harness/libreoffice-kit) supplies the corresponding LibreOffice source pin, modifications, build instructions, Node API, and artifact validation. Its engine packages retain their license and third-party notices; the Node API retains its MPL-2.0 declaration and NOTICE. Recipients must have access to those corresponding sources and notices.
+` : ''}
+${novncRuntime ? `
+## noVNC remote desktop client
+
+\`${NOVNC_PACKAGE}\` declares MPL-2.0, which remains outside the permissive-license allowlist; the notices check accepts only this package identity at those terms. The [distribution decision](.agents/notes/implemented/architecture/2026-10-19-novnc-mpl-distribution.md) records the source obligations.
+
+The [upstream repository](https://github.com/novnc/noVNC) supplies the corresponding source for the bundled RFB client; the shipped copy is the published npm package, and bundler minification does not author covered files. The file-scoped copyleft applies to noVNC's own files.
 ` : ''}
 
 ## Development-only npm dependencies

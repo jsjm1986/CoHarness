@@ -63,7 +63,9 @@ const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-commands/brand': ['CommandDefinitionId'],
   '@deepseek-ai/dsh-host-apiproxy': ['DEFAULT_HISTORY_PAGE_TARGET_BYTES', 'toFetchHandler'],
   '@deepseek-ai/dsh-host-apiproxy/api': ['RpcId', 'clientRequestSchema', 'serverRequestJson'],
+  '@deepseek-ai/dsh-remote-desktop': ['RemoteDesktopError', 'RemoteDesktopGrantId'],
   '@deepseek-ai/dsh-scope': ['scopeOf', 'scopeTarget'],
+  '@deepseek-ai/dsh-session': ['SessionId'],
   '@deepseek-ai/dsh-session-format/surface': ['SESSION_SURFACE_EVENT_TYPES'],
   '@deepseek-ai/dsh-settings': ['settingsNamespace'],
 } as const satisfies HostDependencyExports

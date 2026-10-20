@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/api/remote-desktop-controller/README.md
+/:
+  en: b64ef3a6a0db8be0
+  zh: 02307004b44a57f0
+/deepseek-ai-dsh-api-remote-desktop-controller:
+  en: b8793aebb7b0b024
+  zh: 151d7f7e61beb227
+/deepseek-ai-dsh-api-remote-desktop-controller/summary:
+  en: 15754aa2dcb92e5d
+  zh: 08ccc62e5ddff44f
+/deepseek-ai-dsh-api-remote-desktop-controller/table-of-contents:
+  en: 642fc11ef81efb22
+  zh: c9fdd750fdee54d4
+/deepseek-ai-dsh-api-remote-desktop-controller/methods:
+  en: f8fbc35ac04e793f
+  zh: 2341d9c5b4d36786
+/deepseek-ai-dsh-api-remote-desktop-controller/authorization:
+  en: 1f10d087b63bdd14
+  zh: c05d2dae71c2c54a
+/deepseek-ai-dsh-api-remote-desktop-controller/client-half:
+  en: 053ba2a0c99a3c73
+  zh: cb072dfa7335fe82
+/deepseek-ai-dsh-api-remote-desktop-controller/model-experience:
+  en: 87590ee249d1b2d6
+  zh: 24167451eee8286e
+/deepseek-ai-dsh-api-remote-desktop-controller/known-limitations-and-deferred-work:
+  en: 66ecce3fa0fe6753
+  zh: b48c6c6042e1de42

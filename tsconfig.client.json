@@ -41,6 +41,7 @@
   ],
   "references": [
     { "path": "./packages/api/terminal-controller/tsconfig.client.json" },
+    { "path": "./packages/api/remote-desktop-controller/tsconfig.client.json" },
     { "path": "./packages/util/crypto" },
     { "path": "./packages/util/values" },
     { "path": "./packages/util/workspace-path" },
@@ -63,6 +64,8 @@
     { "path": "./packages/client/ui-sidebar-right" },
     { "path": "./packages/client/ui-sidebar-browser" },
     { "path": "./packages/client/ui-sidebar-terminal" },
+    { "path": "./packages/client/ui-remote-desktop" },
+    { "path": "./packages/client/ui-remote-desktop-admin" },
     { "path": "./packages/client/modules" },
     { "path": "./packages/client/hmr" },
     { "path": "./packages/client/connection/tsconfig.client.json" },
