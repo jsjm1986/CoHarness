@@ -30,7 +30,7 @@ async function prepareOffice(cwd: string) {
 
 async function sessionEvents(cwd: string) {
   const logs = await readdir(join(cwd, '.sessions'), { recursive: true })
-  const path = logs.find(p => p.endsWith('session.v4.jsonl'))
+  const path = logs.find(p => /session\.v\d+\.jsonl$/u.test(p))
   expect(path).toBeDefined()
   const events = parseSessionLog(await readFile(join(cwd, '.sessions', path!), 'utf8'))
   return events

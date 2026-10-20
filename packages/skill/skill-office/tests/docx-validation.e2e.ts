@@ -51,7 +51,7 @@ assert r.bold and r.font.size.pt == 24 and r.font.color.rgb == (31, 78, 121)
 assert Document('input.docx').paragraphs[0].text == 'Quarterly revenue'
 `], { cwd })
       const paths = await readdir(join(cwd, '.sessions'), { recursive: true })
-      const log = paths.find(path => path.endsWith('session.v4.jsonl'))
+      const log = paths.find(path => /session\.v\d+\.jsonl$/u.test(path))
       expect(log).toBeDefined()
       const events = parseSessionLog(await readFile(join(cwd, '.sessions', log!), 'utf8'))
       expectNoRenderContext(events)

@@ -92,7 +92,7 @@ it.skipIf(!process.env.DEEPSEEK_API_KEY || !runtime).each(cases)('$format $kind 
       },
       async inspect(cwd) {
         const logs = await readdir(sessionRoot, { recursive: true })
-        const log = logs.find(path => path.endsWith('session.v4.jsonl'))
+        const log = logs.find(path => /session\.v\d+\.jsonl$/u.test(path))
         expect(log, `No recorded session for ${format} ${intent} in ${sessionRoot}`).toBeDefined()
         const bytes = await readFile(join(sessionRoot, log!))
         const traceDir = process.env.DSH_OFFICE_TRACE_DIR

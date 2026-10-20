@@ -225,8 +225,15 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
       }
       expect(manifest.dependencies[ADDON]).toMatch(/^file:/u)
       expect(manifest.dsh.profile.bundles).not.toContain(ADDON)
-      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'approved.expected.md'),
-        (await captureStableAria(page, '[role="dialog"]', world)).replaceAll(normalizedKey, fixtureSource), MODE)
+      // CommandText names its scrollport only while the command overflows,
+      // so the same terminal card diffs between a labeled group and one
+      // prompt text depending on the platform's path length and viewport.
+      // Collapse the overflow form; scrollport behavior is asserted above.
+      const approvedSnapshot = (await captureStableAria(page, '[role="dialog"]', world))
+        .replaceAll(normalizedKey, fixtureSource)
+        .replace(/- text: Done \$\n(\s*)- group "[^"]+": "(pnpm add file:[^"]+)"/,
+          '- text: "Done $ $2"')
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'approved.expected.md'), approvedSnapshot, MODE)
       expect(pageErrors).toEqual([])
     } catch (error) {
       await saveFailureShot(page, 'plugin-install-approve')

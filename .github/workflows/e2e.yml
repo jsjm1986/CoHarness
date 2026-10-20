@@ -122,6 +122,9 @@ jobs:
       - name: Prepare Office runtime
         run: pnpm run prepare:primary-runtime --target linux-x64 --output .cache/e2e-office
 
+      - name: Install Chromium for the inspector e2e
+        run: pnpm --filter @deepseek-ai/dsh-experimental-inspector exec playwright install chromium
+
       # Real-API end-to-end tests only. The keyless gates (lint/typecheck/
       # coverage/snapshot/etc.) already run in ci.yml on every push/PR.
       # DEEPSEEK_BASE_URL is pinned to the external API; the secret is scoped to

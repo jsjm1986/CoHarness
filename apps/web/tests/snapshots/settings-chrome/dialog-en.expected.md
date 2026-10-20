@@ -82,3 +82,4 @@
   - button "Detailed":
     - text: Detailed
     - img
+  - text: "Current version: {{version}}"

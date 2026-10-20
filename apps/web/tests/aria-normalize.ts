@@ -116,6 +116,9 @@ export function normalizeAria(
       // Package-manager output inside install cards reports its own live
       // wall-clock total ("Done in 266ms"); the command text stays literal.
       value = value.replace(/Done in \d+(?:\.\d+)?m?s/g, 'Done in {{duration}}')
+      // The settings footer prints the build's product version; keep the
+      // label, redact the value that changes with every release.
+      value = value.replace(/(当前版本：|Current version: )\S+/g, '$1{{version}}')
       value = normalizeMeasurement(value, scope)
       if (value !== node.value) {
         if (node.range == null) throw new Error('ARIA scalar has no source range')

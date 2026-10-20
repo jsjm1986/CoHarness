@@ -82,3 +82,4 @@
   - button "详细":
     - text: 详细
     - img
+  - text: "当前版本：{{version}}"
