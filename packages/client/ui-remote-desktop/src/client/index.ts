@@ -1,6 +1,6 @@
 /** Register the human remote-desktop tab type and its consent/RFB body. */
 import type { Context } from '@deepseek-ai/cordis'
-import RFB from '@novnc/novnc/lib/rfb.js'
+import { RFB } from './rfb.ts'
 import type {} from '@deepseek-ai/dsh-api-remote-desktop-controller/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
