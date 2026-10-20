@@ -269,6 +269,7 @@
     "client/ui-primitives": "all",
     "client/ui-project-activity": "workbench",
     "client/ui-reference": "conversation",
+    "client/ui-remote-desktop": "workbench",
     "client/ui-renderer": "all",
     "client/ui-schedule": "conversation",
     "client/ui-settings": "settings",

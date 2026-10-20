@@ -30,7 +30,9 @@ function targetsOf(grants: readonly RemoteDesktopGrantView[]): { target: RemoteD
   return [...byKey.values()]
 }
 
-type MenuState = { phase: 'loading' } | { phase: 'ready'; targets: ReturnType<typeof targetsOf> } | { phase: 'failed' }
+type ListState = { phase: 'loading' } | { phase: 'ready'; targets: ReturnType<typeof targetsOf> } | { phase: 'failed' }
+
+type MenuState = { open: boolean; attempt: number; list: ListState }
 
 /**
  * Offer the targets the signed-in user is authorized for through the entry's
@@ -42,30 +44,29 @@ type MenuState = { phase: 'loading' } | { phase: 'ready'; targets: ReturnType<ty
  */
 export function RemoteDesktopGuide({ title, description, kind, useTabInfo, t, listTargets }: RemoteDesktopGuideProps): ReactNode {
   const { tab } = useTabInfo()
-  const [open, setOpen] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<MenuState>({ phase: 'loading' })
+  const [menu, setMenu] = useState<MenuState>({ open: false, attempt: 0, list: { phase: 'loading' } })
+  const toggle = (): void => { setMenu(value => ({ ...value, open: !value.open, list: { phase: 'loading' } })) }
+  const retry = (): void => { setMenu(value => ({ ...value, attempt: value.attempt + 1, list: { phase: 'loading' } })) }
   useEffect(() => {
-    if (!open) return
-    const controller = new AbortController()
-    listTargets(controller.signal).then(
-      (rows) => { if (!controller.signal.aborted) setState({ phase: 'ready', targets: targetsOf(rows) }) },
-      () => { if (!controller.signal.aborted) setState({ phase: 'failed' }) },
-    )
-    return () => { controller.abort() }
-  }, [open, attempt, listTargets])
-  const items = state.phase === 'loading'
+    if (!menu.open) return
+    const lifetime = new AbortController()
+    const settle = (list: ListState): void => { if (!lifetime.signal.aborted) setMenu(value => ({ ...value, list })) }
+    listTargets(lifetime.signal).then(rows => settle({ phase: 'ready', targets: targetsOf(rows) }), () => settle({ phase: 'failed' }))
+    return () => { lifetime.abort() }
+  }, [menu.open, menu.attempt, listTargets])
+  const { list } = menu
+  const items = list.phase === 'loading'
     ? [{ id: 'loading', label: t('targetsLoading'), disabled: true }]
-    : state.phase === 'failed'
+    : list.phase === 'failed'
       ? [{ id: 'error', label: t('targetsFailed'), disabled: true }, { id: 'retry', label: t('retry') }]
-      : state.targets.length === 0
+      : list.targets.length === 0
         ? [{ id: 'empty', label: t('targetsEmpty'), disabled: true }]
-        : state.targets.map(({ target, level, recording }, index) => ({
+        : list.targets.map(({ target, level, recording }, index) => ({
           id: String(index),
           label: `${target.desktop === undefined ? target.nodeId : `${target.nodeId} · ${target.desktop}`} · ${t(level === 'control' ? 'control' : 'viewOnly')}${recording ? ` · ${t('recording')}` : ''}`,
         }))
   return <div className={css.entry} data-sidebar-right-guide-entry={kind}>
-    <Button variant="ghost" className={css.main} aria-haspopup="menu" aria-expanded={open} onClick={() => { setState({ phase: 'loading' }); setOpen(value => !value) }}>
+    <Button variant="ghost" className={css.main} aria-haspopup="menu" aria-expanded={menu.open} onClick={toggle}>
       <RemoteDesktopGuideIcon size={description === undefined ? 22 : 26} className={css.icon} />
       <span className={css.text}>
         <span className={css.title}>{title}</span>
@@ -73,21 +74,21 @@ export function RemoteDesktopGuide({ title, description, kind, useTabInfo, t, li
       </span>
     </Button>
     <Menu
-      open={open} portal autoFocus align="end" className={css.menu}
+      open={menu.open} portal autoFocus align="end" className={css.menu}
       items={items}
-      onClose={() => { setOpen(false) }}
+      onClose={() => { setMenu(value => ({ ...value, open: false })) }}
       onSelect={(id) => {
-        if (id === 'retry') { setState({ phase: 'loading' }); setAttempt(value => value + 1); return }
-        const chosen = state.phase === 'ready' ? state.targets[Number(id)] : undefined
+        if (id === 'retry') { retry(); return }
+        const chosen = list.phase === 'ready' ? list.targets[Number(id)] : undefined
         if (chosen === undefined) return
-        setOpen(false)
+        setMenu(value => ({ ...value, open: false }))
         tab.actions.openTab('remoteDesktop', {
           replaceTab: true,
           params: { nodeId: chosen.target.nodeId, ...(chosen.target.desktop === undefined ? {} : { desktop: chosen.target.desktop }) },
         })
       }}
-      anchor={<Button variant="ghost" className={css.trigger} aria-label={t('connectDescription')} aria-haspopup="menu" aria-expanded={open}
-        onClick={() => { setState({ phase: 'loading' }); setOpen(value => !value) }}>
+      anchor={<Button variant="ghost" className={css.trigger} aria-label={t('connectDescription')} aria-haspopup="menu" aria-expanded={menu.open}
+        onClick={toggle}>
         <IconChevronDownOutline14 />
       </Button>}
     />
