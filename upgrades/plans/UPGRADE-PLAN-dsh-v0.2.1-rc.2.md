@@ -87,11 +87,11 @@
 - `81484f4`：`release/publish.ts`、`publish-npm-baseline.ts` 直取（dist-tag 校验 + 通道核验；我方 `packFilters` 死代码冲突块按上游删除，静态目录 glob 覆盖同一集合）；根 devDeps 加 `semver@^7.8.5`/`@types/semver@^7.8.0`，pnpm→11.28.5、smol-toml→^1.9.0；pyproject 吸收 Pillow==12.3.0 + core-metadata 2.4（ruff 保留——我方 ci.yml 仍跑 quality 组；license 保 Apache-2.0 不回退 MIT）。
 - `651c4da`：timeout 注入路径切换为上游语义——`coverageTestTimeoutOptions`/`parseCoverageTestTimeout` 进 config 内联 project（CLI 不转发 hookTimeout/poll），`coverageTestTimeoutArgs` 及其三个调用点（run-gates 双道、run-coverage-partitions）移除；vitest 根道挂 `localWorkerBudget`（本地 maxWorkers≤48，CI 保 Vitest 默认）。我方 `coverage-policy.ts`/`coverage-scoped.ts`/`test-invariants.ts` 抽象层保留——上游内联重构不覆盖。
 
-P1 剩余：
+P1 剩余（2026-10-20 逐条对账核销）：
 
-- `coverage-partitions.ts` 剩余：`vitest list` 改 JSON 清单（我方 parseListOutput 仍解析文本行）、`.coverage-times.json` 时长史 reporter——我方已有自有 `COVERAGE_TIMINGS_FILE`/`coverageTimingCacheKey`/`readFileDurations` 实现，需对账是否等价或上游新增独有逻辑。
-- `vitest.config.ts` 剩余：`resolvePwshPath` 探测接入（上游用其实现 pwshCoverageExclusions）；`test-invariants.ts` 上游已删但我方有 +14 行自有不变量——保留决策；`sourcePlaneAliases`→`claudeCodeTestingAliases` 改名跟随与否。
-- `run-gates.ts`/`.spec`：加 `ci-unit` 模式、`ConcurrencyDefault` 导出（带诊断来源）、parallelism default 接入 `defaultConcurrency`、sharedHygieneGates；我方 +191 行 CoHarness 车道逐条保留。
-- `ci.yml`：`.coverage-times.json` restore/save 缓存步骤（先核对——我方时长史系统已存在，ci.yml 可能已有等价缓存）；`sandbox.yml`：check:ci:unit 道（依赖 run-gates ci-unit）。
-- `package.json` scripts / `tsconfig.base.json`：上游 ±200 行别名面改动多数挂在未携带包上，随各包携带相位吸收。
-- `gen-third-party-notices.ts`：inspector devtools 披露 import 依赖 P8 的 inspector 携带决策；examples//yao-pkg/ruff 条目上游删除均不适用于我方现状。
+- `coverage-partitions.ts`：**已等价**——我方同样 `vitest list --filesOnly --json=<file>` + `JSON.parse`；时长史走自有 `COVERAGE_TIMINGS_FILE`/`coverageTimingCacheKey`/`readFileDurations`，与上游 `.coverage-times.json` reporter 同职。
+- `vitest.config.ts`：**已等价**——pwshCoverageExclusions 经 `coverage-policy.ts` 的 `resolveCoveragePolicy(platform, probePwshAvailable())` 承载（同清单同探针）；`test-invariants.ts` +14 行自有不变量保留（已裁决）；`sourcePlaneAliases`/`claudeCodeTestingAliases` 两组别名并存于我方共享层，改名无新增语义。
+- `run-gates.ts`/`.spec`：**已携带**——`ci-unit` 模式、`ConcurrencyDefault` 导出、`defaultConcurrency`、sharedHygieneGates 均已在位；我方 +191 行 CoHarness 车道保留。
+- `ci.yml`：**已携带**——`.coverage-times.json` restore/save 缓存在位；`sandbox.yml` `check:ci:unit` 道在位。
+- `package.json` scripts / `tsconfig.base.json`：随各包携带相位吸收。
+- `gen-third-party-notices.ts`：**已补齐**——inspector devtools 披露 import + `browser.add('chrome-devtools-frontend')` + 披露段落，产物重生成，spec 37/37 绿。
