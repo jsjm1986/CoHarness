@@ -17,6 +17,15 @@ async function service(): Promise<RemoteDesktopService> {
 }
 
 describe('RemoteDesktopService', () => {
+  it('seeds this host\'s screen-sharing endpoint on a fresh directory', async () => {
+    const svc = await service()
+    const rows = await svc.endpoints()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ host: '127.0.0.1', port: 5900 })
+    const text = await readFile(join(svc.dir, 'endpoints.json'), 'utf8')
+    expect(JSON.parse(text)).toEqual({ endpoints: rows })
+  })
+
   it('round-trips endpoints and rejects duplicates', async () => {
     const svc = await service()
     const rows = await svc.saveEndpoints([{ nodeId: 'mac-mini', host: '127.0.0.1', port: 5900 }])

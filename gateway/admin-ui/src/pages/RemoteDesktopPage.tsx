@@ -8,7 +8,7 @@ import {
   type RemoteDesktopAuditEvent, type RemoteDesktopEndpoint, type RemoteDesktopGrant,
 } from '../api.ts'
 import {
-  Button, ConfirmDialog, EmptyState, ErrorBanner, Field, IconButton, LoadingState,
+  Button, ConfirmDialog, Dialog, EmptyState, ErrorBanner, Field, IconButton, LoadingState,
   PageHeader, Section, StatusBadge, Switch,
 } from '../components/ui.tsx'
 import { adminLanguage, translateCopy } from '../language.ts'
@@ -33,8 +33,8 @@ export function RemoteDesktopPage() {
   const [grants, setGrants] = useState<RemoteDesktopGrant[]>([])
   const [events, setEvents] = useState<RemoteDesktopAuditEvent[]>([])
   const [usernames, setUsernames] = useState<string[]>([])
-  const [draft, setDraft] = useState<EndpointDraft>(EMPTY_ENDPOINT)
-  const [grantDraft, setGrantDraft] = useState<GrantDraft>(EMPTY_GRANT)
+  const [endpointDraft, setEndpointDraft] = useState<EndpointDraft | null>(null)
+  const [grantDraft, setGrantDraft] = useState<GrantDraft | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<{ kind: 'revoke' | 'endpoint'; id: string } | null>(null)
@@ -69,6 +69,7 @@ export function RemoteDesktopPage() {
       const result = await saveRemoteDesktopEndpoints(rows)
       setEndpoints(result.endpoints)
       setNotice(t('noticeEndpointsSaved'))
+      setEndpointDraft(null)
     } catch (err) {
       setError(messageOf(err))
     } finally {
@@ -76,17 +77,8 @@ export function RemoteDesktopPage() {
     }
   }
 
-  const addEndpoint = async () => {
-    await saveEndpoints([...endpointList, {
-      nodeId: draft.nodeId.trim(),
-      host: draft.host.trim(),
-      port: Number(draft.port),
-      ...(draft.desktop.trim() === '' ? {} : { desktop: draft.desktop.trim() }),
-    }])
-    setDraft(EMPTY_ENDPOINT)
-  }
-
   const issueGrant = async () => {
+    if (grantDraft === null) return
     setBusy(true)
     try {
       const sep = grantDraft.endpoint.indexOf(' ')
@@ -98,7 +90,7 @@ export function RemoteDesktopPage() {
         level: grantDraft.level,
         recording: grantDraft.recording,
       })
-      setGrantDraft(EMPTY_GRANT)
+      setGrantDraft(null)
       setNotice(t('noticeGranted'))
       await reload()
     } catch (err) {
@@ -141,12 +133,13 @@ export function RemoteDesktopPage() {
 
   return (
     <div>
-      <PageHeader title={t('sectionEndpoints')} description={t('pageDescription')}
+      <PageHeader title={t('pageTitle')} description={t('pageDescription')}
         actions={<Button onClick={() => void reload()} icon={RefreshCw}>{t('refresh')}</Button>} />
       {error !== null && <ErrorBanner message={error} />}
       {notice !== null && <p role="status">{notice}</p>}
 
-      <Section title={t('sectionEndpoints')} flush>
+      <Section title={t('sectionEndpoints')} flush
+        actions={<Button variant="secondary" icon={Plus} onClick={() => setEndpointDraft(EMPTY_ENDPOINT)}>{t('addEndpoint')}</Button>}>
         {endpointList.length === 0
           ? <EmptyState title={t('endpointsEmpty')} />
           : (
@@ -160,7 +153,8 @@ export function RemoteDesktopPage() {
               <tbody>
                 {endpointList.map(e => (
                   <tr key={endpointKeyOf(e)}>
-                    <td>{e.nodeId}</td><td>{e.desktop ?? '—'}</td><td>{e.host}</td><td>{e.port}</td>
+                    <td>{e.nodeId}{e.host === '127.0.0.1' && <StatusBadge>{t('localBadge')}</StatusBadge>}</td>
+                    <td>{e.desktop ?? '—'}</td><td>{e.host}</td><td>{e.port}</td>
                     <td>
                       <IconButton label={t('remove')} icon={Trash2}
                         onClick={() => setConfirm({ kind: 'endpoint', id: endpointKeyOf(e) })} />
@@ -170,24 +164,13 @@ export function RemoteDesktopPage() {
               </tbody>
             </table>
           )}
-        <form onSubmit={ev => { ev.preventDefault(); void addEndpoint() }}>
-          <Field label={t('labelNodeId')}>
-            <input value={draft.nodeId} onChange={e => setDraft({ ...draft, nodeId: e.target.value })} required />
-          </Field>
-          <Field label={t('labelDesktop')}>
-            <input value={draft.desktop} onChange={e => setDraft({ ...draft, desktop: e.target.value })} />
-          </Field>
-          <Field label={t('labelHost')}>
-            <input value={draft.host} onChange={e => setDraft({ ...draft, host: e.target.value })} required />
-          </Field>
-          <Field label={t('labelPort')}>
-            <input type="number" min={1} max={65535} value={draft.port} onChange={e => setDraft({ ...draft, port: e.target.value })} required />
-          </Field>
-          <Button type="submit" disabled={busy} icon={Plus}>{t('addEndpoint')}</Button>
-        </form>
       </Section>
 
-      <Section title={t('sectionGrants')} flush>
+      <Section title={t('sectionGrants')} flush
+        actions={endpointList.length === 0 ? undefined : (
+          <Button variant="secondary" icon={Plus}
+            onClick={() => setGrantDraft({ ...EMPTY_GRANT, endpoint: endpointKeyOf(endpointList[0]!) })}>{t('grantAccess')}</Button>
+        )}>
         {grants.length === 0
           ? <EmptyState title={t('grantsEmpty')} />
           : (
@@ -228,34 +211,6 @@ export function RemoteDesktopPage() {
               </tbody>
             </table>
           )}
-        {endpointList.length > 0 && (
-          <form onSubmit={ev => { ev.preventDefault(); void issueGrant() }}>
-            <Field label={t('labelPrincipal')}>
-              <input list="remote-desktop-principals" value={grantDraft.principal}
-                onChange={e => setGrantDraft({ ...grantDraft, principal: e.target.value })} required />
-              <datalist id="remote-desktop-principals">
-                {usernames.map(u => <option key={u} value={u} />)}
-              </datalist>
-            </Field>
-            <Field label={t('labelNodeId')}>
-              <select value={grantDraft.endpoint} onChange={e => setGrantDraft({ ...grantDraft, endpoint: e.target.value })} required>
-                <option value="" disabled>—</option>
-                {endpointList.map(e => (
-                  <option key={endpointKeyOf(e)} value={endpointKeyOf(e)}>{targetLabel(e)}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label={t('labelLevel')}>
-              <select value={grantDraft.level} onChange={e => setGrantDraft({ ...grantDraft, level: e.target.value as 'view' | 'control' })}>
-                <option value="view">{t('levelView')}</option>
-                <option value="control">{t('levelControl')}</option>
-              </select>
-            </Field>
-            <Switch label={t('labelRecording')} checked={grantDraft.recording}
-              onChange={checked => setGrantDraft({ ...grantDraft, recording: checked })} />
-            <Button type="submit" disabled={busy}>{t('grantAccess')}</Button>
-          </form>
-        )}
       </Section>
 
       <Section title={t('sectionAudit')} flush>
@@ -275,6 +230,89 @@ export function RemoteDesktopPage() {
             </table>
           )}
       </Section>
+
+      <Dialog
+        open={endpointDraft !== null}
+        title={t('addEndpointTitle')}
+        description={t('addEndpointDescription')}
+        onClose={() => { if (!busy) setEndpointDraft(null) }}
+        footer={<>
+          <Button type="button" onClick={() => setEndpointDraft(null)} disabled={busy}>{t('cancel')}</Button>
+          <Button type="button" variant="primary" disabled={busy}
+            onClick={() => {
+              if (endpointDraft === null) return
+              void saveEndpoints([...endpointList, {
+                nodeId: endpointDraft.nodeId.trim(),
+                host: endpointDraft.host.trim(),
+                port: Number(endpointDraft.port),
+                ...(endpointDraft.desktop.trim() === '' ? {} : { desktop: endpointDraft.desktop.trim() }),
+              }])
+            }}>{t('save')}</Button>
+        </>}
+      >
+        {endpointDraft === null ? null : (
+          <div className="formGrid">
+            <Field label={t('labelNodeId')} hint={t('hintNodeId')}>
+              <input className="input" value={endpointDraft.nodeId}
+                onChange={e => setEndpointDraft({ ...endpointDraft, nodeId: e.target.value })} />
+            </Field>
+            <Field label={t('labelDesktop')} hint={t('hintDesktop')}>
+              <input className="input" value={endpointDraft.desktop}
+                onChange={e => setEndpointDraft({ ...endpointDraft, desktop: e.target.value })} />
+            </Field>
+            <Field label={t('labelHost')} hint={t('hintHost')}>
+              <input className="input" value={endpointDraft.host}
+                onChange={e => setEndpointDraft({ ...endpointDraft, host: e.target.value })} />
+            </Field>
+            <Field label={t('labelPort')}>
+              <input className="input" inputMode="numeric" value={endpointDraft.port}
+                onChange={e => setEndpointDraft({ ...endpointDraft, port: e.target.value })} />
+            </Field>
+          </div>
+        )}
+      </Dialog>
+
+      <Dialog
+        open={grantDraft !== null}
+        title={t('grantTitle')}
+        description={t('grantDescription')}
+        onClose={() => { if (!busy) setGrantDraft(null) }}
+        footer={<>
+          <Button type="button" onClick={() => setGrantDraft(null)} disabled={busy}>{t('cancel')}</Button>
+          <Button type="button" variant="primary" onClick={() => void issueGrant()} disabled={busy}>{t('grantAccess')}</Button>
+        </>}
+      >
+        {grantDraft === null ? null : (
+          <div className="formGrid">
+            <Field label={t('labelPrincipal')} hint={t('hintPrincipal')}>
+              <input className="input" list="remote-desktop-principals" value={grantDraft.principal}
+                onChange={e => setGrantDraft({ ...grantDraft, principal: e.target.value })} />
+              <datalist id="remote-desktop-principals">
+                {usernames.map(u => <option key={u} value={u} />)}
+              </datalist>
+            </Field>
+            <Field label={t('labelNodeId')}>
+              <select className="input" value={grantDraft.endpoint}
+                onChange={e => setGrantDraft({ ...grantDraft, endpoint: e.target.value })}>
+                {endpointList.map(e => (
+                  <option key={endpointKeyOf(e)} value={endpointKeyOf(e)}>{targetLabel(e)}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t('labelLevel')} hint={t('hintLevel')}>
+              <select className="input" value={grantDraft.level}
+                onChange={e => setGrantDraft({ ...grantDraft, level: e.target.value as 'view' | 'control' })}>
+                <option value="view">{t('levelView')}</option>
+                <option value="control">{t('levelControl')}</option>
+              </select>
+            </Field>
+            <div className="formSpanFull">
+              <Switch label={t('labelRecording')} checked={grantDraft.recording}
+                onChange={checked => setGrantDraft({ ...grantDraft, recording: checked })} />
+            </div>
+          </div>
+        )}
+      </Dialog>
 
       <ConfirmDialog
         open={confirm !== null}
