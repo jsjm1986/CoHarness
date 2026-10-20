@@ -1,6 +1,6 @@
-/** Remote-desktop target list owned by the provider's guide entry. */
+/** Remote-desktop target menu owned by the provider's guide entry. */
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { RemoteDesktopGrantView } from '@deepseek-ai/dsh-api-remote-desktop-controller/types'
@@ -30,54 +30,66 @@ function targetsOf(grants: readonly RemoteDesktopGrantView[]): { target: RemoteD
   return [...byKey.values()]
 }
 
+type MenuState = { phase: 'loading' } | { phase: 'ready'; targets: ReturnType<typeof targetsOf> } | { phase: 'failed' }
+
 /**
- * List the targets the signed-in user is authorized for; clicking one opens
- * its remote-desktop tab where status and consent resolve. Administrators
- * configure endpoints and grants — users never enter configuration here.
+ * Offer the targets the signed-in user is authorized for through the entry's
+ * chevron menu; choosing one opens its remote-desktop tab where status and
+ * consent resolve. Administrators configure endpoints and grants — users
+ * never enter configuration here.
  * @param props - guide copy, enclosing tab actions, injected target listing.
  * @returns the authorized target picker.
  */
 export function RemoteDesktopGuide({ title, description, kind, useTabInfo, t, listTargets }: RemoteDesktopGuideProps): ReactNode {
   const { tab } = useTabInfo()
-  const [grants, setGrants] = useState<RemoteDesktopGrantView[] | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [state, setState] = useState<MenuState>({ phase: 'loading' })
   useEffect(() => {
+    if (!open) return
     const controller = new AbortController()
-    setFailed(false)
-    listTargets(controller.signal)
-      .then((rows) => { if (!controller.signal.aborted) setGrants(rows) })
-      .catch(() => { if (!controller.signal.aborted) setFailed(true) })
+    listTargets(controller.signal).then(
+      (rows) => { if (!controller.signal.aborted) setState({ phase: 'ready', targets: targetsOf(rows) }) },
+      () => { if (!controller.signal.aborted) setState({ phase: 'failed' }) },
+    )
     return () => controller.abort()
-  }, [listTargets])
-  const targets = grants === null ? [] : targetsOf(grants)
+  }, [open, attempt, listTargets])
+  const items = state.phase === 'loading'
+    ? [{ id: 'loading', label: t('targetsLoading'), disabled: true }]
+    : state.phase === 'failed'
+      ? [{ id: 'error', label: t('targetsFailed'), disabled: true }, { id: 'retry', label: t('retry') }]
+      : state.targets.length === 0
+        ? [{ id: 'empty', label: t('targetsEmpty'), disabled: true }]
+        : state.targets.map(({ target, level, recording }, index) => ({
+          id: String(index),
+          label: `${target.desktop === undefined ? target.nodeId : `${target.nodeId} · ${target.desktop}`} · ${t(level === 'control' ? 'control' : 'viewOnly')}${recording ? ` · ${t('recording')}` : ''}`,
+        }))
   return <div className={css.entry} data-sidebar-right-guide-entry={kind}>
-    <div className={css.head}>
+    <Button variant="ghost" className={css.main} aria-haspopup="menu" aria-expanded={open} onClick={() => { setState({ phase: 'loading' }); setOpen(value => !value) }}>
       <RemoteDesktopGuideIcon size={description === undefined ? 22 : 26} className={css.icon} />
       <span className={css.text}>
         <span className={css.title}>{title}</span>
         {description !== undefined && <span className={css.description}>{description}</span>}
       </span>
-    </div>
-    {failed && <p className={css.empty}>{t('targetsFailed')}</p>}
-    {!failed && grants === null && <p className={css.empty}>{t('targetsLoading')}</p>}
-    {!failed && grants !== null && targets.length === 0 && <p className={css.empty}>{t('targetsEmpty')}</p>}
-    <div className={css.targets}>
-      {targets.map(({ target, level, recording }) => {
-        const label = target.desktop === undefined ? target.nodeId : `${target.nodeId} · ${target.desktop}`
-        return <Button
-          key={`${target.nodeId} ${target.desktop ?? ''}`}
-          className={css.target}
-          onClick={() => tab.actions.openTab('remoteDesktop', {
-            replaceTab: true,
-            params: { nodeId: target.nodeId, ...(target.desktop === undefined ? {} : { desktop: target.desktop }) },
-          })}
-        >
-          <span className={css.targetName}>{label}</span>
-          <span className={css.targetMeta}>
-            {t(level === 'control' ? 'control' : 'viewOnly')}{recording ? ` · ${t('recording')}` : ''}
-          </span>
-        </Button>
-      })}
-    </div>
+    </Button>
+    <Menu
+      open={open} portal autoFocus align="end" className={css.menu}
+      items={items}
+      onClose={() => { setOpen(false) }}
+      onSelect={(id) => {
+        if (id === 'retry') { setState({ phase: 'loading' }); setAttempt(value => value + 1); return }
+        const chosen = state.phase === 'ready' ? state.targets[Number(id)] : undefined
+        if (chosen === undefined) return
+        setOpen(false)
+        tab.actions.openTab('remoteDesktop', {
+          replaceTab: true,
+          params: { nodeId: chosen.target.nodeId, ...(chosen.target.desktop === undefined ? {} : { desktop: chosen.target.desktop }) },
+        })
+      }}
+      anchor={<Button variant="ghost" className={css.trigger} aria-label={t('connectDescription')} aria-haspopup="menu" aria-expanded={open}
+        onClick={() => { setState({ phase: 'loading' }); setOpen(value => !value) }}>
+        <IconChevronDownOutline14 />
+      </Button>}
+    />
   </div>
 }

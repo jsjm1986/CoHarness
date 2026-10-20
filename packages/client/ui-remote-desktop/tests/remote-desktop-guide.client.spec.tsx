@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** Authorized-target listing of the remote-desktop guide entry. */
+/** Authorized-target menu of the remote-desktop guide entry. */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
@@ -33,21 +33,21 @@ function fixture(grants: typeof GRANTS | Promise<never>) {
   return { openTab, props }
 }
 
-it('lists the caller\'s authorized targets and opens the chosen one', async () => {
+it('lists the caller\'s authorized targets in the menu and opens the chosen one', async () => {
   const { openTab, props } = fixture(GRANTS)
   render(<RemoteDesktopGuide {...props} />)
-  const target = await screen.findByText('mac-mini')
-  expect(screen.getByText('win-1 · display-0')).toBeTruthy()
-  expect(screen.getByText('Control')).toBeTruthy()
-  expect(screen.getByText('View only · Recording')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: en.connectDescription }))
+  const target = await screen.findByText('mac-mini · Control')
+  expect(screen.getByText('win-1 · display-0 · View only · Recording')).toBeTruthy()
   fireEvent.click(target)
   expect(openTab).toHaveBeenCalledWith('remoteDesktop', {
     replaceTab: true, params: { nodeId: 'mac-mini' },
   })
 })
 
-it('shows the empty message when the caller has no live grants', async () => {
+it('shows the empty item in the menu when the caller has no live grants', async () => {
   const { props } = fixture([])
   render(<RemoteDesktopGuide {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: en.connectDescription }))
   await waitFor(() => expect(screen.getByText(en.targetsEmpty)).toBeTruthy())
 })
