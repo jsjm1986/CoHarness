@@ -1,6 +1,4 @@
-- button "返回插件列表":
-  - img
-  - text: 插件列表
+- button "返回插件": 插件
 - heading "网页搜索" [level=3]
 - paragraph: DeepSeek 搜索提供方。
 - text: 启用新版 Web 搜索 API

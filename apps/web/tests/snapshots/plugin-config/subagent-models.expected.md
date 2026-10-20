@@ -1,6 +1,4 @@
-- button "返回插件列表":
-  - img
-  - text: 插件列表
+- button "返回插件": 插件
 - heading "模型选择" [level=3]
 - paragraph: 允许 Agent 为子智能体选择模型
 - text: 允许 Agent 为子智能体选择模型

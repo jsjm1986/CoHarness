@@ -58,10 +58,10 @@ describe('web e2e: plugin configuration section', () => {
       await page.getByRole('navigation', { name: '面板' }).getByRole('button', { name: '插件', exact: true }).click()
       await panel.waitFor({ timeout: 10_000 })
     }
-    const back = panel.getByRole('button', { name: '返回插件列表', exact: true })
+    const back = panel.getByRole('button', { name: '返回插件', exact: true })
     if (await back.count() > 0) await back.click()
     // The Configuration group lists the namespaces this composition serves.
-    const group = panel.locator('[data-plugin-group="config"]')
+    const group = panel.locator('[data-plugin-group="basic"]')
     await group.getByRole('button', { name: '查看 终端', exact: true }).waitFor({ timeout: 10_000 })
     return panel
   }
@@ -84,7 +84,7 @@ describe('web e2e: plugin configuration section', () => {
     const panel = await openPlugins()
 
     // Each card belongs to a Host settings namespace served by this composition.
-    const group = panel.locator('[data-plugin-group="config"]')
+    const group = panel.locator('[data-plugin-group="basic"]')
     for (const name of ['终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索', '记忆']) {
       await expect.poll(async () => group.getByRole('button', { name: `查看 ${name}`, exact: true }).count(), { timeout: 10_000 }).toBe(1)
     }

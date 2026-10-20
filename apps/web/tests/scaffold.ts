@@ -111,6 +111,22 @@ const WELCOME_NOTICE_ACK_FIELD = 'welcomeNoticeVersion'
 const WELCOME_NOTICE_VERSION = '2026-09-28.1'
 
 /**
+ * Persist the shipped welcome acknowledgement into a harness home that no
+ * server has booted yet — the pre-boot equivalent of the settled-context ack
+ * below, for lanes that spawn `dsh` themselves. A first-run home would paint
+ * the versioned notice modal over every page.
+ * @param home - the `DSH_HOME` directory the spawned server reads.
+ */
+export async function writeWelcomeNoticeAck(home: string): Promise<void> {
+  await mkdir(home, { recursive: true })
+  await writeFile(join(home, 'settings.yaml'), [
+    `${WELCOME_NOTICE_SETTINGS_NAMESPACE}:`,
+    `  ${WELCOME_NOTICE_ACK_FIELD}: '${WELCOME_NOTICE_VERSION}'`,
+    '',
+  ].join('\n'))
+}
+
+/**
  * The routes a shipped composition always has, with no ability to stream.
  * A fixture-less keyless scenario issues no model calls, but its tree must
  * still answer `listProviders()` — surfaces legitimately gate on whether any

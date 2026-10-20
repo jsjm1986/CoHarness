@@ -112,7 +112,7 @@ it('installs a local bundle through the built Admin workflow and verifies the re
       expect((await settings()).subagent.maxDepth).toBe(3)
       await config.getByRole('button', { name: '放弃草稿', exact: true }).click()
       expect(await config.getByLabel('maxDepth', { exact: true }).inputValue()).toBe('3')
-      await page.getByRole('button', { name: '返回插件列表', exact: true }).click()
+      await page.getByRole('button', { name: '返回插件', exact: true }).click()
       await page.getByRole('button', { name: '添加插件', exact: true }).click()
       const dialog = page.getByRole('dialog')
       await dialog.locator('input').fill(bundle)

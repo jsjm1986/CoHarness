@@ -1,7 +1,5 @@
 - dialog "The plugin could not be installed":
-  - button "Back to editing":
-    - img
-    - text: Edit
+  - button "Back to editing": Edit
   - button "Close":
     - img
   - alert: The plugin could not be installed
@@ -15,9 +13,7 @@
     - list:
       - listitem:
         - code: approval-fixture-addon@file:{{fixtureSource}}
-    - paragraph: Once allowed, the scripts run here with your permissions, and the permission is saved in this profile; you will not be asked again.
+    - paragraph: Once allowed, the scripts run here with your permissions, and the permission is saved in this profile.
     - paragraph: Allow only packages you trust.
     - button "Allow these scripts and retry"
-  - button "Show install details":
-    - text: Show install details
-    - img
+  - button "Show install details"

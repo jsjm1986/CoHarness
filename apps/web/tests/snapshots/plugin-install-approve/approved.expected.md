@@ -6,12 +6,10 @@
   - paragraph: Local directory
   - paragraph: Version 1.0.0
   - status: Install scripts allowed for approval-fixture-addon@file:{{fixtureSource}}
-  - button "Hide install details" [expanded]:
-    - text: Hide install details
-    - img
+  - button "Hide install details" [expanded]
   - paragraph: "Installs into {{cwd}}/home/profiles/web"
   - text: Done $
   - group "Command line 1": "pnpm add file:{{cwd}}/home/addon"
   - button "Copy"
-  - text: "Progress: resolved 1, reused 0, downloaded 0, added 0 Already up to date Progress: resolved 1, reused 0, downloaded 0, added 0, done dependencies: + approval-fixture-addon file:{{cwd}}/home/addon node_modules/approval-fixture-addon install$ node build.cjs node_modules/approval-fixture-addon install: Done Done in {{duration}} using pnpm v11.28.4"
+  - text: "Progress: resolved 1, reused 0, downloaded 0, added 0 Already up to date Progress: resolved 1, reused 0, downloaded 0, added 0, done dependencies: + approval-fixture-addon file:{{cwd}}/home/addon node_modules/approval-fixture-addon install$ node build.cjs node_modules/approval-fixture-addon install: Done Done in {{duration}} using pnpm v11.28.5"
   - button "Enable now"

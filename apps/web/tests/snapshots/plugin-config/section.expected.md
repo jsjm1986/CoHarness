@@ -1,7 +1,6 @@
 - heading "插件" [level=1]
 - text: 安装、启用和配置插件
-- button "插件说明":
-  - img
+- button "插件说明"
 - button "刷新" [disabled]
 - group "添加插件":
   - button "添加插件" [disabled]:
@@ -9,8 +8,7 @@
     - text: 添加插件
   - button "选择添加插件方式" [disabled]
 - status: 本部署没有可管理的 profile，无法安装或启停插件。
-- heading "插件配置" [level=3]
-- text: "6"
+- heading "内置插件配置" [level=3]
 - list:
   - listitem:
     - button "查看 终端": 终端

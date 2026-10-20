@@ -79,7 +79,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await expect.poll(
       () => configuredInput.getAttribute('placeholder'),
       { timeout: 10_000 },
-    ).toBe('已配置——输入新值可替换')
+    ).toBe('留空使用已保存凭据')
 
     const secondReloadWarnings = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
@@ -111,10 +111,11 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
       const sightings: string[] = []
       ;(window as unknown as { __takeoverSightings: string[] }).__takeoverSightings = sightings
       setInterval(() => {
-        if (document.querySelector(
+        const hit = document.querySelector(
           '[role="dialog"][aria-label="内测声明"], '
           + '[role="dialog"][aria-label="添加一个 API Key 开始使用"]',
-        ) !== null) {
+        )
+        if (hit !== null) {
           sightings.push('chrome')
         }
         if (document.getElementById('root')?.inert === true) sightings.push('inert')

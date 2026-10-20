@@ -16,7 +16,7 @@ import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
-import { captureStableAria } from './scaffold.ts'
+import { captureStableAria, writeWelcomeNoticeAck } from './scaffold.ts'
 import { REPO_ROOT, saveFailureShot, saveFailureDom } from './support.ts'
 import { expectSelectableTerminalCommand } from './terminal-command-browser.ts'
 
@@ -133,6 +133,9 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
     }))
     await writeFile(join(addon, 'build.cjs'), 'require("node:fs").writeFileSync("built.txt", "built")\n')
     await writeFile(join(addon, 'cordis.patch.yml'), '[]\n')
+    // The management page is the subject; a first-run home would paint the
+    // versioned welcome modal over it.
+    await writeWelcomeNoticeAck(home)
     await mkdir(SNAPSHOT_DIR, { recursive: true })
 
     signal.throwIfAborted()

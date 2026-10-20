@@ -297,16 +297,22 @@ export class ModelsSettingsStore {
       const derived = derivedKeyRefOf(row.entry)
       return [...derived === undefined ? [] : [derived], ...nativeAuthRefsOf(row.entry)]
     }))]
-    let credentials: Record<string, CredentialView> = {}
+    const credentials: Record<string, CredentialView> = {}
     let credentialError: string | null = null
     if (refs.length > 0) {
       try {
-        const response = await this.api.credentials.describe({ refs })
-        // Credential state is an enrichment for the Models page: neither a
-        // business rejection nor a transport failure fails the load. The
-        // onboarding projection below retains the failure distinction.
-        if (response.result.ok) credentials = response.result.value.credentials
-        else credentialError = response.result.error.message
+        // The describe payload caps `refs` at 64 on the wire schema; catalog
+        // surfaces with many keyless rows (each contributing native-auth refs)
+        // exceed it, so the join describes in slices and merges. Credential
+        // state is an enrichment for the Models page: neither a business
+        // rejection nor a transport failure fails the load, and the onboarding
+        // projection below retains the failure distinction.
+        const slices: string[][] = []
+        for (let index = 0; index < refs.length; index += 64) slices.push(refs.slice(index, index + 64))
+        for (const response of await Promise.all(slices.map(slice => this.api.credentials.describe({ refs: slice })))) {
+          if (response.result.ok) Object.assign(credentials, response.result.value.credentials)
+          else credentialError ??= response.result.error.message
+        }
       } catch (error) {
         credentialError = messageOf(error)
       }
