@@ -69,7 +69,10 @@ async function setup() {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`
   cfg.publicOrigins.push(base)
-  close = () => new Promise(resolve => server.close(() => resolve()))
+  close = () => {
+    server.closeAllConnections()
+    return new Promise(resolve => server.close(() => resolve()))
+  }
   const login = async (username: string) => {
     const response = await fetch(`${base}/login`, { method: 'POST', redirect: 'manual', headers: { origin: base, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username, password: 'pw-12345678' }) })
     return (response.headers.get('set-cookie') ?? '').split(';')[0] ?? ''

@@ -37,6 +37,8 @@ export interface GatewayConfig {
   principalAssertionTtlMs: number
   /** Maximum time an HTTP/WebSocket proxy waits on one runtime upstream operation. */
   upstreamTimeoutMs: number
+  /** Idle keep-alive lifetime of the public HTTP listener; must outlive the front proxy's origin pool. */
+  keepAliveTimeoutMs: number
   /** Maximum interval between durable access-revocation reads and listener reconnects. */
   accessInvalidationPollMs: number
   /** Heartbeat interval for a managed runtime's execution revocation stream. */
@@ -195,6 +197,13 @@ export const DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES = 64 * 1024 * 1024
 export const DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS = 1_000
 export const DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS = 30_000
 export const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000
+/**
+ * Outlives the commonest front-proxy origin-pool idle timers (Cloudflare
+ * cloudflared 90s, nginx 75s, AWS ALB 60s): a shorter listener timeout lets a
+ * proxy reuse a socket the server is already closing, which the client sees as
+ * an EOF/502.
+ */
+export const DEFAULT_KEEPALIVE_TIMEOUT_MS = 100_000
 export const DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS = 15_000
 export const DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES = 64 * 1024 * 1024
 /** Maximum delay accepted by Node's timer-backed APIs (setTimeout/setInterval). */
@@ -549,6 +558,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     DEFAULT_UPSTREAM_TIMEOUT_MS,
     'HGW_UPSTREAM_TIMEOUT_MS',
   )
+  const keepAliveTimeoutMs = timerDelay(
+    env.HGW_KEEPALIVE_TIMEOUT_MS,
+    DEFAULT_KEEPALIVE_TIMEOUT_MS,
+    'HGW_KEEPALIVE_TIMEOUT_MS',
+  )
   const upstreamResponseLimitBytes = positiveSafeInteger(
     env.HGW_UPSTREAM_RESPONSE_LIMIT_BYTES,
     DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES,
@@ -656,6 +670,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     principalKeyDir,
     principalAssertionTtlMs,
     upstreamTimeoutMs,
+    keepAliveTimeoutMs,
     upstreamResponseLimitBytes,
     runtimeLogCapBytes,
     runtimeApiBodyLimitBytes,
