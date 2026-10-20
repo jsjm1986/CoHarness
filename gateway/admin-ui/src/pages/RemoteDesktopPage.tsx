@@ -141,28 +141,32 @@ export function RemoteDesktopPage() {
       <Section title={t('sectionEndpoints')} flush
         actions={<Button variant="secondary" icon={Plus} onClick={() => setEndpointDraft(EMPTY_ENDPOINT)}>{t('addEndpoint')}</Button>}>
         {endpointList.length === 0
-          ? <EmptyState title={t('endpointsEmpty')} />
+          ? <EmptyState title={t('endpointsEmpty')} detail={t('endpointsEmptyDetail')} />
           : (
-            <table>
-              <thead>
-                <tr>
-                  <th>{t('labelNodeId')}</th><th>{t('labelDesktop')}</th><th>{t('labelHost')}</th>
-                  <th>{t('labelPort')}</th><th />
-                </tr>
-              </thead>
-              <tbody>
-                {endpointList.map(e => (
-                  <tr key={endpointKeyOf(e)}>
-                    <td>{e.nodeId}{e.host === '127.0.0.1' && <StatusBadge>{t('localBadge')}</StatusBadge>}</td>
-                    <td>{e.desktop ?? '—'}</td><td>{e.host}</td><td>{e.port}</td>
-                    <td>
-                      <IconButton label={t('remove')} icon={Trash2}
-                        onClick={() => setConfirm({ kind: 'endpoint', id: endpointKeyOf(e) })} />
-                    </td>
+            <div className="tableWrap" role="region" aria-label={t('tableAriaEndpoints')} tabIndex={0}>
+              <table className="dataTable">
+                <thead>
+                  <tr>
+                    <th>{t('labelNodeId')}</th><th>{t('labelDesktop')}</th><th>{t('labelHost')}</th>
+                    <th>{t('labelPort')}</th><th>{t('columnActions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {endpointList.map(e => (
+                    <tr key={endpointKeyOf(e)}>
+                      <td>{e.nodeId} {e.host === '127.0.0.1' && <StatusBadge tone="info">{t('localBadge')}</StatusBadge>}</td>
+                      <td>{e.desktop ?? '—'}</td><td><code>{e.host}</code></td><td><code>{e.port}</code></td>
+                      <td>
+                        <div className="compactActions">
+                          <IconButton label={t('remove')} icon={Trash2}
+                            onClick={() => setConfirm({ kind: 'endpoint', id: endpointKeyOf(e) })} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
       </Section>
 
@@ -172,62 +176,69 @@ export function RemoteDesktopPage() {
             onClick={() => setGrantDraft({ ...EMPTY_GRANT, endpoint: endpointKeyOf(endpointList[0]!) })}>{t('grantAccess')}</Button>
         )}>
         {grants.length === 0
-          ? <EmptyState title={t('grantsEmpty')} />
+          ? <EmptyState title={t('grantsEmpty')} detail={t('grantsEmptyDetail')} />
           : (
-            <table>
-              <thead>
-                <tr>
-                  <th>{t('labelPrincipal')}</th><th>{t('labelNodeId')}</th><th>{t('labelLevel')}</th>
-                  <th>{t('labelScope')}</th><th>{t('labelRecording')}</th><th>{t('labelGrantedBy')}</th>
-                  <th>{t('labelCreatedAt')}</th><th />
-                </tr>
-              </thead>
-              <tbody>
-                {grants.map(g => (
-                  <tr key={g.id}>
-                    <td>{g.principal}</td>
-                    <td>{targetLabel(g.target)}</td>
-                    <td>
-                      {g.revokedAt === undefined
-                        ? (
-                          <select value={g.level} onChange={e => void changeLevel(g, e.target.value as 'view' | 'control')}>
-                            <option value="view">{t('levelView')}</option>
-                            <option value="control">{t('levelControl')}</option>
-                          </select>
-                        )
-                        : t(g.level === 'control' ? 'levelControl' : 'levelView')}
-                    </td>
-                    <td>{g.scope.kind === 'machine' ? t('scopeMachine') : t('scopeSession')}</td>
-                    <td>{g.recording ? t('recordingYes') : '—'}</td>
-                    <td>{g.grantedBy}</td>
-                    <td>{timeLabel(g.createdAt)}</td>
-                    <td>
-                      {g.revokedAt === undefined
-                        ? <Button variant="secondary" onClick={() => setConfirm({ kind: 'revoke', id: g.id })}>{t('revoke')}</Button>
-                        : <StatusBadge>{t('revokedBadge')}</StatusBadge>}
-                    </td>
+            <div className="tableWrap" role="region" aria-label={t('tableAriaGrants')} tabIndex={0}>
+              <table className="dataTable">
+                <thead>
+                  <tr>
+                    <th>{t('labelPrincipal')}</th><th>{t('labelNodeId')}</th><th>{t('labelLevel')}</th>
+                    <th>{t('labelScope')}</th><th>{t('labelRecording')}</th><th>{t('labelGrantedBy')}</th>
+                    <th>{t('labelCreatedAt')}</th><th>{t('columnActions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {grants.map(g => (
+                    <tr key={g.id}>
+                      <td>{g.principal}</td>
+                      <td>{targetLabel(g.target)}</td>
+                      <td>
+                        {g.revokedAt === undefined
+                          ? (
+                            <select className="selectCompact" value={g.level}
+                              onChange={e => void changeLevel(g, e.target.value as 'view' | 'control')}>
+                              <option value="view">{t('levelView')}</option>
+                              <option value="control">{t('levelControl')}</option>
+                            </select>
+                          )
+                          : <StatusBadge tone="neutral">{t(g.level === 'control' ? 'levelControl' : 'levelView')}</StatusBadge>}
+                      </td>
+                      <td>{g.scope.kind === 'machine' ? t('scopeMachine') : t('scopeSession')}</td>
+                      <td>{g.recording ? <StatusBadge tone="warning">{t('recordingYes')}</StatusBadge> : '—'}</td>
+                      <td>{g.grantedBy}</td>
+                      <td>{timeLabel(g.createdAt)}</td>
+                      <td>
+                        <div className="compactActions">
+                          {g.revokedAt === undefined
+                            ? <Button variant="ghost" onClick={() => setConfirm({ kind: 'revoke', id: g.id })}>{t('revoke')}</Button>
+                            : <StatusBadge tone="danger">{t('revokedBadge')}</StatusBadge>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
       </Section>
 
       <Section title={t('sectionAudit')} flush>
         {events.length === 0
-          ? <EmptyState title={t('auditEmpty')} />
+          ? <EmptyState title={t('auditEmpty')} detail={t('auditEmptyDetail')} />
           : (
-            <table>
-              <thead><tr><th>{t('eventTime')}</th><th>{t('eventKind')}</th><th>{t('labelPrincipal')}</th><th>{t('labelNodeId')}</th></tr></thead>
-              <tbody>
-                {events.map((ev, i) => (
-                  <tr key={i}>
-                    <td>{timeLabel(ev.at)}</td><td>{ev.kind}</td>
-                    <td>{ev.principal ?? '—'}</td><td>{ev.target === undefined ? '—' : targetLabel(ev.target)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="tableWrap" role="region" aria-label={t('tableAriaAudit')} tabIndex={0}>
+              <table className="dataTable">
+                <thead><tr><th>{t('eventTime')}</th><th>{t('eventKind')}</th><th>{t('labelPrincipal')}</th><th>{t('labelNodeId')}</th></tr></thead>
+                <tbody>
+                  {events.map((ev, i) => (
+                    <tr key={i}>
+                      <td>{timeLabel(ev.at)}</td><td><code>{ev.kind}</code></td>
+                      <td>{ev.principal ?? '—'}</td><td>{ev.target === undefined ? '—' : targetLabel(ev.target)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
       </Section>
 
