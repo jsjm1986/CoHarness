@@ -39,6 +39,9 @@
       "path": "../../shell/shell"
     },
     {
+      "path": "../../session/session-persistence"
+    },
+    {
       "path": "../../session/working-directory"
     }
   ]

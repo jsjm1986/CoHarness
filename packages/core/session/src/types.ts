@@ -1,4 +1,5 @@
 import type { Branded, BrandedNumber } from '@deepseek-ai/dsh-brand'
+import type { TypertResource } from '@deepseek-ai/dsh-typert-protocol'
 import type {
   AssistantMessage,
   DeveloperMessage,
@@ -603,4 +604,16 @@ export interface PluginRecord {
   readonly time: number
   /** The JSON payload as committed. */
   readonly data: unknown
+}
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface TypertResourceMap {
+    /** One Session; the Session Controller registers its default `sessionId` wire field. */
+    session: TypertResource<SessionId>
+  }
+
+  interface RemoteErrorDetailsMap {
+    /** The named Session does not exist; produced by every layer that resolves a SessionId. */
+    'session/not-found': { readonly sessionId: SessionId }
+  }
 }
