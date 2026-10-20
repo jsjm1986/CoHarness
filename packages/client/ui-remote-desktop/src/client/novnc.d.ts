@@ -4,7 +4,10 @@
  * transpile declares named members the published default export does not
  * carry, so the package-local declaration pins the consumed subset.
  * Pinned to the 1.5.x line: 1.6+ switched to `core/` ES modules whose
- * top-level await cannot bundle into the client runtime's CJS rows. */
+ * top-level await cannot bundle into the client runtime's CJS rows.
+ * The CommonJS transpile places the class on `module.exports.default`;
+ * consumers unwrap it through `src/client/rfb.ts` because interop modes
+ * disagree on whether the default is the class or its container. */
 declare module '@novnc/novnc/lib/rfb.js' {
   /** RFB connection options accepted by the constructor. */
   export interface RfbOptions {

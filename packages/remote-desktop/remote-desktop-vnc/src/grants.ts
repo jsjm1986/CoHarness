@@ -104,7 +104,7 @@ export class VncGrantStore {
       } catch {
         throw new RemoteDesktopError(`invalid JSON in remote-desktop grants file "${this.file}" line ${index + 1}`, 'REMOTE_DESKTOP_TRANSPORT')
       }
-      const row = parsed as Partial<StoredGrant>
+      const row = parsed as { id?: unknown; target?: unknown }
       if (typeof row.id !== 'string' || typeof row.target !== 'object' || row.target === null) {
         throw new RemoteDesktopError(`invalid grant row in remote-desktop grants file "${this.file}" line ${index + 1}`, 'REMOTE_DESKTOP_TRANSPORT')
       }
