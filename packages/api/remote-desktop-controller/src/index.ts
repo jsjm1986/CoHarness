@@ -83,6 +83,9 @@ function auditView(event: RemoteDesktopAuditEvent): RemoteDesktopAuditEventView 
  * browser-visible principal is always the verified user, never caller input.
  */
 export class RemoteDesktopController extends TypertRemoteService {
+  /** The grant-enforcing provider plus the Remote descriptor registry. */
+  static inject = ['remoteDesktop', 'typert']
+
   private readonly access: RemoteDesktopAccess
 
   /**
