@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-20-remote-desktop-stream-url-runtime-pinning.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-stream-url-runtime-pinning.md
+/agent-note-remote-desktop-stream-url-binds-the-document-runtime-target-through-identity-pinning:
+  en: 73396cf117f9e006
+  zh: 82f6c92fbac2cfe4
+/agent-note-remote-desktop-stream-url-binds-the-document-runtime-target-through-identity-pinning/problem:
+  en: 27eda7d62f270c51
+  zh: 0c5e9d02787b09cf
+/agent-note-remote-desktop-stream-url-binds-the-document-runtime-target-through-identity-pinning/decision:
+  en: 0f559cb7d0771dc2
+  zh: 47f4208f3298261b
+/agent-note-remote-desktop-stream-url-binds-the-document-runtime-target-through-identity-pinning/alternatives-considered:
+  en: a5eec98202d315e4
+  zh: 5aa29498a093931a
+/agent-note-remote-desktop-stream-url-binds-the-document-runtime-target-through-identity-pinning/verification:
+  en: ab46bee2233d341f
+  zh: c0eedf9203e80dd9
+/agent-note-remote-desktop-stream-url-binds-the-document-runtime-target-through-identity-pinning/consequences:
+  en: d884812711009e39
+  zh: 4da7bb6002ea6686

@@ -40,8 +40,15 @@ export class ClientRemoteDesktops extends Service {
   /**
    * @param ctx - Client root Context.
    * @param remote - generated `remoteDesktop` namespace.
+   * @param privateResourceUrl - binds private URLs to the verified document
+   *   identity and runtime target (Gateway `dshTarget`/`dshPrincipal`); the
+   *   stream upgrade resolves its runtime from them, not from the scope cookie.
    */
-  constructor(ctx: Context, private readonly remote: RemoteDesktopRemote) {
+  constructor(
+    ctx: Context,
+    private readonly remote: RemoteDesktopRemote,
+    private readonly privateResourceUrl?: (value: string) => string,
+  ) {
     super(ctx, 'remoteDesktops')
   }
 
@@ -88,9 +95,11 @@ export class ClientRemoteDesktops extends Service {
   ): Promise<RemoteDesktopAttachment> {
     const result = await this.remote.attach(sessionId, { ...target, level }, signal)
     if (!result.ok) throw result.error
-    const url = new URL(result.value.stream.path, location.href)
+    // Identity pinning must run on the http(s) URL: the fence matches the page
+    // origin, so a ws(s) URL would fall out of its scope check unpinned.
+    const path = `${result.value.stream.path}?token=${encodeURIComponent(result.value.stream.token)}`
+    const url = new URL(this.privateResourceUrl?.(path) ?? path, location.href)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    url.search = `token=${encodeURIComponent(result.value.stream.token)}`
     return { id: result.value.id, spec: result.value.spec, url: url.href }
   }
 
@@ -172,8 +181,8 @@ export class ClientRemoteDesktops extends Service {
   }
 }
 
-/** Required Client transport plus the generated `remoteDesktop` namespace. */
-export const inject = ['remote']
+/** Required Client transport, `connection` (stream URL identity pinning), and the generated `remoteDesktop` namespace. */
+export const inject = ['remote', 'connection']
 
 /**
  * Remote namespaces this plugin self-mounts through `ctx.remote.$mount`. The
@@ -192,5 +201,10 @@ export async function apply(ctx: Context): Promise<void> {
     const { default: remoteDesktopRemote } = await import('@deepseek-ai/dsh-api-remote-desktop-controller/remote')
     await ctx.remote.$mount(remoteDesktopRemote)
   }
-  new ClientRemoteDesktops(ctx, ctx.get('remote.remoteDesktop') as RemoteDesktopRemote)
+  const connection = ctx.get('connection') as { privateResourceUrl?: (value: string) => string } | undefined
+  new ClientRemoteDesktops(
+    ctx,
+    ctx.get('remote.remoteDesktop') as RemoteDesktopRemote,
+    connection?.privateResourceUrl,
+  )
 }
