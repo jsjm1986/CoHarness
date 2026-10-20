@@ -21,6 +21,8 @@ export const zh = {
   consentRequired: '授权已变更，请重新确认。',
   stale: '此桌面目标已失效，请刷新后重试。',
   failed: '远程桌面失败：{message}',
+  connectTitle: '连接远程桌面', connectDescription: '输入已配置的目标节点',
+  nodeId: '节点标识', connect: '连接',
 } satisfies Record<string, string>
 
 /** English remote-desktop copy. */
@@ -37,4 +39,6 @@ export const en = {
   consentRequired: 'The grants changed; confirm again.',
   stale: 'This desktop target is stale; refresh and try again.',
   failed: 'Remote desktop failed: {message}',
+  connectTitle: 'Connect to a remote desktop', connectDescription: 'Enter a configured target node',
+  nodeId: 'Node id', connect: 'Connect',
 } satisfies Record<keyof typeof zh, string>

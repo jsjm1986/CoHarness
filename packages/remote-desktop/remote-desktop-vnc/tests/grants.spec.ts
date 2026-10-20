@@ -87,7 +87,7 @@ describe('VncGrantStore', () => {
     await store.insert(grant())
     await store.update(RemoteDesktopGrantId('g1'), { revokedAt: NOW })
     const reopened = await VncGrantStore.open(file)
-    expect(reopened.all()[0].revokedAt).toBe(NOW)
+    expect(reopened.all()[0]!.revokedAt).toBe(NOW)
   })
 
   it('opens an absent file as empty and rejects unknown updates', async () => {

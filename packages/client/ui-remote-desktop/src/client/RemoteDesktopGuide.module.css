@@ -1,0 +1,30 @@
+.entry { box-sizing: border-box; display: flex; flex-direction: column; width: 100%; overflow: hidden; border: 0.5px solid var(--dsw-alias-border-l4); border-radius: 24px; background: var(--dsw-alias-bg-layer-1); }
+.head { display: flex; align-items: center; gap: 14px; min-width: 0; min-height: 56px; padding: 14px 20px 6px; }
+.icon { flex: none; }
+.text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.title { overflow: hidden; color: var(--dsw-alias-label-primary); font-size: 15px; line-height: 1.4; white-space: nowrap; text-overflow: ellipsis; }
+.description { overflow: hidden; color: var(--dsw-alias-label-caption); font-size: 13px; line-height: 1.4; white-space: nowrap; text-overflow: ellipsis; }
+.form { display: flex; align-items: center; gap: 8px; padding: 6px 20px 14px 60px; }
+.field { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border: 0.5px solid var(--dsw-alias-border-l4); border-radius: 8px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-size: 13px; }
+.field::placeholder { color: var(--dsw-alias-label-caption); }
+.action { flex: none; }
+
+/* Phone: the entry joins the guide's flat-list grammar — full-width rows split
+   by hairlines — instead of a capsule card floating mid-pane. */
+@media (max-width: 767px) {
+  .entry {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+
+  .head {
+    min-height: 56px;
+    padding: var(--dsw-space-3) var(--dsw-space-4);
+    gap: var(--dsw-space-3);
+  }
+
+  .form {
+    padding: 0 var(--dsw-space-4) var(--dsw-space-3);
+  }
+}

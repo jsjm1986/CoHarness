@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-将 `@novnc/novnc` 作为 `ui-remote-desktop` 的打包运行时依赖出货，原样导入 `core/rfb.js` 模块。MPL-2.0 是文件级弱 copyleft：其义务覆盖 noVNC 自身的源文件，而客户端打包产物构成的大作品仍保持项目许可证，因为没有修改任何 noVNC 文件。`assertRuntimeLicenses` 中的身份级豁免仅按 `@novnc/novnc` 这一包身份在 MPL-2.0 条款下放行；其他包身份或许可证条款变更依然拒绝。
+将 `@novnc/novnc` 作为 `ui-remote-desktop` 的打包运行时依赖出货，原样导入 `lib/rfb.js` 模块。版本钉在 1.5.x 线，因为 1.6+ 切换到 `core/` ES 模块，其顶层 await 无法打进客户端运行时的 CJS 产物。MPL-2.0 是文件级弱 copyleft：其义务覆盖 noVNC 自身的源文件，而客户端打包产物构成的大作品仍保持项目许可证，因为没有修改任何 noVNC 文件。`assertRuntimeLicenses` 中的身份级豁免仅按 `@novnc/novnc` 这一包身份在 MPL-2.0 条款下放行；其他包身份或许可证条款变更依然拒绝。
 
 MPL-2.0 §3.2 的源码可得性通过 `THIRD_PARTY_NOTICES.md` 满足：声明文本把接收方指向上游仓库 `https://github.com/novnc/noVNC` 作为打包代码的对应源码。分发的副本是已发布的 npm 包；打包器的压缩不产生新的被覆盖文件。
 

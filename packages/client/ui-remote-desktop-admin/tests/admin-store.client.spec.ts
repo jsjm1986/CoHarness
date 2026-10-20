@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteDesktopAdminController } from '../src/client/admin-store.ts'
 import type { RemoteDesktopGrantView } from '@deepseek-ai/dsh-api-remote-desktop-controller/types'
+import type { ClientRemoteDesktops } from '@deepseek-ai/dsh-api-remote-desktop-controller/client'
 
 const SESSION = 's-1' as SessionId
 const GRANT: RemoteDesktopGrantView = {
@@ -10,17 +11,15 @@ const GRANT: RemoteDesktopGrantView = {
   scope: { kind: 'machine' }, recording: false, grantedBy: 'admin-1', createdAt: 1,
 }
 
-function remote(overrides: Partial<{
-  listGrants: ReturnType<typeof vi.fn>
-  audit: ReturnType<typeof vi.fn>
-  revoke: ReturnType<typeof vi.fn>
-}> = {}) {
+type RemoteApi = Pick<ClientRemoteDesktops, 'listGrants' | 'grant' | 'setLevel' | 'revoke' | 'audit'>
+
+function remote(overrides: Partial<RemoteApi> = {}): RemoteApi {
   return {
-    listGrants: overrides.listGrants ?? vi.fn().mockResolvedValue([GRANT]),
-    audit: overrides.audit ?? vi.fn().mockResolvedValue([]),
-    grant: vi.fn().mockResolvedValue(GRANT),
-    setLevel: vi.fn().mockResolvedValue({ ...GRANT, level: 'control' }),
-    revoke: overrides.revoke ?? vi.fn().mockResolvedValue({ ...GRANT, revokedAt: 2 }),
+    listGrants: overrides.listGrants ?? vi.fn<RemoteApi['listGrants']>().mockResolvedValue([GRANT]),
+    audit: overrides.audit ?? vi.fn<RemoteApi['audit']>().mockResolvedValue([]),
+    grant: vi.fn<RemoteApi['grant']>().mockResolvedValue(GRANT),
+    setLevel: vi.fn<RemoteApi['setLevel']>().mockResolvedValue({ ...GRANT, level: 'control' }),
+    revoke: overrides.revoke ?? vi.fn<RemoteApi['revoke']>().mockResolvedValue({ ...GRANT, revokedAt: 2 }),
   }
 }
 

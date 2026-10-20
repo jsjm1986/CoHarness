@@ -118,7 +118,7 @@ describe('VncRemoteDesktop', () => {
     const done = svc.serveStream(session.stream.token, clientEnd)
     await new Promise(resolve => setImmediate(resolve))
     const received: Buffer[] = []
-    svc.servers[0].on('data', (chunk: Buffer) => received.push(chunk))
+    svc.servers[0]!.on('data', (chunk: Buffer) => received.push(chunk))
     browserEnd.write(Buffer.concat([HANDSHAKE, KEY_EVENT, FB_UPDATE_REQUEST]))
     await new Promise(resolve => setImmediate(resolve))
     expect(Buffer.concat(received).equals(Buffer.concat([HANDSHAKE, FB_UPDATE_REQUEST]))).toBe(true)
@@ -138,7 +138,7 @@ describe('VncRemoteDesktop', () => {
     const done = svc.serveStream(session.stream.token, clientEnd)
     await new Promise(resolve => setImmediate(resolve))
     const received: Buffer[] = []
-    svc.servers[0].on('data', (chunk: Buffer) => received.push(chunk))
+    svc.servers[0]!.on('data', (chunk: Buffer) => received.push(chunk))
     browserEnd.write(Buffer.concat([HANDSHAKE, KEY_EVENT]))
     await new Promise(resolve => setImmediate(resolve))
     expect(Buffer.concat(received).equals(Buffer.concat([HANDSHAKE, KEY_EVENT]))).toBe(true)

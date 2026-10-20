@@ -10,7 +10,7 @@ The human remote desktop client (`ui-remote-desktop`) needs an RFB (VNC) rendere
 
 ## Decision
 
-Ship `@novnc/novnc` as a bundled runtime dependency of `ui-remote-desktop`, importing the `core/rfb.js` module unmodified. MPL-2.0 is file-scoped weak copyleft: its obligations cover noVNC's own source files, while the larger work formed by the client bundle remains under the project license because no noVNC file is modified. The identity-scoped acceptance in `assertRuntimeLicenses` admits only `@novnc/novnc` at MPL-2.0; other package identities or changed license terms still reject.
+Ship `@novnc/novnc` as a bundled runtime dependency of `ui-remote-desktop`, importing the `lib/rfb.js` module unmodified. The pin holds the 1.5.x line because 1.6+ switched to `core/` ES modules whose top-level await cannot bundle into the client runtime's CJS rows. MPL-2.0 is file-scoped weak copyleft: its obligations cover noVNC's own source files, while the larger work formed by the client bundle remains under the project license because no noVNC file is modified. The identity-scoped acceptance in `assertRuntimeLicenses` admits only `@novnc/novnc` at MPL-2.0; other package identities or changed license terms still reject.
 
 Source availability under MPL-2.0 §3.2 is met through `THIRD_PARTY_NOTICES.md`, which directs recipients to the upstream repository `https://github.com/novnc/noVNC` as the corresponding source for the bundled code. The distributed copy is the published npm package; bundler minification does not author new covered files.
 

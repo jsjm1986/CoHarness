@@ -1,16 +1,21 @@
-/** Minimal typing for the noVNC package's sole export (`./core/rfb.js`): the
- * RFB class surface this plugin consumes. The upstream package ships no
- * declarations; the third-party @types package targets a `lib/rfb` layout the
- * published tarball does not contain. */
-declare module '@novnc/novnc' {
-  /** RFB connection options this plugin sets. */
+/** Minimal typing for the noVNC RFB entry (`./lib/rfb.js`): the class surface
+ * this plugin consumes. The upstream package ships no declarations; the
+ * third-party @types package targets a `lib/rfb` layout whose CommonJS
+ * transpile declares named members the published default export does not
+ * carry, so the package-local declaration pins the consumed subset.
+ * Pinned to the 1.5.x line: 1.6+ switched to `core/` ES modules whose
+ * top-level await cannot bundle into the client runtime's CJS rows. */
+declare module '@novnc/novnc/lib/rfb.js' {
+  /** RFB connection options accepted by the constructor. */
   export interface RfbOptions {
-    /** Receive frames but send no keyboard/pointer input; the server enforces the same level. */
-    readonly viewOnly?: boolean
-    /** Scale the remote framebuffer to the container size. */
-    readonly scaleViewport?: boolean
-    /** Focus the canvas when the pointer clicks it. */
-    readonly focusOnClick?: boolean
+    /** Allow simultaneous client connections to the same session. */
+    readonly shared?: boolean
+    /** Authentication credentials offered to the server. */
+    readonly credentials?: Record<string, string>
+    /** Additional WebSocket sub-protocols to negotiate. */
+    readonly wsProtocols?: readonly string[]
+    /** UltraVNC repeater ID for proxied connections. */
+    readonly repeaterID?: string
   }
 
   /** The HTML5 RFB client; an EventTarget emitting `connect`/`disconnect`/`desktopname`/`credentialsrequired`. */
@@ -21,6 +26,12 @@ declare module '@novnc/novnc' {
      * @param options - connection options.
      */
     constructor(target: HTMLElement, urlOrChannel: string, options?: RfbOptions)
+    /** Drop keyboard/pointer events before they reach the socket; the server enforces the same level. */
+    viewOnly: boolean
+    /** Scale the remote framebuffer to the container size. */
+    scaleViewport: boolean
+    /** Focus the canvas when the pointer clicks it. */
+    focusOnClick: boolean
     /** End the connection and release the canvas. */
     disconnect(): void
   }

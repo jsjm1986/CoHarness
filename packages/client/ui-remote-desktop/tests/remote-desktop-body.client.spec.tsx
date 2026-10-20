@@ -2,6 +2,7 @@
 /** Consent-gated attach flow of the remote-desktop tab body. */
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import type { ComponentProps } from 'react'
 import { RemoteDesktopBody } from '../src/client/RemoteDesktopBody.tsx'
 import type { RemoteDesktopInjected } from '../src/client/face.ts'
 import { en } from '../src/client/locales.ts'
@@ -42,7 +43,7 @@ function fixture(consented: boolean) {
 
 it('shows the consent card before attach and mounts the screen after confirm', async () => {
   const f = fixture(false)
-  render(<RemoteDesktopBody {...f.props as never} />)
+  render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
   await screen.findByText(en.consentTitle)
   expect(f.attach).not.toHaveBeenCalled()
   expect(screen.getByText(en.consentRecording)).toBeTruthy()
@@ -54,14 +55,14 @@ it('shows the consent card before attach and mounts the screen after confirm', a
 
 it('skips consent when the status already covers the grant set', async () => {
   const f = fixture(true)
-  render(<RemoteDesktopBody {...f.props as never} />)
+  render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
   await waitFor(() => { expect(f.attach).toHaveBeenCalled() })
   expect(f.confirm).not.toHaveBeenCalled()
 })
 
 it('disconnects the screen on unmount', async () => {
   const f = fixture(true)
-  const view = render(<RemoteDesktopBody {...f.props as never} />)
+  const view = render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
   await waitFor(() => { expect(f.openScreen).toHaveBeenCalled() })
   view.unmount()
   expect(f.disconnect).toHaveBeenCalled()
