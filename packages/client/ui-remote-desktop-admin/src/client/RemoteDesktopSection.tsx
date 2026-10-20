@@ -53,7 +53,7 @@ export function RemoteDesktopSection(props: SectionProps): ReactNode {
       {errorText !== undefined && <p className={css.error}>{errorText}</p>}
       <div className={css.toolbar}>
         <label className={css.check}>
-          <input type="checkbox" checked={includeRevoked} onChange={event => setIncludeRevoked(event.currentTarget.checked)} />
+          <input type="checkbox" checked={includeRevoked} onChange={(event) => { setIncludeRevoked(event.currentTarget.checked) }} />
           {t('includeRevoked')}
         </label>
       </div>
@@ -74,30 +74,30 @@ export function RemoteDesktopSection(props: SectionProps): ReactNode {
         void grant(input, gate.signal)
       }}>
         <input className={css.field} required placeholder={t('nodeId')} value={draft.nodeId}
-          onChange={event => setDraft({ ...draft, nodeId: event.currentTarget.value })} />
+          onChange={(event) => { setDraft({ ...draft, nodeId: event.currentTarget.value }) }} />
         <input className={css.field} placeholder={t('desktop')} value={draft.desktop}
-          onChange={event => setDraft({ ...draft, desktop: event.currentTarget.value })} />
+          onChange={(event) => { setDraft({ ...draft, desktop: event.currentTarget.value }) }} />
         <input className={css.field} required placeholder={t('principal')} value={draft.principal}
-          onChange={event => setDraft({ ...draft, principal: event.currentTarget.value })} />
+          onChange={(event) => { setDraft({ ...draft, principal: event.currentTarget.value }) }} />
         <select className={css.field} value={draft.level}
-          onChange={event => setDraft({ ...draft, level: event.currentTarget.value as RemoteDesktopLevelView })}>
+          onChange={(event) => { setDraft({ ...draft, level: event.currentTarget.value as RemoteDesktopLevelView }) }}>
           <option value="view">{t('view')}</option>
           <option value="control">{t('control')}</option>
         </select>
         <select className={css.field} value={draft.scope}
-          onChange={event => setDraft({ ...draft, scope: event.currentTarget.value as 'machine' | 'session' })}>
+          onChange={(event) => { setDraft({ ...draft, scope: event.currentTarget.value as 'machine' | 'session' }) }}>
           <option value="machine">{t('machine')}</option>
           <option value="session">{t('session')}</option>
         </select>
         {draft.scope === 'session' && <>
           <input className={css.field} required placeholder={`${t('session')} id`} value={draft.sessionId}
-            onChange={event => setDraft({ ...draft, sessionId: event.currentTarget.value })} />
+            onChange={(event) => { setDraft({ ...draft, sessionId: event.currentTarget.value }) }} />
           <input className={css.field} required type="datetime-local" aria-label={t('expiresAt')} value={draft.expiresAt}
-            onChange={event => setDraft({ ...draft, expiresAt: event.currentTarget.value })} />
+            onChange={(event) => { setDraft({ ...draft, expiresAt: event.currentTarget.value }) }} />
         </>}
         <label className={css.check}>
           <input type="checkbox" checked={draft.recording}
-            onChange={event => setDraft({ ...draft, recording: event.currentTarget.checked })} />
+            onChange={(event) => { setDraft({ ...draft, recording: event.currentTarget.checked }) }} />
           {t('recording')}
         </label>
         <button type="submit" className={css.action} disabled={state.busy}>{state.busy ? t('issuing') : t('issue')}</button>

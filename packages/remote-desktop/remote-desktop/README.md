@@ -35,7 +35,7 @@ A provider subclasses `RemoteDesktop` and implements eight members.
 | `resolve(request, signal?)` | Match live grants for `{ target, principal?, sessionId? }`, compute the effective level (never exceeding the grants), and produce the enforced spec including the recording flag. Throws `RemoteDesktopError` with `REMOTE_DESKTOP_FORBIDDEN` when no live grant authorizes the request — resolution never silently narrows or widens. |
 | `attach(request, signal?)` | Resolve, then establish the desktop transport and a stream endpoint; returns the `RemoteDesktopSession` owning `detach`. Implementations publish `remote-desktop/attached` only after the attach commits. |
 | `status(target, signal?)` | Read live remote state of one desktop endpoint: reachability plus attachment count. |
-| `listGrants(filter?, signal?)` | List grants; revoked rows require `includeRevoked`. |
+| `listGrants(filter?, signal?)` | List grants; revoked rows require `includeRevoked`, and `attachable` restricts to grants the caller may attach under now, matched on `sessionId` for session-scoped rows. |
 | `grant(input, actor)` | Issue a grant; `actor.admin === true` required. Publishes `remote-desktop/grants-changed` only after the write commits. |
 | `revoke(id, actor)` | Revoke a grant by id; returns the revoked row. |
 | `audit(filter?, signal?)` | Query capability-owned audit events newest first, optionally restricted to a target or principal. |

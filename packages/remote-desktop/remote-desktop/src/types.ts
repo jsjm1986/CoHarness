@@ -109,6 +109,13 @@ export interface RemoteDesktopGrantFilter {
   readonly target?: RemoteDesktopTarget
   readonly principal?: string
   readonly includeRevoked?: boolean
+  /** Caller Session address for session-scoped matching; only `attachable` consumes it. */
+  readonly sessionId?: SessionId
+  /**
+   * Restrict results to grants the caller may attach under right now: the
+   * caller's own principal, unrevoked, with a live scope for `sessionId`.
+   */
+  readonly attachable?: boolean
 }
 
 /** The authenticated human or administrator an action is attributed to. */

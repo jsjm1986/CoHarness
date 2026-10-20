@@ -52,7 +52,7 @@ export function RemoteDesktopGuide({ title, description, kind, useTabInfo, t, li
       (rows) => { if (!controller.signal.aborted) setState({ phase: 'ready', targets: targetsOf(rows) }) },
       () => { if (!controller.signal.aborted) setState({ phase: 'failed' }) },
     )
-    return () => controller.abort()
+    return () => { controller.abort() }
   }, [open, attempt, listTargets])
   const items = state.phase === 'loading'
     ? [{ id: 'loading', label: t('targetsLoading'), disabled: true }]

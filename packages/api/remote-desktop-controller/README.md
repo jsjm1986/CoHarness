@@ -30,7 +30,7 @@ The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `r
 | `status(agent, target)` | caller's session | any grant holder | Endpoint availability, attachment count, and the caller's grant summary (`level`/`recording`/`consented`). |
 | `confirm(agent, target, level)` | caller's session | matching grant | Records consent covering the resolved grant set; returns the spec acknowledged (including `recording`). |
 | `attach(agent, target, level)` | caller's session | matching grant + covering consent | Returns `{ id, spec, stream }`; fails `remote-desktop/failure` `REMOTE_DESKTOP_CONSENT_REQUIRED` without a prior `confirm`. |
-| `listGrants(agent, filter)` | caller's session | admin sees all; others own principal | Grant rows, optionally including revoked. |
+| `listGrants(agent, filter)` | caller's session | admin sees all; others own principal | Grant rows, optionally including revoked; `attachable` restricts to grants attachable from the caller's session. |
 | `grant(agent, input)` | administrator's session | admin | Issues a grant attributed to the caller. |
 | `setLevel(agent, grantId, level)` | administrator's session | admin | Changes a grant's level. |
 | `revoke(agent, grantId)` | administrator's session | admin | Revokes a grant. |

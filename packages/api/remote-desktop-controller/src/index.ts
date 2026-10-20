@@ -164,22 +164,25 @@ export class RemoteDesktopController extends TypertRemoteService {
   /**
    * Grants visible to the caller: administrators see all; others see only
    * rows for their own principal (the service enforces the same scoping).
-   * @param agent - caller's Session address bound for routing.
-   * @param request - optional principal and revoked-row inclusion.
+   * `attachable` restricts to grants the caller may attach under now, matched
+   * against the caller's Session for session-scoped rows.
+   * @param agent - caller's Session address; supplies session-scope matching.
+   * @param request - optional principal, revoked-row, and attachable filters.
    * @param signal - request cancellation.
    * @returns matching grants, newest administration first.
    */
   @Remote
   async listGrants(
     agent: Agent,
-    request: { principal?: string; includeRevoked?: boolean },
+    request: { principal?: string; includeRevoked?: boolean; attachable?: boolean },
     signal: AbortSignal,
   ): Promise<RemoteDesktopGrantView[]> {
     const actor = this.access.actor(signal)
-    void agent // Wire-bound routing address; the actor comes from the request principal.
     const rows = await this.ctx.remoteDesktop.listGrants(actor, {
       ...(request.principal === undefined ? {} : { principal: request.principal }),
       ...(request.includeRevoked === undefined ? {} : { includeRevoked: request.includeRevoked }),
+      ...(request.attachable === undefined ? {} : { attachable: request.attachable }),
+      sessionId: agent.id,
     })
     return rows.map(grantView)
   }

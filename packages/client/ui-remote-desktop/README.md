@@ -26,7 +26,7 @@ Open a `remoteDesktop` tab in the right sidebar for a granted remote node. The t
 
 Compose this plugin in the Web profile; it registers the `remoteDesktop` sidebar tab kind. A caller opens a tab with `openTabIn(sessionId, 'remoteDesktop', { params: { nodeId, desktop? } })`.
 
-The tab loads the endpoint status through `ctx.remoteDesktops`. When the caller's grant set is not yet consented, a card states the exact level — **View only** or **Control** — plus the recording flag when an administrator marks the grant for recording; **Confirm and connect** records the consent and attaches. When consent already covers the grants, the tab attaches directly. Denials surface the stable capability code as a localized notice with **Retry**.
+The tab loads the endpoint status through `ctx.remoteDesktops`. When the caller's grant set is not yet consented, a card states the exact level — **View only** or **Control** — plus the recording flag when an administrator marks the grant for recording; **Confirm and connect** records the consent and attaches. When consent already covers the grants, the tab attaches directly. Denials surface the stable capability code as a localized notice with **Retry**. A live attachment shows the effective level and offers **Disconnect**; a closed stream offers **Reconnect**, which runs the status → attach flow again under the recorded consent.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -34,7 +34,7 @@ The tab loads the endpoint status through `ctx.remoteDesktops`. When the caller'
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-All authorization lives in the capability: the tab only performs `status → confirm → attach` over `ctx.remoteDesktops` (the remote-desktop controller's client half) and mounts the returned `ws(s)://` stream URL with the bundled `@novnc/novnc` `RFB` class. `viewOnly` mirrors the attached spec's level, but the VNC provider additionally filters client input messages inside the stream, so a forged control request still cannot inject input under a view grant. Grant, level, revoke, and audit administration live in the sibling `ui-remote-desktop-admin` settings section.
+All authorization lives in the capability: the tab only performs `status → confirm → attach` over `ctx.remoteDesktops` (the remote-desktop controller's client half) and mounts the returned `ws(s)://` stream URL with the bundled `@novnc/novnc` `RFB` class. `viewOnly` mirrors the attached spec's level, but the VNC provider additionally filters client input messages inside the stream, so a forged control request still cannot inject input under a view grant. The guide entry lists only grants the caller may attach under in the current Session (`listGrants` with `attachable`), so session-scoped grants bound to other sessions never appear as targets. Grant, level, revoke, and audit administration live in the sibling `ui-remote-desktop-admin` settings section.
 
 The `openScreen` callback is part of the injected face so tests mount the body without an RFB engine.
 
@@ -56,6 +56,6 @@ This package is a human-facing Client UI; it contributes nothing to prompts, too
 <a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
-- Tabs open programmatically with a `nodeId` parameter; no in-product target browser exists yet — deployments or companion plugins own endpoint discovery.
+- The guide menu covers only grant-based target discovery; endpoints that exist but carry no grant for the caller never appear.
 - The stream URL resolves against the page origin; deployments serving the RFB mount on another origin must extend `ClientRemoteDesktops.attach` instead of proxying at this layer.
 - RFB recordings produced by the provider have no in-product playback surface.

@@ -65,10 +65,10 @@ export function pumpRfb(
     if (allowed.length > 0 && !upstream.write(allowed)) client.pause()
   })
   upstream.on('drain', () => client.resume())
-  client.on('close', () => teardown())
-  client.on('error', error => teardown(error))
-  upstream.on('close', () => teardown())
-  upstream.on('error', error => teardown(error))
+  client.on('close', () => { teardown() })
+  client.on('error', (error) => { teardown(error) })
+  upstream.on('close', () => { teardown() })
+  upstream.on('error', (error) => { teardown(error) })
 
-  return { done, close: () => teardown() }
+  return { done, close: () => { teardown() } }
 }

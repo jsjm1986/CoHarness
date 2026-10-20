@@ -33,11 +33,11 @@ export class WebSocketDuplex extends Duplex {
   override _read(_size: number): void {}
 
   override _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
-    this.socket.send(chunk, { binary: true }, (error?: Error) => callback(error ?? null))
+    this.socket.send(chunk, { binary: true }, (error?: Error) => { callback(error ?? null) })
   }
 
   override _final(callback: (error?: Error | null) => void): void {
-    this.socket.once('close', () => callback())
+    this.socket.once('close', () => { callback() })
     this.socket.close()
   }
 

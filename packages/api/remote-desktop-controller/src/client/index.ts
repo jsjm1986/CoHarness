@@ -96,14 +96,17 @@ export class ClientRemoteDesktops extends Service {
 
   /**
    * Grants the caller may see: administrators see all rows; other callers see
-   * their own principal's rows.
+   * their own principal's rows. `attachable` restricts to grants the caller
+   * may attach under now, matched against `sessionId` for session scope.
    * @param sessionId - Session the call is scoped to.
-   * @param filter - optional principal restriction and revoked-row inclusion.
+   * @param filter - optional principal restriction, revoked-row inclusion, and attachable scope.
    * @param signal - request cancellation.
    * @returns matching grant rows, newest administration first.
    */
   async listGrants(
-    sessionId: SessionId, filter: { principal?: string; includeRevoked?: boolean }, signal: AbortSignal,
+    sessionId: SessionId,
+    filter: { principal?: string; includeRevoked?: boolean; attachable?: boolean },
+    signal: AbortSignal,
   ): Promise<RemoteDesktopGrantView[]> {
     const result = await this.remote.listGrants(sessionId, filter, signal)
     if (!result.ok) throw result.error
