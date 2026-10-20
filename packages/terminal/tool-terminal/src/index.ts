@@ -31,7 +31,7 @@ export const inject = ['terminals', 'tools', 'systemPrompt', 'workingDirectory']
 
 /** Default cap for one complete model-facing terminal result. */
 export const DEFAULT_MAX_RESULT_BYTES = 256 * 1024
-/** Smallest cap that preserves registry-issued PTY and job ids in creation acknowledgements. */
+/** Smallest cap that preserves every counter-backed PTY and job id in its creation acknowledgement. */
 export const MIN_MAX_RESULT_BYTES = 64
 
 /** Model-facing terminal tool configuration. */
@@ -143,6 +143,26 @@ function sendDetail(result: TerminalSendResult): string {
   return result.sessionStatus.kind === 'running'
     ? `wait: ${result.waitReason}`
     : `session exited: ${result.sessionStatus.exitCode ?? result.sessionStatus.signal ?? 'unknown'}`
+}
+
+/**
+ * Narrow a foreground send's presentation metadata to the exited session's
+ * terminal status. A running session — or absent/malformed metadata — yields
+ * undefined, which the presenter renders as an unknown exit status rather
+ * than a fabricated clean exit.
+ * @param meta - the `tool/result` presentation payload.
+ * @returns the exit code (possibly null) and signal pair, or undefined.
+ */
+function sendExitStatus(meta: unknown): { exitCode: number | null; signal: string | null } | undefined {
+  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return undefined
+  const status = (meta as Record<string, unknown>).sessionStatus
+  if (typeof status !== 'object' || status === null || Array.isArray(status)) return undefined
+  const record = status as Record<string, unknown>
+  if (record.kind !== 'exited') return undefined
+  return {
+    exitCode: typeof record.exitCode === 'number' ? record.exitCode : null,
+    signal: typeof record.signal === 'string' ? record.signal : null,
+  }
 }
 
 /** Register all terminal tools and the minimal usage guidance. */
@@ -261,7 +281,6 @@ export function apply(ctx: Context, config: Config = {}): void {
         const jobId = jobs.start({
           kind: 'pty-send',
           label: `${id}: ${args.text || '(input)'}`,
-          toolCall: { callId: exec.callId, rootCallId: exec.rootCallId },
           owner: owner.id,
           outputLimitBytes: maxResultBytes,
           output: [sendSource(() => operation)],
@@ -299,7 +318,15 @@ export function apply(ctx: Context, config: Config = {}): void {
     presentResult(args, result) {
       if ((args as Partial<SendArgs>).run_in_background === true || result.isError) return undefined
       const raw = rawContentText(result.content)
-      return raw === undefined ? undefined : { card: 'terminal', output: raw }
+      if (raw === undefined) return undefined
+      // The send settles when its wait ends, not when the foreground command
+      // exits — a still-running session has no exit status to claim. Only a
+      // session that actually exited under this send supplies one.
+      const status = sendExitStatus(result.meta)
+      if (status === undefined) return { card: 'terminal', output: raw }
+      return status.signal !== null
+        ? { card: 'terminal', output: raw, signal: status.signal }
+        : { card: 'terminal', output: raw, exitCode: status.exitCode }
     },
   }))
 

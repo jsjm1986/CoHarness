@@ -9,25 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../util/output-retention"
-    },
-    {
-      "path": "../../terminal/terminal"
-    },
-    {
       "path": "../../core/agent"
-    },
-    {
-      "path": "../../llm/llm"
     },
     {
       "path": "../../core/system-prompt"
@@ -39,7 +21,25 @@
       "path": "../../jobs/jobs"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
       "path": "../../session/working-directory"
+    },
+    {
+      "path": "../terminal"
+    },
+    {
+      "path": "../../util/output-retention"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

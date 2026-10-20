@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { provideWorkingDirectoryFixture, unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -9,11 +8,11 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { renderToolsSdk } from '@deepseek-ai/dsh-tools'
 import type { ToolSdkSchema } from '@deepseek-ai/dsh-tools/src/ts-types.ts'
 import TerminalSessionService, { TerminalSessionId } from '@deepseek-ai/dsh-terminal'
-import type { TerminalBackend, TerminalBackendSession, TerminalSendOperation, TerminalSendRead, TerminalSendRequest, TerminalSessionStatus, TerminalSignal } from '@deepseek-ai/dsh-terminal'
+import type { TerminalBackend, TerminalBackendSession, TerminalSendOperation, TerminalSendRequest, TerminalSessionStatus, TerminalSignal } from '@deepseek-ai/dsh-terminal'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
-import { sendSource } from '../src/background.ts'
+import { provideWorkingDirectoryFixture, unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 async function fakeAgent(ctx: Context, rawId: string): Promise<Agent> {
   const scope = ctx.plugin(() => {})
@@ -56,11 +55,7 @@ class StubSession implements TerminalBackendSession {
     }))
     const operation: TerminalSendOperation = {
       done,
-      readOutput: () => {
-        const delta = this.delta
-        this.delta = ''
-        return { delta, truncated: this.deltaTruncated }
-      },
+      readOutput: () => ({ delta: this.delta, truncated: this.deltaTruncated }),
       cancel: () => {
         if (cancelled) return false
         cancelled = true
@@ -314,6 +309,33 @@ describe('tool-terminal foreground API', () => {
     expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, { content: [{ type: 'text', text: 'a' }, { type: 'text', text: 'b' }], isError: false })).toBeUndefined()
     expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, { content: [undefined as never], isError: false })).toBeUndefined()
     expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, { content: [{ type: 'text', text: 'ok' }], isError: false })).toEqual({ card: 'terminal', output: 'ok' })
+    // The send settles when its wait ends — a still-running session has no
+    // exit status to claim, while an exited one surfaces its real status.
+    const sendMeta = (sessionStatus: { kind: 'running' } | { kind: 'exited'; exitCode: number | null; signal: string | null }) =>
+      ({ viewport: '', waitReason: 'session_exit', sessionStatus, truncated: false })
+    expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, {
+      content: [{ type: 'text', text: 'ok' }], isError: false,
+      meta: sendMeta({ kind: 'running' }),
+    })).toEqual({ card: 'terminal', output: 'ok' })
+    expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, {
+      content: [{ type: 'text', text: 'ok' }], isError: false,
+      meta: sendMeta({ kind: 'exited', exitCode: 2, signal: null }),
+    })).toEqual({ card: 'terminal', output: 'ok', exitCode: 2 })
+    expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, {
+      content: [{ type: 'text', text: 'ok' }], isError: false,
+      meta: sendMeta({ kind: 'exited', exitCode: null, signal: 'SIGTERM' }),
+    })).toEqual({ card: 'terminal', output: 'ok', signal: 'SIGTERM' })
+    expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, {
+      content: [{ type: 'text', text: 'ok' }], isError: false,
+      meta: sendMeta({ kind: 'exited', exitCode: null, signal: null }),
+    })).toEqual({ card: 'terminal', output: 'ok', exitCode: null })
+    // A malformed sessionStatus narrows to no exit claim rather than a fabricated one.
+    for (const sessionStatus of ['running', null, []]) {
+      expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, {
+        content: [{ type: 'text', text: 'ok' }], isError: false,
+        meta: { viewport: '', waitReason: 'session_exit', sessionStatus, truncated: false },
+      })).toEqual({ card: 'terminal', output: 'ok' })
+    }
 
     expect(ctx.tools.get('terminal_open')?.presentCall?.({ type: 'stub' })).toMatchObject({ card: 'generic', title: 'Open terminal stub' })
     expect(ctx.tools.get('terminal_open')?.presentCall?.({ type: 'stub', name: 'main' })).toMatchObject({ card: 'generic', title: 'Open terminal main' })
@@ -419,19 +441,6 @@ describe('tool-terminal foreground API', () => {
   })
 })
 
-describe('sendSource', () => {
-  it('reads nothing before the send starts and counts delivered bytes afterwards', () => {
-    const reads: TerminalSendRead[] = [{ delta: '界', truncated: false }, { delta: '', truncated: true }]
-    const send: { operation?: TerminalSendOperation } = {}
-    const source = sendSource(() => send.operation)
-    expect(source.read(0)).toEqual({ text: '', nextOffset: 0, lossy: false })
-    send.operation = { readOutput: () => reads.shift()!, cancel: () => false, done: new Promise(() => {}) }
-    expect(source.read(0)).toEqual({ text: '界', nextOffset: 3, lossy: false })
-    // A truncated delta carries the same marker the foreground read shows.
-    expect(source.read(3)).toEqual({ text: '[output truncated]', nextOffset: 21, lossy: false })
-  })
-})
-
 describe('tool-terminal task integration', () => {
   it('registers a generic task and exposes incremental output', async () => {
     const { ctx, agent } = await setup(true)
@@ -471,20 +480,19 @@ describe('tool-terminal task integration', () => {
 
     stub.sessions[0]!.autoSettle = false
     const started = await call(ctx, 'terminal_send', { sessionId: 'pty-1', text: '', run_in_background: true }, agent)
-    const jobId = backgroundJobId(started)
-    expect(text(started)).toContain(jobId)
-    expect(text(await call(ctx, 'job_kill', { job_id: jobId }, agent))).toContain('requested cancellation')
+    const firstId = backgroundJobId(started)
+    expect(text(started)).toContain(firstId)
+    expect(text(await call(ctx, 'job_kill', { job_id: firstId }, agent))).toContain('requested cancellation')
     await new Promise(resolve => setTimeout(resolve, 0))
-    expect(text(await call(ctx, 'job_output', { job_id: jobId }, agent))).toContain('[status: killed')
+    expect(text(await call(ctx, 'job_output', { job_id: firstId }, agent))).toContain('[status: killed')
 
     stub.sessions[0]!.rejectOperation = true
     stub.sessions[0]!.autoSettle = false
-    const failed = await call(ctx, 'terminal_send', { sessionId: 'pty-1', text: 'bad', run_in_background: true }, agent)
-    const failedJobId = backgroundJobId(failed)
-    expect(failedJobId).not.toBe(jobId)
-    expect(text(failed)).toContain(failedJobId)
+    const second = await call(ctx, 'terminal_send', { sessionId: 'pty-1', text: 'bad', run_in_background: true }, agent)
+    const secondId = backgroundJobId(second)
+    expect(text(second)).toContain(secondId)
     await new Promise(resolve => setTimeout(resolve, 0))
-    expect(text(await call(ctx, 'job_output', { job_id: failedJobId }, agent))).toContain('[status: failed')
+    expect(text(await call(ctx, 'job_output', { job_id: secondId }, agent))).toContain('[status: failed')
   })
 
   it('reports foreground cancellation after the terminal operation settles', async () => {
