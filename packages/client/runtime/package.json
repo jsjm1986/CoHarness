@@ -39,7 +39,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "immer": "^11.1.18",
-    "zustand": "~5.0.14"
+    "zustand": "~5.0.15"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
