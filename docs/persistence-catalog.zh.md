@@ -2439,7 +2439,7 @@ SHA-256: `2aad1179f957631477b582e57cd8f538cb82618fc3fb816bde1171154235b065`
 
 SHA-256: `f0290738a0f88f258321ea9f4d44a871ed021e7029e4ef32441e04e6add99f7a`
 
-来源：[`packages/llm/llm/src/message.ts:119`](../packages/llm/llm/src/message.ts)
+来源：[`packages/llm/llm/src/message.ts:124`](../packages/llm/llm/src/message.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7316,7 +7316,7 @@ SHA-256: `326a9bfda27dda5882fb3cbe6e715df41dae2298fdae3d66437457268a665693`
 
 SHA-256: `fa87537f4a9c1e25602990a8bf686b383e9e00352ec8946e16ae24ba7c1625be`
 
-来源：[`packages/llm/llm/src/message.ts:172`](../packages/llm/llm/src/message.ts)
+来源：[`packages/llm/llm/src/message.ts:177`](../packages/llm/llm/src/message.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7344,7 +7344,7 @@ SHA-256: `86e1e384495ee09ac2d60c9db3610f1f1fddac2d248f6f1d6000e78054680219`
 
 SHA-256: `a3f18b9c0134602b19d592f6c3bd8bcc019d70ae69cc19f0e69274b312e89f7b`
 
-来源：[`packages/llm/llm/src/message.ts:162`](../packages/llm/llm/src/message.ts)
+来源：[`packages/llm/llm/src/message.ts:167`](../packages/llm/llm/src/message.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7359,7 +7359,7 @@ SHA-256: `a3f18b9c0134602b19d592f6c3bd8bcc019d70ae69cc19f0e69274b312e89f7b`
 
 SHA-256: `3115e5e4d8e0173661708de88a36f8893bdc0074827edd6a65843b4a5af3931e`
 
-来源：[`packages/llm/llm/src/message.ts:201`](../packages/llm/llm/src/message.ts)
+来源：[`packages/llm/llm/src/message.ts:206`](../packages/llm/llm/src/message.ts)
 
 以下类型之一：
 
@@ -7375,7 +7375,7 @@ SHA-256: `3115e5e4d8e0173661708de88a36f8893bdc0074827edd6a65843b4a5af3931e`
 
 SHA-256: `c288d90c496110e979e40b5e67c71420dea1f6ca1758f1c19488d6b12a1d2089`
 
-来源：[`packages/llm/llm/src/message.ts:141`](../packages/llm/llm/src/message.ts)
+来源：[`packages/llm/llm/src/message.ts:146`](../packages/llm/llm/src/message.ts)
 
 以下类型之一：
 
@@ -7523,7 +7523,7 @@ SHA-256: `719c51f67074f97034a6c94297fe1f4b5d3c8d392c57586dab732aa5398c7a91`
 
 SHA-256: `09f3f8dc417f278257202714132f98ba7b52957d7b558c4a04456603890eb363`
 
-来源：[`packages/llm/llm/src/message.ts:156`](../packages/llm/llm/src/message.ts)
+来源：[`packages/llm/llm/src/message.ts:161`](../packages/llm/llm/src/message.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7563,7 +7563,7 @@ SHA-256: `d9c462b9f62fdd3efc76a44b9524dc8781f6b91cd9c7e584b17d971defafebab`
 
 SHA-256: `4b259f7f8f0a44ad5e90b70a73553ced1df27012d126921d397ff403b6c86731`
 
-来源：[`packages/llm/llm/src/message.ts:178`](../packages/llm/llm/src/message.ts)
+来源：[`packages/llm/llm/src/message.ts:183`](../packages/llm/llm/src/message.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7580,7 +7580,7 @@ SHA-256: `4b259f7f8f0a44ad5e90b70a73553ced1df27012d126921d397ff403b6c86731`
 
 SHA-256: `4c227064c74bca8db5db564cbf2e0bee889b105b5a0bbd345cd8b6f3f3cc2eb7`
 
-来源：[`packages/llm/llm/src/message.ts:167`](../packages/llm/llm/src/message.ts)
+来源：[`packages/llm/llm/src/message.ts:172`](../packages/llm/llm/src/message.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
