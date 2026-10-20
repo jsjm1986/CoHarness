@@ -1,15 +1,15 @@
 {
   "requestSystemPrompts": [
     [
-      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 1."
+      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 1.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
     ],
     [
-      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 1.",
-      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 2."
+      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 1.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.",
+      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 2.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
     ],
     [
-      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 1.",
-      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 2."
+      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 1.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.",
+      "You are a helpful software engineer assistant.\n\nPython SDK prompt version 2.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
     ]
   ],
   "systemMessageOperations": [
@@ -17,8 +17,8 @@
     "append"
   ],
   "subscribedSystemPrompts": [
-    "You are a helpful software engineer assistant.\n\nPython SDK prompt version 1.",
-    "You are a helpful software engineer assistant.\n\nPython SDK prompt version 2."
+    "You are a helpful software engineer assistant.\n\nPython SDK prompt version 1.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.",
+    "You are a helpful software engineer assistant.\n\nPython SDK prompt version 2.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
   ],
   "requestContexts": [
     {

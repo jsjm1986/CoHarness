@@ -1748,8 +1748,6 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
               <StateDot state="idle" />{t('unavailable')}
             </p>
           ) : null}
-          {/* The basic group answers to the settings document, not the profile: it renders in every package-list state. */}
-          {renderGroup('basic', t('basicTitle'), basicCards)}
         </div>
       ) : null}
       {showsCards && (state.status === 'denied' || (loaded && !canManage)) ? (
@@ -1812,8 +1810,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
           />
         )
         : null}
-      {/* An item's page is a settings surface, independent of the bundle-list load. */}
-      {onInstalled && openItem !== undefined
+      {onInstalled && loaded && openItem !== undefined
         ? <ItemDetail form={formFor(openItem.id)} item={openItem} t={t} renderSlot={renderSlot} onBack={() => { setView({ kind: 'list' }) }} />
         : null}
       {loaded && installedCards
