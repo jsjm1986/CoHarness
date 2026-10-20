@@ -2456,9 +2456,6 @@ importers:
       '@deepseek-ai/dsh-client-ui-remote-desktop':
         specifier: workspace:*
         version: link:../../client/ui-remote-desktop
-      '@deepseek-ai/dsh-client-ui-remote-desktop-admin':
-        specifier: workspace:*
-        version: link:../../client/ui-remote-desktop-admin
       '@deepseek-ai/dsh-client-ui-renderer':
         specifier: workspace:*
         version: link:../../client/ui-renderer
@@ -4131,39 +4128,6 @@ importers:
       react-dom:
         specifier: ^19.3.0
         version: 19.3.0(react@19.3.0)
-
-  packages/client/ui-remote-desktop-admin:
-    devDependencies:
-      '@deepseek-ai/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@deepseek-ai/dsh-api-remote-desktop-controller':
-        specifier: workspace:*
-        version: link:../../api/remote-desktop-controller
-      '@deepseek-ai/dsh-client-locale':
-        specifier: workspace:*
-        version: link:../locale
-      '@deepseek-ai/dsh-client-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-      '@deepseek-ai/dsh-client-ui-renderer':
-        specifier: workspace:*
-        version: link:../ui-renderer
-      '@deepseek-ai/dsh-client-ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
-      '@deepseek-ai/dsh-client-ui-slots':
-        specifier: workspace:*
-        version: link:../ui-slots
-      '@deepseek-ai/dsh-session':
-        specifier: workspace:*
-        version: link:../../core/session
-      '@types/react':
-        specifier: ~19.2.7
-        version: 19.2.18
-      react:
-        specifier: ^19.3.0
-        version: 19.3.0
 
   packages/client/ui-renderer:
     devDependencies:

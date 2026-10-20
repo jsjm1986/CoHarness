@@ -272,12 +272,10 @@
       name: '@deepseek-ai/dsh-client-ui-sidebar-terminal'
 
     # Human remote desktop: 'remoteDesktop' sidebar tabs render the consent
-    # card and RFB screen; the settings section administers grants and audit.
+    # card and RFB screen. Endpoint and grant administration lives in the
+    # gateway admin surface, not user settings.
     - id: ui-remote-desktop
       name: '@deepseek-ai/dsh-client-ui-remote-desktop'
-
-    - id: ui-remote-desktop-admin
-      name: '@deepseek-ai/dsh-client-ui-remote-desktop-admin'
 
 
     # Gateway project scope, shared-conversation visibility, read-only role UI,

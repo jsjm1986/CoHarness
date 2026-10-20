@@ -26,7 +26,6 @@ A three-package capability seam owns the human desktop surface; nothing in it re
 - The `dial` seam accepts a replacement transport; remote-session reverse-tunnel routing is the integration follow-up.
 - View-only framing supports security types `None` and `VNC authentication`; other types refuse view attachments (control passes through).
 - Origin policy and outer request rejection belong to the client-connection layer, not the stream mount.
-- The browser client packages (`ui-remote-desktop`, `ui-remote-desktop-admin`) are the next increment.
 
 ## Alternatives considered
 

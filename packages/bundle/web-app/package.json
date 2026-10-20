@@ -133,8 +133,7 @@
     "@deepseek-ai/dsh-remote-desktop-vnc": "workspace:*",
     "@deepseek-ai/dsh-remote-desktop-stream": "workspace:*",
     "@deepseek-ai/dsh-api-remote-desktop-controller": "workspace:*",
-    "@deepseek-ai/dsh-client-ui-remote-desktop": "workspace:*",
-    "@deepseek-ai/dsh-client-ui-remote-desktop-admin": "workspace:*"
+    "@deepseek-ai/dsh-client-ui-remote-desktop": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
