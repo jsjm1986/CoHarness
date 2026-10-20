@@ -18,6 +18,9 @@
         "packages/api/gateway/src/stream-server.ts"
       ]
     },
+    "api/remote-desktop-controller": {
+      "sovereignty": "owned"
+    },
     "api/remotes": {
       "sovereignty": "adapted"
     },
@@ -261,6 +264,12 @@
     },
     "client/ui-reference": {
       "sovereignty": "adapted"
+    },
+    "client/ui-remote-desktop": {
+      "sovereignty": "owned"
+    },
+    "client/ui-remote-desktop-admin": {
+      "sovereignty": "owned"
     },
     "client/ui-renderer": {
       "sovereignty": "adapted",
@@ -771,6 +780,15 @@
     },
     "ptc-runtime/ptc-runtime-node": {
       "sovereignty": "adapted"
+    },
+    "remote-desktop/remote-desktop": {
+      "sovereignty": "owned"
+    },
+    "remote-desktop/remote-desktop-stream": {
+      "sovereignty": "owned"
+    },
+    "remote-desktop/remote-desktop-vnc": {
+      "sovereignty": "owned"
     },
     "runtime-diagnostics/invariants": {
       "sovereignty": "tracked"
