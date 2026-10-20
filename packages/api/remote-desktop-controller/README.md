@@ -19,6 +19,7 @@ The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `r
 - [Authorization](#authorization)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
@@ -46,15 +47,30 @@ The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `r
 
 `@deepseek-ai/dsh-api-remote-desktop-controller/client` installs `ctx.remoteDesktops` (`ClientRemoteDesktops`): it self-mounts the generated `remoteDesktop` Remote contribution (`./remote`), converts each `{ ok }` wire result into thrown errors, and resolves `attach`'s `{ path, token }` to an absolute `ws(s)://` URL against `location`, pinned through `connection.privateResourceUrl` (`dshTarget`/`dshPrincipal`) so the Gateway upgrade reaches the runtime that minted the token — the scope cookie alone is not reliable for that. UI plugins (`ui-remote-desktop`, `ui-remote-desktop-admin`) consume this service rather than the wire namespace directly.
 
+**Runtime invariant:** No companion is published. Grant, attachment, and audit truth live in `ctx.remoteDesktop`; the controller is a stateless request translator with no diverging observation of its own.
+
 <a id="model-experience"></a>
 ## Model Experience
 
-No model-visible surface; human-facing BFF only.
+None, as the BFF namespace serves human operators and no method result enters a model request.
 
-<a id="known-limitations-and-deferred-work"></a>
+#### KV Cache effect
+
+None; the namespace contributes no model request prefix.
+
 ## Known Limitations and Deferred Work
 
 - `serveStream` is exposed by the capability, not this namespace; `dsh-remote-desktop-stream` mounts the WebSocket path (`stream.path` + `?token=`).
 - Capability rejections surface as `remote-desktop/failure` with the stable `RemoteDesktopErrorCode` in `code`; `remote-desktop/forbidden` remains the wire code for controller-side interactive-user and administrator checks.
 - Detach is implicit (stream close); an explicit force-detach admin method is deferred.
 - Session-scoped grants use the caller's session for grant matching at attach; granting on behalf of a different session happens through the `scope.sessionId` payload under administrator authority.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

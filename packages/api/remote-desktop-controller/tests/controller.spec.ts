@@ -16,7 +16,7 @@ afterEach(async () => { await Promise.all(roots.splice(0).map(ctx => ctx.fiber.d
 const signal = (): AbortSignal => new AbortController().signal
 
 function agent(ctx: Context): Agent {
-  return { id: 'session' as SessionId, ctx } as unknown as Agent
+  return { id: 'session' as SessionId, ctx } as Agent
 }
 
 /**

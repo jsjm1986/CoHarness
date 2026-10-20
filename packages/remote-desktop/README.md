@@ -21,3 +21,5 @@ The Service Definition lives at `remote-desktop/remote-desktop/`. A different tr
 ## Summary
 
 The `remote-desktop/` group gives the harness governed human desktop access: `ctx.remoteDesktop` defines grants and the enforced attachment contract in `remote-desktop/`; `remote-desktop-vnc/` implements it over RFB against configured VNC endpoints (macOS Screen Sharing, UltraVNC, KasmVNC/x11vnc); `api/remote-desktop-controller/` exposes `status`/`attach`/`listGrants`/`grant`/`setLevel`/`revoke`/`audit` to the browser under authenticated-session authority plus administrator checks. Audit events record grant lifecycle, attach/detach, and level escalation; recording is a per-grant flag captured by the provider.
+
+- [Remote-desktop subsystem](../../docs/subsystems/remote-desktop.md) — the grant model, enforced `resolve → attach` contract, stream sessions, and audit taxonomy.

@@ -18,6 +18,7 @@ Open a `remoteDesktop` tab in the right sidebar for a granted remote node. The t
 - [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
@@ -48,14 +49,29 @@ The `openScreen` callback is part of the injected face so tests mount the body w
 - [Remote-desktop administration](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/client/ui-remote-desktop-admin) (README.zh.md in-repo)
 - [Right sidebar](../../client/ui-sidebar-right/README.md)
 
+**Runtime invariant:** No companion is published. Attach state and target lists come from `ctx.remoteDesktops` each render cycle; the plugin keeps no shadow of the capability's records.
+
 <a id="model-experience"></a>
 ## Model Experience
 
-This package is a human-facing Client UI; it contributes nothing to prompts, tools, or the model context, and the remote desktop it exposes is explicitly for a human operator — Agent computer use remains a separate seam.
+None, as the desktop viewer and attach flow are human-operated surfaces — Agent computer use remains a separate seam — that register no model-visible content.
 
-<a id="known-limitations-and-deferred-work"></a>
+#### KV Cache effect
+
+None; the plugin contributes no model request prefix.
+
 ## Known Limitations and Deferred Work
 
 - The guide menu covers only grant-based target discovery; endpoints that exist but carry no grant for the caller never appear.
 - The stream URL resolves against the page origin; deployments serving the RFB mount on another origin must extend `ClientRemoteDesktops.attach` instead of proxying at this layer.
 - RFB recordings produced by the provider have no in-product playback surface.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -29,7 +29,7 @@ function fixture(grants: typeof GRANTS | Promise<never>) {
     t: (key: keyof typeof en) => en[key],
     title: 'Remote desktop',
     kind: 'remoteDesktop',
-  } as unknown as ComponentProps<typeof RemoteDesktopGuide>
+  } as ComponentProps<typeof RemoteDesktopGuide>
   return { openTab, props }
 }
 

@@ -18,6 +18,7 @@ kind: "package-reference"
 - [延伸阅读](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
@@ -45,13 +46,29 @@ kind: "package-reference"
 - [远程桌面 BFF](../../api/remote-desktop-controller/README.zh.md)
 - [远程桌面标签页](../ui-remote-desktop/README.zh.md)
 
+**运行时不变量：** 未发布配套入口。存储镜像的是经 `ctx.remoteDesktops` 取得的服务端授权与审计状态；权威记录归能力层所有。
+
 <a id="model-experience"></a>
 ## 模型体验
 
-本包是面向人类的 Client UI；不贡献任何提示词、工具或模型上下文。
+无：授权管理区是人类操作的设置面，不注册任何模型可见内容。
+
+#### KV Cache 影响
+
+无；本区不贡献任何模型请求前缀。
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 - 管理操作绑定当前选中的 Session；未选中 Session 时本节提示需要打开会话，而不是猜测身份。
 - 审计尾部未分页；依赖大型持久审计文件的部署按能力层的尾部容量读取。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -17,6 +17,8 @@
     // Source-subpath test imports can arrive through workspace links whose
     // realpath semantics vary by host. Load package CSS declarations directly.
     "packages/client/*/src/css-modules.d.ts",
+    // Ambient noVNC declarations consumed by ui-remote-desktop source-subpath imports.
+    "packages/client/ui-remote-desktop/src/client/novnc.d.ts",
     "packages/client/*/tests/**/*.ts",
     "packages/client/*/tests/**/*.tsx",
     "packages/*/*/tests/**/*.client.spec.ts",

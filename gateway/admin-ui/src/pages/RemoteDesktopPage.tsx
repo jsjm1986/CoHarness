@@ -17,8 +17,8 @@ import { zh, en } from './remote-desktop.copy.ts'
 const rdCopy = () => translateCopy(adminLanguage(), { zh, en })
 const messageOf = (error: unknown): string => error instanceof Error ? error.message : rdCopy()('operationFailed')
 
-interface EndpointDraft { nodeId: string; desktop: string; host: string; port: string }
-const EMPTY_ENDPOINT: EndpointDraft = { nodeId: '', desktop: '', host: '', port: '5900' }
+interface EndpointDraft { nodeId: string; desktop: string; host: string; port: string; username: string; passwordRef: string }
+const EMPTY_ENDPOINT: EndpointDraft = { nodeId: '', desktop: '', host: '', port: '5900', username: '', passwordRef: '' }
 
 interface GrantDraft { principal: string; endpoint: string; level: 'view' | 'control'; recording: boolean }
 const EMPTY_GRANT: GrantDraft = { principal: '', endpoint: '', level: 'view', recording: false }
@@ -148,7 +148,7 @@ export function RemoteDesktopPage() {
                 <thead>
                   <tr>
                     <th>{t('labelNodeId')}</th><th>{t('labelDesktop')}</th><th>{t('labelHost')}</th>
-                    <th>{t('labelPort')}</th><th>{t('columnActions')}</th>
+                    <th>{t('labelPort')}</th><th>{t('labelSignIn')}</th><th>{t('columnActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -156,6 +156,7 @@ export function RemoteDesktopPage() {
                     <tr key={endpointKeyOf(e)}>
                       <td>{e.nodeId} {e.host === '127.0.0.1' && <StatusBadge tone="info">{t('localBadge')}</StatusBadge>}</td>
                       <td>{e.desktop ?? '—'}</td><td><code>{e.host}</code></td><td><code>{e.port}</code></td>
+                      <td>{e.passwordRef === undefined ? '—' : <StatusBadge tone="info">{t('signInManaged')}</StatusBadge>}</td>
                       <td>
                         <div className="compactActions">
                           <IconButton label={t('remove')} icon={Trash2}
@@ -257,6 +258,8 @@ export function RemoteDesktopPage() {
                 host: endpointDraft.host.trim(),
                 port: Number(endpointDraft.port),
                 ...(endpointDraft.desktop.trim() === '' ? {} : { desktop: endpointDraft.desktop.trim() }),
+                ...(endpointDraft.username.trim() === '' ? {} : { username: endpointDraft.username.trim() }),
+                ...(endpointDraft.passwordRef.trim() === '' ? {} : { passwordRef: endpointDraft.passwordRef.trim() }),
               }])
             }}>{t('save')}</Button>
         </>}
@@ -278,6 +281,14 @@ export function RemoteDesktopPage() {
             <Field label={t('labelPort')}>
               <input className="input" inputMode="numeric" value={endpointDraft.port}
                 onChange={e => setEndpointDraft({ ...endpointDraft, port: e.target.value })} />
+            </Field>
+            <Field label={t('labelUsername')} hint={t('hintUsername')}>
+              <input className="input" value={endpointDraft.username}
+                onChange={e => setEndpointDraft({ ...endpointDraft, username: e.target.value })} />
+            </Field>
+            <Field label={t('labelPasswordRef')} hint={t('hintPasswordRef')}>
+              <input className="input" value={endpointDraft.passwordRef} placeholder="VNC_PASSWORD_…"
+                onChange={e => setEndpointDraft({ ...endpointDraft, passwordRef: e.target.value })} />
             </Field>
           </div>
         )}

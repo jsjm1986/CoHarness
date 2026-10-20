@@ -288,6 +288,12 @@ flowchart LR
   svc_sessionController["ctx.sessionController<br/>Host Session resolution surface"]
   pkg_experimental_api_speech_to_text["experimental-api-speech-to-text"]
   svc_speechController["ctx.speechController<br/>Experimental transcription Remote"]
+  pkg_remote_desktop["remote-desktop"]
+  svc_remoteDesktop["ctx.remoteDesktop<br/>Human remote-desktop attachment seam"]
+  pkg_remote_desktop_vnc["remote-desktop-vnc"]
+  pkg_remote_desktop_stream["remote-desktop-stream"]
+  pkg_remote_desktop_controller["remote-desktop-controller"]
+  svc_remoteDesktopController["ctx.remoteDesktopController<br/>Remote-desktop grant and session Remote namespace"]
   pkg_experimental_speech_to_text["experimental-speech-to-text"]
   svc_speechToText["ctx.speechToText<br/>Experimental speech recognition providers"]
   pkg_experimental_speech_to_text_sensevoice["experimental-speech-to-text-sensevoice"]
@@ -376,6 +382,9 @@ flowchart LR
   pkg_ptc_runtime --> svc_ptcRuntime
   pkg_ptc_runtime_node --> svc_ptcRuntime
   pkg_pwsh_local --> svc_shell
+  pkg_remote_desktop --> svc_remoteDesktop
+  pkg_remote_desktop_controller --> svc_remoteDesktopController
+  pkg_remote_desktop_vnc --> svc_remoteDesktop
   pkg_sandbox --> svc_sandbox
   pkg_sandbox_local --> svc_sandbox
   pkg_sandbox_policy --> svc_sandboxPolicy
@@ -515,6 +524,8 @@ flowchart LR
   svc_pluginRegistryProbe --> pkg_ui_plugin_manager
   svc_profileContext --> pkg_plugin_manager
   svc_ptcRuntime --> pkg_tools
+  svc_remoteDesktop --> pkg_remote_desktop_controller
+  svc_remoteDesktop --> pkg_remote_desktop_stream
   svc_sandbox --> pkg_bash_sandbox
   svc_sandbox --> pkg_terminal_bash
   svc_sandboxPolicy --> pkg_bash_sandbox
@@ -724,6 +735,8 @@ flowchart LR
 | `ctx.schedule` | `core` | [`schedule`](../packages/schedule/schedule) | - | - | - | 任务独立于 Session 激活状态存储，并在原 Session 中排队到期消息。 |
 | `ctx.sessionController` | `core` | [`api-remotes`](../packages/api/remotes) | - | [`schedule`](../packages/schedule/schedule) | - | 为其它 Host API 域将 Session 身份解析为其存活 Agent，保留解析方的类型化拒绝码。 |
 | `ctx.speechController` | `core` | [`experimental-api-speech-to-text`](../packages/experimental/api-speech-to-text) | - | - | - | 在提供给方分发前校验有界浏览器音频。 |
+| `ctx.remoteDesktop` | `seam` | [`remote-desktop`](../packages/remote-desktop/remote-desktop) | [`remote-desktop-vnc`](../packages/remote-desktop/remote-desktop-vnc) | [`remote-desktop-stream`](../packages/remote-desktop/remote-desktop-stream), `remote-desktop-controller` | - | resolve 将已认证参与者映射为受授权约束的 spec；attach 返回存活会话并由 serveStream 推送其通道。 |
+| `ctx.remoteDesktopController` | `core` | `remote-desktop-controller` | - | - | - | 将已认证请求主体映射为服务参与者，并对授权、attach、状态与审计操作执行管理员检查。 |
 | `ctx.speechToText` | `seam` | [`experimental-speech-to-text`](../packages/experimental/speech-to-text) | [`experimental-speech-to-text-sensevoice`](../packages/experimental/speech-to-text-sensevoice) | [`experimental-api-speech-to-text`](../packages/experimental/api-speech-to-text) | - | 路由显式识别器；浏览器通过已认证 Remote 使用，转写文本在提交前保留在草稿中。 |
 
 维护模式：混合模式。服务从 Cordis 声明中发现；接口、实现和消费方角色在 `scripts/gen-doc-graphs.ts` 中分类，并设有完整性守卫。

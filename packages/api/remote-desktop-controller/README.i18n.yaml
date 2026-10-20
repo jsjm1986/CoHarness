@@ -10,10 +10,10 @@
   zh: 151d7f7e61beb227
 /deepseek-ai-dsh-api-remote-desktop-controller/summary:
   en: 994aff0ca47ea601
-  zh: e4363084ff1fd60c
+  zh: 7cb31dfad9460ee0
 /deepseek-ai-dsh-api-remote-desktop-controller/table-of-contents:
-  en: 642fc11ef81efb22
-  zh: c9fdd750fdee54d4
+  en: 9056620bc78707a6
+  zh: 15dbfe3064000b1e
 /deepseek-ai-dsh-api-remote-desktop-controller/methods:
   en: c5906c9d5b64361a
   zh: 380dc288990a697a
@@ -21,11 +21,17 @@
   en: eb85945ae005e225
   zh: c5d71b315038004c
 /deepseek-ai-dsh-api-remote-desktop-controller/client-half:
-  en: 924cf927bf234823
-  zh: d5e74b6b899dab41
+  en: d349b79200a0591c
+  zh: 9e54b3dda5dc99af
 /deepseek-ai-dsh-api-remote-desktop-controller/model-experience:
-  en: 87590ee249d1b2d6
-  zh: 24167451eee8286e
+  en: 5dde8058303d5d2e
+  zh: da3c80c7308f0e2a
+/deepseek-ai-dsh-api-remote-desktop-controller/model-experience/kv-cache-effect:
+  en: 857f2353163e5f00
+  zh: 500782d3127df1a5
 /deepseek-ai-dsh-api-remote-desktop-controller/known-limitations-and-deferred-work:
-  en: bf450b0bce0037de
-  zh: 72cb538221e69b6e
+  en: 77983ea41f15a1f9
+  zh: b595c2a478e0676e
+/deepseek-ai-dsh-api-remote-desktop-controller/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

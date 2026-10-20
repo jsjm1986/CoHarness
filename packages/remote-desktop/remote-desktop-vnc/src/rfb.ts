@@ -67,8 +67,16 @@ export class RfbClientFilter {
   /** Input frames dropped since construction (KeyEvent/PointerEvent/ClientCutText). */
   dropped = 0
   private buf = Buffer.alloc(0)
-  private phase: Phase = 'version'
+  private phase: Phase
   private authRemaining = 0
+
+  /**
+   * @param phase - the stream's first phase; `'frame'` when a managed
+   *   credential handshake already consumed the client preamble host-side.
+   */
+  constructor(phase: Phase = 'version') {
+    this.phase = phase
+  }
 
   /**
    * Filter one client chunk; returns the bytes allowed upstream.

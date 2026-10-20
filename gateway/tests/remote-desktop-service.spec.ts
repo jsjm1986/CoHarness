@@ -36,6 +36,24 @@ describe('RemoteDesktopService', () => {
     await expect(svc.saveEndpoints([rows[0], rows[0]])).rejects.toBeInstanceOf(RemoteDesktopServiceError)
   })
 
+  it('persists managed-credential fields and rejects invalid combinations', async () => {
+    const svc = await service()
+    const rows = await svc.saveEndpoints([{
+      nodeId: 'mac-mini', host: '127.0.0.1', port: 5900, username: 'alice', passwordRef: 'VNC_PASSWORD_MAC_MINI',
+    }])
+    expect(rows[0]).toMatchObject({ username: 'alice', passwordRef: 'VNC_PASSWORD_MAC_MINI' })
+    const text = await readFile(join(svc.dir, 'endpoints.json'), 'utf8')
+    expect(JSON.parse(text)).toEqual({ endpoints: rows })
+    await expect(svc.saveEndpoints([{
+      nodeId: 'mac-mini', host: '127.0.0.1', port: 5900, username: 'alice',
+    }])).rejects.toMatchObject({ status: 400, message: 'remote-desktop-username-without-passwordref' })
+    for (const passwordRef of ['9VNC', 'VNC-PASSWORD', 'VNC PASSWORD', 'a'.repeat(129)]) {
+      await expect(svc.saveEndpoints([{
+        nodeId: 'mac-mini', host: '127.0.0.1', port: 5900, passwordRef,
+      }])).rejects.toMatchObject({ status: 400, message: 'remote-desktop-passwordref-invalid' })
+    }
+  })
+
   it('writes grants in the provider JSONL format and mutates them', async () => {
     const svc = await service()
     await svc.saveEndpoints([{ nodeId: 'mac-mini', host: '127.0.0.1', port: 5900 }])

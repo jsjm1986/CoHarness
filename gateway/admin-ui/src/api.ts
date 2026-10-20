@@ -1382,6 +1382,14 @@ export interface RemoteDesktopEndpoint {
   desktop?: string
   host: string
   port: number
+  /** Login user name for password-authenticated servers; requires `passwordRef`. */
+  username?: string
+  /**
+   * Environment-variable name resolved to the endpoint password by the
+   * runtime credential store; the host authenticates with it and the browser
+   * never sees the password.
+   */
+  passwordRef?: string
 }
 
 /** Stored remote-desktop grant row. */

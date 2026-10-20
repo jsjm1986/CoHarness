@@ -185,6 +185,35 @@
         "tests/**/*.tsx"
       ]
     },
+    "packages/client/ui-remote-desktop": {
+      "entry": [
+        "tests/**/*.spec.tsx",
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ]
+    },
+    "packages/remote-desktop/remote-desktop": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/api/remote-desktop-controller": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
     "packages/client/ui-goal": {
       "entry": [
         "tests/**/*.spec.tsx"

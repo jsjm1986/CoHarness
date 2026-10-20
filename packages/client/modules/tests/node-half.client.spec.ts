@@ -1044,7 +1044,7 @@ describe('client bundle activation', () => {
 function emitLoaderEntryChange(context: Context, name: string): void {
   context.emit('internal/plugin', {
     entry: { options: { name } },
-  } as unknown as Fiber)
+  } as Fiber)
 }
 
 describe('shared module declarations', () => {
@@ -1053,8 +1053,8 @@ describe('shared module declarations', () => {
     writeBuiltPackage(packageName, { external: ['react'] })
     expect(construct([packageName]).graph().entries).toEqual([{
       id: packageName,
-      url: expect.stringContaining(`plugins/combo.js??${packageName}/client.js&rev=`) as unknown as string,
-      rev: expect.any(String) as unknown as string,
+      url: expect.stringContaining(`plugins/combo.js??${packageName}/client.js&rev=`) as string,
+      rev: expect.any(String) as string,
       external: ['react'],
     }])
   })

@@ -18,6 +18,7 @@ A browser client opens `wss://<host><stream.path>?token=<token>` after `remoteDe
 - [Composition](#composition)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
@@ -26,14 +27,29 @@ A browser client opens `wss://<host><stream.path>?token=<token>` after `remoteDe
 
 Load alongside a `ctx.remoteDesktop` provider (`dsh-remote-desktop-vnc`) and `ctx.webServer`. The plugin uses `ctx.inject(['webServer', 'remoteDesktop'])` and activates only where both exist; the provider's `streamPath` config must match this plugin's so `attach` advertises the mounted path.
 
+**Runtime invariant:** No companion is published. The mount owns only per-connection WebSocket plumbing; token and attachment truth stay in `ctx.remoteDesktop`.
+
 <a id="model-experience"></a>
 ## Model Experience
 
-No model-visible surface; human-facing transport mount only.
+None, as the transport mount relays a human's screen and input frames and adds no model input.
 
-<a id="known-limitations-and-deferred-work"></a>
+#### KV Cache effect
+
+None; the mount contributes no model request prefix.
+
 ## Known Limitations and Deferred Work
 
 - Origin policy and outer request rejection (`connection/request` waterfall) are the client-connection layer's job; this mount registers directly on `ctx.webServer`.
 - Backpressure across the ws↔Duplex boundary is one-way: inbound `ws` messages do not pause the socket when the pump stalls (Node buffering applies); the outbound direction honors `send` callbacks.
 - Recording disclosure to the connecting client is covered by the `confirm`/`status` consent flow, not by this socket.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

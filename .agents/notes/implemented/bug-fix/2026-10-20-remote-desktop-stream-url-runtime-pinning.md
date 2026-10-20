@@ -22,7 +22,7 @@ The attach response now passes the path through `connection.privateResourceUrl` 
 
 ## Verification
 
-`packages/api/remote-desktop-controller/tests/client-model.spec.ts` covers both branches: a stand-in `privateResourceUrl` produces a `wss://` URL carrying `token`, `dshTarget`, and `dshPrincipal`; without the callback the URL keeps path and token only. The full package suite passes. A live reproduction showed the failure shape exactly: an upgrade scoped to `project:3` while the token was minted in the personal runtime closed with `1006` immediately, while the correctly scoped upgrade received the `RFB 003.889` banner from the real endpoint.
+`packages/api/remote-desktop-controller/tests/client-model.client.spec.ts` covers both branches: a stand-in `privateResourceUrl` produces a `wss://` URL carrying `token`, `dshTarget`, and `dshPrincipal`; without the callback the URL keeps path and token only. The full package suite passes. A live reproduction showed the failure shape exactly: an upgrade scoped to `project:3` while the token was minted in the personal runtime closed with `1006` immediately, while the correctly scoped upgrade received the `RFB 003.889` banner from the real endpoint.
 
 ## Consequences
 

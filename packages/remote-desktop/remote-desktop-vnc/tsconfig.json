@@ -12,6 +12,9 @@
       "path": "../remote-desktop"
     },
     {
+      "path": "../../credentials/credentials"
+    },
+    {
       "path": "../../core/session"
     },
     {

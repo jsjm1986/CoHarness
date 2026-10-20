@@ -28,6 +28,14 @@ export interface RemoteDesktopEndpointRow {
   desktop?: string
   host: string
   port: number
+  /** Login user name for password-authenticated servers; requires `passwordRef`. */
+  username?: string
+  /**
+   * Environment-variable name the runtime's credential store resolves to the
+   * endpoint password. When set, the provider authenticates host-side and the
+   * browser handshake negotiates no authentication.
+   */
+  passwordRef?: string
 }
 
 /** Stored grant row; matches the provider's JSONL grant format. */
@@ -63,6 +71,15 @@ function requireText(value: unknown, field: string, max = 128): string {
 function requirePort(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > 65535) {
     throw new RemoteDesktopServiceError(400, 'remote-desktop-port-invalid')
+  }
+  return value
+}
+
+const PASSWORD_REF_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+function requirePasswordRef(value: unknown): string {
+  if (typeof value !== 'string' || !PASSWORD_REF_PATTERN.test(value) || value.length > 128) {
+    throw new RemoteDesktopServiceError(400, 'remote-desktop-passwordref-invalid')
   }
   return value
 }
@@ -116,6 +133,11 @@ export class RemoteDesktopService {
         host: requireText(raw.host, 'host', 253),
         port: requirePort(raw.port),
         ...(raw.desktop === undefined || raw.desktop === '' ? {} : { desktop: requireText(raw.desktop, 'desktop') }),
+        ...(raw.username === undefined || raw.username === '' ? {} : { username: requireText(raw.username, 'username') }),
+        ...(raw.passwordRef === undefined || raw.passwordRef === '' ? {} : { passwordRef: requirePasswordRef(raw.passwordRef) }),
+      }
+      if (row.username !== undefined && row.passwordRef === undefined) {
+        throw new RemoteDesktopServiceError(400, 'remote-desktop-username-without-passwordref')
       }
       const key = endpointKey(row)
       if (seen.has(key)) throw new RemoteDesktopServiceError(400, 'remote-desktop-endpoint-duplicate')

@@ -844,6 +844,22 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Validates bounded browser audio before provider dispatch.',
   },
   {
+    key: 'remoteDesktop',
+    pkg: 'remote-desktop',
+    title: 'Human remote-desktop attachment seam',
+    mode: 'seam',
+    implementations: ['remote-desktop-vnc'],
+    consumers: ['remote-desktop-stream', 'remote-desktop-controller'],
+    note: 'resolve maps an authenticated actor to a grant-bounded spec; attach returns a live session and serveStream pumps its channel.',
+  },
+  {
+    key: 'remoteDesktopController',
+    pkg: 'remote-desktop-controller',
+    title: 'Remote-desktop grant and session Remote namespace',
+    mode: 'core',
+    note: 'Maps authenticated request principals to service actors and enforces administrator checks for grant, attach, status, and audit operations.',
+  },
+  {
     key: 'speechToText',
     pkg: 'experimental-speech-to-text',
     title: 'Experimental speech recognition providers',
