@@ -1,7 +1,7 @@
 /** Injected remote-desktop commands for sidebar tab bodies. */
 import type { RemoteDesktopAttachment } from '@deepseek-ai/dsh-api-remote-desktop-controller/client'
 import type {
-  RemoteDesktopLevelView, RemoteDesktopSpecView, RemoteDesktopStatusView, RemoteDesktopTargetView,
+  RemoteDesktopGrantView, RemoteDesktopLevelView, RemoteDesktopSpecView, RemoteDesktopStatusView, RemoteDesktopTargetView,
 } from '@deepseek-ai/dsh-api-remote-desktop-controller/types'
 
 /** RFB screen handle returned by the injected `openScreen`; the tab owns teardown. */
@@ -66,4 +66,15 @@ declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
     /** The remote node and optional desktop to view or control. */
     remoteDesktop: { readonly nodeId: string; readonly desktop?: string }
   }
+}
+
+/** The remote-desktop guide's Remote calls, bound to the owning Session. */
+export interface RemoteDesktopGuideInjected {
+  /**
+   * List the live grant rows the current principal may connect to; the
+   * provider already scopes non-admin callers to their own rows.
+   * @param signal - request cancellation.
+   * @returns authorized targets with level, scope, and recording flags.
+   */
+  readonly listTargets: (signal: AbortSignal) => Promise<RemoteDesktopGrantView[]>
 }

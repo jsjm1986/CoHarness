@@ -24,8 +24,9 @@ export const zh = {
   closed: '连接已断开。',
   credentialsTitle: '输入桌面登录凭证', username: '用户名', password: '密码',
   credentialsAction: '登录',
-  connectTitle: '连接远程桌面', connectDescription: '输入已配置的目标节点',
-  nodeId: '节点标识', connect: '连接',
+  connectTitle: '连接远程桌面', connectDescription: '选择一个已授权的目标',
+  targetsLoading: '正在读取已授权的目标…', targetsEmpty: '暂无可用目标，请联系管理员开通。',
+  targetsFailed: '无法读取授权目标，请稍后重试。', recording: '录制',
 } satisfies Record<string, string>
 
 /** English remote-desktop copy. */
@@ -45,6 +46,7 @@ export const en = {
   closed: 'The connection closed.',
   credentialsTitle: 'Enter the desktop credentials', username: 'Username', password: 'Password',
   credentialsAction: 'Sign in',
-  connectTitle: 'Connect to a remote desktop', connectDescription: 'Enter a configured target node',
-  nodeId: 'Node id', connect: 'Connect',
+  connectTitle: 'Connect to a remote desktop', connectDescription: 'Pick an authorized target',
+  targetsLoading: 'Reading your authorized targets…', targetsEmpty: 'No targets available; ask an administrator.',
+  targetsFailed: 'Could not read your authorized targets; retry later.', recording: 'Recording',
 } satisfies Record<keyof typeof zh, string>

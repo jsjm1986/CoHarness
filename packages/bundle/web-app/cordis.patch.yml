@@ -200,19 +200,11 @@
     # Human remote desktop: the VNC provider enforces grants/consent inside the
     # RFB stream, the stream row mounts its WebSocket endpoint on webServer,
     # and the controller exposes the remoteDesktop/* Remote namespace.
-    # This deployment exposes the host Mac's own Screen Sharing endpoint and
-    # keeps grants and audit in a deployment-level JSONL store shared by the
-    # managed runtimes on this node.
+    # The gateway runtime patch points the provider at the deployment's
+    # remote-desktop directory: administrators own endpoints and grants in
+    # /admin and the files reload in place.
     - id: remote-desktop-vnc
       name: '@deepseek-ai/dsh-remote-desktop-vnc'
-      config:
-        endpoints:
-          - nodeId: mac-mini
-            desktop: ''
-            host: 127.0.0.1
-            port: 5900
-        grantsFile: /Users/a1234/.harness-gateway/remote-desktop/grants.jsonl
-        auditFile: /Users/a1234/.harness-gateway/remote-desktop/audit.jsonl
 
     - id: remote-desktop-stream
       name: '@deepseek-ai/dsh-remote-desktop-stream'

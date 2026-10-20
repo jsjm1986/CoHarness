@@ -2,7 +2,7 @@
  * @module @deepseek-ai/dsh-remote-desktop-vnc/grants
  */
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteDesktopError, RemoteDesktopGrantId } from '@deepseek-ai/dsh-remote-desktop'
@@ -44,9 +44,12 @@ interface StoredGrant {
   revokedAt?: number
 }
 
-/** Durable grant store: JSONL file, rewritten atomically on each mutation. */
+/** Durable grant store: JSONL file, rewritten atomically on each mutation and
+ * reloaded when an external writer (the deployment's grant administration
+ * surface) changes the file. */
 export class VncGrantStore {
   private readonly grants = new Map<string, RemoteDesktopGrant>()
+  private seenMtimeMs = 0
 
   private constructor(private readonly file: string) {}
 
@@ -57,20 +60,35 @@ export class VncGrantStore {
   static async open(file: string): Promise<VncGrantStore> {
     const store = new VncGrantStore(file)
     if (file === ':memory:') return store
+    await store.reload()
+    return store
+  }
+
+  /** Re-read the file when its mtime advanced past the last seen revision. */
+  async refresh(): Promise<void> {
+    if (this.file === ':memory:') return
+    const info = await stat(this.file).catch(() => undefined)
+    const mtimeMs = info?.mtimeMs ?? 0
+    if (mtimeMs === this.seenMtimeMs) return
+    this.seenMtimeMs = mtimeMs
+    await this.reload()
+  }
+
+  private async reload(): Promise<void> {
     let text: string
     try {
-      text = await readFile(file, 'utf8')
+      text = await readFile(this.file, 'utf8')
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return store
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
       throw error
     }
+    this.grants.clear()
     for (const line of text.split('\n')) {
       const trimmed = line.trim()
       if (trimmed === '') continue
       const row = JSON.parse(trimmed) as StoredGrant
-      store.grants.set(row.id, { ...row, id: RemoteDesktopGrantId(row.id) })
+      this.grants.set(row.id, { ...row, id: RemoteDesktopGrantId(row.id) })
     }
-    return store
   }
 
   /** All stored rows, including revoked ones. */
@@ -103,5 +121,7 @@ export class VncGrantStore {
     const tmp = `${this.file}.tmp`
     await writeFile(tmp, body, 'utf8')
     await rename(tmp, this.file)
+    const info = await stat(this.file).catch(() => undefined)
+    if (info !== undefined) this.seenMtimeMs = info.mtimeMs
   }
 }

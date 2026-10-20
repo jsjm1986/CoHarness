@@ -102,4 +102,19 @@ describe('VncGrantStore', () => {
     const store = await VncGrantStore.open(file)
     expect(store.all()).toHaveLength(1)
   })
+
+  it('reloads when an external writer replaces the file', async () => {
+    const file = join(dir, 'shared.jsonl')
+    await writeFile(file, `${JSON.stringify(grant())}\n`, 'utf8')
+    const store = await VncGrantStore.open(file)
+    expect(store.all()).toHaveLength(1)
+    // External writers (the administration surface) replace the file wholesale;
+    // a bumped mtime must surface the new rows without a restart.
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await writeFile(file, `${JSON.stringify(grant())}\n${JSON.stringify(grant({ id: RemoteDesktopGrantId('g2') }))}\n`, 'utf8')
+    await store.refresh()
+    expect(store.all().map(g => g.id)).toEqual(['g1', 'g2'])
+    await store.refresh()
+    expect(store.all()).toHaveLength(2)
+  })
 })

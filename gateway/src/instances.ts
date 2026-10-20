@@ -746,6 +746,15 @@ export class InstanceManager {
       }
       patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
       patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
+      // Remote-desktop providers share the gateway's administration files so
+      // grants and endpoints managed in /admin take effect in every runtime.
+      patchText += `- id: remote-desktop-vnc
+  config:
+    endpointsFile: ${JSON.stringify(join(this.cfg.remoteDesktopDir, 'endpoints.json'))}
+    grantsFile: ${JSON.stringify(join(this.cfg.remoteDesktopDir, 'grants.jsonl'))}
+    auditFile: ${JSON.stringify(join(this.cfg.remoteDesktopDir, 'audit.jsonl'))}
+    recordingDir: ${JSON.stringify(join(this.cfg.remoteDesktopDir, 'recordings'))}
+`
       if (this.cfg.desktopId !== undefined) {
         // The provisioned driver package is materialized beside the policy
         // plugins so the runtime resolves it from the instance profile's

@@ -97,6 +97,9 @@ export interface GatewayDeps {
   nodeConfiguration?: Pick<import('./node-config-store.ts').NodeConfigurationStore, 'view' | 'save' | 'requestApply'>
   /** Deployment backup registry. */
   backups?: Pick<import('./postgres/backup-service.ts').PostgresBackupService, 'list' | 'get' | 'record' | 'setVerified'>
+  /** Administrator-owned remote-desktop endpoints, grants, and audit view. */
+  remoteDesktop?: Pick<import('./remote-desktop-service.ts').RemoteDesktopService,
+    'endpoints' | 'saveEndpoints' | 'listGrants' | 'createGrant' | 'setLevel' | 'revoke' | 'audit'>
   /** Backup execution context for administrator-driven dumps. */
   backupWork?: GatewayBackupWork
   /** Packaged-versus-applied migration diff for the deployment page. */

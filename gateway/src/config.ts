@@ -69,6 +69,8 @@ export interface GatewayConfig {
   bootstrapAdminPasswordFile: string
   /** Deployment backup directory holding dumps plus managed-file snapshots. */
   backupDir: string
+  /** Remote-desktop administration directory shared with runtime providers. */
+  remoteDesktopDir: string
   /** Stable private node-configuration file selected by the launcher. */
   nodeConfigFile: string
   /** Private database connection file; its location is backed up without exposing its contents. */
@@ -672,6 +674,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     ...(cloudflaredBin === undefined ? {} : { cloudflaredBin }),
     bootstrapAdminPasswordFile,
     backupDir: env.HGW_BACKUP_DIR ?? join(stateRoot, 'backups'),
+    remoteDesktopDir: env.HGW_REMOTE_DESKTOP_DIR ?? join(stateRoot, 'remote-desktop'),
     nodeConfigFile: resolve(env.HGW_NODE_CONFIG_FILE ?? join(stateRoot, 'node-config.json')),
     ...(env.HGW_DATABASE_URL_FILE === undefined || env.HGW_DATABASE_URL_FILE.trim() === '' ? {} : { databaseUrlFile: resolve(env.HGW_DATABASE_URL_FILE) }),
     configurationRevision,
