@@ -1338,3 +1338,65 @@ export function createBackup(): Promise<DeploymentBackup> {
 export function verifyBackup(id: string): Promise<DeploymentBackup> {
   return request('/admin/api/backups/verify', { method: 'POST', body: JSON.stringify({ id }) })
 }
+
+/** Administrator-registered remote-desktop endpoint. */
+export interface RemoteDesktopEndpoint {
+  nodeId: string
+  desktop?: string
+  host: string
+  port: number
+}
+
+/** Stored remote-desktop grant row. */
+export interface RemoteDesktopGrant {
+  id: string
+  target: { nodeId: string; desktop?: string }
+  principal: string
+  level: 'view' | 'control'
+  scope: { kind: 'machine' } | { kind: 'session'; sessionId: string; expiresAt: number }
+  recording: boolean
+  grantedBy: string
+  createdAt: number
+  revokedAt?: number
+}
+
+/** Provider audit event tail row. */
+export interface RemoteDesktopAuditEvent {
+  kind: string
+  principal?: string
+  target?: { nodeId: string; desktop?: string }
+  at: number
+}
+
+export function listRemoteDesktopEndpoints(): Promise<{ endpoints: RemoteDesktopEndpoint[] }> {
+  return request('/admin/api/remote-desktop/endpoints')
+}
+
+export function saveRemoteDesktopEndpoints(endpoints: RemoteDesktopEndpoint[]): Promise<{ endpoints: RemoteDesktopEndpoint[] }> {
+  return request('/admin/api/remote-desktop/endpoints', { method: 'POST', body: JSON.stringify({ endpoints }) })
+}
+
+export function listRemoteDesktopGrants(): Promise<{ grants: RemoteDesktopGrant[] }> {
+  return request('/admin/api/remote-desktop/grants')
+}
+
+export function createRemoteDesktopGrant(input: {
+  principal: string
+  target: { nodeId: string; desktop?: string }
+  level: 'view' | 'control'
+  recording: boolean
+}): Promise<{ grant: RemoteDesktopGrant }> {
+  return request('/admin/api/remote-desktop/grants', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function setRemoteDesktopGrantLevel(id: string, level: 'view' | 'control'): Promise<{ grant: RemoteDesktopGrant }> {
+  return request('/admin/api/remote-desktop/grants/level', { method: 'POST', body: JSON.stringify({ id, level }) })
+}
+
+export function revokeRemoteDesktopGrant(id: string): Promise<{ grant: RemoteDesktopGrant }> {
+  return request('/admin/api/remote-desktop/grants/revoke', { method: 'POST', body: JSON.stringify({ id }) })
+}
+
+export function listRemoteDesktopAudit(limit = 100): Promise<{ events: RemoteDesktopAuditEvent[] }> {
+  return request(`/admin/api/remote-desktop/audit?limit=${limit}`)
+}

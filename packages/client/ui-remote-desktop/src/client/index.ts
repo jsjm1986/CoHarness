@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { RemoteDesktopBody } from './RemoteDesktopBody.tsx'
 import { RemoteDesktopGuide } from './RemoteDesktopGuide.tsx'
 import { RemoteDesktopGuideIcon } from './RemoteDesktopIcon.tsx'
-import type { RemoteDesktopInjected } from './face.ts'
+import type { RemoteDesktopGuideInjected, RemoteDesktopInjected } from './face.ts'
 import { en, zh } from './locales.ts'
 
 /** Services needed by the remote-desktop sidebar seat. */
@@ -29,7 +29,12 @@ export function apply(ctx: Context): void {
     guide: [{ id: 'connect', order: 40, title: () => t('connectTitle'), description: () => t('connectDescription'), icon: RemoteDesktopGuideIcon }],
   }), 'ui-remote-desktop.type')
   ctx.effect(() => ctx.slots.inject('sidebar.right.tab.guide.entry', () => ctx.slots.register(
-    { name: 'sidebar.right.tab.guide.entry', key: id, locale: namespace, inject: () => ({}) },
+    {
+      name: 'sidebar.right.tab.guide.entry', key: id, locale: namespace,
+      inject: (sessionId): RemoteDesktopGuideInjected => ({
+        listTargets: signal => ctx.remoteDesktops.listGrants(sessionId, {}, signal),
+      }),
+    },
     RemoteDesktopGuide,
   )), 'ui-remote-desktop.guide')
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register(

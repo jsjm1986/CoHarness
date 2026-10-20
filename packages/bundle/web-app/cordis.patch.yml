@@ -195,8 +195,9 @@
     # Human remote desktop: the VNC provider enforces grants/consent inside the
     # RFB stream, the stream row mounts its WebSocket endpoint on webServer,
     # and the controller exposes the remoteDesktop/* Remote namespace.
-    # Deployments list VNC endpoints and switch the volatile ':memory:' stores
-    # to files in an overlay.
+    # The gateway runtime patch points the provider at the deployment's
+    # remote-desktop directory: administrators own endpoints and grants in
+    # /admin and the files reload in place.
     - id: remote-desktop-vnc
       name: '@deepseek-ai/dsh-remote-desktop-vnc'
 

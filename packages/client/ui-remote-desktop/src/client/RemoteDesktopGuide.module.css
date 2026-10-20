@@ -28,3 +28,12 @@
     padding: 0 var(--dsw-space-4) var(--dsw-space-3);
   }
 }
+
+.empty { margin: 0; padding: 2px 20px 16px 60px; color: var(--dsw-alias-label-caption); font-size: 13px; line-height: 1.5; }
+.targets { display: flex; flex-direction: column; gap: 8px; padding: 4px 20px 16px 60px; }
+.target { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: auto; padding: 9px 12px; }
+.targetName { overflow: hidden; color: var(--dsw-alias-label-primary); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+.targetMeta { flex: none; color: var(--dsw-alias-label-caption); font-size: 12px; }
+@media (max-width: 767px) {
+  .empty, .targets { padding-left: var(--dsw-space-4); padding-right: var(--dsw-space-4); }
+}
