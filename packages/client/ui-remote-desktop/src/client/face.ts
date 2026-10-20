@@ -8,6 +8,11 @@ import type {
 export interface RemoteDesktopScreen {
   /** End the RFB connection and remove its canvas. */
   disconnect(): void
+  /**
+   * Resume the handshake after a `credentialsrequired` prompt.
+   * @param credentials - operator-supplied values for the fields the server asked for.
+   */
+  sendCredentials(credentials: { readonly username?: string; readonly password?: string }): void
 }
 
 /** The remote-desktop sidebar seat's Remote calls, bound to the owning Session. */
@@ -40,10 +45,20 @@ export interface RemoteDesktopInjected {
    * Mount an RFB client into the container; its lifecycle ends with `disconnect`.
    * @param container - element the RFB canvas fills.
    * @param url - absolute `ws(s)://` stream URL including the one-time token.
-   * @param options - `viewOnly` mirrors the attached level; the server enforces it too.
+   * @param options - `viewOnly` mirrors the attached level; the server enforces it
+   * too. `onCredentialsRequired` fires with the field list each time the server
+   * challenges for credentials; `onDisconnected` fires on a remote close, never
+   * on local teardown.
    * @returns the live screen handle.
    */
-  readonly openScreen: (container: HTMLElement, url: string, options: { readonly viewOnly: boolean }) => RemoteDesktopScreen
+  readonly openScreen: (
+    container: HTMLElement, url: string,
+    options: {
+      readonly viewOnly: boolean
+      readonly onCredentialsRequired?: (types: readonly string[]) => void
+      readonly onDisconnected?: () => void
+    },
+  ) => RemoteDesktopScreen
 }
 
 declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {

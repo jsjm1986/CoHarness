@@ -32,6 +32,8 @@ declare module '@novnc/novnc/lib/rfb.js' {
     scaleViewport: boolean
     /** Focus the canvas when the pointer clicks it. */
     focusOnClick: boolean
+    /** Resume the handshake after `credentialsrequired` with the operator's values. */
+    sendCredentials(credentials: Record<string, string>): void
     /** End the connection and release the canvas. */
     disconnect(): void
   }

@@ -1,12 +1,12 @@
 /** Remote-desktop tab body: grant status, explicit consent, attach, and the RFB screen. */
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   RemoteDesktopStatusView, RemoteDesktopTargetView,
 } from '@deepseek-ai/dsh-api-remote-desktop-controller/types'
 import type { RemoteDesktopAttachment } from '@deepseek-ai/dsh-api-remote-desktop-controller/client'
-import type { RemoteDesktopInjected } from './face.ts'
+import type { RemoteDesktopInjected, RemoteDesktopScreen } from './face.ts'
 import type {} from './locales.ts'
 import css from './RemoteDesktopBody.module.css'
 
@@ -133,20 +133,59 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
           <span className={css.badge}>{phase.attachment.spec.level === 'control' ? t('control') : t('viewOnly')}</span>
           {phase.attachment.spec.recording && <span className={css.recording}>{t('consentRecording')}</span>}
         </div>
-        <RfbSurface openScreen={openScreen} url={phase.attachment.url} viewOnly={phase.attachment.spec.level === 'view'} />
+        <RfbSurface openScreen={openScreen} url={phase.attachment.url} viewOnly={phase.attachment.spec.level === 'view'} t={t} />
       </div>
     )
   }
 }
 
-/** The RFB canvas container; mounts the screen once per attachment URL. */
-function RfbSurface({ openScreen, url, viewOnly }: Pick<RemoteDesktopInjected, 'openScreen'> & { url: string; viewOnly: boolean }): ReactNode {
+/** The RFB canvas container; mounts the screen once per attachment URL and
+ * answers the server's credentials challenge inside the tab. */
+function RfbSurface({ openScreen, url, viewOnly, t }: Pick<RemoteDesktopInjected, 'openScreen'> & Pick<BodyProps, 't'> & { url: string; viewOnly: boolean }): ReactNode {
   const container = useRef<HTMLDivElement>(null)
+  const screen = useRef<RemoteDesktopScreen | undefined>(undefined)
+  const [challenge, setChallenge] = useState<readonly string[] | undefined>(undefined)
+  const [closed, setClosed] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   useEffect(() => {
     const host = container.current
     if (host === null) return
-    const screen = openScreen(host, url, { viewOnly })
-    return () => { screen.disconnect() }
+    const next = openScreen(host, url, {
+      viewOnly,
+      onCredentialsRequired: types => setChallenge(types),
+      onDisconnected: () => setClosed(true),
+    })
+    screen.current = next
+    return () => { screen.current = undefined; next.disconnect() }
   }, [openScreen, url, viewOnly])
-  return <div ref={container} className={css.canvas} />
+  const sendCredentials = (event: FormEvent): void => {
+    event.preventDefault()
+    const current = screen.current
+    if (current === undefined || challenge === undefined) return
+    current.sendCredentials({
+      ...(challenge.includes('username') ? { username } : {}),
+      ...(challenge.includes('password') ? { password } : {}),
+    })
+    setPassword('')
+    setChallenge(undefined)
+  }
+  return <div ref={container} className={css.canvas}>
+    {closed && <p className={css.auth}>{t('closed')}</p>}
+    {challenge !== undefined && !closed && (
+      <form className={css.auth} onSubmit={sendCredentials}>
+        <p className={css.heading}>{t('credentialsTitle')}</p>
+        {challenge.includes('username') && (
+          <input className={css.field} required autoFocus value={username} placeholder={t('username')}
+            aria-label={t('username')} onChange={event => setUsername(event.currentTarget.value)} />
+        )}
+        {challenge.includes('password') && (
+          <input className={css.field} required type="password" autoFocus={!challenge.includes('username')}
+            value={password} placeholder={t('password')} aria-label={t('password')}
+            onChange={event => setPassword(event.currentTarget.value)} />
+        )}
+        <button type="submit" className={css.action}>{t('credentialsAction')}</button>
+      </form>
+    )}
+  </div>
 }
