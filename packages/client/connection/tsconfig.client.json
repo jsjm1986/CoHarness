@@ -12,7 +12,6 @@
     "src/client/project-models.ts",
     "src/client/connection.ts",
     "src/client/fixture.ts",
-    "src/fixture-message-source.ts",
     "src/client/index.ts",
     "src/client/random-uuid.ts",
     "src/client/rpc.ts",

@@ -47,7 +47,6 @@ import type { ConnectionInteractions } from './api.ts'
 import { AbstractApiClient, RpcId, SESSION_SEARCH_RESULT_LIMIT } from './api.ts'
 import { randomUuid } from './random-uuid.ts'
 import type { ClientConnectionRpc } from '../rpc.ts'
-import '../fixture-message-source.ts'
 
 /** Brand fixture-only command metadata without a runtime edge to Host commands. */
 const commandDefinitionId = (id: string): CommandDefinitionId => id as CommandDefinitionId
