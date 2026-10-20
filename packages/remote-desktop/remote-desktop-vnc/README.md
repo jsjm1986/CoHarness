@@ -30,7 +30,8 @@ Install this provider when the harness serves human remote-desktop access to mac
 | Field | Semantics |
 |---|---|
 | `endpoints` | `{ nodeId, desktop?, host, port }` rows; duplicate target keys fail at load. |
-| `grantsFile` | JSONL grant-store path, rewritten atomically per mutation; `':memory:'` selects a volatile store. |
+| `endpointsFile` | `{endpoints: [...]}` JSON maintained by the deployment's administration surface; replaces the inline list and reloads on change. A malformed write keeps failing loudly on each call until a valid file lands. |
+| `grantsFile` | JSONL grant-store path, rewritten atomically per mutation and reloaded when an external writer replaces it; `':memory:'` selects a volatile store. A malformed line fails loudly while the last good rows stay in effect. |
 | `recordingDir` | Directory receiving `<sessionId>.rfb` raw stream captures for grants flagged `recording`; empty disables it and a flagged `serveStream` fails. |
 | `streamPath` | Pathname the stream mount serves; clients append `?token=`; default `/remote-desktop/stream`. |
 | `attachTokenTtlMs` | Attach-token validity window; default `60000`. |

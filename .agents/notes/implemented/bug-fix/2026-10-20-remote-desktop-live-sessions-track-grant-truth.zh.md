@@ -10,7 +10,7 @@ VNC Provider 的 `live` 会话表曾以三条互不相关的路径偏离授权�
 
 ## Decision
 
-会话记账现在共用一条提交路径。`attach` 为每个 token 装上定时器；未消费的 token 过期进入 `finishDetach`，移除 `live` 条目、记录 `detach` 并发出 `remote-desktop/attached`。token 消费后的每个 `serveStream` 失败——端点缺失、拨号失败、录制器打开失败、条目过期——都销毁两侧 socket 并完成同一条 detach，`live` 中不再存在没有流的会话。`revoke` 与 `setLevel` 调用 `enforceLiveSessions`：按已提交的存储对每个存活会话重跑 `matchingGrants`，已解析级别不再被授权的会话被拆除；仍有授权支撑的流保持打开。`listGrants` 新增 `attachable` 与调用者绑定的 `sessionId`，经 `resolve` 所用的同一个 `matchingGrants` 谓词过滤；浏览器控制器把 `sessionId` 绑定到被寻址的 agent，引导入口传 `attachable: true`，列出的目标恰好是 attach 会授权的目标。标签页主体启用了此前闲置的 `disconnect`/`reconnect` 文案：断开即关闭 RFB socket（服务端随之拆除），重连按已记录的确认重走 status → attach 换取新 token。
+会话记账现在共用一条提交路径。`attach` 为每个 token 装上定时器；未消费的 token 过期进入 `finishDetach`，移除 `live` 条目、记录 `detach` 并发出 `remote-desktop/attached`。token 消费后的每个 `serveStream` 失败——端点缺失、拨号失败、录制器打开失败、条目过期——都销毁两侧 socket 并完成同一条 detach，`live` 中不再存在没有流的会话。`revoke` 与 `setLevel` 调用 `enforceLiveSessions`：按已提交的存储对每个存活会话重跑 `matchingGrants`，已解析级别不再被授权的会话被拆除；仍有授权支撑的流保持打开。`listGrants` 新增 `attachable` 与调用者绑定的 `sessionId`，经 `resolve` 所用的同一个 `matchingGrants` 谓词过滤并要求目标已配置端点；浏览器控制器把 `sessionId` 绑定到被寻址的 agent，引导入口传 `attachable: true`，列出的目标恰好是 attach 会授权的目标。标签页主体启用了此前闲置的 `disconnect`/`reconnect` 文案：断开即关闭 RFB socket（服务端随之拆除），重连按已记录的确认重走 status → attach 换取新 token。
 
 ## Alternatives considered
 

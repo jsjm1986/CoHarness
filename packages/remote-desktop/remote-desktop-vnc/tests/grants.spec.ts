@@ -117,4 +117,34 @@ describe('VncGrantStore', () => {
     await store.refresh()
     expect(store.all()).toHaveLength(2)
   })
+
+  it('keeps the last good rows on a corrupt write and retries until it parses', async () => {
+    const file = join(dir, 'corruptible.jsonl')
+    await writeFile(file, `${JSON.stringify(grant())}\n`, 'utf8')
+    const store = await VncGrantStore.open(file)
+    expect(store.all()).toHaveLength(1)
+    // A truncated external write must fail loudly without discarding the last
+    // committed rows, and the unconsumed mtime must retry on the next call.
+    await writeFile(file, '{"id":', 'utf8')
+    await expect(store.refresh()).rejects.toThrow(RemoteDesktopError)
+    expect(store.all()).toHaveLength(1)
+    await expect(store.refresh()).rejects.toThrow(RemoteDesktopError)
+    expect(store.all()).toHaveLength(1)
+    // The next good write recovers without a restart.
+    await writeFile(file, `${JSON.stringify(grant({ id: RemoteDesktopGrantId('g9') }))}\n`, 'utf8')
+    await store.refresh()
+    expect(store.all().map(g => g.id)).toEqual(['g9'])
+  })
+
+  it('picks up an external rewrite that lands after its own persist', async () => {
+    const file = join(dir, 'self-then-external.jsonl')
+    const store = await VncGrantStore.open(file)
+    await store.insert(grant())
+    // An external writer replacing the file after the store's own persist must
+    // still be observed: the self-write must not pre-mark the mtime as seen.
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await writeFile(file, `${JSON.stringify(grant())}\n${JSON.stringify(grant({ id: RemoteDesktopGrantId('g2') }))}\n`, 'utf8')
+    await store.refresh()
+    expect(store.all()).toHaveLength(2)
+  })
 })

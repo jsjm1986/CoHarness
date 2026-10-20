@@ -35,7 +35,7 @@ Provider 子类化 `RemoteDesktop` 并实现八个成员。
 | `resolve(request, signal?)` | 为 `{ target, principal?, sessionId? }` 匹配实时授权，计算有效级别（永不超过授权），产出包含录制标志的强制规格。无有效授权时抛出 `REMOTE_DESKTOP_FORBIDDEN` 的 `RemoteDesktopError`——解析绝不静默收窄或放宽。 |
 | `attach(request, signal?)` | 先解析，再建立桌面传输与流端点；返回拥有 `detach` 的 `RemoteDesktopSession`。实现仅在 attach 提交后发布 `remote-desktop/attached`。 |
 | `status(target, signal?)` | 读取一个桌面端点的实时远端状态：可达性与附件数。 |
-| `listGrants(filter?, signal?)` | 列出授权；已撤销行需要 `includeRevoked`，`attachable` 将结果限制为调用者当前可挂接的授权——按 `sessionId` 匹配会话作用域行。 |
+| `listGrants(filter?, signal?)` | 列出授权；已撤销行需要 `includeRevoked`，`attachable` 将结果限制为调用者当前可挂接的授权——`sessionId` 的存活作用域，且目标已配置端点。 |
 | `grant(input, actor)` | 签发授权；要求 `actor.admin === true`。仅在写入提交后发布 `remote-desktop/grants-changed`。 |
 | `revoke(id, actor)` | 按 id 撤销授权；返回被撤销行。 |
 | `audit(filter?, signal?)` | 查询能力自有的审计事件，最新在前，可选按 target 或 principal 过滤。 |

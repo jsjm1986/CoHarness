@@ -20,6 +20,11 @@ export interface RfbPump {
  * through (framebuffer data); client→server is filtered for `view` and raw
  * for `control`. `onDrop` observes the final count of dropped input frames
  * for audit when the pump tears down.
+ * @param client - the browser-side socket end.
+ * @param upstream - the dialed VNC endpoint socket.
+ * @param level - the enforced access level; `view` installs the input filter.
+ * @param onDrop - teardown observer receiving the dropped input-frame count.
+ * @returns the pump handle whose `done` settles on teardown.
  */
 export function pumpRfb(
   client: Duplex,

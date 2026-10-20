@@ -70,7 +70,11 @@ export class RfbClientFilter {
   private phase: Phase = 'version'
   private authRemaining = 0
 
-  /** Filter one client chunk; returns the bytes allowed upstream. */
+  /**
+   * Filter one client chunk; returns the bytes allowed upstream.
+   * @param chunk - the raw client-to-server bytes to classify.
+   * @returns the handshake and non-input frames safe for upstream.
+   */
   push(chunk: Uint8Array): Buffer {
     this.buf = this.buf.length === 0 ? Buffer.from(chunk) : Buffer.concat([this.buf, chunk])
     const out: Buffer[] = []

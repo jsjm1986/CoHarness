@@ -30,7 +30,8 @@ kind: "package-reference"
 | 字段 | 语义 |
 |---|---|
 | `endpoints` | `{ nodeId, desktop?, host, port }` 行；重复目标键在装载时报错。 |
-| `grantsFile` | JSONL 授权存储路径，每次变更原子重写；`':memory:'` 选择易失存储。 |
+| `endpointsFile` | 由部署管理面维护的 `{endpoints: [...]}` JSON 文件；设置后取代内联列表并随变更重载。损坏写入在每次调用时持续报错，直至有效文件落地。 |
+| `grantsFile` | JSONL 授权存储路径，每次变更原子重写，外部写入者替换文件时重载；`':memory:'` 选择易失存储。损坏行响亮失败，最后一份完好行继续生效。 |
 | `recordingDir` | 接收带 `recording` 标志授权的 `<sessionId>.rfb` 原始流捕获的目录；为空则禁用，带标志的 `serveStream` 失败。 |
 | `streamPath` | 流挂载提供的路径名；客户端追加 `?token=`；默认 `/remote-desktop/stream`。 |
 | `attachTokenTtlMs` | attach token 有效期窗口；默认 `60000`。 |

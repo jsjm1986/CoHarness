@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-20-remote-desktop-file-state-and-wire-error-repairs.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-file-state-and-wire-error-repairs.md
+/agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes:
+  en: f627979b0d4ac1ec
+  zh: e6b6ce55ef71794a
+/agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes/problem:
+  en: c3b462dbe1fcc794
+  zh: 617c700d19df50b4
+/agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes/decision:
+  en: e0040fe246baa7cc
+  zh: 5377b9d49c2a1946
+/agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes/alternatives-considered:
+  en: 99abb77aebf126f9
+  zh: 2549f067680b6af2
+/agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes/consequences:
+  en: 3e7385083befc694
+  zh: 448dd8d633e97c64

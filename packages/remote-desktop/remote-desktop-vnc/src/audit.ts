@@ -53,7 +53,13 @@ export class VncAuditLog {
     private readonly logger: Pick<LoggerService, 'warn'>,
   ) {}
 
-  /** Open the log; `':memory:'` selects a volatile window. */
+  /**
+   * Open the log; `':memory:'` selects a volatile window.
+   * @param file - the append-only JSONL path, or `':memory:'`.
+   * @param capacity - retained event count for `all()` and tail reload.
+   * @param logger - sink for append-failure and unreadable-row warnings.
+   * @returns the opened log with the retained tail loaded.
+   */
   static async open(file: string, capacity: number, logger: Pick<LoggerService, 'warn'>): Promise<VncAuditLog> {
     const log = new VncAuditLog(file, capacity, logger)
     if (file === ':memory:') return log
@@ -65,16 +71,30 @@ export class VncAuditLog {
       return log
     }
     const rows = text.split('\n').map(line => line.trim()).filter(line => line !== '')
-    for (const row of rows.slice(-capacity)) log.events.push(brandEvent(JSON.parse(row) as RemoteDesktopAuditEvent))
+    for (const row of rows.slice(-capacity)) {
+      // A crash mid-append can leave a truncated tail line; drop unreadable
+      // rows instead of failing the whole capability at load.
+      try {
+        log.events.push(brandEvent(JSON.parse(row) as RemoteDesktopAuditEvent))
+      } catch (error) {
+        log.logger.warn(error instanceof Error ? error : new Error(String(error)))
+      }
+    }
     return log
   }
 
-  /** All retained events, oldest first. */
+  /**
+   * All retained events, oldest first.
+   * @returns the bounded in-memory window.
+   */
   all(): RemoteDesktopAuditEvent[] {
     return [...this.events]
   }
 
-  /** Record one event: update the window, then queue its durable append. */
+  /**
+   * Record one event: update the window, then queue its durable append.
+   * @param event - the committed lifecycle event.
+   */
   record(event: RemoteDesktopAuditEvent): void {
     this.events.push(event)
     if (this.events.length > this.capacity) this.events.splice(0, this.events.length - this.capacity)

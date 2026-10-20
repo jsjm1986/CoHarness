@@ -183,7 +183,7 @@ export class RemoteDesktopController extends TypertRemoteService {
       ...(request.includeRevoked === undefined ? {} : { includeRevoked: request.includeRevoked }),
       ...(request.attachable === undefined ? {} : { attachable: request.attachable }),
       sessionId: agent.id,
-    })
+    }).catch(translate)
     return rows.map(grantView)
   }
 
@@ -207,7 +207,7 @@ export class RemoteDesktopController extends TypertRemoteService {
         : { kind: 'session', sessionId: SessionId(request.scope.sessionId), expiresAt: request.scope.expiresAt },
       recording: request.recording,
       grantedBy: actor.principal,
-    }, actor)
+    }, actor).catch(translate)
     return grantView(grant)
   }
 
@@ -226,7 +226,7 @@ export class RemoteDesktopController extends TypertRemoteService {
   ): Promise<RemoteDesktopGrantView> {
     const actor = this.adminActor(signal)
     void agent // Wire-bound routing address; the actor comes from the request principal.
-    const grant = await this.ctx.remoteDesktop.setLevel(RemoteDesktopGrantId(request.grantId), request.level, actor)
+    const grant = await this.ctx.remoteDesktop.setLevel(RemoteDesktopGrantId(request.grantId), request.level, actor).catch(translate)
     return grantView(grant)
   }
 
@@ -241,7 +241,7 @@ export class RemoteDesktopController extends TypertRemoteService {
   async revoke(agent: Agent, request: { grantId: string }, signal: AbortSignal): Promise<RemoteDesktopGrantView> {
     const actor = this.adminActor(signal)
     void agent // Wire-bound routing address; the actor comes from the request principal.
-    const grant = await this.ctx.remoteDesktop.revoke(RemoteDesktopGrantId(request.grantId), actor)
+    const grant = await this.ctx.remoteDesktop.revoke(RemoteDesktopGrantId(request.grantId), actor).catch(translate)
     return grantView(grant)
   }
 

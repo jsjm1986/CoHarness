@@ -7,7 +7,11 @@ import type { Branded } from '@deepseek-ai/dsh-brand'
 /** Opaque grant identity. Consumers never parse it. */
 export type RemoteDesktopGrantId = Branded<'RemoteDesktopGrantId'>
 
-/** Brand a string as a {@link RemoteDesktopGrantId}; provider use only. */
+/**
+ * Brand a string as a {@link RemoteDesktopGrantId}; provider use only.
+ * @param id - the storage identity to brand.
+ * @returns the branded grant identity.
+ */
 export function RemoteDesktopGrantId(id: string): RemoteDesktopGrantId {
   return id as RemoteDesktopGrantId
 }
@@ -15,7 +19,11 @@ export function RemoteDesktopGrantId(id: string): RemoteDesktopGrantId {
 /** Opaque live-attachment identity. */
 export type RemoteDesktopSessionId = Branded<'RemoteDesktopSessionId'>
 
-/** Brand a string as a {@link RemoteDesktopSessionId}; provider use only. */
+/**
+ * Brand a string as a {@link RemoteDesktopSessionId}; provider use only.
+ * @param id - the session identity to brand.
+ * @returns the branded attachment identity.
+ */
 export function RemoteDesktopSessionId(id: string): RemoteDesktopSessionId {
   return id as RemoteDesktopSessionId
 }
@@ -23,7 +31,11 @@ export function RemoteDesktopSessionId(id: string): RemoteDesktopSessionId {
 /** Opaque one-time attach token minted by the provider; the stream endpoint validates it. */
 export type RemoteDesktopToken = Branded<'RemoteDesktopToken'>
 
-/** Brand a string as a {@link RemoteDesktopToken}; provider use only. */
+/**
+ * Brand a string as a {@link RemoteDesktopToken}; provider use only.
+ * @param token - the minted secret to brand.
+ * @returns the branded one-time token.
+ */
 export function RemoteDesktopToken(token: string): RemoteDesktopToken {
   return token as RemoteDesktopToken
 }
