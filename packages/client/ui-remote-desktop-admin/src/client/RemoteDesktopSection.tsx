@@ -90,7 +90,7 @@ export function RemoteDesktopSection(props: SectionProps): ReactNode {
           <option value="session">{t('session')}</option>
         </select>
         {draft.scope === 'session' && <>
-          <input className={css.field} required placeholder={`${t('session')} id`} value={draft.sessionId}
+          <input className={css.field} required placeholder={t('sessionId')} value={draft.sessionId}
             onChange={(event) => { setDraft({ ...draft, sessionId: event.currentTarget.value }) }} />
           <input className={css.field} required type="datetime-local" aria-label={t('expiresAt')} value={draft.expiresAt}
             onChange={(event) => { setDraft({ ...draft, expiresAt: event.currentTarget.value }) }} />

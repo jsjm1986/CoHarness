@@ -18,6 +18,7 @@ kind: "package-reference"
 - [延伸阅读](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
@@ -48,10 +49,16 @@ kind: "package-reference"
 - [远程桌面管理](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/client/ui-remote-desktop-admin)（仓库内为 README.zh.md）
 - [右侧边栏](../../client/ui-sidebar-right/README.zh.md)
 
+**运行时不变量：** 未发布配套入口。attach 状态与目标列表每次渲染都取自 `ctx.remoteDesktops`；插件不保留能力层记录的影子副本。
+
 <a id="model-experience"></a>
 ## 模型体验
 
-本包是面向人类的 Client UI；不贡献任何提示词、工具或模型上下文，其暴露的远程桌面明确服务于人类操作者——Agent 的 computer use 仍是独立的缝。
+无：桌面查看器与 attach 流程是人类操作的面——Agent 的 computer use 仍是独立的缝——不注册任何模型可见内容。
+
+#### KV Cache 影响
+
+无；本插件不贡献任何模型请求前缀。
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
@@ -59,3 +66,13 @@ kind: "package-reference"
 - 引导菜单仅覆盖基于授权的目标发现；存在端点但调用者无授权的目标不会显示。
 - 流 URL 相对页面源站解析；在其他源站上挂载 RFB 的部署应扩展 `ClientRemoteDesktops.attach`，而不是在本层做代理。
 - provider 产出的 RFB 录制尚无产品内回放面。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -18,6 +18,7 @@ Adds a **Remote desktop** section to Settings where an administrator issues gran
 - [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 -----
 
@@ -45,13 +46,28 @@ The section's React-free controller (`admin-store.ts`) owns the snapshot store a
 - [Remote-desktop BFF](../../api/remote-desktop-controller/README.md)
 - [Remote-desktop tabs](../ui-remote-desktop/README.md)
 
+**Runtime invariant:** No companion is published. The store mirrors server grant and audit state fetched through `ctx.remoteDesktops`; the capability owns the authoritative records.
+
 <a id="model-experience"></a>
 ## Model Experience
 
-This package is a human-facing Client UI; it contributes nothing to prompts, tools, or the model context.
+None, as the grant administration section is a human-operated settings surface that registers no model-visible content.
 
-<a id="known-limitations-and-deferred-work"></a>
+#### KV Cache effect
+
+None; the section contributes no model request prefix.
+
 ## Known Limitations and Deferred Work
 
 - Administration binds to the currently selected Session; with no Session selected the section reports that one is required instead of guessing authority.
 - The audit tail is not paginated; deployments relying on large durable audit files read them through the capability's tail capacity.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

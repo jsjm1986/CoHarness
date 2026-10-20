@@ -15,6 +15,23 @@ export interface RfbPump {
   close(): void
 }
 
+/** Optional pump behavior beyond the level defaults. */
+export interface PumpRfbOptions {
+  /** Teardown observer receiving the dropped input-frame count. */
+  onDrop?: (dropped: number) => void
+  /**
+   * Client bytes a managed credential handshake already consumed past
+   * ClientInit; pushed through the input filter before live socket data.
+   */
+  clientResidual?: Buffer
+  /**
+   * The client preamble was consumed host-side by a managed handshake — the
+   * view filter starts in the frame phase instead of parsing a preamble that
+   * never reaches it.
+   */
+  frameOnly?: boolean
+}
+
 /**
  * Pipe `client` to `upstream` under `level`. Server→client always passes
  * through (framebuffer data); client→server is filtered for `view` and raw
@@ -23,16 +40,16 @@ export interface RfbPump {
  * @param client - the browser-side socket end.
  * @param upstream - the dialed VNC endpoint socket.
  * @param level - the enforced access level; `view` installs the input filter.
- * @param onDrop - teardown observer receiving the dropped input-frame count.
+ * @param options - residual bytes, managed-handshake framing, and the drop observer.
  * @returns the pump handle whose `done` settles on teardown.
  */
 export function pumpRfb(
   client: Duplex,
   upstream: Duplex,
   level: RemoteDesktopLevel,
-  onDrop?: (dropped: number) => void,
+  options: PumpRfbOptions = {},
 ): RfbPump {
-  const filter = level === 'view' ? new RfbClientFilter() : undefined
+  const filter = level === 'view' ? new RfbClientFilter(options.frameOnly ? 'frame' : 'version') : undefined
   let settled = false
   let resolveDone!: () => void
   let rejectDone!: (error: Error) => void
@@ -44,18 +61,14 @@ export function pumpRfb(
   function teardown(error?: Error): void {
     if (settled) return
     settled = true
-    if (filter && filter.dropped > 0) onDrop?.(filter.dropped)
+    if (filter && filter.dropped > 0) options.onDrop?.(filter.dropped)
     client.destroy()
     upstream.destroy()
     if (error) rejectDone(error)
     else resolveDone()
   }
 
-  upstream.on('data', (chunk: Buffer) => {
-    if (!client.write(chunk)) upstream.pause()
-  })
-  client.on('drain', () => upstream.resume())
-  client.on('data', (chunk: Buffer) => {
+  function upstreamChunk(chunk: Buffer): void {
     if (!filter) {
       if (!upstream.write(chunk)) client.pause()
       return
@@ -68,12 +81,22 @@ export function pumpRfb(
       return
     }
     if (allowed.length > 0 && !upstream.write(allowed)) client.pause()
+  }
+
+  upstream.on('data', (chunk: Buffer) => {
+    if (!client.write(chunk)) upstream.pause()
   })
+  client.on('drain', () => upstream.resume())
+  client.on('data', upstreamChunk)
   upstream.on('drain', () => client.resume())
   client.on('close', () => { teardown() })
   client.on('error', (error) => { teardown(error) })
   upstream.on('close', () => { teardown() })
   upstream.on('error', (error) => { teardown(error) })
+
+  if (options.clientResidual !== undefined && options.clientResidual.length > 0) {
+    upstreamChunk(options.clientResidual)
+  }
 
   return { done, close: () => { teardown() } }
 }

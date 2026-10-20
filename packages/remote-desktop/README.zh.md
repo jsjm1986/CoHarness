@@ -21,3 +21,5 @@ Service Definition 位于 `remote-desktop/remote-desktop/`。不同传输（RDP�
 ## 概要
 
 `remote-desktop/` 组为 harness 提供受治理的人类桌面访问：`remote-desktop/` 中的 `ctx.remoteDesktop` 定义授权与强制附件契约；`remote-desktop-vnc/` 在配置的 VNC 端点（macOS 屏幕共享、UltraVNC、KasmVNC/x11vnc）上以 RFB 实现；`api/remote-desktop-controller/` 在已认证会话权限加管理员检查下向浏览器暴露 `status`/`attach`/`listGrants`/`grant`/`setLevel`/`revoke`/`audit`。审计事件记录授权生命周期、attach/detach 与级别提升；录制是 Provider 捕获的每授权标志。
+
+- [远程桌面子系统](../../docs/subsystems/remote-desktop.zh.md) —— 授权模型、强制的 `resolve → attach` 契约、流式会话与审计分类法。

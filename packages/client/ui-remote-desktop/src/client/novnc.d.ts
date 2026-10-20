@@ -25,10 +25,10 @@ declare module '@novnc/novnc/lib/rfb.js' {
   export default class RFB extends EventTarget {
     /**
      * @param target - element the client canvas fills.
-     * @param urlOrChannel - `ws(s)://` endpoint or a pre-connected channel.
+     * @param urlOrChannel - `ws(s)://` endpoint or a pre-connected channel object (Websock-compatible).
      * @param options - connection options.
      */
-    constructor(target: HTMLElement, urlOrChannel: string, options?: RfbOptions)
+    constructor(target: HTMLElement, urlOrChannel: string | object, options?: RfbOptions)
     /** Drop keyboard/pointer events before they reach the socket; the server enforces the same level. */
     viewOnly: boolean
     /** Scale the remote framebuffer to the container size. */

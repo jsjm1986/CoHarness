@@ -24,11 +24,11 @@ class FakeChannel {
 it('answers the RFB 003.889 banner and advances to security negotiation', () => {
   const host = document.createElement('div')
   const channel = new FakeChannel()
-  const rfb = new RFB(host, channel as unknown as string, {}) as unknown as { _rfbInitState: string }
+  const rfb = new RFB(host, channel, {})
   channel.readyState = 1
   ;(channel.onopen as (e: unknown) => void)?.call(channel, {})
   ;(channel.onmessage as (e: unknown) => void)?.call(channel, { data: new TextEncoder().encode('RFB 003.889\n').buffer })
   const out = channel.sent.map(b => new TextDecoder().decode(b)).join('')
   expect(out).toContain('RFB')
-  expect(rfb._rfbInitState).toBe('Security')
+  expect(Reflect.get(rfb, '_rfbInitState')).toBe('Security')
 })

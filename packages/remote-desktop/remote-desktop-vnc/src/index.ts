@@ -37,8 +37,11 @@ import type {
   RemoteDesktopTargetStatus,
 } from '@deepseek-ai/dsh-remote-desktop'
 import { pumpRfb, type RfbPump } from './bridge.ts'
+import { managedHandshake } from './managed.ts'
 import { matchingGrants, VncGrantStore } from './grants.ts'
 import { VncAuditLog } from './audit.ts'
+import { credentialRef, isCredentialRefName } from '@deepseek-ai/dsh-credentials'
+import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 
 /** Configuration for the VNC remote-desktop provider. */
 export interface Config {
@@ -47,10 +50,26 @@ export interface Config {
    * target keys fail at load.
    */
   endpoints?: {
+    /** Node identifier this endpoint serves; matches `RemoteDesktopTarget.nodeId`. */
     nodeId: string
+    /** Desktop name on the node; omit when the node exposes a single desktop. */
     desktop?: string
+    /** VNC server hostname or address the RFB client dials. */
     host: string
+    /** VNC server TCP port (RFB; conventionally 5900 + display number). */
     port: number
+    /**
+     * Login user name for password-authenticated servers (Apple Remote
+     * Desktop type 30 requires it); meaningless without `passwordRef`.
+     */
+    username?: string
+    /**
+     * Credential reference — an environment-variable name — resolving to the
+     * endpoint's password through `ctx.credentials`. When set, the provider
+     * terminates the RFB security negotiation host-side and the browser
+     * handshake offers only `None`: the password never leaves the host.
+     */
+    passwordRef?: string
   }[]
   /**
    * JSON file `{endpoints: [...]}` maintained by the deployment's
@@ -111,6 +130,38 @@ function endpointKey(target: RemoteDesktopTarget): string {
   return JSON.stringify([target.nodeId, target.desktop ?? ''])
 }
 
+/** One configured VNC endpoint plus its optional managed-credential binding. */
+interface VncEndpoint {
+  readonly host: string
+  readonly port: number
+  readonly username?: string
+  readonly passwordRef?: string
+}
+
+/**
+ * Validate one endpoint row's credential fields and normalize the map value.
+ * `username` without `passwordRef` configures nothing and fails loud;
+ * `passwordRef` alone is valid — None-capable servers ignore it and ARD
+ * selection fails at stream time when a username is required.
+ */
+function endpointRow(
+  row: { host: string; port: number; username?: string; passwordRef?: string },
+  label: string,
+): VncEndpoint {
+  if (row.passwordRef !== undefined && !isCredentialRefName(row.passwordRef)) {
+    throw new RemoteDesktopError(`${label} carries an invalid passwordRef "${row.passwordRef}"`, 'REMOTE_DESKTOP_TRANSPORT')
+  }
+  if (row.username !== undefined && row.passwordRef === undefined) {
+    throw new RemoteDesktopError(`${label} configures username without passwordRef`, 'REMOTE_DESKTOP_TRANSPORT')
+  }
+  return {
+    host: row.host,
+    port: row.port,
+    ...(row.username === undefined ? {} : { username: row.username }),
+    ...(row.passwordRef === undefined ? {} : { passwordRef: row.passwordRef }),
+  }
+}
+
 /** Bound on tokens minted but not yet consumed by a stream handshake. */
 const MAX_PENDING_ATTACHMENTS = 1024
 
@@ -124,9 +175,11 @@ export class VncRemoteDesktop extends RemoteDesktop {
   static Config: z<Config> = z.object({
     endpoints: z.array(z.object({
       nodeId: z.string(),
-      desktop: z.string(),
+      desktop: z.string().required(false),
       host: z.string(),
       port: z.number().step(1).min(1).max(65_535),
+      username: z.string().required(false),
+      passwordRef: z.string().required(false),
     })).default([]),
     /** JSON file `{endpoints: [...]}` maintained by the deployment's
      * administration surface; when set it replaces the inline list and is
@@ -141,7 +194,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
     probeTimeoutMs: z.number().step(1).min(1).default(3_000),
   })
 
-  private readonly endpoints = new Map<string, { host: string; port: number }>()
+  private readonly endpoints = new Map<string, VncEndpoint>()
   private endpointsMtimeMs = 0
   private readonly pending = new Map<RemoteDesktopToken, PendingAttach>()
   private readonly live = new Map<RemoteDesktopSessionId, LiveSession>()
@@ -157,7 +210,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
       if (this.endpoints.has(key)) {
         throw new RemoteDesktopError(`duplicate remote-desktop endpoint for "${key}"`, 'REMOTE_DESKTOP_TRANSPORT')
       }
-      this.endpoints.set(key, { host: endpoint.host, port: endpoint.port })
+      this.endpoints.set(key, endpointRow(endpoint, `endpoint "${key}"`))
     }
     this.ready = this.init()
     ctx.effect(() => () => {
@@ -340,7 +393,24 @@ export class VncRemoteDesktop extends RemoteDesktop {
       return
     }
     if (recorder) upstream.on('data', (chunk: Buffer) => recorder.write(chunk))
-    const pump = pumpRfb(socket, upstream, entry.spec.level)
+    let residuals: { client?: Buffer; upstream?: Buffer } = {}
+    const passwordRef = endpoint.passwordRef
+    if (passwordRef !== undefined) {
+      try {
+        residuals = await this.managedStreamHandshake(socket, upstream, { username: endpoint.username, passwordRef })
+      } catch (error) {
+        recorder?.end()
+        upstream.destroy()
+        socket.destroy()
+        this.finishDetach(entry.sessionId)
+        throw error
+      }
+    }
+    if (residuals.upstream !== undefined && residuals.upstream.length > 0) socket.write(residuals.upstream)
+    const pump = pumpRfb(socket, upstream, entry.spec.level, {
+      ...(passwordRef === undefined ? {} : { frameOnly: true }),
+      ...(residuals.client === undefined ? {} : { clientResidual: residuals.client }),
+    })
     session.pump = pump
     try {
       await pump.done
@@ -348,6 +418,35 @@ export class VncRemoteDesktop extends RemoteDesktop {
       recorder?.end()
       if (this.live.has(entry.sessionId)) this.finishDetach(entry.sessionId)
     }
+  }
+
+  /**
+   * The credential-managed leg of {@link serveStream}: resolve the endpoint's
+   * `passwordRef` per stream through `ctx.credentials`, then authenticate
+   * host-side so the browser's handshake negotiates `None` and the password
+   * never crosses to the client. Fails loud when the endpoint declares
+   * `passwordRef` but no credentials provider is mounted or the reference
+   * resolves to nothing — a managed endpoint must not silently degrade to the
+   * interactive prompt the browser cannot answer anyway.
+   */
+  private async managedStreamHandshake(
+    socket: Duplex,
+    upstream: Duplex,
+    endpoint: { username?: string | undefined; passwordRef: string },
+  ): Promise<{ client: Buffer; upstream: Buffer }> {
+    const credentials: CredentialProvider | undefined = this.ctx.get('credentials')
+    if (credentials === undefined) {
+      throw new RemoteDesktopError('endpoint declares passwordRef but no credentials provider is mounted', 'REMOTE_DESKTOP_TRANSPORT')
+    }
+    const resolved = await credentials.resolve(credentialRef(endpoint.passwordRef))
+    if (resolved === undefined) {
+      throw new RemoteDesktopError(`endpoint credential "${endpoint.passwordRef}" resolves to nothing`, 'REMOTE_DESKTOP_TRANSPORT')
+    }
+    const handshake = await managedHandshake(socket, upstream, {
+      ...(endpoint.username === undefined ? {} : { username: endpoint.username }),
+      password: resolved.value,
+    })
+    return { client: handshake.clientResidual, upstream: handshake.upstreamResidual }
   }
 
   override async status(
@@ -569,7 +668,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
  * JSON, a non-array `endpoints`, a wrong-shaped row, and duplicate keys all
  * fail with `REMOTE_DESKTOP_TRANSPORT` naming the file.
  */
-function parseEndpointsFile(text: string, file: string): Map<string, { host: string; port: number }> {
+function parseEndpointsFile(text: string, file: string): Map<string, VncEndpoint> {
   const fail = (detail: string): never => {
     throw new RemoteDesktopError(`invalid remote-desktop endpoints file "${file}": ${detail}`, 'REMOTE_DESKTOP_TRANSPORT')
   }
@@ -581,21 +680,43 @@ function parseEndpointsFile(text: string, file: string): Map<string, { host: str
   }
   const rows = (parsed as { endpoints?: unknown }).endpoints
   if (!Array.isArray(rows)) return fail('"endpoints" must be an array')
-  const next = new Map<string, { host: string; port: number }>()
+  const next = new Map<string, VncEndpoint>()
   for (const [index, row] of rows.entries()) {
     if (typeof row !== 'object' || row === null) {
       return fail(`row ${index} must carry string nodeId, optional desktop, string host, and integer port 1-65535`)
     }
-    const endpoint = row as { nodeId?: unknown; desktop?: unknown; host?: unknown; port?: unknown }
+    const endpoint = row as {
+      nodeId?: unknown
+      desktop?: unknown
+      host?: unknown
+      port?: unknown
+      username?: unknown
+      passwordRef?: unknown
+    }
     if (typeof endpoint.nodeId !== 'string'
       || (endpoint.desktop !== undefined && typeof endpoint.desktop !== 'string')
       || typeof endpoint.host !== 'string'
-      || typeof endpoint.port !== 'number' || !Number.isSafeInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65535) {
-      return fail(`row ${index} must carry string nodeId, optional desktop, string host, and integer port 1-65535`)
+      || typeof endpoint.port !== 'number' || !Number.isSafeInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65535
+      || (endpoint.username !== undefined && typeof endpoint.username !== 'string')
+      || (endpoint.passwordRef !== undefined && typeof endpoint.passwordRef !== 'string')) {
+      return fail(`row ${index} must carry string nodeId, optional desktop, string host, integer port 1-65535, and optional string username/passwordRef`)
     }
     const key = endpointKey({ nodeId: endpoint.nodeId, ...(endpoint.desktop === undefined ? {} : { desktop: endpoint.desktop }) })
     if (next.has(key)) return fail(`duplicate endpoint for "${key}"`)
-    next.set(key, { host: endpoint.host, port: endpoint.port })
+    let value: VncEndpoint
+    try {
+      value = endpointRow(
+        {
+          host: endpoint.host, port: endpoint.port,
+          ...(endpoint.username === undefined ? {} : { username: endpoint.username }),
+          ...(endpoint.passwordRef === undefined ? {} : { passwordRef: endpoint.passwordRef }),
+        },
+        `row ${index}`,
+      )
+    } catch (error) {
+      return fail((error as Error).message)
+    }
+    next.set(key, value)
   }
   return next
 }

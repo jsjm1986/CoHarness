@@ -9,7 +9,7 @@ kind: "package-reference"
 
 **`RemoteDesktopController`**（`ctx.remoteDesktopController`，Remote 命名空间 `remoteDesktop`）是浏览器与 `ctx.remoteDesktop` 之间的 BFF。每个方法为身份验证调用者的会话权限，把授权执行委托给能力层，绝不接受调用方提供的 actor。
 
-## 概要
+## 概述
 
 控制器在 Remote 传输上暴露 `status`、`attach`、`listGrants`、`grant`、`setLevel`、`revoke` 与 `audit`。会话作用域调用（`status`、`attach`）绑定被寻址会话用于授权匹配，principal 取自验证过的请求断言；管理调用额外要求管理员角色。独立部署中本地操作员同时具备两种角色。
 
@@ -19,6 +19,7 @@ kind: "package-reference"
 - [授权](#authorization)
 - [模型体验](#model-experience)
 - [已知限制与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
@@ -46,10 +47,16 @@ kind: "package-reference"
 
 `@deepseek-ai/dsh-api-remote-desktop-controller/client` 安装 `ctx.remoteDesktops`（`ClientRemoteDesktops`）：自挂载生成的 `remoteDesktop` Remote 贡献（`./remote`），把每个 `{ ok }` 线侧结果转为抛出的错误，并把 `attach` 返回的 `{ path, token }` 解析为相对 `location` 的绝对 `ws(s)://` URL，再经 `connection.privateResourceUrl` 钉住 `dshTarget`/`dshPrincipal`，让 Gateway 的 upgrade 把 WebSocket 代理到铸造 token 的那个 runtime——仅靠 scope cookie 并不可靠。UI 插件（`ui-remote-desktop`、`ui-remote-desktop-admin`）消费该服务而非直接使用线侧命名空间。
 
+**运行时不变量：** 未发布配套入口。授权、附件与审计的真相存于 `ctx.remoteDesktop`；控制器是无状态的请求翻译器，自身没有可分歧的观察。
+
 <a id="model-experience"></a>
 ## 模型体验
 
-无模型可见面；纯人类 BFF。
+无：本 BFF 命名空间服务于人类操作者，没有任何方法结果进入模型请求。
+
+#### KV Cache 影响
+
+无；该命名空间不贡献任何模型请求前缀。
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
@@ -58,3 +65,13 @@ kind: "package-reference"
 - 能力层拒绝以 `remote-desktop/failure` 呈现，`code` 字段携带稳定的 `RemoteDesktopErrorCode`；`remote-desktop/forbidden` 仍是控制器侧交互用户与管理员检查的线缆码。
 - detach 是隐式的（流关闭）；显式强制 detach 管理方法延后。
 - 会话作用域授权在 attach 时以调用者会话做授权匹配；代表其他会话的授予通过管理员权限下的 `scope.sessionId` 载荷完成。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

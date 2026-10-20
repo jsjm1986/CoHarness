@@ -27,7 +27,7 @@ function remote(): RemoteDesktopRemote {
         stream: { path: '/api/remote-desktop/stream', token: 'tok-1' },
       },
     }),
-  } as unknown as RemoteDesktopRemote
+  } as RemoteDesktopRemote
 }
 
 function fixture(privateResourceUrl?: (value: string) => string): ClientRemoteDesktops {

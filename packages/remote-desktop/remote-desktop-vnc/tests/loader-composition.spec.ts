@@ -83,13 +83,19 @@ async function loadComposition(): Promise<{ ctx: Context; grantsFile: string; en
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([['@deepseek-ai/dsh-remote-desktop-vnc', VncRemoteDesktop]])
+  const unreachable = (name: string) => () => { throw new Error(`unreachable ModuleLoader.${name}`) }
   ctx.loader.internal = {
     version: 'v2',
+    loadCache: new Map(),
     async import(specifier: string) {
       if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
       return modules.get(specifier)
     },
-  } as unknown as NonNullable<typeof ctx.loader.internal>
+    register: unreachable('register'),
+    getOrCreateModuleJob: unreachable('getOrCreateModuleJob'),
+    resolveSync: unreachable('resolveSync'),
+    load: unreachable('load'),
+  }
   await ctx.loader.create({
     name: 'cordis:include',
     config: { path: pathToFileURL(join(root!, 'cordis.yml')).href },

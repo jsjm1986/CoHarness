@@ -28,17 +28,20 @@ Use `dsh-remote-desktop` when an application needs governed human access to remo
 <a id="service-api-ctxremotedesktop"></a>
 ## Service API (`ctx.remoteDesktop`)
 
-A provider subclasses `RemoteDesktop` and implements eight members.
+A provider subclasses `RemoteDesktop` and implements ten members.
 
 | Member | Semantics |
 |---|---|
-| `resolve(request, signal?)` | Match live grants for `{ target, principal?, sessionId? }`, compute the effective level (never exceeding the grants), and produce the enforced spec including the recording flag. Throws `RemoteDesktopError` with `REMOTE_DESKTOP_FORBIDDEN` when no live grant authorizes the request — resolution never silently narrows or widens. |
-| `attach(request, signal?)` | Resolve, then establish the desktop transport and a stream endpoint; returns the `RemoteDesktopSession` owning `detach`. Implementations publish `remote-desktop/attached` only after the attach commits. |
-| `status(target, signal?)` | Read live remote state of one desktop endpoint: reachability plus attachment count. |
-| `listGrants(filter?, signal?)` | List grants; revoked rows require `includeRevoked`, and `attachable` restricts to grants the caller may attach under now — live scope for `sessionId` and a configured endpoint for the target. |
+| `resolve(request, signal?)` | Match live grants for `{ target, principal, sessionId? }`, compute the effective level (never exceeding the grants), and produce the enforced spec including the recording flag. Throws `RemoteDesktopError` with `REMOTE_DESKTOP_FORBIDDEN` when no live grant authorizes the request — resolution never silently narrows or widens. |
+| `confirm(request, signal?)` | Resolve the request, record the caller's consent against the resolved grant set and level (a `consent` audit event), and return the spec the caller acknowledged. |
+| `attach(request, signal?)` | Resolve, then require a consent covering the resolved grants at the requested level — `REMOTE_DESKTOP_CONSENT_REQUIRED` otherwise — establish the desktop transport and a stream endpoint, and return the `RemoteDesktopSession` owning `detach`. Implementations publish `remote-desktop/attached` only after the attach commits. |
+| `serveStream(token, socket, signal?)` | Consume the one-time token minted by `attach`, resolve the pending spec, and pump the desktop protocol over the upgraded socket with the effective level enforced inside the pump. |
+| `status(actor, target, options?, signal?)` | Read live remote state of one desktop endpoint: reachability, attachment count, and the caller's grant summary; requires at least one live grant for `actor.principal`. |
+| `listGrants(actor, filter?, signal?)` | List grants; revoked rows require `includeRevoked`, and `attachable` restricts to grants the caller may attach under now — live scope for `sessionId` and a configured endpoint for the target. Non-admin actors see only their own principal. |
 | `grant(input, actor)` | Issue a grant; `actor.admin === true` required. Publishes `remote-desktop/grants-changed` only after the write commits. |
-| `revoke(id, actor)` | Revoke a grant by id; returns the revoked row. |
-| `audit(filter?, signal?)` | Query capability-owned audit events newest first, optionally restricted to a target or principal. |
+| `setLevel(id, level, actor)` | Change a grant's level; `actor.admin === true` required. |
+| `revoke(id, actor)` | Revoke a grant by id; `actor.admin === true` required. |
+| `audit(actor, filter?, signal?)` | Query capability-owned audit events newest first, optionally restricted to a target or principal; non-admin actors see only their own events. |
 
 <a id="the-remote-desktop-events"></a>
 ## The `remote-desktop/*` events
@@ -58,20 +61,30 @@ The effective level is the maximum level across matching live grants; a session 
 <a id="vocabulary"></a>
 ## Vocabulary
 
-`RemoteDesktopGrantId` / `RemoteDesktopSessionId` / `RemoteDesktopToken` are branded opaque ids. `RemoteDesktopTarget` names a node plus an optional desktop identity (omitted selects the primary desktop). `RemoteDesktopSpec` is the resolved contract: target, effective level, authorizing grants, and recording flag. `RemoteDesktopSession` carries the branded session id, its spec, and the one-time stream endpoint (`path` + `token`) the browser client opens. `RemoteDesktopAuditEvent` is the closed taxonomy — `grant`, `revoke`, `set-level`, `attach`, `detach`, `level-escalate` — attributed to an explicit `RemoteDesktopActor`. Failures throw `RemoteDesktopError` carrying a stable `RemoteDesktopErrorCode` (`REMOTE_DESKTOP_FORBIDDEN`, `REMOTE_DESKTOP_TARGET_UNAVAILABLE`, `REMOTE_DESKTOP_GRANT_NOT_FOUND`, `REMOTE_DESKTOP_GRANT_EXPIRED`, `REMOTE_DESKTOP_STALE_TARGET`, `REMOTE_DESKTOP_TRANSPORT`). See `src/types.ts` for the full contracts.
+`RemoteDesktopGrantId` / `RemoteDesktopSessionId` / `RemoteDesktopToken` are branded opaque ids. `RemoteDesktopTarget` names a node plus an optional desktop identity (omitted selects the primary desktop). `RemoteDesktopSpec` is the resolved contract: target, effective level, authorizing grants, and recording flag. `RemoteDesktopSession` carries the branded session id, its spec, and the one-time stream endpoint (`path` + `token`) the browser client opens. `RemoteDesktopAuditEvent` is the closed taxonomy — `consent`, `grant`, `revoke`, `set-level`, `attach`, `detach`, `level-escalate` — attributed to an explicit `RemoteDesktopActor`. Failures throw `RemoteDesktopError` carrying a stable `RemoteDesktopErrorCode` (`REMOTE_DESKTOP_FORBIDDEN`, `REMOTE_DESKTOP_TARGET_UNAVAILABLE`, `REMOTE_DESKTOP_GRANT_NOT_FOUND`, `REMOTE_DESKTOP_GRANT_EXPIRED`, `REMOTE_DESKTOP_STALE_TARGET`, `REMOTE_DESKTOP_TRANSPORT`, `REMOTE_DESKTOP_CONSENT_REQUIRED`). See `src/types.ts` for the full contracts.
+
+**Runtime invariant:** No companion is published. The Service Definition declares the contract only; provider implementations own every observable runtime relationship.
 
 <a id="model-experience"></a>
 ## Model Experience
 
-No model-visible surface. This capability serves human users through the API and browser client; nothing in it enters prompts, tool schemas, or model results, so it has no token or KV-cache effect.
+None, as the capability serves human desktop access through the API and browser client; nothing in it enters prompts, tool schemas, or model results.
 
-<a id="known-limitations-and-deferred-work"></a>
+#### KV Cache effect
+
+None; the capability contributes no model request prefix.
+
 ## Known Limitations and Deferred Work
 
 - The audit-event taxonomy is defined here; durable audit storage lands with its provider (see `@deepseek-ai/dsh-remote-desktop-vnc`).
 - Screen recording is a per-grant flag carried on the spec; the recording pipeline is provider behavior.
 
 <a id="dev-note"></a>
-## Dev Note
+### Dev Note
 
-This package owns only the Service Definition — no provider implementation. It publishes no `./invariant` companion because it owns no observable runtime relationship; the provider package owns what it can check.
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+This package owns only the Service Definition — no provider implementation.
+
+</details>

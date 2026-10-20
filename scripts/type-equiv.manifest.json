@@ -2586,6 +2586,71 @@
       "doc": "docs/subsystems/memory.md",
       "symbol": "MemoryCursor",
       "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopTarget",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopLevel",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopGrantScope",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopGrant",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopAttachRequest",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopSpec",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopStream",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopSession",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopActor",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopErrorCode",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopTargetStatus",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopGrantFilter",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/remote-desktop.md",
+      "symbol": "RemoteDesktopGrantInput",
+      "source": "packages/remote-desktop/remote-desktop/src/types.ts"
     }
   ]
 }

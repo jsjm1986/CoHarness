@@ -10,25 +10,31 @@
   zh: 8e990964ee192c12
 /deepseek-ai-dsh-remote-desktop-vnc/summary:
   en: c69ce9c9ebfdfdd1
-  zh: 5bc5b9e2273cafa4
+  zh: 18901b343143da67
 /deepseek-ai-dsh-remote-desktop-vnc/table-of-contents:
-  en: 278f218f00fd119c
-  zh: b7c57f5d48465381
+  en: 44a97d20b47c965f
+  zh: 57e087a65dd06a37
 /deepseek-ai-dsh-remote-desktop-vnc/configuration:
-  en: 2877ccf913872270
-  zh: feebe939a2f5480d
+  en: e0b5e24ba8300a45
+  zh: feb37623c1f16455
 /deepseek-ai-dsh-remote-desktop-vnc/attachment-flow:
-  en: f78bb4bf1a1cf2bf
-  zh: 828129493d03fc87
+  en: f220c415792f856c
+  zh: 87d9dc23aa4696ea
+/deepseek-ai-dsh-remote-desktop-vnc/managed-credentials:
+  en: 705a94c8588f8ded
+  zh: 94166c42bc8cd1c7
 /deepseek-ai-dsh-remote-desktop-vnc/view-only-enforcement:
-  en: 61fce5cb7e8878b5
-  zh: 4f315d40ff47e6a7
+  en: 41efabf9bfe1bea4
+  zh: b4e00d8d0f515310
 /deepseek-ai-dsh-remote-desktop-vnc/model-experience:
-  en: 4fe23457049e0db0
-  zh: 0d202bccc2f12450
+  en: d03dc543ec417a50
+  zh: d51d67f5d2129474
+/deepseek-ai-dsh-remote-desktop-vnc/model-experience/kv-cache-effect:
+  en: 6df5d919e32a2969
+  zh: ce383c7d4273feea
 /deepseek-ai-dsh-remote-desktop-vnc/known-limitations-and-deferred-work:
-  en: a79d514fa03f9f7d
-  zh: 440fd45dd8b370ca
-/deepseek-ai-dsh-remote-desktop-vnc/dev-note:
-  en: b4209f97d7b31041
-  zh: 6ee3a4d2c7865ad0
+  en: 9df34498fe0587dd
+  zh: 099a2fd3481f0d8f
+/deepseek-ai-dsh-remote-desktop-vnc/known-limitations-and-deferred-work/dev-note:
+  en: e6f880c18f52a85c
+  zh: 55ca84ca75079abb

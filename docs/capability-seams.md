@@ -286,6 +286,12 @@ flowchart LR
   svc_sessionController["ctx.sessionController<br/>Host Session resolution surface"]
   pkg_experimental_api_speech_to_text["experimental-api-speech-to-text"]
   svc_speechController["ctx.speechController<br/>Experimental transcription Remote"]
+  pkg_remote_desktop["remote-desktop"]
+  svc_remoteDesktop["ctx.remoteDesktop<br/>Human remote-desktop attachment seam"]
+  pkg_remote_desktop_vnc["remote-desktop-vnc"]
+  pkg_remote_desktop_stream["remote-desktop-stream"]
+  pkg_remote_desktop_controller["remote-desktop-controller"]
+  svc_remoteDesktopController["ctx.remoteDesktopController<br/>Remote-desktop grant and session Remote namespace"]
   pkg_experimental_speech_to_text["experimental-speech-to-text"]
   svc_speechToText["ctx.speechToText<br/>Experimental speech recognition providers"]
   pkg_experimental_speech_to_text_sensevoice["experimental-speech-to-text-sensevoice"]
@@ -374,6 +380,9 @@ flowchart LR
   pkg_ptc_runtime --> svc_ptcRuntime
   pkg_ptc_runtime_node --> svc_ptcRuntime
   pkg_pwsh_local --> svc_shell
+  pkg_remote_desktop --> svc_remoteDesktop
+  pkg_remote_desktop_controller --> svc_remoteDesktopController
+  pkg_remote_desktop_vnc --> svc_remoteDesktop
   pkg_sandbox --> svc_sandbox
   pkg_sandbox_local --> svc_sandbox
   pkg_sandbox_policy --> svc_sandboxPolicy
@@ -513,6 +522,8 @@ flowchart LR
   svc_pluginRegistryProbe --> pkg_ui_plugin_manager
   svc_profileContext --> pkg_plugin_manager
   svc_ptcRuntime --> pkg_tools
+  svc_remoteDesktop --> pkg_remote_desktop_controller
+  svc_remoteDesktop --> pkg_remote_desktop_stream
   svc_sandbox --> pkg_bash_sandbox
   svc_sandbox --> pkg_terminal_bash
   svc_sandboxPolicy --> pkg_bash_sandbox
@@ -722,6 +733,8 @@ flowchart LR
 | `ctx.schedule` | `core` | [`schedule`](../packages/schedule/schedule) | - | - | - | Stores tasks independently of Session activation and queues due messages in the original Session. |
 | `ctx.sessionController` | `core` | [`api-remotes`](../packages/api/remotes) | - | [`schedule`](../packages/schedule/schedule) | - | Resolves Session identities to their live Agents for other Host API domains, preserving the resolver's typed refusal codes. |
 | `ctx.speechController` | `core` | [`experimental-api-speech-to-text`](../packages/experimental/api-speech-to-text) | - | - | - | Validates bounded browser audio before provider dispatch. |
+| `ctx.remoteDesktop` | `seam` | [`remote-desktop`](../packages/remote-desktop/remote-desktop) | [`remote-desktop-vnc`](../packages/remote-desktop/remote-desktop-vnc) | [`remote-desktop-stream`](../packages/remote-desktop/remote-desktop-stream), `remote-desktop-controller` | - | resolve maps an authenticated actor to a grant-bounded spec; attach returns a live session and serveStream pumps its channel. |
+| `ctx.remoteDesktopController` | `core` | `remote-desktop-controller` | - | - | - | Maps authenticated request principals to service actors and enforces administrator checks for grant, attach, status, and audit operations. |
 | `ctx.speechToText` | `seam` | [`experimental-speech-to-text`](../packages/experimental/speech-to-text) | [`experimental-speech-to-text-sensevoice`](../packages/experimental/speech-to-text-sensevoice) | [`experimental-api-speech-to-text`](../packages/experimental/api-speech-to-text) | - | Routes explicit recognizers; the browser uses the authenticated Remote and keeps transcripts in the draft until submission. |
 
 Maintenance mode: hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard.

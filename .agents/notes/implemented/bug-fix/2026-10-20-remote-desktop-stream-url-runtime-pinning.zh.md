@@ -22,7 +22,7 @@ Status: implemented
 
 ## Verification
 
-`packages/api/remote-desktop-controller/tests/client-model.spec.ts` 覆盖两个分支：替身 `privateResourceUrl` 产出带 `token`、`dshTarget`、`dshPrincipal` 的 `wss://` URL；没有回调时 URL 只保留 path 与 token。包内全部测试通过。线上复现精确呈现了故障形态：token 铸造在 personal runtime 时，按 `project:3` 发出的 upgrade 立刻以 `1006` 关闭，而 scope 正确的 upgrade 收到了真实端点的 `RFB 003.889` 横幅。
+`packages/api/remote-desktop-controller/tests/client-model.client.spec.ts` 覆盖两个分支：替身 `privateResourceUrl` 产出带 `token`、`dshTarget`、`dshPrincipal` 的 `wss://` URL；没有回调时 URL 只保留 path 与 token。包内全部测试通过。线上复现精确呈现了故障形态：token 铸造在 personal runtime 时，按 `project:3` 发出的 upgrade 立刻以 `1006` 关闭，而 scope 正确的 upgrade 收到了真实端点的 `RFB 003.889` 横幅。
 
 ## Consequences
 
