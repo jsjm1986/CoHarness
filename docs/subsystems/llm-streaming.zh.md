@@ -171,6 +171,10 @@ interface MessageSourceMap {
   model: ModelMessageSource
   tool: ToolMessageSource
   'system-prompt': SystemPromptMessageSource
+  /** Browser fixture transport producer kind; exists only inside fixture-backed web sessions.
+   * @persistenceAttribution
+   */
+  fixture: { kind: 'fixture' }
 }
 ```
 

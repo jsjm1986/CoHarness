@@ -166,6 +166,16 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           expect(initialTurns).toBeLessThan(HISTORY_TURNS)
           let count = initialTurns
           while (count < HISTORY_TURNS) {
+            // The final page lands while the tail count still reads mid-append:
+            // hasMore then unmounts the control before the DOM finishes growing,
+            // so settle for either the control or the complete history first.
+            await page.waitForFunction(
+              ({ selector, total }) => document.querySelectorAll(selector).length >= total
+                || Array.from(document.querySelectorAll('button')).some(button => button.textContent?.trim() === 'Load earlier'),
+              { selector: TAIL, total: HISTORY_TURNS },
+            )
+            count = await page.locator(TAIL).count()
+            if (count >= HISTORY_TURNS) break
             pages.push(await measure(page, async () => {
               await page.getByRole('button', { name: 'Load earlier', exact: true }).click({ force: true })
               await page.waitForFunction(({ selector, previous }) => document.querySelectorAll(selector).length > previous, { selector: TAIL, previous: count })
