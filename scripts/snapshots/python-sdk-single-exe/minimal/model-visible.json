@@ -18,6 +18,76 @@
         }
       },
       {
+        "name": "edit",
+        "description": "Edit an existing UTF-8 text file by replacing literal text.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
+            },
+            "old_string": {
+              "type": "string",
+              "description": "Literal text to replace."
+            },
+            "new_string": {
+              "type": "string",
+              "description": "Literal replacement text. Use an empty string to delete the match."
+            },
+            "replace_all": {
+              "type": "boolean",
+              "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
+            }
+          },
+          "required": [
+            "file_path",
+            "old_string",
+            "new_string"
+          ]
+        }
+      },
+      {
+        "name": "read",
+        "description": "Read a UTF-8 text file and return line-numbered content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to read, resolved by the filesystem backend."
+            },
+            "offset": {
+              "type": "number",
+              "description": "1-based first line to return. Defaults to 1."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of lines to return. Defaults to 2000."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
+        "name": "read_image",
+        "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to the image file, resolved by the filesystem backend."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
         "name": "str_replace_editor",
         "description": "Custom editing tool for viewing, creating and editing files\n* State is persistent across command calls and discussions with the user\n* A null placeholder for a parameter unused by the selected command is treated as omitted. Required parameters still need values; omit str_replace.new_str rather than setting it to null when deleting a match\n* If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep\n* The `create` command cannot be used if the specified `path` already exists as a file\n* If a `command` generates a long output, it will be truncated and marked with `<response clipped>`\n\nNotes for using the `str_replace` command:\n* The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!\n* If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique\n* The `new_str` parameter should contain the edited lines that should replace the `old_str`",
         "parameters": {
@@ -114,12 +184,33 @@
             }
           }
         }
+      },
+      {
+        "name": "write",
+        "description": "Create or fully replace a UTF-8 text file.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
+            },
+            "content": {
+              "type": "string",
+              "description": "Full UTF-8 text content to write."
+            }
+          },
+          "required": [
+            "file_path",
+            "content"
+          ]
+        }
       }
     ],
     "messages": [
       {
         "role": "system",
-        "text": "You are a helpful software engineer assistant."
+        "text": "You are a helpful software engineer assistant.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
       },
       {
         "role": "user",
@@ -146,6 +237,76 @@
         }
       },
       {
+        "name": "edit",
+        "description": "Edit an existing UTF-8 text file by replacing literal text.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
+            },
+            "old_string": {
+              "type": "string",
+              "description": "Literal text to replace."
+            },
+            "new_string": {
+              "type": "string",
+              "description": "Literal replacement text. Use an empty string to delete the match."
+            },
+            "replace_all": {
+              "type": "boolean",
+              "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
+            }
+          },
+          "required": [
+            "file_path",
+            "old_string",
+            "new_string"
+          ]
+        }
+      },
+      {
+        "name": "read",
+        "description": "Read a UTF-8 text file and return line-numbered content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to read, resolved by the filesystem backend."
+            },
+            "offset": {
+              "type": "number",
+              "description": "1-based first line to return. Defaults to 1."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of lines to return. Defaults to 2000."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
+        "name": "read_image",
+        "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to the image file, resolved by the filesystem backend."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
         "name": "str_replace_editor",
         "description": "Custom editing tool for viewing, creating and editing files\n* State is persistent across command calls and discussions with the user\n* A null placeholder for a parameter unused by the selected command is treated as omitted. Required parameters still need values; omit str_replace.new_str rather than setting it to null when deleting a match\n* If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep\n* The `create` command cannot be used if the specified `path` already exists as a file\n* If a `command` generates a long output, it will be truncated and marked with `<response clipped>`\n\nNotes for using the `str_replace` command:\n* The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!\n* If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique\n* The `new_str` parameter should contain the edited lines that should replace the `old_str`",
         "parameters": {
@@ -242,12 +403,33 @@
             }
           }
         }
+      },
+      {
+        "name": "write",
+        "description": "Create or fully replace a UTF-8 text file.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
+            },
+            "content": {
+              "type": "string",
+              "description": "Full UTF-8 text content to write."
+            }
+          },
+          "required": [
+            "file_path",
+            "content"
+          ]
+        }
       }
     ],
     "messages": [
       {
         "role": "system",
-        "text": "You are a helpful software engineer assistant."
+        "text": "You are a helpful software engineer assistant.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
       },
       {
         "role": "user",
@@ -288,6 +470,76 @@
         }
       },
       {
+        "name": "edit",
+        "description": "Edit an existing UTF-8 text file by replacing literal text.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
+            },
+            "old_string": {
+              "type": "string",
+              "description": "Literal text to replace."
+            },
+            "new_string": {
+              "type": "string",
+              "description": "Literal replacement text. Use an empty string to delete the match."
+            },
+            "replace_all": {
+              "type": "boolean",
+              "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
+            }
+          },
+          "required": [
+            "file_path",
+            "old_string",
+            "new_string"
+          ]
+        }
+      },
+      {
+        "name": "read",
+        "description": "Read a UTF-8 text file and return line-numbered content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to read, resolved by the filesystem backend."
+            },
+            "offset": {
+              "type": "number",
+              "description": "1-based first line to return. Defaults to 1."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of lines to return. Defaults to 2000."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
+        "name": "read_image",
+        "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to the image file, resolved by the filesystem backend."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
         "name": "str_replace_editor",
         "description": "Custom editing tool for viewing, creating and editing files\n* State is persistent across command calls and discussions with the user\n* A null placeholder for a parameter unused by the selected command is treated as omitted. Required parameters still need values; omit str_replace.new_str rather than setting it to null when deleting a match\n* If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep\n* The `create` command cannot be used if the specified `path` already exists as a file\n* If a `command` generates a long output, it will be truncated and marked with `<response clipped>`\n\nNotes for using the `str_replace` command:\n* The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!\n* If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique\n* The `new_str` parameter should contain the edited lines that should replace the `old_str`",
         "parameters": {
@@ -384,12 +636,33 @@
             }
           }
         }
+      },
+      {
+        "name": "write",
+        "description": "Create or fully replace a UTF-8 text file.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
+            },
+            "content": {
+              "type": "string",
+              "description": "Full UTF-8 text content to write."
+            }
+          },
+          "required": [
+            "file_path",
+            "content"
+          ]
+        }
       }
     ],
     "messages": [
       {
         "role": "system",
-        "text": "You are a helpful software engineer assistant."
+        "text": "You are a helpful software engineer assistant.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
       },
       {
         "role": "user",
@@ -444,6 +717,76 @@
         }
       },
       {
+        "name": "edit",
+        "description": "Edit an existing UTF-8 text file by replacing literal text.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
+            },
+            "old_string": {
+              "type": "string",
+              "description": "Literal text to replace."
+            },
+            "new_string": {
+              "type": "string",
+              "description": "Literal replacement text. Use an empty string to delete the match."
+            },
+            "replace_all": {
+              "type": "boolean",
+              "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
+            }
+          },
+          "required": [
+            "file_path",
+            "old_string",
+            "new_string"
+          ]
+        }
+      },
+      {
+        "name": "read",
+        "description": "Read a UTF-8 text file and return line-numbered content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to read, resolved by the filesystem backend."
+            },
+            "offset": {
+              "type": "number",
+              "description": "1-based first line to return. Defaults to 1."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of lines to return. Defaults to 2000."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
+        "name": "read_image",
+        "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to the image file, resolved by the filesystem backend."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
         "name": "str_replace_editor",
         "description": "Custom editing tool for viewing, creating and editing files\n* State is persistent across command calls and discussions with the user\n* A null placeholder for a parameter unused by the selected command is treated as omitted. Required parameters still need values; omit str_replace.new_str rather than setting it to null when deleting a match\n* If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep\n* The `create` command cannot be used if the specified `path` already exists as a file\n* If a `command` generates a long output, it will be truncated and marked with `<response clipped>`\n\nNotes for using the `str_replace` command:\n* The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!\n* If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique\n* The `new_str` parameter should contain the edited lines that should replace the `old_str`",
         "parameters": {
@@ -540,12 +883,33 @@
             }
           }
         }
+      },
+      {
+        "name": "write",
+        "description": "Create or fully replace a UTF-8 text file.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
+            },
+            "content": {
+              "type": "string",
+              "description": "Full UTF-8 text content to write."
+            }
+          },
+          "required": [
+            "file_path",
+            "content"
+          ]
+        }
       }
     ],
     "messages": [
       {
         "role": "system",
-        "text": "You are a helpful software engineer assistant."
+        "text": "You are a helpful software engineer assistant.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
       },
       {
         "role": "user",
