@@ -20,10 +20,17 @@ const FRAME_FIXED: Readonly<Record<number, number>> = {
 /** Message types a view-only attachment may send upstream. */
 const VIEW_ALLOWED: ReadonlySet<number> = new Set([0, 1, 2])
 
-/** Byte length of the client's security handshake response, by security type. */
+/**
+ * Byte length of the client's security handshake response, by security type.
+ * Type 30 (Apple Remote Desktop) carries the fixed 128-byte encrypted
+ * credentials plus the 64-byte DH public key of Apple's 512-bit group; a
+ * server negotiating a different key length underframes the next byte into a
+ * message-type check, which still fails closed.
+ */
 function securityResponseBytes(type: number): number {
   if (type === 1) return 0 // None
   if (type === 2) return 16 // VNC authentication (DES challenge response)
+  if (type === 30) return 192 // Apple Remote Desktop: credentials + DH public key
   throw new RemoteDesktopError(
     `RFB security type ${type} cannot be framed on a view-only stream`,
     'REMOTE_DESKTOP_TRANSPORT',

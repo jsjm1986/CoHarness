@@ -79,8 +79,8 @@ export class VncGrantStore {
     try {
       text = await readFile(this.file, 'utf8')
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
-      throw error
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      text = ''
     }
     this.grants.clear()
     for (const line of text.split('\n')) {
