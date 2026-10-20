@@ -211,6 +211,86 @@ describe('managedHandshake', () => {
     client.destroy()
     upstream.destroy()
   })
+
+  it('returns bytes buffered past ClientInit and ServerInit as residuals', async () => {
+    const [client, browserEnd] = duplexPair()
+    const [upstream, serverEnd] = duplexPair()
+    const server = reader(serverEnd)
+    const browser = reader(browserEnd)
+    const serverScript = (async () => {
+      serverEnd.write(Buffer.from('RFB 003.889\n', 'latin1'))
+      await server.take(12)
+      serverEnd.write(Buffer.from([1, 1]))
+      await server.take(1)
+      serverEnd.write(Buffer.alloc(4))
+      await server.take(1)
+      serverEnd.write(Buffer.concat([serverInit('desk'), Buffer.from([0xaa])]))
+    })()
+    const browserScript = (async () => {
+      await browser.take(12)
+      browserEnd.write(Buffer.from('RFB 003.008\n', 'latin1'))
+      await browser.take(2)
+      browserEnd.write(Buffer.from([1]))
+      await browser.take(4)
+      browserEnd.write(Buffer.from([1, 0xbb]))
+      await browser.take(28)
+    })()
+    const result = await managedHandshake(client, upstream, { password: 'x' })
+    await Promise.all([serverScript, browserScript])
+    expect(result.upstreamResidual.equals(Buffer.from([0xaa]))).toBe(true)
+    expect(result.clientResidual.equals(Buffer.from([0xbb]))).toBe(true)
+    client.destroy()
+    upstream.destroy()
+  })
+
+  it('surfaces the upstream refusal reason verbatim', async () => {
+    const [client] = duplexPair()
+    const [upstream, serverEnd] = duplexPair()
+    const r = reader(serverEnd)
+    void (async () => {
+      serverEnd.write(Buffer.from('RFB 003.889\n', 'latin1'))
+      await r.take(12)
+      const reason = Buffer.from('too busy', 'utf8')
+      const head = Buffer.alloc(5)
+      head.writeUInt32BE(reason.length, 1)
+      serverEnd.write(Buffer.concat([head, reason]))
+    })()
+    await expect(managedHandshake(client, upstream, { password: 'x' }))
+      .rejects.toThrow('refused security negotiation: too busy')
+    client.destroy()
+    upstream.destroy()
+  })
+
+  it('rejects a bad upstream banner and a browser preamble that is not RFB', async () => {
+    const [client] = duplexPair()
+    const [upstream, serverEnd] = duplexPair()
+    void (async () => {
+      serverEnd.write(Buffer.from('NOPE 000.000\n', 'latin1'))
+    })()
+    await expect(managedHandshake(client, upstream, { password: 'x' }))
+      .rejects.toThrow('bad RFB banner')
+    client.destroy()
+    upstream.destroy()
+
+    const [client2, browserEnd2] = duplexPair()
+    const [upstream2, serverEnd2] = duplexPair()
+    const r = reader(serverEnd2)
+    const b = reader(browserEnd2)
+    const script = (async () => {
+      serverEnd2.write(Buffer.from('RFB 003.889\n', 'latin1'))
+      await r.take(12)
+      serverEnd2.write(Buffer.from([1, 1]))
+      await r.take(1)
+      serverEnd2.write(Buffer.alloc(4))
+      await b.take(12)
+      browserEnd2.write(Buffer.from('HTTP/1.1 400\n', 'latin1'))
+    })()
+    await expect(managedHandshake(client2, upstream2, { password: 'x' }))
+      .rejects.toThrow('browser sent a bad RFB preamble')
+    await script
+    client2.destroy()
+    upstream2.destroy()
+  })
 })
 
 class TestVnc extends VncRemoteDesktop {
@@ -235,6 +315,14 @@ function grantInput(overrides: Partial<RemoteDesktopGrantInput> = {}): RemoteDes
 }
 
 describe('serveStream with managed credentials', () => {
+  it('rejects a config endpoint with username but no passwordRef at load', async () => {
+    const ctx = new Context()
+    await expect(ctx.plugin(TestVnc, {
+      endpoints: [{ nodeId: 'n1', host: '127.0.0.1', port: 5900, username: 'alice' }],
+      grantsFile: ':memory:',
+    })).rejects.toThrow('username without passwordRef')
+  })
+
   it('splices a credential-managed stream and drops view-level input', async () => {
     const ctx = new Context()
     ctx.provide('credentials', {
