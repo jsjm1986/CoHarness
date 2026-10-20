@@ -14,7 +14,7 @@ type BodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'remoteDes
 
 type Phase =
   | { readonly kind: 'loading' }
-  | { readonly kind: 'denied'; readonly code: string }
+  | { readonly kind: 'denied'; readonly code: string; readonly message: string }
   | { readonly kind: 'consent'; readonly status: RemoteDesktopStatusView }
   | { readonly kind: 'attaching'; readonly status: RemoteDesktopStatusView }
   | { readonly kind: 'live'; readonly status: RemoteDesktopStatusView; readonly attachment: RemoteDesktopAttachment }
@@ -47,8 +47,13 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
     ? { nodeId: params.nodeId, ...(params.desktop === undefined ? {} : { desktop: params.desktop }) }
     : undefined
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
+  const [retry, setRetry] = useState(0)
   const run = useRef(0)
   const gate = useRef<AbortController | undefined>(undefined)
+
+  const deny = (error: unknown): void => {
+    setPhase({ kind: 'denied', code: issueOf(error), message: error instanceof Error ? error.message : String(error) })
+  }
 
   const attachNow = async (current: RemoteDesktopStatusView): Promise<void> => {
     const attempt = run.current
@@ -63,7 +68,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
       if (controller.signal.aborted || run.current !== attempt) return
       const code = issueOf(error)
       if (code === 'consentRequired') setPhase({ kind: 'consent', status: current })
-      else setPhase({ kind: 'denied', code })
+      else setPhase({ kind: 'denied', code, message: error instanceof Error ? error.message : String(error) })
     }
   }
 
@@ -82,7 +87,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
       if (controller.signal.aborted || run.current !== attempt) return
       const code = issueOf(error)
       if (code === 'consentRequired') setPhase({ kind: 'consent', status: current })
-      else setPhase({ kind: 'denied', code })
+      else setPhase({ kind: 'denied', code, message: error instanceof Error ? error.message : String(error) })
     }
   }
 
@@ -100,19 +105,19 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
         else setPhase({ kind: 'consent', status: next })
       } catch (error) {
         if (controller.signal.aborted || run.current !== attempt) return
-        setPhase({ kind: 'denied', code: issueOf(error) })
+        deny(error)
       }
     })()
     return () => { controller.abort(new Error('remote-desktop tab unmounted')) }
-  }, [target?.nodeId, target?.desktop])
+  }, [target?.nodeId, target?.desktop, retry])
 
   if (target === undefined) return <p className={css.notice}>{t('stale')}</p>
   switch (phase.kind) {
     case 'loading': return <p className={css.notice}>{t('connecting')}</p>
     case 'denied': return (
       <div className={css.notice}>
-        <p>{phase.code === 'failed' ? t('failed') : t(phase.code as 'forbidden' | 'unavailable' | 'stale' | 'consentRequired')}</p>
-        <button type="button" className={css.action} onClick={() => { run.current += 1; setPhase({ kind: 'loading' }) }}>{t('retry')}</button>
+        <p>{phase.code === 'failed' ? t('failed').replace('{message}', phase.message) : t(phase.code as 'forbidden' | 'unavailable' | 'stale' | 'consentRequired')}</p>
+        <button type="button" className={css.action} onClick={() => setRetry(count => count + 1)}>{t('retry')}</button>
       </div>
     )
     case 'consent': return (

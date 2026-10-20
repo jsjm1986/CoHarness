@@ -71,6 +71,12 @@ describe('RfbClientFilter', () => {
     expect(() => filter.push(Buffer.from('XYZ 003.008\n'))).toThrow(RemoteDesktopError)
   })
 
+  it('passes an Apple Remote Desktop handshake including its 192-byte response', () => {
+    const filter = new RfbClientFilter()
+    const input = Buffer.concat([handshake(30, 192), FB_UPDATE_REQUEST])
+    expect(filter.push(input).equals(input)).toBe(true)
+  })
+
   it('fails closed on a security type it cannot frame', () => {
     const filter = new RfbClientFilter()
     expect(() => filter.push(Buffer.concat([Buffer.from('RFB 003.008\n', 'latin1'), Buffer.from([16])]))).toThrow(RemoteDesktopError)

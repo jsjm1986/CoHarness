@@ -26,7 +26,7 @@ export interface Config {
 
 /** Validated plugin config: every field defaults. */
 export const Config: z<Config> = z.object({
-  streamPath: z.string().default('/remote-desktop/stream'),
+  streamPath: z.string().default('/api/remote-desktop/stream'),
 })
 
 /** Complete config after schemastery applies every field default. */
