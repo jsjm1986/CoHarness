@@ -32,7 +32,7 @@ export function apply(ctx: Context): void {
     {
       name: 'sidebar.right.tab.guide.entry', key: id, locale: namespace,
       inject: (sessionId): RemoteDesktopGuideInjected => ({
-        listTargets: signal => ctx.remoteDesktops.listGrants(sessionId, {}, signal),
+        listTargets: signal => ctx.remoteDesktops.listGrants(sessionId, { attachable: true }, signal),
       }),
     },
     RemoteDesktopGuide,
@@ -51,7 +51,7 @@ export function apply(ctx: Context): void {
           rfb.focusOnClick = true
           let localClose = false
           rfb.addEventListener('credentialsrequired', (event) => {
-            const types = (event as CustomEvent<{ types?: string[] }>).detail?.types
+            const types = (event as CustomEvent<{ types?: string[] }>).detail.types
             options.onCredentialsRequired?.(types ?? ['password'])
           })
           rfb.addEventListener('disconnect', () => { if (!localClose) options.onDisconnected?.() })

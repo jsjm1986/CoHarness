@@ -30,7 +30,7 @@ kind: "package-reference"
 | `status(agent, target)` | 调用者会话 | 任一授权持有者 | 端点可达性、附件数，以及调用者的授权摘要（`level`/`recording`/`consented`）。 |
 | `confirm(agent, target, level)` | 调用者会话 | 匹配的授权 | 记录覆盖已解析授权集的同意；返回被确认的 spec（含 `recording`）。 |
 | `attach(agent, target, level)` | 调用者会话 | 匹配的授权 + 覆盖同意 | 返回 `{ id, spec, stream }`；无前置 `confirm` 则以 `remote-desktop/failure` `REMOTE_DESKTOP_CONSENT_REQUIRED` 失败。 |
-| `listGrants(agent, filter)` | 调用者会话 | admin 见全部；其他见本人 principal | 授权行，可选包含已撤销。 |
+| `listGrants(agent, filter)` | 调用者会话 | admin 见全部；其他见本人 principal | 授权行，可选包含已撤销；`attachable` 限制为调用者会话当前可挂接的授权。 |
 | `grant(agent, input)` | 管理员会话 | admin | 签发归属调用者的授权。 |
 | `setLevel(agent, grantId, level)` | 管理员会话 | admin | 修改授权级别。 |
 | `revoke(agent, grantId)` | 管理员会话 | admin | 撤销授权。 |

@@ -84,6 +84,8 @@ interface PendingAttach {
   readonly spec: RemoteDesktopSpec
   readonly principal: string
   readonly expiresAt: number
+  /** Self-expiry: an unconsumed token detaches its session so `live` stays accurate. */
+  readonly timer: NodeJS.Timeout
 }
 
 interface LiveSession {
@@ -91,6 +93,8 @@ interface LiveSession {
   readonly session: RemoteDesktopSession
   readonly spec: RemoteDesktopSpec
   readonly principal: string
+  /** The caller's Session address; re-matches session-scoped grants on mutations. */
+  readonly sessionId?: SessionId
   pump?: RfbPump
 }
 
@@ -148,7 +152,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
 
   constructor(ctx: Context, private readonly config: ResolvedConfig) {
     super(ctx)
-    for (const endpoint of config.endpoints ?? []) {
+    for (const endpoint of config.endpoints) {
       const key = `${endpoint.nodeId}${endpoint.desktop ?? ''}`
       if (this.endpoints.has(key)) {
         throw new RemoteDesktopError(`duplicate remote-desktop endpoint for "${key}"`, 'REMOTE_DESKTOP_TRANSPORT')
@@ -158,12 +162,14 @@ export class VncRemoteDesktop extends RemoteDesktop {
     this.ready = this.init()
     ctx.effect(() => () => {
       for (const session of this.live.values()) session.pump?.close()
+      for (const entry of this.pending.values()) clearTimeout(entry.timer)
+      this.pending.clear()
     })
   }
 
   private async init(): Promise<void> {
-    this.store = await VncGrantStore.open(this.config.grantsFile ?? ':memory:')
-    this.auditLog = await VncAuditLog.open(this.config.auditFile ?? ':memory:', this.config.auditCapacity, this.ctx.logger)
+    this.store = await VncGrantStore.open(this.config.grantsFile)
+    this.auditLog = await VncAuditLog.open(this.config.auditFile, this.config.auditCapacity, this.ctx.logger)
     if (this.config.endpointsFile !== '') {
       this.endpoints.clear()
       await this.syncEndpoints()
@@ -180,8 +186,8 @@ export class VncRemoteDesktop extends RemoteDesktop {
     this.endpointsMtimeMs = mtimeMs
     this.endpoints.clear()
     if (info === undefined) return
-    const text = await readFile(file, 'utf8').catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return ''
+    const text = await readFile(file, 'utf8').catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return ''
       throw error
     })
     const parsed = JSON.parse(text) as { endpoints?: { nodeId: string; desktop?: string; host: string; port: number }[] }
@@ -247,26 +253,32 @@ export class VncRemoteDesktop extends RemoteDesktop {
     this.requireConsent(spec, request.principal)
     const id = RemoteDesktopSessionId(randomUUID())
     const token = RemoteDesktopToken(randomBytes(32).toString('base64url'))
-    this.sweepPending()
     if (this.pending.size >= MAX_PENDING_ATTACHMENTS) {
       throw new RemoteDesktopError('too many pending remote-desktop attachments', 'REMOTE_DESKTOP_TRANSPORT')
     }
+    const timer = setTimeout(() => { this.expirePending(token) }, this.config.attachTokenTtlMs)
+    timer.unref()
     this.pending.set(token, {
       sessionId: id,
       spec,
       principal: request.principal,
       expiresAt: Date.now() + this.config.attachTokenTtlMs,
+      timer,
     })
     const session: RemoteDesktopSession = {
       id,
       spec,
       stream: { path: this.config.streamPath, token },
-      detach: async () => {
-        this.pending.delete(token)
-        await this.finishDetach(id)
+      detach: () => {
+        this.dropPending(token)
+        this.finishDetach(id)
+        return Promise.resolve()
       },
     }
-    this.live.set(id, { id, session, spec, principal: request.principal })
+    this.live.set(id, {
+      id, session, spec, principal: request.principal,
+      ...(request.sessionId === undefined ? {} : { sessionId: request.sessionId }),
+    })
     this.record({ kind: 'attach', session: id, spec, principal: request.principal, at: Date.now() })
     this.ctx.emit('remote-desktop/attached', session, true)
     return session
@@ -276,14 +288,16 @@ export class VncRemoteDesktop extends RemoteDesktop {
     await this.ready
     await this.syncEndpoints()
     const entry = this.pending.get(token)
-    this.pending.delete(token)
+    this.dropPending(token)
     if (!entry || entry.expiresAt <= Date.now()) {
       socket.destroy()
+      if (entry !== undefined) this.finishDetach(entry.sessionId)
       throw new RemoteDesktopError('invalid or expired remote-desktop attach token', 'REMOTE_DESKTOP_FORBIDDEN')
     }
     const endpoint = this.endpoints.get(endpointKey(entry.spec.target))
     if (!endpoint) {
       socket.destroy()
+      this.finishDetach(entry.sessionId)
       throw new RemoteDesktopError(
         `no VNC endpoint for "${endpointKey(entry.spec.target)}"`,
         'REMOTE_DESKTOP_TARGET_UNAVAILABLE',
@@ -294,6 +308,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
       upstream = await this.dial(endpoint)
     } catch (error) {
       socket.destroy()
+      this.finishDetach(entry.sessionId)
       throw new RemoteDesktopError(
         `cannot reach VNC endpoint for "${endpointKey(entry.spec.target)}": ${(error as Error).message}`,
         'REMOTE_DESKTOP_TARGET_UNAVAILABLE',
@@ -305,7 +320,21 @@ export class VncRemoteDesktop extends RemoteDesktop {
       socket.destroy()
       return
     }
-    const recorder = await this.openRecorder(entry)
+    let recorder: WriteStream | undefined
+    try {
+      recorder = await this.openRecorder(entry)
+    } catch (error) {
+      upstream.destroy()
+      socket.destroy()
+      this.finishDetach(entry.sessionId)
+      throw error
+    }
+    if (!this.live.has(entry.sessionId)) {
+      recorder?.end()
+      upstream.destroy()
+      socket.destroy()
+      return
+    }
     if (recorder) upstream.on('data', (chunk: Buffer) => recorder.write(chunk))
     const pump = pumpRfb(socket, upstream, entry.spec.level)
     session.pump = pump
@@ -313,7 +342,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
       await pump.done
     } finally {
       recorder?.end()
-      if (this.live.has(entry.sessionId)) await this.finishDetach(entry.sessionId)
+      if (this.live.has(entry.sessionId)) this.finishDetach(entry.sessionId)
     }
   }
 
@@ -361,11 +390,14 @@ export class VncRemoteDesktop extends RemoteDesktop {
     await this.ready
     await this.store.refresh()
     const principal = actor.admin ? filter?.principal : actor.principal
-    return this.store.all().filter(g =>
+    const rows = this.store.all().filter(g =>
       (principal === undefined || g.principal === principal)
       && (filter?.includeRevoked || g.revokedAt === undefined)
       && (filter?.target === undefined
         || (g.target.nodeId === filter.target.nodeId && (g.target.desktop ?? '') === (filter.target.desktop ?? ''))))
+    if (filter?.attachable !== true) return rows
+    const now = Date.now()
+    return rows.filter(g => matchingGrants([g], actor.principal, g.target, filter.sessionId, now).length > 0)
   }
 
   override async grant(input: RemoteDesktopGrantInput, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant> {
@@ -390,6 +422,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
         this.record({ kind: 'level-escalate', session: session.id, from: session.spec.level, to: level, principal: session.principal, at: Date.now() })
       }
     }
+    this.enforceLiveSessions()
     this.ctx.emit('remote-desktop/grants-changed')
     return updated
   }
@@ -400,6 +433,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
     this.requireAdmin(actor)
     const updated = await this.store.update(id, { revokedAt: Date.now() })
     this.record({ kind: 'revoke', grant: updated, actor, at: Date.now() })
+    this.enforceLiveSessions()
     this.ctx.emit('remote-desktop/grants-changed')
     return updated
   }
@@ -447,7 +481,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
     }
   }
 
-  private async finishDetach(id: RemoteDesktopSessionId): Promise<void> {
+  private finishDetach(id: RemoteDesktopSessionId): void {
     const session = this.live.get(id)
     if (!session) return
     this.live.delete(id)
@@ -460,11 +494,33 @@ export class VncRemoteDesktop extends RemoteDesktop {
     this.auditLog.record(event)
   }
 
-  private sweepPending(): void {
+  /**
+   * Detach every live session whose spec level the remaining grants no longer
+   * authorize for its principal and Session address. Runs after grant
+   * mutations so revoke and downgrade take effect on open streams.
+   */
+  private enforceLiveSessions(): void {
+    const grants = this.store.all()
     const now = Date.now()
-    for (const [token, entry] of this.pending) {
-      if (entry.expiresAt <= now) this.pending.delete(token)
+    for (const session of [...this.live.values()]) {
+      const remaining = matchingGrants(grants, session.principal, session.spec.target, session.sessionId, now)
+      const authorized = remaining.length === 0 ? -1 : Math.max(...remaining.map(g => levelRank(g.level)))
+      if (levelRank(session.spec.level) > authorized) this.finishDetach(session.id)
     }
+  }
+
+  private dropPending(token: RemoteDesktopToken): void {
+    const entry = this.pending.get(token)
+    if (entry === undefined) return
+    clearTimeout(entry.timer)
+    this.pending.delete(token)
+  }
+
+  private expirePending(token: RemoteDesktopToken): void {
+    const entry = this.pending.get(token)
+    if (entry === undefined) return
+    this.dropPending(token)
+    this.finishDetach(entry.sessionId)
   }
 
   private async openRecorder(entry: PendingAttach): Promise<WriteStream | undefined> {
@@ -495,7 +551,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
       })
       socket.once('error', fail)
       if (timeoutMs !== undefined) {
-        socket.setTimeout(timeoutMs, () => fail(new RemoteDesktopError('VNC endpoint probe timed out', 'REMOTE_DESKTOP_TARGET_UNAVAILABLE')))
+        socket.setTimeout(timeoutMs, () => { fail(new RemoteDesktopError('VNC endpoint probe timed out', 'REMOTE_DESKTOP_TARGET_UNAVAILABLE')) })
       }
     })
   }

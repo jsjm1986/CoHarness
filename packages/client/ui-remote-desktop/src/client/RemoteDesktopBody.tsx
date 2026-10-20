@@ -1,5 +1,5 @@
 /** Remote-desktop tab body: grant status, explicit consent, attach, and the RFB screen. */
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
@@ -48,7 +48,6 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
     : undefined
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
   const [retry, setRetry] = useState(0)
-  const run = useRef(0)
   const gate = useRef<AbortController | undefined>(undefined)
 
   const deny = (error: unknown): void => {
@@ -56,16 +55,15 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
   }
 
   const attachNow = async (current: RemoteDesktopStatusView): Promise<void> => {
-    const attempt = run.current
     const controller = gate.current
     if (target === undefined || controller === undefined) return
     setPhase({ kind: 'attaching', status: current })
     try {
       const attachment = await attach(target, current.level, controller.signal)
-      if (controller.signal.aborted || run.current !== attempt) return
+      if (controller.signal.aborted) return
       setPhase({ kind: 'live', status: current, attachment })
     } catch (error) {
-      if (controller.signal.aborted || run.current !== attempt) return
+      if (controller.signal.aborted) return
       const code = issueOf(error)
       if (code === 'consentRequired') setPhase({ kind: 'consent', status: current })
       else setPhase({ kind: 'denied', code, message: error instanceof Error ? error.message : String(error) })
@@ -73,18 +71,17 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
   }
 
   const consentNow = async (current: RemoteDesktopStatusView): Promise<void> => {
-    const attempt = run.current
     const controller = gate.current
     if (target === undefined || controller === undefined) return
     setPhase({ kind: 'attaching', status: current })
     try {
       await confirm(target, current.level, controller.signal)
-      if (controller.signal.aborted || run.current !== attempt) return
+      if (controller.signal.aborted) return
       const attachment = await attach(target, current.level, controller.signal)
-      if (controller.signal.aborted || run.current !== attempt) return
+      controller.signal.throwIfAborted()
       setPhase({ kind: 'live', status: current, attachment })
     } catch (error) {
-      if (controller.signal.aborted || run.current !== attempt) return
+      if (controller.signal.aborted) return
       const code = issueOf(error)
       if (code === 'consentRequired') setPhase({ kind: 'consent', status: current })
       else setPhase({ kind: 'denied', code, message: error instanceof Error ? error.message : String(error) })
@@ -93,18 +90,17 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
 
   useEffect(() => {
     if (target === undefined) return
-    const attempt = ++run.current
     const controller = new AbortController()
     gate.current = controller
     void (async () => {
       setPhase({ kind: 'loading' })
       try {
         const next = await status(target, controller.signal)
-        if (controller.signal.aborted || run.current !== attempt) return
+        if (controller.signal.aborted) return
         if (next.consented) await attachNow(next)
         else setPhase({ kind: 'consent', status: next })
       } catch (error) {
-        if (controller.signal.aborted || run.current !== attempt) return
+        if (controller.signal.aborted) return
         deny(error)
       }
     })()
@@ -117,7 +113,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
     case 'denied': return (
       <div className={css.notice}>
         <p>{phase.code === 'failed' ? t('failed').replace('{message}', phase.message) : t(phase.code as 'forbidden' | 'unavailable' | 'stale' | 'consentRequired')}</p>
-        <button type="button" className={css.action} onClick={() => setRetry(count => count + 1)}>{t('retry')}</button>
+        <button type="button" className={css.action} onClick={() => { setRetry(count => count + 1) }}>{t('retry')}</button>
       </div>
     )
     case 'consent': return (
@@ -133,20 +129,22 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
     )
     case 'attaching': return <p className={css.notice}>{t('attaching')}</p>
     case 'live': return (
-      <div className={css.screen}>
-        <div className={css.chrome}>
-          <span className={css.badge}>{phase.attachment.spec.level === 'control' ? t('control') : t('viewOnly')}</span>
-          {phase.attachment.spec.recording && <span className={css.recording}>{t('consentRecording')}</span>}
-        </div>
-        <RfbSurface openScreen={openScreen} url={phase.attachment.url} viewOnly={phase.attachment.spec.level === 'view'} t={t} />
-      </div>
+      <RfbSurface
+        openScreen={openScreen} url={phase.attachment.url} spec={phase.attachment.spec}
+        t={t} onReconnect={() => { setRetry(count => count + 1) }}
+      />
     )
   }
 }
 
-/** The RFB canvas container; mounts the screen once per attachment URL and
- * answers the server's credentials challenge inside the tab. */
-function RfbSurface({ openScreen, url, viewOnly, t }: Pick<RemoteDesktopInjected, 'openScreen'> & Pick<BodyProps, 't'> & { url: string; viewOnly: boolean }): ReactNode {
+/** The live surface: chrome controls plus the RFB canvas. Mounts the screen
+ * once per attachment URL, answers the server's credentials challenge inside
+ * the tab, and offers disconnect/reconnect around the stream's own lifecycle. */
+function RfbSurface({ openScreen, url, spec, t, onReconnect }: Pick<RemoteDesktopInjected, 'openScreen'> & Pick<BodyProps, 't'> & {
+  url: string
+  spec: RemoteDesktopAttachment['spec']
+  onReconnect: () => void
+}): ReactNode {
   const container = useRef<HTMLDivElement>(null)
   const screen = useRef<RemoteDesktopScreen | undefined>(undefined)
   const [challenge, setChallenge] = useState<readonly string[] | undefined>(undefined)
@@ -159,14 +157,19 @@ function RfbSurface({ openScreen, url, viewOnly, t }: Pick<RemoteDesktopInjected
     setClosed(false)
     setChallenge(undefined)
     const next = openScreen(host, url, {
-      viewOnly,
-      onCredentialsRequired: types => setChallenge(types),
-      onDisconnected: () => setClosed(true),
+      viewOnly: spec.level === 'view',
+      onCredentialsRequired: (types) => { setChallenge(types) },
+      onDisconnected: () => { setClosed(true) },
     })
     screen.current = next
     return () => { screen.current = undefined; next.disconnect() }
-  }, [openScreen, url, viewOnly])
-  const sendCredentials = (event: FormEvent): void => {
+  }, [openScreen, url, spec.level])
+  const disconnect = (): void => {
+    setChallenge(undefined)
+    screen.current?.disconnect()
+    setClosed(true)
+  }
+  const sendCredentials = (event: SyntheticEvent): void => {
     event.preventDefault()
     const current = screen.current
     if (current === undefined || challenge === undefined) return
@@ -177,22 +180,34 @@ function RfbSurface({ openScreen, url, viewOnly, t }: Pick<RemoteDesktopInjected
     setPassword('')
     setChallenge(undefined)
   }
-  return <div ref={container} className={css.canvas}>
-    {closed && <p className={css.auth}>{t('closed')}</p>}
-    {challenge !== undefined && !closed && (
-      <form className={css.auth} onSubmit={sendCredentials}>
-        <p className={css.heading}>{t('credentialsTitle')}</p>
-        {challenge.includes('username') && (
-          <input className={css.field} required autoFocus value={username} placeholder={t('username')}
-            aria-label={t('username')} onChange={event => setUsername(event.currentTarget.value)} />
-        )}
-        {challenge.includes('password') && (
-          <input className={css.field} required type="password" autoFocus={!challenge.includes('username')}
-            value={password} placeholder={t('password')} aria-label={t('password')}
-            onChange={event => setPassword(event.currentTarget.value)} />
-        )}
-        <button type="submit" className={css.action}>{t('credentialsAction')}</button>
-      </form>
-    )}
+  return <div className={css.screen}>
+    <div className={css.chrome}>
+      <span className={css.badge}>{spec.level === 'control' ? t('control') : t('viewOnly')}</span>
+      {spec.recording && <span className={css.recording}>{t('consentRecording')}</span>}
+      {!closed && <button type="button" className={css.action} onClick={disconnect}>{t('disconnect')}</button>}
+    </div>
+    <div ref={container} className={css.canvas}>
+      {closed && (
+        <div className={css.auth}>
+          <p>{t('closed')}</p>
+          <button type="button" className={css.action} onClick={onReconnect}>{t('reconnect')}</button>
+        </div>
+      )}
+      {challenge !== undefined && !closed && (
+        <form className={css.auth} onSubmit={sendCredentials}>
+          <p className={css.heading}>{t('credentialsTitle')}</p>
+          {challenge.includes('username') && (
+            <input className={css.field} required autoFocus value={username} placeholder={t('username')}
+              aria-label={t('username')} onChange={(event) => { setUsername(event.currentTarget.value) }} />
+          )}
+          {challenge.includes('password') && (
+            <input className={css.field} required type="password" autoFocus={!challenge.includes('username')}
+              value={password} placeholder={t('password')} aria-label={t('password')}
+              onChange={(event) => { setPassword(event.currentTarget.value) }} />
+          )}
+          <button type="submit" className={css.action}>{t('credentialsAction')}</button>
+        </form>
+      )}
+    </div>
   </div>
 }

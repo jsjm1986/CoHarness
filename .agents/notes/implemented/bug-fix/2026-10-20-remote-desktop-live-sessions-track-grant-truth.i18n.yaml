@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-20-remote-desktop-live-sessions-track-grant-truth.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-live-sessions-track-grant-truth.md
+/agent-note-remote-desktop-live-sessions-track-grant-truth-through-expiry-failure-and-mutation:
+  en: 9305bc28dc27a247
+  zh: 3ed45d3da3350a03
+/agent-note-remote-desktop-live-sessions-track-grant-truth-through-expiry-failure-and-mutation/problem:
+  en: 17bbde7fd4712c6d
+  zh: 44afdf848a2300f2
+/agent-note-remote-desktop-live-sessions-track-grant-truth-through-expiry-failure-and-mutation/decision:
+  en: 9d7d92e649ee1b7d
+  zh: bd4051a49f073a66
+/agent-note-remote-desktop-live-sessions-track-grant-truth-through-expiry-failure-and-mutation/alternatives-considered:
+  en: c7d1b37c9b7839e2
+  zh: 5578637a93ba5a8a
+/agent-note-remote-desktop-live-sessions-track-grant-truth-through-expiry-failure-and-mutation/consequences:
+  en: d57e6a7c58b1d33f
+  zh: 6eb655836b87c5d7

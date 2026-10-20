@@ -5,7 +5,7 @@
  * The dial seam is faked with in-memory duplexes; no ports or listeners.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Duplex } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -182,6 +182,78 @@ describe('VncRemoteDesktop', () => {
     await session.detach()
   })
 
+  it('closes a live stream when its last authorizing grant is revoked', async () => {
+    const first = await svc.grant(grantInput(), ADMIN)
+    const second = await svc.grant(grantInput(), ADMIN)
+    const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
+    await svc.confirm(request)
+    const session = await svc.attach(request)
+    const [browserEnd, clientEnd] = duplexPair()
+    const done = svc.serveStream(session.stream.token, clientEnd)
+    await new Promise(resolve => setImmediate(resolve))
+    await svc.revoke(first.id, ADMIN)
+    const received: Buffer[] = []
+    svc.servers[0]!.on('data', (chunk: Buffer) => received.push(chunk))
+    browserEnd.write(Buffer.concat([HANDSHAKE, FB_UPDATE_REQUEST]))
+    await new Promise(resolve => setImmediate(resolve))
+    expect(Buffer.concat(received).equals(Buffer.concat([HANDSHAKE, FB_UPDATE_REQUEST]))).toBe(true)
+    await svc.revoke(second.id, ADMIN)
+    await done
+    const kinds = (await svc.audit(ADMIN)).map(e => e.kind)
+    expect(kinds).toContain('detach')
+    expect((await svc.audit(ADMIN)).filter(e => e.kind === 'detach')).toHaveLength(1)
+  })
+
+  it('closes a live stream when the level drops below its spec', async () => {
+    const row = await svc.grant(grantInput({ level: 'control' }), ADMIN)
+    const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'control' as const }
+    await svc.confirm(request)
+    const session = await svc.attach(request)
+    const [browserEnd, clientEnd] = duplexPair()
+    const done = svc.serveStream(session.stream.token, clientEnd)
+    await new Promise(resolve => setImmediate(resolve))
+    await svc.setLevel(row.id, 'view', ADMIN)
+    await done
+    browserEnd.destroy()
+  })
+
+  it('detaches a pending session when its attach token expires', async () => {
+    const ctx2 = new Context()
+    const fiber2 = await ctx2.plugin(TestVnc, {
+      endpoints: [{ nodeId: 'n1', host: '127.0.0.1', port: 5900 }],
+      grantsFile: ':memory:',
+      attachTokenTtlMs: 20,
+    })
+    try {
+      const svc2 = ctx2.remoteDesktop as TestVnc
+      await svc2.grant(grantInput(), ADMIN)
+      const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
+      await svc2.confirm(request)
+      await svc2.attach(request)
+      const actor = { principal: 'alice', admin: false }
+      await vi.waitFor(async () => {
+        expect((await svc2.status(actor, { nodeId: 'n1' })).attachments).toBe(0)
+      }, { timeout: 2_000, interval: 20 })
+      expect((await svc2.audit(ADMIN)).map(e => e.kind)).toContain('detach')
+    } finally {
+      await fiber2.dispose()
+    }
+  })
+
+  it('scopes attachable grant listing to the caller and its Session', async () => {
+    await svc.grant(grantInput(), ADMIN)
+    await svc.grant(grantInput({
+      scope: { kind: 'session', sessionId: SessionId('s1'), expiresAt: Date.now() + 60_000 },
+    }), ADMIN)
+    await svc.grant(grantInput({ principal: 'bob' }), ADMIN)
+    const actor = { principal: 'alice', admin: false }
+    expect(await svc.listGrants(actor)).toHaveLength(2)
+    expect(await svc.listGrants(actor, { attachable: true, sessionId: SessionId('s1') })).toHaveLength(2)
+    expect(await svc.listGrants(actor, { attachable: true, sessionId: SessionId('s2') })).toHaveLength(1)
+    expect(await svc.listGrants(actor, { attachable: true })).toHaveLength(1)
+    expect(await svc.listGrants(ADMIN, { attachable: true, sessionId: SessionId('s1') })).toHaveLength(0)
+  })
+
   it('reports endpoint availability and grant summary through status', async () => {
     await svc.grant(grantInput(), ADMIN)
     const actor = { principal: 'alice', admin: false }
@@ -195,12 +267,12 @@ describe('VncRemoteDesktop', () => {
   it('requires an explicit consent covering the resolved grant set', async () => {
     const request = { principal: 'alice', target: { nodeId: 'n1' }, level: 'view' as const }
     await svc.grant(grantInput(), ADMIN)
-    await expect(svc.attach(request)).rejects.toThrowError(/confirm/)
+    await expect(svc.attach(request)).rejects.toThrow(/confirm/)
     const spec = await svc.confirm(request)
     expect(spec.recording).toBe(false)
     await svc.attach(request)
     const extra = await svc.grant(grantInput(), ADMIN)
-    await expect(svc.attach(request)).rejects.toThrowError(/confirm/)
+    await expect(svc.attach(request)).rejects.toThrow(/confirm/)
     await svc.revoke(extra.id, ADMIN)
     await svc.attach(request)
   })
@@ -212,5 +284,8 @@ describe('VncRemoteDesktop', () => {
     const session = await svc.attach(request)
     const [, clientEnd] = duplexPair()
     await expect(svc.serveStream(session.stream.token, clientEnd)).rejects.toThrow(RemoteDesktopError)
+    expect(clientEnd.destroyed).toBe(true)
+    expect(svc.servers[0]!.destroyed).toBe(true)
+    expect((await svc.audit(ADMIN)).map(e => e.kind)).toContain('detach')
   })
 })

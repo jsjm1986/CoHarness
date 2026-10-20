@@ -41,7 +41,7 @@ kind: "package-reference"
 <a id="attachment-flow"></a>
 ## 附件流程
 
-`confirm` 解析调用者授权，记录覆盖已解析授权集、达到请求级别的同意（一条 `consent` 审计事件），并返回 spec 让调用者获知录制标志。随后 `attach` 再次解析，要求存在覆盖同意（否则 `REMOTE_DESKTOP_CONSENT_REQUIRED`——授权集中新增授权、级别提升或重启都需重新 `confirm`），铸造一次性品牌化 token，返回 `{ path, token }`。传输挂载在 `path` 升级客户端 socket 并调用 `serveStream(token, socket)`；Provider 恰好消费一次 token，拨号到配置端点，泵至任一侧关闭。`detach` 与泵拆除共用一条提交路径，记录 `detach` 审计事件并发出 `remote-desktop/attached`。
+`confirm` 解析调用者授权，记录覆盖已解析授权集、达到请求级别的同意（一条 `consent` 审计事件），并返回 spec 让调用者获知录制标志。随后 `attach` 再次解析，要求存在覆盖同意（否则 `REMOTE_DESKTOP_CONSENT_REQUIRED`——授权集中新增授权、级别提升或重启都需重新 `confirm`），铸造一次性品牌化 token，返回 `{ path, token }`。传输挂载在 `path` 升级客户端 socket 并调用 `serveStream(token, socket)`；Provider 恰好消费一次 token，拨号到配置端点，泵至任一侧关闭。`detach` 与泵拆除共用一条提交路径，记录 `detach` 审计事件并发出 `remote-desktop/attached`。已消费的 token 在任何泵前失败（端点缺失、拨号不可达、录制器无法打开）时拆除其会话；未消费的 token 在 `attachTokenTtlMs` 后过期并进入同一条 detach 路径。`revoke` 与 `setLevel` 按剩余授权重估每个存活会话：已解析级别不再被授权的会话被拆除并记录审计。
 
 <a id="view-only-enforcement"></a>
 ## view-only 强制

@@ -9,7 +9,6 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import z from '@deepseek-ai/schemastery'
 import type { IncomingMessage } from 'node:http'
-import type { Socket } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { WebSocketServer } from 'ws'
 import { RemoteDesktopToken } from '@deepseek-ai/dsh-remote-desktop'
@@ -50,7 +49,7 @@ export function apply(ctx: Context, config: ResolvedConfig): void {
           socket.destroy()
           return
         }
-        wss.handleUpgrade(req, socket as Socket, head, (ws) => {
+        wss.handleUpgrade(req, socket, head, (ws) => {
           const duplex = new WebSocketDuplex(ws)
           void mount.remoteDesktop.serveStream(RemoteDesktopToken(token), duplex)
             .catch(() => duplex.destroy())

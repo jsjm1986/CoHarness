@@ -49,5 +49,5 @@ it('shows the empty item in the menu when the caller has no live grants', async 
   const { props } = fixture([])
   render(<RemoteDesktopGuide {...props} />)
   fireEvent.click(screen.getByRole('button', { name: en.connectDescription }))
-  await waitFor(() => expect(screen.getByText(en.targetsEmpty)).toBeTruthy())
+  await waitFor(() => { expect(screen.getByText(en.targetsEmpty)).toBeTruthy() })
 })
