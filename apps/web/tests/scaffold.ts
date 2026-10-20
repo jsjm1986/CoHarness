@@ -33,8 +33,8 @@ import type { Page } from 'playwright'
 import { expect } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
-import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
-import Group from '@deepseek-ai/cordis-plugin-group'
+import { entryListSchema, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
+import * as yaml from 'js-yaml'
 import { scrubModelRequestBulk, stabilizeFixtureMessageIds } from '@deepseek-ai/dsh-session-snapshot'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { assertSessionFixtureVersion, parseSessionFixtureName, parseSnapshotManifest, redactSessionSnapshotIds, sessionFixtureFiles, sessionFixtureName } from '@deepseek-ai/dsh-session-snapshot'
@@ -42,8 +42,15 @@ import {
   auditStartupEntries,
   composeEntries,
   healProfilesModuleFallback,
+  initProfile,
   loadOverlayPatches,
+  loadProfileDirectory,
+  mountRootInclude,
+  readProfileManifest,
+  readProfilePatches,
+  writeProfileManifest,
   type Profile,
+  type ProfileContext,
 } from '@deepseek-ai/dsh-app-boot'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { AssistantStreamAccumulator, expandAssistantStream, LlmAdapter } from '@deepseek-ai/dsh-llm'
@@ -78,6 +85,8 @@ const BASE_PATCH_PATH = join(REPO_ROOT, 'packages/bundle/base/cordis.patch.yml')
 const WEB_PATCH_PATH = join(REPO_ROOT, 'packages/bundle/web-app/cordis.patch.yml')
 /** The installation anchor whose dependency surface the profile module fallback mirrors. */
 const INSTALL_ANCHOR = join(REPO_ROOT, 'apps/cli/package.json')
+/** In-profile bundle carrying this harness's deployment defaults, below editable profile values. */
+const SCAFFOLD_DEFAULTS_BUNDLE = 'dsh-web-scaffold-defaults'
 /** The deployment's own agent-preset root, shipped beside the app's config. */
 const SHIPPED_PRESET_DIR = join(REPO_ROOT, 'apps/cli/config/agent-presets')
 
@@ -439,10 +448,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   const documentRoot = join(storageRoot, 'documents')
   if (maskDeepSeekCredential) Reflect.deleteProperty(process.env, 'DEEPSEEK_API_KEY')
 
-  // The include patch set — the same layer stack the profile boot composes
-  // (bundle patches in dsh.profile.bundles order), applied over the SAME empty root (a
-  // patch id that stops matching a row fails the boot sweep loudly instead of
-  // drifting).
+  // The include overlay set — the CLI-style `--patch` layer the profile boot
+  // applies over its profile-composed bundle layers (a patch id that stops
+  // matching a row fails the boot sweep loudly instead of drifting). The
+  // shipped bundle layers themselves reach the composition through the
+  // scaffold profile below, the same way the launcher reads them.
   const basePatches = loadOverlayPatches('web e2e scaffold', BASE_PATCH_PATH)
   const surfacePatches = loadOverlayPatches('web e2e scaffold', WEB_PATCH_PATH)
   const extraOverlayPatches = options.extraOverlayPath === undefined
@@ -454,9 +464,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     surfaceContext?: boolean
   } | undefined
   const surfaceContext = webRuntimeConfig?.surfaceContext !== false
-  const patches: PatchOptions[] = [
-    ...basePatches,
-    ...surfacePatches,
+  const overlayPatches: PatchOptions[] = [
     // Keyless scenarios retain the recorded default; explicit scenario overlays win.
     ...mode === 'record' || options.deepSeekMissingCredential === true
       ? []
@@ -600,6 +608,20 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       : [{ id: 'llm-deepseek', disabled: true }],
   ]
 
+  // Live fields use a shared deployment layer; process-specific ports and roots stay in CLI overlays.
+  const formEntries = new Set(['agent-default-model', 'agent-preset-registry', 'llm-deepseek', 'llm-pi-ai',
+    'web', 'web-search-deepseek', 'web-deepseek-api', 'agent-loop', 'subagent', 'bash-sandbox', 'pwsh-sandbox',
+    'session-log-deepseek', 'ui-theme', 'locale', 'ui-chat', 'ui-conversation', 'ui-settings', 'ui-settings-general', 'permission'])
+  const formDefaults: PatchOptions[] = []
+  const processOverlays = overlayPatches.map((patch) => {
+    if (patch.id === undefined || !formEntries.has(patch.id) || patch.config === undefined) return patch
+    const config: unknown = patch.config
+    formDefaults.push({ id: patch.id, config })
+    const ordinary = { ...patch }
+    Reflect.deleteProperty(ordinary, 'config')
+    return ordinary
+  })
+
   // Sessions inherit the gateway's process.cwd() default; run the boot from
   // the temp workspace so tool cwd, session cwd, and fixtures agree.
   const originalCwd = process.cwd()
@@ -645,6 +667,37 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     const rootConfig = join(profileDir, 'cordis.yml')
     await writeFile(rootConfig, '[]\n')
     ctx.baseUrl = pathToFileURL(profileDir).href + '/'
+    // A real profile: the shipped web bundles plus each fixture package,
+    // installed the way `dsh plugin add` leaves them. Fixture packages are
+    // installed but not started: the scenario composes them by hand.
+    const dependencies: Record<string, string> = {}
+    const bundles = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']
+    for (const layer of extraLayers) dependencies[layer.packageName] = `file:${layer.packageDir}`
+    // Fixture deployment defaults remain below editable profile values.
+    const fixtureDir = join(profileDir, 'node_modules', SCAFFOLD_DEFAULTS_BUNDLE)
+    await mkdir(fixtureDir, { recursive: true })
+    await writeFile(join(fixtureDir, 'package.json'), JSON.stringify({
+      name: SCAFFOLD_DEFAULTS_BUNDLE,
+      version: '1.0.0',
+      dsh: { bundle: { patch: 'cordis.patch.yml' } },
+    }))
+    await writeFile(join(fixtureDir, 'cordis.patch.yml'), yaml.dump(formDefaults, { schema: entryListSchema }))
+    bundles.push(SCAFFOLD_DEFAULTS_BUNDLE)
+    dependencies[SCAFFOLD_DEFAULTS_BUNDLE] = `file:${fixtureDir}`
+    initProfile(profileDir, bundles)
+    const profileManifest = readProfileManifest('dsh', profileDir)
+    profileManifest.dependencies = dependencies
+    writeProfileManifest(profileDir, profileManifest)
+    const profileContext: ProfileContext = {
+      name: 'scaffold', dir: profileDir, patchPath: profile.patchPath, installAnchor: INSTALL_ANCHOR,
+      cwd: workspaceCwd, home: harnessHome,
+      startedBundles: loadProfileDirectory('dsh', profileDir, INSTALL_ANCHOR).layers.map(layer => layer.packageName),
+      overlays: processOverlays, telemetryDisabledEnv: undefined,
+    }
+    // HMR gates file-driven reloads on application readiness, which the
+    // launcher commits after boot; this direct harness is ready at once.
+    ctx.provide('appReady', { onReady: (listener) => { listener(); return () => {} } })
+    ctx.provide('profileContext', profileContext)
     // This direct Loader harness supplies the same root-path capability as app-boot.
     ctx.provide('dshHomePath', dshHomePath)
     // A host with no command line still provides one: the web bundle's startup
@@ -658,16 +711,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     })
     await ctx.plugin(Loader)
-    ctx.loader.builtins.include = Include
-    // `cordis:group` beside it, exactly as `boot()` registers it: a group row is
-    // how a preset gives one `isolate` realm to a provider and its consumers,
-    // and a preset resolving package names from its own directory cannot reach
-    // `@deepseek-ai/cordis-plugin-group` by name.
-    ctx.loader.builtins.group = Group
-    await ctx.loader.create({
-      name: 'cordis:include',
-      config: { path: pathToFileURL(rootConfig).href, patches },
-    })
+    await mountRootInclude(ctx, rootConfig, readProfilePatches('dsh', profileContext))
     await ctx.loader.await()
     await auditStartupEntries(ctx, 'web e2e scaffold')
     if (options.welcomeNoticePending !== true
