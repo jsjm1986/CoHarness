@@ -436,8 +436,15 @@ describe('task admission and package contracts', () => {
     expect(rows).toEqual([{
       id: 'subagent-codex',
       name: '@deepseek-ai/dsh-subagent-codex',
+    }, {
+      id: 'tool-subagent-codex',
+      name: '@deepseek-ai/dsh-tool-subagent',
+      config: {
+        provider: 'codex',
+        toolName: 'subagent_codex',
+        maxDepth: 'provider-managed',
+      },
     }])
-    expect(JSON.stringify(rows)).not.toContain('tool-subagent')
   })
 
   it('accepts one or more text blocks and rejects empty or non-text tasks', () => {
