@@ -18,7 +18,7 @@ A three-package capability seam owns the human desktop surface; nothing in it re
 
 `dsh-remote-desktop-stream` is the Web transport mount: one exact-path WebSocket upgrade route on `ctx.webServer`, the `?token=` handshake, and a ws→`Duplex` adapter feeding `serveStream`. The minted token — single-use, TTL-bounded — is the stream credential; the route performs no separate authentication.
 
-`dsh-api-remote-desktop-controller` is the BFF: the `remoteDesktop/*` TypertRemoteService namespace. Every method authorizes the caller's session through the shared `userTerminalAuthorization` seam (identity = verified `creator`), maps administrator checks onto `userTerminalAdministration`, and delegates enforcement to the capability — service-side rejection holds even if a deployment miswires policies. `REMOTE_SESSION_POLICIES` declares each method's session path and read/write classification; attach is `execution: 'request'` (a human gesture starts remote execution).
+`dsh-api-remote-desktop-controller` is the BFF: the `remoteDesktop/*` TypertRemoteService namespace. Every method resolves the caller's actor from the request's verified Gateway principal via `gatewayRuntime.interactive()` (identity = claim username, admin = claim role) and delegates enforcement to the capability — service-side rejection holds even if a deployment miswires policies. The substrate was corrected from the terminal-grant delegation this note originally recorded; see the [interactive-principal note](2026-10-20-remote-desktop-interactive-principal.md). `REMOTE_SESSION_POLICIES` declares each method's session path and read/write classification; attach is `execution: 'request'` (a human gesture starts remote execution).
 
 ## Consequences
 
