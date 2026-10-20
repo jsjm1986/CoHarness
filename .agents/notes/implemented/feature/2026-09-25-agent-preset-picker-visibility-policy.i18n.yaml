@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-agent-preset-picker-visibility-policy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-agent-preset-picker-visibility-policy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-25-agent-preset-picker-visibility-policy.md
+document:
+  en: 418fa2805fa480e55dd843c63a1c7f39e4222cde
+  zh: 26074fddd76f81126f6440a65d4824ae8f89d5ba
 /agent-note-agent-preset-picker-visibility-is-a-settings-field-and-the-host-resolves-one-selection-policy:
   en: 252db988f81e26b4
   zh: 54b2cb0eb2bd4417

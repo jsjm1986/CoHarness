@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-12-subagent-persona-tool-filter-and-depth.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-12-subagent-persona-tool-filter-and-depth.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-12-subagent-persona-tool-filter-and-depth.md
+document:
+  en: 8595538b29d2ca04027451cd1552b63ed4a451b2
+  zh: 894f50cc1edb63b25f3fefeac6d008e6c76a2d96
 /agent-note-configure-subagent-persona-tool-visibility-and-depth:
   en: ea51f1e98afc88b7
   zh: 6aa0101b8de5097f

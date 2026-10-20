@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-npm-release-sequences.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-npm-release-sequences.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-10-npm-release-sequences.md
+document:
+  en: 1037837320906e527754df9032acaab34025bf2d
+  zh: 3f572500277bdc656856d50f33905f4f05b510b2
 /agent-note-private-npm-publication-as-three-independent-sequences:
   en: 176f873a6b094838
   zh: 9baeba69cbaea9cf

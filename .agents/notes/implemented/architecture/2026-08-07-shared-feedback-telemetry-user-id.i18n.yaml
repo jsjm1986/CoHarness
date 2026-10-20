@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-07-shared-feedback-telemetry-user-id.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-07-shared-feedback-telemetry-user-id.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-07-shared-feedback-telemetry-user-id.md
+document:
+  en: 64b39b839d1c262fd8baee4a4ab17bd49ee759ed
+  zh: 94a67dac8306049b6dcd7552d1eee6a4cc01a2dd
 /agent-note-shared-anonymous-user-id-across-telemetry-feedback-and-deepseek-requests:
   en: c5a45903496ca88d
   zh: f0533210dd504264

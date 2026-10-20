@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-deepseek-search-fetch-api.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-deepseek-search-fetch-api.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-deepseek-search-fetch-api.md
+document:
+  en: 1df773558d055dc8145dc8437920a9e9efe6fa6a
+  zh: 997a7d5509e91d41b449b57c5d2829c3bc011394
 /agent-note-direct-deepseek-search-and-fetch-apis:
   en: fb19be7e7fc65810
   zh: 865aaed5b7f802cc

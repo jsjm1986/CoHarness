@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-10-steward-maintenance-space.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-10-steward-maintenance-space.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-10-steward-maintenance-space.md
+document:
+  en: a23c972edaf888cd45a4a3767f05f79ddfece475
+  zh: d1e514934f2f9c76f063ebdd5f069f139e653759
 /agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime:
   en: c51822f8d73cf0a9
   zh: bf8ac150f127bb79

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-cot-translation-port.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-cot-translation-port.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-cot-translation-port.md
+document:
+  en: 65598f9d8eb2618294f4e987d6f0b5803ffc2fa0
+  zh: 4eef09fc71d2d07181362250821459d00350ce53
 /agent-note-chain-of-thought-translation-port-through-fork-seams:
   en: b6d5f3edebe57587
   zh: 25af37a05ad94ca8

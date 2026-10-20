@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-21-deepseek-llm-api-request-extensions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-21-deepseek-llm-api-request-extensions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-deepseek-llm-api-request-extensions.md
+document:
+  en: 222669e273a7b678eef216ed3e989f0a35359c2b
+  zh: 12605b852d6a81bf3d1e84bfde8333ccd371fc86
 /agent-note-deepseek-llm-api-request-extensions-for-session-logs-and-plugin-packages:
   en: bbb93b705960a21b
   zh: 0fc6fc150215f08f

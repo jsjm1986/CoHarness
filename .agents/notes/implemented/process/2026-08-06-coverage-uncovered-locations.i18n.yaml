@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-coverage-uncovered-locations.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-coverage-uncovered-locations.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-06-coverage-uncovered-locations.md
+document:
+  en: 7a4bd7317bf66d090d73a6a05f361ccc1582f1c4
+  zh: 12560dd9297076746d58f78f5ce3538346082ac8
 /agent-note-exact-uncovered-locations-on-coverage-failure:
   en: 11e17542faf0a552
   zh: 0f8ea4f5f2b76743

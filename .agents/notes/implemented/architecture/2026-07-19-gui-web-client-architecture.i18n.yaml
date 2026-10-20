@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-gui-web-client-architecture.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-gui-web-client-architecture.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.md
+document:
+  en: fd15078951762b0b734490c2ad21b8bd1d4ad16d
+  zh: 170bf852ff7a05d648375885649487e9823f6e19
 /agent-note-web-client-architecture-the-client-cordis-plugin-tree-the-slot-system-and-the-react-free-object-layer:
   en: 40dfaead21fd3018
   zh: 8cfb05f84f3c5685

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-22-rc2-behavior-alignment.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-22-rc2-behavior-alignment.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-22-rc2-behavior-alignment.md
+document:
+  en: a085482fc400273befa80ce08fcc101e0ed70028
+  zh: b707dba3859d79b6ff10d5c8b02d7205f8448476
 /agent-note-rc2-behavior-alignment-without-repository-merge:
   en: 3bec54fa8935017f
   zh: fdd69920e35edabe

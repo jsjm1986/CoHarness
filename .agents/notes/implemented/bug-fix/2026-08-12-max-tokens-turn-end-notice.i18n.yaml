@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-12-max-tokens-turn-end-notice.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-12-max-tokens-turn-end-notice.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-12-max-tokens-turn-end-notice.md
+document:
+  en: bdb34d67a6d8271089af04f6bcd0f046ef7cdea6
+  zh: 9b9c679972570e791b607330195810d68f04c803
 /agent-note-the-chat-flow-surfaces-a-max-tokens-turn-end:
   en: b1c2df67718db3ad
   zh: a72ff1e9726a2892

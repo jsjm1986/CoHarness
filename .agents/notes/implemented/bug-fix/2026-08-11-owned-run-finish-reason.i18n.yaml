@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-11-owned-run-finish-reason.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-11-owned-run-finish-reason.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-11-owned-run-finish-reason.md
+document:
+  en: 87a158c7fedc8c6447306c489ba9f969d95dc412
+  zh: 926a0d14c45168c5ec6ebd9f3493d4c2b3fe3c1c
 /agent-note-owned-run-finish-reason-reporting:
   en: 7a20d78462157056
   zh: 47bcfa4d028b29c4

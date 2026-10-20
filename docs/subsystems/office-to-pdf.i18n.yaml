@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for office-to-pdf.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for office-to-pdf.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/office-to-pdf.md
+document:
+  en: 91814645d7e5f820eebed2fc13edf65a245fe5c1
+  zh: 308958bd3c8e9fe75bf934157db07eb887f8f4d8
 /:
   en: 80b36c20b91461aa
   zh: d3f94ff1f6d010c6

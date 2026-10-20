@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-23-client-plugin-loading-model.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-23-client-plugin-loading-model.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-23-client-plugin-loading-model.md
+document:
+  en: f832dfc36f8d41ae2001a73bdcf25cac76cbe5c7
+  zh: 2a0e9f6a36f96699152fc99c38046da3bf03ee40
 /agent-note-client-plugin-loading-lazy-factories-cordis-lifecycle-and-hot-reload:
   en: 874618fd5ad1d06a
   zh: a5e4bfad490fab34

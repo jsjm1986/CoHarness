@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-goal-owned-durable-events.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-goal-owned-durable-events.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-31-goal-owned-durable-events.md
+document:
+  en: 558ba8b5d3e7a847d1a76ec1c9bac57d5af44e14
+  zh: 2cfeb474719963d0f205252fcb22be608c917955
 /agent-note-goal-owned-durable-events:
   en: a8fca44de335547c
   zh: e0cc7072f2247a19

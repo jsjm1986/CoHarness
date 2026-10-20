@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-02-fs-per-session-cwd.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-02-fs-per-session-cwd.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-02-fs-per-session-cwd.md
+document:
+  en: 23c9f414590df8c79109e46f24af031b765b8f58
+  zh: 6a8ffb357d43bdd61c09a2766e9977d4ad33b128
 /agent-note-resolve-filesystem-paths-against-the-caller-s-session-cwd:
   en: 5569aa7c1a739a51
   zh: fad6a6183599e445

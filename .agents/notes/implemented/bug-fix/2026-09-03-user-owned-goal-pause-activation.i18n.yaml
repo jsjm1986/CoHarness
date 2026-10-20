@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-03-user-owned-goal-pause-activation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-03-user-owned-goal-pause-activation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-03-user-owned-goal-pause-activation.md
+document:
+  en: 47b33a721de24e0348fde616074ca33dca2af042
+  zh: e89a63f11972c133259c7c1d1791a20cd59b3ce3
 /agent-note-user-owned-goal-pause-exposes-live-activation:
   en: 07749eb6ac180964
   zh: b9c1165739fc45bf

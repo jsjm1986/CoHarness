@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-09-nontransactional-loader.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-09-nontransactional-loader.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-09-nontransactional-loader.md
+document:
+  en: 98b0b1ce0c1250e651c5280c9b918948b17cd963
+  zh: 77ae1ce91aa0d20940f0c63f2a2d42a0f3c07edb
 /agent-note-keep-loader-mutations-non-transactional:
   en: 199b544883ab8736
   zh: 4b2ad7d22985d52f

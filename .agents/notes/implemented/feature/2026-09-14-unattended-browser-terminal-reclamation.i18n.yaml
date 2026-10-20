@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-14-unattended-browser-terminal-reclamation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-14-unattended-browser-terminal-reclamation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-14-unattended-browser-terminal-reclamation.md
+document:
+  en: ea34495b0f0cf9e6d4b513cf4b9d2f90449fc9c2
+  zh: 7066975648b9c9e602baebcc4c9e69e99763a51a
 /agent-note-two-hour-reclamation-of-unattended-browser-terminals:
   en: 7d9283383e551b42
   zh: c9d9ed029a0afcf2

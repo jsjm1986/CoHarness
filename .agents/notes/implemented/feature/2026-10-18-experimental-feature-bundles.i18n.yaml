@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-experimental-feature-bundles.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-experimental-feature-bundles.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md
+document:
+  en: cd1e6dec78abcb7e42176b5c74e778e40cc12d03
+  zh: 74ad0ac4914a2af69dcaa1f4c9f9b17a2e1dd746
 /agent-note-experimental-feature-bundles-for-upstream-showcase-rows:
   en: fa2d633298c1d2b1
   zh: 19438ef0ae13fe6d

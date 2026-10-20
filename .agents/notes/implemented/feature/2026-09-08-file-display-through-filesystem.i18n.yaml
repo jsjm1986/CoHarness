@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-08-file-display-through-filesystem.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-08-file-display-through-filesystem.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-08-file-display-through-filesystem.md
+document:
+  en: b1f93f8c9fbd245ad69bc732b2a599c6e0abeb0d
+  zh: faa3fdb757c9a3fc60cae37692a559158e02ceee
 /agent-note-authenticated-file-display-reuses-filesystem-byte-reads:
   en: 1db6d91b6011384e
   zh: 68152c2e3fff2931

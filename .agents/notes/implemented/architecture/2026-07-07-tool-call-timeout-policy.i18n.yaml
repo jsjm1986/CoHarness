@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-07-tool-call-timeout-policy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-07-tool-call-timeout-policy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.md
+document:
+  en: 60d82c1d591f0a32350b1a21ed74e148c4c93576
+  zh: 49ca7f397d15c1a351cba4837d4d531e54120ea6
 /agent-note-tool-call-timeout-policy-as-a-plugin:
   en: 46fa7d1eac4fe061
   zh: 7a62f8f7b1c66722

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-12-experimental-publication-denylist.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-12-experimental-publication-denylist.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-12-experimental-publication-denylist.md
+document:
+  en: f19faa1f391628574fd47e3064130e00c26c831a
+  zh: 92a1c6d5cd0f23615f89d4779f2b9a977b1a8438
 /agent-note-publish-experimental-packages-with-explicit-private-exceptions:
   en: 20aed7271477745f
   zh: 81b50a3ba89b7935

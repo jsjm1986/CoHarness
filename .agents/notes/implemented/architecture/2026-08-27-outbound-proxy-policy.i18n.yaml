@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-27-outbound-proxy-policy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-27-outbound-proxy-policy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-outbound-proxy-policy.md
+document:
+  en: 0f882c95cd1abcfb86da97cde58fe11d83b933d8
+  zh: b03de045a0c9569ff27ed113ac2e0023ac4129ef
 /agent-note-one-outbound-proxy-policy-installed-before-anything-can-request:
   en: b19652a0e1cc1826
   zh: 4d3511e4f0db5b9d

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-07-composer-session-stats-pills.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-07-composer-session-stats-pills.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-07-composer-session-stats-pills.md
+document:
+  en: 89ae3e8eadf0015c49f42a4357a7958fd102fcb4
+  zh: eab9d6dff4af7d4103caebae9e644d08dac2b0f6
 /agent-note-composer-session-stats-two-icon-pills-with-click-open-stat-dialogs:
   en: 76e613674da56884
   zh: 4c9c5d750eace3e0

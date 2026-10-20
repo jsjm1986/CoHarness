@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for web-styling.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for web-styling.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/web-styling.md
+document:
+  en: f92d13b54a8ac24b2195b19693c1f398068b721e
+  zh: be3a0c2664dafcf45068f43c96f80d6dbc2838dd
 /web-ui-style-reference:
   en: aab8007f4e9287d7
   zh: 158960e753f32a91

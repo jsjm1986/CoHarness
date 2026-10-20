@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for maintaining-dsh-code-review.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for maintaining-dsh-code-review.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/maintaining-dsh-code-review.md
+document:
+  en: a8c2a66c065aaec5c03f0ab6965377d1d1eb14bd
+  zh: fca56ffeb35309660ac5284cb8e877eb8648405a
 /maintaining-the-dsh-code-review-skill:
   en: 7356eb0a9cc41144
   zh: 3194fbcf27f4fac1

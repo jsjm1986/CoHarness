@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-telemetry-byte-bounded-requests.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-telemetry-byte-bounded-requests.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-telemetry-byte-bounded-requests.md
+document:
+  en: 226daba2dc8652e33205439bb0e2593d0a03e7d1
+  zh: 5d2ca9b1862ae2dcc6f4d9031f9328760ecbfd38
 /agent-note-byte-bounded-otlp-request-scheduling-for-session-telemetry:
   en: 1428d1c9eb8b1de7
   zh: aa30d3058abac990

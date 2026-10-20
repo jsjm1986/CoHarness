@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-24-project-default-model-access.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-24-project-default-model-access.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-project-default-model-access.md
+document:
+  en: 929df7edc2b0e5e46e4bf91c8e208498d357f72e
+  zh: fa78a72bb595b16891f6508beca7792ca17a80d7
 /agent-note-project-default-model-authorization:
   en: 39ccd6763e7347eb
   zh: a8da882c94b76e89

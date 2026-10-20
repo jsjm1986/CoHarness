@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-remote-event-delivery.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-remote-event-delivery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-10-remote-event-delivery.md
+document:
+  en: 0f0e5f07de43e54a55a6701c0a749e88ad40ae0e
+  zh: b2958b5429aecd1fae578e0f8202222099205d94
 /agent-note-remote-event-delivery-ctx-remote-on:
   en: 7106d0b3c2377bc1
   zh: 57a11b8a480a49dd

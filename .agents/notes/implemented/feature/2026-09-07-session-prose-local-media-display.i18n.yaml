@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-07-session-prose-local-media-display.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-07-session-prose-local-media-display.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-07-session-prose-local-media-display.md
+document:
+  en: 3f44d25ada735469af471cbbc57c998c6b93cad6
+  zh: 5a58c613444c69447ca6e54d28da4ce8a7a19f86
 /agent-note-session-prose-local-media-paths-display-through-a-same-origin-file-route:
   en: 58736e33d45c5578
   zh: 224ab6304833ce7f

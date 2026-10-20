@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-cross-gateway-access-invalidation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-cross-gateway-access-invalidation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-cross-gateway-access-invalidation.md
+document:
+  en: 2b1641b2b93576f235432ef6670ba6c0267973bd
+  zh: 1219d939330bf4f8f310ec867b54530912537dd2
 /agent-note-cross-gateway-access-invalidation:
   en: 7b58c322e6680282
   zh: a95da07738615577

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-new-session-fresh-agent.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-new-session-fresh-agent.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-new-session-fresh-agent.md
+document:
+  en: 87982463867b58621766adeb20a55f8666212a1e
+  zh: 2ff359ea0b04f2072196c1cf481bb987c72d837a
 /agent-note-bare-new-session-mints-a-fresh-session-agent-under-the-current-preset:
   en: b10a4c288ff59b0e
   zh: 0eddca481773964b

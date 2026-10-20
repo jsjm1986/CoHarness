@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-model-governance-byok.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-model-governance-byok.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-model-governance-byok.md
+document:
+  en: ebbcb6a9793d45580f40c385a1e661ce617a31f7
+  zh: 71f2105b6d5af52aa17430983011e1497a27c249
 /agent-note-model-governance-default-deny-and-user-declared-byok-route-authorization:
   en: be0146efb43c6a00
   zh: d01577911bb39e8d

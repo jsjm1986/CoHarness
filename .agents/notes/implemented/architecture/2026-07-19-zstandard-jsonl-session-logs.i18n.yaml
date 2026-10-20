@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-zstandard-jsonl-session-logs.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-zstandard-jsonl-session-logs.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.md
+document:
+  en: 93fc20f931c75552352834b9340e7d38680d4254
+  zh: d58f89430ab91de6beabba83c2a31f43e4a7d275
 /agent-note-zstandard-jsonl-session-logs:
   en: b46a6b48493de93e
   zh: 0e394abf1d11fd43

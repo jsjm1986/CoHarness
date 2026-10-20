@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for llm-streaming.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for llm-streaming.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/llm-streaming.md
+document:
+  en: da7aa058c518f5955d654a314e38f959bd19fb95
+  zh: 54af92b0f1014036d121c5b5a8ff08c71b17eb30
 /llm-streaming:
   en: d40ab180baf95513
   zh: 93fddbf35c0d366a

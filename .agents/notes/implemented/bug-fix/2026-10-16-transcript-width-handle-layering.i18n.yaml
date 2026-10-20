@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-16-transcript-width-handle-layering.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-16-transcript-width-handle-layering.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-16-transcript-width-handle-layering.md
+document:
+  en: e3ee9afb9023e61311d2ead3c78d8847e17b0f3e
+  zh: e8c48476b9fcc7b1302d8856bf1d2e6d221ecf24
 /agent-note-transcript-width-handles-stay-behind-chat-content:
   en: 986ba28cd47131de
   zh: 0eb8afc0cb59ab10

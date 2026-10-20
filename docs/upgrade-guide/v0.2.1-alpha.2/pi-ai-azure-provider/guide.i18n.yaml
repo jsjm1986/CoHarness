@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.2/pi-ai-azure-provider/guide.md
+document:
+  en: 1b4119f4d7d2ede8950358b9f6acbc368a21fe4b
+  zh: ad62892268befa29cbf7fecf7d390049cc058854
 /:
   en: 51d5b5b4d2fb1b8a
   zh: 4dc9af2458a8fcac

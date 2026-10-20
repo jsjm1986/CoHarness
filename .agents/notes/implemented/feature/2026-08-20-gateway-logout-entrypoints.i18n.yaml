@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-20-gateway-logout-entrypoints.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-20-gateway-logout-entrypoints.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-gateway-logout-entrypoints.md
+document:
+  en: 9a197ad1ee9cf0494c8f3f3d3ec30895bab50b96
+  zh: 1425a6ec68815735ea3cf86e434bfc970e9bc5dc
 /agent-note-gateway-logout-entry-points:
   en: 5944f6ca7a8341e5
   zh: 15bb301c07a50c5f

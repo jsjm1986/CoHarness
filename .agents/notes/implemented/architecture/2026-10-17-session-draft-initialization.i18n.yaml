@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-17-session-draft-initialization.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-17-session-draft-initialization.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-17-session-draft-initialization.md
+document:
+  en: 97565f53df74a6114f8fd15177d9a8aa9bb1fc62
+  zh: 2b9dbbbeced88679dc440d5bf72484c6c5ebb2b9
 /agent-note-session-draft-initialization-behind-a-root-event:
   en: 964b9161ffb96bb4
   zh: ab9f27ae0053fb07

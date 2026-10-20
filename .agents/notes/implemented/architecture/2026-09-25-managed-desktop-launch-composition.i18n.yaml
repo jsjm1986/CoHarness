@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-managed-desktop-launch-composition.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-managed-desktop-launch-composition.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-25-managed-desktop-launch-composition.md
+document:
+  en: 94c0469943136bc943270cf24c0f5dbf67634252
+  zh: e506bf826255ca0b5c47677a8355bc33530fd69b
 /agent-note-compose-the-managed-desktop-driver-from-node-configuration:
   en: 5c11c87c9409c51d
   zh: 87f3f73c96006a32

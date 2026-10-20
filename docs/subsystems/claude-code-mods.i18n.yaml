@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for claude-code-mods.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for claude-code-mods.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/claude-code-mods.md
+document:
+  en: 1d125affae2196f4b0f0d4888cf2a16b05118b6a
+  zh: 696b6af1e7e5d521990326aaf102dd10216e4c0b
 /claude-code-mods-compatibility:
   en: e520df3bf44e1160
   zh: 557956eaf6faf4a7

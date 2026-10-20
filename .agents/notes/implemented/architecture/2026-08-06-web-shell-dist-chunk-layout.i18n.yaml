@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-web-shell-dist-chunk-layout.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-web-shell-dist-chunk-layout.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-web-shell-dist-chunk-layout.md
+document:
+  en: 1c7b4273dc243685317b149e2fd7fddf2a6c18d1
+  zh: d1435215d3c077efc3afaac7b3a7a1c2e2ffdae7
 /agent-note-web-shell-dist-chunk-split-and-directory-layout:
   en: 66e4e679b16bb003
   zh: 41f4553f85b364cd

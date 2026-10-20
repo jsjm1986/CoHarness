@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-ptc-chat-subcall-rows.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-ptc-chat-subcall-rows.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-26-ptc-chat-subcall-rows.md
+document:
+  en: 96c211611026648f780b76a686c8499f31d13228
+  zh: 162a6cf3aca8e82d5a860508295aaf1b48eb0c39
 /agent-note-ptc-mode-chat-rendering-sub-calls-as-native-rows-under-the-parent:
   en: 5e0398dd5ed72f71
   zh: 344d809737f839d9

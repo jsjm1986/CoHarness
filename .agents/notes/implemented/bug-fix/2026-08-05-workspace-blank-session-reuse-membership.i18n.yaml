@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-05-workspace-blank-session-reuse-membership.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-05-workspace-blank-session-reuse-membership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-05-workspace-blank-session-reuse-membership.md
+document:
+  en: 84e9e26c2da87a8c195ff0d810e54667786ab2d5
+  zh: 044122ed21d2febac2fa5c0d547e0e6c65754fb8
 /agent-note-workspace-new-session-reuse-hijacked-cwd-matching-unaccounted-blank-sessions:
   en: 4ec330d363bd0eec
   zh: 9bf31e1ef87949f5

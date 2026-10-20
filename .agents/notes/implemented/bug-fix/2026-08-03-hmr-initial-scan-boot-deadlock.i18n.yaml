@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-03-hmr-initial-scan-boot-deadlock.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-03-hmr-initial-scan-boot-deadlock.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-03-hmr-initial-scan-boot-deadlock.md
+document:
+  en: 500c6b9e08e2094d410cc3df55b1f40bb6340882
+  zh: 4ed7ccf0ed147ec8c3f095fc5627e74b9a712e1f
 /agent-note-hmr-s-initial-scan-deadlocked-a-failing-boot-into-a-silent-exit-13:
   en: 252e1815bc67fd3a
   zh: 9a116a8f356c495c

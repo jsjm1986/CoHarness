@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-22-acp-subagent-backend.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-22-acp-subagent-backend.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-22-acp-subagent-backend.md
+document:
+  en: 25fe5b06b1a53157baa29274fb96fafe27f66562
+  zh: e27aa5f598ca1c1bf78e6b668f47951c2b739ea2
 /agent-note-acp-subagent-backend-out-of-process-delegation:
   en: c1810d9d50b3e5f1
   zh: dfd6a4b8d615c958

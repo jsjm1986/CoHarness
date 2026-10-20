@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-26-mobile-code-card-density.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-26-mobile-code-card-density.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-26-mobile-code-card-density.md
+document:
+  en: ad0882f355dfde142154da397f53dd2bc26249d5
+  zh: 24844117ae780b44a1c6c0647686f6099343e76d
 /agent-note-compact-mobile-code-and-result-cards:
   en: d46443279e76e32a
   zh: 703ddb7863413885

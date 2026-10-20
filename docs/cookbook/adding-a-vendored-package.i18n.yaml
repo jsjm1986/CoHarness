@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for adding-a-vendored-package.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for adding-a-vendored-package.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/adding-a-vendored-package.md
+document:
+  en: 239ac27565204332559038014fabae83fc2d1057
+  zh: 6037d4533da3353034e9860d5968d8b1f105007e
 /cookbook-adding-a-vendored-package:
   en: 4f73c7b48d0e97a0
   zh: 6469d38c65107a83

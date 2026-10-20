@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-10-v6-era-event-admission.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-10-v6-era-event-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-v6-era-event-admission.md
+document:
+  en: 24a3d2c42c6cf2410ca6cbc67e39918f9b275149
+  zh: 1b13ea584137c3aba046d3becf4df51b63f4f5b4
 /agent-note-v6-era-event-types-rejected-by-their-own-migration:
   en: 5ed03674f0d65cdb
   zh: 629a88e6a3e4e588

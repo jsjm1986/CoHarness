@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-settings-panel-yields-to-onboarding.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-settings-panel-yields-to-onboarding.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-settings-panel-yields-to-onboarding.md
+document:
+  en: 62c87396afd4af455a87cdfd496ab28a94061fb1
+  zh: 4a03ed0edf6b4aa577ba40d8a77c46af66e9bea5
 /agent-note-settings-panel-closes-when-an-onboarding-step-appears:
   en: 9e1fa530bde83914
   zh: c8c751bfddf9ede3

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-18-session-independent-automation-triggers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-18-session-independent-automation-triggers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-09-18-session-independent-automation-triggers.md
+document:
+  en: 8b54bcf8bb6a6f9892c2ca3a2b825082680021f1
+  zh: 9dd1d1b32a50cb1cfcfd2fd89994d3a2acba5758
 /agent-note-session-independent-durable-automation-triggers:
   en: 9959fb43045d312f
   zh: 3e4c7954fff6e27d

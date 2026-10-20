@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-02-typert-remote-method-calls.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-02-typert-remote-method-calls.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md
+document:
+  en: d9fefbcd4b18cdd392b07809c1ef22c2357f0a73
+  zh: 0d9691b20696f2176a9918a252aeb7078d171510
 /agent-note-typert-gateway-targeted-method-calls:
   en: 4d77bacdc36f246b
   zh: b884bf274df490af

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-ui-plugin-manager-rc2-parity.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-ui-plugin-manager-rc2-parity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-ui-plugin-manager-rc2-parity.md
+document:
+  en: ccaabb20a41926304629f64f3acf55b68b2e85d3
+  zh: f25c850c8885bdcb3167657b8ceef56e558f3805
 /agent-note-rc-2-parity-for-the-plugin-manager-showcase:
   en: f135a8744f949731
   zh: 86eaac58df3d590f

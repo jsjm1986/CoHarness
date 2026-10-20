@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-18-compaction-capability-seam.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-18-compaction-capability-seam.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md
+document:
+  en: e357a58d9f13554424120140dab0642b4aa640e9
+  zh: e69337e4045fdb391f1b28301366a4879b2a521b
 /agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend:
   en: 6808ccbe73762daa
   zh: 11f3669e6ae4512c

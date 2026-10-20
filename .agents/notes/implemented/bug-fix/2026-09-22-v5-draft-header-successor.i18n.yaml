@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-v5-draft-header-successor.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-v5-draft-header-successor.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-v5-draft-header-successor.md
+document:
+  en: c28b9fa4a681dad99556aa0df39651594a6ac461
+  zh: 4cec38d164ce645e9de301a3cce63c92a39de6b6
 /agent-note-v5-successor-for-declared-draft-headers:
   en: d342eaf54bf31a92
   zh: 5fe2f85778680938

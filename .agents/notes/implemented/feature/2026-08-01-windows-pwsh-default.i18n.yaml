@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-01-windows-pwsh-default.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-01-windows-pwsh-default.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-01-windows-pwsh-default.md
+document:
+  en: ff66b017cedf790c87bc688a1c9b4099c1e9ce9c
+  zh: d287159c6a42b4649bc56019927429e5187e2291
 /agent-note-windows-defaults-to-pwsh:
   en: 2553b692b51c3ce9
   zh: 52c7f9eb7b10162a

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-23-schedule-local-menu.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-23-schedule-local-menu.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-schedule-local-menu.md
+document:
+  en: 51c927cb5d2d37af3aa50a0470d23ef5d03ddcf8
+  zh: 47218e94fe3e2b08d502dddf522bb9ca57c3c2b3
 /agent-note-own-the-schedule-detail-menus-inside-the-schedule-client:
   en: a9ed8f9cf0bdfd66
   zh: ff11822efe6b48b7

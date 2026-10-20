@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-27-bounded-session-write-behind-retention.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-27-bounded-session-write-behind-retention.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-bounded-session-write-behind-retention.md
+document:
+  en: c86463dbae346a1449dfe47f70e7ad6c704227c5
+  zh: 6525001c82cf06a4e2d922189995a6cbc135b109
 /agent-note-bound-session-write-behind-retention-by-events-and-bytes:
   en: 0883d6390d7cc498
   zh: 32975415d6b6d131

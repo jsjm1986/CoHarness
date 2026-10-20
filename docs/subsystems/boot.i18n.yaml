@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for boot.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for boot.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/boot.md
+document:
+  en: 5d6409d53e520ef94a524c4986f37dc94d5acdb9
+  zh: c42675b6c1a6faa77ad6afc9dbb44594542015d6
 /profile-management:
   en: 962b4398c9052959
   zh: 14471c340a9f6e60

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-06-macos-x64-python-runtime.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-06-macos-x64-python-runtime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-06-macos-x64-python-runtime.md
+document:
+  en: 9404c55f93202353e33925e0884f192204ffc237
+  zh: f1e85e8628ec37a9da24590ace5ee4748f0a86bb
 /agent-note-python-runtime-publishes-a-native-macos-x64-wheel:
   en: b19dc0e613ab11fc
   zh: 7881ac29eb86e6d0

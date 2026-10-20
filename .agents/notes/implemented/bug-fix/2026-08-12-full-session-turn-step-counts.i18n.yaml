@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-12-full-session-turn-step-counts.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-12-full-session-turn-step-counts.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-12-full-session-turn-step-counts.md
+document:
+  en: ecfa00dc3e24101953a9d5a724dba17682d839bd
+  zh: 85e2a26b5af51296e20f29af49e909c6e182ea05
 /agent-note-full-session-stats-strip-figures-through-a-sessionstats-projection:
   en: 5d4fd2e8762fec43
   zh: 520cef30f224e8d5

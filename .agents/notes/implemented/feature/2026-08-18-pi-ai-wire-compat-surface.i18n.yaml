@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-18-pi-ai-wire-compat-surface.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-18-pi-ai-wire-compat-surface.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-pi-ai-wire-compat-surface.md
+document:
+  en: 3da2db1ebdf67bcfaf8c872491356b0ef7d0ca89
+  zh: ff9870f5863fb96ee026dfab1b96b4e1f3e6e238
 /agent-note-pi-ai-wire-compatibility-surface-in-llm-pi-ai:
   en: b7200701fe718f62
   zh: b3d341445a75df2e

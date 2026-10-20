@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-provider-teardown-observers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-provider-teardown-observers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-provider-teardown-observers.md
+document:
+  en: f1e3f2840308b51cacf23e5d6a0657f3c41d15a2
+  zh: 836392fac1818f2fe963255eaaf489474a7f952e
 /agent-note-provider-teardown-retains-observers-through-consumer-cleanup:
   en: 96051f5320ae3785
   zh: 522d28165208fa70

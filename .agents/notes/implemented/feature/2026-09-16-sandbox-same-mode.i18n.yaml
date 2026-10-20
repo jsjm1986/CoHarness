@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-16-sandbox-same-mode.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-16-sandbox-same-mode.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-16-sandbox-same-mode.md
+document:
+  en: 5cc24ceb80998c436308c96e237bc78c8cdf572b
+  zh: 193d2a20e35c1ddcad0505fa4826204aa58fd956
 /agent-note-repeated-sandbox-modes-need-no-approval:
   en: 85325770757063d8
   zh: 9c55052551299ddf

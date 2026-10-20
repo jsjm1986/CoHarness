@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-29-terminal-llm-stream-failures.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-29-terminal-llm-stream-failures.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.md
+document:
+  en: d867cda610a4086db493f756bdb5a9d42dd03696
+  zh: 1fa31abffa1b0bb45deb5bf8b521e59347b35ca8
 /agent-note-terminal-llm-stream-failures:
   en: 6195cb1d9b4dd423
   zh: 0c93d3a39e2bc1f4

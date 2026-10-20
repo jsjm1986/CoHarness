@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-chat-fold-disclosure-reset.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-chat-fold-disclosure-reset.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-chat-fold-disclosure-reset.md
+document:
+  en: 6cb19904cd21f882914fa4e5355bf07fa1679ed2
+  zh: 0865820e4fc73eec29613e018c78beeec1736d9e
 /agent-note-a-folded-chat-turn-resets-its-mounted-child-disclosures:
   en: 2806d3abe0b55132
   zh: 099291e5a3f1ebf8

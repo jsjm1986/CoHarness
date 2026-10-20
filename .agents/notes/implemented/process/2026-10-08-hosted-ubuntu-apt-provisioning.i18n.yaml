@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-08-hosted-ubuntu-apt-provisioning.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-08-hosted-ubuntu-apt-provisioning.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-08-hosted-ubuntu-apt-provisioning.md
+document:
+  en: 9609f321fe51a9ae0680dacd81fddbd5c831d592
+  zh: 4118ab8bc886a0d177c1d1bb75546dbf8f00002a
 /agent-note-bounded-authenticated-apt-provisioning-on-hosted-ubuntu-runners:
   en: db747b112cd4c83f
   zh: f1fea62463b1e2f5

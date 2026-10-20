@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-task-surface.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-task-surface.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-04-task-surface.md
+document:
+  en: 8e68c60ad933a812b45efdfccd4a842c6b7700b1
+  zh: ab434c7913ebc408f8b99183e1f1268f84a2832d
 /agent-note-task-surface-for-structured-session-interaction:
   en: fd53b5c7554236fc
   zh: 6ff988716b5624cf

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-10-single-file-executable-sdk-runtime-distribution.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-10-single-file-executable-sdk-runtime-distribution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md
+document:
+  en: e9043973fdef597b65e47a709af3caee88eab235
+  zh: 6ca91372e749556966e68b1c018fd375d6a65914
 /agent-note-executable-sdk-runtime-distribution:
   en: 5ca54419078ba51a
   zh: 30e0c9a6a195d75d

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-20-spawn-agent-preset-selection.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-20-spawn-agent-preset-selection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-20-spawn-agent-preset-selection.md
+document:
+  en: 889591409537fcfd349c540ac05a35911d089ebc
+  zh: 943c8650ca2eb08182071775602133f08b7d706d
 /agent-note-independent-spawn-preset-selection-and-restoration:
   en: 2c57fd9b420af1cc
   zh: 8d0d7a53fc85f746

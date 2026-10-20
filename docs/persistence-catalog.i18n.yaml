@@ -1,12 +1,15 @@
-# Bilingual-pair consistency record for persistence-catalog.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for persistence-catalog.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-catalog.md
+document:
+  en: 1cbdf21e64156304af8dfdf594535b6e951176d8
+  zh: 1892fda25ca1ab64ba4c0911e9c4de8f4cccfdeb
 /:
   en: a11f106978c9dce7
   zh: a11f106978c9dce7
 /session-persistence-event-catalog:
-  en: 4304d931973a44ab
+  en: 1387c4505dde2faf
   zh: 48570fa1c13d6910
 /session-persistence-event-catalog/persistence-type-fingerprints:
   en: e65998160d54f050

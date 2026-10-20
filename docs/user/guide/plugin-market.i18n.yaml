@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for plugin-market.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for plugin-market.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/plugin-market.md
+document:
+  en: 91152f23ed0ddd12f228e7e10d2b3c6244afb447
+  zh: 3b7ca0ea38c44852def98425eda5ec84aab32d53
 /plugin-markets:
   en: 09b2a6328dcae63c
   zh: ac7bce767e4f5011

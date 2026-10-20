@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-continuable-structured-output.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-continuable-structured-output.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-continuable-structured-output.md
+document:
+  en: b47dc822b877210cf585f86fd0069d3727fbe2c5
+  zh: 97342b7d85bdd8d092900c03757d2ff917bfeae5
 /agent-note-continuable-children-accept-an-outputschema-with-scoped-capture:
   en: 6bdebd352f581a91
   zh: df770821f551c1d9

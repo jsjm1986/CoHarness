@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-25-dual-usage-attribution.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-25-dual-usage-attribution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-dual-usage-attribution.md
+document:
+  en: b33a762f85ba6c4447bfda98c79cd1f80744318f
+  zh: 1e44bd8a05f9b8dca3307d1822e65ada355c6212
 /agent-note-separate-billing-ownership-from-project-activity-attribution:
   en: df365e063154fdf2
   zh: c8e403b1c2699b8e

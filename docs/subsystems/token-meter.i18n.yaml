@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for token-meter.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for token-meter.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/token-meter.md
+document:
+  en: 0103f2e79ae898a9f28f241382e1ea78e33b7a0b
+  zh: c377c63a8d7f776430134514177a8fcd06c9a7e6
 /token-meter:
   en: 7b81394f8688ad71
   zh: e38852d59e9793fd

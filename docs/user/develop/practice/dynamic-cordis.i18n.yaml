@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for dynamic-cordis.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for dynamic-cordis.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/develop/practice/dynamic-cordis.md
+document:
+  en: c9065027f3449355aa7a19e16672fa5812cab633
+  zh: 21d0a410d8e27931786a76b9383230a3d30004e5
 /configure-persistent-plugins-from-a-prompt:
   en: 9503745724cbe962
   zh: 985513234a4eda31

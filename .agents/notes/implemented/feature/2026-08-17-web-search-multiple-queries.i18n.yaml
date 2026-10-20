@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-web-search-multiple-queries.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-web-search-multiple-queries.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-web-search-multiple-queries.md
+document:
+  en: f0a8bf3d69763231ee2c1f441ed52e2e0b7a6060
+  zh: 5c6be5e20fdb7ea14fcc8ef3e1275f57a008152f
 /agent-note-web-search-accepts-multiple-queries-in-one-call:
   en: 6dc2a2bc7872fdf1
   zh: c89780c82a3e7898

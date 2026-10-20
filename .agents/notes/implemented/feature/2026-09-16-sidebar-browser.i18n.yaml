@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-16-sidebar-browser.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-16-sidebar-browser.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-16-sidebar-browser.md
+document:
+  en: bdebc46f8907dbbad05eac18468ea1cbac99e4d3
+  zh: 677af8cacfc4a5e52f008b0aada6c3e547e7288c
 /agent-note-sandboxed-sidebar-browser:
   en: eae586a5966353a5
   zh: ca3a7283e3fae594

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-plugin-option-placement.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-plugin-option-placement.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-plugin-option-placement.md
+document:
+  en: dd7782dbe17f71b71451a92ac160539540e00387
+  zh: 2f9920e2917c061807cb6ddfd12c58b3f2367466
 /agent-note-dsh-plugin-reads-profile-only-before-forwarded-pnpm-arguments:
   en: cc3f08c670d78dd5
   zh: 25642c6b578d9e66

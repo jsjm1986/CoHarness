@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-05-durable-web-schedule.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-05-durable-web-schedule.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-durable-web-schedule.md
+document:
+  en: 1effefa0a0a813d28de2220bc23e52919a66613a
+  zh: bb74144d9514630d26d4521c1229121db7a3b563
 /agent-note-durable-session-local-reminders:
   en: c40fc2bc6dd1b469
   zh: c3932a1c8c60579b

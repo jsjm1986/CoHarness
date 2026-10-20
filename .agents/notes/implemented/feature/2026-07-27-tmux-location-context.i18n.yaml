@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-tmux-location-context.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-tmux-location-context.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-tmux-location-context.md
+document:
+  en: c5cafa3f5dce6772e40a952f5b9c145afb4f389c
+  zh: dc03916c2ba4052c37065d9f1e6340c17a36e5aa
 /agent-note-tmux-location-context:
   en: 242cf9b3a709d684
   zh: d10a0dc0762a784d

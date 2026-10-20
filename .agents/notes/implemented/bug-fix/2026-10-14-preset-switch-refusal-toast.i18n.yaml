@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-14-preset-switch-refusal-toast.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-14-preset-switch-refusal-toast.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-14-preset-switch-refusal-toast.md
+document:
+  en: 6c4ea4faadaa32ab1c051cb4ebc5cafb9424f1fa
+  zh: 9168e1315e3ce2b406bffeee07a542789e4b5195
 /agent-note-announce-preset-switch-refusals-in-a-banner:
   en: 5a0f924aead181e7
   zh: d3b4c1f338bc1a06

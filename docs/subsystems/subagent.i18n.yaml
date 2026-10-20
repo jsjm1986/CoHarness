@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for subagent.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for subagent.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/subagent.md
+document:
+  en: 4886d5a9b92d694e5d4d7cd30f41ba2a382d6d98
+  zh: 169ba51f73eb2889f91bb43bd0d0ffc8ffe797b5
 /subagent:
   en: 2f7537253a02c8af
   zh: 24069c7a0f54132d

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for adding-a-package.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for adding-a-package.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/adding-a-package.md
+document:
+  en: 77a4f8f0195191c47bbd77d39e2246335fda71f4
+  zh: 3987d7fddafff4811180e35137275348a6f6f238
 /cookbook-adding-a-workspace-package:
   en: b94bcdbebcd6355e
   zh: 9fd61c2b986da759

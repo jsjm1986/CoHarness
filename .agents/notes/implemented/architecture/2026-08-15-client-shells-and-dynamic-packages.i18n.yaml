@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-15-client-shells-and-dynamic-packages.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-15-client-shells-and-dynamic-packages.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.md
+document:
+  en: a92300663bac3bfe04768cf2a4f0c354c4c0c66f
+  zh: 5bd55558708f8e949ed3700f145c0725554f4d4b
 /agent-note-client-shell-layering-and-dynamic-package-boundaries:
   en: c8976de4e5547fdd
   zh: 3d1bcb3273993af4

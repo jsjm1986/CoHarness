@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-09-filesystem-absence-observation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-09-filesystem-absence-observation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-09-filesystem-absence-observation.md
+document:
+  en: 40338c4806607b262b93222b4a73a34538414e51
+  zh: 4544424800844e61f839d5af1f92cef3b3655a27
 /agent-note-filesystem-absence-is-an-observation-and-guarded-creation-never-replaces:
   en: 4921093602e6edea
   zh: a1fb59d0f79d50ad

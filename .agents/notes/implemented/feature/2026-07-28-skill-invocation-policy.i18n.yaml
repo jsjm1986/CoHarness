@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-28-skill-invocation-policy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-28-skill-invocation-policy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-skill-invocation-policy.md
+document:
+  en: 7a4f83ecae3dea82ab6864e748c9d8b8599f6bfc
+  zh: 8d66af69b7f45c5d76d18963df6921eaec2e1e8c
 /agent-note-independent-model-and-user-skill-invocation-policy:
   en: d5f87e846ef041b1
   zh: 273e87043d19a709

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-shared-code-card-toolbar.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-shared-code-card-toolbar.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-shared-code-card-toolbar.md
+document:
+  en: 83cdd556b7a91e14bea7f2cb34c1fa8a77d518dd
+  zh: 7b947036e64e7b382a54d4cb16707a7c27ed870a
 /agent-note-shared-code-card-toolbar-unifies-wrap-copy-and-language-chrome:
   en: 118817c05640fe41
   zh: a3e76dfe43d1fd90

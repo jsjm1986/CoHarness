@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-10-public-package-manifest.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-10-public-package-manifest.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-10-public-package-manifest.md
+document:
+  en: 0e6c1650a6b04e98aeba1aa6ef45df78e3f2cb44
+  zh: 9b7d15f479ca1aab7bea655b2dee43625728a442
 /agent-note-public-package-manifest-fields:
   en: 1ea0f036c6d0ba67
   zh: 3e885b6827315f74

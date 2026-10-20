@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for adding-a-settings-card.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for adding-a-settings-card.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/adding-a-settings-card.md
+document:
+  en: a98621da39f66b00c4a70542ff831e4ac007c583
+  zh: 29fa28f414b8605fbeb6cce9125b1a9ff0f6189d
 /cookbook-adding-a-settings-card:
   en: 0d1b25f40df956db
   zh: c0f9ce028fa50773

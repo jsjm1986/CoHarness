@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-06-approval-seam.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-06-approval-seam.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-06-approval-seam.md
+document:
+  en: ace41ebbb94cc24c2fdd3e7ae2d3a69b28b169af
+  zh: 63b7478b0903c149fc87fd944c95e94cc8de2359
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers:
   en: 5a500ddf8910f3b2
   zh: 0461f97e3c905d72

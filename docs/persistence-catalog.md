@@ -3,7 +3,7 @@
 
 # Session Persistence Event Catalog
 
-Every repository-declared durable Session event appears here with its source declaration and resolved types. The catalog covers the logical and physical headers, event envelopes, and every plugin declaration merge. See [Session](subsystems/session.md) for replay and [persistence](subsystems/persistence.md) for storage.
+Every repository-declared durable Session event appears here with its source declaration and resolved types. The catalog covers the logical and physical headers, event envelopes, and every SessionEventMap declaration merge. See [Session](subsystems/session.md) for replay and [persistence](subsystems/persistence.md) for storage.
 
 Experimental records appear in the separate [experimental plugin record catalog](experimental-persistence-catalog.md).
 

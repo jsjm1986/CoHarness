@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-admin-managed-public-access-tunnel.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-admin-managed-public-access-tunnel.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.md
+document:
+  en: 7b37ecc64c822ab8427a2754163ab4a49c823d3d
+  zh: e3b041a1f682b22e7d37161c9e42dbcf81eaacf6
 /agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel:
   en: d55247101c9441f7
   zh: 6e974dd5916f60e6

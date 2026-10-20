@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-10-component-factories-and-local-slots.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-10-component-factories-and-local-slots.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-10-component-factories-and-local-slots.md
+document:
+  en: 801e77644d9d2c80c4a9f3cad263420d1deda163
+  zh: 3ccd5f01633a1aa4ae830e1ee41243f5d1b65cc5
 /agent-note-reusable-component-factories-with-local-slots:
   en: c59d9a681b69c8e0
   zh: 987e95099a9bbe2a

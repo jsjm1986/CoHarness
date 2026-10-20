@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-23-ssh-execution-providers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-23-ssh-execution-providers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-ssh-execution-providers.md
+document:
+  en: e7ca868bffecfb56ff12723286419298a6851c86
+  zh: 661f7a265c77398d5a67e615ecfb901c63145971
 /agent-note-ssh-execution-providers:
   en: 96bda94763275721
   zh: 2e3f9a535241ee48

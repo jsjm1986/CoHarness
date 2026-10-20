@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-web-latency-throughput-metrics.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-web-latency-throughput-metrics.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-04-web-latency-throughput-metrics.md
+document:
+  en: 4d7627a9a38127259f1ba07121cea7282f794f2e
+  zh: f0089cb45775f2dc9701a7256119f04e4709dd76
 /agent-note-web-turn-and-window-latency-throughput-metrics:
   en: 96046957b1671c01
   zh: 1f9736b5f48bcf8e

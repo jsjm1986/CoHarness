@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-feedback-category.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-feedback-category.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-09-25-feedback-category.md
+document:
+  en: f642da0e2fd40ffe12a17284ad5a0d2042909dcf
+  zh: f428ff71fbe35cc5a07974ae5eedd021efa0ab62
 /:
   en: 3d5a424ae7d7e46b
   zh: c22a8e4a62d8cc1a

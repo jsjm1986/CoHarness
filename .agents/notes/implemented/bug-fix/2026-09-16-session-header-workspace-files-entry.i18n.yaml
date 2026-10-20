@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-16-session-header-workspace-files-entry.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-16-session-header-workspace-files-entry.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-session-header-workspace-files-entry.md
+document:
+  en: 3044e7bc2edc80b61abb76db8d7262cb44c98c2f
+  zh: 7190b6d65f60a39fd2c4eb3a61dbe608181ffc57
 /agent-note-workspace-files-entry-reaches-the-single-conversation-header:
   en: d928a207111ef3e4
   zh: 3ee94e0cdc3d0ed5

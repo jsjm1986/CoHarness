@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 04-events.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 04-events.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cordis-tutorial/04-events.md
+document:
+  en: db911b9a06d7304d73030a2020de3d465fde2f9c
+  zh: 0125f81c5521ed62da790ee7033ca4b715311ee1
 /4-events:
   en: c0d426252aeee143
   zh: a9d91f2ef46e2d3b

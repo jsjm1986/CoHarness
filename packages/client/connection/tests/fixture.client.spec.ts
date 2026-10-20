@@ -227,6 +227,11 @@ describe('createFixtureApi', () => {
       value: { default: expect.any(String) as unknown, modeSelectionEnabled: expect.any(Boolean) as unknown },
       secrets: [],
       writable: true,
+    }, {
+      ns: 'ui-onboarding',
+      value: { welcomeNoticeVersion: expect.any(String) as unknown },
+      secrets: [],
+      writable: true,
     }])
 
     const initial = await api.credentials.describe(req({ refs: ['DEEPSEEK_API_KEY', 'TEST_API_KEY'] }))

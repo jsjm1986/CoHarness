@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-12-scoped-layers-store.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-12-scoped-layers-store.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-12-scoped-layers-store.md
+document:
+  en: 8088868877c2baa53b1eaa130cb2f852ebfa4f29
+  zh: 1ddcd770ab11f53fc7879b4790885bc0e784ebb8
 /agent-note-shared-scoped-layer-storage:
   en: fd7fb761274acf79
   zh: 78f68d9b8479b3d5

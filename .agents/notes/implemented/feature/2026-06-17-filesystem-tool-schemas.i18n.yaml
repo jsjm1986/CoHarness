@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-17-filesystem-tool-schemas.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-17-filesystem-tool-schemas.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-17-filesystem-tool-schemas.md
+document:
+  en: bbc95a19d04f912dfd58c7d00b591143e11aa406
+  zh: fdcf26eb39b7c5c268ef1e0798dcd2d3f827efca
 /agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes:
   en: 6191f7aa9b8d060b
   zh: 1eec01f504a67b50

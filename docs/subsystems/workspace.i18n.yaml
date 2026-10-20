@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for workspace.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for workspace.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/workspace.md
+document:
+  en: e70e4b8802941fc9008884225ab4bfb42ec121c1
+  zh: 76c46e49c1d415e4e91b9d28b5a3fbbdce48b51e
 /workspaces:
   en: 96d7258454677bfd
   zh: 6449818d92879500

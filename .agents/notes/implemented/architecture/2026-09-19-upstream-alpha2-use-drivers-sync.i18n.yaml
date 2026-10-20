@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-19-upstream-alpha2-use-drivers-sync.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-19-upstream-alpha2-use-drivers-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-upstream-alpha2-use-drivers-sync.md
+document:
+  en: 60da24f22c83c57e52e2e62ad43b0886f0fbffef
+  zh: 9efcaa5a43ac91e0c742f1884e0487bdc326b617
 /agent-note-driver-and-mcp-integration-with-bounded-cancellation:
   en: e60be247105fa673
   zh: f683c16b8a80dc73

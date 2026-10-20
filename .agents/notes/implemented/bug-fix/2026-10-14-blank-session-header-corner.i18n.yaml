@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-14-blank-session-header-corner.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-14-blank-session-header-corner.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-14-blank-session-header-corner.md
+document:
+  en: 21af0c918e81b6c58e1f00efaab7693b139212b7
+  zh: 3a415a8575d3a8ae218e35af6923305a69dea9c0
 /agent-note-keep-the-session-header-corner-seat-mounted-on-blank-sessions:
   en: 6447d7a5f8158f18
   zh: 57deb0cd302d217a

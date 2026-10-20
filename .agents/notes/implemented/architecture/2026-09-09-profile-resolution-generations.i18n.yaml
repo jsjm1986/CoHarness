@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-09-profile-resolution-generations.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-09-profile-resolution-generations.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-09-profile-resolution-generations.md
+document:
+  en: c1f22744966b68ac8cd503395bb146a99b3e1e2b
+  zh: abf928bf791ec82eb412749ba504a10115c90981
 /agent-note-add-immutable-profile-resolution-generations:
   en: 6a4338564c01ad91
   zh: 241248cff9bd4cfc

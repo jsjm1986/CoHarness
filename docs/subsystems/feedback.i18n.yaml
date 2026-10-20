@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for feedback.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for feedback.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/feedback.md
+document:
+  en: 8e989cff3c1a3924d29edd32f9af817bc0aa2570
+  zh: 5fe904d5d847b51607b82d4cef3a16fefd8eb6da
 /message-feedback:
   en: e495bd65a659ccef
   zh: 3845bfe2ef6f6b52

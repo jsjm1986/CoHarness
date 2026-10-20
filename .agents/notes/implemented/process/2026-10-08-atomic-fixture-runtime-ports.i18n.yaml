@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-08-atomic-fixture-runtime-ports.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-08-atomic-fixture-runtime-ports.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-08-atomic-fixture-runtime-ports.md
+document:
+  en: c3b744ea4494f0d548a562bbbdca15ade4f3f98f
+  zh: 930a02f776fecd1ff222c6569d9424608ae72bf4
 /agent-note-atomic-loopback-ports-for-process-backed-gateway-fixtures:
   en: e0a549f25bcc3a64
   zh: 15354ddbfe7fea08

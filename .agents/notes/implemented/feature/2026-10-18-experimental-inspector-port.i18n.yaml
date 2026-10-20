@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-experimental-inspector-port.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-experimental-inspector-port.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-experimental-inspector-port.md
+document:
+  en: cefa3912f987c75f3c8ae32a22b9450ea6f46502
+  zh: b9e55cc2c00d2c2548db56dfc73a399e0b344021
 /agent-note-experimental-inspector-port-through-fork-seams:
   en: e69714cd12eacd66
   zh: 9206f38df4653ad2

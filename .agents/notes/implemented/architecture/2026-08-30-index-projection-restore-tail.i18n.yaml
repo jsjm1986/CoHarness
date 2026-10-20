@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-30-index-projection-restore-tail.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-30-index-projection-restore-tail.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-index-projection-restore-tail.md
+document:
+  en: 201a9fa773e529cf198457052eca7dc245e12be8
+  zh: f2bbc7a9b36e136f5808d99d5dc706708b186f66
 /agent-note-index-projection-restore-tails-without-copying:
   en: 819314abdb0a6fe3
   zh: 9c1e284368155492

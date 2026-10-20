@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-30-pi-ai-grant-json-image.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-30-pi-ai-grant-json-image.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-30-pi-ai-grant-json-image.md
+document:
+  en: 33acc98aa4d554000e0b58816ad728391e212c4e
+  zh: 54edf43d58c930a9c9efe701635528cd89a5ad01
 /agent-note-store-pi-ai-grants-as-json-compatible-values:
   en: ec061554729845e5
   zh: 06ad6636486b4a60

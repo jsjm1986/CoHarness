@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for workflow.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for workflow.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/workflow.md
+document:
+  en: 34d38ccc839bd3adb32d8c81558bca6c0bf8a78c
+  zh: f5cfd7ff5cc5fb5b06ee15ffebdfffa44a7ea819
 /workflow:
   en: 9615b95a6b834fde
   zh: aa0ade61c4e67b1a

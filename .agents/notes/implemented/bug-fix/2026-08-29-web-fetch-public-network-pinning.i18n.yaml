@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-29-web-fetch-public-network-pinning.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-29-web-fetch-public-network-pinning.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-29-web-fetch-public-network-pinning.md
+document:
+  en: e5ed6480375329064a4506943c29814a880d1ece
+  zh: bcbe88363c178e35582197e21fd3d777a2d656dd
 /agent-note-pin-webfetch-requests-to-validated-public-addresses:
   en: f88900a294bb756b
   zh: 9e91283853261be3

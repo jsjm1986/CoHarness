@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-subagent-empty-terminal-message-output.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-subagent-empty-terminal-message-output.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-10-subagent-empty-terminal-message-output.md
+document:
+  en: 24bab01ad844a5b48e0bf6fe0fc54df6403f4bb7
+  zh: 28d8d85e316fe4770e55685e9d5641fda846c5c5
 /agent-note-one-selection-rule-keeps-subagent-output-past-an-empty-terminal-message:
   en: e5a22b7a9474f2e1
   zh: 3c51da306b0675b6

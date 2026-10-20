@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-30-pwsh-marker-readiness.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-30-pwsh-marker-readiness.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/rejected/bug-fix/2026-08-30-pwsh-marker-readiness.md
+document:
+  en: d12658e4ce66140415bd5daa7cbfc5692a10d701
+  zh: 985e7669bfa0fb63773d954ba1ebb71daed3e556
 /agent-note-do-not-ship-an-unverified-persistent-pwsh-marker-wait:
   en: 0d7082b38f1317a7
   zh: eb132116d90752ab

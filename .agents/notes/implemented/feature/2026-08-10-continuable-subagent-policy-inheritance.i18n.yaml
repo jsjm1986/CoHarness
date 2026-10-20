@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-continuable-subagent-policy-inheritance.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-continuable-subagent-policy-inheritance.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-continuable-subagent-policy-inheritance.md
+document:
+  en: bae7a20bbfa760d95b282757bce0e6d59b96cb92
+  zh: ce7f62c5a059a3d60dd37edf646e81529faa5553
 /agent-note-continuable-subagent-policy-inheritance-the-durable-child-log-owns-the-delegation-time-snapshot:
   en: 532a1dd25b20ea6b
   zh: 295d1935fa2640cd

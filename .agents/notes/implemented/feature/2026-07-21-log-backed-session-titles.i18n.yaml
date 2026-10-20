@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-21-log-backed-session-titles.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-21-log-backed-session-titles.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-log-backed-session-titles.md
+document:
+  en: a80a385f160fd85ff1c1cc1bcfb6b6217fed1dd5
+  zh: 4418e797c8b002557c206e5fe77768dfbda6b303
 /agent-note-log-backed-session-titles:
   en: b04a348ca633c170
   zh: 5d6a97ea03e86102

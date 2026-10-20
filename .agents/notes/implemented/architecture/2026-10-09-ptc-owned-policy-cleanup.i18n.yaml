@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-09-ptc-owned-policy-cleanup.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-09-ptc-owned-policy-cleanup.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-09-ptc-owned-policy-cleanup.md
+document:
+  en: 470568cc3f75e0466242a665e512223496f4d4ae
+  zh: 9d852a0eb63fac35e2996384b1a1b2a3a1c2dad6
 /agent-note-ptc-owns-policy-change-cleanup-waits:
   en: dfe28bee0ab79ff6
   zh: dd68c51b4cbfbc3f

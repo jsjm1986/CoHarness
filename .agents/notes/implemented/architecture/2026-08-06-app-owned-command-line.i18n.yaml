@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-app-owned-command-line.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-app-owned-command-line.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-app-owned-command-line.md
+document:
+  en: c60f37a198a5036214376ebad9f5fe74e33ca6f3
+  zh: 93c80f17e2a4eafd26daceaa091bd444c2fe7ecd
 /agent-note-apps-own-their-command-line-through-ctx-cmdlineargs:
   en: df38fa31444adc13
   zh: 506473dae15adf44

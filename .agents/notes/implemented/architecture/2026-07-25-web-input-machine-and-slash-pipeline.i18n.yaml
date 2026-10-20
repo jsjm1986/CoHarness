@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-25-web-input-machine-and-slash-pipeline.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-25-web-input-machine-and-slash-pipeline.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md
+document:
+  en: fe962b12c4b5369ba29711b6244d80f56d32ef17
+  zh: 4f117ea79314110966a7ccab0ed8f8466355133b
 /agent-note-web-input-state-machine-composer-slots-and-the-slash-pipeline-ui-conversation-input-ui-input-trigger:
   en: 5d508e800b38ed39
   zh: 0ef40e0436b8f29f

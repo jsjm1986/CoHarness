@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-24-domain-kv-storage-and-workspace.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-24-domain-kv-storage-and-workspace.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md
+document:
+  en: 639e49401171a6b0e1356cf3d6e69ef2d65e3374
+  zh: 0d3465807bdf18ebb558d54609b190a56c12e0e1
 /agent-note-domain-kv-storage-capability-seam-and-the-workspace-entity:
   en: e1792a25ca5d684d
   zh: ddb20d72b56eebf8

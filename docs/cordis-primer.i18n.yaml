@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for cordis-primer.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for cordis-primer.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cordis-primer.md
+document:
+  en: 2a3afe180623d89b006dfa3e73aba5567c15bbe9
+  zh: 999073673a2daf3343cf02a1dffc01e90de3b755
 /cordis-primer:
   en: 065178153a059ae3
   zh: d1c5c429a8c35ac2

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-ptc-runtime-python-fd3-protocol.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-ptc-runtime-python-fd3-protocol.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md
+document:
+  en: 16c125340b7d223f60e7aae412d0fdfd4c0580e3
+  zh: b5c7539844ed8658d67de5317b2e3b4bb43ac8bd
 /agent-note-the-ptc-runtime-python-fd-3-frame-protocol:
   en: fc43bcfc72cc4476
   zh: c81279cb0da1481c

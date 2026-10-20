@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-28-bounded-model-policy-refresh.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-28-bounded-model-policy-refresh.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-28-bounded-model-policy-refresh.md
+document:
+  en: 90e1b668ea1e875bf961223ef02a40ee95d8424a
+  zh: 04dcbb78149eb4346d2b6081409d3f11b5b3c18a
 /agent-note-bound-bulk-model-policy-refreshes:
   en: ee47d527b8f49f1c
   zh: b8ba88c222fa8249

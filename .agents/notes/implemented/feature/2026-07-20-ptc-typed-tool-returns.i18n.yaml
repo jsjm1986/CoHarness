@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-20-ptc-typed-tool-returns.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-20-ptc-typed-tool-returns.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-20-ptc-typed-tool-returns.md
+document:
+  en: a06b6682d1d3fbda798c4b50bf875e208b5a6a7c
+  zh: 316d94c67158fb4073b510c07b2e5696db8b0e2a
 /agent-note-typed-tool-returns-in-ptc-mode:
   en: 4b7c45b382db3a40
   zh: 96e9210446ec35ed

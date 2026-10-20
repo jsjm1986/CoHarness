@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-19-release-runtime-links-and-governance-peers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-19-release-runtime-links-and-governance-peers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-19-release-runtime-links-and-governance-peers.md
+document:
+  en: abd29711cbb147a8e6d3696295ac032b16afe246
+  zh: f1e1730fc9b5d1c7c947f49728f7e2154bde93ab
 /agent-note-activation-validates-gateway-runtime-links-and-model-governance-peers-unpin:
   en: 1232a69393aa5de1
   zh: 463873c06dba267f

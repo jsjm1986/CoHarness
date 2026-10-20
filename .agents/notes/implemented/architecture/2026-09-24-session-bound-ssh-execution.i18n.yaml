@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-24-session-bound-ssh-execution.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-24-session-bound-ssh-execution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-24-session-bound-ssh-execution.md
+document:
+  en: f070e066d4efd33660451f552f0a23f31d8aae62
+  zh: 0cc81bfb58bb35fb4d6d22c1803703d2320c5b60
 /agent-note-session-bound-ssh-execution:
   en: 45da8d708992cdc4
   zh: 7a9700138d9df81f

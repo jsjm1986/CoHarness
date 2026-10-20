@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-01-canonical-ci-automation-gates.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-01-canonical-ci-automation-gates.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-01-canonical-ci-automation-gates.md
+document:
+  en: 31095b480e6268f0efc2f06c8b312eba3a30e063
+  zh: c2855120735818ef27388059748a29361534db93
 /agent-note-canonical-repository-gates-for-credentialed-ci-automation:
   en: 08f49a2e56f498e4
   zh: d4b311cd6ba9caae

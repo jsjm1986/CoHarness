@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-30-models-settings-extension-slots.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-30-models-settings-extension-slots.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-models-settings-extension-slots.md
+document:
+  en: 5f09a34e9c64b42be65fa06df2fc91f8658830c5
+  zh: 95926b894207c8c5feb136c6a6191d75c0f5e05a
 /agent-note-expose-additive-models-settings-extension-slots:
   en: 371ebeb2e6e14137
   zh: 8f25e1dd78377c73

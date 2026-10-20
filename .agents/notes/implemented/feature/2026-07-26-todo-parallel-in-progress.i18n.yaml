@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-todo-parallel-in-progress.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-todo-parallel-in-progress.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-26-todo-parallel-in-progress.md
+document:
+  en: e9755b38fd38f088ba3b4192dbc8937136e0b3e4
+  zh: 389e6a4562610eac879019e0069ec34e72b5eb5b
 /agent-note-allow-several-in-progress-todos-at-once:
   en: 86f0b8cf54b13083
   zh: 1e109cbca059a94a

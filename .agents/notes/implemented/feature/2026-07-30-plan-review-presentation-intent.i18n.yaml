@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-plan-review-presentation-intent.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-plan-review-presentation-intent.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-plan-review-presentation-intent.md
+document:
+  en: 5bbd1ffc974563589449d43a761039fb4dc84b03
+  zh: cd0b8c407523eb0a811eb76878962f932f3dcec9
 /agent-note-plan-review-as-a-decision-not-a-question:
   en: f9c583ef67fb09fc
   zh: dce52aa262ead18b

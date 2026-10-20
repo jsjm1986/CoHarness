@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-13-token-cache-disclosure-replay.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-13-token-cache-disclosure-replay.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-token-cache-disclosure-replay.md
+document:
+  en: 8d934582c68bc2cedd8939c62537073a73fdd6d1
+  zh: c4eb25ad573aff3d67e4de017e14cac30ef96c67
 /agent-note-token-and-cache-disclosure-follows-compact-retry-settlements:
   en: ea4eefc7b9258240
   zh: 28e7b081c6387ac5

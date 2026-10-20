@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-13-explicit-worktree-creation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-13-explicit-worktree-creation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-explicit-worktree-creation.md
+document:
+  en: 9b84d0c9fdc60cd5716ee5284a69faaeeb6a0039
+  zh: f93a4a2cd71670950028b49fff622179348643c0
 /agent-note-explicit-worktree-creation:
   en: 68d9e5eab7671458
   zh: fc889567986f2bbe

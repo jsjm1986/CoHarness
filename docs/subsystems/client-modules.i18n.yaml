@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for client-modules.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for client-modules.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/client-modules.md
+document:
+  en: 2deceecd3c15a8d75eff4b8f18924bff54a0b7e0
+  zh: d7785a36faa8fa39e219c2a524eecb337f830c62
 /client-modules:
   en: e256a29cc5bc2726
   zh: e181d6b1a6e5c647

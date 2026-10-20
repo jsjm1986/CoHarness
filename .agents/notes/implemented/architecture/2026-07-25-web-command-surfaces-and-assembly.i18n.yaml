@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-25-web-command-surfaces-and-assembly.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-25-web-command-surfaces-and-assembly.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-25-web-command-surfaces-and-assembly.md
+document:
+  en: 4aa50af409687a0ba29388614e59ba4dc5a80bf4
+  zh: db17b64e3729f658aed6cfa6c0c1fd8bf7470228
 /agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent:
   en: 4dd9d2d0f3ae27fd
   zh: 9b9f8a676f718250

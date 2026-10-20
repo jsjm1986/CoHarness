@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-english-ui-copy-review-corrections.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-english-ui-copy-review-corrections.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-english-ui-copy-review-corrections.md
+document:
+  en: 3e5a3b0a07b9c12fd387901999842e5a561ca24b
+  zh: 9f6c55f95619251e34a44f6fd1b5e078f8d3f799
 /agent-note-english-ui-copy-review-corrections:
   en: 2b02fa561436e73e
   zh: 901bacc6145a7c83

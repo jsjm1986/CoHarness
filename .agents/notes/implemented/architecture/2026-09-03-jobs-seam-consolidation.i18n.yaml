@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-03-jobs-seam-consolidation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-03-jobs-seam-consolidation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-03-jobs-seam-consolidation.md
+document:
+  en: 7f7b53b4b5cc07908a62b8ff776400f6d9199e38
+  zh: 13c68f7686c5a9b557676a04d30b4a2f61fdf2ec
 /agent-note-one-output-ring-one-projection-one-event-stream-for-background-jobs:
   en: f4cb113e6501a363
   zh: 55693cca6db201b0

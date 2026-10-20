@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-03-scope-control-panel-menu.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-03-scope-control-panel-menu.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-03-scope-control-panel-menu.md
+document:
+  en: 25aa9cef9d5793f5043fefac91eb49a3e9bb37cd
+  zh: 66b80303f716a6398c535d6dad152ae23162f86a
 /agent-note-scope-switcher-as-a-sidebar-width-adaptive-panel-menu:
   en: d9563dc5f434570b
   zh: ca4b783217090a87

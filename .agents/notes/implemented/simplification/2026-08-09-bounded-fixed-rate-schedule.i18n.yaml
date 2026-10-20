@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-09-bounded-fixed-rate-schedule.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-09-bounded-fixed-rate-schedule.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-09-bounded-fixed-rate-schedule.md
+document:
+  en: 83d7e149f654d80fd988d0e4247aad3c4b34c6be
+  zh: a8b287ce7ff009758f9fdbe41ed1e88555cb1846
 /agent-note-bounded-fixed-rate-schedule:
   en: 4461c9b9ef7ec839
   zh: 3b4a58ddb9170865

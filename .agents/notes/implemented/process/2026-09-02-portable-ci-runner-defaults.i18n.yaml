@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-02-portable-ci-runner-defaults.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-02-portable-ci-runner-defaults.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-02-portable-ci-runner-defaults.md
+document:
+  en: e9c437d9c88a470069cd5f09e313afd816f2d25d
+  zh: d2212133cc6c6e1269480d0647b44ffd6aad0abc
 /agent-note-portable-defaults-for-repository-ci-runners:
   en: 971742f675b28e33
   zh: 5d8dfd515f50ad26

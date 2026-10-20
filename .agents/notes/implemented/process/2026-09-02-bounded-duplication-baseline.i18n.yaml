@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-02-bounded-duplication-baseline.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-02-bounded-duplication-baseline.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-02-bounded-duplication-baseline.md
+document:
+  en: 6ed962657c89c280862dce78fd7868efefeb526e
+  zh: d0db65a239e9c68080e18198bbdd6cd305f16654
 /agent-note-bound-the-existing-duplication-baseline:
   en: 3c38f2f0a1d89f98
   zh: 8c757a8450876ea3

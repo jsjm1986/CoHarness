@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-org-model-settings-revision-fold.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-org-model-settings-revision-fold.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-org-model-settings-revision-fold.md
+document:
+  en: f69906b47455862c4af7a872b7c7d4538cd720c1
+  zh: c584b7430308a0d1be22d553a700cccc4582bd5b
 /agent-note-fold-organization-model-settings-writes-through-the-describe-mirror:
   en: 517df81eb8ba8e07
   zh: 1b6ff4db89ca45a4

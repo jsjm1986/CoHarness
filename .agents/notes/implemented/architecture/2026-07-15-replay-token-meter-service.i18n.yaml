@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-15-replay-token-meter-service.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-15-replay-token-meter-service.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-15-replay-token-meter-service.md
+document:
+  en: 54065baca8dc36472a0eab2e45b9a0dd915f626d
+  zh: 34fe6c74078d33b40a2d289d2470221ef61256e7
 /agent-note-replay-token-meter-service:
   en: 9d44a7f825a8fec3
   zh: f4034b78cc95371d

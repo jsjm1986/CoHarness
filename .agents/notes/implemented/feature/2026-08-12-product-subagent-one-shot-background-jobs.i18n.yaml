@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-12-product-subagent-one-shot-background-jobs.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-12-product-subagent-one-shot-background-jobs.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-12-product-subagent-one-shot-background-jobs.md
+document:
+  en: 778cf07d0df498564800427dd94865bd3620dd9c
+  zh: f375a5eb85b9fcece875fe7071e60c91075e9c6f
 /agent-note-product-one-shot-subagents-use-generic-background-jobs:
   en: 86d8f55c9662de33
   zh: 3a1dbecad496b64a

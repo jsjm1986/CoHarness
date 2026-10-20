@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-05-native-or-ptc-presentation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-05-native-or-ptc-presentation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-10-05-native-or-ptc-presentation.md
+document:
+  en: 97068af298fb5bf1ca743e40e31e34f3e74a69a0
+  zh: f6950cb50b6ae2a9fef3d83158b69790d6e8cf40
 /agent-note-one-tool-invocation-form-per-agent:
   en: d45e87191f6e7667
   zh: 4350b7a9ff83b310

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-stop-all-worker-failures.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-stop-all-worker-failures.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-stop-all-worker-failures.md
+document:
+  en: e85a942927649d5b181c9939d626e5219aa6537a
+  zh: 91a1c56d395366e016cc0ccabb9a73f7577843a2
 /agent-note-drain-shutdown-workers-after-target-failures:
   en: 15b0d62811c4cfaf
   zh: 1b6420da5822649c

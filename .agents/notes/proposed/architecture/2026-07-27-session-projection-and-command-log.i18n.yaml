@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-session-projection-and-command-log.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-session-projection-and-command-log.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md
+document:
+  en: d468b398765996c18819265283413a84fb1d1fc1
+  zh: 8528d0f675d8e96e23e0a8473f13b2a7b4708e61
 /agent-note-session-projections-and-command-lifecycle-logging:
   en: c4b22a24c549feb8
   zh: 4e4921326e0cd13a

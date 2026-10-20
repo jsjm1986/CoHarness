@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-11-content-block-vocabulary.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-11-content-block-vocabulary.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-11-content-block-vocabulary.md
+document:
+  en: a31df6a7d16ea7cba649702fdb474dab34533c1b
+  zh: da387b179816cda64791e71ca7affa1fbdfd195b
 /agent-note-provider-neutral-content-block-vocabulary-owned-by-dsh-llm:
   en: 64935f5c8e315004
   zh: 6a9cbb4578eaa437

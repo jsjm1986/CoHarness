@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-approval-display-reason-projection.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-approval-display-reason-projection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-approval-display-reason-projection.md
+document:
+  en: 9732800ac51b2a9c40d47b017dec2ca0dee367ec
+  zh: 48a9386506daffc92f004c5016069149f2bf0c09
 /agent-note-the-approval-panel-projects-localized-displayreason-through-the-wire:
   en: 683638379cbec925
   zh: 382419d04905c3b5

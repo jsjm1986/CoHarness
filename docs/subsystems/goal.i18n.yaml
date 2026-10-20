@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for goal.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for goal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/goal.md
+document:
+  en: d7639743d0a76efeca05947710407b31505364dd
+  zh: c3192a507d22f93be7f8fcf321001a66930d137a
 /same-session-goals:
   en: f76138e8235819ce
   zh: fdb595b0451cd8f7

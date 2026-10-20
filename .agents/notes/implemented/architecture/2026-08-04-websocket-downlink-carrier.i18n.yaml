@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-websocket-downlink-carrier.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-websocket-downlink-carrier.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.md
+document:
+  en: f59e2c50b948fb8c93d698668571dff66a025cb5
+  zh: e261626de7700b8bd135b731d1b2eff612079250
 /agent-note-websocket-carrier-for-browser-downlinks:
   en: 046870d865e35244
   zh: 1eb4ba8c53ccede6

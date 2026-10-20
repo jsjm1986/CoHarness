@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-31-alpha-historical-unknown-event-refusal.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-31-alpha-historical-unknown-event-refusal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-31-alpha-historical-unknown-event-refusal.md
+document:
+  en: c63b36f63206e0992416239483d908b0645a98c2
+  zh: 231c46c11486b05a69a200b857a0ea6df35b6e79
 /agent-note-alpha-session-migration-refuses-every-unknown-historical-event:
   en: 4c7472b402f5dd38
   zh: 1d7aa8233d13a083

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-28-auto-review.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-28-auto-review.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-28-auto-review.md
+document:
+  en: 9b4e1adf536a1a8662505bed4abc498225487c8b
+  zh: 27f37e2ddd36372fbebca9d539fe0cdfe627c3a7
 /agent-note-experimental-auto-review-before-each-tool-call:
   en: 66cfb9da0816f4f2
   zh: 79f66b9713964a5e

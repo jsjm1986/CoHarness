@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-21-cross-session-references.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-21-cross-session-references.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-cross-session-references.md
+document:
+  en: 0e1d6c5ba167266799c4954991d9efdb3880488a
+  zh: 0daeec7836c2cba476d1c427fe849db7a25339ab
 /agent-note-cross-session-references:
   en: 0adc3bc970cb36d4
   zh: c9b52a2f995d73ec

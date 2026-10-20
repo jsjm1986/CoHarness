@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-session-skill-source-preview.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-session-skill-source-preview.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-session-skill-source-preview.md
+document:
+  en: a0df5d0073b066716205fa9e0ea0d8ccb0b21cf4
+  zh: 2234dbe652ace5c46b13ed32eca9a1da705f5fee
 /agent-note-read-only-skill-source-through-the-session-registry:
   en: fe4d376239bbdf14
   zh: 4c1e4fd00a5e97c8

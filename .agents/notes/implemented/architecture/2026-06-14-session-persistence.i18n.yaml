@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-14-session-persistence.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-14-session-persistence.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-14-session-persistence.md
+document:
+  en: 62228bd2f5b25b13880a563818d08f3a2d52d956
+  zh: ebf004333c383336cd025aa8a4aabc9d1e07f0e5
 /agent-note-session-persistence-as-an-abstract-service-over-the-existing-sessionevent:
   en: d7cf18702f4ed830
   zh: 7e0cc6db7c90a7bd

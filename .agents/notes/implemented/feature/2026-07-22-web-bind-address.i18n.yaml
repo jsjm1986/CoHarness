@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-22-web-bind-address.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-22-web-bind-address.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-22-web-bind-address.md
+document:
+  en: 3332176c0cee940648ad334a44edd30879225503
+  zh: 5ad73b8916d9cedce1073f4a2d025f40197b7d65
 /agent-note-explicit-web-bind-address:
   en: 88903f0a232e6960
   zh: a4c6334791e91f3b

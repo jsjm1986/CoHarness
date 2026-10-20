@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-windows-x64-python-runtime.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-windows-x64-python-runtime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-25-windows-x64-python-runtime.md
+document:
+  en: af213383b2d48e5db1b3fdf2c2275d1d7eda0739
+  zh: e39742054c5c9e2aeba87fe3520a5ae982e314f3
 /agent-note-python-runtime-publishes-a-native-windows-x64-wheel:
   en: e75f8cfe4945a341
   zh: 0fc24e44af61971e

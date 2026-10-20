@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-15-llm-model-catalog-and-acp-selection.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-15-llm-model-catalog-and-acp-selection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-15-llm-model-catalog-and-acp-selection.md
+document:
+  en: 7cba9018cd8280b71fd43244c871ef5b4e8b7c90
+  zh: d194cb94c38d756c3b9bf641d37943c60251556c
 /agent-note-advisory-llm-catalogs-and-per-session-acp-model-selection:
   en: 4c0a0b91cbef97a9
   zh: 5db8a9e3421966b5

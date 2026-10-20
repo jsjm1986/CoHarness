@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-web-diff-card.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-web-diff-card.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-diff-card.md
+document:
+  en: cae4153c1091dcde307377e03d19bbfbe63765dd
+  zh: a013733ea3b9c202704bfe078b2af86be4e9d101
 /agent-note-web-diff-card-the-write-edit-render-intent-reaches-the-browser:
   en: 46fea57ce1b771e7
   zh: b12f318fa1891f35

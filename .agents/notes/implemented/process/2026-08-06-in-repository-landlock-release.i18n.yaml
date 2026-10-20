@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-in-repository-landlock-release.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-in-repository-landlock-release.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-06-in-repository-landlock-release.md
+document:
+  en: 82b21cc0c30338ad11583797f011794b8dbcc90c
+  zh: 554967fbce454fc9a45b54d735f485006f9dee51
 /agent-note-in-repository-landlock-release:
   en: 4376b58c8e9f8073
   zh: aa453cc7060dd935

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-subagent-list-identity-projection.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-subagent-list-identity-projection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-subagent-list-identity-projection.md
+document:
+  en: 2995b86e69b517cb1f8ed77b7051045b0ce335ec
+  zh: bb46b923ebad5c4f34470f2fa6c95b31509e035d
 /agent-note-subagent-list-identity-via-the-projection-unit:
   en: 545ff611d54f91b3
   zh: 878d77d47958ec32

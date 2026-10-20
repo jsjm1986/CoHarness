@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-15-product-subagent-noninteractive-permissions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-15-product-subagent-noninteractive-permissions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-product-subagent-noninteractive-permissions.md
+document:
+  en: 8788fba3492e08090dd038fc3e7377f6bd1e29cd
+  zh: cbf3c3cd14fcecd2c24e335a8b71cc3b5370e247
 /agent-note-product-subagents-use-profile-selected-non-interactive-permissions:
   en: feb20636c72ade23
   zh: fd2e9f192a3fa527

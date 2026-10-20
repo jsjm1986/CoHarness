@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for jobs.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for jobs.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/jobs.md
+document:
+  en: 7b2b9fefc4871c575100b9b2d1a27e0111cc8b3c
+  zh: db91152516530a1a0477e904f652abc5417e53d5
 /background-job-runtime:
   en: c2ca80844a3afaf3
   zh: a8b48d41aa75427a

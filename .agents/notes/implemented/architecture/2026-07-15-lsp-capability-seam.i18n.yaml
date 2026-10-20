@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-15-lsp-capability-seam.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-15-lsp-capability-seam.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.md
+document:
+  en: 90f9daf4b890bd53621916e492d4d82baaa3e8cc
+  zh: bdb5e812e94a4aec4402fe83ca9c818bfa00f9f9
 /agent-note-lsp-capability-seam-and-model-facing-query-tool:
   en: bce19a7b7394ab3f
   zh: 95f89e11c9399d0a

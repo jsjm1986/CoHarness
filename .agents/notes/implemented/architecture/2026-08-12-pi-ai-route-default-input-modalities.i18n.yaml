@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-12-pi-ai-route-default-input-modalities.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-12-pi-ai-route-default-input-modalities.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-12-pi-ai-route-default-input-modalities.md
+document:
+  en: efd20b2cd73979208bb777fa42536bc5b918e29e
+  zh: 069a7916c8d4ffe738ff910a851e0a9cd1f66d0a
 /agent-note-a-pi-ai-model-declares-its-own-input-modalities-and-undeclared-means-text:
   en: 25d21ed6acf65327
   zh: 2c732d0eaa1f5976

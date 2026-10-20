@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-19-no-unknown-casts.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-19-no-unknown-casts.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-19-no-unknown-casts.md
+document:
+  en: 2f90422d0980fddc2569951ef7f8dba34b488ce4
+  zh: 3b66236e586a60a61cdcc1f93b1c0c14ce27eb15
 /agent-note-prohibit-new-assertions-to-unknown:
   en: d05b7f323025e1b9
   zh: fa84da1b6dbbd40a

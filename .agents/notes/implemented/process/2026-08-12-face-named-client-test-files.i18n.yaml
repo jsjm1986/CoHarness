@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-12-face-named-client-test-files.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-12-face-named-client-test-files.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-12-face-named-client-test-files.md
+document:
+  en: e83ebe4fda25218d96bab546af025b59064ca18f
+  zh: 7062c67f9c98d87f480e119df807955c1a10820a
 /agent-note-face-named-client-test-files:
   en: d94ea46f9bc0e1ab
   zh: 3267575d395679f8

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-19-historical-catalog-completion.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-19-historical-catalog-completion.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-19-historical-catalog-completion.md
+document:
+  en: a835079999c2f12ab23c703daf679d3f8f90fc32
+  zh: 24673a00d2af4d9831e96dea4b646fdb7ceb1c8e
 /agent-note-historical-catalog-completion-binds-explicit-child-evidence-to-v6-v7:
   en: 44b54541c4bdf763
   zh: 13582198fcad3a63

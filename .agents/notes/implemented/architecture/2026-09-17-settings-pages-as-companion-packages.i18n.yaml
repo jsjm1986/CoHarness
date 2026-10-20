@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-settings-pages-as-companion-packages.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-settings-pages-as-companion-packages.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-17-settings-pages-as-companion-packages.md
+document:
+  en: 2d7c232f6f36d0b6b29e89a46994d5ce53f104a7
+  zh: 8ecbc57e7940e4af372ce7f6e87c5e60cd6acd2f
 /agent-note-settings-pages-as-companion-packages:
   en: ada5eadeb6e921e4
   zh: 1cc804b1720c2c98

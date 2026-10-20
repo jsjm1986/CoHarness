@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-08-persistent-ptc-sandbox.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-08-persistent-ptc-sandbox.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-08-persistent-ptc-sandbox.md
+document:
+  en: 2c4235fcc3fabdc57fa2e42a1ff0802186616fd4
+  zh: d841702941752cf865ebc621e2eda50949b70ec6
 /agent-note-retained-ptc-processes-follow-file-policy:
   en: ef07a82c85e490e1
   zh: b1662d1970d2b83b

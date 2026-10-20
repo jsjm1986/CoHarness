@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-product-subagent-providers-in-shared-host.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-product-subagent-providers-in-shared-host.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-10-product-subagent-providers-in-shared-host.md
+document:
+  en: 196e28c1263c4b6d71eaeb59b9ba8457b36f3ff4
+  zh: 1451890e1b250a2095e3366c59d6ce0873b55fe9
 /agent-note-product-subagent-providers-live-in-the-shared-profile-host:
   en: a3aa43861f48264f
   zh: 72d94c2d77a7d2e8

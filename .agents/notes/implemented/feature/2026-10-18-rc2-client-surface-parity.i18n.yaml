@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-rc2-client-surface-parity.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-rc2-client-surface-parity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-rc2-client-surface-parity.md
+document:
+  en: 33ad63545d0d460bd3c8b9f01ac6ff021b2986e2
+  zh: b69f7e5bb748820fd73fd8de7c8727693d765a68
 /agent-note-rc-2-client-surface-parity-for-conversation-workspace-and-settings:
   en: 7368d45467b521e5
   zh: 7367c2b7319cce4b

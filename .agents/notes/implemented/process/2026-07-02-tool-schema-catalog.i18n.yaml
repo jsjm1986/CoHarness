@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-02-tool-schema-catalog.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-02-tool-schema-catalog.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-02-tool-schema-catalog.md
+document:
+  en: 21192b8caff386058008eed1417ef78c678190f7
+  zh: 756f279b1a8ebd08efd92c6cf8abfd5a70a9dcdb
 /agent-note-generated-tool-schema-catalog-boot-and-harvest:
   en: 7cc7f58030e4549c
   zh: 6dd1bc3fd68a14a9

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-vitest-jsdom-webstorage-ownership.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-vitest-jsdom-webstorage-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-07-30-vitest-jsdom-webstorage-ownership.md
+document:
+  en: 3956a7566fa1c79a767636bce9a19f16588126e2
+  zh: bd01ffdc68a45802ae403bdf44533d39126b021a
 /agent-note-keep-browser-storage-owned-by-jsdom-in-vitest:
   en: 27f5d59b3a654a15
   zh: 9543000979dceef7

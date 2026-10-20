@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-13-upgrade-records-gate.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-13-upgrade-records-gate.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-13-upgrade-records-gate.md
+document:
+  en: d251a85ab3d3310eac8f911e2c4a8eabd6fd3967
+  zh: 55e9f16d645abc701b1c2c594949e32df09a79dc
 /agent-note-upgrade-records-gate-and-commit-inventory:
   en: 4784395d8f8c8736
   zh: 409509476ad68454

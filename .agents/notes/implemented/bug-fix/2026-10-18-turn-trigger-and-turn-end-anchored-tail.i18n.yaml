@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-turn-trigger-and-turn-end-anchored-tail.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-turn-trigger-and-turn-end-anchored-tail.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-turn-trigger-and-turn-end-anchored-tail.md
+document:
+  en: 52ab161effe6ffdaad68b9f8560a596cc0ec3e43
+  zh: e0932cb39f933be009caa4941732e445bfcbdd81
 /agent-note-turn-trigger-opener-and-turn-end-anchored-completed-turn-footer:
   en: 9eb30a205c247082
   zh: ba525feccb80c8f5

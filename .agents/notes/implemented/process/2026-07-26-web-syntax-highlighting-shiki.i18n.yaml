@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-web-syntax-highlighting-shiki.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-web-syntax-highlighting-shiki.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-web-syntax-highlighting-shiki.md
+document:
+  en: ba50318d306426d886af25f01eba616ab919d237
+  zh: 5533bcb5348db152a8f9466eae7d3d8d9a726162
 /agent-note-web-client-syntax-highlighting-synchronous-fine-grained-shiki:
   en: 43be52b9af687aed
   zh: 5f5b70aa4c821e00

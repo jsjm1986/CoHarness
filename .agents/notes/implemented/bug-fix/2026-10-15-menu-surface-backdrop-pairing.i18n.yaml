@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-menu-surface-backdrop-pairing.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-menu-surface-backdrop-pairing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-menu-surface-backdrop-pairing.md
+document:
+  en: 62ba8147112d60bbd717836e5a30124a7ad398c3
+  zh: b0a09648e10a27450282049effe516658ffa5b7d
 /agent-note-elevated-menu-surfaces-pair-fill-with-backdrop-filter:
   en: 5cd19ad75e87c3a1
   zh: 78d0db9ccd7e5bf6

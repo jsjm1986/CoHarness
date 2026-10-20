@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-17-remote-access-concepts-at-authorize-seam.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-17-remote-access-concepts-at-authorize-seam.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-remote-access-concepts-at-authorize-seam.md
+document:
+  en: 5430b0e41e3a67d1ec1c248d3c89c274209dd244
+  zh: 1c84a3c6b3c45009a5062e8506c1d512beb5b96b
 /agent-note-remote-access-concepts-land-on-the-collaboration-authorization-seam:
   en: 3ab3ff72ce1c723c
   zh: 857115b7cd327d5b

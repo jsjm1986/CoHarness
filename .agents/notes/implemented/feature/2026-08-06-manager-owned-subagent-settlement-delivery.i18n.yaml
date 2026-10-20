@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-manager-owned-subagent-settlement-delivery.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-manager-owned-subagent-settlement-delivery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-manager-owned-subagent-settlement-delivery.md
+document:
+  en: 1f91e8b9ce018dd7fc79d698978e5aa922b32033
+  zh: 392a82ae7bec4900ed8e3fb4eaae086f4a496846
 /agent-note-settlement-delivery-belongs-to-the-continuation-manager:
   en: e8e4fec15acfe5d4
   zh: 6dac0279cf244edc

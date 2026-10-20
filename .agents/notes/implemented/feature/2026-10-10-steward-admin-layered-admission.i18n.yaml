@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-10-steward-admin-layered-admission.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-10-steward-admin-layered-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-10-steward-admin-layered-admission.md
+document:
+  en: 97414252154778ce229e05eda12d160b3a6033d0
+  zh: 58acc557cecfeb04d850bf93166e5ee89c864dc1
 /agent-note-steward-admission-layers-the-grant-on-administrator-membership:
   en: 264defdc641aac18
   zh: 8d6bee435c436243

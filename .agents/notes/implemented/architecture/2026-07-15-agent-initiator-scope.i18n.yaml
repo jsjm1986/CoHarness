@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-15-agent-initiator-scope.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-15-agent-initiator-scope.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.md
+document:
+  en: 63540c0ec6b29a10613e01f1ed9ced24e8f2d277
+  zh: 3ea893aa5f6992bf09965436c1db3144d2fae5ac
 /agent-note-initiating-agent-scope-over-asynclocalstorage:
   en: b0a59e3a34c41826
   zh: 7131428a14901d14

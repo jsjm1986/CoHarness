@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-plan-narrow-viewport-regression.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-plan-narrow-viewport-regression.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-06-plan-narrow-viewport-regression.md
+document:
+  en: 945d014e0c51cbaf4080e72f50ee60763d851698
+  zh: 56b305645484060693dbd38397228676be73645c
 /agent-note-narrow-viewport-plan-chip-click-area-regression-test:
   en: 9f37a80f97254837
   zh: fac764c0f226d7f1

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-12-prune-unused-skill-registry-api.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-12-prune-unused-skill-registry-api.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/rejected/simplification/2026-07-12-prune-unused-skill-registry-api.md
+document:
+  en: c84c6d8d61e13ebe7e1a5d3d29260637e38dbf9f
+  zh: 0fada10b8c086b982dd402adccd42b9e48d129a7
 /agent-note-prune-unused-skill-registry-api:
   en: ff5d0311e8e1e032
   zh: a5c7ab3f62dc41b3

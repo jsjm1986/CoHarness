@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-dockkit-strip-segmented-bar.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-dockkit-strip-segmented-bar.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-dockkit-strip-segmented-bar.md
+document:
+  en: 5dc825004669606710f248c02b1dc65901b0bfcd
+  zh: 90851633251e3bb35d0e0f86cc555e9d8fdc9d29
 /agent-note-dock-strip-adopts-the-segmented-bar-language-and-the-panel-clips-its-own-corners:
   en: e359358f4b9130ce
   zh: 05937b6116bba286

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-01-ptc-omits-workflow-tool.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-01-ptc-omits-workflow-tool.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-01-ptc-omits-workflow-tool.md
+document:
+  en: 6d3c28db7b65e220a785792670ae8a7ffcedc23e
+  zh: 562affa1291cadfe51d85d133136ed231268d5c6
 /agent-note-ptc-preset-omits-the-general-workflow-tool:
   en: 439a3305239eced7
   zh: aae484ac96ea4836

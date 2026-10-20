@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-11-process-specific-prompt-values-in-runtime-context.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-11-process-specific-prompt-values-in-runtime-context.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-11-process-specific-prompt-values-in-runtime-context.md
+document:
+  en: 4906bf23b57eeede87d2a7a237a65503d059d680
+  zh: 9643a977dc70c5a86efb18e70521eae2b7933b85
 /agent-note-process-specific-checkout-path-and-web-url-move-to-runtime-context:
   en: 711ce3e3afb1f905
   zh: 2d4e4aea44043c4a

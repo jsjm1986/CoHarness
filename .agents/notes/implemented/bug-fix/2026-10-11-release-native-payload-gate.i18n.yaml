@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-11-release-native-payload-gate.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-11-release-native-payload-gate.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-11-release-native-payload-gate.md
+document:
+  en: 2199bace2338b74af71af4c8c168c32475e9af22
+  zh: 97c43f0c07aecae7ae98fc4173db503bc0405c3f
 /agent-note-release-activation-requires-the-host-native-addon-payload:
   en: 76149f7a24cfef8b
   zh: ee16cf7223dcb09f

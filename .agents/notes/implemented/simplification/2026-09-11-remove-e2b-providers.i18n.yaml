@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-11-remove-e2b-providers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-11-remove-e2b-providers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-11-remove-e2b-providers.md
+document:
+  en: a73c5849ff98751b76903b1ef0c284112efba073
+  zh: 1a092a80437c41a3fbee17d1468e40315c9533f4
 /agent-note-remove-the-e2b-execution-providers:
   en: 0f876c637fad20a9
   zh: a7616ada505f0bc1

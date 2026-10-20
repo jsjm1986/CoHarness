@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 0002-js-expression-disabled-filesystem-tools.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 0002-js-expression-disabled-filesystem-tools.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/postmortem/0002-js-expression-disabled-filesystem-tools.md
+document:
+  en: 93c62261f54e273ea5dbb2ca1a236daf9b2a6f15
+  zh: d612b7781539267bb63b9ccb0c01255bbd9e44fa
 /post-mortem-0002-filesystem-snapshot-tools-were-permanently-disabled:
   en: 02d6d2adb8360fc7
   zh: ec94ad79d29fb636

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-14-trajectory-request-lifecycle.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-14-trajectory-request-lifecycle.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-14-trajectory-request-lifecycle.md
+document:
+  en: eb046eedd5d689f577b9820553e06e59f5e28e3d
+  zh: e1ad38cc072d8c19c5ee62ee3bb31132ca7450e6
 /agent-note-trajectory-request-lifecycle-is-settled-state-not-stream-presence:
   en: 1c8df52b38ae50c9
   zh: 76c7cf99d7bc63b7

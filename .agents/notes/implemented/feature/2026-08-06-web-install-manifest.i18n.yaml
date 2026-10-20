@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-web-install-manifest.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-web-install-manifest.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-web-install-manifest.md
+document:
+  en: 3ecd8c9cdbd3e46547c37b335da65e2522a7460d
+  zh: 3527578509e08938b00b306479f53115f93f1879
 /agent-note-web-install-manifest-metadata:
   en: 887fcbd60e1e6588
   zh: 62b51a0798bf7300

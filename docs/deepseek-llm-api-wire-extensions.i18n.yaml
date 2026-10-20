@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for deepseek-llm-api-wire-extensions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for deepseek-llm-api-wire-extensions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/deepseek-llm-api-wire-extensions.md
+document:
+  en: 0b77722a44d812da0dcc250de4f0e3c05109955f
+  zh: ac2c9588070665d72f62346019505aa8e4ec1509
 /official-deepseek-llm-api-wire-extensions:
   en: f2829271ec4dc949
   zh: b457402fe9c51747

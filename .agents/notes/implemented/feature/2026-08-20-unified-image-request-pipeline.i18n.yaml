@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-20-unified-image-request-pipeline.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-20-unified-image-request-pipeline.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-unified-image-request-pipeline.md
+document:
+  en: 7431a474b55a9dae82b1c9cd36b770b31fe39602
+  zh: 247a57b8017f513c552204d951ef6931f7f9d045
 /agent-note-unified-normalized-attachments-request-versions-and-provider-files:
   en: 79d1a6f50ac76c3d
   zh: 9af0070009537602

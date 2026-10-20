@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-25-abort-signal-webview-compat.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-25-abort-signal-webview-compat.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-abort-signal-webview-compat.md
+document:
+  en: f6937d5896d1ffa3843c898861c1bbc9446494d1
+  zh: 89caaa2eda124d70fd8ccf955e0c2898ea29a37d
 /agent-note-web-boot-supplies-abortsignal-static-factory-compatibility:
   en: 26c3a3b05166895c
   zh: 8e9172ae40d4e7d6

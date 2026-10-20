@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 0001-acp-default-export-drops-inject.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 0001-acp-default-export-drops-inject.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/postmortem/0001-acp-default-export-drops-inject.md
+document:
+  en: f8474bde0b81b24573f813d9a0fb017962751f49
+  zh: f48cba7592761d418d948ca3f6829989912c07aa
 /post-mortem-0001-acp-server-crashed-on-connect-export-default-dropped-the-plugin-s-inject:
   en: d7e3ed1019ed04b5
   zh: 23c6df9914b95d3a

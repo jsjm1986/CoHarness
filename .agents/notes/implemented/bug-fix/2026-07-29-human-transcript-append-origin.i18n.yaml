@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-29-human-transcript-append-origin.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-29-human-transcript-append-origin.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-29-human-transcript-append-origin.md
+document:
+  en: e39e2014debd159931b8717d4a69b01d6171b5c6
+  zh: ddc9305bf0d673f2648d1d7408ff040909ba76ed
 /agent-note-the-human-transcript-projects-append-origin-events:
   en: 2388feacd3537645
   zh: eab2552415e6d8f8

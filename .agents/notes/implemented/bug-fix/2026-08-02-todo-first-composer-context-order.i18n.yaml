@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-02-todo-first-composer-context-order.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-02-todo-first-composer-context-order.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-02-todo-first-composer-context-order.md
+document:
+  en: 26962426c763c6911fc61acab09cdb96725922b1
+  zh: a341dddfb759043dbd3d7cf8347530bb33afcf65
 /agent-note-todo-first-composer-context-order:
   en: 2f83e2f5ee82024f
   zh: 5c8e1d6f9f29bbe7

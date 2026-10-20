@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-hero-workspace-row-simplification.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-hero-workspace-row-simplification.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-hero-workspace-row-simplification.md
+document:
+  en: a688b66c675cdc904d69ee4c75ba0c15fe0d27cf
+  zh: 95d1c56f679a90af046ddaf64418bbf5853d2200
 /agent-note-hero-workspace-row-keeps-only-the-workspace-selector:
   en: eb3d377a7e549a65
   zh: 27ed1136b0f28789

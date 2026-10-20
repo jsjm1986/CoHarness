@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-26-snapshot-session-identity-binding-order.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-26-snapshot-session-identity-binding-order.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-26-snapshot-session-identity-binding-order.md
+document:
+  en: ffce2df508f1157517068235c71858b19ddb1133
+  zh: f797e5304c3f17aeeb122068b7fbb2fea6668472
 /agent-note-snapshot-session-identity-binding-order:
   en: a750a66fbe525037
   zh: e112a6451ea96719

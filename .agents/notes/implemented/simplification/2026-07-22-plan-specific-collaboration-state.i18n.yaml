@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-22-plan-specific-collaboration-state.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-22-plan-specific-collaboration-state.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md
+document:
+  en: 6ec535a6bf49608f2aaaffd067d68095bd359e96
+  zh: 677e92803e4a07ba62ecdfac3f1e7d42ca5debb0
 /agent-note-plan-specific-collaboration-state:
   en: b1e94e354a36ef2b
   zh: bbc98d4b9a837a5a

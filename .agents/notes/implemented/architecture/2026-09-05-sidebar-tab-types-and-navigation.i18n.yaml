@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-05-sidebar-tab-types-and-navigation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-05-sidebar-tab-types-and-navigation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-05-sidebar-tab-types-and-navigation.md
+document:
+  en: ed2b60dc462a125447d1f361953841dc418e1b4b
+  zh: d9c16e0547b58d6f63e692a52cbd421f95a4029c
 /agent-note-right-sidebar-tab-types-and-navigation:
   en: 2860d8acc82e4a85
   zh: 7b09ac61a684e36d

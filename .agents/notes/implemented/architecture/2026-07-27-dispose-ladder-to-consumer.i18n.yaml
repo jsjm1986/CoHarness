@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-dispose-ladder-to-consumer.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-dispose-ladder-to-consumer.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-27-dispose-ladder-to-consumer.md
+document:
+  en: 58d835864d2f6544152fdf09cf6e93380793a2ae
+  zh: dc7413e85fa6e52de14f51fd175c7b37b43029a4
 /agent-note-the-dispose-ladder-belongs-to-its-consumer-not-the-subprocess-seam:
   en: 96bb0ebf7496b0ed
   zh: 849fe09eb37a9ef6

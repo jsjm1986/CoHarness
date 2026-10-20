@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-17-experimental-claude-code-mods-extraction.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-17-experimental-claude-code-mods-extraction.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-17-experimental-claude-code-mods-extraction.md
+document:
+  en: 353f6dde67ef127046a0ea91ad7186f96a1d7146
+  zh: 8695102737d47b173b0e6aa1e46152d00094fba8
 /agent-note-experimental-claude-code-mods-extraction-and-deferred-upstream-packages:
   en: b2ddfb2f825a064e
   zh: 18046d4cec45e2a2

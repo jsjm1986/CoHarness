@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-pnpm-action-setup-for-symmetric-ci-caching.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-pnpm-action-setup-for-symmetric-ci-caching.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-pnpm-action-setup-for-symmetric-ci-caching.md
+document:
+  en: 31d1ebf009a6e044722081985546e87b9d4ae0e2
+  zh: 84445abfdd42671f2f5c9de8403ed7891f9cc292
 /agent-note-provision-ci-pnpm-via-pnpm-action-setup:
   en: 6a830cf69f4badaf
   zh: 9d29c8997361bb56

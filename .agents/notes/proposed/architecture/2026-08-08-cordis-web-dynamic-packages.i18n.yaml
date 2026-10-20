@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-08-cordis-web-dynamic-packages.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-08-cordis-web-dynamic-packages.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-08-08-cordis-web-dynamic-packages.md
+document:
+  en: 647fbbbd32ddb47de1f3903acaed71b2922627ee
+  zh: 08da978e769d79535a0996f222c668ba0ea0a9d4
 /agent-note-cordis-host-client-dynamic-plugin-runtime:
   en: da60448ef1401f4d
   zh: 022fe706a500af77

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-15-platform-office-engines.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-15-platform-office-engines.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-15-platform-office-engines.md
+document:
+  en: 4272054672c6163f22b910ab64b6472a9dbdfb4c
+  zh: d0a317333049734415ab9c0c05a5624b63b27447
 /agent-note-one-office-engine-per-platform:
   en: 5ba8eea6deb11824
   zh: 7d1cb289fa278c74

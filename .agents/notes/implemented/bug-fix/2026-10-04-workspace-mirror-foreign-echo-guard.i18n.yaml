@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-workspace-mirror-foreign-echo-guard.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-workspace-mirror-foreign-echo-guard.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-workspace-mirror-foreign-echo-guard.md
+document:
+  en: 1ec0c56e903193e13e70325a4193fb420e8466a3
+  zh: 597381a7f413dc9b622edd959efd0cf453c0f350
 /agent-note-pin-whole-set-workspace-echoes-to-the-mirrored-runtime:
   en: fc4daa3952a20826
   zh: c5d5c75cd2d9f27b

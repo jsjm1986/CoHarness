@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-20-attachment-read-quarantine.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-20-attachment-read-quarantine.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/bug-fix/2026-08-20-attachment-read-quarantine.md
+document:
+  en: 28e0f26cee2ec1e257fd4d43b4edc4300e2c6f23
+  zh: 7f4ceae4e1fe9e656ed762de9828e14145976dc3
 /agent-note-quarantine-unreadable-historical-attachments:
   en: 044cc37c349ad018
   zh: ba3336ebf923aeeb

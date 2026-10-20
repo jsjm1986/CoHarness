@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-ci-failover-runbook.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-ci-failover-runbook.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-ci-failover-runbook.md
+document:
+  en: b9fbdea07cb1a57317d7f6509a9fc435727e4eb1
+  zh: c8449567f7d82c2e415bfc96112daba8d55fa04b
 /agent-note-ci-failover-runbook-hosted-pools-in-house-pool:
   en: 677b522817e84e2f
   zh: f8518a7033b0fd54

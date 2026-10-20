@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for typert.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for typert.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/typert.md
+document:
+  en: d0e5c1805c400db784306c6b01e6d6db9ef21392
+  zh: 3a9f5c382a4be8514b1729c67fdb5fa0863e8a8f
 /typert-remote-calls:
   en: ccc2694e359c2333
   zh: cd68bf5e74e2d685

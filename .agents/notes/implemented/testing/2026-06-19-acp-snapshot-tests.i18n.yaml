@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-19-acp-snapshot-tests.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-19-acp-snapshot-tests.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-06-19-acp-snapshot-tests.md
+document:
+  en: aa3ce4fe96e3c03a1d7c8880a682d76ab23f5e74
+  zh: 08d936da7fd6d4cb37c425bdbe868962eb5713c3
 /agent-note-acp-snapshot-tests-record-once-replay-deterministic:
   en: 2f19b76966d5cf54
   zh: cbaed521d650e079

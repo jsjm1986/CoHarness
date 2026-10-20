@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-03-selective-upstream-alpha4-alpha5-sync.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-03-selective-upstream-alpha4-alpha5-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-03-selective-upstream-alpha4-alpha5-sync.md
+document:
+  en: 245df02ffb1c4bbe60b8c9226087ac93eaa6f81d
+  zh: 6a6426938d61db64f256328ebe98d4855c66abe6
 /agent-note-selective-upstream-alpha-4-and-alpha-5-integration:
   en: fea70f1eecb7e66b
   zh: 5bbed5dd553feca5

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-03-user-side-plugin-manager-page.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-03-user-side-plugin-manager-page.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-03-user-side-plugin-manager-page.md
+document:
+  en: f8a7ef24b879fa58ddee43822dee908a0e34dfb0
+  zh: 469b84dd0d95b520584c91f36db0b4f03f8caa50
 /agent-note-the-web-sidebar-plugins-page-brings-grant-gated-bundle-management-to-users:
   en: 1d17c7bdff98b69d
   zh: 41fb13b214dbe71c

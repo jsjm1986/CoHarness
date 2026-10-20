@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-30-web-job-output-and-kill.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-30-web-job-output-and-kill.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-30-web-job-output-and-kill.md
+document:
+  en: 51a8aa79fb710351d2e6d4bfdf8d843ef165944d
+  zh: 71812b0d14ad90511b60c64cc489e97c18261d52
 /agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster:
   en: e5d382b515d0c459
   zh: bbbcc9835ca0521e

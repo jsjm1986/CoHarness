@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for persistence.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for persistence.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/persistence.md
+document:
+  en: b5cf3a031ff8c50d6bc93baf885335b6ce93d1d1
+  zh: f6ce6ebd5bb70a07014a2c7a3f348154f32bdd66
 /session-persistence:
   en: 41bb07bee6956883
   zh: 57918168715e6d12

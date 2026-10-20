@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-host-plane-ownership-after-presets.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-host-plane-ownership-after-presets.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-10-host-plane-ownership-after-presets.md
+document:
+  en: 1e2a5d08466c18a1e55d1a00102af548a877670c
+  zh: 403bbf0b881d1ecc0013d84fcf4531a5e844f2a0
 /agent-note-host-ownership-of-token-accounting-across-presets:
   en: 45be5970f9d763c9
   zh: 9401a4292c7b40d0

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-05-web-snapshot-process-isolation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-05-web-snapshot-process-isolation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-05-web-snapshot-process-isolation.md
+document:
+  en: 2fa12010d03b5be468cee1c791a863b030725d1d
+  zh: 3aedf8aeb6976aa980e08853425995372808b2a5
 /agent-note-isolate-stateful-web-snapshot-suites-in-their-own-processes:
   en: 33d8a744e985006d
   zh: 3ab3b05151cc1a92

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-phosphor-glyph-subset.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-phosphor-glyph-subset.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-phosphor-glyph-subset.md
+document:
+  en: d9404beea086faa5a761419854c4874f84e55c6a
+  zh: 7fad7c369ea686f0f4b7dcd1358e5a8e67d50647
 /agent-note-back-ten-ic-ds-glyphs-with-inlined-phosphor-path-data:
   en: 63c35291d1f3ec5e
   zh: a83311624455a1c4

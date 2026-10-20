@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-14-cross-family-fs-sandbox.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-14-cross-family-fs-sandbox.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.md
+document:
+  en: 05a9223b6c6cd61d3fa43e99543982c0862036a0
+  zh: 1c3377126ceadc4a2946d7f949cdc1f764deffcd
 /agent-note-cross-family-file-sandbox-one-policy-home-a-sandboxed-fs-provider-and-fs-escalation-parity:
   en: d971839c319030fa
   zh: 29d8cc0ec85337af

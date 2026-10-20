@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-web-tool-row-unified-expand-and-inspect.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-web-tool-row-unified-expand-and-inspect.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-tool-row-unified-expand-and-inspect.md
+document:
+  en: 2223f8fbfa40b95fe7eca5a3e19d7fec08468103
+  zh: e7582534c5a59e4fac14953ace12c5f80ae29c4a
 /agent-note-web-tool-row-unified-expand-and-trajectory-inspect:
   en: d8c3dfa0bed52069
   zh: 555c04ab1cd3d503

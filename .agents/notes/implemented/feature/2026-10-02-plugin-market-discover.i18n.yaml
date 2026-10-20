@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-02-plugin-market-discover.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-02-plugin-market-discover.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md
+document:
+  en: 505ea944e6f323341220f597b4f074c88e1c2a03
+  zh: f924fb064180d2220ca764ae4a9175dc8fd775a2
 /agent-note-plugin-market-discover-page-and-index-reader:
   en: e226087ae345768b
   zh: b043fa6c793fd684

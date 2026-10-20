@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-session-title-provider-strategy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-session-title-provider-strategy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-session-title-provider-strategy.md
+document:
+  en: 7c6c5aa9b2be315bf705566a599f93033755a1c9
+  zh: 38ab5970aba07e8720022a853d70c20e9b6c3dd1
 /agent-note-session-title-provider-strategy-split:
   en: 8c0052c642136318
   zh: f17656b738df10ad

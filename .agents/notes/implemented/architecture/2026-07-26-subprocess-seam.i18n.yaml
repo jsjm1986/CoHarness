@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-subprocess-seam.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-subprocess-seam.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-26-subprocess-seam.md
+document:
+  en: aa7a989a0321760c9bc278df8356a57f4dd0d459
+  zh: bb9755957f2de35a884d51f1fadc037a7bbbeddd
 /agent-note-the-subprocess-service-is-its-own-seam-under-the-bash-executors-dsh-subprocess-dsh-subprocess-local:
   en: 657c5f7418560c91
   zh: 6a4b95f8b261eb26

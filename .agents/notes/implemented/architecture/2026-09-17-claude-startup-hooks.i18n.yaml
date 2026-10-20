@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-claude-startup-hooks.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-claude-startup-hooks.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-17-claude-startup-hooks.md
+document:
+  en: e48d8c4f41be8e0f24d5c571007baa32b96816a4
+  zh: 8e5279dd3921bfc7b0f0631bc1a772d56d3ae9d7
 /agent-note-await-claude-code-sessionstart-hooks:
   en: 17dc69212df144cd
   zh: 1a5854f2f665965d

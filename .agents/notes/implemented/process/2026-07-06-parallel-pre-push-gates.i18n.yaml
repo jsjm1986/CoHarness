@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-06-parallel-pre-push-gates.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-06-parallel-pre-push-gates.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-06-parallel-pre-push-gates.md
+document:
+  en: b0f85faf16c0317906bc6a2b67ac42ac1f4876a5
+  zh: ab57c7eb8f895374788504ff44a3224657376feb
 /agent-note-parallel-pre-push-gates:
   en: 78b4af648b16163f
   zh: 696ac02ec24d0520

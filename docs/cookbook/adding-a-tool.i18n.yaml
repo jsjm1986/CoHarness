@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for adding-a-tool.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for adding-a-tool.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/adding-a-tool.md
+document:
+  en: 02f544ae1eea211fcf1e59757cfb94c7c28d3bef
+  zh: bff928f4f7f449b8cb98737f870598455908ca02
 /tool-authoring-reference:
   en: 97ed54443f2a4464
   zh: 09c294f281c0de75

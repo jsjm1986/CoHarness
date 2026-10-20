@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-approval-panel-command-cap.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-approval-panel-command-cap.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-approval-panel-command-cap.md
+document:
+  en: 1d74d790299522a0f1e6b23f342cd10b35192d27
+  zh: 35263df4df4460ccfad4a0c11704997f4b2e27f2
 /agent-note-the-approval-takeover-shares-the-composer-s-text-cap:
   en: e174fd6000691b84
   zh: 2ed83359fc30250d

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for slots.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for slots.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/slots.md
+document:
+  en: e0c12fe886aabd13f993e573b9df6e6d0e975960
+  zh: 30a5f8e9ef168eb0dee91c1756c526795feb9e28
 /web-client-slots:
   en: 658e15faf926bdf5
   zh: 429b5354136e7c21

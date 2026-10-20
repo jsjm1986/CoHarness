@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-09-preset-owned-subagent-composition.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-09-preset-owned-subagent-composition.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-10-09-preset-owned-subagent-composition.md
+document:
+  en: f243c7c03e77fb8ccbf71e0e44b176a7063a7729
+  zh: 8fb60cbcc4880b00548d17eeed11e1f5249082e1
 /agent-note-preset-owned-subagent-composition:
   en: 08d7745426af0373
   zh: 26f9afb3cc941a9a

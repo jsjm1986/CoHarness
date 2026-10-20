@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-image-dimension-admission-limit.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-image-dimension-admission-limit.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-image-dimension-admission-limit.md
+document:
+  en: 027259c0949d142ce8d8af27e7daa2abd54769ab
+  zh: 38422615aa93b7f1639877d7d3751322c77de1eb
 /agent-note-per-side-image-dimension-admission-limit:
   en: 752ef8b930d96c38
   zh: f8cfa309ab9c5ce2

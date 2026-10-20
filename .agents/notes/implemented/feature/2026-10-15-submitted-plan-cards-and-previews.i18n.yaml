@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-submitted-plan-cards-and-previews.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-submitted-plan-cards-and-previews.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-submitted-plan-cards-and-previews.md
+document:
+  en: 5462f3b8c09a2f4c15f820b882b225f59bf8712c
+  zh: 8c0a7e0268ed4f1555b7e7fd1e56b78faa8ebeda
 /agent-note-submitted-plan-cards-and-session-backed-sidebar-previews:
   en: 940388f620d92056
   zh: f3c7fd401332cbdc

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-15-model-agent-availability-and-team-targets.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-15-model-agent-availability-and-team-targets.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-15-model-agent-availability-and-team-targets.md
+document:
+  en: e1f7f95cfa333be6d05677b4b19775c744f2817c
+  zh: 0447d7d4059eb75d1fb9169389cd83a54292aadf
 /agent-note-model-agent-availability-and-team-targets:
   en: 7c8722f7b156cd8c
   zh: aad147cf37021d82

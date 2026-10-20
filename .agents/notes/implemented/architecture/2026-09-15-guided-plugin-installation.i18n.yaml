@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-15-guided-plugin-installation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-15-guided-plugin-installation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-15-guided-plugin-installation.md
+document:
+  en: d7092f1ba3edd2c48471ed0538e14ee70a371e1a
+  zh: d4db3ec2444d2f5f66e9c9e49e8df866349e3102
 /agent-note-guided-plugin-installation:
   en: 6b8375e59efb720e
   zh: d94f130f72639233

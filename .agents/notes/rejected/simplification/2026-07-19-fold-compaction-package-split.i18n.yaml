@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-fold-compaction-package-split.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-fold-compaction-package-split.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/rejected/simplification/2026-07-19-fold-compaction-package-split.md
+document:
+  en: 17d2ff5b8b663131eb3548dbf32d9489ca174f6b
+  zh: a981e0096516d51481360f95a0d72720a9023c5e
 /agent-note-fold-the-single-compaction-backend-into-its-service-package:
   en: 22e69a4c9159be12
   zh: c68cd8f8f536dc03

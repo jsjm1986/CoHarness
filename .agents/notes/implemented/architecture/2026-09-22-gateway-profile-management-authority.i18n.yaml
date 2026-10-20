@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-gateway-profile-management-authority.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-gateway-profile-management-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.md
+document:
+  en: 0c889bf4e5950be7d909741530f14f88c19370d5
+  zh: 0b5b98fbd645d95b1ce029dcb62c1eb53e613fb4
 /agent-note-gateway-authority-for-profile-management:
   en: a782735ef281441c
   zh: aee6df3db0bd1a92

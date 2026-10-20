@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-agent-event-payload-objects.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-agent-event-payload-objects.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-agent-event-payload-objects.md
+document:
+  en: 470c8fb3f9282005829846307778d3d1088c3888
+  zh: 861a1b9c12c4ff050a9825212b02bc6c4e1c662d
 /agent-note-agent-scoped-events-dispatch-a-single-payload-object:
   en: 6c3ac29fcae8f65a
   zh: 5e0d851aa0f89ead

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 07-into-the-harness.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 07-into-the-harness.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cordis-tutorial/07-into-the-harness.md
+document:
+  en: 1bfe05fb511b54067b913a1a2d0903a0772a22d7
+  zh: 5ed4ff9d95d6e8b14402e525e1e9bb5328bfb678
 /7-into-the-harness:
   en: 470ff1f9eadc2663
   zh: d92a95cc0058ed3b

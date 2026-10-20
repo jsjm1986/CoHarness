@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-snapshot-child-order-barrier.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-snapshot-child-order-barrier.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-13-snapshot-child-order-barrier.md
+document:
+  en: 90a0edd4d7aeaa9e2ac3922162fbb8e5bba3e7b6
+  zh: f29d57129af535ef58176c6eddfd9c632cc9663b
 /agent-note-barrier-the-advanced-python-snapshot-workflow-child-behind-its-parent-handoff:
   en: e3e756be40bfd5a6
   zh: 4734f5b9f343b4ee

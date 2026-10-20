@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-open-in-app-pick-commit-hover-label.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-open-in-app-pick-commit-hover-label.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-open-in-app-pick-commit-hover-label.md
+document:
+  en: 6b8123a1e7968e4d1e637702657b7daef01f35fd
+  zh: 55fe08b4f0f4bd8da65e0f922386d18214ed475f
 /agent-note-the-open-in-app-pick-persists-after-its-launch-and-the-hover-label-names-the-application:
   en: ef17ebf9bd270c44
   zh: 27a81b741db47bae

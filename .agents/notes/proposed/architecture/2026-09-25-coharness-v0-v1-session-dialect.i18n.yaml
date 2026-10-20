@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-coharness-v0-v1-session-dialect.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-coharness-v0-v1-session-dialect.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-09-25-coharness-v0-v1-session-dialect.md
+document:
+  en: e513e56ddec9cea6e1225af803e24fe30f60028a
+  zh: 4973a82b1af7255f253ca134b723b8148ed8d361
 /agent-note-coharness-v0-v1-session-dialect-admission:
   en: 97db0662b3a9740c
   zh: 78a4236ce2be7063

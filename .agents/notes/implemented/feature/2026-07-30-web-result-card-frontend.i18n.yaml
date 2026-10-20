@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-web-result-card-frontend.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-web-result-card-frontend.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.md
+document:
+  en: 6a00e0820af2c4010554df444a7585fb226294bf
+  zh: 42543e2dcde181ba7fd75f4965e83adefe32d872
 /agent-note-web-result-card-frontend-rendering-the-web-render-intent-in-the-browser:
   en: a42c062904d594d6
   zh: 1f388b77e67c26fb

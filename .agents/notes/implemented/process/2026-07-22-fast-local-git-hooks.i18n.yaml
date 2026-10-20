@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-22-fast-local-git-hooks.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-22-fast-local-git-hooks.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-22-fast-local-git-hooks.md
+document:
+  en: 01cd0f3aeb1c4cb803744232350f402c5bf23497
+  zh: 9387729ccb678e224f7a16c3ecacfcc12853a25b
 /agent-note-fast-local-git-hooks:
   en: 738698be98f442c4
   zh: 88ce548a00466a8f

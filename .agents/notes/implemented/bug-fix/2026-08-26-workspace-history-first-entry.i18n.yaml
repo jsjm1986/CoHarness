@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-26-workspace-history-first-entry.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-26-workspace-history-first-entry.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-workspace-history-first-entry.md
+document:
+  en: b6b99fc87435e35ae6de7e866eff5fa70660eb5a
+  zh: 49b21abb0c8015031ccf497289c16703a7628b31
 /agent-note-workspace-entry-opens-history-before-new-sessions:
   en: 26723b59cdbf3268
   zh: 70c5db5b76f95c6e

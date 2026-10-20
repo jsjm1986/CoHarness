@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-09-plugin-management-in-the-web-sidebar.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-09-plugin-management-in-the-web-sidebar.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-09-plugin-management-in-the-web-sidebar.md
+document:
+  en: d2a3329e7c878f25ad5e50d98fc2e3ab39722887
+  zh: aae035b3a93aec72e84e2792334c42c54d2bca62
 /agent-note-plugin-management-moves-to-the-web-sidebar:
   en: efdb6c8f366dd2c2
   zh: a4246a24a351952a

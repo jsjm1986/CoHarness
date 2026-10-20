@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-21-bounded-llm-request-recovery.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-21-bounded-llm-request-recovery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-21-bounded-llm-request-recovery.md
+document:
+  en: f31b56f684d384af059fc2208868f347201d100e
+  zh: d64a81166f9d31436e5cfbbeace33d5a7a77cc44
 /agent-note-bounded-recovery-for-transient-llm-request-failures:
   en: ad4f03f3ab4a15cb
   zh: f514245927a2a845

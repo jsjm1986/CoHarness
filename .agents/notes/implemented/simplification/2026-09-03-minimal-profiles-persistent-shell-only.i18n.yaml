@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-03-minimal-profiles-persistent-shell-only.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-03-minimal-profiles-persistent-shell-only.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-03-minimal-profiles-persistent-shell-only.md
+document:
+  en: 4640a8fc76f26cfdd7e09e8233f52ae3062a4d59
+  zh: 61d4e6f388bdd8b42081c379e64cdc8bc31dee4e
 /agent-note-minimal-profiles-expose-only-a-persistent-shell:
   en: d48e78dc2040921c
   zh: 70122e09d8c78e77

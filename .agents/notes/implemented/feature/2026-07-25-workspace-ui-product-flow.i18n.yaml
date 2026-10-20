@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-25-workspace-ui-product-flow.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-25-workspace-ui-product-flow.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md
+document:
+  en: 9053d7a9911d36537c0b5c7e0efd9508e4cda932
+  zh: ecf34822d50dfd01363e56089375076428b68172
 /agent-note-workspace-ui-complete-product-flow:
   en: e80ce264d0f70943
   zh: 528e4338b8b93357

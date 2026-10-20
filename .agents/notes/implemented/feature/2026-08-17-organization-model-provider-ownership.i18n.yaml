@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-organization-model-provider-ownership.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-organization-model-provider-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-organization-model-provider-ownership.md
+document:
+  en: 85a6bad51b640971b05f0b3c5943ad518e30bc7d
+  zh: 3f7a6966036ec7399b1121484b87e51f5092e5e3
 /agent-note-organization-provider-ownership-and-project-model-assignment:
   en: c2f4a9941726e059
   zh: 1289bec890b36f4e

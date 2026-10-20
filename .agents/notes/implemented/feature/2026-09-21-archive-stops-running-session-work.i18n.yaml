@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-21-archive-stops-running-session-work.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-21-archive-stops-running-session-work.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-21-archive-stops-running-session-work.md
+document:
+  en: 85c9ad81853b5285c438352a7302d9c620474e5b
+  zh: 6f8056a884772fa3b1ee33c83fd660fb33648aa2
 /agent-note-archiving-a-session-with-running-work:
   en: 0fbbf70c0c7c2bfa
   zh: 5d3119ee84af3796

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for schedule.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for schedule.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/schedule.md
+document:
+  en: d52af84f52d34011e0fe75cba8b34cfebff4bb0b
+  zh: 498ae414c7c9cce3535d13556c41d15a84a4851f
 /schedule-reminders:
   en: c3cb91d1d53b7603
   zh: 715ced3f1a2e9dd5

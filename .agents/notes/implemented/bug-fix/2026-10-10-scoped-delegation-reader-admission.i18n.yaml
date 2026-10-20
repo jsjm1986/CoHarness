@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-10-scoped-delegation-reader-admission.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-10-scoped-delegation-reader-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-scoped-delegation-reader-admission.md
+document:
+  en: ddf34bfd988c0b0c4f205ec5e6a9b881fb4b657f
+  zh: e5119fb75362e2581abde8038f1382c546c66d1d
 /agent-note-delegated-policy-append-routes-scoped-scope-through-the-authority-writer:
   en: 2fa0f4ec067dd16f
   zh: 63b266284a715fc0

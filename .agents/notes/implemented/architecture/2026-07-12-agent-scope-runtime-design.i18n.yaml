@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-12-agent-scope-runtime-design.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-12-agent-scope-runtime-design.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-12-agent-scope-runtime-design.md
+document:
+  en: e76d8302804931408cb02c4afef413979d03dbc5
+  zh: e67b6e5218792c88617a965cc5e68b8b3d0ca119
 /agent-note-agent-scope-runtime-design-and-correctness:
   en: b63ecbd21fc1f427
   zh: 4990d96d76888802

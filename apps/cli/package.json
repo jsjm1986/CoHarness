@@ -167,6 +167,7 @@
     "@deepseek-ai/dsh-settings": "workspace:*",
     "@deepseek-ai/dsh-settings-file": "workspace:*",
     "@deepseek-ai/dsh-shell-env": "workspace:*",
+    "@deepseek-ai/dsh-skill-badge": "workspace:*",
     "@deepseek-ai/dsh-subagent": "workspace:*",
     "@deepseek-ai/dsh-subagent-fork-in-process": "workspace:*",
     "@deepseek-ai/dsh-subagent-spawn-in-process": "workspace:*",

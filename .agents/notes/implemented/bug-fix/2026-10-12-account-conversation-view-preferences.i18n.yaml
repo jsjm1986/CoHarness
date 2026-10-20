@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-account-conversation-view-preferences.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-account-conversation-view-preferences.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-account-conversation-view-preferences.md
+document:
+  en: c0bede5da41b3c7e91c899c99ae4ee52a0579b99
+  zh: 15e66ac483ab547c91038c576916cb2d93e71def
 /agent-note-account-preferences-carry-every-ui-conversation-field:
   en: 4f794cfe04b1a23a
   zh: bc439aefada0df8c

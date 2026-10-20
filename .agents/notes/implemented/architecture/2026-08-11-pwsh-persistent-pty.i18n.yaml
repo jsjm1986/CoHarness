@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-11-pwsh-persistent-pty.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-11-pwsh-persistent-pty.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-11-pwsh-persistent-pty.md
+document:
+  en: 8353b3ab3cdbf20add22a55acb03312c94283602
+  zh: 95048a02416dfcf5f0ef2837d99a561008f6496f
 /agent-note-persistent-pwsh-over-the-terminal-seam-on-windows:
   en: 85a3eb5ba9de0129
   zh: 4d173492a3ca5d75

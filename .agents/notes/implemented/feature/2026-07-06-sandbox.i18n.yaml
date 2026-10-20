@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-06-sandbox.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-06-sandbox.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-06-sandbox.md
+document:
+  en: 78b970df2e0325745c747e8402157518c907a0e2
+  zh: 1e947b0ecd901dcc55d46cc6d4ce6b93eaf51152
 /agent-note-the-subprocess-sandbox-confinement-seam-native-runners-escalation-and-per-session-modes:
   en: b36f59d0746e94f1
   zh: 0d0f8e19917a9eae

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-23-collapse-persistence-flush-state.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-23-collapse-persistence-flush-state.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-23-collapse-persistence-flush-state.md
+document:
+  en: 2801079e5b322d076eced3a0113e7958d9b4c3b9
+  zh: eb292ac1d357f3fa96715e99d5e2ecfc963938c6
 /agent-note-collapse-live-persistence-into-one-flush-controller:
   en: da8a98741f362ace
   zh: 3ed3ff61cfb5ba84

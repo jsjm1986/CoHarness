@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-07-sidebar-responsive-tab-info.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-07-sidebar-responsive-tab-info.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-07-sidebar-responsive-tab-info.md
+document:
+  en: 96f7f047d00a33d6cd48b026ce7762929720d9d6
+  zh: f020068e71777272fd15a967de547ce153884402
 /agent-note-responsive-sidebar-and-injected-tab-information:
   en: 63ced560202cf1a3
   zh: 1ec49cd5ae68f909

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-01-browser-auth-web-transport.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-01-browser-auth-web-transport.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-01-browser-auth-web-transport.md
+document:
+  en: 2fca21b7be92d974117b77365bbda629d643d5aa
+  zh: 189c40477cf83b2e60766f63270574460a9b574a
 /agent-note-browser-session-authentication-for-the-web-connection-carrier:
   en: 71e2120d9c548187
   zh: 0cc8a02f8a043da9

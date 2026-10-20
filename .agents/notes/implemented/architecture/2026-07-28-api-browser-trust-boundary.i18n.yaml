@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-28-api-browser-trust-boundary.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-28-api-browser-trust-boundary.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.md
+document:
+  en: b2a8a92ee67003f81d77c51650672aebf592a395
+  zh: 29eb7ecbf2e5caba20d4c7fbd5bae364141f86e7
 /agent-note-one-carrier-level-browser-trust-boundary-for-all-api-routes:
   en: 491d0faf230d0278
   zh: 40c8eef7719fe354

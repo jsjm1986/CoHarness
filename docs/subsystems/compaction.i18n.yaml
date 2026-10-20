@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for compaction.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for compaction.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/compaction.md
+document:
+  en: 435defd30bef47b48713e64d8a3210f24343411d
+  zh: ac07aa3fd2734d1ea8370474d80f0c5de3981ba0
 /compaction:
   en: 7eb1d2d84fb85447
   zh: 1927119f75c0dd45

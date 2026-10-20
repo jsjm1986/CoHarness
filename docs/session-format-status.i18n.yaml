@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for session-format-status.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for session-format-status.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/session-format-status.md
+document:
+  en: 776e4adcba7157ae03ff7e13ddc9f78196f0ea3a
+  zh: b38b39705e12beeba0f697f29c6a3c2eaa676693
 /session-format-version-and-release-status:
   en: 91b0700056e51bc2
   zh: acf848640296be3a

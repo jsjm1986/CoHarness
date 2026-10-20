@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-04-doc-tiers-and-budgets.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-04-doc-tiers-and-budgets.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-04-doc-tiers-and-budgets.md
+document:
+  en: 3f263864b9b6ee9479d1133b908617f10073dd66
+  zh: d0745d2ac7aacea0f61ea6b699fb86fa39326881
 /agent-note-documentation-structure-tiers-and-budgets:
   en: f2add84f6fdb18d0
   zh: 7f97fab8f9234bb9

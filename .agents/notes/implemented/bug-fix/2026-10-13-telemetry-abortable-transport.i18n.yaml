@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-telemetry-abortable-transport.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-telemetry-abortable-transport.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-telemetry-abortable-transport.md
+document:
+  en: d48c2a429785d2dcd92e142e6ed658aae8e506f8
+  zh: f719e13f47359c186432736a5e530c242ec79e38
 /agent-note-destroy-tracked-otlp-transport-agents-at-telemetry-shutdown:
   en: 514cce38ae8b9d21
   zh: 53ec069a9813d2d1

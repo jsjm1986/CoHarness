@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-16-long-session-input-probe.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-16-long-session-input-probe.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-16-long-session-input-probe.md
+document:
+  en: 58301d8e4b491795c5e059185591dab69926c3a1
+  zh: 31f98d666747eb7963a88a87b378f763d1fcebbc
 /agent-note-long-session-input-probe-drops-per-keypress-driver-roundtrips:
   en: 621f81ceabfb19cf
   zh: 7d776ab1a85e5685

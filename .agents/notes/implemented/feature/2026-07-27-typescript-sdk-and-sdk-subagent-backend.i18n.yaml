@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-typescript-sdk-and-sdk-subagent-backend.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-typescript-sdk-and-sdk-subagent-backend.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-typescript-sdk-and-sdk-subagent-backend.md
+document:
+  en: f538aa97d419aa70a2d28eb3019f1b7e018f4ea4
+  zh: f141e836a116ccfb333d79ed8fc3a725249263b2
 /agent-note-typescript-sdk-client-and-the-sdk-subagent-backend:
   en: 2fac49345d1586e3
   zh: 568067008166eb51

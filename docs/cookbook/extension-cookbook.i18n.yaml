@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for extension-cookbook.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for extension-cookbook.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/extension-cookbook.md
+document:
+  en: d4f806b969d2ce79755c05424a1cf8615b1da2e9
+  zh: f06abbf7e7cc0ca300108675e44b707c4fb62472
 /cookbook-extension-plugin-shapes:
   en: 206362f325ef81e3
   zh: d9a98b400f6666a9

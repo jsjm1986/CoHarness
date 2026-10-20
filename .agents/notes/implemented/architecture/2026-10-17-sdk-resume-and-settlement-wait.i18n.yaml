@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-17-sdk-resume-and-settlement-wait.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-17-sdk-resume-and-settlement-wait.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-17-sdk-resume-and-settlement-wait.md
+document:
+  en: 8e209b92667d3ebb5e40cc296f63a77350c04bd8
+  zh: 8f5b2413bd9744ddde76d47b7d55b7991f5dd97d
 /agent-note-sdk-session-resume-and-settlement-wait-on-the-wire:
   en: 4ead8dc217a18991
   zh: ee404f0759f6aefb

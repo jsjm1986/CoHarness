@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-queued-manual-compaction.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-queued-manual-compaction.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-queued-manual-compaction.md
+document:
+  en: 371950abb10d3ff60ee51fd345bb2f7780538d0d
+  zh: 643baef5dba9d91607b015a1af7e856cbd9773f5
 /agent-note-queued-manual-compaction-with-one-durable-lock:
   en: 45504a64618db51a
   zh: f8dfebaf42ee4ddf

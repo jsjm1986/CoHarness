@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-default-presets-single-editor.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-default-presets-single-editor.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-10-default-presets-single-editor.md
+document:
+  en: 793e7fc202031d7327818e1f2cb04f0be9925f64
+  zh: ca0d73fa26a692aa27ff1c9d1a8486e582273f7f
 /agent-note-one-editor-family-in-general-purpose-presets:
   en: c9842a3e891c8d20
   zh: 6c0740bfb1b6402e

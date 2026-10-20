@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-10-image-offload-events.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-10-image-offload-events.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-10-image-offload-events.md
+document:
+  en: f540dc98cee8daf3e360b14234a2ac21d0f53aab
+  zh: 868fca59ba5fc1941de752127f61b091aedb234f
 /agent-note-durable-image-offload-events:
   en: 13b817438040d321
   zh: 490038f3c93551c7

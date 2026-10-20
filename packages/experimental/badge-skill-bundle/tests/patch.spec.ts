@@ -1,7 +1,6 @@
 /**
- * The experimental badge-skill bundle enables the `skill-badge` row the shipped
- * composition already declares parked disabled; deselecting restores the
- * shipped disabled state.
+ * The experimental badge-skill bundle inserts its own `skill-badge` row over
+ * the shipped composition; deselecting drops the row again.
  */
 
 import { readFileSync } from 'node:fs'
@@ -40,12 +39,12 @@ describe('experimental badge-skill bundle', () => {
     ])
   })
 
-  it('enables the parked skill-badge row', () => {
+  it('inserts the skill-badge row', () => {
     const parsed = yaml.load(readFileSync(resolve(root, './cordis.patch.yml'), 'utf8'), { schema: entryListSchema })
-    // The shipped composition already declares skill-badge disabled so the
-    // graph resolves it; the bundle only switches the parked row on.
+    // The bundle inserts its own row so the feature composes identically on
+    // every profile layer list; deselecting drops the row again.
     expect(parsed).toEqual([
-      { id: 'skill-badge', disabled: false },
+      { insert: [{ id: 'skill-badge', name: '@deepseek-ai/dsh-skill-badge' }] },
     ])
   })
 })

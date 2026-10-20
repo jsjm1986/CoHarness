@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-12-mcp-resources-and-instructions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-12-mcp-resources-and-instructions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-12-mcp-resources-and-instructions.md
+document:
+  en: a5eabd6170507d5a4df295b8554e6da47b40b9be
+  zh: 44890b23944f482a2e1a38483029f1e61caebbe1
 /agent-note-on-demand-mcp-resources-and-scoped-server-instructions:
   en: 052fc1f95f280688
   zh: fdfacc841597d4da

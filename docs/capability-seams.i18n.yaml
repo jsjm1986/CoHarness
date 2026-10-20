@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for capability-seams.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for capability-seams.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/capability-seams.md
+document:
+  en: e14b6745b0e4b04a73329d2fcdee86a37535b8f3
+  zh: 467f3aec6004dd6bfcf82f157446ac66684e4f20
 /:
   en: 41d772192075e133
   zh: 5ef3da69b4de1d8a

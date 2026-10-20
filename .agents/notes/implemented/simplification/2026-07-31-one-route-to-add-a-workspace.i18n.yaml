@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-one-route-to-add-a-workspace.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-one-route-to-add-a-workspace.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-31-one-route-to-add-a-workspace.md
+document:
+  en: bcbe77899d4050bd898b256e81f88183099bdebf
+  zh: edd17af03ca6454be321a4b267ff1761ece2d03f
 /agent-note-one-route-to-add-a-workspace:
   en: 0787ebae62f569df
   zh: 77b8584064a7ed35

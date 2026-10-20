@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-dynamic-client-render-and-attachment-ownership.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-dynamic-client-render-and-attachment-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-17-dynamic-client-render-and-attachment-ownership.md
+document:
+  en: 568e43fe585f07b561aa96ab2d863cf24f2eba31
+  zh: f85c431dd6df35696a919b5eef7e8b1bc875c5c6
 /agent-note-dynamic-client-render-and-attachment-ownership:
   en: 56485c82338cbe4f
   zh: a294eb69abc0f88a
