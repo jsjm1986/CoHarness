@@ -19,7 +19,7 @@ const MODULES_ID = '@deepseek-ai/dsh-client-modules'
 const UI_RENDERER_ID = '@deepseek-ai/dsh-client-ui-renderer'
 
 const comboPath = (ids: readonly string[], rev: string): string =>
-  `/plugins/??${ids.map(id => `${id}/client.js`).join(',')}&rev=${rev}`
+  `/plugins/combo.js??${ids.map(id => `${id}/client.js`).join(',')}&rev=${rev}`
 const comboUrl = (ids: readonly string[], rev: string): string => comboPath(ids, rev).slice(1)
 const mapUrl = (url: string): string => url.replace(/\/client\.js(?=,|&rev=)/g, '/client.js.map')
 const chunkUrl = (id: string, fileName: string, rev: string): string => `/plugins/${id}/${fileName}?rev=${rev}`
@@ -1053,7 +1053,7 @@ describe('shared module declarations', () => {
     writeBuiltPackage(packageName, { external: ['react'] })
     expect(construct([packageName]).graph().entries).toEqual([{
       id: packageName,
-      url: expect.stringContaining(`plugins/??${packageName}/client.js&rev=`) as unknown as string,
+      url: expect.stringContaining(`plugins/combo.js??${packageName}/client.js&rev=`) as unknown as string,
       rev: expect.any(String) as unknown as string,
       external: ['react'],
     }])

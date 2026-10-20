@@ -82,7 +82,7 @@ interface WebBootGraph {
 
 ## bundle 路由与 index 注入
 
-`GET`／`HEAD /plugins/??<package-a>/client.js,<package-b>/client.js&rev=<rev>` 寻址一份生成的 combo 脚本；单资源请求采用同一形式，也是 HMR 路径。脚本在首次 `GET` 时只拼接一次，并以绝对 `sourceMappingURL` 结尾，其中每个资源后缀改为 `.js.map`。启动、index 渲染、脚本 `GET` 和 `HEAD` 都不会读取 map 文件；首次 map `GET` 才会读取并校验这些文件、组合一份 Indexed Source Map v3，并缓存该 body。组件有自带 map 时直接用于对应 section；没有时则获得 identity section，其 `sourcesContent` 是捕获的 bundle，source 名取打包后的 `sourceURL` 或插件路由。每条启动请求 URL 按 UTF-8 字节计算都不超过 3 KiB；切分按更长的 map 形式计算。所有 application URL 都会预加载，所有 bootstrap URL 都会在图全局量与 Vite entry 之前执行。已物化响应使用长期 immutable 缓存。未知或被修改的资源列表、缺少 revision 及陈旧 revision 都返回 404，绝不提供其他字节，也不会让 SPA fallback 把 HTML 当作 JavaScript 返回；其他方法返回 405。注入行在每次 index 渲染时携带当前图，因此重新加载总是基于实时组合启动。
+`GET`／`HEAD /plugins/combo.js??<package-a>/client.js,<package-b>/client.js&rev=<rev>` 寻址一份生成的 combo 脚本——`combo.js` 文件名让不可变响应落入 CDN 静态扩展名缓存；单资源请求采用同一形式，也是 HMR 路径。脚本在首次 `GET` 时只拼接一次，并以绝对 `sourceMappingURL` 结尾，其中每个资源后缀改为 `.js.map`。启动、index 渲染、脚本 `GET` 和 `HEAD` 都不会读取 map 文件；首次 map `GET` 才会读取并校验这些文件、组合一份 Indexed Source Map v3，并缓存该 body。组件有自带 map 时直接用于对应 section；没有时则获得 identity section，其 `sourcesContent` 是捕获的 bundle，source 名取打包后的 `sourceURL` 或插件路由。每条启动请求 URL 按 UTF-8 字节计算都不超过 3 KiB；切分按更长的 map 形式计算。所有 application URL 都会预加载，所有 bootstrap URL 都会在图全局量与 Vite entry 之前执行。已物化响应使用长期 immutable 缓存。未知或被修改的资源列表、缺少 revision 及陈旧 revision 都返回 404，绝不提供其他字节，也不会让 SPA fallback 把 HTML 当作 JavaScript 返回；其他方法返回 405。注入行在每次 index 渲染时携带当前图，因此重新加载总是基于实时组合启动。
 
 ## 服务
 
