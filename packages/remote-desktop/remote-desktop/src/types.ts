@@ -113,7 +113,8 @@ export interface RemoteDesktopGrantFilter {
   readonly sessionId?: SessionId
   /**
    * Restrict results to grants the caller may attach under right now: the
-   * caller's own principal, unrevoked, with a live scope for `sessionId`.
+   * caller's own principal, unrevoked, a live scope for `sessionId`, and a
+   * configured endpoint for the target.
    */
   readonly attachable?: boolean
 }

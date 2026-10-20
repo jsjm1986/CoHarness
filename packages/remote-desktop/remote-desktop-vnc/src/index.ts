@@ -108,7 +108,7 @@ interface ConsentRecord {
 }
 
 function endpointKey(target: RemoteDesktopTarget): string {
-  return `${target.nodeId}${target.desktop ?? ''}`
+  return JSON.stringify([target.nodeId, target.desktop ?? ''])
 }
 
 /** Bound on tokens minted but not yet consumed by a stream handshake. */
@@ -126,7 +126,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
       nodeId: z.string(),
       desktop: z.string(),
       host: z.string(),
-      port: z.number().step(1).min(1),
+      port: z.number().step(1).min(1).max(65_535),
     })).default([]),
     /** JSON file `{endpoints: [...]}` maintained by the deployment's
      * administration surface; when set it replaces the inline list and is
@@ -153,7 +153,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
   constructor(ctx: Context, private readonly config: ResolvedConfig) {
     super(ctx)
     for (const endpoint of config.endpoints) {
-      const key = `${endpoint.nodeId}${endpoint.desktop ?? ''}`
+      const key = endpointKey(endpoint)
       if (this.endpoints.has(key)) {
         throw new RemoteDesktopError(`duplicate remote-desktop endpoint for "${key}"`, 'REMOTE_DESKTOP_TRANSPORT')
       }
@@ -176,28 +176,32 @@ export class VncRemoteDesktop extends RemoteDesktop {
     }
   }
 
-  /** Re-read `endpointsFile` when its mtime advanced; a missing file means no endpoints. */
+  /**
+   * Re-read `endpointsFile` when its mtime advanced; a missing or empty file
+   * means no endpoints. A failed read keeps the last good map and leaves the
+   * mtime unconsumed so every call retries until the file parses.
+   */
   private async syncEndpoints(): Promise<void> {
     const file = this.config.endpointsFile
     if (file === '') return
     const info = await stat(file).catch(() => undefined)
     const mtimeMs = info?.mtimeMs ?? -1
     if (mtimeMs === this.endpointsMtimeMs) return
-    this.endpointsMtimeMs = mtimeMs
-    this.endpoints.clear()
-    if (info === undefined) return
-    const text = await readFile(file, 'utf8').catch((error: unknown) => {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return ''
-      throw error
-    })
-    const parsed = JSON.parse(text) as { endpoints?: { nodeId: string; desktop?: string; host: string; port: number }[] }
-    for (const endpoint of parsed.endpoints ?? []) {
-      const key = `${endpoint.nodeId} ${endpoint.desktop ?? ''}`
-      if (this.endpoints.has(key)) {
-        throw new RemoteDesktopError(`duplicate remote-desktop endpoint for "${key}"`, 'REMOTE_DESKTOP_TRANSPORT')
-      }
-      this.endpoints.set(key, { host: endpoint.host, port: endpoint.port })
+    const text = info === undefined
+      ? ''
+      : await readFile(file, 'utf8').catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return ''
+        throw error
+      })
+    if (text.trim() === '') {
+      this.endpoints.clear()
+      this.endpointsMtimeMs = mtimeMs
+      return
     }
+    const parsed = parseEndpointsFile(text, file)
+    this.endpoints.clear()
+    for (const [key, endpoint] of parsed) this.endpoints.set(key, endpoint)
+    this.endpointsMtimeMs = mtimeMs
   }
 
   override async resolve(request: RemoteDesktopAttachRequest): Promise<RemoteDesktopSpec> {
@@ -396,8 +400,11 @@ export class VncRemoteDesktop extends RemoteDesktop {
       && (filter?.target === undefined
         || (g.target.nodeId === filter.target.nodeId && (g.target.desktop ?? '') === (filter.target.desktop ?? ''))))
     if (filter?.attachable !== true) return rows
+    await this.syncEndpoints()
     const now = Date.now()
-    return rows.filter(g => matchingGrants([g], actor.principal, g.target, filter.sessionId, now).length > 0)
+    return rows.filter(g =>
+      this.endpoints.has(endpointKey(g.target))
+      && matchingGrants([g], actor.principal, g.target, filter.sessionId, now).length > 0)
   }
 
   override async grant(input: RemoteDesktopGrantInput, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant> {
@@ -555,6 +562,42 @@ export class VncRemoteDesktop extends RemoteDesktop {
       }
     })
   }
+}
+
+/**
+ * Parse `endpointsFile` content into a validated key→endpoint map. Malformed
+ * JSON, a non-array `endpoints`, a wrong-shaped row, and duplicate keys all
+ * fail with `REMOTE_DESKTOP_TRANSPORT` naming the file.
+ */
+function parseEndpointsFile(text: string, file: string): Map<string, { host: string; port: number }> {
+  const fail = (detail: string): never => {
+    throw new RemoteDesktopError(`invalid remote-desktop endpoints file "${file}": ${detail}`, 'REMOTE_DESKTOP_TRANSPORT')
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return fail('not valid JSON')
+  }
+  const rows = (parsed as { endpoints?: unknown }).endpoints
+  if (!Array.isArray(rows)) return fail('"endpoints" must be an array')
+  const next = new Map<string, { host: string; port: number }>()
+  for (const [index, row] of rows.entries()) {
+    if (typeof row !== 'object' || row === null) {
+      return fail(`row ${index} must carry string nodeId, optional desktop, string host, and integer port 1-65535`)
+    }
+    const endpoint = row as { nodeId?: unknown; desktop?: unknown; host?: unknown; port?: unknown }
+    if (typeof endpoint.nodeId !== 'string'
+      || (endpoint.desktop !== undefined && typeof endpoint.desktop !== 'string')
+      || typeof endpoint.host !== 'string'
+      || typeof endpoint.port !== 'number' || !Number.isSafeInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65535) {
+      return fail(`row ${index} must carry string nodeId, optional desktop, string host, and integer port 1-65535`)
+    }
+    const key = endpointKey({ nodeId: endpoint.nodeId, ...(endpoint.desktop === undefined ? {} : { desktop: endpoint.desktop }) })
+    if (next.has(key)) return fail(`duplicate endpoint for "${key}"`)
+    next.set(key, { host: endpoint.host, port: endpoint.port })
+  }
+  return next
 }
 
 function eventPrincipal(event: RemoteDesktopAuditEvent): string {

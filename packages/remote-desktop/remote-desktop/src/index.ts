@@ -34,7 +34,11 @@ export class RemoteDesktopError extends Error {
   }
 }
 
-/** Numeric rank for level comparison: `view` ranks below `control`. */
+/**
+ * Numeric rank for level comparison: `view` ranks below `control`.
+ * @param level - the access level to rank.
+ * @returns 0 for `view`, 1 for `control`.
+ */
 export function levelRank(level: RemoteDesktopLevel): number {
   return level === 'control' ? 1 : 0
 }
@@ -100,6 +104,9 @@ export abstract class RemoteDesktop extends Service {
    * compute the effective level (never exceeding grants), and decide the
    * recording flag. Throws {@link RemoteDesktopError} with
    * `REMOTE_DESKTOP_FORBIDDEN` when no live grant authorizes the request.
+   * @param request - the attach request: target, principal, optional Session, requested level.
+   * @param signal - request cancellation.
+   * @returns the enforced spec, including effective level and recording flag.
    */
   abstract resolve(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSpec>
 
@@ -109,6 +116,9 @@ export abstract class RemoteDesktop extends Service {
    * consent against the resolved grant set and requested level, record a
    * `consent` audit event, and return the spec so the caller learns the
    * effective level and recording flag it acknowledged.
+   * @param request - the attach request being consented to.
+   * @param signal - request cancellation.
+   * @returns the resolved spec the consent was recorded against.
    */
   abstract confirm(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSpec>
 
@@ -118,6 +128,9 @@ export abstract class RemoteDesktop extends Service {
    * at the requested level, throwing `REMOTE_DESKTOP_CONSENT_REQUIRED`
    * otherwise — then establish the transport and stream endpoint; the
    * returned session owns detach.
+   * @param request - the attach request to open.
+   * @param signal - request cancellation.
+   * @returns the live session carrying the one-time stream token.
    */
   abstract attach(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSession>
 
@@ -126,6 +139,9 @@ export abstract class RemoteDesktop extends Service {
    * The transport layer calls this after its handshake; the implementation
    * consumes the token exactly once, resolves the pending spec, and pumps
    * the desktop protocol with the effective level enforced inside the pump.
+   * @param token - the one-time stream token minted by `attach`.
+   * @param socket - the upgraded client socket to pump.
+   * @param signal - request cancellation.
    */
   abstract serveStream(token: RemoteDesktopToken, socket: Duplex, signal?: AbortSignal): Promise<void>
 
@@ -133,6 +149,10 @@ export abstract class RemoteDesktop extends Service {
    * Read the live remote state of one desktop endpoint.
    * Requires at least one live grant for `actor.principal` on the target;
    * `options.sessionId` admits session-scoped grants into the summary.
+   * @param actor - the caller whose grants authorize the read.
+   * @param target - the desktop endpoint to probe.
+   * @param options - optional Session address for session-scoped grants.
+   * @param signal - request cancellation.
    * @returns availability, attachment count, and the caller's grant summary.
    */
   abstract status(
@@ -145,24 +165,45 @@ export abstract class RemoteDesktop extends Service {
   /**
    * List grants, optionally filtered; revoked rows need `includeRevoked`.
    * Non-admin actors are restricted to their own principal.
+   * @param actor - the caller; non-admin principals see only their own rows.
+   * @param filter - optional target/principal/revocation/attachable filters.
+   * @param signal - request cancellation.
+   * @returns matching grant rows.
    */
   abstract listGrants(actor: RemoteDesktopActor, filter?: RemoteDesktopGrantFilter, signal?: AbortSignal): Promise<RemoteDesktopGrant[]>
 
   /**
    * Issue a grant. `actor.admin === true` is required; implementations
    * publish `remote-desktop/grants-changed` only after the write commits.
+   * @param input - the grant to issue.
+   * @param actor - the administrator issuing it.
+   * @returns the committed grant row.
    */
   abstract grant(input: RemoteDesktopGrantInput, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant>
 
-  /** Change a grant's access level; `actor.admin === true` required. */
+  /**
+   * Change a grant's access level; `actor.admin === true` required.
+   * @param id - the grant to change.
+   * @param level - the new access level.
+   * @param actor - the administrator making the change.
+   * @returns the updated grant row.
+   */
   abstract setLevel(id: RemoteDesktopGrantId, level: RemoteDesktopLevel, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant>
 
-  /** Revoke a grant by id; `actor.admin === true` required. */
+  /**
+   * Revoke a grant by id; `actor.admin === true` required.
+   * @param id - the grant to revoke.
+   * @param actor - the administrator revoking it.
+   * @returns the revoked grant row.
+   */
   abstract revoke(id: RemoteDesktopGrantId, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant>
 
   /**
    * Query audit events owned by this capability, newest first.
    * Non-admin actors are restricted to their own principal.
+   * @param actor - the caller; non-admin actors see only their own events.
+   * @param filter - optional target and principal restrictions.
+   * @param signal - request cancellation.
    * @returns recorded events; providers may cap the result window.
    */
   abstract audit(

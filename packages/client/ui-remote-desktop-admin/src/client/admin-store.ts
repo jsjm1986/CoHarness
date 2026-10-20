@@ -26,6 +26,7 @@ const IDLE: RemoteDesktopAdminState = { grants: [], audit: [], loading: false, b
  * root-scoped; a missing session simply fails the call with `sessionRequired`.
  */
 export class RemoteDesktopAdminController {
+  /** The admin section's view-state store: endpoints, grants, and dialog phase. */
   readonly store: SnapshotStore<RemoteDesktopAdminState> = createSnapshotStore<RemoteDesktopAdminState>(IDLE)
   private readonly sessionId: () => SessionId | undefined
 

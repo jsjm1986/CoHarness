@@ -15,6 +15,12 @@ import type {
  * Live grants authorizing `{principal, target, sessionId?}` at `at`:
  * unrevoked rows matching the principal and target whose scope is either a
  * machine grant or an unexpired session grant for `sessionId`.
+ * @param grants - the stored rows to filter.
+ * @param principal - the caller principal to match.
+ * @param target - the desktop target to match.
+ * @param sessionId - the caller Session admitting session-scoped rows.
+ * @param at - the timestamp session scopes are checked against.
+ * @returns the unrevoked rows authorizing the request.
  */
 export function matchingGrants(
   grants: readonly RemoteDesktopGrant[],
@@ -56,6 +62,8 @@ export class VncGrantStore {
   /**
    * Open the store. `':memory:'` opens an empty volatile store — a valid
    * choice for tests and an explicit opt-out of durability.
+   * @param file - the JSONL store path, or `':memory:'`.
+   * @returns the opened store with any durable rows loaded.
    */
   static async open(file: string): Promise<VncGrantStore> {
     const store = new VncGrantStore(file)
@@ -64,14 +72,18 @@ export class VncGrantStore {
     return store
   }
 
-  /** Re-read the file when its mtime advanced past the last seen revision. */
+  /**
+   * Re-read the file when its mtime advanced past the last committed revision.
+   * A failed reload keeps the last good rows and leaves the mtime unconsumed,
+   * so every call retries until the file parses again.
+   */
   async refresh(): Promise<void> {
     if (this.file === ':memory:') return
     const info = await stat(this.file).catch(() => undefined)
     const mtimeMs = info?.mtimeMs ?? 0
     if (mtimeMs === this.seenMtimeMs) return
-    this.seenMtimeMs = mtimeMs
     await this.reload()
+    this.seenMtimeMs = mtimeMs
   }
 
   private async reload(): Promise<void> {
@@ -82,27 +94,49 @@ export class VncGrantStore {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       text = ''
     }
-    this.grants.clear()
-    for (const line of text.split('\n')) {
+    const next = new Map<string, RemoteDesktopGrant>()
+    for (const [index, line] of text.split('\n').entries()) {
       const trimmed = line.trim()
       if (trimmed === '') continue
-      const row = JSON.parse(trimmed) as StoredGrant
-      this.grants.set(row.id, { ...row, id: RemoteDesktopGrantId(row.id) })
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(trimmed)
+      } catch {
+        throw new RemoteDesktopError(`invalid JSON in remote-desktop grants file "${this.file}" line ${index + 1}`, 'REMOTE_DESKTOP_TRANSPORT')
+      }
+      const row = parsed as Partial<StoredGrant>
+      if (typeof row.id !== 'string' || typeof row.target !== 'object' || row.target === null) {
+        throw new RemoteDesktopError(`invalid grant row in remote-desktop grants file "${this.file}" line ${index + 1}`, 'REMOTE_DESKTOP_TRANSPORT')
+      }
+      next.set(row.id, { ...row, id: RemoteDesktopGrantId(row.id) } as RemoteDesktopGrant)
     }
+    this.grants.clear()
+    for (const [id, grant] of next) this.grants.set(id, grant)
   }
 
-  /** All stored rows, including revoked ones. */
+  /**
+   * All stored rows, including revoked ones.
+   * @returns every committed grant row.
+   */
   all(): RemoteDesktopGrant[] {
     return [...this.grants.values()]
   }
 
-  /** Insert one grant row and persist. */
+  /**
+   * Insert one grant row and persist.
+   * @param grant - the committed row to append.
+   */
   async insert(grant: RemoteDesktopGrant): Promise<void> {
     this.grants.set(grant.id, grant)
     await this.persist()
   }
 
-  /** Apply a partial update to a stored row, persist, and return the result. */
+  /**
+   * Apply a partial update to a stored row, persist, and return the result.
+   * @param id - the grant row to update.
+   * @param patch - the fields to apply; `id` cannot be rewritten.
+   * @returns the updated row.
+   */
   async update(id: RemoteDesktopGrantId, patch: Partial<Omit<StoredGrant, 'id'>>): Promise<RemoteDesktopGrant> {
     const existing = this.grants.get(id)
     if (!existing) {
@@ -121,7 +155,7 @@ export class VncGrantStore {
     const tmp = `${this.file}.tmp`
     await writeFile(tmp, body, 'utf8')
     await rename(tmp, this.file)
-    const info = await stat(this.file).catch(() => undefined)
-    if (info !== undefined) this.seenMtimeMs = info.mtimeMs
+    // Seen mtime is not advanced: an external writer landing between the
+    // rename and the next refresh must still be picked up.
   }
 }

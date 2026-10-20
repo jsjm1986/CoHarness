@@ -58,6 +58,16 @@ class TestVnc extends VncRemoteDesktop {
   }
 }
 
+/** Dial that records the resolved host/port so tests can identify which endpoint was picked. */
+class RecordingVnc extends VncRemoteDesktop {
+  readonly dialed: { host: string; port: number }[] = []
+  protected override dial(endpoint: { host: string; port: number }): Promise<Duplex> {
+    this.dialed.push(endpoint)
+    const [upstreamEnd] = duplexPair()
+    return Promise.resolve(upstreamEnd)
+  }
+}
+
 function grantInput(overrides: Partial<RemoteDesktopGrantInput> = {}): RemoteDesktopGrantInput {
   return {
     target: { nodeId: 'n1' },
@@ -287,5 +297,30 @@ describe('VncRemoteDesktop', () => {
     expect(clientEnd.destroyed).toBe(true)
     expect(svc.servers[0]!.destroyed).toBe(true)
     expect((await svc.audit(ADMIN)).map(e => e.kind)).toContain('detach')
+  })
+
+  it('keeps near-colliding node/desktop pairs distinct for consent and endpoint lookup', async () => {
+    // ('ab','c') and ('a','bc') would share one concatenated key; consent or an
+    // endpoint resolving across that boundary attaches the wrong desktop.
+    const ctx2 = new Context()
+    const fiber2 = await ctx2.plugin(RecordingVnc, {
+      endpoints: [
+        { nodeId: 'ab', desktop: 'c', host: '127.0.0.1', port: 5901 },
+        { nodeId: 'a', desktop: 'bc', host: '127.0.0.1', port: 5902 },
+      ],
+      grantsFile: ':memory:',
+    })
+    try {
+      const svc2 = ctx2.remoteDesktop as RecordingVnc
+      await svc2.grant(grantInput({ target: { nodeId: 'ab', desktop: 'c' } }), ADMIN)
+      await svc2.grant(grantInput({ target: { nodeId: 'a', desktop: 'bc' } }), ADMIN)
+      await svc2.confirm({ principal: 'alice', target: { nodeId: 'ab', desktop: 'c' }, level: 'view' })
+      const actor = { principal: 'alice', admin: false }
+      expect((await svc2.status(actor, { nodeId: 'ab', desktop: 'c' })).consented).toBe(true)
+      expect((await svc2.status(actor, { nodeId: 'a', desktop: 'bc' })).consented).toBe(false)
+      expect(svc2.dialed.map(endpoint => endpoint.port)).toEqual([5901, 5902])
+    } finally {
+      await fiber2.dispose()
+    }
   })
 })
