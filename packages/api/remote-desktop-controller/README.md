@@ -7,11 +7,11 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-**`RemoteDesktopController`** (`ctx.remoteDesktopController`, Remote namespace `remoteDesktop`) is the BFF between the browser and `ctx.remoteDesktop`. Every method verifies the caller's session authority for identity, delegates grant enforcement to the capability, and never accepts a caller-supplied actor.
+**`RemoteDesktopController`** (`ctx.remoteDesktopController`, Remote namespace `remoteDesktop`) is the BFF between the browser and `ctx.remoteDesktop`. Every method resolves the caller's actor from the request's verified principal, delegates grant enforcement to the capability, and never accepts a caller-supplied actor.
 
 ## Summary
 
-The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `revoke`, and `audit` over the Remote transport. Session-scoped calls (`status`, `attach`) authorize the addressed session and bind the verified `creator` as the principal; management calls additionally require administrator authority via `userTerminalAdministration`. In standalone deployments the local operator holds both roles.
+The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `revoke`, and `audit` over the Remote transport. Session-scoped calls (`status`, `attach`) bind the addressed session for grant matching and take the principal from the verified request claims; management calls additionally require the administrator role. In standalone deployments the local operator holds both roles.
 
 ## Table of Contents
 
@@ -39,7 +39,7 @@ The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `r
 <a id="authorization"></a>
 ## Authorization
 
-`RemoteDesktopAccess` mirrors the terminal controller's pattern: managed deployments (execution-authority present) delegate identity to `userTerminalAuthorization` and the admin role to `userTerminalAdministration`, failing closed when a policy is absent; standalone deployments fall back to a `local-operator` authority with administrator rights. Service-side enforcement still applies — admin methods reject non-admin actors even if a deployment miswires the policies.
+`RemoteDesktopAccess` reads the request's verified Gateway principal through `gatewayRuntime.interactive()` in managed deployments (execution-authority present): `principal` is the claim's username and `admin` its role, so administrator-issued grants are the whole product permission — no user-terminal grant is required. Restricted-purpose and non-interactive callers are denied with `remote-desktop/forbidden`; standalone deployments fall back to a `local-operator` administrator. Service-side enforcement still applies — admin methods reject non-admin actors even if a deployment miswires the policies.
 
 <a id="client-half"></a>
 ## Client half
@@ -55,6 +55,6 @@ No model-visible surface; human-facing BFF only.
 ## Known Limitations and Deferred Work
 
 - `serveStream` is exposed by the capability, not this namespace; `dsh-remote-desktop-stream` mounts the WebSocket path (`stream.path` + `?token=`).
-- Capability rejections surface as `remote-desktop/failure` with the stable `RemoteDesktopErrorCode` in `code`; `remote-desktop/forbidden` remains the wire code for controller-side administrator checks.
+- Capability rejections surface as `remote-desktop/failure` with the stable `RemoteDesktopErrorCode` in `code`; `remote-desktop/forbidden` remains the wire code for controller-side interactive-user and administrator checks.
 - Detach is implicit (stream close); an explicit force-detach admin method is deferred.
-- Session-scoped grants use the caller's session for grant matching; granting on behalf of a different session happens through the `scope.sessionId` payload under administrator authority.
+- Session-scoped grants use the caller's session for grant matching at attach; granting on behalf of a different session happens through the `scope.sessionId` payload under administrator authority.

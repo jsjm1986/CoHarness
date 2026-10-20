@@ -18,7 +18,7 @@ harness 需要受治理的人类远程桌面访问——查看和操作另一台
 
 `dsh-remote-desktop-stream` 是 Web 传输挂载：`ctx.webServer` 上一条精确路径的 WebSocket upgrade 路由、`?token=` 握手，以及喂给 `serveStream` 的 ws→`Duplex` 适配器。铸造的 token——单次使用、TTL 有界——就是流凭据；路由不执行单独认证。
 
-`dsh-api-remote-desktop-controller` 是 BFF：`remoteDesktop/*` TypertRemoteService 命名空间。每个方法经共享 `userTerminalAuthorization` 缝授权调用者会话（身份=验证过的 `creator`），把管理员检查映射到 `userTerminalAdministration`，并把执行委托给能力层——即使部署错误接线策略，服务端拒绝仍然成立。`REMOTE_SESSION_POLICIES` 声明每个方法的会话路径与读/写分类；attach 为 `execution: 'request'`（人类手势启动远程执行）。
+`dsh-api-remote-desktop-controller` 是 BFF：`remoteDesktop/*` TypertRemoteService 命名空间。每个方法经 `gatewayRuntime.interactive()` 从请求自带的已验证 Gateway 断言解析调用者 actor（身份=断言用户名，admin=断言角色），并把执行委托给能力层——即使部署错误接线策略，服务端拒绝仍然成立。授权基座已从本笔记最初记录的终端授权委托修正，见[交互断言笔记](2026-10-20-remote-desktop-interactive-principal.zh.md)。`REMOTE_SESSION_POLICIES` 声明每个方法的会话路径与读/写分类；attach 为 `execution: 'request'`（人类手势启动远程执行）。
 
 ## 后果
 

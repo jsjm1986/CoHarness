@@ -11,7 +11,7 @@ kind: "package-reference"
 
 ## 概要
 
-控制器在 Remote 传输上暴露 `status`、`attach`、`listGrants`、`grant`、`setLevel`、`revoke` 与 `audit`。会话作用域调用（`status`、`attach`）授权被寻址会话并把验证过的 `creator` 绑定为 principal；管理调用额外要求经 `userTerminalAdministration` 的管理员权限。独立部署中本地操作员同时具备两种角色。
+控制器在 Remote 传输上暴露 `status`、`attach`、`listGrants`、`grant`、`setLevel`、`revoke` 与 `audit`。会话作用域调用（`status`、`attach`）绑定被寻址会话用于授权匹配，principal 取自验证过的请求断言；管理调用额外要求管理员角色。独立部署中本地操作员同时具备两种角色。
 
 ## 目录
 
@@ -39,7 +39,7 @@ kind: "package-reference"
 <a id="authorization"></a>
 ## 授权
 
-`RemoteDesktopAccess` 沿用终端控制器的模式：托管部署（存在 execution-authority）把身份委托给 `userTerminalAuthorization`、管理员角色委托给 `userTerminalAdministration`，策略缺失时失败关闭；独立部署回退到具备管理员权限的 `local-operator` 身份。服务端仍独立执行——即使部署错误接线策略，管理方法也拒绝非 admin actor。
+`RemoteDesktopAccess` 在托管部署（存在 execution-authority）中通过 `gatewayRuntime.interactive()` 读取请求自带的已验证 Gateway 断言：`principal` 取断言中的用户名，`admin` 取角色，因此管理员签发的授权文件就是全部产品权限——不再要求用户终端授权。受限 purpose 与非交互调用以 `remote-desktop/forbidden` 拒绝；独立部署回退到具备管理员权限的 `local-operator` 身份。服务端仍独立执行——即使部署错误接线策略，管理方法也拒绝非 admin actor。
 
 <a id="client-half"></a>
 ## Client 半边
@@ -55,6 +55,6 @@ kind: "package-reference"
 ## 已知限制与延后工作
 
 - `serveStream` 由能力层暴露而非本命名空间；`dsh-remote-desktop-stream` 挂载 WebSocket 路径（`stream.path` + `?token=`）。
-- 能力层拒绝以 `remote-desktop/failure` 呈现，`code` 字段携带稳定的 `RemoteDesktopErrorCode`；`remote-desktop/forbidden` 仍是控制器侧管理员检查的线缆码。
+- 能力层拒绝以 `remote-desktop/failure` 呈现，`code` 字段携带稳定的 `RemoteDesktopErrorCode`；`remote-desktop/forbidden` 仍是控制器侧交互用户与管理员检查的线缆码。
 - detach 是隐式的（流关闭）；显式强制 detach 管理方法延后。
-- 会话作用域授权以调用者会话做授权匹配；代表其他会话的授予通过管理员权限下的 `scope.sessionId` 载荷完成。
+- 会话作用域授权在 attach 时以调用者会话做授权匹配；代表其他会话的授予通过管理员权限下的 `scope.sessionId` 载荷完成。
