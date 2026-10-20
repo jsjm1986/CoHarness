@@ -316,6 +316,8 @@ export const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set
  */
 export const PROJECT_TYPERT_PERSONAL_CONFIGURATION: ReadonlySet<string> = new Set([
   'llm/discoverModels',
+  // Translation limits disclose personal provider preferences and availability.
+  'cotTranslation/limits',
 ])
 
 /** Brand one validated non-empty wire string as a Session identity. */

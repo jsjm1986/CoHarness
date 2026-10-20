@@ -407,7 +407,6 @@
     { "path": "./packages/experimental/cot-translation-bundle" },
     { "path": "./packages/experimental/inspector/tsconfig.host.json" },
     { "path": "./packages/experimental/inspector-profile" },
-    { "path": "./packages/experimental/session-inspector" },
     { "path": "./packages/experimental/computer-use-cua-driver-mcp" },
     { "path": "./packages/experimental/computer-use-cua-driver-native" },
     { "path": "./packages/experimental/ptc-runtime-python" },

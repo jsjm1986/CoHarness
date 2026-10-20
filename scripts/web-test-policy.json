@@ -225,6 +225,7 @@
   "packages": {
     "api/terminal-controller": "conversation",
     "boot/plugin-manager": "settings",
+    "client/file-upload": "conversation",
     "client/hmr": "shell",
     "client/locale": "all",
     "client/shortcuts": [
@@ -286,6 +287,7 @@
     "client/ui-settings": "settings",
     "client/ui-settings-general": "settings",
     "client/ui-settings-models": "settings",
+    "client/ui-settings-plugin-inventory": "settings",
     "client/ui-settings-plugins": "settings",
     "client/ui-settings-unarchive-sessions": "settings",
     "client/ui-shortcuts": [
@@ -298,6 +300,7 @@
       "workbench"
     ],
     "client/ui-sidebar-browser": "documents",
+    "client/ui-sidebar-files": "workbench",
     "client/ui-sidebar-right": "all",
     "client/ui-sidebar-terminal": "conversation",
     "client/ui-skill": "conversation",
@@ -327,7 +330,10 @@
     "experimental/agent-team": "subagent",
     "experimental/client-ui-agent-team": "subagent",
     "experimental/client-ui-claude-code-mods": "conversation",
+    "experimental/client-ui-cot-translation": "conversation",
     "experimental/client-ui-voice-input": "conversation",
+    "experimental/inspector": "workbench",
+    "experimental/session-inspector": "workbench",
     "goal/goal": "conversation",
     "host/plugin-inventory": "settings",
     "interaction/permission-presets": "settings",

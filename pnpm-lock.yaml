@@ -7988,8 +7988,8 @@ importers:
         specifier: workspace:~
         version: link:../../../vendor/include
       js-yaml:
-        specifier: ^4.3.2
-        version: 4.3.2
+        specifier: ^5.2.3
+        version: 5.3.0
 
   packages/experimental/inspector:
     dependencies:
@@ -8104,8 +8104,8 @@ importers:
         specifier: workspace:~
         version: link:../../../vendor/include
       js-yaml:
-        specifier: ^4.3.2
-        version: 4.3.2
+        specifier: ^5.2.3
+        version: 5.3.0
 
   packages/experimental/plugin-market-bundle:
     dependencies:
@@ -20677,10 +20677,6 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
-  js-yaml@4.3.2:
-    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
-    hasBin: true
-
   js-yaml@5.3.0:
     resolution: {integrity: sha512-muutsYr+e2+d3rTgUGslq5rxbBlUy3cJ61IsHag2QNDQV+7zXWjkUpmALIajhrlLlrgRUiymj6U3zUr/TMK84Q==}
     hasBin: true
@@ -27476,10 +27472,6 @@ snapshots:
   js-tokens@10.0.0: {}
 
   js-tokens@4.0.0: {}
-
-  js-yaml@4.3.2:
-    dependencies:
-      argparse: 2.0.1
 
   js-yaml@5.3.0:
     dependencies:

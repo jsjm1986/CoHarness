@@ -50,6 +50,10 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'sessionFeedback/record': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
   'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'request' },
   'userQuestions/attachWait': { action: 'read', path: ['agentId'] },
+  // Uploads stage bytes under the receiving Session only; no execution origin.
+  'fileUploads/upload': { action: 'write', path: ['agentId'], execution: 'none' },
+  // Translation is a session-bound provider call when the Client supplies one; it starts no execution.
+  'cotTranslation/translate': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
 })
 
 const REGISTERED_SESSION_POLICIES = new Map<string, RemoteSessionPolicy>()
