@@ -562,18 +562,21 @@ describe('task admission and package contracts', () => {
     const rows = Array.isArray(parsed)
       ? (parsed as Array<{ insert?: Array<{ id?: string; name?: string }> }>).flatMap(entry => entry.insert ?? [])
       : []
-    expect(rows).toEqual([{
-      id: 'subagent-claude-code',
-      name: '@deepseek-ai/dsh-subagent-claude-code',
-    }, {
-      id: 'tool-subagent-claude-code',
-      name: '@deepseek-ai/dsh-tool-subagent',
-      config: {
-        provider: 'claude-code',
-        toolName: 'subagent_claude_code',
-        maxDepth: 'provider-managed',
+    expect(rows).toEqual([
+      {
+        id: 'subagent-claude-code',
+        name: '@deepseek-ai/dsh-subagent-claude-code',
       },
-    }])
+      {
+        id: 'tool-subagent-claude-code',
+        name: '@deepseek-ai/dsh-tool-subagent',
+        config: {
+          provider: 'claude-code',
+          toolName: 'subagent_claude_code',
+          maxDepth: 'provider-managed',
+        },
+      },
+    ])
   })
 
   it('preserves text sequences and rejects empty, blank, and non-text tasks', () => {
