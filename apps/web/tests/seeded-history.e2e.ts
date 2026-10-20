@@ -16,7 +16,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, ContextFormed, Message } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
 import { deriveEventMessage, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
@@ -29,12 +29,6 @@ import {
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 import { normalizeAria } from './aria-normalize.ts'
-
-declare module '@deepseek-ai/dsh-llm' {
-  interface MessageSourceMap {
-    'fixture': { kind: 'fixture' } & ContextFormed
-  }
-}
 
 const OVERLAY = fileURLToPath(new URL('./seeded-history.overlay.yml', import.meta.url))
 

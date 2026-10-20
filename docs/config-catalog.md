@@ -1413,7 +1413,7 @@ export interface HmrConfig extends ChokidarOptions {
 
 ## `@deepseek-ai/dsh-hooks-claude-code`
 
-- `inject`: `shell` · `workingDirectory`
+- `inject`: `shell` · `sessionProjections` · `workingDirectory`
 - `source`: [`packages/hooks/hooks-claude-code/src/index.ts:54`](../packages/hooks/hooks-claude-code/src/index.ts)
 
 ```ts config-catalog
@@ -1459,7 +1459,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-hooks-codex`
 
-- `inject`: `shell` · `workingDirectory`
+- `inject`: `shell` · `sessionProjections` · `workingDirectory`
 - `source`: [`packages/hooks/hooks-codex/src/index.ts:53`](../packages/hooks/hooks-codex/src/index.ts)
 
 ```ts config-catalog
@@ -4164,7 +4164,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-tool-session-query`
 
-- `inject`: `tools` · `systemPrompt` · `sessionQuery`
+- `inject`: `tools` · `systemPrompt` · `sessionQuery` · `sessionProjections`
 - `source`: [`packages/session-query/tool-session-query/src/index.ts:41`](../packages/session-query/tool-session-query/src/index.ts)
 
 ```ts config-catalog

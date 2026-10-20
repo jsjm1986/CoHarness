@@ -60,15 +60,6 @@ function text(t: string): ContentBlock[] {
   return [{ type: 'text', text: t }]
 }
 
-declare module '@deepseek-ai/dsh-llm' {
-  interface MessageSourceMap {
-    /** Demo-session fixture producer kind; exists only inside this generator.
-     * @persistenceAttribution
-     */
-    fixture: { kind: 'fixture' }
-  }
-}
-
 function userMessage(content: ContentBlock[], source: MessageSource = { kind: 'user' }): UserMessage {
   return createUserMessage({ content, source })
 }
