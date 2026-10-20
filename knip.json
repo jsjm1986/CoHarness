@@ -204,7 +204,8 @@
     },
     "packages/api/remote-desktop-controller": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/remote-standin.ts"
       ],
       "project": [
         "src/**/*.ts",

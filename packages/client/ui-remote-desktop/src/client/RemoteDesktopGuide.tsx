@@ -51,7 +51,10 @@ export function RemoteDesktopGuide({ title, description, kind, useTabInfo, t, li
     if (!menu.open) return
     const lifetime = new AbortController()
     const settle = (list: ListState): void => { if (!lifetime.signal.aborted) setMenu(value => ({ ...value, list })) }
-    listTargets(lifetime.signal).then(rows => settle({ phase: 'ready', targets: targetsOf(rows) }), () => settle({ phase: 'failed' }))
+    listTargets(lifetime.signal).then(
+      (rows) => { settle({ phase: 'ready', targets: targetsOf(rows) }) },
+      () => { settle({ phase: 'failed' }) },
+    )
     return () => { lifetime.abort() }
   }, [menu.open, menu.attempt, listTargets])
   const { list } = menu

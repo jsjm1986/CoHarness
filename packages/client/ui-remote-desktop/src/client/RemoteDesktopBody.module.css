@@ -54,6 +54,7 @@
   font-size: 12px;
   padding: 2px 8px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--surface-alt, #f2f4f7);
 }
 
