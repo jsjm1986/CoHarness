@@ -1,13 +1,11 @@
-.entry { box-sizing: border-box; display: flex; flex-direction: column; width: 100%; overflow: hidden; border: 0.5px solid var(--dsw-alias-border-l4); border-radius: 24px; background: var(--dsw-alias-bg-layer-1); }
-.head { display: flex; align-items: center; gap: 14px; min-width: 0; min-height: 56px; padding: 14px 20px 6px; }
+.entry { box-sizing: border-box; display: flex; align-items: stretch; width: 100%; overflow: hidden; border: 0.5px solid var(--dsw-alias-border-l4); border-radius: 24px; background: var(--dsw-alias-bg-layer-1); }
+.main { flex: 1; justify-content: flex-start; gap: 14px; min-width: 0; height: auto; min-height: 56px; padding: 14px 20px; border-radius: 24px 0 0 24px; text-align: left; }
 .icon { flex: none; }
 .text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .title { overflow: hidden; color: var(--dsw-alias-label-primary); font-size: 15px; line-height: 1.4; white-space: nowrap; text-overflow: ellipsis; }
 .description { overflow: hidden; color: var(--dsw-alias-label-caption); font-size: 13px; line-height: 1.4; white-space: nowrap; text-overflow: ellipsis; }
-.form { display: flex; align-items: center; gap: 8px; padding: 6px 20px 14px 60px; }
-.field { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border: 0.5px solid var(--dsw-alias-border-l4); border-radius: 8px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-size: 13px; }
-.field::placeholder { color: var(--dsw-alias-label-caption); }
-.action { flex: none; }
+.trigger { align-self: stretch; flex: none; height: auto; width: 44px; padding: 0; border-radius: 0 24px 24px 0; }
+.menu { display: flex; align-self: stretch; flex: none; }
 
 /* Phone: the entry joins the guide's flat-list grammar — full-width rows split
    by hairlines — instead of a capsule card floating mid-pane. */
@@ -18,22 +16,15 @@
     border-radius: 0;
   }
 
-  .head {
+  .main {
     min-height: 56px;
     padding: var(--dsw-space-3) var(--dsw-space-4);
     gap: var(--dsw-space-3);
+    border-radius: 0;
   }
 
-  .form {
-    padding: 0 var(--dsw-space-4) var(--dsw-space-3);
+  .trigger {
+    width: var(--dsw-touch-target);
+    border-radius: 0;
   }
-}
-
-.empty { margin: 0; padding: 2px 20px 16px 60px; color: var(--dsw-alias-label-caption); font-size: 13px; line-height: 1.5; }
-.targets { display: flex; flex-direction: column; gap: 8px; padding: 4px 20px 16px 60px; }
-.target { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: auto; padding: 9px 12px; }
-.targetName { overflow: hidden; color: var(--dsw-alias-label-primary); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
-.targetMeta { flex: none; color: var(--dsw-alias-label-caption); font-size: 12px; }
-@media (max-width: 767px) {
-  .empty, .targets { padding-left: var(--dsw-space-4); padding-right: var(--dsw-space-4); }
 }
