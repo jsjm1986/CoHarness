@@ -152,7 +152,16 @@ describe('web e2e: Session draft initialization', () => {
     const input = page.locator('textarea:enabled').first()
     await input.fill('@reference')
     const menu = page.getByRole('listbox', { name: 'Trigger suggestions', exact: true })
-    await menu.getByRole('option', { name: /reference target\.md/u }).click()
+    const option = menu.getByRole('option', { name: /reference target\.md/u })
+    // A candidate fetch that ran before the workspace file scan settled does
+    // not retry on its own, so re-issue the last keystroke until it resolves.
+    await expect.poll(async () => {
+      if (await option.count() !== 0) return true
+      await input.fill('@referenc')
+      await input.pressSequentially('e')
+      return false
+    }, { timeout: 60_000 }).toBe(true)
+    await option.click()
     const reference = page.locator('[data-reference-appearance="file"]')
     await expect.poll(() => reference.textContent()).toBe('@reference target.md')
     await expect.poll(() => input.inputValue()).toBe('@reference target.md ')
