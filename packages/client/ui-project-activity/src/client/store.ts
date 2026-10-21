@@ -1,6 +1,6 @@
-/** Activity panel view store: feed pages, grouping, and the member filter. */
+/** Activity panel view store: feed pages, journal page, mode, and the member filter. */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ActivityGrouping, ActivityItem } from './feed.ts'
+import type { ActivityItem, ActivityMode, ProgressPage } from './feed.ts'
 
 /** One activity tab's view state. */
 export interface ActivityState {
@@ -12,8 +12,12 @@ export interface ActivityState {
   loading: boolean
   /** The last page request rejected; refresh retries it. */
   failed: boolean
-  /** Active toolbar grouping. */
-  grouping: ActivityGrouping
+  /** Latest journal page; absent until the first read lands. */
+  progress?: ProgressPage
+  /** The last journal read rejected; refresh retries it. */
+  progressFailed: boolean
+  /** Active panel mode. */
+  grouping: ActivityMode
   /** Member filter: restrict rows to one member's public id, or null for all. */
   member: number | null
 }
@@ -27,8 +31,12 @@ type ActivityActions = {
   appended: (draft: ActivityState, items: readonly ActivityItem[], nextBefore: string | undefined) => void
   /** Mark the in-flight request rejected. */
   failed: (draft: ActivityState) => void
-  /** Switch the grouping mode. */
-  grouped: (draft: ActivityState, grouping: ActivityGrouping) => void
+  /** Publish a fresh journal page. */
+  progressLoaded: (draft: ActivityState, page: ProgressPage) => void
+  /** Mark the journal read rejected. */
+  progressFailed: (draft: ActivityState) => void
+  /** Switch the panel mode. */
+  grouped: (draft: ActivityState, grouping: ActivityMode) => void
   /** Set the member filter; null shows every member. */
   filtered: (draft: ActivityState, member: number | null) => void
 }
@@ -38,7 +46,7 @@ type ActivityActions = {
  */
 export function createActivityStore(): EngineStoreHandle<ActivityState, ActivityActions> {
   return defineStore({
-    init: (): ActivityState => ({ items: [], loading: false, failed: false, grouping: 'time', member: null }),
+    init: (): ActivityState => ({ items: [], loading: false, failed: false, progressFailed: false, grouping: 'progress', member: null }),
     actions: {
       loading: (draft) => { draft.loading = true; draft.failed = false },
       refreshed: (draft, items, nextBefore) => {
@@ -54,6 +62,8 @@ export function createActivityStore(): EngineStoreHandle<ActivityState, Activity
         draft.loading = false
       },
       failed: (draft) => { draft.loading = false; draft.failed = true },
+      progressLoaded: (draft, page) => { draft.progress = page; draft.progressFailed = false },
+      progressFailed: (draft) => { draft.progressFailed = true },
       grouped: (draft, grouping) => { draft.grouping = grouping },
       filtered: (draft, member) => { draft.member = member },
     },

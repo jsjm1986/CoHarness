@@ -9,12 +9,15 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { ActivityBody, type ActivityInjected } from './ActivityBody.tsx'
 import { ActivityTitle } from './ActivityTitle.tsx'
 import { ACTIVITY_ID, activityDefinition } from './definition.tsx'
-import { fetchActivity } from './feed.ts'
+import { fetchActivity, fetchProgress, generateProgress } from './feed.ts'
 import { en, zh, type ActivityKey } from './locales.ts'
 import { createActivityStore } from './store.ts'
 
 export { type ActivityBodyProps, type ActivityInjected } from './ActivityBody.tsx'
-export type { ActivityItem, ActivityPage, ActivityGrouping, ActivitySection } from './feed.ts'
+export type {
+  ActivityGrouping, ActivityItem, ActivityMode, ActivityPage, ActivitySection,
+  ProgressContent, ProgressEntry, ProgressItem, ProgressPage, ProgressStatus,
+} from './feed.ts'
 export type { ActivityKey } from './locales.ts'
 export { createActivityStore } from './store.ts'
 export type { ActivityState, ActivityStore } from './store.ts'
@@ -62,6 +65,7 @@ export function apply(ctx: Context): void {
     name: 'sidebar.right.pane.tab', key: ACTIVITY_ID, locale: namespace, store,
     inject: (_sessionId, actions): ActivityInjected => {
       let inFlight: AbortController | undefined
+      let journalPoll: AbortController | undefined
       const load = async (before: string | undefined): Promise<void> => {
         inFlight?.abort()
         const controller = new AbortController()
@@ -75,9 +79,44 @@ export function apply(ctx: Context): void {
           if (!controller.signal.aborted) actions.failed()
         }
       }
+      // A pass is asynchronous on the gateway; poll the journal page while
+      // `generating` stays set so the member watches it land.
+      const pollJournal = async (): Promise<void> => {
+        journalPoll?.abort()
+        const controller = new AbortController()
+        journalPoll = controller
+        for (let round = 0; round < 48; round += 1) {
+          await new Promise(resolve => setTimeout(resolve, 2_500))
+          if (controller.signal.aborted) return
+          if (await readJournal(controller.signal)) return
+        }
+      }
+      const readJournal = async (signal: AbortSignal): Promise<boolean> => {
+        try {
+          const page = await fetchProgress(signal)
+          if (signal.aborted) return true
+          actions.progressLoaded(page)
+          if (page.status.generating) void pollJournal()
+          return !page.status.generating
+        } catch {
+          if (!signal.aborted) actions.progressFailed()
+          return true
+        }
+      }
       return {
-        refresh: () => { void load(undefined) },
+        refresh: () => {
+          journalPoll?.abort()
+          const controller = new AbortController()
+          journalPoll = controller
+          void load(undefined)
+          void readJournal(controller.signal)
+        },
         loadMore: (before) => { void load(before) },
+        generate: () => {
+          void generateProgress()
+            .then(() => pollJournal())
+            .catch(() => { actions.progressFailed() })
+        },
         reveal: (sessionId, seq) => {
           const viewport: ConversationViewport | undefined = ctx.get('conversationViewport')
           if (viewport === undefined) return

@@ -59,6 +59,15 @@ async function mockActivityGateway(target: Page): Promise<void> {
       },
     })
   })
+  await target.route(/\/account\/api\/progress(?:\?.*)?$/, async (route) => {
+    await route.fulfill({
+      json: {
+        enabled: true,
+        periods: [],
+        status: { enabled: true, pending: 0, generating: false, canGenerate: true },
+      },
+    })
+  })
 }
 
 /** Open a fresh conversation so the reveal click visibly switches panes. */
@@ -116,6 +125,9 @@ describe('project activity tab', () => {
 
     await openActivityTab(page)
     const feed = page.locator('[class*="feed"]')
+    // The panel lands on the progress journal; the raw feed lives one segment over.
+    await feed.getByText('No progress journal yet', { exact: true }).waitFor({ timeout: 15_000 })
+    await page.getByRole('button', { name: 'Time', exact: true }).click()
     await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor({ timeout: 15_000 })
     await feed.getByText(ANSWER_TEXT, { exact: true }).waitFor()
     await feed.getByText('Zhou', { exact: true }).waitFor()

@@ -26,6 +26,7 @@ import { selectLauncher } from './launcher.ts'
 import { PostgresAuditService } from './postgres/audit-service.ts'
 import { PostgresAuthService } from './postgres/auth-service.ts'
 import { PostgresCollaborationService } from './postgres/collaboration-service.ts'
+import { PostgresProgressService } from './postgres/progress-service.ts'
 import {
   createPostgresPool,
   databaseUrlFromFile,
@@ -208,6 +209,7 @@ const governance: GatewayModelGovernanceService = new PostgresModelGovernanceSer
   cfg.usageTimeZone,
 )
 const collaboration = new PostgresCollaborationService(context)
+const progress = new PostgresProgressService(context, { collaboration, governance }, cfg.progress)
 const documentCatalog = new PostgresDocumentCatalogService(context, cfg.archiveRetentionDays)
 const documentCatalogHandlers = createDocumentCatalogHandlers(documentCatalog, audit)
 const push = createPostgresPushService(context, cfg)
@@ -413,6 +415,7 @@ const deps: GatewayDeps = {
   audit,
   governance,
   collaboration,
+  progress,
   documents: documentCatalog,
   archives,
   push,
@@ -745,14 +748,19 @@ const documentRetentionTask = fencedTask('document retention sweep', async () =>
 const desktopSweepTask = fencedTask('desktop grant sweep', async () => {
   await desktops.sweep()
 })
+const progressSweepTask = fencedTask('project progress digest', async () => {
+  await progress.sweep()
+})
 const reaper = setInterval(reaperTask.run, 60_000)
 const archiveRetentionSweep = setInterval(archiveRetentionTask.run, 60 * 60_000)
 const documentRetentionSweep = setInterval(documentRetentionTask.run, 60 * 60_000)
 const desktopSweep = setInterval(desktopSweepTask.run, Math.max(1_000, cfg.desktop.grantTtlMs / 2))
+const progressSweep = setInterval(progressSweepTask.run, cfg.progress.sweepMs)
 reaper.unref()
 archiveRetentionSweep.unref()
 documentRetentionSweep.unref()
 desktopSweep.unref()
+progressSweep.unref()
 
 const CONNECTION_DRAIN_MS = 3000
 const SHUTDOWN_TIMEOUT_MS = 10_000

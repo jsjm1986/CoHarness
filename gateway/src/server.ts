@@ -59,6 +59,8 @@ export interface GatewayDeps {
   accessMonitor?: import('./access-invalidation.ts').GatewayAccessMonitor
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
+  /** Optional human-facing project progress journal; absent without PostgreSQL. */
+  progress?: Pick<import('./postgres/progress-service.ts').PostgresProgressService, 'progressForUser' | 'generateNow'>
   /** PostgreSQL-backed account preferences; absent in legacy test compositions. */
   userPreferences?: GatewayUserPreferencesService
   /** Optional organization-level document metadata catalog. */
@@ -1727,6 +1729,42 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       try {
         send(res, 200, JSON.stringify(await deps.collaboration.listActivity(
           user.id, resolved.context.scope.projectId, { limit, before })), 'application/json')
+      } catch (error) {
+        if (error instanceof CollaborationDeniedError) {
+          send(res, error.code === 'not-member' ? 403 : 404, JSON.stringify({ error: error.code }), 'application/json')
+          return
+        }
+        throw error
+      }
+      return
+    }
+
+    if (pathname === '/account/api/progress' && req.method === 'GET') {
+      if (resolved.context.scope.kind !== 'project' || deps.progress === undefined) {
+        send(res, 400, '{"error":"project-scope-required"}', 'application/json')
+        return
+      }
+      try {
+        send(res, 200, JSON.stringify(await deps.progress.progressForUser(
+          resolved.context.scope.projectId, user.id)), 'application/json')
+      } catch (error) {
+        if (error instanceof CollaborationDeniedError) {
+          send(res, error.code === 'not-member' ? 403 : 404, JSON.stringify({ error: error.code }), 'application/json')
+          return
+        }
+        throw error
+      }
+      return
+    }
+
+    if (pathname === '/account/api/progress/generate' && req.method === 'POST') {
+      if (resolved.context.scope.kind !== 'project' || deps.progress === undefined) {
+        send(res, 400, '{"error":"project-scope-required"}', 'application/json')
+        return
+      }
+      try {
+        send(res, 200, JSON.stringify(await deps.progress.generateNow(
+          resolved.context.scope.projectId, user.id)), 'application/json')
       } catch (error) {
         if (error instanceof CollaborationDeniedError) {
           send(res, error.code === 'not-member' ? 403 : 404, JSON.stringify({ error: error.code }), 'application/json')
