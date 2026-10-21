@@ -40,7 +40,7 @@ Gateway 新增 `GET /account/api/activity?before=<keyset>&limit=<n>`，与 `/acc
 
 ### 呈现（已评审 HTML 稿）
 
-L1 细线列表：日 → 会话 → 条目，行间 0.5px `border-l1` 分隔；工具条内 segmented「时间 | 会话 | 成员」分组切换、成员筛选、手动刷新。回答渲染为灰色提问原文 + accent tint `radius-full` 胶囊的选中答案。全部样式使用 `ui-theme` 令牌。
+每个分组是一种折叠阅读视图：`time` 按日折叠（今天默认展开），条目为单行摘要，点行就地展开详情卡——含提问原文、完整内容与「跳到会话」；`conversation` 每会话一个折叠块，块头为色点+标题+最近时间，摘要行优先呈现最新回答（「定了：提问 → 答案（谁）」），元信息行带参与人头像、条数与决定数；`member` 每人一个折叠块（头像+姓名+条数+决定数），摘要行先列「定了」再列「说了」。会话色点由 `sessionId` 哈希固定五色。回答行动词化为 accent「定了」，消息为普通文本；行点击仍 `reveal(sessionId, seq)`，会话 chip 点击 `reveal(sessionId, null)`。折叠态为组件本地状态。工具条、筛选、刷新、分页不变；全部样式使用 `ui-theme` 令牌。
 
 ## 备选方案
 

@@ -117,13 +117,16 @@ describe('project activity tab', () => {
     await openActivityTab(page)
     const feed = page.locator('[class*="feed"]')
     await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor({ timeout: 15_000 })
-    await feed.getByText(QUESTION_TEXT, { exact: false }).waitFor()
     await feed.getByText(ANSWER_TEXT, { exact: true }).waitFor()
     await feed.getByText('Zhou', { exact: true }).waitFor()
-    await feed.getByText('answered', { exact: true }).waitFor()
+    await feed.getByText('chose', { exact: true }).waitFor()
+
+    // The folded line expands to the detail card; the question shows there.
+    await feed.getByText(ANSWER_TEXT, { exact: true }).click()
+    await feed.getByText(QUESTION_TEXT, { exact: false }).waitFor()
 
     const seeded = page.getByText('DONE', { exact: true })
-    await feed.getByText(MESSAGE_TEXT, { exact: true }).click()
+    await feed.getByText('Jump to conversation', { exact: true }).click()
     await seeded.waitFor({ timeout: 15_000 })
   }, 90_000)
 })
