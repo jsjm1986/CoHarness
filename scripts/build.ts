@@ -108,7 +108,7 @@ export function buildGates(
         command: process.execPath,
         args: scope === 'typecheck' ? aggregateBuildArgs(face) : aggregateCheckArgs(face),
         // No Host aggregate file imports a generated `/typert` or `/remote` subpath, so
-        // host-check never reads what a concurrent host-typert step writes.
+        // host-check never reads what the host-bundle step writes.
         needs: scope === 'check' ? [] : [`${face}-src`],
         env,
       })

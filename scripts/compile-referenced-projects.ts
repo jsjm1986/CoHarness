@@ -1,10 +1,9 @@
 /**
  * Compile and bundle package projects without repeating aggregate test and script typechecks.
- * Contract steps replace the Host bundle with the bundle-free Typert pass for consumers that read
- * only declarations.
+ * The Host bundle emits the generated Typert declarations that Client compilation reads.
  */
 
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
@@ -14,7 +13,7 @@ import { pnpmCommand } from './release/process.ts'
 type CompilationMode = 'checked' | 'benchmark-emit'
 
 /** Identifier of one package-library build step. */
-export type LibraryStepId = 'host-src' | 'host-bundle' | 'host-typert' | 'desktop-bundle' | 'client-src' | 'client-bundle'
+export type LibraryStepId = 'host-src' | 'host-bundle' | 'client-src' | 'client-bundle'
 
 /** One package-library build step as a shell-free child-process invocation. */
 export interface LibraryStep {
@@ -144,31 +143,16 @@ function compilerStep(
   }
 }
 
-// Typert reads workspace packages only from source (generate-typert.ts
-// rejects build outputs), so it needs no compiled package. It runs under tsx's
-// ESM hook rather than through `pnpm exec`, whose startup would lengthen the
-// critical path before Client compilation.
-function typertStep(): LibraryStep {
-  return {
-    id: 'host-typert',
-    label: 'Host Typert',
-    displayCommand: 'tsx scripts/generate-typert.ts',
-    command: process.execPath,
-    args: ['--import', import.meta.resolve('tsx/esm'), fileURLToPath(new URL('generate-typert.ts', import.meta.url))],
-    needs: [],
-  }
-}
-
 function pnpmStep(id: LibraryStepId, label: string, args: readonly string[], needs: readonly LibraryStepId[]): LibraryStep {
   const [command, ...prefix] = pnpmCommand()
   return { id, label, displayCommand: `pnpm ${args.join(' ')}`, command, args: [...prefix, ...args], needs }
 }
 
 /**
- * List the package-library build steps in Host, Desktop, then Client dependency order.
+ * List the package-library build steps in Host then Client dependency order.
  * Host bundling runs Typert, whose Remote declarations Client compilation imports.
  * @param root - Repository root containing the compiler and bundle configurations.
- * @param faces - `host` lists Host compilation and bundling, which produce the Typert outputs; `all` adds Desktop and Client.
+ * @param faces - `host` lists Host compilation and bundling, which produce the Typert outputs; `all` adds Client.
  * @param mode - Check package types by default; benchmark emission defers diagnostics to required full builds.
  * @returns The ordered steps; each step needs its predecessor.
  * @throws If an aggregate configuration is invalid.
@@ -181,26 +165,24 @@ export function libraryBuildSteps(root: string, faces: 'host' | 'all', mode: Com
   if (faces === 'host') return host
   return [
     ...host,
-    pnpmStep('desktop-bundle', 'Desktop bundle', ['--filter', '@deepseek-ai/dsh-desktop', 'run', 'bundle'], ['host-bundle']),
-    compilerStep(root, 'client', mode, ['desktop-bundle']),
+    compilerStep(root, 'client', mode, ['host-bundle']),
     pnpmStep('client-bundle', 'Client bundle', ['exec', 'tsdown', '--config-loader', 'native', '--env.DSH_BUILD_FACE', 'client'], ['client-src']),
   ]
 }
 
 /**
- * List the bundle-free package steps that produce every declaration the type checkers, oxlint, and
- * documentation checks read: Host compilation and the Typert pass, which writes the generated
- * Typert declarations from source without bundling, run independently; Client compilation, which
- * imports both, needs the two. Unlike {@link libraryBuildSteps}, no step writes runnable bundles.
+ * List the package steps whose outputs the type checkers, oxlint, and documentation checks read:
+ * Host compilation and bundling, which emit the generated Typert declarations that Client
+ * compilation imports. {@link libraryBuildSteps} adds the runnable Client bundle on top.
  * @param root - Repository root containing the compiler configurations.
- * @param faces - `host` lists Host compilation and the Typert pass; `all` adds Client compilation.
+ * @param faces - `host` lists the Host steps; `all` adds Client compilation.
  * @returns The steps in report order.
  * @throws If an aggregate configuration is invalid.
  */
 export function contractSteps(root: string, faces: 'host' | 'all'): LibraryStep[] {
-  const host = [compilerStep(root, 'host', 'checked', []), typertStep()]
+  const host = libraryBuildSteps(root, 'host')
   if (faces === 'host') return host
-  return [...host, compilerStep(root, 'client', 'checked', ['host-src', 'host-typert'])]
+  return [...host, compilerStep(root, 'client', 'checked', ['host-bundle'])]
 }
 
 function runStep(root: string, step: LibraryStep): void {
@@ -209,23 +191,12 @@ function runStep(root: string, step: LibraryStep): void {
   if (result.status !== 0) throw stepFailure(step, result.status ?? result.signal)
 }
 
-function runStepConcurrently(root: string, step: LibraryStep): Promise<void> {
-  return new Promise((settle, fail) => {
-    const child = spawn(step.command, step.args, { cwd: root, stdio: 'inherit' })
-    child.once('error', fail)
-    child.once('close', (code, signal) => {
-      if (code === 0) settle()
-      else fail(stepFailure(step, code ?? signal))
-    })
-  })
-}
-
 function stepFailure(step: LibraryStep, exit: number | NodeJS.Signals | null): Error {
   return new Error(`compile-referenced-projects: ${step.label} exited with ${String(exit)}`)
 }
 
 /**
- * Emit package libraries serially in Host, Desktop, then Client dependency order.
+ * Emit package libraries serially in Host then Client dependency order.
  * @param root - Repository root containing the compiler and bundle configurations.
  * @param hostOnly - Stop after Host compilation and bundling, which produce the Typert outputs.
  * @param mode - Check package types by default; benchmark emission defers diagnostics to required full builds.
@@ -236,18 +207,13 @@ export function buildLibraryArtifacts(root: string, hostOnly: boolean, mode: Com
 }
 
 /**
- * Compile Host package projects and, concurrently, write the generated Typert declarations
- * without bundling. Both steps run to completion even when the other fails.
- * @param root - Repository root containing the compiler configuration; the Typert pass runs there.
- * @returns A promise that settles after both steps exit.
- * @throws The failed step's error, or an `AggregateError` naming both steps when both fail.
+ * Compile and bundle Host package projects, whose bundle emits the generated Typert declarations
+ * other consumers type-check against.
+ * @param root - Repository root containing the compiler configuration.
+ * @throws If the compiler or bundler fails.
  */
-export async function buildHostContracts(root: string): Promise<void> {
-  const results = await Promise.allSettled(contractSteps(root, 'host').map(step => runStepConcurrently(root, step)))
-  const failures: unknown[] = []
-  for (const result of results) if (result.status === 'rejected') failures.push(result.reason)
-  if (failures.length === 1) throw failures[0]
-  if (failures.length > 1) throw new AggregateError(failures, 'compile-referenced-projects: host compiler and Host Typert both failed')
+export function buildHostContracts(root: string): void {
+  for (const step of contractSteps(root, 'host')) runStep(root, step)
 }
 
 if (import.meta.main) {
@@ -262,7 +228,7 @@ if (import.meta.main) {
       compileReferencedProjects(root, mode)
       break
     case 'host-contracts':
-      await buildHostContracts(root)
+      buildHostContracts(root)
       break
     case 'host-libraries':
       buildLibraryArtifacts(root, true)

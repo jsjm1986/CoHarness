@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/typert/generator/README.md
 document:
-  en: 215270e11237d9958b06cf0aaf34a815f42f75c9
-  zh: ec4a847a57ef581733d0202b4290ff3b67e802b2
+  en: 6b3d13e2db36aaa97d4f0ae7ae85bd71a73b6324
+  zh: d183473c88e200c4289e014308caa53534f9e463
 /:
   en: 3fe330c4d51197ec
   zh: 5874f3bcd419dbbc
@@ -33,8 +33,8 @@ document:
   en: ebcb4850a5620d93
   zh: 55f6f54265830f28
 /deepseek-ai-dsh-typert-generator/use-this-package/generating-without-a-bundler:
-  en: adbc7e622184b8ad
-  zh: 5c2da2edfa78107d
+  en: 6a3c3152fcb4a7be
+  zh: a05b0a9723b8315d
 /deepseek-ai-dsh-typert-generator/understand-the-implementation:
   en: b90762df7a978580
   zh: 123ab225a2b5df2a
