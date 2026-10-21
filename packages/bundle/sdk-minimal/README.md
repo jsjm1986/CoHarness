@@ -1,5 +1,5 @@
 ---
-description: "Standalone SDK profile with one default shell tool for users who need a minimal cross-platform coding agent without the shared base bundle."
+description: "Standalone SDK profile with a small read-only tool surface for users who need a minimal cross-platform coding agent without the shared base bundle."
 kind: "package-bundle"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use `dsh --profile sdk-minimal` when an SDK client needs a small, explicit coding-agent runtime. By default, the profile advertises only a platform-selected persistent shell, persists sessions as uncompressed JSONL, and selects the model from the SDK initialization request. It supplies a complete Cordis tree and deliberately excludes `dsh-base`, Web, settings, managed credentials, telemetry, compaction, filesystem tools, workspace instructions, skills, jobs, and subagents. Its danger-full-access policy lets the shell modify any path available to the process, so use it only with an isolated workspace.
+Use `dsh --profile sdk-minimal` when an SDK client needs a small, explicit coding-agent runtime. By default, the profile advertises a platform-selected persistent shell plus read-only `read_image` and `working_directory` tools, persists sessions as uncompressed JSONL, and selects the model from the SDK initialization request. It supplies a complete Cordis tree and deliberately excludes `dsh-base`, Web, settings, managed credentials, telemetry, mutating filesystem tools, workspace instructions, skills, and subagents. Its danger-full-access policy lets the shell modify any path available to the process, so use it only with an isolated workspace.
 
 ## Table of Contents
 
@@ -36,9 +36,9 @@ dsh --profile sdk-minimal
 
 Use `dsh plugin --profile sdk-minimal` to manage persistent external dependencies. Profile, home, and ordered `--patch` files can replace rows or insert bundles above the complete default tree. The shipped template applies patches only at startup.
 
-The profile mounts exactly one persistent shell stack: Bash on Linux and macOS, or PowerShell on Windows. Both stacks use a 300-second timeout and one owner-scoped terminal; the other platform's rows remain disabled.
+The profile mounts exactly one persistent shell stack: Bash on Linux and macOS, or PowerShell on Windows. Both stacks use a 300-second timeout and one owner-scoped terminal; the other platform's rows remain disabled. The shell is the composition's only mutating tool.
 
-Like every shipped profile, it mounts [MCP resources](../../mcp/mcp-resources/README.md) once. Configure only [MCP client entries](../../mcp/mcp-client/README.md) to add servers. Clients mounted by another provider also count as configured. With no server configured in the caller's scope, MCP contributes no prompt text or tools and the default remains one shell tool.
+Like every shipped profile, it mounts [MCP resources](../../mcp/mcp-resources/README.md) once. Configure only [MCP client entries](../../mcp/mcp-client/README.md) to add servers. Clients mounted by another provider also count as configured. With no server configured in the caller's scope, MCP contributes no prompt text or tools and the default stays the fixed read-only tool set.
 
 -----
 
@@ -48,7 +48,7 @@ Like every shipped profile, it mounts [MCP resources](../../mcp/mcp-resources/RE
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The bundle's single insert is the complete application tree: SDK stdio startup and JSON-RPC serving, one environment-configured DeepSeek adapter, the explicit agent core, conditional MCP resource tools, local subprocess execution, a platform-selected persistent shell PTY, and uncompressed JSONL persistence under `$DSH_HOME/sessions`. It does not inherit another bundle, so every extra row is an explicit profile change.
+The bundle's single insert is the complete application tree: SDK stdio startup and JSON-RPC serving, one environment-configured DeepSeek adapter, the explicit agent core, conditional MCP resource tools, local subprocess execution, a platform-selected persistent shell PTY, read-only image inspection and working-directory tools backed by local filesystem and attachment services, a local jobs service, basic compaction with image offload, and uncompressed JSONL persistence under `$DSH_HOME/sessions`. It does not inherit another bundle, so every extra row is an explicit profile change.
 
 ### Source map
 
@@ -78,11 +78,11 @@ The bundle's single insert is the complete application tree: SDK stdio startup a
 
 #### What the model sees
 
-The system prompt is `DSH_SYSTEM_PROMPT` or `You are a helpful software engineer assistant.`. With no MCP server configured, the only advertised tool is owner-scoped persistent `bash` on Linux/macOS or `pwsh` on Windows; runtime context, filesystem tools, workspace instructions, skills, jobs controls, compaction, and Harness identity are absent.
+The system prompt is `DSH_SYSTEM_PROMPT` or `You are a helpful software engineer assistant.`. With no MCP server configured, the advertised tools are owner-scoped persistent `bash` on Linux/macOS or `pwsh` on Windows, `read_image`, and `working_directory`; text-reading and mutating filesystem tools, runtime context, workspace instructions, skills, and Harness identity are absent, and basic compaction bounds long sessions.
 
 #### Token effect
 
-By default, one stable persona plus one tool schema. Configured MCP servers add their tools, shared resource tools, and available server instructions. Tool results and ordinary conversation history grow with the session.
+By default, one stable persona plus a small fixed tool set. Configured MCP servers add their tools, shared resource tools, and available server instructions. Tool results and ordinary conversation history grow with the session.
 
 #### KV Cache effect
 
