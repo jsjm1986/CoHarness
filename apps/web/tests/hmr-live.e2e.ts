@@ -87,9 +87,9 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   const distBackupPath = join(distBackup, 'dist')
   await cp(distPath, distBackupPath, { recursive: true })
   const originalSource = await readFile(sourcePath)
-  // dev:web's build stage rewrites the build record, and a vitest-spawned
-  // build bakes NODE_ENV=test into every client bundle — a record digest no
-  // restore of the artifact bytes can match. Back the record up beside them.
+  // A vitest-spawned build stage would bake NODE_ENV=test into every client
+  // bundle — a record digest no restore of the artifact bytes can match. Back
+  // the record up beside them.
   const recordPath = join(REPO_ROOT, CLIENT_BUILD_RECORD_PATH)
   const originalRecord = await readFile(recordPath)
   const oldText = 'COHARNESS'
@@ -111,10 +111,9 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     ]) + '\n')
     subprocessFiber = await subprocessCtx.plugin(LocalSubprocessRuntime)
     watcher = subprocessCtx.subprocess.spawn(spawnSpec(
-      // --skip-build: the lane's build already emitted every artifact, and
-      // dev:web's own build:artifacts would rewrite the build record with
-      // vitest's ambient NODE_ENV baked into the bundles it digests.
-      ['pnpm', 'run', 'dev:web', '--skip-build'],
+      // NODE_ENV=production: any build stage inside dev:web would otherwise
+      // bake vitest's ambient NODE_ENV=test into the bundles it digests.
+      ['pnpm', 'run', 'dev:web'],
       REPO_ROOT,
       { ...clientBuildEnvironment, NODE_ENV: 'production' },
     ))
