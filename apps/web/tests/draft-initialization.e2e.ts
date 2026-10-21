@@ -176,6 +176,11 @@ describe('web e2e: Session draft initialization', () => {
     const snapshot = await captureStableAria(page, '[data-composer-card] textarea', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'reference.expected.md'), snapshot, MODE)
 
+    // The reuse scan reads freshly repulled summaries whose workspace/cwd join
+    // lands a frame after the session itself; the session's own sidebar row is
+    // the observable edge of that same join, so its presence means a reuse
+    // connect can already see this Session.
+    await page.locator(`[data-row-key^="session:"][data-row-key*="${sessionId!}"]`).waitFor({ timeout: 30_000 })
     await startSession(page, wid, { prompt: 'keep the existing reference' })
     await expect.poll(() => selected(page)).toBe(sessionId)
     await expect.poll(() => input.inputValue()).toBe('@reference target.md ')

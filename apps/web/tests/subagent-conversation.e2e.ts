@@ -60,11 +60,13 @@ async function waitForAgentToSettle(scaffold: WebScaffold, id: SessionId): Promi
   }
 }
 
-/** Open the portaled subagent catalog through its hover-owned trigger. */
+/** Open the portaled subagent catalog through its trigger's keyboard path. */
 async function openSubagentCatalog(page: Page, name: string): Promise<void> {
   const trigger = page.getByRole('button', { name, exact: true })
   await trigger.waitFor({ timeout: 15_000 })
-  await trigger.hover()
+  // The hover path rides a 150ms open timer that a stray pointerleave cancels;
+  // ArrowDown opens the same catalog synchronously with no pointer timing.
+  await trigger.press('ArrowDown')
   await page.getByRole('tree', { name: 'Subagent sessions' }).waitFor({ timeout: 15_000 })
 }
 

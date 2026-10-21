@@ -438,17 +438,15 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     expect(scaffold.ctx.agents.get(SessionId(privateSessionId))).toBeDefined()
 
     const agentCount = scaffold.ctx.agents.list().length
+    // A bare click that lands before the first create's navigation commits
+    // joins the in-flight create instead of minting a second Session+Agent;
+    // the persisted current-session marker flips at sessions.open(), strictly
+    // after that join window closes, so it is the settle signal for re-arming
+    // the button.
+    await expect.poll(() => page!.evaluate(() => localStorage.getItem('dsh.sessions.current')))
+      .toContain(privateSessionId)
     await newSession.click()
-    // The second bare click is not idempotent either: it mints another
-    // Session+Agent rather than reusing the first one or any draft
-    // reservation, and still performs no blank candidate lookup. A click
-    // landing while the first create is still in flight joins it instead, so
-    // the poll re-issues the click until a fresh agent registers.
-    await expect.poll(async () => {
-      if (scaffold.ctx.agents.list().length !== agentCount) return true
-      await newSession.click()
-      return false
-    }, { timeout: 30_000 }).toBe(true)
+    await expect.poll(() => scaffold.ctx.agents.list().length, { timeout: 30_000 }).toBe(agentCount + 1)
     expect(scaffold.ctx.agents.list()).toHaveLength(agentCount + 1)
     expect(gateway.conversationReads).not.toContain(BLANK_SESSION_ID)
     expect(scaffold.ctx.agents.get(SessionId(privateSessionId))).toBeDefined()
