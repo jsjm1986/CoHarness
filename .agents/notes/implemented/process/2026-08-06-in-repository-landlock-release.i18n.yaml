@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-06-in-repository-landlock-release.md
 document:
-  en: 82b21cc0c30338ad11583797f011794b8dbcc90c
-  zh: 554967fbce454fc9a45b54d735f485006f9dee51
+  en: cb2b32927b473a3e99cb4ec1a15a4f5e1ac5c7f5
+  zh: 0f301c0ce2ab7522a5151b7872cf7ea71c073937
 /agent-note-in-repository-landlock-release:
   en: 4376b58c8e9f8073
   zh: aa453cc7060dd935
@@ -18,5 +18,5 @@ document:
   en: e018e1e934c95eec
   zh: e2234990997c364e
 /agent-note-in-repository-landlock-release/consequences:
-  en: 65aa310ce5d23487
-  zh: b91c04833456577c
+  en: 4f23e51b9c3af7f9
+  zh: 6bc819505c534462

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/shell.md
 document:
-  en: 84db166852f3fe2015ac64872900542559d51575
-  zh: 6ee2cf893ad1892e5bad90d712be06c5f8649f5e
+  en: b7af587ea4ed1f6d30bc1520be9d43c6395b18d8
+  zh: 88fe095e468d429eecf9b829bd03421c67ceccc5
 /shell-executor:
   en: c9aba02120c42608
   zh: f76b6b9745015993
@@ -18,8 +18,8 @@ document:
   en: 471d328907ef0761
   zh: d6b0b8e66e427394
 /shell-executor/file-sandbox-shellsandboxinfo:
-  en: d09036a8749423ce
-  zh: bba45a62001754ae
+  en: 113521d4d115921a
+  zh: f9702b1ee3475790
 /shell-executor/background-processes-shellprocess:
   en: 32b7078c68f7edae
   zh: 998c10d0b30b4802

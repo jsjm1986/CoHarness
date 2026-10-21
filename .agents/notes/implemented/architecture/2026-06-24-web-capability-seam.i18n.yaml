@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md
 document:
-  en: 6df93fafbe03af73a994992f09bd6d033314bf4d
-  zh: 0b0318fd4cf8a097eadb518e021e8374d0e7ef3b
+  en: f645fbdcbb1c3e8e749d6f372c439e5ca200fcab
+  zh: ef99b993922eae1e761594ac340fa455637a5adf
 /agent-note-web-capability-seam-stable-tools-over-multiple-providers:
   en: ca120635fc40431c
   zh: 6be7c5ae3c86cdcc
@@ -63,8 +63,8 @@ document:
   en: a9ae4f8a459789ce
   zh: f44a184156bef30e
 /agent-note-web-capability-seam-stable-tools-over-multiple-providers/deferred-work:
-  en: fbefd756aadfd9c9
-  zh: 19a28ce48fae225d
+  en: 3e84d0daae1c7ce3
+  zh: 5484259b17e80654
 /agent-note-web-capability-seam-stable-tools-over-multiple-providers/open-questions:
-  en: f3507703314d73cd
-  zh: 39ad727740573121
+  en: c51438586e41052a
+  zh: 24fd9dcc4a5a5738

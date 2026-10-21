@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/compaction/README.md
 document:
-  en: 46ab8fab72d55b4926c9fe582187e025ce7a67d0
-  zh: cb2f3cbab8bf0aee7d3dd57d77a39131f7fe6cbc
+  en: 80fc42b5f64fcb0072685b8531eb381a8040ffc9
+  zh: 348a8855c5aa0fa5252f5abacdb69579313eb188
 /:
   en: 4fe8f6f7b09339c1
   zh: d138739147e506ef
@@ -21,8 +21,8 @@ document:
   en: ff30478097349347
   zh: ec5c73197eaf1718
 /compaction-compaction-capability-family/related-documentation:
-  en: 4bb1ee8212d9df3c
-  zh: 80ffe4910a29c105
+  en: fc567b1f03126a0c
+  zh: ccba1db6daa0b5c6
 /compaction-compaction-capability-family/dev-note:
   en: 5de1d6304e00c58f
   zh: 8d8225361cfa29e5

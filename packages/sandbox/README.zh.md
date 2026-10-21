@@ -15,9 +15,9 @@ kind: "package-group"
 | [`sandbox-local/`](sandbox-local/README.zh.md) | 提供本地平台限制后端 | 注册到 `ctx.sandbox` |
 | [`sandbox-policy/`](sandbox-policy/README.zh.md) | 解析持久的逐会话沙箱策略 | `ctx.sandboxPolicy` |
 
-[沙箱决策](../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)记录了能力边界，[文件系统集成决策](../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.zh.md)记录了跨家族策略的使用方式。
+[沙箱决策](../../.agents/notes/archived/feature/2026-07-06-sandbox.md)记录了能力边界，[文件系统集成决策](../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.zh.md)记录了跨家族策略的使用方式。
 
-子系统参考——模式与强制执行、按调用策略、包装 argv 方言、故障关闭错误——见 [docs/subsystems/sandbox.md](../../docs/subsystems/sandbox.zh.md)；边界与跨家族阶段见[沙箱](../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)与[跨家族 fs 沙箱](../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.zh.md) Agent Note。
+子系统参考——模式与强制执行、按调用策略、包装 argv 方言、故障关闭错误——见 [docs/subsystems/sandbox.md](../../docs/subsystems/sandbox.zh.md)；边界与跨家族阶段见[沙箱](../../.agents/notes/archived/feature/2026-07-06-sandbox.md)与[跨家族 fs 沙箱](../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.zh.md) Agent Note。
 
 ## 概述
 

@@ -8,7 +8,7 @@ English | [中文](2026-08-17-command-image-attachment-envelope.zh.md)
 
 The Web composer submits one envelope — draft text, attached images, and delivery mode — but the two submission planes consumed it asymmetrically. A plain message rode `defaultSink → conversation.sendSession`, which serialized the images into prompt content and cleared them on success. A claimed slash command rode `claim.submit(args, actx)`, a text-only transaction: `/goal rebuild the cathedral` with four reference photos executed the command, cleared the draft, and silently stranded the images in the composer rail. The model never saw them, and no surface said so. The defect was contract-level, not a missed call site: nothing in the claim, the adjudication, or the host executor modeled attachments, so any command could consume the text half of a submission and drop the rest.
 
-Merging the two planes was not on the table — the [plugin command registration Agent Note](2026-07-19-plugin-command-registration.md) deliberately keeps human commands out of the model plane, and that separation is correct. The gap was that the envelope fractured at the plane fork.
+Merging the two planes was not on the table — the [plugin command registration Agent Note](../../archived/feature/2026-07-19-plugin-command-registration.md) deliberately keeps human commands out of the model plane, and that separation is correct. The gap was that the envelope fractured at the plane fork.
 
 ## Decision
 

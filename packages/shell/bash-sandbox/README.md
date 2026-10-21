@@ -111,7 +111,7 @@ Read these pages when the executor contract is not enough. They move from the se
 - [sandbox-policy](../../sandbox/sandbox-policy/README.md) — the per-session mode and workspace root this executor honors.
 - [sandbox-local](../../sandbox/sandbox-local/README.md) — the shipped runner backends: bwrap, Landlock, and Seatbelt.
 - [tool-bash](../tool-bash/README.md) — the model-facing `bash` tool and its escalation surface.
-- [Sandbox Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.md) — the sandbox design, escalation, and switching contract.
+- [Sandbox Agent Note](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — the sandbox design, escalation, and switching contract.
 
 -----
 

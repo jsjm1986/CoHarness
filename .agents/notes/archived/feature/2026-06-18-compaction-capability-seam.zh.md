@@ -1,6 +1,7 @@
 # Agent Note: 压缩作为能力 seam（抽象约定 + 基础后端）
 
 Status: implemented
+Archived: 2026-09-30
 
 [English](2026-06-18-compaction-capability-seam.md) | 中文
 

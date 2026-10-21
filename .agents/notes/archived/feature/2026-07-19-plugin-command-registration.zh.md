@@ -1,6 +1,7 @@
 # Agent Note: 插件自有的人类命令注册
 
 Status: implemented
+Archived: 2026-09-30
 
 [English](2026-07-19-plugin-command-registration.md) | 中文
 

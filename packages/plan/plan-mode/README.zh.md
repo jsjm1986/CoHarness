@@ -119,7 +119,7 @@ agent 完成计划后，会以 markdown 形式、从标题开头书写计划并�
 - [plan/ 包映射](../README.zh.md)——本组及其唯一的包。
 - [`exit_plan_mode` 工具目录条目](../../../docs/tool-catalog.zh.md#deepseek-aidsh-plan-mode)——模型收到的确切 schema。
 - [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-plan-mode)——每个受支持配置字段及其含义。
-- [plan 专用协作状态](../../../.agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.zh.md)——计划模式背后的设计决策。
+- [plan 专用协作状态](../../../.agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md)——计划模式背后的设计决策。
 
 -----
 
