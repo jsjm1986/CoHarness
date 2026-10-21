@@ -406,23 +406,28 @@ export class PostgresProgressService {
     for (const candidate of candidates) {
       if (ran >= this.config.sweepMaxProjects) return
       const internal = candidate.projectId
-      const state = await this.stateRow(internal)
-      if (this.generating(state)) continue
-      // Equality cannot skip: rows sharing the watermark timestamp but sorted
-      // past its (session, seq) key are still undigested — pending() decides.
-      if (state?.watermark_ts != null && candidate.latest < state.watermark_ts) continue
-      const pending = await this.pending(internal, state)
-      if (pending.count === 0) continue
-      const now = Date.now()
-      const quiet = pending.latest === null || now - pending.latest.getTime() >= this.config.idleMs
-      const spaced = state?.last_run_at == null || now - state.last_run_at.getTime() >= this.config.intervalMs
-      const enough = pending.hasDecision || pending.count >= this.config.minActivity
-      if (!quiet || !spaced || !enough) continue
-      const project = await this.publicIdOf(internal)
-      if (project === null) continue
-      if (!(await this.acquire(internal))) continue
-      await this.runPass(project, internal)
-      ran += 1
+      try {
+        const state = await this.stateRow(internal)
+        if (this.generating(state)) continue
+        // Equality cannot skip: rows sharing the watermark timestamp but sorted
+        // past its (session, seq) key are still undigested — pending() decides.
+        if (state?.watermark_ts != null && candidate.latest < state.watermark_ts) continue
+        const pending = await this.pending(internal, state)
+        if (pending.count === 0) continue
+        const now = Date.now()
+        const quiet = pending.latest === null || now - pending.latest.getTime() >= this.config.idleMs
+        const spaced = state?.last_run_at == null || now - state.last_run_at.getTime() >= this.config.intervalMs
+        const enough = pending.hasDecision || pending.count >= this.config.minActivity
+        if (!quiet || !spaced || !enough) continue
+        const project = await this.publicIdOf(internal)
+        if (project === null) continue
+        if (!(await this.acquire(internal))) continue
+        await this.runPass(project, internal)
+        ran += 1
+      } catch (error) {
+        // One broken project must not starve the rest of the sweep.
+        console.error(`[gateway] project progress digest skipped ${internal}:`, error)
+      }
     }
   }
 
@@ -448,24 +453,27 @@ export class PostgresProgressService {
     return result.rows.map(row => ({ projectId: row.pid, latest: row.mx }))
   }
 
-  /** Undigested member-visible rows since the stored watermark. */
+  /** Undigested member-visible rows since the stored watermark, inside the scan window. */
   private async pending(internal: string, state: StateRow | undefined): Promise<{ count: number; latest: Date | null; hasDecision: boolean }> {
     const result = await this.pool.query<{ pending: number; latest: Date | null; decided: boolean }>(`
       WITH ${VISIBLE_CTE}, feed AS (${MEMBER_ROWS})
       SELECT count(*)::int pending, max(f.ts) latest, coalesce(bool_or(f.kind='decision'),false) decided
-      FROM feed f WHERE ${AFTER_WATERMARK}`,
+      FROM feed f WHERE ${AFTER_WATERMARK}
+        AND f.ts > now() - ($6::text || ' days')::interval`,
     [this.context.organizationId, internal,
-      state?.watermark_ts?.toISOString() ?? null, state?.watermark_session ?? null, state?.watermark_seq ?? 0])
+      state?.watermark_ts?.toISOString() ?? null, state?.watermark_session ?? null, state?.watermark_seq ?? 0,
+      String(this.config.materialWindowDays)])
     const row = result.rows[0]
     return { count: Number(row?.pending ?? 0), latest: row?.latest ?? null, hasDecision: row?.decided === true }
   }
 
   /**
-   * Material rows since the watermark, oldest first. Member and agent rows are
-   * fetched under separate caps then merged by the watermark keyset so agent
-   * volume cannot starve member-authored material.
+   * Material rows since the watermark, oldest first, plus `limit`: the last
+   * key a capped stream provably covers. When either stream hit its cap the
+   * merged tail past `limit` may be missing rows, so callers consume only the
+   * complete prefix and leave the rest under the watermark for the next pass.
    */
-  private async material(internal: string, state: StateRow | undefined): Promise<MaterialRow[]> {
+  private async material(internal: string, state: StateRow | undefined): Promise<{ rows: MaterialRow[]; limit: MaterialRow | null }> {
     const watermark = [this.context.organizationId, internal,
       state?.watermark_ts?.toISOString() ?? null, state?.watermark_session ?? null, state?.watermark_seq ?? 0]
     const members = await this.pool.query<{
@@ -476,7 +484,9 @@ export class PostgresProgressService {
       WITH ${VISIBLE_CTE}, feed AS (${MEMBER_ROWS})
       SELECT f.*, v.title FROM feed f JOIN visible v ON v.id=f.session_id
       WHERE ${AFTER_WATERMARK}
-      ORDER BY f.ts, f.session_id, f.seq LIMIT $6`, [...watermark, this.config.maxMaterialRows])
+        AND f.ts > now() - ($6::text || ' days')::interval
+      ORDER BY f.ts, f.session_id, f.seq LIMIT $7`,
+    [...watermark, String(this.config.materialWindowDays), this.config.maxMaterialRows])
     const agents = await this.pool.query<{
       session_id: string; seq: string; ts: Date; text: string | null; title: string | null
     }>(`
@@ -489,7 +499,9 @@ export class PostgresProgressService {
         WHERE search_row.role='assistant')
       SELECT f.*, v.title FROM feed f JOIN visible v ON v.id=f.session_id
       WHERE ${AFTER_WATERMARK}
-      ORDER BY f.ts, f.session_id, f.seq LIMIT $6`, [...watermark, this.config.maxAssistantRows])
+        AND f.ts > now() - ($6::text || ' days')::interval
+      ORDER BY f.ts, f.session_id, f.seq LIMIT $7`,
+    [...watermark, String(this.config.materialWindowDays), this.config.maxAssistantRows])
     const rows: MaterialRow[] = []
     for (const row of members.rows) {
       const text = row.kind === 'decision'
@@ -508,11 +520,18 @@ export class PostgresProgressService {
         actor: null, occurredAt: row.ts, seq: Number(row.seq), text: row.text,
       })
     }
-    rows.sort((left, right) =>
-      left.occurredAt.getTime() - right.occurredAt.getTime()
-      || left.sessionId.localeCompare(right.sessionId)
-      || left.seq - right.seq)
-    return rows
+    rows.sort(compareKeys)
+    const lastMember = members.rows.length === this.config.maxMaterialRows ? members.rows[members.rows.length - 1] : undefined
+    const lastAgent = agents.rows.length === this.config.maxAssistantRows ? agents.rows[agents.rows.length - 1] : undefined
+    const limits: MaterialRow[] = []
+    if (lastMember !== undefined) {
+      limits.push({ kind: 'member', sessionId: lastMember.session_id, sessionTitle: null, actor: null, occurredAt: lastMember.ts, seq: Number(lastMember.seq), text: '' })
+    }
+    if (lastAgent !== undefined) {
+      limits.push({ kind: 'agent', sessionId: lastAgent.session_id, sessionTitle: null, actor: null, occurredAt: lastAgent.ts, seq: Number(lastAgent.seq), text: '' })
+    }
+    limits.sort(compareKeys)
+    return { rows, limit: limits[0] ?? null }
   }
 
   /** Acquire or renew the in-flight lease for one project. */
@@ -535,7 +554,12 @@ export class PostgresProgressService {
   private async runPass(publicId: number, internal: string): Promise<void> {
     try {
       const state = await this.stateRow(internal)
-      const material = await this.material(internal, state)
+      const fetched = await this.material(internal, state)
+      // A capped stream's tail may be missing rows; digest only the complete
+      // prefix so the watermark never advances past undigested material.
+      const material = fetched.limit === null
+        ? fetched.rows
+        : fetched.rows.filter(row => compareKeys(row, fetched.limit!) <= 0)
       if (material.length === 0) {
         await this.clearLease(internal)
         return
@@ -647,7 +671,7 @@ export class PostgresProgressService {
     const result = await this.pool.query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
       period_start,period_end,model,generated_at FROM harness.project_journal
       WHERE organization_id=$1 AND project_id=$2
-      ORDER BY CASE kind WHEN 'current' THEN 0 ELSE 1 END, generated_at DESC LIMIT 26`,
+      ORDER BY CASE kind WHEN 'current' THEN 0 ELSE 1 END, period_key DESC LIMIT 26`,
     [this.context.organizationId, internal])
     return result.rows.map(row => ({
       id: row.id,
@@ -697,14 +721,18 @@ export class PostgresProgressService {
 
   private async clearLease(internal: string): Promise<void> {
     await this.pool.query(`UPDATE harness.project_journal_state
-      SET generating_since=NULL,updated_at=now() WHERE organization_id=$1 AND project_id=$2`,
+      SET generating_since=NULL,last_error=NULL,updated_at=now() WHERE organization_id=$1 AND project_id=$2`,
     [this.context.organizationId, internal])
   }
 
-  /** Record a pass failure and release the lease so a later sweep retries. */
+  /**
+   * Record a pass failure and release the lease so a later sweep retries. The
+   * failed attempt still stamps `last_run_at`, so the interval gate backs off
+   * repeated failures instead of retrying on every sweep tick.
+   */
   private async fail(internal: string, message: string): Promise<void> {
     await this.pool.query(`UPDATE harness.project_journal_state
-      SET generating_since=NULL,last_error=$3,updated_at=now()
+      SET generating_since=NULL,last_error=$3,last_run_at=now(),updated_at=now()
       WHERE organization_id=$1 AND project_id=$2`,
     [this.context.organizationId, internal, message.slice(0, 500)])
   }
@@ -724,11 +752,18 @@ function answerSummary(outcome: unknown): string {
   }).filter(text => text !== '').join('；').slice(0, 300)
 }
 
-/** Asked question texts from a serialized `tool/call` event data payload. */
+/** Total order over the watermark keyset `(occurredAt, sessionId, seq)`. */
+function compareKeys(left: MaterialRow, right: MaterialRow): number {
+  return left.occurredAt.getTime() - right.occurredAt.getTime()
+    || left.sessionId.localeCompare(right.sessionId)
+    || left.seq - right.seq
+}
+
+/** Asked question texts from a serialized `tool/call` arguments payload. */
 function questionText(raw: string | null): string | undefined {
   if (raw === null) return undefined
   try {
-    const questions = (JSON.parse(raw) as { arguments?: { questions?: unknown } }).arguments?.questions
+    const questions = (JSON.parse(raw) as { questions?: unknown }).questions
     if (!Array.isArray(questions)) return undefined
     const text = questions
       .map(entry => (entry as { question?: unknown }).question)
