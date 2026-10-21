@@ -441,8 +441,14 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await newSession.click()
     // The second bare click is not idempotent either: it mints another
     // Session+Agent rather than reusing the first one or any draft
-    // reservation, and still performs no blank candidate lookup.
-    await expect.poll(() => scaffold.ctx.agents.list().length, { timeout: 10_000 }).toBe(agentCount + 1)
+    // reservation, and still performs no blank candidate lookup. A click
+    // landing while the first create is still in flight joins it instead, so
+    // the poll re-issues the click until a fresh agent registers.
+    await expect.poll(async () => {
+      if (scaffold.ctx.agents.list().length !== agentCount) return true
+      await newSession.click()
+      return false
+    }, { timeout: 30_000 }).toBe(true)
     expect(scaffold.ctx.agents.list()).toHaveLength(agentCount + 1)
     expect(gateway.conversationReads).not.toContain(BLANK_SESSION_ID)
     expect(scaffold.ctx.agents.get(SessionId(privateSessionId))).toBeDefined()
