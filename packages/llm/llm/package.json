@@ -47,7 +47,8 @@
     "./discovery": {
       "types": "./lib/types/discovery.d.ts",
       "default": "./lib/types/discovery.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "lib/index.js",
@@ -56,7 +57,8 @@
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "locale/*.json"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {

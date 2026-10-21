@@ -27,12 +27,14 @@
     "./estimate": {
       "types": "./lib/types/estimate.d.ts",
       "default": "./lib/types/estimate.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {

@@ -27,7 +27,8 @@
     "./output": {
       "types": "./lib/types/output.d.ts",
       "default": "./lib/output.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "lib/index.js",
@@ -35,7 +36,8 @@
     "lib/runner-*.js",
     "lib/output.js",
     "scripts/ensure-spawn-helper.mjs",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json"
   ],
   "scripts": {
     "postinstall": "node scripts/ensure-spawn-helper.mjs"

@@ -23,7 +23,8 @@
       "default": "./lib/client.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "dsh": {
     "client": {
@@ -70,7 +71,8 @@
     "lib/index.js",
     "lib/client.js",
     "lib/styles",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json"
   ],
   "scripts": {
     "bundle": "tsdown",

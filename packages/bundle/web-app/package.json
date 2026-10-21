@@ -24,14 +24,18 @@
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./startup/locale/*.json": "./locale/startup/*.json"
   },
   "files": [
     "lib/index.js",
     "lib/startup.js",
     "cordis.patch.yml",
     "lib/public-url-*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json",
+    "locale/startup/*.json"
   ],
   "license": "Apache-2.0",
   "dsh": {

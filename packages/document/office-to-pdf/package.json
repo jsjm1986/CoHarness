@@ -24,12 +24,14 @@
     "./types": {
       "types": "./lib/types/types.d.ts",
       "default": "./lib/types/types.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~"

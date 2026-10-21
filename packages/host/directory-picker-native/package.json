@@ -23,12 +23,14 @@
       "default": "./lib/worker.cjs"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "lib/index.js",
     "lib/worker.cjs",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json"
   ],
   "license": "Apache-2.0",
   "dependencies": {

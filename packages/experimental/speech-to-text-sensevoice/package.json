@@ -23,13 +23,15 @@
     "./worker": {
       "types": "./lib/types/worker.d.ts",
       "default": "./lib/worker.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "lib/index.js",
     "lib/worker.js",
     "runtime/assets.json",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json"
   ],
   "license": "Apache-2.0",
   "dependencies": {

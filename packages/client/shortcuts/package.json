@@ -27,7 +27,8 @@
     "./protocol": {
       "types": "./lib/types/protocol.d.ts",
       "default": "./lib/protocol.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "dsh": {
     "client": {
@@ -65,7 +66,8 @@
     "lib/index.js",
     "lib/client.js",
     "lib/protocol.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json"
   ],
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:~"

@@ -23,12 +23,16 @@
       "default": "./lib/types/host.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./host/locale/*.json": "./locale/host/*.json"
   },
   "files": [
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json",
+    "locale/host/*.json"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {

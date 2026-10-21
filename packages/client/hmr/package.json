@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-client-hmr",
-  "description": "Dev-only hot-reload driver for script-loaded client entries: SSE rebuilt frames → invalidate/prefetch → fiber swap through the vendored Loader entry",
+  "description": "Dev-only hot-reload driver for script-loaded client entries: SSE rebuilt frames \u2192 invalidate/prefetch \u2192 fiber swap through the vendored Loader entry",
   "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -23,7 +23,8 @@
       "default": "./lib/client.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "dsh": {
     "client": {
@@ -53,6 +54,7 @@
   "files": [
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/*.json"
   ]
 }

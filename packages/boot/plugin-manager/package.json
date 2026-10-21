@@ -43,7 +43,9 @@
     "./tools": {
       "types": "./lib/types/tools.d.ts",
       "default": "./lib/types/tools.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./tools/locale/*.json": "./locale/tools/*.json"
   },
   "files": [
     "lib/index.js",
@@ -52,7 +54,9 @@
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "locale/*.json",
+    "locale/tools/*.json"
   ],
   "license": "Apache-2.0",
   "dependencies": {
