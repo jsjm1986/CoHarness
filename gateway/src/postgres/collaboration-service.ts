@@ -45,6 +45,14 @@ interface ActivityRow {
   conversation_title: string | null
 }
 
+/**
+ * Event JSON containing a `\u0000` escape crashes `json` navigation (`->`/`->>`)
+ * when the parser de-escapes string tokens. The CASE guard skips those events —
+ * the same skip-then-navigate approach the history index uses.
+ */
+const SAFE_EVENT = (alias: string) =>
+  `(CASE WHEN position('\\u0000' in ${alias}.event::text) = 0 THEN ${alias}.event END)`
+
 /** Decode a `ts|sessionId|seq` feed cursor; malformed input reads as no cursor. */
 function parseActivityCursor(raw: string | undefined): { ts: string; sessionId: string; seq: number } | undefined {
   if (raw === undefined) return undefined
@@ -557,26 +565,26 @@ export class PostgresCollaborationService {
     ), feed AS (
       SELECT 'message'::text kind,e.session_id,e.seq,e.occurred_at ts,
         left(search_row.content,500) text,
-        COALESCE(NULLIF(e.event->'data'->'source'->'participant'->>'displayName',''),
-          e.event->'data'->'source'->'participant'->>'username') actor_label,
-        e.event->'data'->'source'->'participant'->>'userId' actor_uid,
+        COALESCE(NULLIF(${SAFE_EVENT('e')}->'data'->'source'->'participant'->>'displayName',''),
+          ${SAFE_EVENT('e')}->'data'->'source'->'participant'->>'username') actor_label,
+        ${SAFE_EVENT('e')}->'data'->'source'->'participant'->>'userId' actor_uid,
         NULL::text question_args,NULL::jsonb outcome
       FROM harness.conversation_search search_row
       JOIN harness.conversation_events e ON e.session_id=search_row.session_id
         AND e.seq=search_row.event_seq
       JOIN visible v ON v.id=e.session_id
-      WHERE search_row.role='user' AND e.event->'data'->'source'->'participant' IS NOT NULL
+      WHERE search_row.role='user' AND ${SAFE_EVENT('e')}->'data'->'source'->'participant' IS NOT NULL
       UNION ALL
       SELECT 'answer',c.conversation_id,COALESCE(res.seq,-1),c.responded_at,
         NULL,u.display_name,u.public_id::text,
-        call_args.event->'data'->>'arguments',c.outcome
+        ${SAFE_EVENT('call_args')}->'data'->>'arguments',c.outcome
       FROM harness.conversation_interaction_responses c
       JOIN visible v ON v.id=c.conversation_id
       JOIN harness.users u ON u.id=c.responder_user_id AND u.organization_id=c.organization_id
       LEFT JOIN harness.conversation_events res ON res.session_id=c.conversation_id
-        AND res.event_type='tool/result' AND res.event->'data'->>'callId'=c.call_id
+        AND res.event_type='tool/result' AND ${SAFE_EVENT('res')}->'data'->>'callId'=c.call_id
       LEFT JOIN harness.conversation_events call_args ON call_args.session_id=c.conversation_id
-        AND call_args.event_type='tool/call' AND call_args.event->'data'->>'callId'=c.call_id
+        AND call_args.event_type='tool/call' AND ${SAFE_EVENT('call_args')}->'data'->>'callId'=c.call_id
       WHERE c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
     )
     SELECT f.*,v.title conversation_title FROM feed f JOIN visible v ON v.id=f.session_id
