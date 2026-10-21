@@ -857,9 +857,6 @@
     "remote-desktop/remote-desktop-vnc": {
       "sovereignty": "owned"
     },
-    "runtime-diagnostics/invariants": {
-      "sovereignty": "tracked"
-    },
     "sandbox/sandbox": {
       "sovereignty": "tracked"
     },
