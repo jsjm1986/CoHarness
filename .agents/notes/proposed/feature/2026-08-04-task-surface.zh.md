@@ -102,7 +102,7 @@ interface TaskSurfacePresentationMeta {
 
 该工具保留通用 [render intent](../../implemented/architecture/2026-07-02-tool-render-intent-union.zh.md)。带 key 的 Web 行读取 `ToolResultNode` 上已经保留的带标签元数据，无需新增 render-intent 分支或呈现注册表。不支持 Task Surface 的客户端会渲染普通结果内容。
 
-Web 插件按照 [toolview](../../implemented/architecture/2026-07-23-toolview-dissolution.zh.md) 和 [slot 注册](../../implemented/architecture/2026-07-22-slot-type-chain-implementation.zh.md)约定，提供两个静态的会话作用域注册项。一个以 `show_task_surface` 为 key 的 `conversation.chat.toolview` 条目将持久 transcript（文本记录）调用实例渲染为简洁摘要和只读回放。现有 `conversation.input.dock` 中的一个 `TaskSurfaceDock` 条目是唯一可操作的挂载点：它读取活动投影，针对确切身份调用 `getActive`，并拥有字段、草稿、提交和关闭操作。Dock 与 transcript 分页相互独立，因此即使 `ToolResultNode` 位于已加载历史窗口之外，活动 Surface 仍可操作。
+Web 插件按照 [toolview](../../archived/architecture/2026-07-23-toolview-dissolution.md) 和 [slot 注册](../../implemented/architecture/2026-07-22-slot-type-chain-implementation.zh.md)约定，提供两个静态的会话作用域注册项。一个以 `show_task_surface` 为 key 的 `conversation.chat.toolview` 条目将持久 transcript（文本记录）调用实例渲染为简洁摘要和只读回放。现有 `conversation.input.dock` 中的一个 `TaskSurfaceDock` 条目是唯一可操作的挂载点：它读取活动投影，针对确切身份调用 `getActive`，并拥有字段、草稿、提交和关闭操作。Dock 与 transcript 分页相互独立，因此即使 `ToolResultNode` 位于已加载历史窗口之外，活动 Surface 仍可操作。
 
 Dock 遵循现有 composer chain 的回退语义。任何 `conversation.composer` 接管都会隐藏包括 `TaskSurfaceDock` 在内的回退 composer 栈，但不会将其卸载；接管结束后，同一个草稿所有者会重新出现。接管方不会获得 Task Surface 操作，也不会创建另一个编辑器。
 

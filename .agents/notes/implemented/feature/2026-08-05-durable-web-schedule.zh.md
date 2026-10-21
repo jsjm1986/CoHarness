@@ -14,7 +14,7 @@ Status: implemented
 
 [`examples/web-schedule`](../../../../examples/web-schedule/README.zh.md) overlay 显式加载 `@deepseek-ai/dsh-time-context` 与 `@deepseek-ai/dsh-schedule`；默认 Web 配置树保持不变。Schedule 只观察插件加载后发布的根 Agent，并在该 Agent scope 中安装三个工具和一个可丢弃 owner。cold history 读取、已发布的根、child Agent 与其他 host 都不会激活它。
 
-用户可见边界是 `session-local`：原 Session 只有在 live 时才会准时运行提醒，cold 期间不发送任何外部通知；该 Session 再次 live 后才会处理 overdue 提醒。到期工作会等待 Agent 完全 idle，再通过 `followup()` 进入普通的下一轮队列；它绝不会中途引导当前轮次，也没有独立 Web 回执（[对话式交付](../simplification/2026-08-09-conversational-schedule-delivery.zh.md)）。
+用户可见边界是 `session-local`：原 Session 只有在 live 时才会准时运行提醒，cold 期间不发送任何外部通知；该 Session 再次 live 后才会处理 overdue 提醒。到期工作会等待 Agent 完全 idle，再通过 `followup()` 进入普通的下一轮队列；它绝不会中途引导当前轮次，也没有独立 Web 回执（[对话式交付](../../archived/simplification/2026-08-09-conversational-schedule-delivery.md)）。
 
 | 场景 | 持久事实 | live 行为 | 用户可见结果 |
 | --- | --- | --- | --- |
@@ -46,7 +46,7 @@ Every 是固定时长间隔，而不是日历规则。第一个目标是创建�
 
 所有不同的逾期 Every 记录都会参与同一个批次，每条记录各自提供一个最新发生时点，并共享同一个 `acceptedAt`。系统不存在跨记录的冷却、门控、配额或保留的批次时间戳。至少 5 分钟的限制约束了唤醒与模型请求频率。如果下一个序列点会超出四位年份存储范围，dispatch 会终结该记录。
 
-日历表达式与 Cron 表达式被有意排除（[有界周期性简化](../simplification/2026-08-09-bounded-fixed-rate-schedule.zh.md)）；支持这些表达式需要增加时区敏感的日历语言、求值器依赖、校验范围和 tzdata 回放策略，而这些都与固定速率提醒无关。
+日历表达式与 Cron 表达式被有意排除（[有界周期性简化](../../archived/simplification/2026-08-09-bounded-fixed-rate-schedule.md)）；支持这些表达式需要增加时区敏感的日历语言、求值器依赖、校验范围和 tzdata 回放策略，而这些都与固定速率提醒无关。
 
 ### Live 交付生命周期
 

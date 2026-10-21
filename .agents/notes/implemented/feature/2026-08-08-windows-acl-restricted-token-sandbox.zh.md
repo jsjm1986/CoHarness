@@ -49,6 +49,6 @@ AppContainer 令牌没有环境读访问：每个可读路径都必须预先通�
 
 ## Related
 
-[pwsh 执行器决策](2026-08-01-pwsh-tool-and-executor.zh.md)拥有本档所消费的 pwsh-sandbox/tool-pwsh 方言划分。
+[pwsh 执行器决策](../../archived/feature/2026-08-01-pwsh-tool-and-executor.md)拥有本档所消费的 pwsh-sandbox/tool-pwsh 方言划分。
 
 [删除约束决策](2026-09-19-windows-acl-mandatory-integrity-confinement.zh.md)以 Low 完整性层与环境性删除拒绝扩展本档；它只取代本文档所述的删除路径。

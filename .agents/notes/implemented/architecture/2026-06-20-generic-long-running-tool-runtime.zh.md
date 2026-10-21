@@ -19,7 +19,7 @@ Status: implemented
 
 长时间运行工具是生产方。`dsh-tool-bash` 将 `ShellProcess` 适配为增量输出与进程取消；`dsh-tool-subagent` 将子运行适配为最终输出与子运行释放。bash 与 subagent 能力 seam 保持独立，不依赖会话或任务注册表。
 
-`JobRegistry` 是 `@deepseek-ai/dsh-jobs` 中的 Service Definition；进程内 Service Provider 是 `@deepseek-ai/dsh-jobs-local` 中的 `LocalJobRegistry`（该拆分记录在[任务注册表约定 Agent Note](2026-07-26-job-registry-seam.zh.md)中）。
+`JobRegistry` 是 `@deepseek-ai/dsh-jobs` 中的 Service Definition；进程内 Service Provider 是 `@deepseek-ai/dsh-jobs-local` 中的 `LocalJobRegistry`（该拆分记录在[任务注册表约定 Agent Note](../../archived/architecture/2026-07-26-job-registry-seam.md)中）。
 
 ## 运行时约定
 
@@ -105,7 +105,7 @@ bash seam 暴露 `resolve`、`run` 和 `start`。`start(spec)` 返回一个 `She
 
 ### 立即抽象任务运行时后端
 
-当前 `JobStart.run()` 约定传入进程内回调与确切的 `Agent` 对象。持久化后端会改变身份、重启、所有权与观察语义，因此在引入之时注册表保持为单一具体服务，而非固化错误的边界。[任务注册表约定 Agent Note](2026-07-26-job-registry-seam.zh.md)后来在不改变这些进程内语义的前提下，将约定与进程内实现分离。
+当前 `JobStart.run()` 约定传入进程内回调与确切的 `Agent` 对象。持久化后端会改变身份、重启、所有权与观察语义，因此在引入之时注册表保持为单一具体服务，而非固化错误的边界。[任务注册表约定 Agent Note](../../archived/architecture/2026-07-26-job-registry-seam.md)后来在不改变这些进程内语义的前提下，将约定与进程内实现分离。
 
 ### 由消费方负责授权或清理事件
 

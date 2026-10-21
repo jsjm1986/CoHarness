@@ -37,4 +37,4 @@ Session 身份规范化识别 `<kind>-<16 位十六进制>` 的 job id：`redact
 ## 相关
 
 - [通用长时间运行工具运行时](2026-06-20-generic-long-running-tool-runtime.zh.md)——该生成方式所服务的生产方/注册表约定。
-- [job 注册表 seam](2026-07-26-job-registry-seam.zh.md)——注册表所在的三包布局。
+- [job 注册表 seam](../../archived/architecture/2026-07-26-job-registry-seam.md)——注册表所在的三包布局。

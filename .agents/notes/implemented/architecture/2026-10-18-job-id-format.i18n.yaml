@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-job-id-format.md
 document:
-  en: 59ad178709c32316e71ec9d50ad3f5b93d6533e2
-  zh: 97638f1bd22031095b649281e6a2651190353893
+  en: ae0c1e010c80a9bf8ea4197bec9483a4c749680b
+  zh: 3dcb8b3618950ee02f4db7e3df086c9577883e75
 /agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters:
   en: 8d09a09e99aaefd0
   zh: 0a9b43217dedcb0f
@@ -24,5 +24,5 @@ document:
   en: f5d000ec1aa0e13d
   zh: af4ec32431ad0f17
 /agent-note-background-job-ids-are-random-short-uuids-not-per-kind-counters/related:
-  en: b580ce0101209169
-  zh: 6a0760bbc6f478d4
+  en: afca38dee9a56ad5
+  zh: 1d30cbf0723ab097

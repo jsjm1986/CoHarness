@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-durable-web-schedule.md
 document:
-  en: 1effefa0a0a813d28de2220bc23e52919a66613a
-  zh: bb74144d9514630d26d4521c1229121db7a3b563
+  en: 0537e3dc83afdfb78009bf1df7aade7b02974fe6
+  zh: 89d35457e0d61a96c2c39a9a5b8eb324fa592cd8
 /agent-note-durable-session-local-reminders:
   en: c40fc2bc6dd1b469
   zh: c3932a1c8c60579b
@@ -12,8 +12,8 @@ document:
   en: 75d2d50c48475d22
   zh: 293c507e9e516f29
 /agent-note-durable-session-local-reminders/decision:
-  en: 858629f359470172
-  zh: a29c79a54bebb82f
+  en: db4f6a6231a4d46f
+  zh: bb96f2a5b3337d7c
 /agent-note-durable-session-local-reminders/decision/session-log-authority-and-tools:
   en: 08cd17874864611b
   zh: efb7e046b9ebdfda
@@ -21,8 +21,8 @@ document:
   en: 2e1fe906d42245aa
   zh: bd21d4a2dd7d8afc
 /agent-note-durable-session-local-reminders/decision/bounded-fixed-rate-semantics:
-  en: 316e7c04220d9554
-  zh: 05a61a98546d8a7f
+  en: 2ebada22d530b18a
+  zh: 90e7dd128c8ba54a
 /agent-note-durable-session-local-reminders/decision/live-delivery-lifecycle:
   en: e69281749cf18500
   zh: 9ce38e39e486f2d6
