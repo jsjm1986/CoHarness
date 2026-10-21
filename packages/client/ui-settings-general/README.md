@@ -15,23 +15,19 @@ A loopback browser loads the provider's `hasDocument` capability through `settin
 
 The Host half registers `ui-onboarding` in the user-settings seam so stored documents that still carry `welcomeNoticeVersion` remain valid. No GUI step reads or writes that field; the shell itself remains policy-free.
 
+The `shell.overlay` entry `host-release-change` asks whether to reload when the connected Host serves another release than the page booted from. It binds `ctx.modules.entries.releaseChange` in its hooks compartment and receives two callbacks: one calls `ctx.modules.entries.dismissRelease()`, the other reloads the page. The dialog draws the Host's completed transition and the page's pending one — versions when they differ, commits otherwise — while the page applies no plugin update from that release; [Client Modules](../modules/README.md#host-release-changes) owns which release counts as current.
+
 ## Summary
 
 Use this package to give the dsh web client a Settings panel, connection-recovery control, feature-contributed navigation, and sequential first-run onboarding. Users can open it from the sidebar, retry a failed connection immediately, and access a local configuration file when the Host makes one available on a loopback browser. Feature packages supply their own settings rows, sections, and onboarding steps; this package supplies their shared presentation and does not add onboarding copy or built-in General rows.
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The shell projects the `settings.section` and `settings.onboarding` ledgers contributed by registrants; durable values stay in Host settings namespaces.
 
 <a id="model-experience"></a>
 ## Model Experience

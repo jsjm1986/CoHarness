@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-05-agent-teams.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-05-agent-teams.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-agent-teams.md
+document:
+  en: 921a63b9827fd1afa7a648860a47ceea2b391a91
+  zh: 4e5cade9797623c1c6b07210ceb5308d79380fc2
 /agent-note-durable-agent-teams-over-continuable-children:
   en: c914d8148bfc4bf9
   zh: a8115f87c0ac6cae
@@ -24,8 +27,8 @@
   en: 82477565fc9b4b0b
   zh: 8edfc79c85c04031
 /agent-note-durable-agent-teams-over-continuable-children/testing:
-  en: 1a9d8540b4621ab5
-  zh: 9d87ba6143bdc970
+  en: 20387c0f828a719b
+  zh: e815843edd115f63
 /agent-note-durable-agent-teams-over-continuable-children/consequences:
   en: 3f3f55af7b4367b6
   zh: e83d3615327545d2

@@ -1,13 +1,16 @@
-# Bilingual-pair consistency record for 2026-08-17-command-image-attachment-envelope.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-command-image-attachment-envelope.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-command-image-attachment-envelope.md
+document:
+  en: c81fbeb23997c9f4090e66f84c6589566e070916
+  zh: 2c53ce004dcdfe1674b48101567c9a151fbe2e46
 /agent-note-command-image-attachment-envelope:
   en: 3fcfef1622f25354
   zh: 604ee952eba55b8a
 /agent-note-command-image-attachment-envelope/problem:
-  en: e08e096ea4e99916
-  zh: 2d45f2e3dda68ceb
+  en: 91af44be08dd3144
+  zh: 2a8017eec3df633b
 /agent-note-command-image-attachment-envelope/decision:
   en: 2703afadbac835ed
   zh: f080f308b26d0a56

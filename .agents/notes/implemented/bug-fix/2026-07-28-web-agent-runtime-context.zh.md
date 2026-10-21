@@ -10,13 +10,13 @@ CLI（命令行界面）共享 base 配置了空的部署 persona，Web overlay 
 
 ## 决策
 
-Web profile 会组合 `dsh-base` 与 `dsh-web-app` 两个组合包。Web 组合包提供一段简洁的编码 agent persona，其中包含解析后的 `{{model}}` 与会话 `{{cwd}}`；当 `surfaceContext` 为 true 时，其 `web-runtime` 插件会添加 `app:web-surface` 提示词段。挂载 profile 配置树前，`dsh web` 别名会读取组合后的同一项设置，并且仅在启用界面上下文时安装现有的 `harness:source` 提示词段。无头组合包和拥有完整提示词的 profile 都会设置 `surfaceContext: false`，从而抑制 Web 提示词与受管 shell 事实；Web 别名也会抑制源码提示词段，而无需检查 overlay 路径。每项已挂载的提示词贡献仍会在 agent loop（智能体循环）等消费方发出 request header 前激活。源码提示词段的措辞，以及其中不得从一条路径推断另一条路径的警告，均由另行记录的[源码 checkout 与工作目录区分决策](2026-07-30-source-checkout-workdir-distinction.zh.md)负责。
+Web profile 会组合 `dsh-base` 与 `dsh-web-app` 两个组合包。Web 组合包提供一段简洁的编码 agent persona，其中包含解析后的 `{{model}}` 与会话 `{{cwd}}`；其 `harness-dev-context` 配置行添加不含动态值的 `app:web-surface` 与 `harness:source` 提示词段，并把绑定的 Web URL 与 checkout 路径作为运行时上下文发布给模型。无头组合包和拥有完整提示词的 profile 不会挂载该配置行；`surfaceContext` 仍门控 `DSH_WEB_URL` 这一 shell 事实，而禁用 `harness-dev-context` 配置行会抑制两项贡献。每项已挂载的提示词贡献仍会在 agent loop（智能体循环）等消费方发出 request header 前激活。源码提示词段中不得从一条路径推断另一条路径的警告，由另行记录的[源码 checkout 与工作目录区分决策](2026-07-30-source-checkout-workdir-distinction.zh.md)负责；不含动态值的措辞与旧格式会话的保留，则由[运行时上下文迁移](2026-10-11-process-specific-prompt-values-in-runtime-context.zh.md)负责。
 
-Web 提示词段把未限定的「这个页面」「这个 GUI」或「这个应用」解释为 DeepSeek Harness Web GUI。同时，它会明确说明浏览器不会隐式提供 DOM、路由或截图上下文，使模型能够识别产品，但不会声称掌握未收到的视觉状态。组装后的文本会记录在 `request/header` 中，从而保持「模型可见内容必须有日志记录」这一不变量。
+Web 提示词段把未限定的「这个页面」「这个 GUI」或「这个应用」解释为 DeepSeek Harness Web GUI。同时，它会明确说明浏览器不会隐式提供 DOM、路由或截图上下文，使模型能够识别产品，但不会声称掌握未收到的视觉状态。组装后的文本与运行时上下文取值都会随会话记录，从而保持「模型可见内容必须有日志记录」这一不变量。
 
 ## 验证
 
-Web 运行时单元测试会固定启用和禁用 `surfaceContext` 时的行为，Web 别名单元测试则会固定组合后配置行对源码提示词段的默认启用与显式禁用门控。无密钥的 Web fresh-round-trip 场景会启动已交付的 base 与 Web 组合包，通过 HTTP／SSE（Server-Sent Events）应用运行一个真实会话，并在规范化源码路径与工作目录后对系统提示词前缀生成快照。该快照按请求顺序固定 harness 身份、源码 checkout、Web 界面定位，以及解析后的编码 agent persona。Core Web 快照会应用 RL overlay，并固定不含源码提示词段或 Web 提示词段的完整系统提示词。
+web-app 单元测试会固定 `surfaceContext` 对 `DSH_WEB_URL` 的控制以及 `webApp.getAdvertisedUrl()` 的行为。无密钥的 Web fresh-round-trip 场景会启动已交付的 base 与 Web 组合包，通过 HTTP／SSE（Server-Sent Events）应用运行一个真实会话，断言系统提示词中的不含动态值 Web 指引，并断言两个进程取值以运行时上下文送达。该快照按请求顺序固定 harness 身份、Web 界面定位，以及解析后的编码 agent persona。Core Web 快照会应用 RL overlay，并固定不含源码提示词段或 Web 提示词段的完整系统提示词。
 
 ## 考虑过的替代方案
 

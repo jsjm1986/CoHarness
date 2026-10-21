@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-18-composer-narrow-pane-bare-icons.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-18-composer-narrow-pane-bare-icons.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-composer-narrow-pane-bare-icons.md
+document:
+  en: edab68d1f80856cca1db3974669154116b6d35ed
+  zh: d97efcbf79d95df20cf4648a6f390b3cbc5e7d79
 /agent-note-narrow-pane-composer-uses-bare-icon-seats-with-hover-discs:
   en: cb6aac7bdbe40289
   zh: b3cdd4d717e288ef

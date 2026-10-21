@@ -12,14 +12,19 @@ import { chatNode } from './common.ts'
 interface ReferencedUserMessageNode extends UserMessageNode {
   /** Labels cited by the immediately following session-reference context. */
   readonly referenceLabels?: readonly string[]
+  /** Skill names the same step's `skill-invocation` injections loaded. */
+  readonly skillNames?: readonly string[]
 }
 
 interface ReferencedSteeringMessageNode extends SteeringMessageNode {
   /** Labels cited by the immediately following session-reference context. */
   readonly referenceLabels?: readonly string[]
+  /** Skill names the same step's `skill-invocation` injections loaded. */
+  readonly skillNames?: readonly string[]
 }
 
-type MessageNode = ReferencedUserMessageNode | ReferencedSteeringMessageNode | ContextMessageNode
+type MessageNode = ReferencedUserMessageNode | ReferencedSteeringMessageNode
+  | (ContextMessageNode & { readonly waking?: boolean })
 
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ChatNodeDataMap {
@@ -29,6 +34,8 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
     steering: ReferencedSteeringMessageNode
     /** Non-user context injected into model history. */
     context: ContextMessageNode
+    /** Non-human input that starts a Turn. */
+    'turn-trigger': ContextMessageNode
   }
 }
 
@@ -66,7 +73,22 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   start: (_context, match, reader) => {
     if (match.event.type !== 'user/message') throw new Error('input-message start requires user/message')
     const event = match.event
-    if (event.data.source.kind !== 'user') return contextMessage(event, event.data)
+    if (event.data.source.kind !== 'user') {
+      const nextTurn = reader.previous<InboxState>('inbox-next-turn')?.state
+      const nextStep = reader.previous<InboxState>('inbox-next-step')?.state
+      const location = match.location
+      const turnStart = location.kind === 'step' ? location.turn.start?.seq : undefined
+      // An idle steer opens Step 1 without a next-turn claim in this Turn.
+      // A human in that same next-step claim owns the opening instead of its notices.
+      const idleSteer = location.kind === 'step' && location.step.step === 1
+        && turnStart !== undefined && (nextStep?.claimSeq ?? -1) > turnStart
+        && (nextTurn?.claimSeq ?? -1) < turnStart && nextStep?.claimedHuman === false
+        && nextStep.currentClaimed.has(String(event.data.id))
+      return {
+        ...contextMessage(event, event.data),
+        waking: nextTurn?.currentClaimed.has(String(event.data.id)) === true || idleSteer,
+      }
+    }
     const claimed = reader.previous<InboxState>('inbox-next-step')?.state.currentClaimed.has(String(event.data.id)) === true
     return claimed
       ? {
@@ -89,7 +111,12 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   buildViewNode: (context) => {
     if (context.state === undefined) return null
     if (isCollaborationAttributionNotice(context.state.source)) return null
-    return chatNode(context, context.state.kind, context.state.seq, context.state)
+    const waking = context.state.kind === 'context'
+      && context.start?.event.type === 'user/message'
+      && context.state.waking === true
+    // A non-human message claimed to wake this Turn renders as the Turn's
+    // independent trigger instead of foldable context.
+    return chatNode(context, waking ? 'turn-trigger' : context.state.kind, context.state.seq, context.state)
   },
 }
 

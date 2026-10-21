@@ -19,18 +19,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与待完成工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。服务通过已挂载提供方校验并提交每个图像，返回可序列化引用；它自身不拥有可供比较的附件缓存或第二份记录。
-
 
 <a id="model-experience"></a>
 ## 模型体验

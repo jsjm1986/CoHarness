@@ -20,7 +20,6 @@ kind: "package-reference"
 - [职责拆分](#responsibility-split)
 - [传输卫生](#transport-hygiene)
 - [配置](#config)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -61,12 +60,6 @@ kind: "package-reference"
 | `userAgent` | `deepseek-harness/…` | `User-Agent` 标头。 |
 
 数值限制会在插件构造时验证：除 `maxRedirects` 外，每个上限都必须是正的有限数；`maxRedirects` 必须是非负整数。无效值会抛出异常，不会静默构造限制荒谬的提供方。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次调用执行一次有界匿名抓取并返回解码内容；不保留连接或缓存状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

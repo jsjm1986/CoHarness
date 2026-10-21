@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-codex/README.md
+document:
+  en: 7d67cf8b5c75c1063b5826385a0ab24f01445f38
+  zh: 66f6fcb5679fb22678ec1dc0eacda26afcc91785
 /:
   en: 266b664df709da67
   zh: 07bde2df0c861ceb
@@ -12,8 +15,8 @@
   en: 2d790b5830aecb62
   zh: 5c59141aec808188
 /deepseek-ai-dsh-subagent-codex/table-of-contents:
-  en: 278cc475a8c18518
-  zh: 59a1966a919118d8
+  en: f5c2ae1c282ea5d1
+  zh: d0d95e10928bc415
 /deepseek-ai-dsh-subagent-codex/start-and-ownership:
   en: fa1a023130d2dab0
   zh: 5e888cfae9f5558e
@@ -27,11 +30,8 @@
   en: 12d233d6918756ab
   zh: 128d230ac5d31a59
 /deepseek-ai-dsh-subagent-codex/product-compatibility-and-evidence:
-  en: 4d821fd711dc818e
-  zh: cf6ab7266a1410a7
-/deepseek-ai-dsh-subagent-codex/invariants:
-  en: 9805f757941b86d1
-  zh: c1827ee637f07dd8
+  en: d82c6d5b38a76b8d
+  zh: eb7c4045967230dc
 /deepseek-ai-dsh-subagent-codex/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -60,8 +60,8 @@
   en: fdbb7dcbf8b37f2b
   zh: 9accaada9f21e36a
 /deepseek-ai-dsh-subagent-codex/known-limitations-and-deferred-work:
-  en: 3d9a64195cf9b62d
-  zh: cd26613afb2e206e
+  en: 80ff25de585aaacf
+  zh: b78da362e407cf5b
 /deepseek-ai-dsh-subagent-codex/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

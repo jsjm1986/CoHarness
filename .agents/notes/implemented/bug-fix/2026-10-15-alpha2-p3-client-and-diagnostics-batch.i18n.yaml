@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-alpha2-p3-client-and-diagnostics-batch.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-alpha2-p3-client-and-diagnostics-batch.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-alpha2-p3-client-and-diagnostics-batch.md
+document:
+  en: 0bcb27848ea3d36d79d5152f5468f50bdf393b2f
+  zh: 3cfb65b81370f7cf4394698e5773578c57d11cbd
 /agent-note-close-the-alpha-2-p3-residual-list-rings-menu-contextmeter-persistence-diagnostics:
   en: 54db9d8a4c9626e3
   zh: 9d680783b44d6e31

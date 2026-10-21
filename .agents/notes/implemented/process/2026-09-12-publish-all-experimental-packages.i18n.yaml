@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-12-publish-all-experimental-packages.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-12-publish-all-experimental-packages.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-12-publish-all-experimental-packages.md
+document:
+  en: 8bef877297d096159fcce60e6b479e12461357f2
+  zh: 6163e6b4ac11c46dac3897361585d2fcc29ef746
 /agent-note-publish-every-current-experimental-package:
   en: e08e7bc92478407d
   zh: 45501f51a5f619ec

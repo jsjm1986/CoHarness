@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-04-tighten-hook-protocol-contract.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-04-tighten-hook-protocol-contract.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-04-tighten-hook-protocol-contract.md
+document:
+  en: 70cf7a15fe0ec0c43c0ef768667ef4741aee27d2
+  zh: 3be16b4b8cdbe210b0f2e2dc1dc315dc0d3a2bd6
 /agent-note-tighten-the-hook-protocol-contract-dialect-discarded-fields-double-defaults-and-lib-owned-hook-result-semantics:
   en: 2987203a259281c5
   zh: 76dc41a7788217aa

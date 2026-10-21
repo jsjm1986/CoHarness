@@ -38,7 +38,9 @@ describe.skipIf(MODE === 'record')('web e2e: historical Cordis cards remain read
     expectedEvents = parseSessionLog(realizeSeedFixture(scaffold, source, SEED_ID))
     await seedSession(scaffold, source, SEED_ID, 'standard')
     browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    // The seeded fixture renders dated stamps in the viewer's zone; pin the
+    // zone the golden was recorded under so the literal "9/1 13:31" holds.
+    page = await newEnglishPage(browser, 1000, 'Asia/Shanghai')
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })

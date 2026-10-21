@@ -105,6 +105,21 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'cotTranslation',
+    pkg: 'experimental-client-ui-cot-translation',
+    title: 'Reasoning translation Remote',
+    mode: 'service',
+    note: 'Serves reasoning translations, reuses saved results, and joins ordinary Session activation for uncached inactive Sessions.',
+  },
+  {
+    key: 'translator',
+    pkg: 'experimental-translator',
+    title: 'Anonymous text translation',
+    mode: 'service',
+    consumers: ['experimental-client-ui-cot-translation'],
+    note: 'Resolves Google or Bing requests and retains shared experimental records through the active Session writer.',
+  },
+  {
     key: 'hostSessionLifecycle',
     pkg: 'host-apiproxy',
     title: 'Host ownership and idle release of Session handles',
@@ -147,6 +162,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers.',
   },
   {
+    key: 'pluginMarket',
+    pkg: 'plugin-market',
+    title: 'Plugin market index reader',
+    mode: 'core',
+    consumers: ['client-ui-plugin-market', 'plugin-market'],
+    note: 'Fetches and validates the index sources the user configures; installation goes through the plugin manager.',
+  },
+  {
     key: 'pluginRegistryProbe',
     pkg: 'ui-plugin-manager',
     title: 'Registry reachability probing for the install dialog',
@@ -166,6 +189,22 @@ const SERVICE_ROLES: ServiceRole[] = [
     key: 'officeToPdf', pkg: 'office-to-pdf', title: 'Office to PDF conversion',
     mode: 'core', consumers: ['host-apiproxy'],
     note: 'Authorized deferred source reads feed a bounded Host converter using the declared native engine or Node WASM.',
+  },
+  {
+    key: 'inspector',
+    pkg: 'experimental-inspector',
+    title: 'Cross-realm runtime inspection',
+    mode: 'core',
+    note: 'Owns the Worker-hosted CDP target and the transport-independent Host and Client observation and Cordis-tree query API.',
+  },
+  {
+    key: 'worktrees',
+    pkg: 'experimental-worktree',
+    title: 'Git worktree creation',
+    mode: 'seam',
+    implementations: ['experimental-worktree'],
+    consumers: ['experimental-tool-worktree'],
+    note: 'Explicit experimental creation from a pinned local commit. Existing write permissions govern checkout and shared Git metadata; the working-directory service owns the resulting Session directory.',
   },
   {
     key: 'mcpResources',
@@ -222,6 +261,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Uploads land as real named files inside a directory the tool authorization policy already grants. The personal-document Consumer adds bounded discovery and text reads without exposing host paths; ordinary filesystem tools remain available for attached documents.',
   },
   {
+    key: 'fileUploads',
+    pkg: 'client-file-upload',
+    title: 'Session-scoped staged upload receipts',
+    mode: 'core',
+    consumers: ['commands'],
+    note: 'Accepts streamed browser bytes and encoded Remote uploads, stages per-Session receipts, binds them to prompt requests, and retires them on delivery observation.',
+  },
+  {
     key: 'llm',
     pkg: 'llm',
     title: 'LLM adapter registry',
@@ -275,16 +322,8 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'session',
     title: 'In-memory session store',
     mode: 'core',
-    consumers: ['agent-loop', 'agent', 'session-persistence', 'session-query', 'session-query-sqlite', 'subagent-inprocess', 'invariants', 'message-feedback'],
+    consumers: ['agent-loop', 'agent', 'session-persistence', 'session-query', 'session-query-sqlite', 'subagent-inprocess', 'message-feedback'],
     note: 'Owns append-only Session instances and emits the durable session event feed.',
-  },
-  {
-    key: 'invariants',
-    pkg: 'invariants',
-    title: 'Package-owned invariant registry',
-    mode: 'core',
-    consumers: ['session', 'agent', 'scope', 'agent-loop'],
-    note: 'Companion subpaths register owner-local checks; the service owns selection, uniqueness, child fibers, and package-attributed failures.',
   },
   {
     key: 'typert',
@@ -720,6 +759,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns the implicit-root roster, durable peer mailbox, shared task DAG, and continuable-child lifecycle; tool-agent-team contributes the scoped model policy and controls.',
   },
   {
+    key: 'claudeCodeMods',
+    pkg: 'experimental-claude-code-mods',
+    title: 'Claude Code mods bridge',
+    mode: 'core',
+    note: 'Loads mods that defineMod plugins add, raises their hook chains from harness extension points, and draws the band above the prompt over its Remote.',
+  },
+  {
     key: 'jobs',
     pkg: 'jobs',
     title: 'Background job registry',
@@ -733,7 +779,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'web',
     title: 'Web access provider registry',
     mode: 'seam',
-    implementations: ['web-search-exa', 'web-search-perplexity', 'web-search-deepseek', 'web-fetch-http'],
+    implementations: ['web-search-exa', 'web-search-perplexity', 'web-search-deepseek', 'web-deepseek-api', 'web-fetch-http'],
     consumers: ['tool-web'],
     note: 'Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names.',
   },
@@ -762,6 +808,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['connection', 'modules', 'hmr'],
     note: 'Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes.',
+  },
+  {
+    key: 'webApp',
+    pkg: 'web-app',
+    title: 'Served Web GUI',
+    mode: 'core',
+    consumers: ['harness-dev-context'],
+    note: 'The web-runtime row advertises one URL for its Web GUI: the configured publicUrl, otherwise the listener origin; DSH_WEB_URL, the startup URL, and harness-dev-context read the same value.',
   },
   {
     key: 'webhookRuntime',

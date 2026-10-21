@@ -12,7 +12,7 @@ export type {
   SessionHistoryIndex, SessionHistoryIndexItem, ToolEventView,
   DirectoryEntry, DirectoryListing, DesktopConfirmation,
   ResponseValue, WorkspaceApi, WorkspaceId, WorkspaceView,
-  SkillsApi, SkillEntry,
+  SkillsApi, SkillEntry, SkillPreview,
   ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
   ModelReasoningEffort, ModelSelection, QueueAction, QueuedInboxItem, SessionModels,
   GoalRef,
@@ -24,6 +24,8 @@ export type {
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 
 export type { ClientRuntimeTarget as ConnectionRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
+export type { ConnectionInteractions } from '@deepseek-ai/dsh-host-apiproxy/api'
+export { interactionsUnavailableError } from '@deepseek-ai/dsh-host-apiproxy/api/interactions'
 export type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools/presentation'
 export type {
   RpcRequest, RpcResponse, RpcResult, RpcError, RpcErrorCode,

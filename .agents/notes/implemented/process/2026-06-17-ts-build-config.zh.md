@@ -25,7 +25,6 @@ Status: implemented
     - 在根目录严格配置下直接对 `vendor/*/src` 做类型检查，会触发大量不属于本项目所有权范围的类型错误。
     - `packages/*/*` 对 `vendor` 的包依赖解析到 `vendor/*/lib`，以适应不同的 tsconfig 严格度。
 
-
 ## 决策
 
 包内相对导入使用显式 `.ts` 说明符。

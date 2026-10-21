@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-settings-write-path-integrity.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-settings-write-path-integrity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-settings-write-path-integrity.md
+document:
+  en: eaeb85d15e94be6ddc1912929386365599ef4d21
+  zh: 27c52bd53dad2d5dede8ad054b193d342c20f78f
 /agent-note-settings-write-path-integrity-and-observer-lifecycle:
   en: 0178f54c15b312b1
   zh: cb108997ea3b0f23
@@ -9,8 +12,8 @@
   en: 7d20d60f07db97ed
   zh: 134269fb32d59c30
 /agent-note-settings-write-path-integrity-and-observer-lifecycle/decision:
-  en: 3415b9da72a978af
-  zh: 2192c0c55fabbd0e
+  en: a854e60bac8cac0c
+  zh: 6ac3ae91dd1beb47
 /agent-note-settings-write-path-integrity-and-observer-lifecycle/alternatives-considered:
   en: 1e37ea2b38b334fb
   zh: 6b249ba2c2985b8a

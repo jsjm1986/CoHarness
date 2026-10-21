@@ -83,7 +83,7 @@ export async function verifyNodeDataRelocation(context: PostgresRuntimeContext, 
   const configurationPaths = new Set<string>()
   for (const file of source.files) {
     const owner = copies.find(copy => within(copy.from.path, file.sourcePath))!.from.owner
-    if (!owner.endsWith('/gateway') && !owner.endsWith('/app-boot') && !owner.endsWith('/@deepseek-ai/dsh-agent-presets')) continue
+    if (!owner.endsWith('/gateway') && !owner.endsWith('/app-boot') && !owner.endsWith('/@deepseek-ai/dsh-agent-preset-registry')) continue
     if (!['.env', 'cordis.patch.yml', 'directory-grants.json', 'model-governance.json', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'].includes(basename(file.sourcePath))
       && !/\.ya?ml$/u.test(file.sourcePath)) continue
     configurationPaths.add(file.sourcePath)

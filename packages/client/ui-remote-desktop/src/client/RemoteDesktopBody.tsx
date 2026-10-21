@@ -54,6 +54,13 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
     setPhase({ kind: 'denied', code: issueOf(error), message: error instanceof Error ? error.message : String(error) })
   }
 
+  const settleDenied = (controller: AbortController, error: unknown, current: RemoteDesktopStatusView): void => {
+    if (controller.signal.aborted) return
+    const code = issueOf(error)
+    if (code === 'consentRequired') setPhase({ kind: 'consent', status: current })
+    else setPhase({ kind: 'denied', code, message: error instanceof Error ? error.message : String(error) })
+  }
+
   const attachNow = async (current: RemoteDesktopStatusView): Promise<void> => {
     const controller = gate.current
     if (target === undefined || controller === undefined) return
@@ -63,10 +70,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
       if (controller.signal.aborted) return
       setPhase({ kind: 'live', status: current, attachment })
     } catch (error) {
-      if (controller.signal.aborted) return
-      const code = issueOf(error)
-      if (code === 'consentRequired') setPhase({ kind: 'consent', status: current })
-      else setPhase({ kind: 'denied', code, message: error instanceof Error ? error.message : String(error) })
+      settleDenied(controller, error, current)
     }
   }
 
@@ -81,10 +85,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
       controller.signal.throwIfAborted()
       setPhase({ kind: 'live', status: current, attachment })
     } catch (error) {
-      if (controller.signal.aborted) return
-      const code = issueOf(error)
-      if (code === 'consentRequired') setPhase({ kind: 'consent', status: current })
-      else setPhase({ kind: 'denied', code, message: error instanceof Error ? error.message : String(error) })
+      settleDenied(controller, error, current)
     }
   }
 

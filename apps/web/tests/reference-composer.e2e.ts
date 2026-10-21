@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
   SESSION_FORMAT_VERSION,
@@ -84,7 +84,7 @@ function targetSessionFixture(): string {
     message: createSystemMessage('Fixture system prompt.'),
   }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
-    content: [{ type: 'text', text: '@Research notes what changed?' }],
+    content: [{ type: 'text', text: '@Research notes what changed? @preview.txt' }],
     source: { kind: 'user' },
   }), { surfaceOp: 'append' })
   session.append('user/message', createUserMessage({
@@ -137,6 +137,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
+    await writeFile(join(scaffold.workspaceCwd, 'preview.txt'), 'Sent file reference preview.\n')
     await seedSession(scaffold, sourceSessionFixture(), SOURCE_SESSION_ID)
     await seedSession(scaffold, targetSessionFixture(), TARGET_SESSION_ID)
     browser = await chromium.launch()
@@ -149,8 +150,11 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
   }, 120_000)
 
   afterAll(async () => {
-    await browser?.close()
-    await scaffold?.close()
+    const failures: unknown[] = []
+    await browser?.close().catch((error: unknown) => failures.push(error))
+    await scaffold?.close().catch((error: unknown) => failures.push(error))
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) throw new AggregateError(failures, 'reference-composer e2e cleanup failed')
   })
 
   it('groups both sources and projects files and sessions as structured inline icon labels', async () => {
@@ -211,6 +215,23 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await compareOrRefreshGolden(ORDER_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('Research notes what changed?')
     expect(snapshot).toContain('Referenced session · Research notes')
+    const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
+      .mockImplementation(async (request, _signal) => ({
+        rpcId: request.rpcId,
+        result: { ok: true, value: { opened: true as const } },
+      }))
+    try {
+      const [response] = await Promise.all([
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/host.openPath'),
+        page.getByRole('button', { name: 'preview.txt', exact: true }).click(),
+      ])
+      expect(response.status()).toBe(200)
+      expect(openPath).toHaveBeenCalledTimes(1)
+      expect(openPath.mock.calls[0]?.[0].payload.path).toBe(join(scaffold.workspaceCwd, 'preview.txt'))
+      expect(await response.json()).toMatchObject({ result: { ok: true, value: { opened: true } } })
+    } finally {
+      openPath.mockRestore()
+    }
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['menu.expected.md', 'order.expected.md'])

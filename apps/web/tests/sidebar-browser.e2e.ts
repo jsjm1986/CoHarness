@@ -84,6 +84,11 @@ describe('web e2e: Session-owned Browser', () => {
     await expect.poll(() => iframe.getAttribute('sandbox')).toBeNull()
     await frame.getByRole('heading', { name: 'First local page' }).waitFor()
     await page.reload({ waitUntil: 'load' })
+    // A restored checkpoint is offered, never auto-loaded: the page surfaces
+    // the last location and the user restores it explicitly.
+    await panel.getByText('Previously opened', { exact: true }).waitFor()
+    await panel.getByText(target, { exact: true }).waitFor()
+    await panel.getByRole('button', { name: 'Restore page', exact: true }).click()
     await page.frameLocator('[data-sidebar-browser-frame]').getByRole('heading', { name: 'First local page' }).waitFor()
     expect(await iframe.getAttribute('sandbox')).toContain('allow-scripts')
     expect(await panel.getByRole('button', { name: 'Disable sandbox restrictions', exact: true }).count()).toBe(1)

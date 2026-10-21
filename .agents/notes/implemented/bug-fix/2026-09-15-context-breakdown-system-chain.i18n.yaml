@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-15-context-breakdown-system-chain.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-15-context-breakdown-system-chain.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-context-breakdown-system-chain.md
+document:
+  en: 191072da05aa2c3bce9dd3719568fbf6a11e3b3b
+  zh: 336cbf6b827bd1dd877eac2c6a203cf3ef93779a
 /agent-note-context-breakdown-keeps-the-effective-system-prompt-and-superseded-nodes-in-separate-figures:
   en: 6c050b58aec5010a
   zh: 5fb45e0c01aaa49a

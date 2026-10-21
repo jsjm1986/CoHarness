@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-remote-desktop",
   "description": "Human remote-desktop tabs for the right sidebar: grant summary, explicit consent, attach, and the noVNC RFB screen",
-  "version": "0.1.5-alpha.1.coharness.1",
+  "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
   },
@@ -38,7 +38,7 @@
     "bundle": "tsdown",
     "watch": "tsdown --watch"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-api-remote-desktop-controller": "workspace:*",

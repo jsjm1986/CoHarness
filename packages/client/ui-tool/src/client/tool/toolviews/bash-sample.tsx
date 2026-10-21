@@ -17,11 +17,12 @@ import { useState, type KeyboardEvent } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import clsx from 'clsx'
 import {
-  IconApiOutline14, IconChevronDownOutline14, IconInspectOutline12, StateDot, TerminalBlock,
+  CommandText, IconApiOutline14, IconChevronDownOutline14, IconInspectOutline12, StateDot, TerminalBlock,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
 import {
+  isBackgroundShellCall,
   isSettledPersistentShellCall,
   isSpilledShellCall,
   terminalBlockLabels,
@@ -90,11 +91,14 @@ function StartedBashRow({ toolName, block, sessionId, useSessions, inspect, open
     : model.state
   const status = stateStatus(state, t)
   const [expanded, setExpanded] = useState(false)
-  // Execution failures (for example cancellation before the process reports a
-  // terminal result) use the generic presenter. Keep their recorded args and
-  // full error reachable instead of collapsing the row to the first line.
+  const background = isBackgroundShellCall(block)
+  // Background launches expose their acknowledgement without assigning the
+  // job an exit status. Execution failures (for example cancellation before
+  // the process reports a terminal result), persistent results, and spill
+  // previews also keep the generic input/output presentation, which keeps
+  // their recorded args and full error reachable.
   const genericError = terminal === null
-    && (model.state === 'error' || isSettledPersistentShellCall(block) || isSpilledShellCall(block))
+    && (model.state === 'error' || isSettledPersistentShellCall(block) || isSpilledShellCall(block) || background)
     && (model.bodyRaw !== null || model.output !== null)
   const expandable = terminal !== null || genericError || openDetails !== undefined
   const open = expanded && expandable
@@ -159,7 +163,12 @@ function StartedBashRow({ toolName, block, sessionId, useSessions, inspect, open
                 {model.bodyRaw !== null && (
                   <div className={css.ioSection}>
                     <span className={css.ioLabel}>{t('row.input')}</span>
-                    <span className={css.ioText}>{formatToolBody(model.variant, model.bodyRaw)}</span>
+                    {background
+                      ? (
+                        <CommandText className={css.commandInput}
+                          text={formatToolBody(model.variant, model.bodyRaw) ?? ''} label={t('row.commandArguments')} />
+                      )
+                      : <span className={css.ioText}>{formatToolBody(model.variant, model.bodyRaw)}</span>}
                   </div>
                 )}
                 {model.bodyRaw !== null && model.output !== null && (

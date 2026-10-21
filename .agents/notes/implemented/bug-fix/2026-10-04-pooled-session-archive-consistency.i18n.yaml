@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-pooled-session-archive-consistency.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-pooled-session-archive-consistency.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-pooled-session-archive-consistency.md
+document:
+  en: 0dfa07c92a40eb7faf6a6569670f796d73cca327
+  zh: 57bae69a00c80b1c7442e88253e84dc4ead4463b
 /agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror:
   en: 19c7c7b6872c6cab
   zh: e928b709b81ce86c

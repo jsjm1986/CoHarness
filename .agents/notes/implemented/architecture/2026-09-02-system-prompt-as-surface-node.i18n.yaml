@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-02-system-prompt-as-surface-node.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-02-system-prompt-as-surface-node.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md
+document:
+  en: 2796b9dd52e391dfc711ffd3c3ce564f21b714f3
+  zh: 417bf5fb3e57f124bb0d242f41a77d8639b26f22
 /agent-note-the-system-prompt-is-surface-node-0:
   en: 449b745953058cff
   zh: 4db99c7d1f06e6b9
@@ -18,8 +21,8 @@
   en: a217a08932938062
   zh: 4924d99d55d9c973
 /agent-note-the-system-prompt-is-surface-node-0/decision/ownership-in-the-loop:
-  en: 88945024c2efe271
-  zh: 05dca84a4ce5e614
+  en: a7d0d3a61d2fef04
+  zh: 29a3d5dbed2f987a
 /agent-note-the-system-prompt-is-surface-node-0/decision/consumers:
   en: 39f9f4acffcccdc6
   zh: 36b23a57e7d28950
@@ -33,5 +36,5 @@
   en: bccea8236b4c32b3
   zh: a1150784718a6639
 /agent-note-the-system-prompt-is-surface-node-0/testing:
-  en: f5b21c4863cd92bd
-  zh: 7d1efed827d55161
+  en: 9a5a241ae3d0c676
+  zh: 8f3e83cc54604bcc

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-01-authorization-session-scoped-commit.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-01-authorization-session-scoped-commit.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-01-authorization-session-scoped-commit.md
+document:
+  en: dc55150b3bd56d4f14ad2aa15dcda63e5f850d9b
+  zh: f444230b4c9920e4c0c0596841492725b059ec3c
 /agent-note-session-scoped-credential-commit-for-authorization-flows:
   en: 93eb7bb8ddd775e5
   zh: e367649ce807b1f3

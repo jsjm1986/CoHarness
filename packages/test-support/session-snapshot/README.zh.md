@@ -90,7 +90,7 @@ spill 场景通过真实本地提供方保存到私有临时根目录。fixture 
 
 ### 可能出什么问题
 
-- **子会话轮次等待失败**——即使首次日志收集就超过期限，`waitForSubagentTurnEnd` 也会指出子会话、目标轮次与等待期限，并通过错误的 cause 保留底层失败。
+- **轮次结束等待失败**——即使首次日志收集就超过期限，`waitForTurnEnd` 和 `waitForSubagentTurnEnd` 也会指出会话或子会话及等待期限。子会话等待还会指出目标轮次。两者都通过错误的 cause 保留底层失败。
 - **fixture 保护拒绝已提交文件**——遗留场景目录、缺失文件、一个 header 类别包含多个 pin、重复的伴随文件内容、未擦除的提示文本或工具 schema、没有前置 `system/message` 的 `request/header`，以及格式错误的 pin header 都会在比较运行前使套件失败。
 - **会话收集需要原始 JSONL mode**——快照配置使用 JSONL 后端的 `compression: 'none'`；压缩 JSONL 没有快照收集路径。
 - **构建 mode 需要当前产物**——选择 `DSH_EXAMPLE_MODE=lib` 前先运行 `pnpm run build`；源 mode 仍是零构建路径。
@@ -122,7 +122,6 @@ spill 场景通过真实本地提供方保存到私有临时根目录。fixture 
 | [`src/workspace.ts`](src/workspace.ts) | 场景 workspace 设置与完整预期状态比较 |
 | [`src/suite.ts`](src/suite.ts) | 场景表套件工厂、fixture 保护、录制/刷新回写 |
 | [`src/index.ts`](src/index.ts) | 再导出四个层的包入口 |
-| — | 不发布运行时不变式伴生入口；该测试支持包不拥有任何生产事件流或可变数据；消费它的测试套件会检验该工具包。 |
 
 ### 数据流
 
@@ -144,7 +143,6 @@ spill 场景通过真实本地提供方保存到私有临时根目录。fixture 
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -158,7 +156,6 @@ spill 场景通过真实本地提供方保存到私有临时根目录。fixture 
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明何时需要对该工具包特别小心。它们是当前包约束，不是任务积压。
 

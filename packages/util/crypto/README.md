@@ -16,7 +16,6 @@ Zero-dependency browser-safe UUID and byte-encoding helpers. UUID minting uses `
 ## Table of Contents
 
 - [API](#api)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -35,11 +34,6 @@ import { bytesToBase64, randomUUID, type Uuid } from '@deepseek-ai/dsh-util-cryp
 | `randomUUID()` | Random RFC 9562 v4 UUID generated from `crypto.getRandomValues`. |
 | `bytesToBase64(data)` | Canonical base64 encoding in bounded chunks. |
 | `Uuid` | Five-group UUID string type. |
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A pure library owning no event stream or mutable runtime data; its encoding algebra is enforced by unit tests.
 
 <a id="model-experience"></a>
 ## Model Experience

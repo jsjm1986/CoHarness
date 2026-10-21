@@ -95,8 +95,6 @@ kind: "package-reference"
 -----
 
 
-**运行时不变量：** 不发布 companion。本包经三条无状态路由提供一趟主机解析的结果；路由注册已由各自的 HMR 安全测试证明可处置，不存在可能分叉的独立观测。
-
 <a id="model-experience"></a>
 ## 模型体验
 

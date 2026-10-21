@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-10-plugins-page-runtime-scope-label.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-10-plugins-page-runtime-scope-label.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-10-plugins-page-runtime-scope-label.md
+document:
+  en: 48efe31e70327820b9348d078362bcc8768cf51c
+  zh: cf9458dd859263af40e1e3038e2536dc65acc249
 /agent-note-plugins-page-labels-the-runtime-scope-it-edits:
   en: fc7c074cfd510b81
   zh: 20de22c4c3fb487d

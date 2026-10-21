@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-turn-trigger-and-turn-end-anchored-tail.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-turn-trigger-and-turn-end-anchored-tail.md
+document:
+  en: 52ab161effe6ffdaad68b9f8560a596cc0ec3e43
+  zh: e0932cb39f933be009caa4941732e445bfcbdd81
+/agent-note-turn-trigger-opener-and-turn-end-anchored-completed-turn-footer:
+  en: 9eb30a205c247082
+  zh: ba525feccb80c8f5
+/agent-note-turn-trigger-opener-and-turn-end-anchored-completed-turn-footer/problem:
+  en: 6da9f73eb1bfde60
+  zh: 78ee4187de11e645
+/agent-note-turn-trigger-opener-and-turn-end-anchored-completed-turn-footer/decision:
+  en: 01d17191ab9f0b93
+  zh: 0351e19ebb364ccc
+/agent-note-turn-trigger-opener-and-turn-end-anchored-completed-turn-footer/alternatives-considered:
+  en: ebebebafa32fe8dc
+  zh: c3806cfae83dabbb
+/agent-note-turn-trigger-opener-and-turn-end-anchored-completed-turn-footer/consequences:
+  en: 33594bfbc5900a16
+  zh: 544d160e91fe0dbc

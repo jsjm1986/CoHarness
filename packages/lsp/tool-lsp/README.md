@@ -19,7 +19,6 @@ Namespace plugin (`name` / `inject` / `Config` / `apply`, no default export). In
 
 - [The tool](#the-tool)
 - [Configuration](#configuration)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -41,11 +40,6 @@ The tool requires an Agent Session; a non-agent call fails with `LSP_WORKSPACE_R
 | `maxLocations` | `100` | Largest number of rendered locations before an omission marker. |
 | `maxResultChars` | `16000` | Largest complete rendered result, including truncation metadata. |
 | `timeoutMs` | `60000` | Tool-call timeout budget, enforced by `dsh-tool-call-timeout-policy`; covers the complete queued open/query/close lifecycle and is not model-configurable. |
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The tool validates, converts, and bounds each request against `ctx.lsp`; provider state stays behind the seam.
 
 <a id="model-experience"></a>
 ## Model Experience

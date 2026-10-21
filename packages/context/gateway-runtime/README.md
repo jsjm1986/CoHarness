@@ -13,11 +13,9 @@ Authenticated request context and private loopback transport for a Harness runti
 
 Use `dsh-gateway-runtime` for the authenticated request context and private loopback transport of a Gateway-launched Harness runtime. A launch credential binds the process to one organization and one personal or project runtime identity and verifies short-lived browser principals for other collaboration packages.
 
-
 ## Table of Contents
 
 - [Runtime contract](#runtime-contract)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -41,11 +39,6 @@ The `plugin-admin` purpose permits only declared profile-management HTTP methods
 ### Execution authorization
 
 The plugin marks its application with `executionAuthorityRequired`. That requirement remains until the application is disposed, including when an authorization provider unloads. [Gateway Execution](../gateway-execution/README.md) owns execution, permission-preset and profile-management policy. It uses this package's verified interactive caller and private transport, or the actual Agent's durable participant references for delegated and restored work.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The launch credential binds a fixed process identity, checked during request admission; the package has no independent projection against which to compare that identity.
 
 <a id="model-experience"></a>
 ## Model Experience

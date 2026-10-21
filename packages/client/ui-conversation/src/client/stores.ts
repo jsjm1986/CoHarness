@@ -8,7 +8,7 @@ import type { ToolCallId, ChatStoreState, SelectionTarget } from './contract/vie
 /** Declared action shape used to give the exported factory a stable return type. */
 type ChatActions = {
   select: (draft: ChatStoreState, target: SelectionTarget | null) => void
-  setDraft: (draft: ChatStoreState, text: string) => void
+  setDraft: (draft: ChatStoreState, value: ChatStoreState['draft']) => void
   setView: (draft: ChatStoreState, view: string) => void
   setInspect: (draft: ChatStoreState, target: { callId: ToolCallId } | null) => void
 }
@@ -26,7 +26,7 @@ export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions
     persist: 'dsh.conversation.chat',
     actions: {
       select: (d, target: SelectionTarget | null) => { d.selection = target },
-      setDraft: (d, text: string) => { d.draft = text },
+      setDraft: (d, value: ChatStoreState['draft']) => { d.draft = value },
       setView: (d, view: string) => { d.view = view },
       setInspect: (d, target: { callId: ToolCallId } | null) => { d.inspect = target },
     },

@@ -39,9 +39,16 @@ function makeHost() {
     // the raw view and crash reports never fire.
     entriesOfSlot: key => entries.get(key) ?? [],
     reportEntryError: () => {},
+    reportFactoryError: () => {},
     specOf: () => ({ kind: 'single', scope: 'root' }),
     isLive: entry => live.has(entry),
     storeOf: () => undefined,
+    factoryStoreOf: () => undefined,
+    retainFactoryOccurrence: () => () => {},
+    subscribeFactory: () => () => {},
+    getFactoryVersion: () => 0,
+    factoryOf: () => undefined,
+    isFactoryLive: () => false,
     sessions: {
       list: { getSnapshot: () => ({}), subscribe: () => () => {} },
       provideInfo: { getSnapshot: () => absentInfo, subscribe: () => () => {} },

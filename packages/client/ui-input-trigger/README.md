@@ -11,7 +11,7 @@ Input trigger pipeline plugin: `/` and `@` detection under the caret (word-bound
 
 Layering: `src/core/` is the pure core — `detectTrigger`, `menuReduce`/`seedGroups`/`MENU_CLOSED`, `exactMatch`, zero React/DOM/cordis; `src/client/service.ts` is the shell wiring the core to the menu snapshot store, the per-hit candidate fetch (generation-gated, `AbortSignal`-superseded, failed sources drop silently with a console record), and the three pick paths. `ReferenceInsert.appearance` optionally identifies a `session`, `file`, or `folder` display without changing its serialized `ref`; the consuming composer owns the glyph and color. `src/types.ts` and the two `contract.ts` files are the frozen cross-package contract; changes require main-thread arbitration.
 
-While a candidate refresh is pending, the menu keeps any stale highlight from being submitted: Enter is consumed until the highlighted group settles, while Tab drills only a row marked `drill` and otherwise preserves native focus traversal.
+While a candidate refresh is pending, the menu keeps any stale highlight from being submitted: Enter and Tab are consumed until the highlighted group settles. Tab settles the highlighted completion — a `drill` row descends, an ordinary row picks — and passes untouched only without a highlight, preserving native focus traversal. Escape and Shift+Tab leave the menu without settling. A dismissal sticks to its hit: Escape, Shift+Tab, a pointer dismissal, and a settling pick each record the token identity, so restoring the caret cannot reopen a closed menu; a new query or another token re-arms it.
 
 Sources may publish a synchronous breadcrumb header. A directory candidate can be settled as an atomic folder reference with Enter/click, or explicitly drilled with Tab, the chevron, or a breadcrumb; drill replaces the token text and re-tracks the menu at the new directory without losing the source-owned header.
 
@@ -25,17 +25,11 @@ When users type `/` or `@` at the caret in the Web GUI, this package opens a gro
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The trigger source roster is an effect-owned registration set proven by the HMR-safety spec; arbitration is per-request controller state with no durable relation.
 
 <a id="model-experience"></a>
 ## Model Experience

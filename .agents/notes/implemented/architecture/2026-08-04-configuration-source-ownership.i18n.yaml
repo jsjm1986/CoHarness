@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-configuration-source-ownership.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-configuration-source-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-04-configuration-source-ownership.md
+document:
+  en: 2cd09ae2daca2b15657caa18ff210fa178c2999b
+  zh: c62eeb06574c85a9ff5d78060d3aeb96fb40f2b5
 /agent-note-one-ordering-for-configuration-sources-and-what-a-discovered-file-may-not-decide:
   en: 77b29dcfd336552f
   zh: d875620dafd6718e

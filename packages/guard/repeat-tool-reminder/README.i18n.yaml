@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/guard/repeat-tool-reminder/README.md
+document:
+  en: a14a3b2526cac762cc79137a6de73c009aa1f453
+  zh: d3914cf77d979efaab770beb379308df17feb9af
 /:
   en: 571e18b80167e1b9
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: 36ac7ba52bc4fee0
   zh: 39894a1c067754c4
 /deepseek-ai-dsh-repeat-tool-reminder/table-of-contents:
-  en: 035cba0f6d10bb0c
-  zh: 29d3cb6354541f4d
+  en: 69da687a777a3b25
+  zh: fdd3d7707c351e3c
 /deepseek-ai-dsh-repeat-tool-reminder/config:
   en: e9c3841f1f1ca52b
   zh: 7fa8a1dcba878312
@@ -21,11 +24,8 @@
   en: ad19f0269f1163aa
   zh: 8130c0846e9df9b8
 /deepseek-ai-dsh-repeat-tool-reminder/reminder-delivery:
-  en: 6de9afff2d68797b
-  zh: b5d387f92e78868f
-/deepseek-ai-dsh-repeat-tool-reminder/invariants:
-  en: dbb825a227bff802
-  zh: 3ab163c9f4f998d9
+  en: 145b4bad940a55ab
+  zh: e1555c18e243c933
 /deepseek-ai-dsh-repeat-tool-reminder/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

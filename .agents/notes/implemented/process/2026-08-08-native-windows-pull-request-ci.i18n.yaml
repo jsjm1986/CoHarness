@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-08-native-windows-pull-request-ci.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-08-native-windows-pull-request-ci.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-08-native-windows-pull-request-ci.md
+document:
+  en: 2352db3672364c8ae28cb079a9eee5e4073cf5e8
+  zh: 23bfe3b477dbfac217b8154b1248514babb90653
 /agent-note-dual-wine-and-native-windows-pull-request-ci:
   en: aac9f226287cb060
   zh: 07081f36326b96f3

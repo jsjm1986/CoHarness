@@ -18,10 +18,11 @@
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace/types'
 import {
   commitSessionNavigation, WorkspaceArchiveError,
-  type ClientContext, type SessionId, type WorkspaceId,
+  type ClientContext, type SessionId, type StartSessionOptions, type WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -31,7 +32,8 @@ import {
   menuOpenStateFactory,
   type ArchiveSessionInjected, type ForkSessionInjected, type PinSessionInjected,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState,
-  type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest, type SessionRenameDialogInjected,
+  type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest, type SessionIdInjected,
+  type SessionRenameDialogInjected,
   type WorkspaceBrowserInjected, type WorkspacePickerInjected,
 } from './contract/slots.ts'
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
@@ -43,6 +45,7 @@ import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/RenameSession.tsx'
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
+import { SessionIdMenuItem } from './session-actions/SessionId.tsx'
 import { WorkspaceBrowser } from './WorkspaceBrowser.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
 import { en, zh, type WorkspaceKey } from './locales.ts'
@@ -62,6 +65,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
+/**
+ * Draft initialization a New Session flow may hand its landing composer.
+ * Failure notification stays with the Workspace UI's notice channel.
+ */
+export type UiStartSessionOptions = Omit<StartSessionOptions, 'onFailure'>
+
 /** Session navigation face other plugins consume through `ctx.uiWorkspace`. */
 export interface UiWorkspace {
   /**
@@ -71,10 +80,15 @@ export interface UiWorkspace {
    */
   openSession(sessionId: SessionId): void
   /**
-   * Start a New Session flow and navigate to its Session.
+   * Start a New Session flow and navigate to its Session. A bare call mints
+   * a fresh Session+Agent under the current preset definition; draft options
+   * keep the Workspace's existing draft or blank instead.
    * @param workspaceId - explicit target; absent inherits the current or most recent Workspace.
+   * @param options - draft initialization for the landing composer: `prompt`
+   * prefills unsent text (an empty draft only; it never sends or executes),
+   * `clearPreviousDraft` discards the draft text first.
    */
-  startSession(workspaceId?: WorkspaceId): void
+  startSession(workspaceId?: WorkspaceId, options?: UiStartSessionOptions): void
   /**
    * Fork a Session and open its child.
    * @param sessionId - source Session.
@@ -217,13 +231,16 @@ export function apply(ctx: ClientContext): void {
         console.warn('session navigation failed:', reason)
       })
     },
-    startSession: (workspaceId) => {
+    startSession: (workspaceId, options) => {
       // Starting a session targets the Conversation surface — the no-workspace
       // clear and a same-session reuse emit no selection change, so the panel
       // reset cannot ride the session-list subscription `openSession` enjoys.
       ctx.layout.selectPanel(null)
-      ctx.workspaces.startSession(workspaceId, (reason) => {
-        notify({ kind: 'createFailed', message: createFailureMessage(reason) })
+      ctx.workspaces.startSession(workspaceId, {
+        ...options,
+        onFailure: (reason) => {
+          notify({ kind: 'createFailed', message: createFailureMessage(reason) })
+        },
       })
     },
     forkSession,
@@ -318,6 +335,12 @@ export function apply(ctx: ClientContext): void {
       uiWorkspace.forkSession(sessionId).catch(() => {
         // Fork or child-rename failure keeps the current selection.
       })
+    },
+  })
+  const sessionIdInjected = (): SessionIdInjected => ({
+    copySessionId: async (sessionId) => {
+      const copied = await writeClipboard(sessionId)
+      notify({ kind: copied ? 'sessionIdCopied' : 'sessionIdCopyFailed' })
     },
   })
   const renameInjected = (): RenameSessionInjected => ({ requestSessionRename })
@@ -422,6 +445,13 @@ export function apply(ctx: ClientContext): void {
         inject: archiveInjected,
       },
       ArchiveSessionMenuItem,
+    )
+    yield ctx.slots.register(
+      {
+        name: 'sidebar.workspaces.session.menu.item', id: 'session-id', order: 450, locale: NS,
+        inject: sessionIdInjected,
+      },
+      SessionIdMenuItem,
     )
   })
   ctx.slots.inject('sidebar.workspaces.session.row.action', function* () {

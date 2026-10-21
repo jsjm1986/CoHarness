@@ -19,18 +19,11 @@ node 半边是一个空 `apply`：它的存在只为让插件出现在 host 的 
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。OS 选择器属于 host 后端；无渲染占位内容只转发每次打开请求并上报一个结果，不保留目录状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

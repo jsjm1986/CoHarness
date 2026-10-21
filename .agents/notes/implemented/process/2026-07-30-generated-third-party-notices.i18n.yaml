@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-generated-third-party-notices.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-generated-third-party-notices.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-30-generated-third-party-notices.md
+document:
+  en: 9ca24c9634b0410f9b7cc255902344cd6014bb90
+  zh: b49e60565bbae62cf17026db17babc1ba7a408dc
 /agent-note-generated-third-party-notices:
   en: 762fe10c2750eb0a
   zh: 24f5efdf4cc1755e

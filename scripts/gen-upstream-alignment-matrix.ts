@@ -77,6 +77,20 @@ const AREA_PHASE: Record<string, string> = {
 }
 
 /**
+ * Override row for a package upstream relocated into `packages/experimental/`
+ * at rc.2 while the fork carries it at its own group path.
+ * @param upstreamKey - the package key upstream now publishes under `experimental/`.
+ * @returns the row override asserting the local layout is the fork-owned home.
+ */
+function MOVED_TO_EXPERIMENTAL(upstreamKey: string): Record<string, unknown> {
+  return {
+    status: 'reject',
+    targetAssessment: 'fork-owned',
+    rejectReason: `Upstream moved the package to packages/experimental/${upstreamKey} at rc.2; the fork retains the package at its own group path, which upstream-only bookkeeping maps back through scripts/upstream-sync.json.`,
+  }
+}
+
+/**
  * Per-area curation that cannot be derived mechanically: statuses, reject
  * reasons, assessments, and dispositions recording the locked owner decisions
  * for the dsh-v0.2.0-rc.1 round.
@@ -88,20 +102,15 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
     rejectReason: 'Same-key upstream package with unrelated semantics: CoHarness owns session-format-v3-to-v4 for the released v3→v4 edge, while upstream rc.1 uses the key for its V4-generation line. Recorded upstreamShadowed in scripts/upstream-sync.json. Upstream V4 event vocabulary (developer/message, forked, tool-role streaming, attachments, plugin:<name>) is absorbed event-by-event into the fork v6→v7 edge — never file-merged.',
     localDisposition: 'Owner decision: retain v6 generation; absorb upstream event semantics via a new adjacent v6→v7 migration edge in P4.',
   },
-  'packages/preset/agent-presets': {
-    status: 'adapt',
-    targetAssessment: 'increment-review-required',
-    localDisposition: 'Owner decision: migrate to the upstream two-package structure (agent-preset + agent-preset-registry) in P5 while preserving derivePatches hooks, the Typert Remote contract, realm split, and the settings namespace. All consumers rewire in the same phase.',
-  },
   'packages/preset/agent-preset': {
-    status: 'required',
+    status: 'adapt',
     targetAssessment: 'inherited-scope-review-required',
-    localDisposition: 'Upstream preset payload half of the two-package split; carried in P5 with the registry, re-hung on the fork remote/authoring layer.',
+    localDisposition: 'Upstream preset authoring skill pack (skills/templates/locales) carried in P5 alongside the registry split; the fork js-yaml line is 5.x. The fork file-model presets keep their embedded skills, so the packaged skills serve upstream-style declared presets.',
   },
   'packages/preset/agent-preset-registry': {
-    status: 'required',
+    status: 'adapt',
     targetAssessment: 'inherited-scope-review-required',
-    localDisposition: 'Upstream preset registry half of the two-package split (acquireScope/recompose/select + remoteExportList). Carried in P5; fork webhook/subagent/apiproxy consumers rewire onto it.',
+    localDisposition: 'Owner decision: migrated to the upstream two-package structure in P5 while preserving the Typert Remote contract, realm split, authoring/inventory layers, and the settings namespace. The registry merges the upstream declaration model (register/generations/acquireScope/inspectCompositions) onto the fork file-discovery and standing-generation core; all consumers rewired in the same phase.',
   },
   'packages/settings/settings-file': {
     status: 'reject',
@@ -133,7 +142,7 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
   'packages/jobs/jobs': {
     status: 'adapt',
     targetAssessment: 'increment-review-required',
-    localDisposition: 'Owner decision: ring-buffer output rewrite adopted (JobChunk/lossy/spillPath/owner: SessionId/JobView) as an independent P4 milestone touching durable semantics, wire protocol, completion reporting, and bounded reads. maxConsecutiveWakes stays bounded at 10 per the multi-tenant safety decision — never unbounded.',
+    localDisposition: 'Owner decision: ring-buffer output rewrite adopted (JobChunk/lossy/spillPath/owner: SessionId/JobView) as an independent P4 milestone touching durable semantics, wire protocol, completion reporting, and bounded reads. maxConsecutiveWakes stays unset — no cap; the optional field remains configurable.',
   },
   'packages/client/ui-schedule': {
     status: 'adapt',
@@ -170,6 +179,26 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
     status: 'reject',
     targetAssessment: 'not-carried',
     rejectReason: 'Upstream atomic profile-patch editor surface; the fork settings pipeline owns configuration writes. Re-evaluate only if the settings projection port in P5 needs its atomic edit primitive.',
+  },
+  'packages/experimental/schedule-bundle': {
+    status: 'reject',
+    targetAssessment: 'fork-owned',
+    rejectReason: 'Upstream dissolved the schedule bundle into first-class schedule/schedule + schedule/tool-schedule at rc.2; the fork retains its own schedule-bundle wrapper and the carried schedule/schedule service.',
+  },
+  'packages/hooks/hook-protocol': MOVED_TO_EXPERIMENTAL('hook-protocol'),
+  'packages/hooks/hooks-claude-code': MOVED_TO_EXPERIMENTAL('hooks-claude-code'),
+  'packages/hooks/hooks-codex': MOVED_TO_EXPERIMENTAL('hooks-codex'),
+  'packages/terminal/tool-terminal': MOVED_TO_EXPERIMENTAL('tool-terminal'),
+  'packages/webhook/webhook': MOVED_TO_EXPERIMENTAL('webhook'),
+  'packages/webhook/webhook-github': MOVED_TO_EXPERIMENTAL('webhook-github'),
+  'packages/workflow/tool-ralph': MOVED_TO_EXPERIMENTAL('tool-ralph'),
+  'packages/session-query/tool-session-query': MOVED_TO_EXPERIMENTAL('tool-session-query'),
+  'packages/session/session-title-all-prompts-llm': MOVED_TO_EXPERIMENTAL('session-title-all-prompts-llm'),
+  'packages/skill/skill-badge': MOVED_TO_EXPERIMENTAL('skill-badge'),
+  'packages/subagent/subagent-in-process-driver': {
+    status: 'reject',
+    targetAssessment: 'fork-owned',
+    rejectReason: 'Upstream has no in-process subagent driver package; the fork-owned driver is retained.',
   },
   'non-package:apps/web': {
     status: 'adapt',
@@ -232,24 +261,34 @@ const CARRY_IN = new Set([
 
 /** Gate-replay contract updates where upstream changed the reviewed input at rc.1. */
 const REPLAY_UPDATES: Record<string, string> = {
+  '.github/workflows/build-exe-for-python-sdk.yml': 'Preserve the plan → sdk-wheel → matrix build shape and artifact retention; rc.2 routes release macOS targets to macos-15-large/-xlarge runners while ordinary CI and direct dispatches keep the standard matrix, and pins checkout/upload-artifact to v7.0.1.',
+  '.github/workflows/python-release.yml': 'Keep independent publish flow; rc.2 is a mechanical action-pin roll (checkout v7.0.1, download/upload-artifact v7.0.1) with no semantic change to the wheel matrix or SHA256SUMS publication.',
+  '.github/workflows/release-vendor.yml': 'Keep independent flow; rc.2 builds PR legs through compile-referenced-projects.ts host-libraries instead of the full build:lib:host (rehearsal-only fast path), and rolls pnpm action-setup/setup-node/cache pins to v5/v7/v6.1.0.',
+  '.github/workflows/release.yml': 'Keep independent flow; rc.2 rolls the same action pins (checkout v7.0.1, pnpm action-setup v5.0.0, setup-node v7.0.0, cache/restore v6.1.0) without changing publish order or credential handling.',
+  '.github/workflows/pi-ai-provider-e2e.yml': 'rc.2 rolls action pins only; the provider e2e lane remains upstream-infrastructure specific.',
+  '.github/workflows/e2e.yml': 'Keep canonical-repo and secret preflight, dispatch gating, JSON results, and real-provider assertions; rc.2 narrows PR legs to build:artifacts --profile official in place of the full build:official.',
+  '.github/workflows/ci.yml': 'Keep aggregate gate ordering and fork lanes; rc.2 adds the .coverage-times.json restore/save pair feeding the merged-report partitioner, raises the bench timeout to 20 minutes, uploads the scaled benchmark report after global teardown, and rolls action pins.',
+  '.github/workflows/sandbox.yml': 'Preserve real-kernel confinement assertions, the anti-self-skip guard, and exit-status propagation; rc.2 routes the unit lane through check:ci:unit with DSH_COVERAGE_TEST_TIMEOUT_MS=90000 on shared 3-vCPU runners.',
+  'scripts/run-oxlint.ts': 'Preserve the DSH_OXLINT_THREADS positive-integer contract; rc.2 lets a caller --threads pass through when the env var is unset, falls back to the local worker budget outside CI, and keeps CI on Oxlint defaults.',
+  'scripts/run-oxlint.spec.ts': 'Preserve invocation assertions; rc.2 covers the new default-parallelism fallback and --threads pass-through branches.',
+  'scripts/coverage-partitions.ts': 'Preserve single-worker partition coordination and merged-report thresholds; rc.2 splits the lane budget into parseCoverageTestTimeout plus coverageTestTimeoutOptions consumed by vitest.config.ts inline projects, and adds the file-times reporter feeding .coverage-times.json.',
+  'scripts/gen-third-party-notices.ts': 'Retain Ruff MIT metadata, vendor/AGENTS coverage, and generated-artifact assertions; rc.2 adds the chrome-devtools-frontend row for the experimental Inspector lane (fork does not carry inspector — prune the import and section at carry) and corrects the kit repository URL.',
+  'scripts/publish-npm-baseline.ts': 'Preserve tarball manifest inspection and publish baseline assertions; rc.2 drops the verify-built-package-invariants run alongside the runtime-invariant removal the fork already landed.',
+  'scripts/release/publish.ts': 'Before any registry call preserve the family ordering; rc.2 adds dist-tag validation (non-empty, no leading hyphen, no URI-encoded characters, no ranges) and verifyDistTag so a partial publication cannot rebind an existing version to a new channel.',
+  'scripts/run-gates.ts': 'Preserve three-state gates and needs/after semantics; rc.2 adds the ci-unit aggregate, extracts runAggregate with explicit ConcurrencyDefault, swaps package-invariant gates for plugin-record-callers/no-top-level-await/product-use/official-bundle-catalog/provider-data leaves, and points bench at run-ci-bench.ts.',
+  'scripts/run-gates.spec.ts': 'Preserve gate-graph assertions; rc.2 grows coverage for ci-unit composition, runAggregate concurrency defaults, and the new leaf gates.',
+  'package.json': 'Keep upstream command names wired to existing executor modes; rc.2 bumps version/pnpm, adds build:artifacts/build:check plus check:ci:unit and desktop package/upload shortcuts, replaces invariant and scoped-events gates with upgrade-guides/no-top-level-await/plugin-record-callers/cli-help/bundle-registry/official-bundle-catalog/provider-data/product-use, and adds dev-bundle-registry plus experimental workspace deps — prune desktop lanes at carry.',
+  'python/sdk/pyproject.toml': 'Preserve SDK build/test extras; rc.2 raises hatchling to 1.32.0, adds Pillow==12.3.0 to the test extra, and sets core-metadata-version 2.4 for Twine 6.2.0.',
+  'python/sdk/uv.lock': 'Preserve SDK lock; rc.2 regenerates for the hatchling and Pillow bumps — recheck after the fork SDK delta relocks.',
+  'tsconfig.base.json': 'Preserve single-source path aliases per package/vendor boundary; rc.2 adds aliases for remote-access, typert-protocol/remote-info, plugin-market, client-ui-secret-mask/plugin-market/file-upload, cua, and the experimental lanes, drops every /invariant alias, and adds claude-code-mods examples subpaths — prune excluded-lane rows at carry.',
+  'vitest.config.ts': 'rc.2 wires laneTestBudget (DSH_COVERAGE_TEST_TIMEOUT_MS) into inline projects, caps non-CI forks via defaultParallelism with LOCAL_TEST_PARALLELISM_CAP, adds the claude-code/testing aliases and cua-macos Windows exclusion, and narrows the Windows hooks glob to the three experimental hook packages — prune excluded-lane rows when carrying.',
+  'apps/web/tests/scaffold.ts': 'Keep real Loader and storage lifecycle; rc.2 adds workspacePathLength for fixed-length compaction cwd text, makes baseURL optional on search config, adds the deepSeekWebApi provider/select patch, and switches the JSONL persistence import to a namespace form — the fork keeps its default-export class shape.',
+  'apps/web/tests/queue-actions.e2e.ts': 'Queue row action coverage; rc.2 adds the goal-stop replay-override scenario (hang → round → human) asserting a queued /goal prompt runs after Stop — port onto the local session runtime API at carry.',
+  'apps/web/tests/workspace-management.e2e.ts': 'Scope archive assertions to owned surfaces; rc.2 renames the Settings menu to Account menu, retargets seededSessionRow onto a page parameter for the multi-page tooltip test, and adds the session-details tooltip ordering assertion.',
   'scripts/prepare-ci-bubblewrap.sh': 'Preserve pinned-payload SHA-256 verification and the functional confinement probe; rc.1 moves the pin to bubblewrap 0.12.0-1 with a Launchpad build URL that survives Ubuntu pool pruning (glibc 2.38+/Linux 5.10+, satisfied by the 24.04 image).',
   'scripts/run-web-snapshots.ts': 'Retain the serial-owner list (rc.1 adds client-plugin-live.e2e.ts) and the bounded worker pool; rc.1 relaxes DSH_WEB_SNAPSHOT_WORKERS to a positive integer so a single worker is legal.',
-  '.github/workflows/e2e.yml': 'Keep canonical-repo and secret preflight, dispatch gating, JSON results, and real-provider assertions; rc.1 adds a Prepare Office runtime step exporting DSH_PRIMARY_RUNTIME for real-API e2e.',
-  '.github/workflows/build-exe-for-python-sdk.yml': 'Runner sizing is upstream-infrastructure specific; rc.1 halves the Blacksmith failover legs to 2 vCPU. Preserve the plan → sdk-wheel → matrix build shape and artifact retention.',
-  '.github/workflows/sandbox.yml': 'Resolve native build commands against native/system; preserve real-kernel confinement assertions, the anti-self-skip guard, and exit-status propagation. rc.1 moves darwin unit parity into a dedicated unit-darwin job with a 60-minute completion ceiling.',
-  'vitest.config.ts': 'rc.1 adds apps/*/tests/**/*.spec.tsx to includes, adds scripts/test-dom-environment.ts to every project setupFiles, and adds coverage exclusions for lanes the fork does not carry (electron guest, voice-input) — prune excluded-lane rows when carrying.',
-  'scripts/gen-third-party-notices.ts': 'Retain Ruff MIT metadata, vendor/AGENTS coverage, and generated-artifact assertions. rc.1 renames the Desktop runtime lock to the shared scripts/primary-runtime/lock.json (collectBundledPythonDependencies); carry the shared-lock wording and prune desktop-lane references.',
-  'tsconfig.base.json': 'Preserve single-source path aliases per package/vendor boundary. rc.1 adds aliases for excluded lanes (account chain, telemetry otel, voice chain, api/job-controller, api/session-controller) which must be pruned at carry, and new carried subpaths: dsh-session/fork, dsh-token-meter/estimate, dsh-jobs/view, workspace-controller/default-workspace, plus the agent-presets→agent-preset-registry rename.',
-  'package.json': 'Keep upstream command names wired to existing executor modes. rc.1 adds prepare:primary-runtime, migrate:sessions-to-v4 (skip — V4 is shadowed), verify-no-unknown-casts, verify-package-meta, verify-client-route-resolution, an image-viewer docs check, the ci-windows-observational→ci-windows-observational-ready rename, build:lib:host desktop bundling (prune — no desktop lane), and new deps (extract-zip, fflate, pnpm 11.7.0, tar).',
-  '.github/workflows/ci.yml': 'Keep aggregate gate ordering and fork lanes. rc.1 makes shared-host concurrency unset by default (selfhosted keeps pinned values), installs WebKit alongside Chromium, adds the Linux Office runtime prepare step, and folds windows-observational into windows-build as continue-on-error observational-ready on built artifacts with a warning report step.',
-  'scripts/run-gates.ts': 'Preserve three-state gates and needs/after semantics, existing source leaves, evidence, hygiene union and build deduplication. rc.1 adds ciWorkerEnvironment deriving CI worker defaults from availableParallelism without replacing explicit overrides, renames ci-windows-observational→ci-windows-observational-ready (caller owns the build), extracts sharedHygieneGates (adding package-meta, client-route-resolution, no-unknown-casts leaves), adds plugin-packages and image-viewer doc leaves, and adds source-tool.built plus acl-skill.built e2e (acl-skill is a desktop lane — prune at carry).',
-  'scripts/run-gates.spec.ts': 'Preserve the gate-graph assertions; rc.1 adds ciWorkerEnvironment coverage (budget splitting, serial-reference preservation, invalid-budget rejection) and env stubbing so fixtures own the browser pool.',
-  'scripts/publish-npm-baseline.ts': 'Preserve tarball manifest inspection and the publish baseline assertions; rc.1 narrows the manifest parse to `unknown` before the record check — a type-level change with no contract movement.',
-  'apps/web/tests/scaffold.ts': 'Keep real Loader and storage lifecycle, explicit userdoc-local uploadRoot, and auth scaffold. rc.1 loads the web-app bundle patch array via package.json dsh.bundle.patch (replacing the single cordis.patch.yml), adds SCAFFOLD_DEFAULTS_BUNDLE, formEntries/formDefaults overlay extraction, skippedBundles profile, publicMount, workspaceRegistry.initializeDefault, drops the deepseek-messages replay variant, renames agent-presets→agent-preset-registry, and moves WEB_FIXTURE_TIME to support.ts — all absorbed in the P7 intent audit.',
   'apps/web/tests/scaffold-hermetic.e2e.ts': 'Hermetic scaffold assertions; rc.1 tracks the agent-presets→agent-preset-registry rename.',
-  'apps/web/tests/queue-actions.e2e.ts': 'Queue row action coverage; rc.1 adds edit-queued-message coverage across button/keyboard stop paths, tooltip-on-top geometry assertions, and the Esc Esc stop path (keyboard lane — prune shortcut-coupled assertions, keep queue ordering and edit semantics).',
   'apps/web/tests/markdown-cjk-strong.e2e.ts': 'CJK strong-emphasis golden; rc.1 switches to shared WEB_FIXTURE_TIME determinism with clock.setFixedTime and seedSession createdAt.',
-  'apps/web/tests/workspace-management.e2e.ts': 'Scope archive assertions to owned surfaces and keep directory-browser goldens. rc.1 adds the stale-blank-cache New Session regression covering the blank-writer-reuse fix — port the regression onto the local session runtime API in P7.',
 }
 
 /** Area key for a changed path: packages keep two segments; other dirs keep one; files keep the full name. */
@@ -420,10 +459,13 @@ function main(args: string[]): number {
     const blob = gitBlob(target, path)
     if (blob === undefined) fail(`gate replay ${path} no longer exists at ${tag}`)
     const changedBlob = blob !== String(replay.upstreamBlob)
+    const priorReview = String(replay.reviewedUpstreamCommit)
+    const reviewIsAncestor = !changedBlob
+      && spawnSync('git', ['-C', root, 'merge-base', '--is-ancestor', priorReview, target]).status === 0
     const next: Record<string, unknown> = {
       ...replay,
       upstreamBlob: blob,
-      reviewedUpstreamCommit: changedBlob ? target : replay.reviewedUpstreamCommit,
+      reviewedUpstreamCommit: changedBlob || !reviewIsAncestor ? target : priorReview,
       ...(REPLAY_UPDATES[path] !== undefined ? { replay: REPLAY_UPDATES[path] } : {}),
     }
     if (changedBlob && REPLAY_UPDATES[path] === undefined) fail(`gate replay ${path} changed upstream without a recorded re-review note`)

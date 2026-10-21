@@ -6,6 +6,6 @@
 {"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:8}}","content":{"type":"text","text":"SUBAGENT_SETTLED_NOTED"}}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call","toolCallId":"call_list","title":"list_agents","kind":"other","status":"in_progress","rawInput":{}}}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call_update","toolCallId":"call_list","status":"completed","content":[{"type":"content","content":{"type":"text","text":"{{session:2}} [ready] — Reply with CHILD_OK"}}]}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call_update","toolCallId":"call_list","status":"completed","content":[{"type":"content","content":{"type":"text","text":"{{session:2}} [inactive] — Reply with CHILD_OK"}}]}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:12}}","content":{"type":"text","text":"DONE"}}}}
 {"jsonrpc":"2.0","id":4,"result":{"stopReason":"end_turn"}}

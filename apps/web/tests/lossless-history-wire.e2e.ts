@@ -564,7 +564,27 @@ async function stableUiEvidence(page: Page, scaffold: WebScaffold): Promise<Stab
     interruptedReasoningCount: await page.getByRole('button', {
       name: new RegExp(`^Thinking ${INTERRUPTED_REASONING}`),
     }).count(),
-    stoppedCount: await page.getByText('Stopped', { exact: true }).count(),
+    // A stopped turn-process announces through one hidden status row; its
+    // visible "Stopped" control label repeats the same text, so scope the
+    // count to the status seat rather than every matching text node.
+    stoppedCount: await page.getByRole('status').filter({ hasText: 'Stopped' }).count(),
+  }
+}
+
+/**
+ * Expand every turn-process disclosure without scrolling the transcript.
+ * Playwright clicks scroll their target into view, which can land inside the
+ * near-head auto-load threshold and grow the rendered window mid-scenario;
+ * DOM clicks keep the scrollport pinned at the tail.
+ * @param page - the page under test.
+ */
+async function expandTurnProcessesAtTail(page: Page): Promise<void> {
+  const selector = '[data-turn-process][aria-expanded="false"]'
+  await page.locator(selector).first().waitFor({ timeout: 15_000 })
+  for (let guard = 0; guard < 32; guard += 1) {
+    const pending = page.locator(selector)
+    if (await pending.count() === 0) return
+    await pending.last().evaluate((el) => { (el as HTMLElement).click() })
   }
 }
 
@@ -700,10 +720,13 @@ describe('web e2e: lossless history wire pagination', () => {
     expect(firstBrowserPage?.hasMore).toBe(true)
 
     // The settled turn folds its tool row behind the turn-process disclosure.
-    await expandTurnProcesses(page)
+    // DOM clicks keep the transcript at the tail: a Playwright click scrolls
+    // its target into view, and landing inside the near-head auto-load
+    // threshold grows the window before the first-page golden.
+    await expandTurnProcessesAtTail(page)
     const toolButton = page.getByRole('button', { name: `Bash ${TOOL_DESCRIPTION}` })
     await toolButton.waitFor({ timeout: 10_000 })
-    await toolButton.click()
+    await toolButton.evaluate((el) => { (el as HTMLElement).click() })
     await expect.poll(() => page.getByText(TOOL_OUTPUT, { exact: true }).count(), {
       timeout: 10_000,
     }).toBe(1)
@@ -729,12 +752,12 @@ describe('web e2e: lossless history wire pagination', () => {
     const initialTails = page.locator('[data-chat-flow-kind="turn-tail"]')
     const initialTimeButton = initialTails.nth((await initialTails.count()) - 2)
       .getByRole('button', { name: /Ran for/u })
-    await initialTimeButton.click()
+    await initialTimeButton.evaluate((el) => { (el as HTMLElement).click() })
     const initialTimeDetails = page.locator('[data-turn-time-details]')
     await initialTimeDetails.waitFor({ timeout: 10_000 })
     expect((await initialTimeDetails.textContent()) ?? '').toContain('TTFT')
     expect((await initialTimeDetails.textContent()) ?? '').toContain('tok/s')
-    await initialTimeButton.press('Escape')
+    await page.keyboard.press('Escape')
     expect(initialUi.interruptedTextCount).toBe(1)
     expect(initialUi.interruptedReasoningCount).toBe(1)
     expect(initialUi.stoppedCount).toBe(1)

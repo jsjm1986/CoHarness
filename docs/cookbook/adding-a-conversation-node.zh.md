@@ -199,6 +199,8 @@ export function apply(ctx: ClientContext): void {
 
 `target` 与 `buildViewNode(context)` 必须同时声明一项由 target 拥有的渲染贡献。把 `context.key` 保留为 React 侧身份，根据持久排序证据选择 `anchorSeq`，并且只返回 renderer 可以直接使用的数据。某个 target Node 一旦发布，就要继续返回同一个 key；需要暂时离开可见流时使用 `visibility: 'hidden'`，不要改为返回 `null` 撤回它。
 
+kind 未声明 group-tree 位置的 Chat 节点会加入助手回复之间的可折叠过程运行段：它会成为分组证据，并在所属已完成 Turn 折叠时隐藏。输入级与 Turn 级独立性是内置 kind 在 [`group-tree.ts`](../../packages/client/ui-conversation/src/client/contract/group-tree.ts) 中声明的位置，并非每个 Definition 可选的项；外部 kind 因而始终渲染在窗口之内。
+
 ## 3. 只在 start 时查询更早的业务 Context
 
 有些 Definition 需要另一个业务 kind 在当前位置之前的最新 State。`start` 会收到 `ConversationContextReader`；应在这里调用 `reader.previous<State>(kind)`，不要接收 Context 集合或扫描事件。Reader 返回当前 start `seq` 之前最近一个已启动 Context 的只读数据。

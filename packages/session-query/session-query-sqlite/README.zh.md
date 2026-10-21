@@ -19,7 +19,6 @@ kind: "package-reference"
 - [来源与索引生命周期](#source-and-index-lifecycle)
 - [配置](#configuration)
 - [分词器与限制](#tokenizer-and-limits)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -66,12 +65,6 @@ kind: "package-reference"
 该索引使用 FTS5 `unicode61`。文档与查询文本经过同一规范化器，在每对汉字相邻字符之间插入保留的零宽空格，使每个 CJK 字符成为独立 token，短语匹配由此获得任意长度的子串语义（`记忆` 可匹配 `记忆系统` 内部，`试A版` 等混写串也会拆分）。非汉字区段仍是 token/短语召回而非任意子串召回：`AI` 不匹配 token `BRAID`。需要执行字面的空白弹性子字符串扫描时，使用 `ctx.sessionQuery.filterEvents()` 并传入 `text` 子句。查询会拒绝 NUL；文档中的保留高亮标记和 NUL 会在索引前被规范化，使展示标记无法与源文本冲突。
 
 中止信号会停止已排队工作，并原样流经快照枚举和非修改式检查。来源工作一旦开始，串行化状态机会自行等待该后端 promise，即使后端忽略取消，之后也会在启动任何进一步的枚举、检查、对账或查询工作前检查信号。因此，调用方只会在已启动后端工作完全停稳后观察到取消，而后续搜索在该清理尚未完成时无法进入 serializer。Node 的同步 `DatabaseSync` API 无法中断已在 JavaScript 线程上执行的元数据或 MATCH 语句；系统会在这些不可抢占调用前后立即检查信号。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。搜索在优先实时的逻辑语料上运行，其索引位于它打开的 SQLite 存储内部；不存在第二份语料。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -1,6 +1,7 @@
 /** Stream scripts, live stream control, cancellation, and the create() handshake defaults. */
 import { describe, expect, it } from 'vitest'
-import { RemoteMock, frames, openStream, streamMethod } from '../src/index.ts'
+import type { RemoteStreamHandle } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteMock, frames, openStream, streamHandle, streamMethod } from '../src/index.ts'
 
 const idle = (): AbortSignal => new AbortController().signal
 
@@ -184,8 +185,17 @@ describe('RemoteMock streams', () => {
     expect(mock.modeOf('s/declared')).toBe('stream')
   })
 
-  it('types a fake stream method with the generated signature', async () => {
-    const method = streamMethod<(prefix: string, signal?: AbortSignal) => AsyncIterable<string>>(
+  it('types a fake stream as the generated handle, with inert uplink members', async () => {
+    const handle = streamHandle<string, string>((async function* () {
+      yield 'a'
+      yield 'b'
+    })())
+    handle.send('ignored')
+    handle.end()
+    handle.dispose()
+    await expect(drain(handle)).resolves.toEqual(['a', 'b'])
+
+    const method = streamMethod<(prefix: string, signal?: AbortSignal) => RemoteStreamHandle<string, never>>(
       async function* (prefix, signal) {
         yield `${prefix}:${String(signal?.aborted ?? 'none')}`
       },

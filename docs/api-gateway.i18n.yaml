@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for api-gateway.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for api-gateway.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/api-gateway.md
+document:
+  en: cd3103a172d75a4ab325a2368e37af354f09051b
+  zh: fd7494917f209af4a16f88b87afbc47d75c6afd3
 /api-gateway:
   en: bb69b67db026edcb
   zh: e1fa01966a574a5d

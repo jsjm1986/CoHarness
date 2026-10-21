@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-src-export-erasable-syntax.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-src-export-erasable-syntax.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-04-src-export-erasable-syntax.md
+document:
+  en: 246fa89aca5fe294c0ab9e13b3c6f53ef6816d8c
+  zh: 68e4f7d43a1e598bb0979b44e66fb2f3ebe407c4
 /agent-note-src-exports-must-carry-erasable-only-typescript:
   en: 78d74b43b68f1224
   zh: 084404eea49b338e

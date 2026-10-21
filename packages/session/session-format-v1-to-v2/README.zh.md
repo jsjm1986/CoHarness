@@ -27,7 +27,7 @@ kind: "package-reference"
 
 ### 何时使用
 
-持久化通过 `dsh-session-format-catalog` 获取该迁移边；功能组合不会挂载它。只有在装配或测试静态已发布格式目录，或检查精确的 v1 到 v2 转换时，才直接导入本包。它不发布运行时不变式伴生入口，因为本包没有状态可能彼此分歧的、可独立观测的运行时注册项；decoder 与 transformer 状态只属于一次还原。
+持久化通过 `dsh-session-format-catalog` 获取该迁移边；功能组合不会挂载它。只有在装配或测试静态已发布格式目录，或检查精确的 v1 到 v2 转换时，才直接导入本包。
 
 ### 入口
 
@@ -81,7 +81,6 @@ v2 物理 header 要求 `isSeeded`，且不存储数值切点。编解码器从�
 - [嵌入式 Assistant stream 决策](../../../.agents/notes/implemented/architecture/2026-09-01-v2-embedded-assistant-streams.zh.md)——理由、替代方案与后果。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验

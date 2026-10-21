@@ -28,7 +28,10 @@ describe('web e2e: plugin configuration section', () => {
   let tripwire: ReturnType<typeof watchConsole>
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({})
+    scaffold = await launchWebScaffold({
+      deepSeekSearch: { apiKeyEnv: 'DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY' },
+      deepSeekWebApi: { apiKeyEnv: 'DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY' },
+    })
     browser = await chromium.launch()
     // Chinese browser: the panel asserts the localized copy the client
     // derives from it, as the rest of the settings surface does.
@@ -55,10 +58,10 @@ describe('web e2e: plugin configuration section', () => {
       await page.getByRole('navigation', { name: '面板' }).getByRole('button', { name: '插件', exact: true }).click()
       await panel.waitFor({ timeout: 10_000 })
     }
-    const back = panel.getByRole('button', { name: '返回插件列表', exact: true })
+    const back = panel.getByRole('button', { name: '返回插件', exact: true })
     if (await back.count() > 0) await back.click()
     // The Configuration group lists the namespaces this composition serves.
-    const group = panel.locator('[data-plugin-group="config"]')
+    const group = panel.locator('[data-plugin-group="basic"]')
     await group.getByRole('button', { name: '查看 终端', exact: true }).waitFor({ timeout: 10_000 })
     return panel
   }
@@ -81,7 +84,7 @@ describe('web e2e: plugin configuration section', () => {
     const panel = await openPlugins()
 
     // Each card belongs to a Host settings namespace served by this composition.
-    const group = panel.locator('[data-plugin-group="config"]')
+    const group = panel.locator('[data-plugin-group="basic"]')
     for (const name of ['终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索', '记忆']) {
       await expect.poll(async () => group.getByRole('button', { name: `查看 ${name}`, exact: true }).count(), { timeout: 10_000 }).toBe(1)
     }
@@ -208,7 +211,9 @@ describe('web e2e: plugin configuration section', () => {
   })
 
   it('shows a refused credential replacement without erasing the draft or the stored key', async () => {
-    const ref = credentialRef('DEEPSEEK_API_KEY')
+    // The card resolves the credential reference the mounted section names:
+    // the scaffold configures DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY for both APIs.
+    const ref = credentialRef('DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY')
     await scaffold.ctx.credentials.set(ref, 'plugin-fixture-original')
     const panel = await openItem('网页搜索')
     const key = panel.getByLabel('API Key', { exact: true })
@@ -228,6 +233,68 @@ describe('web e2e: plugin configuration section', () => {
     } finally { removeLayer() }
     expect(tripwire.pageErrors).toEqual([])
   })
+
+  it('switches search and fetch to the Search and Fetch APIs together and preserves each API endpoint', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-search-api-settings'))
+    const panel = await openItem('网页搜索')
+    const toggle = panel.getByRole('switch', { name: '启用新版 Web 搜索 API', exact: true })
+    const endpoint = panel.locator('#plugin-config-web-search-endpoint')
+    const maxUses = panel.getByLabel('单次请求最多搜索次数', { exact: true })
+    const save = panel.getByRole('button', { name: '保存', exact: true })
+    // The scenarios share one card instance: a previous refusal keeps its draft
+    // and failed marker, which this scenario must not carry.
+    const discard = panel.getByRole('button', { name: '放弃修改', exact: true })
+    if (await discard.isEnabled()) await discard.click()
+    expect(await toggle.getAttribute('aria-checked')).toBe('false')
+    expect(await panel.getByRole('link', { name: '网页搜索与抓取指南', exact: true }).getAttribute('href'))
+      .toBe('https://api-docs.deepseek.com/zh-cn/guides/search')
+    expect(await panel.getByLabel('Messages API 基础地址', { exact: true }).count()).toBe(1)
+    expect(await maxUses.inputValue()).toBe('5')
+    expect(await endpoint.inputValue()).toBe('')
+    expect(await save.isDisabled()).toBe(true)
+    await endpoint.fill('https://messages.test/anthropic/v1')
+    await save.click()
+    await expect.poll(() => save.isDisabled()).toBe(true)
+    await toggle.focus()
+    await page.keyboard.press('Space')
+    expect(await panel.getByLabel('Search / Fetch API 基础地址', { exact: true }).count()).toBe(1)
+    expect(await endpoint.inputValue()).toBe('https://api.deepseek.com/v1/tools')
+    expect(await maxUses.count()).toBe(0)
+    const count = panel.getByLabel('每次搜索结果数', { exact: true })
+    expect(await count.inputValue()).toBe('10')
+    await count.fill('51')
+    await panel.getByText('请填 1–50 的整数；留空表示使用默认值。', { exact: true }).waitFor()
+    expect(await save.isDisabled()).toBe(true)
+    expect(await toggle.isDisabled()).toBe(true)
+    await count.fill('10')
+    expect(await settingsDocument()).not.toContain('searchProvider: deepseek-search-api')
+    await endpoint.fill('https://search-api.test/api/v1/tools')
+    await save.click()
+    await expect.poll(() => save.isDisabled()).toBe(true)
+    await expect.poll(settingsDocument).toContain('searchProvider: deepseek-search-api')
+    await expect.poll(settingsDocument).toContain('fetchProvider: deepseek-fetch-api')
+    await expect.poll(settingsDocument).toContain('baseURL: https://search-api.test/api/v1/tools')
+    await page.reload({ waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await openItem('网页搜索')
+    expect(await toggle.getAttribute('aria-checked')).toBe('true')
+    expect(await endpoint.inputValue()).toBe('https://search-api.test/api/v1/tools')
+    const snapshot = await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search.expected.md'), snapshot, MODE)
+    await panel.getByRole('button', { name: '恢复默认', exact: true }).click()
+    expect(await endpoint.inputValue()).toBe('https://api.deepseek.com/v1/tools')
+    await save.click()
+    await expect.poll(() => save.isDisabled()).toBe(true)
+    await expect.poll(settingsDocument).not.toContain('https://search-api.test/api/v1/tools')
+    await toggle.click()
+    expect(await endpoint.inputValue()).toBe('https://messages.test/anthropic/v1')
+    await save.click()
+    await expect.poll(() => save.isDisabled()).toBe(true)
+    await expect.poll(settingsDocument).not.toContain('searchProvider: deepseek-search-api')
+    await expect.poll(settingsDocument).not.toContain('fetchProvider: deepseek-fetch-api')
+    expect(await settingsDocument()).toContain('baseURL: https://messages.test/anthropic/v1')
+    expect(tripwire.pageErrors).toEqual([])
+  }, 60_000)
 
   it('edits subagent depth and capacity through the real settings owner', async () => {
     const panel = await openItem('子智能体')
@@ -276,6 +343,6 @@ describe('web e2e: plugin configuration section', () => {
 
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md', 'refused-key.expected.md', 'subagent-limits.expected.md', 'subagent-models.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md', 'refused-key.expected.md', 'subagent-limits.expected.md', 'subagent-models.expected.md', 'web-search.expected.md'])
   })
 })

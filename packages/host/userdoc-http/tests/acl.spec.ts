@@ -1,6 +1,7 @@
 import { Readable } from 'node:stream'
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
+import { collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { UserDocId, type UserDocRef, type UserDocStore } from '@deepseek-ai/dsh-userdoc'
 import { handleUserDocHttp, USERDOC_CATALOG_OVERVIEW_PATH, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH, type UserDocHttpHost } from '../src/index.ts'
@@ -59,6 +60,7 @@ function context(mode: 'ro' | 'rw' | 'missing', transfer?: (path: string, init?:
     },
     expiresAt: Date.now() + 1000,
     signal: new AbortController().signal,
+    capabilities() { return collaborationCapabilities(this.participant) },
     authorize: vi.fn(),
     readableSessionIds: vi.fn(),
     claimInteraction: vi.fn(),

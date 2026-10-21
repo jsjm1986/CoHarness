@@ -18,6 +18,22 @@
         }
       },
       {
+        "name": "read_image",
+        "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to the image file, resolved by the filesystem backend."
+            }
+          },
+          "required": [
+            "file_path"
+          ]
+        }
+      },
+      {
         "name": "str_replace_editor",
         "description": "Custom editing tool for viewing, creating and editing files\n* State is persistent across command calls and discussions with the user\n* A null placeholder for a parameter unused by the selected command is treated as omitted. Required parameters still need values; omit str_replace.new_str rather than setting it to null when deleting a match\n* If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep\n* The `create` command cannot be used if the specified `path` already exists as a file\n* If a `command` generates a long output, it will be truncated and marked with `<response clipped>`\n\nNotes for using the `str_replace` command:\n* The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!\n* If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique\n* The `new_str` parameter should contain the edited lines that should replace the `old_str`",
         "parameters": {
@@ -142,6 +158,22 @@
           },
           "required": [
             "command"
+          ]
+        }
+      },
+      {
+        "name": "read_image",
+        "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to the image file, resolved by the filesystem backend."
+            }
+          },
+          "required": [
+            "file_path"
           ]
         }
       },
@@ -284,6 +316,22 @@
           },
           "required": [
             "command"
+          ]
+        }
+      },
+      {
+        "name": "read_image",
+        "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to the image file, resolved by the filesystem backend."
+            }
+          },
+          "required": [
+            "file_path"
           ]
         }
       },
@@ -440,6 +488,22 @@
           },
           "required": [
             "command"
+          ]
+        }
+      },
+      {
+        "name": "read_image",
+        "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string",
+              "description": "Path to the image file, resolved by the filesystem backend."
+            }
+          },
+          "required": [
+            "file_path"
           ]
         }
       },

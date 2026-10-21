@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-18-settings-surface-increment.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-settings-surface-increment.md
+document:
+  en: e3d840c7a97ebfae1a3b195cb0d1ee0aabcd7068
+  zh: eaaf5b18f3806de851953618413cbdc64733310b
+/agent-note-upstream-settings-surface-increment-for-rc-2:
+  en: 98fdb7b159330fa5
+  zh: 21cf615456726eb1
+/agent-note-upstream-settings-surface-increment-for-rc-2/problem:
+  en: 4c1b0d3a2346d55b
+  zh: 590096eb3baa623b
+/agent-note-upstream-settings-surface-increment-for-rc-2/decision:
+  en: 0cbd1786d70bc3cc
+  zh: 8625dd3a9fe1842e
+/agent-note-upstream-settings-surface-increment-for-rc-2/alternatives-considered:
+  en: 5080e6aca72441bd
+  zh: 7502ab4cca4fcb06
+/agent-note-upstream-settings-surface-increment-for-rc-2/testing:
+  en: 87cc1df7597f4993
+  zh: 56f9281d41372284
+/agent-note-upstream-settings-surface-increment-for-rc-2/consequences:
+  en: 9f5c3477578da386
+  zh: 49b0decf62d9b1a0

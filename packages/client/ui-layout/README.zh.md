@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-外壳插件提供唯一的三栏 AppFrame、拖动尺寸与窄屏抽屉。它在 `root` 下声明左侧 `sidebar`、中间 `conversation`、右侧 `rightbar`、浮动层及移动顶栏操作。四会话 Workbench 保持为唯一的中间会话容器；右侧栏的标签、分栏与开合由 [ui-sidebar-right](../ui-sidebar-right/README.zh.md) 管理，框架只消费其呈现报告并分配空间。主题呈现器负责配色、别名 token、正文字号与 document 元数据。
+外壳插件提供唯一的三栏 AppFrame、拖动尺寸与窄屏抽屉。它在 `root` 下声明左侧 `sidebar`、中间 `conversation`、右侧 `rightbar`、浮动层及移动顶栏操作。四会话 Workbench 保持为唯一的中间会话容器；右侧栏的标签、分栏与开合由 [ui-sidebar-right](../ui-sidebar-right/README.zh.md) 管理，框架只消费其呈现报告并分配空间。主题呈现器负责配色、别名 token、字号、字体列表与 document 元数据。
 
 框架发布 `data-viewport` 与 `--dsw-viewport-height`，以支持窄窗格和屏幕键盘。medium 模式保留导航控制栏，右侧栏覆盖中间内容；compact 模式使用左侧抽屉和全屏辅助栏。遮罩和 Escape 将关闭请求交给标签状态所有者，不直接改写另一份开合状态。侧边抽屉关闭后恢复顶栏开关焦点。框架尺寸不写入 localStorage，Session 标签的恢复规则由右侧栏负责。
 
@@ -17,22 +17,15 @@ kind: "package-reference"
 
 ## 概述
 
-本包提供 Web GUI 的三栏 AppFrame、左右栏宽度与 `ctx.layout` 呈现控制。右栏先让步以保护中栏空间，全屏由占用方呈现，框架保留宽屏底层轨道。主题呈现器负责配色、别名 token、正文字号与 document 元数据；布局状态在刷新后重置。
+本包提供 Web GUI 的三栏 AppFrame、左右栏宽度与 `ctx.layout` 呈现控制。右栏先让步以保护中栏空间，全屏由占用方呈现，框架保留宽屏底层轨道。主题呈现器负责配色、别名 token、字号、字体列表与 document 元数据；布局状态在刷新后重置。
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。面板几何与折叠是展示层本地的服务状态；框架的 slot 注册通过 HMR 安全性规格证明其释放。
-
 
 <a id="model-experience"></a>
 ## 模型体验

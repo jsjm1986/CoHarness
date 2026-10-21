@@ -4,6 +4,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // `goal-<uuid>` brands a minted uuid; the compound is unambiguous wherever it
 // surfaces (goal/change state, goal_id arguments, result payloads).
 const GOAL_COMPOUND_RE = /goal-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi
+// `<kind>-<16 hex>` mints a background job id; the compound surfaces inside
+// literal payload strings (result text, job_id arguments, notices).
+const JOB_COMPOUND_RE = /(?<![\w-])([a-z][a-z0-9_-]*-[0-9a-f]{16})(?![\w-])/gi
+const SHORT_JOB_ID_RE = /-[0-9a-f]{16}$/i
 const LEGACY_TOKEN_RE = /^\{\{(?:sessionId|messageId)\}\}$/
 const CANONICAL_TOKEN_RE = new RegExp(
   String.raw`^\{\{(session|message|approval|workflow|command|rpc|retry|compaction|`
@@ -17,6 +21,7 @@ const FIELD_KINDS: Readonly<Record<string, IdentityKind>> = {
   sessionId: 'session', parentSessionId: 'session', rootSessionId: 'session', childId: 'session',
   messageId: 'message', participantId: 'principal', principalId: 'principal',
   projectId: 'project', runtimeId: 'runtime', executionTargetId: 'target', resourceId: 'resource',
+  jobId: 'id',
 }
 
 const LITERAL_FIELDS = new Set(['content', 'args', 'arguments', 'parameters', 'schema', 'inputSchema', 'input_schema'])
@@ -48,7 +53,8 @@ function messageId(value: unknown): string | undefined {
 }
 
 function redactedCandidate(value: string): boolean {
-  return UUID_RE.test(value) || LEGACY_TOKEN_RE.test(value) || CANONICAL_TOKEN_RE.test(value)
+  return UUID_RE.test(value) || SHORT_JOB_ID_RE.test(value)
+    || LEGACY_TOKEN_RE.test(value) || CANONICAL_TOKEN_RE.test(value)
 }
 
 /**
@@ -117,7 +123,8 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
       } else if (childKey === 'runId') {
         claim(item, 'workflow')
       } else if (FIELD_KINDS[childKey] !== undefined) {
-        claim(item, FIELD_KINDS[childKey])
+        const kind = FIELD_KINDS[childKey]
+        claim(item, kind === 'session' && (typeof item !== 'string' || !tokenByValue.has(item)) ? 'id' : kind)
       } else if (inRpcParams && childKey === 'id') {
         claim(item, 'id')
       }
@@ -140,12 +147,30 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
     }
     if (isRecord(value)) for (const item of Object.values(value)) mineGoalIds(item)
   }
-  // Claim each log's header before its records so a child catalog id seen in the
-  // parent wins the earlier token — parallel child ids bind in catalog order,
-  // not harvest order.
+  // Branded `<kind>-<16 hex>` job ids sit inside literal payload strings the
+  // same way goal compounds do; mine every string directly.
+  const mineJobIds = (value: unknown): void => {
+    if (typeof value === 'string') {
+      for (const match of value.matchAll(JOB_COMPOUND_RE)) {
+        /* v8 ignore next -- the compound capture is required whenever the job regex matches. */
+        if (match[1] !== undefined) claim(match[1], 'id')
+      }
+      return
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) mineJobIds(item)
+      return
+    }
+    if (isRecord(value)) for (const item of Object.values(value)) mineJobIds(item)
+  }
+  // Claim every log's header before scanning any records so corpus members own
+  // the session namespace; a session-kind field then binds to a committed log's
+  // token, while a reference to a session outside the corpus mints a generic id.
   for (const log of parsed) {
     const header = log.records[0]
     if (header?.type === 'session') claim(header.id, 'session', true)
+  }
+  for (const log of parsed) {
     const feedbackCommands = new Set(log.records.flatMap(record =>
       record.type === 'command/run' && isRecord(record.data) && record.data.name === 'feedback'
         ? [record.data.commandId] : []))
@@ -163,6 +188,7 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
         claim(record.data.compactionId, 'compaction')
       }
       mineGoalIds(record)
+      mineJobIds(record)
       collect(record, record.type)
     }
   }

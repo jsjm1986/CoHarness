@@ -58,8 +58,6 @@ Surrounding whitespace is discarded, but nothing else is parsed. `/feedback /pla
 
 The shipped `dsh` base mounts the command unconditionally — no configuration, no dependency on the goal stack. The Web client exposes it through its command adapter. Headless mode, ACP, and JSON-RPC do not provide a command adapter, so `/feedback` is unavailable there. The first accepted feedback for a harness home can create `$DSH_HOME/.anonymous-user-id`; rejected empty input does not resolve or create an id.
 
-The package owns one independent append-only event with no cross-event or mutable-data relation for an invariant companion to check. The event follows the session log's existing replay, fork, persistence, and crash-tail behavior.
-
 Feedback has no model consumer, amendment, withdrawal, or explicit durability barrier; a recorded entry can be lost with any other unflushed tail. The optional telemetry consumer treats the event as an export-policy trigger. Editable per-message ratings remain in their independent sidecar and do not authorize log sharing.
 
 Package and assembled Web tests cover command capture, category submission, failure retention and retry, and absence of new model turns. The Web dialog has an independently replayed accessibility snapshot.

@@ -5,11 +5,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "1 tool call · 2 intermediate messages":
-  - text: 1 tool call · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -18,6 +17,21 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
+- button "Asked questions"
+- button "Context injection runtime-context":
+  - img
+  - img
+  - text: Context injection runtime-context
+- button "Thinking The user wants me to ask them a checkpoint question first, then continue with whatever they interject. Let me do exactly that.":
+  - img
+  - img
+  - text: Thinking The user wants me to ask them a checkpoint question first, then continue with whatever they interject. Let me do exactly that.
+- button "Ask question 1/1 answered":
+  - img
+  - img
+  - text: Ask question 1/1 answered
 - text: "Interjection: include the word BANANA in your final reply."
 - group "Message time and speed": "{{clock}}"
 - button "Copy":

@@ -90,8 +90,11 @@ export function parseInstallSpec(raw: string): ParsedInstallSpec {
 }
 
 /**
- * The installable spec a dependency entry records, as pnpm would spell it on the command line: the `name@range` pair
- * for a registry version, the resolved `file:`/`link:` path for a local directory, or the recorded value itself.
+ * The spec `pnpm add` accepts for a dependency the profile manifest records. A git address, URL, or other
+ * non-registry protocol is the recorded value without the user information of an http(s) URL, whose query string
+ * is kept; a `file:` or `link:` path, which pnpm records relative to the profile or with `~` for the home
+ * directory, becomes absolute. A registry range, tag, or alias follows the dependency name after `@`, as does a
+ * non-registry value installed under a name other than the package's own.
  * @param name - the dependency name.
  * @param recorded - the value the profile manifest records for it.
  * @param profileDir - the profile directory a relative local path is resolved against.

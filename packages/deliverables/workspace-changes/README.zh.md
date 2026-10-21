@@ -65,7 +65,6 @@ SSH 工作区的 Git、私有索引与快照对象属于远端执行目标，文
 
 Git 使用选定的 `subprocess` 提供方、净化环境、`GIT_CONFIG_COUNT=0`、`GIT_TERMINAL_PROMPT=0`、`GIT_OPTIONAL_LOCKS=0`、配置的超时与有界输出。记录或存储失败会追加不完整公告，停止受影响轮次，并阻止后续工作，直到新请求通过存储探测。已记录的容量需求必须满足新上限，文件系统必须能够容纳一份达到上限的审阅。已发生的文件效果不会回滚。在未结束轮次中更换记录器后，进一步执行被拒绝，直到新轮次捕获自己的基线。释放操作只删除临时 Git 对象和捕获，不删除持久审阅。
 
-**运行时不变式：** 不发布伴生插件。产物读取在返回数据之前检查 Session 归属、内容摘要与文件下标关系；独立扫描会重复此准入检查，却没有观察另一个生产权威来源。
 
 </details>
 
@@ -77,7 +76,6 @@ Git 使用选定的 `subprocess` 提供方、净化环境、`GIT_CONFIG_COUNT=0`
 - [Web 产出物](../../client/ui-deliverables/README.zh.md)——读取所提供摘要并打开其文件的改动文件卡片。
 - [子进程能力](../../subprocess/README.zh.md)——git 运行所经过的接缝。
 - [本轮改动文件卡片决策](../../../.agents/notes/implemented/architecture/2026-09-23-authorized-workspace-review.zh.md)——快照设计、覆盖规则、暂缓的影子仓库与被否决的备选方案。
-
 
 <a id="model-experience"></a>
 ## 模型体验

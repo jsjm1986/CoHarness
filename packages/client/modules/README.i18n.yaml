@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/modules/README.md
+document:
+  en: 54c55358245631416e3ef6a17ef74e8b5f01ce6b
+  zh: 3ea8331e6f95b093f3f6121d3f037f658b2bb69d
 /:
   en: 97d39db1617684ea
   zh: de11ba354583a044
@@ -25,7 +28,10 @@
   zh: 7a74d21bdc3646a6
 /deepseek-ai-dsh-client-modules/use-this-package/live-plugin-composition:
   en: 8daffc3080c64df6
-  zh: b1731899fcd7f22d
+  zh: d5168fd9cd2909ae
+/deepseek-ai-dsh-client-modules/use-this-package/host-release-changes:
+  en: ebd9a30ad42a6758
+  zh: ae82070296f49a32
 /deepseek-ai-dsh-client-modules/use-this-package/sharing-modules:
   en: 0aaf0693db8bb203
   zh: 9f4738cdc6b55c26
@@ -48,8 +54,8 @@
   en: 253d9f265cd83ed0
   zh: 9d0f8df84d9d3ac9
 /deepseek-ai-dsh-client-modules/understand-the-implementation/entry-ownership:
-  en: ae59769034d692fa
-  zh: f71914d6f39b033a
+  en: df2994f9ff8872c9
+  zh: 50c2e1dd5c4087da
 /deepseek-ai-dsh-client-modules/understand-the-implementation/source-map:
   en: fabe9db8c44e2d90
   zh: 89ca94a8161f57ed
@@ -63,8 +69,8 @@
   en: ca75c51c89c2c9b0
   zh: 2026c1566df4f78c
 /deepseek-ai-dsh-client-modules/known-limitations-and-deferred-work:
-  en: 248722683a2de2a6
-  zh: a205c1df0845e881
+  en: bbeb76146cd93994
+  zh: 4c56b71c0a5517ad
 /deepseek-ai-dsh-client-modules/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

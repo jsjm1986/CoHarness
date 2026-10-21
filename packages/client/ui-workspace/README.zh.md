@@ -9,7 +9,7 @@ kind: "package-reference"
 
 共享 Workspace 浏览器与选择器插件。`WorkspaceBrowser` 填充侧边栏的 `sidebar.workspaces` slot，`WorkspacePicker` 则填充页面局部 Session Intent 主视觉区的 `conversation.hero.workspace` slot；两个界面使用同一套 Workspace 菜单和添加流程。当 conversation viewport 处于工作台模式时，浏览器隐藏自身的 Workspace/Session 列表、分节头和 rail 搜索，改为渲染其声明的 `sidebar.workspaces.workbench` 孔位——由工作台插件以面板管理界面填充。
 
-折叠的 Workspace 分区最多显示五条非空 Session，并在选中的空白 New Session 首条提示词落地前保留它作为临时行。溢出数量不计入该临时行，折叠状态下的拖拽会把可见来源保持在隐藏行之前。
+折叠的 Workspace 分区按每个分区各自的水位显示靠前的非空 Session，初始为五条，并在选中的空白 New Session 首条提示词落地前保留它作为临时行。水位会抬升以覆盖前 50 条中最后一个正在运行、有正在运行的子代、等待用户、有未读完成或是主视区当前项的 Session；从搜索打开的 Session 会把水位抬到它所在的任意位置。水位是只升不降的行数，因此运行或通知结束后这些行仍保持可见；把 Session 拖过水位的重排会隐藏它。每次点击「显示更多」把水位再抬高五条、不受 50 行上限约束，剩余不超过五条时则全部显示；最后一批之后「收起」会重置水位。折叠 Workspace 会重置它及其嵌套 Workspace 的水位，被折叠祖先隐藏的分组也无法抬升水位；重置后的水位仍会覆盖符合条件的 Session。溢出数量不计入该临时行，折叠状态下会把被拖拽行藏到溢出控件之后的放置会被拒绝。
 
 该浏览器通过全局运行时钩子将 Session 行渲染为分组或扁平形式，并负责 Workspace 添加／重命名／重排序以及 Session 重排序。每个 Workspace 会记住自身是关闭还是显示 Session；打开后默认显示五条 Session，其余条目通过临时的**展开其余**控件显示，而关闭并重新打开整个 Workspace 后会恢复为五条。从 Workspace 行创建 Session 时会先打开该分组，使 Session 状态到达后新行保持可见。Workspace 列表基线就绪后，浏览器持久化的展开状态与 Session 顺序记录只保留当前 Workspace id、Ungrouped 和单列表记账。视图选项把分组方式和每个记账各自的一份浏览器持久化 Session 顺序放在一起：真实 Workspace 从 `WorkspaceView.sessionIds` 初始化，Ungrouped 和跨 Workspace 的单列表则从最近更新时间顺序初始化。**手动排序**和**最近更新**在两种呈现方式下都可用。进入最近更新时会执行一次完整的时间排序，后续 user prompt 或 steer 会将对应 Session 置顶一次；进入手动排序则保留所有当前位置并停用后续置顶。两种模式下的拖拽都会编辑当前顺序；真实 Workspace 在手动模式下的拖拽还会更新 Host Session 记账，而 Ungrouped 和单列表因没有单一 Workspace 记账，其顺序始终只保存在浏览器本地。单列表没有父级层次，因此不显示空的左侧状态槽；Session 存在可见状态时仍保留该槽。无论采用哪种 Session 顺序，Workspace 拖拽顺序都由 Host 持久化。分组方式提供按 Workspace、按 Workspace 目录树——每个 Workspace 嵌于最近的已注册祖先下——以及单列表；三态归档筛选（隐藏、显示、仅已归档）在所有模式下生效，拖拽 Workspace 时会连同其后代在同级集合内移动。
 
@@ -17,7 +17,7 @@ kind: "package-reference"
 
 compact 抽屉会把每个 Workspace 分组呈现为带边框的卡片，并把 Session 行缩进为卡片内的触控目标；行树、复用规则、状态优先级、排序行为和操作回调与桌面浏览器保持一致。这只是移动呈现变化，不会创建第二份 Workspace 或 Session 投影。
 
-该选择器通过全局 `useWorkspaces` hook 列出真实的 Host Workspace 实体。选择 Workspace 会调用 slot owner 的 `onPick` 回调，重新定位前端 Session 对象。不同的规范化路径即使 basename 和显示标题相同，仍会作为由 id 区分的独立 Workspace；侧边栏的悬停详情把 POSIX 家目录及其后代显示为 `~`／`~/…`，Windows 路径保持原样。每个注册各自声明一个**目录流子 slot**（`single` kind：`conversation.hero.workspace.directoryFlow`／`sidebar.workspaces.directoryFlow`），由组合的选择器包 client half 填入其选取交互——今天是 [`-native`](../../host/directory-picker-native/README.zh.md) 后端的无渲染 OS 选择器驱动，`-browse` 组合下则是应用内浏览对话框。平铺显示的 **添加工作区…** 操作仅在当前界面的 slot 被占用时渲染（每次菜单渲染读取占用状态；slot 为空意味着该组合没有目录选择能力——seam 文档化的无流程默认行为，此时侧边栏区头直接不渲染添加按钮，而非留下一个点了没反应的按钮）。本包持有触发与接纳：占用方通过 slot 的属主交互约定（`open`/`busy`/`onPicked`/`onCancel`/`onError`）每次打开上报一个所选路径，owner 通过对象层接纳它，并等待 Workspace 列表投影刷新后才选中已提交的 Workspace；取消操作不会显示提示，错误落入可重试的文件夹对话框，其 **重新选择** 会重新打开流程。添加只有一条路径：占用者自带的新建文件夹能力已经覆盖了全新目录，因此不再单设按名称创建的对话框。菜单只在确有多个目标可选时出现——没有 Workspace 可列时，锚点手势直接拉起流程，而不是弹出只有一行的浮层；在列表基线落地前，空列表不算最终结果。运行时 Session 与 Workspace 服务负责物化。Workspace 行内的 Delete 操作会打开确认框，说明保留边界、阻止重复提交，并在失败时保持打开；成功后，该分组会被移除，其 Session 则留在 Ungrouped 下。Session 行的菜单与悬停操作是同一 apply 注册的 `sidebar.workspaces.session.menu.item` 与 `sidebar.workspaces.session.row.action` 列表占位——按 `order` 排布的置顶、重命名、fork、归档——独立包可以向同一菜单贡献行；菜单项通过 `useMenuOpenState` 读取所在行的开合状态，该钩子由渲染处的 `hookContext` 绑定而来。Rename 操作打开 `shell.overlay` 对话框，并以该行的显示标题预填：客户端不设名称冲突规则（host 负责规范化，可能以 `title-invalid` 拒绝，错误渲染在对话框告警区）；确认未修改的标题是有意允许的——这正是把当前自动标题钉住、不再被重新生成覆盖的手势。Session 静止时 Archive 操作不经确认对话框直接提交（非破坏性：日志和 workspace 记账席位保持不变）；Host 以 `session-active` 拒绝时，第二个 `shell.overlay` 对话框点名仍在运行的工作并提供"停止并归档"。归档成功后浮出行内 toast，其动作可撤销归档或把浏览器切到已归档视图；其他失败只作为控制台诊断输出，树保持不变。默认筛选下已归档行从所有分组视图——workspace 分组、Ungrouped、内容搜索和平铺列表——中消失；**全部对话（显示已归档）** 使其原位复现，**仅显示已归档** 单列它们，同样的菜单与行内操作可将其恢复。空白的「新会话」行只是占位符：不渲染行菜单和时间标签（其中还没有发生任何事），重命名、fork 和归档都从首条提示词落地后才可用。
+该选择器通过全局 `useWorkspaces` hook 列出真实的 Host Workspace 实体。选择 Workspace 会调用 slot owner 的 `onPick` 回调，重新定位前端 Session 对象。不同的规范化路径即使 basename 和显示标题相同，仍会作为由 id 区分的独立 Workspace；侧边栏的悬停详情把 POSIX 家目录及其后代显示为 `~`／`~/…`，Windows 路径保持原样。每个注册各自声明一个**目录流子 slot**（`single` kind：`conversation.hero.workspace.directoryFlow`／`sidebar.workspaces.directoryFlow`），由组合的选择器包 client half 填入其选取交互——今天是 [`-native`](../../host/directory-picker-native/README.zh.md) 后端的无渲染 OS 选择器驱动，`-browse` 组合下则是应用内浏览对话框。平铺显示的 **添加工作区…** 操作仅在当前界面的 slot 被占用时渲染（每次菜单渲染读取占用状态；slot 为空意味着该组合没有目录选择能力——seam 文档化的无流程默认行为，此时侧边栏区头直接不渲染添加按钮，而非留下一个点了没反应的按钮）。本包持有触发与接纳：占用方通过 slot 的属主交互约定（`open`/`busy`/`onPicked`/`onCancel`/`onError`）每次打开上报一个所选路径，owner 通过对象层接纳它，并等待 Workspace 列表投影刷新后才选中已提交的 Workspace；取消操作不会显示提示，错误落入可重试的文件夹对话框，其 **重新选择** 会重新打开流程。添加只有一条路径：占用者自带的新建文件夹能力已经覆盖了全新目录，因此不再单设按名称创建的对话框。菜单只在确有多个目标可选时出现——没有 Workspace 可列时，锚点手势直接拉起流程，而不是弹出只有一行的浮层；在列表基线落地前，空列表不算最终结果。运行时 Session 与 Workspace 服务负责物化。Workspace 行内的 Delete 操作会打开确认框，说明保留边界、阻止重复提交，并在失败时保持打开；成功后，该分组会被移除，其 Session 则留在 Ungrouped 下。Session 行的菜单与悬停操作是同一 apply 注册的 `sidebar.workspaces.session.menu.item` 与 `sidebar.workspaces.session.row.action` 列表占位——按 `order` 排布的置顶、重命名、fork、归档、复制 Session ID——独立包可以向同一菜单贡献行；菜单项通过 `useMenuOpenState` 读取所在行的开合状态，该钩子由渲染处的 `hookContext` 绑定而来。Rename 操作打开 `shell.overlay` 对话框，并以该行的显示标题预填：客户端不设名称冲突规则（host 负责规范化，可能以 `title-invalid` 拒绝，错误渲染在对话框告警区）；确认未修改的标题是有意允许的——这正是把当前自动标题钉住、不再被重新生成覆盖的手势。Session 静止时 Archive 操作不经确认对话框直接提交（非破坏性：日志和 workspace 记账席位保持不变）；Host 以 `session-active` 拒绝时，第二个 `shell.overlay` 对话框点名仍在运行的工作并提供"停止并归档"。归档成功后浮出行内 toast，其动作可撤销归档或把浏览器切到已归档视图；其他失败只作为控制台诊断输出，树保持不变。默认筛选下已归档行从所有分组视图——workspace 分组、Ungrouped、内容搜索和平铺列表——中消失；**全部对话（显示已归档）** 使其原位复现，**仅显示已归档** 单列它们，同样的菜单与行内操作可将其恢复。空白的「新会话」行只是占位符：不渲染行菜单和时间标签（其中还没有发生任何事），重命名、fork 和归档都从首条提示词落地后才可用。菜单最后一个内置项「复制 Session ID」把完整 ID 写入剪贴板并通过全局提示反馈成败，整个过程不打开该 Session。
 
 Workspace 和 Session 悬浮卡片会复制对应行被截断的值：激活 Workspace 卡片会写入其完整目录路径，激活非空白 Session 卡片则会写入其完整显示标题。临时的空白「新会话」卡片保持只读，因为其本地化标签是占位文案，并非会话内容。只有浏览器接受剪贴板写入后，卡片才会显示由字典提供的已复制状态。
 
@@ -39,18 +39,11 @@ Session 行渲染运行时的实时 `pendingInteraction` 分类：审批显示**
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。Workspace 与 Session 列表由运行时镜像与 Host 调用渲染；浏览器不拥有工作区数据。
-
 
 <a id="model-experience"></a>
 ## 模型体验

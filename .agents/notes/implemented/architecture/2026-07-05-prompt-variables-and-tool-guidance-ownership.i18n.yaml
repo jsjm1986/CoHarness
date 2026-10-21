@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-05-prompt-variables-and-tool-guidance-ownership.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-05-prompt-variables-and-tool-guidance-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-05-prompt-variables-and-tool-guidance-ownership.md
+document:
+  en: f1455ff6b47a7b4d548f4760d8bb46490b479612
+  zh: 3aab3960d4da6b03d7cc1d46e9291f6020276914
 /agent-note-prompt-variables-and-tool-guidance-ownership:
   en: 6f8b4a9d26ab3e50
   zh: 9741e5718e647f0a

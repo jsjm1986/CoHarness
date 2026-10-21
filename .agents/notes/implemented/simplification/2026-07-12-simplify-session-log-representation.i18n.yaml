@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-12-simplify-session-log-representation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-12-simplify-session-log-representation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-12-simplify-session-log-representation.md
+document:
+  en: 3efb531d3c0822d7444d1270eac4da2617c12447
+  zh: 8c05ac6512a8aa8e7fefc56ba410bc81dc3be277
 /agent-note-simplify-session-log-representation:
   en: 67c93363e7893b94
   zh: 1496ef038a039cd6

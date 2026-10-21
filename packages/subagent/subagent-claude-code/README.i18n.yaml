@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-claude-code/README.md
+document:
+  en: 807ad34c5d0ff0684ec78e855a79467defa326d7
+  zh: efc01c53b53d0712f273df14bd16cabc531d3a04
 /:
   en: 106a80259eef465a
   zh: 07bde2df0c861ceb
@@ -12,8 +15,8 @@
   en: 498d97a8dd913e53
   zh: d76f0cd25940c540
 /deepseek-ai-dsh-subagent-claude-code/table-of-contents:
-  en: 6c5b050d365effa8
-  zh: 5ff373d2e22ad19c
+  en: b0da2a7b0d6ecfe6
+  zh: d4de4894f8ec25ce
 /deepseek-ai-dsh-subagent-claude-code/start-and-ownership:
   en: 8d5027446af34c32
   zh: dc65cd9f9ea140ef
@@ -30,11 +33,8 @@
   en: fea643616f003b42
   zh: 7c386919dec2e08c
 /deepseek-ai-dsh-subagent-claude-code/product-compatibility-and-evidence:
-  en: bc4e5d0ba0ee39a4
-  zh: 274abb67dafc06e4
-/deepseek-ai-dsh-subagent-claude-code/invariants:
-  en: f0b2350375ba83be
-  zh: b2f14190fcaf8c43
+  en: d5b832a5ae316139
+  zh: cba475777857c7af
 /deepseek-ai-dsh-subagent-claude-code/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -63,8 +63,8 @@
   en: fdbb7dcbf8b37f2b
   zh: 9accaada9f21e36a
 /deepseek-ai-dsh-subagent-claude-code/known-limitations-and-deferred-work:
-  en: 04cd1bd0a8d1f634
-  zh: f7b5361eb6ed8232
+  en: 36fedbf787455356
+  zh: 1400e634bb5d2ac9
 /deepseek-ai-dsh-subagent-claude-code/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

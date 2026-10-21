@@ -33,8 +33,8 @@ import type { Page } from 'playwright'
 import { expect } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
-import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
-import Group from '@deepseek-ai/cordis-plugin-group'
+import { entryListSchema, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
+import * as yaml from 'js-yaml'
 import { scrubModelRequestBulk, stabilizeFixtureMessageIds } from '@deepseek-ai/dsh-session-snapshot'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { assertSessionFixtureVersion, parseSessionFixtureName, parseSnapshotManifest, redactSessionSnapshotIds, sessionFixtureFiles, sessionFixtureName } from '@deepseek-ai/dsh-session-snapshot'
@@ -42,8 +42,15 @@ import {
   auditStartupEntries,
   composeEntries,
   healProfilesModuleFallback,
+  initProfile,
   loadOverlayPatches,
+  loadProfileDirectory,
+  mountRootInclude,
+  readProfileManifest,
+  readProfilePatches,
+  writeProfileManifest,
   type Profile,
+  type ProfileContext,
 } from '@deepseek-ai/dsh-app-boot'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { AssistantStreamAccumulator, expandAssistantStream, LlmAdapter } from '@deepseek-ai/dsh-llm'
@@ -60,7 +67,9 @@ import SessionStore, {
   type SessionEvent,
   type SessionHeader,
 } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 // Empty type imports carry the webServer/agents/sessionPersistence Context merges.
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -68,7 +77,7 @@ import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { REPO_ROOT, requireDist } from './support.ts'
 
 import { webSnapshotMode, type WebSnapshotMode } from './expected.ts'
-import { normalizeAria } from './aria-normalize.ts'
+import { normalizeAria, type AriaPathDecl } from './aria-normalize.ts'
 export { webSnapshotMode, compareOrRefreshGolden } from './expected.ts'
 
 /** The shipped composition under test: the dsh-base and dsh-web-app bundle patches over the empty profile root. */
@@ -76,6 +85,8 @@ const BASE_PATCH_PATH = join(REPO_ROOT, 'packages/bundle/base/cordis.patch.yml')
 const WEB_PATCH_PATH = join(REPO_ROOT, 'packages/bundle/web-app/cordis.patch.yml')
 /** The installation anchor whose dependency surface the profile module fallback mirrors. */
 const INSTALL_ANCHOR = join(REPO_ROOT, 'apps/cli/package.json')
+/** In-profile bundle carrying this harness's deployment defaults, below editable profile values. */
+const SCAFFOLD_DEFAULTS_BUNDLE = 'dsh-web-scaffold-defaults'
 /** The deployment's own agent-preset root, shipped beside the app's config. */
 const SHIPPED_PRESET_DIR = join(REPO_ROOT, 'apps/cli/config/agent-presets')
 
@@ -100,6 +111,29 @@ const REPLAY_PROVIDERS = [{
     },
   ],
 }]
+
+// Mirrored from packages/client/ui-settings-models/src/onboarding-copy.ts; the
+// scaffold inlines them so the test harness stays independent of the client
+// package graph.
+const WELCOME_NOTICE_SETTINGS_NAMESPACE = 'ui-onboarding'
+const WELCOME_NOTICE_ACK_FIELD = 'welcomeNoticeVersion'
+const WELCOME_NOTICE_VERSION = '2026-09-28.1'
+
+/**
+ * Persist the shipped welcome acknowledgement into a harness home that no
+ * server has booted yet — the pre-boot equivalent of the settled-context ack
+ * below, for lanes that spawn `dsh` themselves. A first-run home would paint
+ * the versioned notice modal over every page.
+ * @param home - the `DSH_HOME` directory the spawned server reads.
+ */
+export async function writeWelcomeNoticeAck(home: string): Promise<void> {
+  await mkdir(home, { recursive: true })
+  await writeFile(join(home, 'settings.yaml'), [
+    `${WELCOME_NOTICE_SETTINGS_NAMESPACE}:`,
+    `  ${WELCOME_NOTICE_ACK_FIELD}: '${WELCOME_NOTICE_VERSION}'`,
+    '',
+  ].join('\n'))
+}
 
 /**
  * The routes a shipped composition always has, with no ability to stream.
@@ -172,6 +206,8 @@ export interface WebScaffold {
   workspaceCwd: string
   /** Temp persistence root (seeded sessions land here through the real API). */
   persistenceRoot: string
+  /** Temp userdoc upload root; rendered document text embeds paths below it. */
+  documentRoot: string
   /** Isolated harness home the settings/credentials rows write ($DSH_HOME double). */
   harnessHome: string
   /** Await a settled turn end: in-process turn/end, then the agent's idle flip (which follows the persistence flush). */
@@ -192,6 +228,8 @@ export interface LaunchOptions {
   workbench?: boolean
   /** Disable the optional native Open In app rows when the host package is not built in a fixture. */
   openInApp?: boolean
+  /** Leave the current welcome notice pending; ordinary scenarios pre-acknowledge it before browser boot. */
+  welcomeNoticePending?: boolean
   /**
    * Optional product overlay applied after the shipped Web surface and before
    * the scaffold's hermetic test patches, matching the launcher's `--patch`
@@ -249,7 +287,7 @@ export interface LaunchOptions {
    * yml default. The code runtime row is always in the tree, so no extra
    * insertion is needed.
    */
-  toolsMode?: 'native' | 'ptc' | 'both'
+  toolsMode?: 'native' | 'ptc'
   /**
    * Insert the opt-in model-facing Cordis tool provider into the shipped tree.
    * Record and replay use the same tool surface, so captured request headers
@@ -269,9 +307,22 @@ export interface LaunchOptions {
    */
   deepSeekSearch?: {
     /** Anthropic-compatible base URL; the provider appends `/messages`. */
-    baseURL: string
+    baseURL?: string
     /** Credential reference resolved by the shipped search provider. */
     apiKeyEnv: string
+  }
+  /**
+   * Patch the shipped DeepSeek Search and Fetch API row to a deterministic
+   * endpoint and credential reference, optionally selecting both providers as
+   * the settings switch does.
+   */
+  deepSeekWebApi?: {
+    /** Search and Fetch API base URL; the providers append `/search` or `/fetch`. */
+    baseURL?: string
+    /** Credential reference resolved by both providers. */
+    apiKeyEnv: string
+    /** Select `deepseek-search-api` and `deepseek-fetch-api` in place of the shipped selection. */
+    select?: boolean
   }
   /**
    * Replace the roster the scaffold mounts by default (the shipped directory
@@ -397,10 +448,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   const documentRoot = join(storageRoot, 'documents')
   if (maskDeepSeekCredential) Reflect.deleteProperty(process.env, 'DEEPSEEK_API_KEY')
 
-  // The include patch set — the same layer stack the profile boot composes
-  // (bundle patches in dsh.profile.bundles order), applied over the SAME empty root (a
-  // patch id that stops matching a row fails the boot sweep loudly instead of
-  // drifting).
+  // The include overlay set — the CLI-style `--patch` layer the profile boot
+  // applies over its profile-composed bundle layers (a patch id that stops
+  // matching a row fails the boot sweep loudly instead of drifting). The
+  // shipped bundle layers themselves reach the composition through the
+  // scaffold profile below, the same way the launcher reads them.
   const basePatches = loadOverlayPatches('web e2e scaffold', BASE_PATCH_PATH)
   const surfacePatches = loadOverlayPatches('web e2e scaffold', WEB_PATCH_PATH)
   const extraOverlayPatches = options.extraOverlayPath === undefined
@@ -412,9 +464,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     surfaceContext?: boolean
   } | undefined
   const surfaceContext = webRuntimeConfig?.surfaceContext !== false
-  const patches: PatchOptions[] = [
-    ...basePatches,
-    ...surfacePatches,
+  const overlayPatches: PatchOptions[] = [
     // Keyless scenarios retain the recorded default; explicit scenario overlays win.
     ...mode === 'record' || options.deepSeekMissingCredential === true
       ? []
@@ -435,7 +485,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // Only the shipped root: a developer's own `~/.dsh/.agent-presets` must not be
     // able to change a golden.
     {
-      id: 'agent-presets',
+      id: 'agent-preset-registry',
       config: {
         default: 'standard',
         roots: [{ path: SHIPPED_PRESET_DIR, trust: 'system' }],
@@ -529,7 +579,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       ? []
       // Never the derived harness-home root: a developer's own presets must not
       // be able to change a golden, whatever roots a scenario asks for.
-      : [{ id: 'agent-presets', config: { ...options.agentPresets, includeUserRoot: false } }],
+      : [{ id: 'agent-preset-registry', config: { ...options.agentPresets, includeUserRoot: false } }],
     ...options.toolsMode === undefined ? [] : [{ id: 'tools', config: { mode: options.toolsMode } }],
     // The shipped Web bundle already owns both runners and the Cordis UI. This
     // scenario adds only the model-facing tools that exercise those services.
@@ -544,13 +594,33 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
         id: 'web-search-deepseek',
         config: {
           apiKeyEnv: options.deepSeekSearch.apiKeyEnv,
-          baseURL: options.deepSeekSearch.baseURL,
+          ...options.deepSeekSearch.baseURL === undefined ? {} : { baseURL: options.deepSeekSearch.baseURL },
         },
       }],
+    ...options.deepSeekWebApi === undefined ? [] : [
+      { id: 'web-deepseek-api', config: { apiKeyEnv: options.deepSeekWebApi.apiKeyEnv, ...options.deepSeekWebApi.baseURL === undefined ? {} : { baseURL: options.deepSeekWebApi.baseURL } } },
+      ...options.deepSeekWebApi.select === true
+        ? [{ id: 'web', config: { searchProvider: 'deepseek-search-api', fetchProvider: 'deepseek-fetch-api' } }]
+        : [],
+    ],
     ...mode === 'record' || options.deepSeekMissingCredential === true
       ? []
       : [{ id: 'llm-deepseek', disabled: true }],
   ]
+
+  // Live fields use a shared deployment layer; process-specific ports and roots stay in CLI overlays.
+  const formEntries = new Set(['agent-default-model', 'agent-preset-registry', 'llm-deepseek', 'llm-pi-ai',
+    'web', 'web-search-deepseek', 'web-deepseek-api', 'agent-loop', 'subagent', 'bash-sandbox', 'pwsh-sandbox',
+    'session-log-deepseek', 'ui-theme', 'locale', 'ui-chat', 'ui-conversation', 'ui-settings', 'ui-settings-general', 'permission'])
+  const formDefaults: PatchOptions[] = []
+  const processOverlays = overlayPatches.map((patch) => {
+    if (patch.id === undefined || !formEntries.has(patch.id) || patch.config === undefined) return patch
+    const config: unknown = patch.config
+    formDefaults.push({ id: patch.id, config })
+    const ordinary = { ...patch }
+    Reflect.deleteProperty(ordinary, 'config')
+    return ordinary
+  })
 
   // Sessions inherit the gateway's process.cwd() default; run the boot from
   // the temp workspace so tool cwd, session cwd, and fixtures agree.
@@ -597,6 +667,37 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     const rootConfig = join(profileDir, 'cordis.yml')
     await writeFile(rootConfig, '[]\n')
     ctx.baseUrl = pathToFileURL(profileDir).href + '/'
+    // A real profile: the shipped web bundles plus each fixture package,
+    // installed the way `dsh plugin add` leaves them. Fixture packages are
+    // installed but not started: the scenario composes them by hand.
+    const dependencies: Record<string, string> = {}
+    const bundles = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']
+    for (const layer of extraLayers) dependencies[layer.packageName] = `file:${layer.packageDir}`
+    // Fixture deployment defaults remain below editable profile values.
+    const fixtureDir = join(profileDir, 'node_modules', SCAFFOLD_DEFAULTS_BUNDLE)
+    await mkdir(fixtureDir, { recursive: true })
+    await writeFile(join(fixtureDir, 'package.json'), JSON.stringify({
+      name: SCAFFOLD_DEFAULTS_BUNDLE,
+      version: '1.0.0',
+      dsh: { bundle: { patch: 'cordis.patch.yml' } },
+    }))
+    await writeFile(join(fixtureDir, 'cordis.patch.yml'), yaml.dump(formDefaults, { schema: entryListSchema }))
+    bundles.push(SCAFFOLD_DEFAULTS_BUNDLE)
+    dependencies[SCAFFOLD_DEFAULTS_BUNDLE] = `file:${fixtureDir}`
+    initProfile(profileDir, bundles)
+    const profileManifest = readProfileManifest('dsh', profileDir)
+    profileManifest.dependencies = dependencies
+    writeProfileManifest(profileDir, profileManifest)
+    const profileContext: ProfileContext = {
+      name: 'scaffold', dir: profileDir, patchPath: profile.patchPath, installAnchor: INSTALL_ANCHOR,
+      cwd: workspaceCwd, home: harnessHome,
+      startedBundles: loadProfileDirectory('dsh', profileDir, INSTALL_ANCHOR).layers.map(layer => layer.packageName),
+      overlays: processOverlays, telemetryDisabledEnv: undefined,
+    }
+    // HMR gates file-driven reloads on application readiness, which the
+    // launcher commits after boot; this direct harness is ready at once.
+    ctx.provide('appReady', { onReady: (listener) => { listener(); return () => {} } })
+    ctx.provide('profileContext', profileContext)
     // This direct Loader harness supplies the same root-path capability as app-boot.
     ctx.provide('dshHomePath', dshHomePath)
     // A host with no command line still provides one: the web bundle's startup
@@ -610,18 +711,17 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     })
     await ctx.plugin(Loader)
-    ctx.loader.builtins.include = Include
-    // `cordis:group` beside it, exactly as `boot()` registers it: a group row is
-    // how a preset gives one `isolate` realm to a provider and its consumers,
-    // and a preset resolving package names from its own directory cannot reach
-    // `@deepseek-ai/cordis-plugin-group` by name.
-    ctx.loader.builtins.group = Group
-    await ctx.loader.create({
-      name: 'cordis:include',
-      config: { path: pathToFileURL(rootConfig).href, patches },
-    })
+    await mountRootInclude(ctx, rootConfig, readProfilePatches('dsh', profileContext))
     await ctx.loader.await()
     await auditStartupEntries(ctx, 'web e2e scaffold')
+    if (options.welcomeNoticePending !== true
+      // Overlays that omit the settings shell (e.g. goal-bar) leave the
+      // onboarding namespace unregistered; only ack when the owner mounted.
+      && ctx.settings.describe().some(descriptor => descriptor.ns === WELCOME_NOTICE_SETTINGS_NAMESPACE)) {
+      await ctx.settings.mutate(WELCOME_NOTICE_SETTINGS_NAMESPACE, [{
+        op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION,
+      }])
+    }
     const boundPort = ctx.get('webServer')?.port
     if (boundPort === undefined) {
       throw new Error('web e2e scaffold: webServer service missing after settled boot')
@@ -736,6 +836,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     ctx,
     workspaceCwd,
     persistenceRoot,
+    documentRoot,
     // Barrier stack: the in-process turn/end identifies the session, its
     // explicit flush makes the transcript durable, and the caller's browser
     // settled-poll comes last because host completion strictly precedes render.
@@ -781,23 +882,19 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
 /**
  * Serialize a live session to the canonical raw session-JSONL layout — the
  * in-memory record-mode harvest, so the on-disk zstd default never matters.
+ * @param session - Captured live Session, including any inherited fork prefix.
+ * @returns Current-writer Session JSONL.
  */
 function rawSessionLog(session: Session): string {
-  const header = session.header
+  const encodedEvents = (session.snapshotEvents() as unknown as readonly SessionFormatEvent[])
+    .map(event => sessionFormatCatalog.encodeCurrentEvent(event))
+  const header = sessionFormatCatalog.encodeCurrentHeader({
+    ...session.header,
+    delegationDepth: session.header.delegationDepth ?? 0,
+  }, session.inheritedEventCount)
   return [
-    JSON.stringify({
-      type: 'session',
-      version: header.version,
-      id: header.id,
-      createdAt: header.createdAt,
-      ...header.cwd === undefined ? {} : { cwd: header.cwd },
-      ...header.parentSession === undefined ? {} : { parentSession: header.parentSession },
-      isSeeded: header.isSeeded,
-      ...header.origin === undefined ? {} : { origin: header.origin },
-      ...header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth },
-      ...header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset },
-    }),
-    ...session.snapshotEvents().map(event => JSON.stringify(event)),
+    JSON.stringify(header),
+    ...encodedEvents.map(record => JSON.stringify(record)),
     '',
   ].join('\n')
 }
@@ -1072,13 +1169,19 @@ async function persistSeedSession(
  * @param page - the page under test.
  * @param selector - the region locator selector.
  * @param workspaceCwd - normalization input.
+ * @param paths - additional declared temporary paths to tokenize (e.g. documentRoot).
  * @returns the stable normalized snapshot.
  */
-export async function captureStableAria(page: Page, selector: string, workspaceCwd: string): Promise<string> {
+export async function captureStableAria(
+  page: Page,
+  selector: string,
+  workspaceCwd: string,
+  paths: readonly AriaPathDecl[] = [],
+): Promise<string> {
   const region = page.locator(selector).first()
-  let previous = normalizeAria(await region.ariaSnapshot(), workspaceCwd)
+  let previous = normalizeAria(await region.ariaSnapshot(), workspaceCwd, paths)
   await expect.poll(async () => {
-    const current = normalizeAria(await region.ariaSnapshot(), workspaceCwd)
+    const current = normalizeAria(await region.ariaSnapshot(), workspaceCwd, paths)
     const busy = await region.locator('[data-model-trigger][aria-busy="true"]').count() !== 0
     const stable = current === previous && !busy
     previous = current

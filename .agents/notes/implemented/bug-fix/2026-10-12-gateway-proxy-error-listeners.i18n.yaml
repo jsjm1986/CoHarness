@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-gateway-proxy-error-listeners.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-gateway-proxy-error-listeners.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-gateway-proxy-error-listeners.md
+document:
+  en: 057a1d6080b54a80e09ed436de8e9fed73d97939
+  zh: 2ac1b83651fef7de4800b8783655c1f293411e00
 /agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing:
   en: 5003e66bf0c80da5
   zh: 4fe87b34957b798e

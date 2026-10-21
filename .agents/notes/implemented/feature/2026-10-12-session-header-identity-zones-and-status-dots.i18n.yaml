@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-session-header-identity-zones-and-status-dots.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-session-header-identity-zones-and-status-dots.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-12-session-header-identity-zones-and-status-dots.md
+document:
+  en: 4883e804b2ed6da210f6b61bdad57ede2eb649ac
+  zh: 64a5ba43cd355bc25e63860dc269e0b2d9c1e7e4
 /agent-note-session-header-split-into-identity-zones-with-state-dots-and-a-metadata-seat:
   en: ffde3c6e108ebdab
   zh: f0fe3bd4dcbb5801

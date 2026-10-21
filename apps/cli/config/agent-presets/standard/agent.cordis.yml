@@ -11,7 +11,7 @@
 # A service row here MUST sit inside a group carrying an `isolate` realm.
 # Without one it publishes into the root realm, where it is process-global —
 # another preset publishing the same name collides, and a host reader would
-# resolve one preset's instance for every session; `dsh-agent-presets` rejects
+# resolve one preset's instance for every session; `dsh-agent-preset-registry` rejects
 # that at mount. `true` means an entry-local realm: this standing mount's own
 # private instance, apart from every other preset's. (A shared label does NOT
 # pool instances — `provide()` throws on the second registration under the
@@ -94,6 +94,12 @@
 # chooses is whether its agent can collect and stop background work at all.
 - id: tool-jobs
   name: '@deepseek-ai/dsh-tool-jobs'
+
+# Reminder management (schedule_create/list/update/delete) registers into this
+# preset's scope: the Host `schedule` service owns storage and delivery, so the
+# tool Consumer needs no realm and presets that omit it get no reminder tools.
+- id: tool-schedule
+  name: '@deepseek-ai/dsh-tool-schedule'
 
 # ── skills ──────────────────────────────────────────────────────────────────
 
@@ -244,8 +250,11 @@
     - id: tool-workflow
       name: '@deepseek-ai/dsh-tool-workflow'
 
+    # Mounted but disabled by default; a preset fork or deployment patch
+    # enables Ralph by removing `disabled`.
     - id: tool-ralph
       name: '@deepseek-ai/dsh-tool-ralph'
+      disabled: true
       config:
         subagentProvider: spawn
         maxRounds: 64
@@ -281,4 +290,7 @@
 # mount it — the host plane disables it for the same reason on web.
 - id: tool-plugin-manager
   name: '@deepseek-ai/dsh-plugin-manager/tools'
+  disabled: true
+- id: tool-plugin-market
+  name: '@deepseek-ai/dsh-plugin-market/tools'
   disabled: true

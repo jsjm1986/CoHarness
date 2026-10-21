@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-19-upstream-alpha2-durable-layer-replatform.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-19-upstream-alpha2-durable-layer-replatform.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-upstream-alpha2-durable-layer-replatform.md
+document:
+  en: b361d0cfac41538738640a98c32c7bf2a8db2c53
+  zh: d8996e680dddd5cbdb60a145a9b03c66bf57b30b
 /agent-note-upstream-alpha-2-durable-layer-re-platform:
   en: cbc3d790af47adf5
   zh: b8f83ee8f84cb359

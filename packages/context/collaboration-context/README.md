@@ -13,7 +13,6 @@ Durable model-visible participant attribution for shared project conversations. 
 
 Use `dsh-collaboration-context` for durable model-visible participant attribution in shared project conversations. Listening at `agent/pre-step`, it recognizes authenticated project participant metadata on final user messages and inserts one paired attribution message immediately before each, so the model sees who said what.
 
-
 ## Table of Contents
 
 - [Runtime contract](#runtime-contract)

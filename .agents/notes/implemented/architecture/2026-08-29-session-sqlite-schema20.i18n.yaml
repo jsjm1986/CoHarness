@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-29-session-sqlite-schema20.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-29-session-sqlite-schema20.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-29-session-sqlite-schema20.md
+document:
+  en: afe23452b51ea1e69d4a37dd0e3487157b32744a
+  zh: 0ced19fb0ca946469d1f5890e4d920c0a73d33ab
 /agent-note-use-a-coharness-sqlite-schema-20-with-explicit-extensions:
   en: aafd8dd24e00b294
   zh: e2e7873ed4215c9f

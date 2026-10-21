@@ -1,7 +1,7 @@
 /** Session- and path-authorized reads of immutable per-turn workspace snapshots. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { environmentForAgent } from '@deepseek-ai/dsh-agent-presets'
+import { environmentForAgent } from '@deepseek-ai/dsh-agent-preset-registry'
 import type { FileSystem, FsTarget } from '@deepseek-ai/dsh-fs'
 import { CollaborationError, collaborationRefusal } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'

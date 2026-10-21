@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/shell/bash-sandbox/README.md
+document:
+  en: a5aafa5d78d5bdcfd9596cf4121787cf877e3152
+  zh: f9a83092a311fd08292c91aae96ec7f609706d67
 /:
   en: 2d1caa2e6179218a
   zh: 0b51a5dbda727ffa
@@ -39,8 +42,8 @@
   en: e1b1ac62e94ce535
   zh: 5fa7a0353fbf777d
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/source-map:
-  en: 2d3bb8e19840dee1
-  zh: 8b3eb6112ecbb9e7
+  en: 26647c231bf1d3f6
+  zh: b7b203f042a18682
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/main-flow:
   en: 59fa1cf69b515274
   zh: 3187f4c6907a13c2
@@ -48,8 +51,8 @@
   en: 0b6c6d7e216e1d23
   zh: 15f94cfccf4fa242
 /deepseek-ai-dsh-bash-sandbox/further-exploration:
-  en: bc15c70d4fcc63c8
-  zh: 9591b7fa6fdbf4fe
+  en: 361b036358f199fc
+  zh: f3915bf8f11637e3
 /deepseek-ai-dsh-bash-sandbox/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

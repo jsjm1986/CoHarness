@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-open-in-app-local-runtime-gate.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-open-in-app-local-runtime-gate.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-open-in-app-local-runtime-gate.md
+document:
+  en: 81b8bfcf0545590fee45d687f1ffe20040d5aad4
+  zh: 5037e89f06041008b262d529a01c48bd05cc42e9
 /agent-note-gate-the-open-in-app-action-on-base-runtime-session-ownership:
   en: 9f4f256238dee59d
   zh: 938b1ff5d53d0887

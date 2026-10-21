@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-persistence-jsonl/README.md
+document:
+  en: 11232aa589861c1f09236ac5e4f8d3fec05bb49c
+  zh: 6d708bc72f7d41d87844ccd6f84d663613065e8e
 /:
   en: 17400a83b991dd8a
   zh: 61495d48365178df
@@ -12,14 +15,14 @@
   en: 4821bd83813408c7
   zh: 2e5c721a19f549e7
 /deepseek-ai-dsh-session-persistence-jsonl/table-of-contents:
-  en: 95f074d29642aeb7
-  zh: db4801be0d4a3062
+  en: 757efd48df7248f8
+  zh: 38c27f579adffcfc
 /deepseek-ai-dsh-session-persistence-jsonl/on-disk-layout:
   en: 7e6bcc4a579589ea
   zh: 4073ef93db30c74e
 /deepseek-ai-dsh-session-persistence-jsonl/config:
-  en: e38bc54d3bad88cd
-  zh: 70bc2df47d2f25dd
+  en: 63d8cf91910ae5b1
+  zh: 81bd2a61a3b3cba9
 /deepseek-ai-dsh-session-persistence-jsonl/physical-encoding:
   en: bacd530bd75886c8
   zh: 45dd1fd73912d7ab
@@ -27,11 +30,8 @@
   en: cf3ca013cce79e30
   zh: e1f029d95c51009e
 /deepseek-ai-dsh-session-persistence-jsonl/write-path:
-  en: 85a6a82cfef9676d
-  zh: e03fc94e465fa578
-/deepseek-ai-dsh-session-persistence-jsonl/invariants:
-  en: e70bbb3036345c2b
-  zh: f1b052f7101ebc47
+  en: 3ab9e6e6f06d76e4
+  zh: ae40580fbb1361fe
 /deepseek-ai-dsh-session-persistence-jsonl/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-28-remove-synthetic-log-only-turns.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-28-remove-synthetic-log-only-turns.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-28-remove-synthetic-log-only-turns.md
+document:
+  en: 619e9e0a1f8dc8afe68de7dfea44986a0aa5cc8c
+  zh: 0d2af069bebfda1580587ce669b7b8dbf16cdd8b
 /agent-note-remove-synthetic-turns-for-log-only-events:
   en: 558a3b8b47acfec2
   zh: 9e6cc6443e468745
@@ -9,14 +12,14 @@
   en: 33413b092d535f4f
   zh: 02f79f372227c104
 /agent-note-remove-synthetic-turns-for-log-only-events/decision:
-  en: 957ff382ee82c076
-  zh: 66c42934536d5a8f
+  en: 9aaba975dc2c2160
+  zh: f90e82d36aec6c0a
 /agent-note-remove-synthetic-turns-for-log-only-events/alternatives-considered:
-  en: fbee860bf43530a7
-  zh: 276647ba5402d6a8
+  en: cf936b80118eecc9
+  zh: 2af064071dd43fe5
 /agent-note-remove-synthetic-turns-for-log-only-events/verification:
-  en: 242a192f49882f36
-  zh: 0442557ff3993643
+  en: 80937328f4f7b240
+  zh: f88454c968d631e0
 /agent-note-remove-synthetic-turns-for-log-only-events/consequences:
   en: 0c636b744dfa4ca9
   zh: 05f409a4fd962015

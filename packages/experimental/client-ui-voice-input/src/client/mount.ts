@@ -11,6 +11,7 @@ import type { TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { VoiceInput, type VoiceInputInjected } from './VoiceInput.tsx'
 import { VoicePluginsItem } from './PreparationCard.tsx'
 import { Recording } from './audio.ts'
+import { createMicrophoneDeviceStore } from './microphone-device.ts'
 import { en, NS, zh } from './locales.ts'
 import { observeReadiness } from './readiness.ts'
 
@@ -19,6 +20,7 @@ export const inject = ['remote', 'slots', 'locale']
 function registerUi(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }))
   const recordings = new Set<Recording>()
+  const microphone = createMicrophoneDeviceStore()
   const readiness = observeReadiness(ctx)
   ctx.effect(() => readiness.dispose)
   ctx.effect(() => async () => { await Promise.all([...recordings].map(recording => recording.dispose())) })
@@ -31,9 +33,10 @@ function registerUi(ctx: Context): void {
       if (navigation === undefined) { requestSettingsSection(); return }
       navigation.openItem('speech-to-text')
     },
-    hooks: { speechReadiness: readiness.state },
+    hooks: { speechReadiness: readiness.state, microphoneDevice: microphone },
+    selectMicrophone: (device) => { microphone.set(device) },
     createRecording: () => {
-      const recording = new Recording(() => { recordings.delete(recording) })
+      const recording = new Recording(() => { recordings.delete(recording) }, microphone.getSnapshot().id)
       recordings.add(recording)
       return recording
     },

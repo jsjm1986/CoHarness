@@ -88,7 +88,6 @@ kind: "package-reference"
 | [`src/index.ts`](src/index.ts) | 插件入口：`ToolResultPruner` 服务、`pruneSession` / `pruneContent` / `measureContent` |
 | [`src/config.ts`](src/config.ts) | `PRUNE_MARKER`、默认值、码点计数、预算验证 |
 | [`src/types.ts`](src/types.ts) | `ToolResultPruneConfig`、`ResolvedConfig`、`PrunedEntry`、`PruneResult` |
-| — | 不发布运行时不变式伴生入口；Session 会验证每次仅改写内容的操作，其伴生条目负责维护跨事件包围关系。 |
 
 </details>
 
@@ -106,7 +105,6 @@ kind: "package-reference"
 - [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-compaction-tool-result-pruner)——每个受支持配置字段及其源声明。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -129,7 +127,6 @@ kind: "package-reference"
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明修剪何时不合适，或何时需要特别注意；它们是当前包约束。
 

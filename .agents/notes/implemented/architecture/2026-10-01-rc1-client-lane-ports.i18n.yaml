@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-01-rc1-client-lane-ports.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-01-rc1-client-lane-ports.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-01-rc1-client-lane-ports.md
+document:
+  en: a83566958192b8b450f580060b056c3ffae0c3a6
+  zh: 2b4ff60d5d0d8fc4ba5b4c2ba26d04dc38eaf721
 /agent-note-upstream-rc-1-client-lane-behavior-ports:
   en: b95903ba7b7332c1
   zh: 1feb4b0b656a0cbb
@@ -9,8 +12,8 @@
   en: d5ae0d908eafd1e1
   zh: 827f19ef3a6bb37e
 /agent-note-upstream-rc-1-client-lane-behavior-ports/decision:
-  en: ccb133f04e7a4f79
-  zh: d5ce03bb7f47ee13
+  en: 8b62747d064ec84c
+  zh: 9a495b719bb56a6a
 /agent-note-upstream-rc-1-client-lane-behavior-ports/alternatives-considered:
   en: 29fb7103edacd2af
   zh: 8fa5e068fdcf0ad3
@@ -18,5 +21,5 @@
   en: 1ffa59137ff84f80
   zh: bddbc6d16705ceae
 /agent-note-upstream-rc-1-client-lane-behavior-ports/testing:
-  en: 289102038ef61ad3
-  zh: 77b95ae2febe495d
+  en: 4595be36fc2fd21f
+  zh: 51c97ac9baba20c6

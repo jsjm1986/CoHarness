@@ -20,7 +20,6 @@ A native cordis plugin could do everything this bridge does — more powerfully,
 - [Config](#config)
 - [Hook points → typed Decisions](#hook-points--typed-decisions)
 - [Context source](#context-source)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -78,11 +77,6 @@ Every agent-scoped stdin payload carries `session_id` and string-shaped `transcr
 ## Context source
 
 Injected context carries an explicit `{ kind: 'plugin', plugin: 'hooks-claude-code' }` source so the durable message is never mistaken for a user prompt.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The bridge translates each canonical interception into a Claude Code hook invocation and maps the outcome back; hook behavior is pinned by specs and no relation is retained between events.
 
 <a id="model-experience"></a>
 ## Model Experience

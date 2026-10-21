@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-20-unify-agent-and-session-id.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-20-unify-agent-and-session-id.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-06-20-unify-agent-and-session-id.md
+document:
+  en: 4084912f95aa2354e815a1b4c05cd7f90bd3c315
+  zh: 3adba379f12a46e6f151e6777e0a63f4b16e9cd6
 /agent-note-unify-the-agent-id-and-the-session-id:
   en: a3b5f1ad744e332a
   zh: f56748eb6f1c1e8f

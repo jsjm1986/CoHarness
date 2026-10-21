@@ -56,9 +56,9 @@ The Host `ToolDefinition.presentCall`, `ToolDefinition.presentResult`, `ToolCall
 
 ## Terminology
 
-**Raw Session event** means a `SessionEvent` fact from the durable log, including the `name` and raw `arguments` string on `tool/call`, and the `content`, `isError`, structured error, and optional `meta` on `tool/result`.
+**Raw Session event** means a `SessionEvent` fact from the durable log, including the `name` and raw `arguments` string on `tool/call`, and the `content`, `isError`, structured error, and optional `meta` on `tool/result` and `tool/ptc-dispatch`.
 
-**Durable metadata** means the JSON value produced by `ToolOutputDefinition.presentationMeta` after a tool succeeds and stored in `tool/result.data.meta`. It is part of the result facts, not a pre-laid-out React or card DTO.
+**Durable metadata** means the JSON value produced by `ToolOutputDefinition.presentationMeta` after a tool succeeds and stored in `tool/result.data.meta` or `tool/ptc-dispatch.data.meta`. It records the operation-time facts — for file tools the absolute path at execution — not a pre-laid-out React or card DTO, and file rows resolve open targets from it rather than from the Session's later cwd.
 
 **Host tool view** means the `ToolCallView` or `ToolResultView` returned by `ToolDefinition.presentCall` or `presentResult`. Session Remote does not transport it.
 
@@ -78,8 +78,8 @@ The Host `ToolDefinition.presentCall`, `ToolDefinition.presentResult`, `ToolCall
 2. Successful execution produces a canonical JSON value.
 3. The Tools runtime snapshots, schema-validates, and freezes the value.
 4. `output.render(args, value)` produces model-visible `ContentBlock[]`.
-5. When a top-level call declares `output.presentationMeta`, the runtime also produces JSON-safe metadata.
-6. The agent loop writes the model-visible result and metadata into a `tool/result` Session event.
+5. When a call declares `output.presentationMeta`, the runtime also produces JSON-safe metadata, for direct and nested PTC calls alike.
+6. The agent loop writes the model-visible result and metadata into a `tool/result` Session event, or — for a nested call — into the parent program's `tool/ptc-dispatch` event.
 7. The Session log does not store `ToolCallView` or `ToolResultView`.
 
 ### Host journal reads

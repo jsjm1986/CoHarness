@@ -42,4 +42,4 @@ Auto-compaction always anchors at the surface head, so the shadowed region is th
 
 - **Unit:** `compaction-basic.spec.ts` asserts the auxiliary call forwards `system`/`tools`/leading messages and appends the compaction instruction as the final message, and that `compactRegion` replays the latest routed header prefix. Existing content assertions read the summarizer input through the replayed messages rather than a transcript string.
 - **Loop:** `compact-loop-repro.spec.ts` classifies the summarization request by the compaction instruction in its trailing user message, and the overflow-recovery tests continue to pin conversation-vs-summary request counts across the real loop.
-- **Snapshot:** keyless replay reconstructs one canonical successful stream from a marked `compaction/summary`; the [compaction-seam note](../feature/2026-06-18-compaction-capability-seam.md) owns the durable marker contract.
+- **Snapshot:** keyless replay reconstructs one canonical successful stream from a marked `compaction/summary`; the [compaction-seam note](../../archived/feature/2026-06-18-compaction-capability-seam.md) owns the durable marker contract.

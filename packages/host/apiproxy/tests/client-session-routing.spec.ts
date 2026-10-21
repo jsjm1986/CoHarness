@@ -67,3 +67,18 @@ it('maps terminal and direct-child fields and keeps malformed JSON available to 
     expect(mapRemoteSessionIds('messageFeedback/list', args, map)).toBe(args)
   }
 })
+
+it('resolves registered Session policies beside built-ins and rejects duplicate ownership', async () => {
+  const { registerRemoteSessionPolicy, lookupRemoteSessionPolicy, remoteSessionId, mapRemoteSessionIds } = await import('../src/api/remote-session-routing.ts')
+  const endpoint = 'extWidgets/refresh'
+  const policy = { action: 'write' as const, path: ['widget', 'sessionId'], execution: 'request' as const }
+  expect(lookupRemoteSessionPolicy(endpoint)).toBeUndefined()
+  registerRemoteSessionPolicy(endpoint, policy)
+  expect(lookupRemoteSessionPolicy(endpoint)).toEqual(policy)
+  expect(remoteSessionId(endpoint, { widget: { sessionId: 'session-a' } })).toBe('session-a')
+  expect(remoteSessionId(endpoint, { widget: {} })).toBeUndefined()
+  expect(mapRemoteSessionIds(endpoint, { widget: { sessionId: 'a' }, other: 'a' }, id => `w:${id}` as typeof id))
+    .toEqual({ widget: { sessionId: 'w:a' }, other: 'a' })
+  expect(() => { registerRemoteSessionPolicy(endpoint, policy) }).toThrow(/already has a Session policy/)
+  expect(() => { registerRemoteSessionPolicy('commands/list', policy) }).toThrow(/already has a Session policy/)
+})

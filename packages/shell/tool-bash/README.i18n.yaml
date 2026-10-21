@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/shell/tool-bash/README.md
+document:
+  en: c92c8b47e7577b2a5d79e91b0402266ab7e206e2
+  zh: d066e1c201a19b150cfa2fe2617feebd7316adec
 /:
   en: 78c0da0038836590
   zh: 61495d48365178df
@@ -12,14 +15,14 @@
   en: d5ef757900d3944e
   zh: b4dc61e0ed4b3fc2
 /deepseek-ai-dsh-tool-bash/table-of-contents:
-  en: 052c55dddeeab59e
-  zh: 9c616d47504b6eeb
+  en: 35e0ac902490d729
+  zh: 51ba8329e12e00c6
 /deepseek-ai-dsh-tool-bash/tools:
   en: 0b27734b46fbf7ef
   zh: 6f0b77578ed0afa8
 /deepseek-ai-dsh-tool-bash/tools/bash:
-  en: 682f5926184add60
-  zh: af2377cf71bda8c1
+  en: 45848081545534ec
+  zh: 8eeaf8a6556c81f7
 /deepseek-ai-dsh-tool-bash/tools/managed-shell-environment:
   en: 46a2cccbfb4d74f3
   zh: 10b29bc45fc0d7ef
@@ -30,14 +33,11 @@
   en: 03242793cb11115d
   zh: a7d4b9b98ca23e79
 /deepseek-ai-dsh-tool-bash/permissions-and-escalation:
-  en: 9c8d6b784e340ff9
-  zh: 97fe1f00b41d16e3
+  en: 12bc6dc03c28e079
+  zh: 6474ddddf3b79fb4
 /deepseek-ai-dsh-tool-bash/per-session-mode-switching:
-  en: 101e6118b965f460
-  zh: c775d2c54f9a0a7d
-/deepseek-ai-dsh-tool-bash/invariants:
-  en: 8dcdc93bfda7621e
-  zh: b69e34658c114c60
+  en: 8975b16b4efefa65
+  zh: a845b28a9b6265b2
 /deepseek-ai-dsh-tool-bash/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

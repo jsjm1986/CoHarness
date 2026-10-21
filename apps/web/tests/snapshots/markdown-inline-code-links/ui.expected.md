@@ -4,9 +4,8 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
+  - button "Feedback":
+    - img
 - button "System prompt":
   - img
   - img
@@ -15,6 +14,8 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - heading "Inline code links" [level=2]
 - paragraph:
   - text: "Preview:"

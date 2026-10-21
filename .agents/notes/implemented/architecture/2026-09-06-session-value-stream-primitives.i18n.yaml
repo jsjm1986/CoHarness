@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-06-session-value-stream-primitives.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-06-session-value-stream-primitives.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-session-value-stream-primitives.md
+document:
+  en: 4524f9f1f6064b9ac513857ada96e5f5ead08b43
+  zh: e9309b239a06609aaedbed2a0c0c161b69a420aa
 /agent-note-session-value-and-assistant-stream-primitives:
   en: 6e93feb69fb0ad8d
   zh: 155c8034305a31a1

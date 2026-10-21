@@ -19,18 +19,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。续传元数据是瞬态的浏览器侧协议状态；权威文档记录经 resumable-v1 协议落在 user-docs 后端。
-
 
 ## 模型体验
 
@@ -47,7 +40,6 @@ kind: "package-reference"
 - **浏览器存储是尽力而为**：隐私模式或受限配额的浏览器可能丢失有界的会话元数据；服务端仍会在配置的过期时间前保留会话，但用户需要重新选择文件，不能直接使用本地会话 id。
 - **认证和路由可用性由 Host 适配器负责**：上传器只使用消费方提供的回调，不负责刷新凭据或发现文档服务不可用。
 
-**运行时不变式：** 不发布伴生入口。上传器是仅浏览器侧的功能状态机，不拥有 Cordis 服务、事件流或跨插件可变关系；其行为由协议与取消测试覆盖。
 
 <a id="dev-note"></a>
 ### 开发备注

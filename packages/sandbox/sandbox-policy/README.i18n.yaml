@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sandbox/sandbox-policy/README.md
+document:
+  en: 0b19ea011473f8872f0d0c1729a6a3d31d146f40
+  zh: 78b6dae35d9158ac6e75ae93e4c7ea400a7bf628
 /:
   en: 06ff9dfc072e2f5b
   zh: 61495d48365178df
@@ -15,14 +18,14 @@
   en: 3bcd5e133a8f9183
   zh: 8504efde89cee96e
 /dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/why-a-shared-home:
-  en: a2da2a374a2fbef0
-  zh: 681a82e0bd462a32
+  en: 375162e24d8e7e16
+  zh: 830e5ac6997d84d3
 /dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/config:
   en: f1a094875a33e0a4
   zh: 48512745150ca087
 /dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/api:
-  en: 55178df45a1ba25b
-  zh: e91195768c02e6a1
+  en: 8f9ee25f6ef34664
+  zh: fbff5758bc6fcc4b
 /dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/the-per-session-store:
   en: 4a41c9d81fdba842
   zh: c3c17816a1470e99

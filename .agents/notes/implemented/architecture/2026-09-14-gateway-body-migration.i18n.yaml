@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-14-gateway-body-migration.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-14-gateway-body-migration.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-gateway-body-migration.md
+document:
+  en: da6fa51604f6b6a5036d625da3e9f2d16c07a22b
+  zh: 2024354247c0065361a57ec1df33741008100df5
 /agent-note-gateway-body-migration-is-server-authoritative:
   en: 1d90a82d927b5a68
   zh: b71205d90a52e839

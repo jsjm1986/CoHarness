@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for dsh-v0.0.1-rc.4.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for dsh-v0.0.1-rc.4.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/releases/dsh-v0.0.1-rc.4.md
+document:
+  en: 9c7da78e7c41f2cc6f3943f4dbe90c54e58bac18
+  zh: 143c524d05414b15317fae8e805dfaf5073fcd9d
 /:
   en: fd1d8d3c57f17598
   zh: cf5f7bee63eaed68

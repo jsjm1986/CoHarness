@@ -18,7 +18,6 @@ kind: "package-library"
 ## 目录
 
 - [所有权与安全性](#ownership-and-safety)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -39,12 +38,6 @@ kind: "package-library"
 - 逐 artifact 迁移会校验每个相邻目标版本，包括由增量阶段实现的迁移。流式阶段负责事件校验，并按源到目标的顺序刷新；流式接口不运行整体 artifact 校验器。
 
 catalog 是纯值操作。JSONL、Gateway 和 SQLite adapter 仍分别负责原始 bytes、损坏尾部恢复、备份和原子发布。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。纯迁移库：链从格式目录确定性地编译，转换产生新代而不改动来源。
-
 
 <a id="model-experience"></a>
 ## 模型体验

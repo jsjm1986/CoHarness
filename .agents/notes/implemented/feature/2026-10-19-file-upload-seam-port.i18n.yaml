@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-19-file-upload-seam-port.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-19-file-upload-seam-port.md
+document:
+  en: 2cf0df4af34b960a866475bd403d8a9b0ad0fe83
+  zh: 2744b30d878c44f2b1728f7444ae9036ac98cb04
+/agent-note-file-upload-seam-port:
+  en: 1169bfd0f29b425f
+  zh: 4b12014895341c15
+/agent-note-file-upload-seam-port/problem:
+  en: 8e8ba3a90d445143
+  zh: d81e2b3d242fa9e0
+/agent-note-file-upload-seam-port/decision:
+  en: 91e39620844a3d74
+  zh: 30516568b22441fb
+/agent-note-file-upload-seam-port/alternatives-considered:
+  en: def1b39e4da72463
+  zh: ada0e3a2a9cf109a
+/agent-note-file-upload-seam-port/testing:
+  en: bfa6851716271ea3
+  zh: 0cd743ab5d728794
+/agent-note-file-upload-seam-port/consequences:
+  en: 0a9af473fc6a665b
+  zh: a3bff27c72aed91c

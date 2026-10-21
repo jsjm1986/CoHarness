@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-27-runtime-qualified-client-sessions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-27-runtime-qualified-client-sessions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-runtime-qualified-client-sessions.md
+document:
+  en: 6314bdcda1ef0f2ece4604f6cc80ca296fb07e8e
+  zh: afd2e43914a6d1b034ef2d9a28ee0fbd130f4ecc
 /agent-note-runtime-qualified-client-sessions:
   en: 3cbcd9c9cbf9b553
   zh: b84b80eb1317144a

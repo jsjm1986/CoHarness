@@ -1,6 +1,4 @@
-- button "返回插件列表":
-  - img
-  - text: 插件列表
+- button "返回插件": 插件
 - heading "子智能体" [level=3]
 - paragraph: 设置子智能体的递归层级和并行数量。
 - text: 最大递归深度

@@ -101,7 +101,6 @@ Linux 普通进程和终端进程即使在 bootstrap 消费启动请求前被取
 | [`src/terminal.ts`](src/terminal.ts) | `node-pty` 终端句柄：Linux scope 绑定、前台检查与 fallback 清理 |
 | [`src/process-inspector.ts`](src/process-inspector.ts) | POSIX 进程树与会话检查 |
 | [`src/windows-inspector.ts`](src/windows-inspector.ts) | 经 koffi 的 Windows Toolhelp32 进程表检查 |
-| — | 不发布运行时不变式伴生入口；除所属 seam 强制执行的约定外，本包不公开独立的事件序列或可变数据关系。 |
 
 ### 主流程
 
@@ -130,7 +129,6 @@ spill 文件以 `0600` 权限、`O_EXCL` 与随机名称在 `0700` 每进程目�
 
 终端分配通过 TERM 和 node-pty 使用调用者指定的 `terminalType`。动态 resize 更新已有 PTY。输出背压会暂停原生读取，待消费者排空后恢复；显式终止会恢复暂停的读取，以接收退出通知。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -144,7 +142,6 @@ spill 文件以 `0600` 权限、`O_EXCL` 与随机名称在 `0700` 每进程目�
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明本提供方何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是通用平台对比或任务积压。
 

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-30-event-domain-semantics.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-30-event-domain-semantics.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-30-event-domain-semantics.md
+document:
+  en: 70da718b5471ce309a090c8aade3e7290cc949dc
+  zh: c3b12a167da0a41b792914d82a675a98b3a0b860
 /agent-note-event-domain-semantics-session-is-the-fact-log-agent-is-the-live-event-channel:
   en: e7cdaa7a6029c259
   zh: ed13f8158ee0eaeb

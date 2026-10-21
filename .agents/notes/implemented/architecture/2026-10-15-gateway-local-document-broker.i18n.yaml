@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-gateway-local-document-broker.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-gateway-local-document-broker.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.md
+document:
+  en: ea295cf2cb8c9a554abff716410d7b72063e52dc
+  zh: 95cb04fa9129cbc3b9b75c2d08c08b7e8a9adfcc
 /agent-note-gateway-local-document-broker:
   en: 2be9c000a3fd32e5
   zh: 000ebe926d430dd4

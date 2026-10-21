@@ -29,18 +29,11 @@ dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、将
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。侧栏贡献外壳席位与折叠框架；Workspace 与 Session 行由 `ui-workspace` 拥有，其数据由运行时镜像拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/jobs/jobs/README.md
+document:
+  en: fefc165a41239fc9a5776b988f5dcff4fc1e1713
+  zh: 6f9a77164c2d9cf5fce9a0378caef85477a633f0
 /:
   en: 4055a3bc920e4ac2
   zh: 3bc99f3b5bc2fd71
@@ -9,8 +12,8 @@
   en: c767d73501da4cf7
   zh: b429afbccc2fde1a
 /deepseek-ai-dsh-jobs/summary:
-  en: f64d24a22c76423c
-  zh: 5bfd3c04ce108bcb
+  en: eea29995f4b49a6d
+  zh: acdded5ddee3a974
 /deepseek-ai-dsh-jobs/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
@@ -18,11 +21,11 @@
   en: 1246c880d1c61927
   zh: 157c703fd2da6b9c
 /deepseek-ai-dsh-jobs/use-this-package/what-a-background-job-gives-you:
-  en: 56f117c80db88cb2
-  zh: 4df7046e005f846c
+  en: c831330ff81ce9d8
+  zh: 958049931da27c4a
 /deepseek-ai-dsh-jobs/use-this-package/the-ownership-boundary:
-  en: 873494750b38dae5
-  zh: 2e6142ab889f7a8b
+  en: 470a9f7e12fa599e
+  zh: 6738b2de8f51063e
 /deepseek-ai-dsh-jobs/use-this-package/starting-background-work-needs-a-controller:
   en: 68075d00cde8763d
   zh: 4bc42c01d9e4dc8d
@@ -39,8 +42,8 @@
   en: 2a42e1e06dfc469e
   zh: 5c2c77eca52846f0
 /deepseek-ai-dsh-jobs/understand-the-implementation/source-map:
-  en: dd67af36de74d78b
-  zh: a456681853f5524e
+  en: 75edabaddba43364
+  zh: f53e4d27ceec9a6f
 /deepseek-ai-dsh-jobs/understand-the-implementation/service-operations:
   en: b2e4ef34ccf1e749
   zh: 128b57b57ed09316

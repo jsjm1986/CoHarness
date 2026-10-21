@@ -28,7 +28,6 @@
     agents: []
     workspaceContext:
       maxBytes: 65536
-      dshHome: !!js process.cwd() + '/.dsh'
     skills:
       enabled: false
     toolBash: false

@@ -16,7 +16,6 @@ import {
   collectRuntimeLocalSourceSpecifiers,
   collectRuntimeSourcePackageUses,
   collectSourcePackageUses,
-  DSH_INVARIANTS,
   PLATFORM_SOURCE,
   readStringLiteralArray,
 } from './verify-client-packages.ts'
@@ -684,14 +683,6 @@ export function expectedPackageDependencies(
   }
   for (const name of facts.peerRequiredHostDependencies) {
     if (!facts.hostRuntimeSourceUses.has(name)) add(name, 'peer-dev', 'required Cordis service')
-  }
-  const invariantsRule = expected.get(DSH_INVARIANTS)
-  // An invariant companion is checked by the in-repo diagnostics harness, so
-  // importing dsh-invariants only from src/invariant.ts is a dev relationship.
-  if (invariantsRule !== undefined
-    && invariantsRule.origins.size > 0
-    && [...invariantsRule.origins].every(origin => origin.endsWith('/src/invariant.ts'))) {
-    expected.set(DSH_INVARIANTS, { section: 'devDependencies', origins: invariantsRule.origins })
   }
   return new Map([...expected].map(([name, rule]) => [name, {
     section: rule.section,

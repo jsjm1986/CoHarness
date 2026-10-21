@@ -23,7 +23,6 @@ kind: "package-reference"
 - [提供方约定](#provider-contract)
 - [运行时 skill](#runtime-skills)
 - [消费方边界](#consumer-boundary)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -88,12 +87,6 @@ kind: "package-reference"
 ## 消费方边界
 
 注册表不渲染模型指引，也不注册面向模型的工具。[`@deepseek-ai/dsh-tool-skill`](../tool-skill) 消费 `ctx.skills` 以提供持久会话目录和 `skill` 工具，因此提供方仍与模型接口独立。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。注册表是提供方注册之上带 effect 作用域释放的贡献表；它不拥有 skill 内容。
-
 
 <a id="model-experience"></a>
 ## 模型体验

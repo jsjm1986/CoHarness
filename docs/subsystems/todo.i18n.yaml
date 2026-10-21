@@ -1,10 +1,16 @@
-# Bilingual-pair consistency record for todo.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for todo.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/todo.md
+document:
+  en: 2d0b55137016dbe6654775c29949b4793f0ecb62
+  zh: a251da854c870ca3a24e8fca3ff0c9b284a2a833
 /todo:
-  en: 2616be895c01ada9
-  zh: 53e0b5ea9d9d6f75
-/todo/durable-event-and-invariant:
-  en: ae4046c1260671ae
-  zh: 4246b14e1965487f
+  en: 171edd35c5357625
+  zh: 2e00e734d78df545
+/todo/todoitem-one-list-entry:
+  en: b82b516e9ffe9bcc
+  zh: 6f384159e179daf6
+/todo/durable-event:
+  en: c5f2a4c1a5f3be8b
+  zh: c028b47d5d77b882

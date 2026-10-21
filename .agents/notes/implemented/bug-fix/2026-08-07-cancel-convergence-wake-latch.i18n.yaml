@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-07-cancel-convergence-wake-latch.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-07-cancel-convergence-wake-latch.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.md
+document:
+  en: 3dc928a170457816cb262659a5cf3c0900b6a13b
+  zh: 07178dac37690cdbb55b8af40fe5ed26d9945aad
 /agent-note-latch-wake-ups-that-land-in-the-cancel-convergence-window:
   en: 0b877f8208b50162
   zh: dd6b6af7d96a5f86

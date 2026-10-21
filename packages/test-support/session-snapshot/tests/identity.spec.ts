@@ -200,6 +200,32 @@ describe('session snapshot identity redaction', () => {
     expect(redactSessionSnapshotIds([output!])).toEqual([output])
   })
 
+  it('collapses minted <kind>-<short-uuid> job ids across structured and literal payloads', () => {
+    const jobId = 'bash-3f9a1c2e8d4b5a67'
+    const source = [
+      { type: 'session', id: parentId },
+      { type: 'tool/result', data: { turn: 1, callId: 'c1',
+        message: { id: messageId, role: 'tool', isError: false,
+          content: [{ type: 'text', text: `started background job ${jobId}` }] } } },
+      { type: 'tool/call', data: { turn: 1, step: 2, callId: 'c2', name: 'job_output',
+        arguments: `{"job_id":"${jobId}","wait":true}` } },
+      { type: 'tool/call', data: { turn: 1, step: 3, callId: 'c3', name: 'job_kill',
+        arguments: `{"job_id":"${jobId}"}` } },
+      { type: 'user/message', data: { role: 'user', id: otherId, source: { kind: 'tool-jobs' },
+        content: [{ type: 'text', text: `background job ${jobId} (bash: pnpm test) finished [status: completed, exit code: 0].` }] } },
+      // Second job: a distinct id earns a distinct token; a counter-form id is
+      // ordinary text and survives untouched.
+      { type: 'tool/result', data: { turn: 1, callId: 'c4',
+        message: { id: runId, role: 'tool', isError: false,
+          content: [{ type: 'text', text: 'started background job pty-send-0000aaaa1111bbbb and stale bash-1' }] } } },
+    ].map(record => JSON.stringify(record)).join('\n')
+    const [output] = redactSessionSnapshotIds([source])
+    expect(output).not.toContain(jobId)
+    expect(output?.match(/\{\{id:1\}\}/g)).toHaveLength(4)
+    expect(output).toContain('started background job {{id:2}} and stale bash-1')
+    expect(redactSessionSnapshotIds([output!])).toEqual([output])
+  })
+
   it('replaces a claimed uuid inside a hyphenated compound while keeping prose boundaries', () => {
     const parentLog = [
       { type: 'session', id: 's' },

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/dsh-directory-guard/README.md
+document:
+  en: 4de92002d2081a78fe0d2038a6aad5de780bab5a
+  zh: 5508905322e545fcb62f9caba3199b540f80f53a
 /deepseek-ai-dsh-directory-guard:
   en: 388b615962e47ac1
   zh: 3877bcd0bc25bee1

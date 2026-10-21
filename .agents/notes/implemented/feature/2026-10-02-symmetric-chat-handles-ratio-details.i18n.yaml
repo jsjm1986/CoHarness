@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-02-symmetric-chat-handles-ratio-details.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-02-symmetric-chat-handles-ratio-details.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-symmetric-chat-handles-ratio-details.md
+document:
+  en: 42954ce4982113017c922494037d5e365264e30a
+  zh: 7879753049c3b1acc186a4ef21ca51e6013ef185
 /agent-note-symmetric-chat-width-handles-and-ratio-sized-details-panel:
   en: 45576607977a95d1
   zh: fb36f9a7f78107b3

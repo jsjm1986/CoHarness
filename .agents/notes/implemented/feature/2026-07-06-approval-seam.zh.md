@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-两个调用方需要同一个封闭决策——「这个具体操作可以继续吗？」：`tools/pre-execute` 的 `ask` 决策（包括 Claude-Code 钩子桥的 `permissionDecision: ask`）以及[沙箱 Agent Note](2026-07-06-sandbox.zh.md) 中拒绝后的一次性升级重试。一个共享的 seam 使它们无需各自发明独立的结果词汇、通道路由、取消机制和审计轨迹，同时保证没有应答者的部署永远不会批准一个无法应答的请求。应答者可以是交互式宿主，也可以是自动化控制器。
+两个调用方需要同一个封闭决策——「这个具体操作可以继续吗？」：`tools/pre-execute` 的 `ask` 决策（包括 Claude-Code 钩子桥的 `permissionDecision: ask`）以及[沙箱 Agent Note](../../archived/feature/2026-07-06-sandbox.md) 中拒绝后的一次性升级重试。一个共享的 seam 使它们无需各自发明独立的结果词汇、通道路由、取消机制和审计轨迹，同时保证没有应答者的部署永远不会批准一个无法应答的请求。应答者可以是交互式宿主，也可以是自动化控制器。
 
 路由问题的核心是归属：权限请求必须到达拥有发起请求的 agent（智能体）的通道，对无人拥有的 agent 失败关闭，并且不侵入没有组合应答者的部署。
 
@@ -63,7 +63,7 @@ tool/result      "escalated" — this one call ran under the wider mode; the gra
 
 #### 每会话策略层
 
-seam 还拥有[沙箱 Agent Note](2026-07-06-sandbox.zh.md) 所描述的会话级 `'ask' | 'never'` 策略。生效策略由日志中记录的切换在部署默认值之上折叠而成。`'never'` 会在任何应答者运行之前，于 `request()` 内部解析为 `rejected`；`'ask'` 则派发请求，否则一路委派至 `unavailable`。两个当前值都会在每次模型请求前加入原子化的运行时上下文快照，因此策略切换无需单独叙述；每次审批请求仍会记录审计对。
+seam 还拥有[沙箱 Agent Note](../../archived/feature/2026-07-06-sandbox.md) 所描述的会话级 `'ask' | 'never'` 策略。生效策略由日志中记录的切换在部署默认值之上折叠而成。`'never'` 会在任何应答者运行之前，于 `request()` 内部解析为 `rejected`；`'ask'` 则派发请求，否则一路委派至 `unavailable`。两个当前值都会在每次模型请求前加入原子化的运行时上下文快照，因此策略切换无需单独叙述；每次审批请求仍会记录审计对。
 
 #### ACP 应答者
 
@@ -87,7 +87,7 @@ ACP 桥只应答其会话映射所拥有的精确 agent 对象。它携带既有
 
 ## 延后
 
-- **`allow_always` 授权存储**：兑现持久授权意味着设计存储、作用域标识（调用？路径？前缀？会话？时间窗口？）和撤销；在设计完成之前，只展示一次性选项（[沙箱 Agent Note](2026-07-06-sandbox.zh.md) § Escalation 记录了开放的作用域问题）。
+- **`allow_always` 授权存储**：兑现持久授权意味着设计存储、作用域标识（调用？路径？前缀？会话？时间窗口？）和撤销；在设计完成之前，只展示一次性选项（[沙箱 Agent Note](../../archived/feature/2026-07-06-sandbox.md) § Escalation 记录了开放的作用域问题）。
 - **通过组合应答者录制由钩子驱动的 `ask`**：权限协议格式（wire format）已通过沙箱示例的升级分支录制。钩子矩阵中的 `hook-cc-pretool-ask` 固定无 ApprovalService 时的后备拒绝，而钩子生产者与应答者的组合仍留在单元测试层。
 - **将子 agent 的审批路由到父会话**：`subagent-acp` 的子侧自动应答自己的权限请求；将其委派给父控制器是独立的设计。
 

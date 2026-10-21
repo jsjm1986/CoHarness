@@ -37,4 +37,4 @@ Operators can complete the refuse → warn → grant → retry loop entirely fro
 ## Related
 
 - [Guided plugin installation](../architecture/2026-09-15-guided-plugin-installation.md) — the registry-plan and rollback machinery the CLI commands share.
-- [Plugin command registration](2026-07-19-plugin-command-registration.md) — the `dsh plugin` dispatch these commands extend.
+- [Plugin command registration](../../archived/feature/2026-07-19-plugin-command-registration.md) — the `dsh plugin` dispatch these commands extend.

@@ -51,8 +51,6 @@ When `dsh-session-projection` is composed, the service reads the eagerly driven 
 
 Activation is never persisted. A fresh cache and every `agent/created` initialization disarm it even when replay finds an active durable phase. A continuation driver also calls `disarm()` before unload or after durability uncertainty. Session resume, fork, and driver replacement therefore retain the objective, phase, revisions, and admitted-round count without initiating work; a later explicit resume mutation must arm continuation.
 
-The separately published `./invariant` companion maintains an independent fold of each attached session. It rejects malformed goal changes, discontinuous revisions, illegal lifecycle transitions, timestamp regressions, and non-sequential admitted rounds before the candidate event enters the durable log.
-
 <a id="extension-points"></a>
 ## Extension points
 

@@ -26,14 +26,14 @@ import type {
   SessionLogOffset as SessionLogOffsetType,
   UserMessage,
 } from '@deepseek-ai/dsh-session'
-import type { ObjectJsonSchema, ToolRestriction } from '@deepseek-ai/dsh-tools'
+import type { ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
 import { attachStructuredRuntime } from './structured.ts'
 import type { StructuredAttachment } from './structured.ts'
 import {
   appendDelegatedPolicyOverrides,
   applyChildComposition,
 } from './child-agent.ts'
-import type { DelegatedPolicyOverrides } from './child-agent.ts'
+import type { ChildComposition, DelegatedPolicyOverrides } from './child-agent.ts'
 import { createSettlementMessage } from './continuation-messages.ts'
 import type { SubagentDescriptorData } from './descriptor.ts'
 import { SubagentError } from './error.ts'
@@ -139,7 +139,7 @@ export interface MaterializeInputs {
     descriptor: SubagentDescriptorData
   }
   agentOptions: AgentOptions
-  composition: { persona?: string | undefined; toolFilter?: ToolRestriction | undefined }
+  composition: ChildComposition
   /**
    * Per-activation structured-output schema a fresh creation attaches to the
    * child; cold resume restores none — the descriptor keeps it out of durable
@@ -780,9 +780,18 @@ export class ContinuableActivationRegistry {
     inputs.signal.throwIfAborted()
     let structured: StructuredAttachment | undefined
     const setup = async (childCtx: Context, child: Agent): Promise<void> => {
+      // An independently selected preset mounts and records its selection
+      // before the first own descriptor, so cold resume can tell an explicitly
+      // composed child from one that inherited the parent's composition.
+      if (inputs.composition.agentPreset !== undefined) {
+        await applyChildComposition(childCtx, parent, inputs.composition)
+      }
       // Only fresh creation appends the descriptor and delegated policy after
       // the inherited marker; a cold resume replays those persisted events.
       if (create !== undefined) {
+        if (inputs.composition.agentPreset !== undefined) {
+          child.session.append('agent-preset/selected', { agentPreset: inputs.composition.agentPreset })
+        }
         child.session.append('subagent/descriptor', create.descriptor)
         appendDelegatedPolicyOverrides(childCtx, child.session, create.delegatedPolicies)
         const workingDirectory = childCtx.get('workingDirectory')
@@ -791,7 +800,7 @@ export class ContinuableActivationRegistry {
         }
         await workingDirectory.set(child, create.cwd, inputs.signal)
       }
-      applyChildComposition(childCtx, parent, inputs.composition)
+      if (inputs.composition.agentPreset === undefined) await applyChildComposition(childCtx, parent, inputs.composition)
       if (inputs.outputSchema !== undefined) {
         structured = attachStructuredRuntime(childCtx, inputs.outputSchema, () =>
           this.resident.get(childId)?.ownedChildren.size === 0

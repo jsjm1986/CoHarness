@@ -1,12 +1,8 @@
 /**
- * Goal surface plugin, browser half: the GoalBar entry in the
- * conversation.input.dock strip. Projection-mode surface — the live goal
- * arrives through `useProjection('goal')` (seeded by the history tail page,
- * updated by session/projection frames), so this plugin owns no store, no
- * refresh chain, and no event listener. The inject face carries only the
- * four mutation verbs through the generated Goal Remote API;
- * their CAS ref reads the session's current projected value at call time.
- * Goal creation stays on the /goal host command.
+ * Goal dock and command-input presentation. Durable goal state comes from the
+ * Session projection; process-local activation comes from Goal Remote reads
+ * and forwarded events. Mutations read the current projected CAS ref at call
+ * time. Goal creation belongs to the /goal Host command.
  */
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the generated Remote API and ctx.remote merge through the Client assembly boundary.
@@ -17,7 +13,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the `goal` SessionProjectionMap key merge (single source, the domain's pure outlet).
 import type { GoalProjection, GoalRef } from '@deepseek-ai/dsh-goal/client'
-import type { GoalActionResult, GoalBarActions } from './slots.ts'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+import type { GoalActionResult, GoalBarInjected } from './slots.ts'
+import { createGoalActivationSource } from './activation-source.ts'
 import { GoalDock } from './GoalBar.tsx'
 import { GoalCommandInputView } from './GoalCommandInputView.tsx'
 import { goalCommandInputDefinition } from './goal-command-input.ts'
@@ -74,27 +72,41 @@ export function apply(ctx: ClientContext): void {
     id: 'goal',
     order: 10,
     locale: NS,
-    inject: (sessionId): GoalBarActions => ({
-      onEdit: async (objective) => {
-        const ref = refOf(sessionId)
-        if (ref === undefined) return noCurrentGoal
-        return await ctx.remote.goals.edit(sessionId, ref, { objective })
-      },
-      onPause: async () => {
-        const ref = refOf(sessionId)
-        if (ref === undefined) return noCurrentGoal
-        return await ctx.remote.goals.pause(sessionId, ref)
-      },
-      onResume: async () => {
-        const ref = refOf(sessionId)
-        if (ref === undefined) return noCurrentGoal
-        return await ctx.remote.goals.resume(sessionId, ref)
-      },
-      onClear: async () => {
-        const ref = refOf(sessionId)
-        if (ref === undefined) return noCurrentGoal
-        return await ctx.remote.goals.clear(sessionId, ref)
-      },
-    }),
+    inject: (sessionId): GoalBarInjected => {
+      const binding = sessions.binding(sessionId)
+      if (binding === undefined) throw new Error(`ui-goal: session "${sessionId}" is unavailable`)
+      const goalActivation = createGoalActivationSource({
+        projection: binding.session.projections.faceOf('goal') as HostObservable<GoalProjection | null | undefined>,
+        session: binding.session,
+        getGoal: () => ctx.remote.goals.get(sessionId),
+        subscribeActivation: listener => ctx.remote.$on('goal/activation-changed', (event) => {
+          if (event.sessionId === sessionId) listener(event.goal)
+        }),
+        subscribeReset: listener => ctx.on('connection/reset', listener),
+      })
+      return {
+        hooks: { goalActivation },
+        onEdit: async (objective) => {
+          const ref = refOf(sessionId)
+          if (ref === undefined) return noCurrentGoal
+          return await ctx.remote.goals.edit(sessionId, ref, { objective })
+        },
+        onPause: async () => {
+          const ref = refOf(sessionId)
+          if (ref === undefined) return noCurrentGoal
+          return await ctx.remote.goals.pause(sessionId, ref)
+        },
+        onResume: async () => {
+          const ref = refOf(sessionId)
+          if (ref === undefined) return noCurrentGoal
+          return await ctx.remote.goals.resume(sessionId, ref)
+        },
+        onClear: async () => {
+          const ref = refOf(sessionId)
+          if (ref === undefined) return noCurrentGoal
+          return await ctx.remote.goals.clear(sessionId, ref)
+        },
+      }
+    },
   }, GoalDock))
 }

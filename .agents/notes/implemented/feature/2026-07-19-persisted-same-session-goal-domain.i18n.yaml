@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-persisted-same-session-goal-domain.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-persisted-same-session-goal-domain.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-persisted-same-session-goal-domain.md
+document:
+  en: fb32b17913dda62d6794472b8b64c849b104812c
+  zh: 78355e59dae0d3d53f41051bc0f03d555e3c01d8
 /agent-note-persisted-same-session-goal-domain:
   en: 05f6641270399579
   zh: 962259d5bd3b3e16

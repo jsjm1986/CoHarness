@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-08-11-minimal-profiles-bare-two-tool-runtime.zh.md)
 
+> The standalone two-tool composition, no-compaction, prompt-suppression, and environment-selection decisions remain current; the shipped defaults' two-tool roster is superseded by [the persistent-shell-only decision](../simplification/2026-09-03-minimal-profiles-persistent-shell-only.md).
+
 ## Problem
 
 The Web `minimal` preset and standalone JSON-RPC minimal composition exposed persistent `bash` and `str_replace_editor`, but their supporting services did not match the intended training runtime. Both mounted context compaction, while the Web preset inherited the host's sandboxed filesystem and the JSON-RPC composition mounted `fs-sandbox` plus filesystem policy. A long session could therefore replace history, and the editor advertised and enforced a filesystem policy that the bare local reference runtime does not have.
@@ -12,7 +14,7 @@ The two launch paths also have different configuration owners. Web mounts a per-
 
 ## Decision
 
-Both shipped minimal profiles expose exactly persistent `bash` and `str_replace_editor`, mount no context-compaction provider, suppress every `dsh-system-prompt` runtime-context contribution for fresh sessions, and run the editor against `@deepseek-ai/dsh-fs-local`. The Web preset isolates `ctx.fs` inside the agent entry and mounts `fs-local` beside the editor, so other Web agents retain the host filesystem provider. Its persona remains the fixed complete prompt owned by the earlier [minimal-preset composition decision](../bug-fix/2026-08-10-minimal-preset-owns-rl-composition.md) and applies runtime-context suppression only to that agent scope. The standalone spine forwards the same setting to its process-owned system-prompt service. Sandbox and approval services remain mounted and enforce their policies; only their model-facing dynamic context is absent.
+The standalone [`minimal.cordis.yml`](../../../../examples/jsonrpc-agent/minimal.cordis.yml) composition retains this note's two-tool contract — persistent `bash` and `str_replace_editor` running against `@deepseek-ai/dsh-fs-local` — while the shipped `minimal` and `sdk-minimal` defaults expose one platform-selected persistent shell and mount neither the editor nor a preset-scoped `fs-local` under the [persistent-shell-only decision](../simplification/2026-09-03-minimal-profiles-persistent-shell-only.md). Every minimal path mounts no context-compaction provider and suppresses every `dsh-system-prompt` runtime-context contribution for fresh sessions. The Web preset's persona remains the fixed complete prompt owned by the earlier [minimal-preset composition decision](../bug-fix/2026-08-10-minimal-preset-owns-rl-composition.md) and applies runtime-context suppression only to that agent scope. The standalone spine forwards the same setting to its process-owned system-prompt service. Sandbox and approval services remain mounted and enforce their policies; only their model-facing dynamic context is absent.
 
 The standalone [`minimal.cordis.yml`](../../../../examples/jsonrpc-agent/minimal.cordis.yml) remains a complete JSON-RPC process composition. It mounts `dsh-sdk-jsonrpc-server`, the local PTY and subprocess services required by persistent Bash, `fs-local`, the two tool consumers, and uncompressed JSONL persistence. It does not mount `token-meter`, `compaction-basic`, `fs-sandbox`, or `fs-observation-policy`. Persistent Bash still consumes the deployment's danger-full-access sandbox policy; the editor is not confined by that policy.
 
@@ -20,7 +22,7 @@ The standalone [`minimal.cordis.yml`](../../../../examples/jsonrpc-agent/minimal
 
 ## Verification
 
-The Web replay boots the complete Web host, creates the agent through the preset service, and asserts that the scoped filesystem is bare, no scoped compaction service exists, no system-prompt-owned runtime-context message was appended, and the assembled request contains exactly the fixed prompt and two tools. It then executes persistent Bash and the editor against the real scoped services.
+The Web replay boots the complete Web host, creates the agent through the preset service, and asserts that no preset-scoped filesystem or compaction service exists, no system-prompt-owned runtime-context section reaches the assembled request, and the request carries the fixed prompt with the persistent-shell roster. It then executes persistent Bash against the real scoped services.
 
 The SDK replay boots the real JSON-RPC agent process through the SDK client, injects an environment-selected prompt, asserts the assembled prompt, exact two-tool catalog, and absence of every system-prompt-owned runtime-context message, and executes both tools. Python SDK bundled-runtime coverage initializes the standalone configuration through each available packaged carrier with environment-selected model, model capacity, and prompt values. Cordis validation checks that both configurations resolve their declared plugins and configuration fields.
 
@@ -36,4 +38,4 @@ The SDK replay boots the real JSON-RPC agent process through the SDK client, inj
 
 ## Consequences
 
-Minimal sessions never summarize or replace earlier history and never add a runtime-context snapshot; callers must keep turns within the selected model's context capacity and must not rely on model-visible narration of standing sandbox or approval policy. The editor can address any absolute path visible to the runtime process, independently of the persistent shell's sandbox policy. The two launch paths share their model-facing tool, no-context, and no-compaction guarantees while retaining different prompt and model configuration appropriate to their owners. The Python SDK path continues to communicate only through the bundled stdio JSON-RPC runtime.
+Minimal sessions never summarize or replace earlier history and never add a runtime-context snapshot; callers must keep turns within the selected model's context capacity and must not rely on model-visible narration of standing sandbox or approval policy. In the standalone composition the editor can address any absolute path visible to the runtime process, independently of the persistent shell's sandbox policy. The two launch paths share their persistent-shell, no-context, and no-compaction guarantees while retaining different prompt, tool roster, and model configuration appropriate to their owners. The Python SDK path continues to communicate only through the bundled stdio JSON-RPC runtime.

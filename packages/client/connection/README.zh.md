@@ -28,7 +28,6 @@ kind: "package-reference"
 - [Host 配置](#host-configuration)
 - [/api 浏览器信任栅栏](#api-browser-trust-fence)
 - [`/api` WebSocket 下行](#api-websocket-downlinks)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -47,7 +46,7 @@ kind: "package-reference"
 <a id="api-browser-trust-fence"></a>
 ## /api 浏览器信任栅栏
 
-node 半侧在桥接或 upgrade 前守卫 `/api` 下的每个入口（`src/api-request-trust.ts`）。每个请求——无论是否带浏览器标记——`Host` 都必须是回环地址权威，或与某个 `trustedHosts` 条目匹配：带端口的 `host:port` 条目精确匹配，不带端口的条目匹配任意端口，两侧均经 WHATWG 归一化后比较（DNS rebinding 防御）。刻意不为无浏览器标记的 HTTP 请求开捷径：明文 HTTP 下浏览器的图片与导航读取既不带 `Origin` 也不带 Fetch-Metadata，因此无标记请求仍可能是被重绑页面发起的、响应可被读走的读取，而 Host 是重绑唯一伪造不了的请求头；WebSocket 浏览器握手会带 `Origin` 并通过同一道比较。非浏览器客户端经由回环地址、部署推导的 LAN IP 字面量或已声明的权威通过同一道栅栏。当标记存在时，如附带 `Origin`，则它必须与 Host 权威完全一致；显式的 `sec-fetch-site: cross-site` 标记一律拒绝。不是纯的、规范形 `host[:port]` 权威的 `trustedHosts` 条目——即 WHATWG 解析读回后与原文不完全一致的——会让插件加载明确报错：否则解析会悄悄授权 `harness.internal/path` 这类笔误里的 hostname，或把悬空冒号、补零端口放大成任意端口授权。HTTP 失败在任何 RPC 分发之前以纯 403 应答，upgrade 失败在启动任何事件流前拒绝握手。非回环组合必须显式信任其服务权威：Web 运行时从全接口服务器配置推导 LAN IP 字面量，cordis.yml 中的 `trustedHosts` 与 CLI（命令行界面）的 `--trusted-host` flag 则声明具名权威。`dsh web --host 0.0.0.0` 在远程访问具备认证层之前有意不受支持。这道栅栏是可达性策略，而不是认证；认证运行在它之后。`connection.requestRejection` 随后先询问 `connection/authenticate` provider 监听器——第一个已定义的应答即生效：`'allow'` 无浏览器凭据即放行，`'deny'` 即使存在已签发的 Cookie 或存活启动令牌也拒绝，`undefined` 则回退到 index 路由 `?token` 交换所签发的、按权威绑定的 Cookie。同一顺序同时守护 `/api`、通用 RPC 通道、WebSocket upgrade，以及——经由 `connection.authorizeIndex`——在 `frontend-static` 提供之前的 index 本身。provider 放行仍须通过这道栅栏。已注册的 `loopback` 子树与 endpoint 以自身声明的机器栅栏作为全部准入，从不询问 provider。决策记录：[api 浏览器信任边界 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.zh.md) 与 [浏览器会话认证 Agent Note](../../../.agents/notes/implemented/architecture/2026-10-01-browser-auth-web-transport.zh.md)。
+node 半侧在桥接或 upgrade 前守卫 `/api` 下的每个入口（`src/api-request-trust.ts`）。每个请求——无论是否带浏览器标记——`Host` 都必须是回环地址权威、与监听器自身的 bind IP 字面量在任意端口上相等，或与某个 `trustedHosts` 条目匹配：带端口的 `host:port` 条目精确匹配，不带端口的条目匹配任意端口，两侧均按监听器自身的协议做 WHATWG 归一化后比较（DNS rebinding 防御）——不取转发头或 `Origin`。刻意不为无浏览器标记的 HTTP 请求开捷径：明文 HTTP 下浏览器的图片与导航读取既不带 `Origin` 也不带 Fetch-Metadata，因此无标记请求仍可能是被重绑页面发起的、响应可被读走的读取，而 Host 是重绑唯一伪造不了的请求头；WebSocket 浏览器握手会带 `Origin` 并通过同一道比较。非浏览器客户端经由回环地址、监听器的 bind IP 字面量或已声明的权威通过同一道栅栏。当标记存在时，如附带 HTTP(S) `Origin`，则它必须与 Host 权威一致，且 Host 按该 Origin 的协议解析，以支持经由 HTTP 上游的 HTTPS 代理；显式的 `sec-fetch-site: cross-site` 标记一律拒绝。不是纯的、规范形 `host[:port]` 权威的 `trustedHosts` 条目——即 WHATWG 解析读回后与原文不完全一致的——会让插件加载明确报错：否则解析会悄悄授权 `harness.internal/path` 这类笔误里的 hostname，或把悬空冒号、补零端口放大成任意端口授权。HTTP 失败在任何 RPC 分发之前以纯 403 应答，upgrade 失败在启动任何事件流前拒绝握手。非回环组合必须显式信任其服务权威：cordis.yml 中的 `trustedHosts` 与 CLI（命令行界面）的 `--trusted-host` flag 声明具名权威，监听器自身的 bind IP 则独立于该表单独放行。`allowsRemoteAuthorities` 报告 `trustedHosts` 是否放行非回环权威；接受 bind IP 不改变该表。通配的 `dsh web --host` 会在启动时因安全原因被拒绝。这道栅栏是可达性策略，而不是认证；认证运行在它之后。`connection.requestRejection` 随后先询问 `connection/authenticate` provider 监听器——第一个已定义的应答即生效：`'allow'` 无浏览器凭据即放行，`'deny'` 即使存在已签发的 Cookie 或存活启动令牌也拒绝，`undefined` 则先回退到以非 Cookie operator 凭据形式呈现的启动令牌本身——`Authorization: Bearer <token>` 或请求 URL 上的 `?token=`——再回退到 index 路由 `?token` 交换所签发的、按权威绑定的 Cookie。已呈现但错误的 operator 凭据在 Cookie 回退之前以 401 拒绝，而不是借其洗白。Operator 连接携带交互模式——`?interactions=` 或 `x-dsh-interactions` 负责声明，客户端的 `createOperatorTransport` 在每个 API、socket 与通用 RPC URL 上同时设置这两个参数，准入则把模式绑定到请求作用域：未声明的连接默认 `'none'`，收不到任何可回答、结算或转发的交互流量；声明 `'answer'` 则保留页面的完整参与能力。经 TLS 监听器签发的 Cookie 带 `Secure`，并把 `https:` 协议编入其名称与签名 audience，因此 HTTP Cookie 无法在同一权威上认证 TLS 监听器；只有挂载监听器自身的协议决定，而非 `publicUrl` 公告或转发头。同一顺序同时守护 `/api`、通用 RPC 通道、WebSocket upgrade，以及——经由 `connection.authorizeIndex`——在 `frontend-static` 提供之前的 index 本身。provider 放行仍须通过这道栅栏。已注册的 `loopback` 子树与 endpoint 以自身声明的机器栅栏作为全部准入，从不询问 provider。决策记录：[api 浏览器信任边界 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.zh.md) 与 [浏览器会话认证 Agent Note](../../../.agents/notes/implemented/architecture/2026-10-01-browser-auth-web-transport.zh.md)。
 
 <a id="api-websocket-downlinks"></a>
 ## `/api` WebSocket 下行
@@ -59,12 +58,6 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 `/api/events.mux` 与 `/api/events.host` 各接受一条 WebSocket upgrade，并只向浏览器发送对应的 `ServerRequest` 文本消息；客户端不会在这些 socket 上发送业务数据。任一 socket 结束都会使当前 connection generation 失败并重建两条流，连接就绪仍要求两条 socket 均已打开且 `host.describe` HTTP 调用成功。Host teardown 会终止两条 socket、中止各自的 source，并等待 source 清理完成后再返回。普通网络 GET 这些路径会返回 426，不保留 SSE（Server-Sent Events）回退；`toFetchHandler` 的 SSE 编解码只服务进程内同构载体。
 
 `connection/request` 是 Host 侧包围每个已通过浏览器信任栅栏请求的 waterfall。它接收请求进入时的 Node header，以及取值为 `http` 或 `upgrade` 的 `kind`，并在 RPC 分发或事件流开启前完成。认证与请求上下文监听器必须将 header 视为不可变值，并调用 `next()` 让独立插件组合；不委托会阻止后续监听器与载体处理器运行。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。连接状态按代限定作用域，并由每次 host 握手重建；消费方观察同一组已发布值，不存在第二个可能分歧的关系。
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -79,6 +72,7 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 ## 已知限制与暂缓事项
 
 - **History 可用性由 Host 决定**：该 carrier 只传输有界的 `session.history` 响应；部署能否在不恢复 Agent 的情况下读取冷日志，属于 Host 持久化提供方的职责。
+- **明文 HTTP 监听器会在传输中暴露载体 Cookie**：此类部署无法给浏览器 Cookie 标记 `Secure`，因此在网络上提供同一权威可能泄露会话 Cookie；在 Web 载体（[`dsh-host-webserver`](../../host/webserver/README.zh.md)）上配置 TLS 会给 Cookie 标记 `Secure` 并将其限定在 TLS 内。
 - **`/api` 桥把每个请求体整体缓冲在内存里**：`maxRequestBodyBytes`（默认 288 MiB，按默认 200 MiB 图片总量上限经 base64 膨胀加信封余量得出）因此同时是单请求的驻留内存上界；要降低它而不缩小图片限额，需要流式请求体路径。
 - 外层桥和内层 Fetch 解析器共用同一个 `maxRequestBodyBytes` 值，因此已准入的图片 envelope 不会再被较小的解析器默认值拒绝一次。
 

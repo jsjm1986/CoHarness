@@ -19,7 +19,6 @@ kind: "package-library"
 - [取消与所有权](#cancellation-and-ownership)
 - [spawn 与 fork 输入](#spawn-and-fork-inputs)
 - [结构化输出](#structured-output)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -71,12 +70,6 @@ kind: "package-library"
 - 单调工具防护会在捕获值后阻止后续调用，结构化输出执行的 `concludeTurn()` 标记则在结果提交后结束轮次。
 
 正常结束却始终未提交必需结构化值的轮次会报告 `error`；驱动器不会重新提示。所有注册都附着于子 agent fiber，并随其一同消失。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。驱动器通过宿主的 agent 工厂按调用管理一个子 Agent；深度、种子注入与结果读取是逐次调用状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

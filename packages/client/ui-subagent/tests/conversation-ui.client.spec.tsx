@@ -72,6 +72,7 @@ function props(
     sessionId: PARENT,
     useSessions,
     openChild: vi.fn(),
+    openChildAside: vi.fn(),
     refresh: vi.fn(),
     setCatalogOpen: vi.fn(),
     lineageSessionId: PARENT,
@@ -163,6 +164,14 @@ describe('SubagentHeaderLineage', () => {
     expect(screen.queryByRole('button', { name: '展开 reviewer 的下级子智能体' })).toBeNull()
     expect(screen.getByRole('treeitem', { name: /reviewer/ }).children).toHaveLength(2)
 
+    const sidebarButton = screen.getByRole('button', { name: '在侧边栏打开 worker' })
+    fireEvent.keyDown(sidebarButton, { key: 'Enter' })
+    fireEvent.click(sidebarButton)
+    expect(input.openChildAside).toHaveBeenCalledWith({
+      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable',
+    })
+
+    hoverCatalog(trigger)
     fireEvent.click(screen.getByRole('treeitem', { name: /worker/ }))
     expect(input.openChild).toHaveBeenCalledWith({
       parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable',

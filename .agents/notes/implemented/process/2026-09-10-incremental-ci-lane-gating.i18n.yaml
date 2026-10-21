@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-10-incremental-ci-lane-gating.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-10-incremental-ci-lane-gating.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-10-incremental-ci-lane-gating.md
+document:
+  en: f50ebb6564daf574e1e96332959cb88020e947ee
+  zh: f46bb3edb037d9c10cc0e54f348209753caa0777
 /agent-note-incremental-ci-lane-gating:
   en: 90f73100508e0437
   zh: 1944eef05bf93910

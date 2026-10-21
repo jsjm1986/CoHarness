@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-12-upstream-sovereignty-manifest.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-12-upstream-sovereignty-manifest.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-12-upstream-sovereignty-manifest.md
+document:
+  en: a2c2d300e232f716e64d14abbdc0417632614046
+  zh: 5e443fdeb39cc350ca6363ab1d616dd67e3f6389
 /agent-note-upstream-sovereignty-manifest-and-sync-gate:
   en: 468037dd4c57f2e1
   zh: 2290e92b8d75f0a5

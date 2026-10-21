@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-31-running-draft-primary-send.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-31-running-draft-primary-send.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-31-running-draft-primary-send.md
+document:
+  en: 55d99caebe144cbaac0a0693d30985c5a1ca1132
+  zh: ac107262c65be42a9187b05f228651f9e83678d5
 /agent-note-running-drafts-take-the-primary-send-action:
   en: 9a0e33c15b70df70
   zh: 144df4afb5a135b2

@@ -4,7 +4,7 @@ import { OfficeSourceKey, OfficeToPdfError } from '@deepseek-ai/dsh-office-to-pd
 import { posix, win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { environmentForAgent } from '@deepseek-ai/dsh-agent-presets'
+import { environmentForAgent } from '@deepseek-ai/dsh-agent-preset-registry'
 import { FsError } from '@deepseek-ai/dsh-fs'
 import type { FileSystem, FsInfo, FsObservation, FsTarget, FsVersion } from '@deepseek-ai/dsh-fs'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'

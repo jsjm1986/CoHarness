@@ -154,9 +154,9 @@ def test_stage_runtime_copies_platform_payload(
     office_asset.parent.mkdir(parents=True)
     office_asset.write_bytes(b"office data")
     resources = executable.with_name(executable.name.removeprefix("deepseek-harness-sdk-runtime-").removesuffix(".exe"))
-    resource = resources / "office-skills/scripts/check_office.py"
+    resource = resources / "office-skills/office-docx/SKILL.md"
     resource.parent.mkdir(parents=True)
-    resource.write_text("checker")
+    resource.write_text("# office-docx")
     destination = tmp_path / "staging"
 
     build_python_release.stage_runtime(destination, "1.2.3", executable, executable.name)
@@ -168,7 +168,7 @@ def test_stage_runtime_copies_platform_payload(
         if path.is_file()
     } == expected
     assert (runtime_dir / office.name / office_asset.relative_to(office)).read_bytes() == b"office data"
-    assert (runtime_dir / resources.name / resource.relative_to(resources)).read_text() == "checker"
+    assert (runtime_dir / resources.name / resource.relative_to(resources)).read_text() == "# office-docx"
     pyproject = (destination / "pyproject.toml").read_text()
     assert 'license = "Apache-2.0"' in pyproject
     assert 'license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]' in pyproject

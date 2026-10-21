@@ -102,7 +102,6 @@ ctx.systemPrompt.variable('cwd', ({ agent }) => agent?.session.header.cwd)
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：`SystemPrompt` 服务、配置、组装流水线、`renderPrompt` |
-| [`src/invariant.ts`](src/invariant.ts) | 不变式配套 |
 
 ### 组装与渲染
 
@@ -128,7 +127,6 @@ ctx.systemPrompt.variable('cwd', ({ agent }) => agent?.session.header.cwd)
 - [core 分组地图](../README.zh.md)——core 各包如何组合。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -171,7 +169,6 @@ schema token 在每次请求中重复。限制工具会为该 agent 移除其全
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明提示词组装何时需要特别留意。它们是当前包约束，不是待办事项清单。
 

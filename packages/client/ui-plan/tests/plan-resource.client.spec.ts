@@ -27,6 +27,7 @@ function planNode(callId: string, title = 'Draft'): ChatConversationViewNode {
 function chatWith(nodes: readonly ChatConversationViewNode[]): ChatSnapshot {
   return {
     order: [], locations: { getTurn: () => [], getStep: () => [] },
+    entries: [], groups: { get: () => undefined },
     navigation: { items: () => [] },
     timeline: { turnOrder: [], turns: new Map() },
     legacy: { nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [] },

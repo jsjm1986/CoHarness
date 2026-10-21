@@ -27,7 +27,7 @@ interface TeamMemberSnapshot {
 }
 ```
 
-Every member starts in `provisioning` and reaches exactly one terminal roster phase, `active` or `failed`. Runtime `running`/`idle`/`inactive` status is derived separately and never rewrites this record.
+Every member starts in `provisioning` and reaches exactly one terminal roster phase, `active` or `failed`. Roster `running`/`inactive` status is derived separately and never rewrites this record.
 
 ## Durable mailbox
 
@@ -177,7 +177,7 @@ async waitForChange(caller: Agent, timeoutMs: number, signal: AbortSignal): Prom
  * @param targetName - durable teammate name.
  * @returns the target status sampled before cancellation.
  */
-interrupt(caller: Agent, targetName: string): { previousStatus: 'running' | 'idle' | 'inactive' }
+interrupt(caller: Agent, targetName: string): { previousStatus: 'running' | 'inactive' }
 
 /**
  * Read the current roster and non-deleted task board through the generated Remote API.

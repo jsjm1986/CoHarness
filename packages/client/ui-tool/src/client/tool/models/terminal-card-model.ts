@@ -25,6 +25,7 @@ import { parsedToolCall, singleResultText, validEscalationFields } from './raw-t
  */
 export function terminalBlockLabels(t: TranslateNS<'conversation'>): TerminalBlockLabels {
   return {
+    commandLine: line => t('terminal.commandLine', { n: line }),
     signal: signal => t('terminal.signal', { signal }),
     exitCode: code => t('terminal.exitCode', { code }),
     noExitCode: t('terminal.noExitCode'),
@@ -189,14 +190,24 @@ function shellCall(name: string, args: Record<string, unknown>): ShellCall | nul
 }
 
 /**
- * Identify a settled call from the persistent Bash or PowerShell tool. Its
- * result stays on the generic input/output path because the persistent shell
+ * Identify a background shell launch whose result acknowledges a job, not its exit.
+ * @param block - running or settled Tool block.
+ * @returns whether the call requests a background shell job.
+ */
+export function isBackgroundShellCall(block: ToolCallBlock): boolean {
+  const parsed = parsedToolCall(block)
+  return parsed !== null && shellCall(parsed.name, parsed.args)?.background === true
+}
+
+/**
+ * Identify a settled root call from the persistent Bash or PowerShell tool.
+ * Its result stays on the generic input/output path because the persistent shell
  * can report resets and partial output without one process exit status.
  * @param block - running or settled Tool block.
  * @returns whether the block is a settled persistent-shell call.
  */
 export function isSettledPersistentShellCall(block: ToolCallBlock): boolean {
-  if (!('kind' in block)) return false
+  if (!('kind' in block) || block.parentCallId !== undefined) return false
   const parsed = parsedToolCall(block)
   if (parsed === null) return false
   return shellCall(parsed.name, parsed.args)?.persistent === true

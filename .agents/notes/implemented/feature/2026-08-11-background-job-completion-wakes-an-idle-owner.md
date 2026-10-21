@@ -26,11 +26,11 @@ For a driver that is genuinely running, `steer()` and `inject()` are the same de
 
 Injection is correct there. A cancelled turn is a user pressing stop, and reopening one on their behalf launders an interrupt into a model request they did not ask for. The turn loop already covers the ordinary case: it cannot close while the next-step inbox holds anything, so a notice arriving before that check extends the current turn, and several tasks settling together cost one step rather than one turn each.
 
-### Waking is bounded, and the bound is not time
+### The wake bound is an optional counter, not time
 
-`maxConsecutiveWakes` (default 3) caps the turns one owner may open this way; beyond it a notice degrades to injection and waits for the next turn. Claiming any user-authored message restores the budget — claiming, not arrival, because that is the point human input actually enters a step. Notices this plugin queued never refill it.
+`maxConsecutiveWakes` is unset by default — no cap, per the [reversal](../bug-fix/2026-10-12-session-reliability-fixes.md). When set, it caps the turns one owner may open this way; beyond it a notice degrades to injection and waits for the next turn. Claiming any user-authored message restores the budget — claiming, not arrival, because that is the point human input actually enters a step. Notices this plugin queued never refill it.
 
-The bound exists because this chain is self-exciting in a way subagent settlement is not. Settlement is bounded by how many children the model spawned; a woken turn can start the background job whose completion wakes it again, with nobody watching. `dsh run` needs no separate policy: its one user message is claimed in the first turn and never repeats, so the budget is spent monotonically and the process terminates.
+A bound exists because this chain is self-exciting in a way subagent settlement is not. Settlement is bounded by how many children the model spawned; a woken turn can start the background job whose completion wakes it again, with nobody watching. `dsh run` needs no separate policy: its one user message is claimed in the first turn and never repeats, so a configured budget is spent monotonically and the process terminates.
 
 `completionDelivery: quiet` restores the old lane for idle owners. It exists for deterministic transcripts; job completion independently retains `quiet | wakeup` because its bounded owner-turn policy differs from next-step subagent reports.
 
@@ -38,7 +38,7 @@ The bound exists because this chain is self-exciting in a way subagent settlemen
 
 `cancelForTeardown` now marks the record `reported`, exactly as `kill()` does after cancelling. The asymmetry was invisible while the notice was a harmless inject; a waking reporter turns it into one model request per teardown layer, on agents the host is destroying.
 
-`reported` was already the right bit — "a kill, read, or wait has reported or committed to report the terminal state" — and teardown is a kill without a caller. Using it keeps every observer of the settlement intact: `onJobDone` still fires, so runtime invariants and the force-fail path stay covered, and only notice reporters go quiet.
+`reported` was already the right bit — "a kill, read, or wait has reported or committed to report the terminal state" — and teardown is a kill without a caller. Using it keeps every observer of the settlement intact: `onJobDone` still fires, so the force-fail path stays covered, and only notice reporters go quiet.
 
 ### Completion is announced last
 
@@ -58,7 +58,7 @@ The bound exists because this chain is self-exciting in a way subagent settlemen
 
 ## Consequences
 
-- Default behavior changes: an idle owner now spends a model request per completion, capped at `maxConsecutiveWakes` per owner between user messages. Deployments that want the old behavior set `completionDelivery: quiet`.
+- Default behavior changes: an idle owner now spends a model request per completion, unbounded unless `maxConsecutiveWakes` is set, which caps the turns one owner may open between user messages. Deployments that want the old behavior set `completionDelivery: quiet`.
 - The `tool-jobs` prompt section needs no edit; "You are notified in-session when a task finishes" became true rather than aspirational.
 - `JobSnapshot.reported` gains teardown as a fourth setter, documented at the Service Definition and in [the subsystem reference](../../../../docs/subsystems/jobs.md).
 - `settle()` announces completion after committing the record and publishing the visible-set change. Any listener relying on running before waiters were released or before `onJobsChanged` now runs after both.

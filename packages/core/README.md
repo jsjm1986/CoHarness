@@ -25,7 +25,6 @@ Runnable compositions belong to [`examples/agent-spine-demo`](../examples/agent-
 
 The subsystem reference — the package-by-package loop map, the `Agent` handle and its delivery/interception contracts — is [docs/subsystems/core.md](../../docs/subsystems/core.md); the default runnable composition is [`examples/agent-spine-demo`](../examples/agent-spine-demo/README.md).
 
-
 ## Summary
 
 Use the core packages to build or extend an agent that records durable session history, assembles system prompts, exposes tools, selects a default model, and runs model turns. These packages define the shared APIs used by every composition, while executable product assemblies live under [`packages/bundle`](../bundle/README.md). Choose this group when developing agent behavior or replacing one of those capabilities; start with [`dsh-base`](../bundle/base/README.md) when you need the default runnable composition.

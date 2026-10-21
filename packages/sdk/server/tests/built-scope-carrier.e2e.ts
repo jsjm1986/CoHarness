@@ -28,7 +28,7 @@ const [
   { Context },
   agentCore,
   { default: SubagentRuntime },
-  { default: JsonlSessionPersistence },
+  JsonlSessionPersistence,
   { HarnessSdkJsonRpcServer },
   { SessionId },
   { provideWorkingDirectoryFixture },
@@ -69,7 +69,7 @@ try {
   const result = Promise.withResolvers();
   const unregister = ctx.subagents.registerProvider({
     name: "built-local",
-    capabilities: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+    capabilities: { agentOptions: false, agentPreset: false, outputSchema: false, depthLimit: false },
     inheritsParentContext: false,
     start() {
       return Promise.resolve({

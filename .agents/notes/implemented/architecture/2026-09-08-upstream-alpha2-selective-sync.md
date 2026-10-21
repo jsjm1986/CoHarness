@@ -4,7 +4,6 @@ Status: implemented
 
 English | [中文](2026-09-08-upstream-alpha2-selective-sync.zh.md)
 
-
 ## Problem
 
 DSH v0.1.3-alpha.2 changes shared prompt, session, connection, subprocess, subagent, feedback, and Web behavior. CoHarness runs its Web Host in the cloud and already owns Gateway authorization, Workspace UI, feedback storage, and multi-session Workbench, so a release-wide file merge would introduce desktop-only behavior and replace product contracts.

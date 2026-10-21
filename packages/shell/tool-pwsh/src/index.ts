@@ -85,6 +85,10 @@ interface PwshToolArgs {
   workdir?: string
   run_in_background?: boolean
   sandbox_permissions?: string
+  /**
+   * Omitted only on an exact repeat of the effective mode; an explicit blank is
+   * always rejected and widening requires a non-empty reason.
+   */
   justification?: string
 }
 
@@ -105,7 +109,7 @@ interface PwshForegroundResult {
 }
 
 /* jscpd:ignore-start -- minimal mirror of dsh-tool-bash's validation and execute plumbing (Agent Note). */
-function validatePwshArgs(args: PwshToolArgs): void {
+function validatePwshArgs(args: PwshToolArgs, effectiveMode: SandboxMode | undefined): void {
   if (args.command.trim().length === 0) {
     throw new Error('invalid command: expected a non-empty string')
   }
@@ -115,6 +119,10 @@ function validatePwshArgs(args: PwshToolArgs): void {
   if (args.timeoutMs !== undefined && (!Number.isFinite(args.timeoutMs) || args.timeoutMs <= 0)) {
     throw new Error(`invalid timeoutMs: expected a positive number, got ${JSON.stringify(args.timeoutMs)}`)
   }
+  // An exact repeat of the effective mode asks for no new permission, so an
+  // omitted justification is exempt — but an explicitly-passed one still goes
+  // through the shared pairing rule below, where a blank is rejected.
+  if (args.sandbox_permissions !== undefined && args.sandbox_permissions === effectiveMode && args.justification === undefined) return
   // The escalation pairing (sandbox_permissions ⇔ justification, non-empty) is
   // the shared rule both enforcing families validate identically.
   validateEscalationArgs(args.sandbox_permissions, args.justification)
@@ -133,6 +141,7 @@ function pwshDescription(backgroundEnabled: boolean, escalationModes: readonly S
     + 'Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. '
     + 'Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. '
     + 'On Windows a force-killed command settles as `[exit code: 1]` without a signal marker — treat it as an interruption, not a command failure. '
+    + 'Provide `description` before `command` in the arguments. '
     + 'Before any delete or move, verify that the resolved absolute target path is the intended one; never run it against a computed path you have not checked. '
     + 'Do not assign to automatic variables such as `$HOME`; variable names are case-insensitive, so `$home` is the same read-only variable. '
     + background
@@ -407,7 +416,6 @@ export function apply(ctx: Context, config: Config = {}): void {
       description: pwshDescription(backgroundEnabled, escalationModes),
       /* jscpd:ignore-start -- deliberate mirror of dsh-tool-bash's parameter surface (pwsh-tool-and-executor Agent Note). */
       parameters: {
-        command: { type: 'string', required: true, description: 'The PowerShell command to execute.' },
         description: {
           type: 'string',
           required: true,
@@ -415,6 +423,7 @@ export function apply(ctx: Context, config: Config = {}): void {
             + '5-10 words (shown in the UI). Examples: "ls" → "List files in current directory"; '
             + '"git status" → "Show working tree status"; "Get-Process" → "List running processes".',
         },
+        command: { type: 'string', required: true, description: 'The PowerShell command to execute.' },
         timeoutMs: {
           type: 'number',
           description: promote
@@ -433,7 +442,8 @@ export function apply(ctx: Context, config: Config = {}): void {
           },
           justification: {
             type: 'string' as const,
-            description: 'Required with sandbox_permissions: one sentence for the user explaining why this exact command needs the wider access.',
+            description: 'Required with sandbox_permissions: one sentence for the user explaining why this exact command needs the wider access. '
+              + 'Use the language of the user’s current request.',
           },
         } : {},
       },
@@ -520,9 +530,9 @@ export function apply(ctx: Context, config: Config = {}): void {
       },
       /* jscpd:ignore-start -- the execute path mirrors dsh-tool-bash's by design (see the pwsh-tool-and-executor Agent Note). */
       async execute(args: PwshToolArgs, exec) {
-        validatePwshArgs(args)
         // Description is display metadata; workdir defaults to the caller's session.
         const standingPolicy = resolveSandboxPolicy(exec)
+        validatePwshArgs(args, standingPolicy?.mode)
         const approvedMode = args.sandbox_permissions !== undefined && args.justification !== undefined
           ? await approvePwshEscalation(args.sandbox_permissions, args.justification, exec, standingPolicy)
           : undefined

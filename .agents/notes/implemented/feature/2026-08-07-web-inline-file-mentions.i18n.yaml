@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-07-web-inline-file-mentions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-07-web-inline-file-mentions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-07-web-inline-file-mentions.md
+document:
+  en: 0c7341e9aec688a0661fedb18731a1c172215f45
+  zh: 3483672b42ccfda819d4c42453fc6609910ca1d3
 /agent-note-inline-code-file-mentions-open-the-file-they-name:
   en: dd830c81d49eab5b
   zh: cc3a3c77f8b06cb3

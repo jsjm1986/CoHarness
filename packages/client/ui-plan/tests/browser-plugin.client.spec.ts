@@ -33,6 +33,7 @@ function chatSnapshot() {
   return {
     chat: {
       order: [], locations: { getTurn: () => [], getStep: () => [] },
+      entries: [], groups: { get: () => undefined },
       navigation: { items: () => [] },
       timeline: { turnOrder: [], turns: new Map() },
       legacy: { nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [] },

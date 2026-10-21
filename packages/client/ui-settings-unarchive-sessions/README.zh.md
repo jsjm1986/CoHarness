@@ -17,17 +17,11 @@ Web 设置中的**已归档会话**页面：从 Workspace 导航中隐藏的会�
 
 ## 目录
 
-- [不变量](#invariants)
 - [Model Experience](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行不变量：** 不发布伴生包。本页面注册一个本地化的 `settings.section` 贡献及其 locale 命名空间；不发出 Cordis 事件，也不拥有跨插件的可变关系。
 
 <a id="model-experience"></a>
 ## Model Experience

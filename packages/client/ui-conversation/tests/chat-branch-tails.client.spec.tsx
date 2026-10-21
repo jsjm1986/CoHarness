@@ -49,10 +49,11 @@ interface MessageItemProps {
   readonly node: ConversationNode
   readonly t: ChatNodeViewProps['t']
   readonly referenceLabels?: readonly string[]
+  readonly skillNames?: readonly string[]
 }
 
 /** Legacy-node fixture adapter for the independently registered renderers. */
-function MessageItem({ node, t: translate, referenceLabels }: MessageItemProps) {
+function MessageItem({ node, t: translate, referenceLabels, skillNames }: MessageItemProps) {
   const kind = node.kind === 'assistant' ? 'assistant-step' : node.kind
   const viewNode: ChatConversationViewNode = {
     key: `fixture:${node.kind}:${node.seq}`,
@@ -64,8 +65,12 @@ function MessageItem({ node, t: translate, referenceLabels }: MessageItemProps) 
     visibility: 'visible',
     data: node.kind === 'model-retry'
       ? { attempts: [node], current: node }
-      : (node.kind === 'user' || node.kind === 'steering') && referenceLabels !== undefined
-        ? { ...node, referenceLabels }
+      : (node.kind === 'user' || node.kind === 'steering') && (referenceLabels !== undefined || skillNames !== undefined)
+        ? {
+          ...node,
+          ...(referenceLabels === undefined ? {} : { referenceLabels }),
+          ...(skillNames === undefined ? {} : { skillNames }),
+        }
         : node,
   }
   const props = { node: viewNode, t: translate, renderMessageImages } as ChatNodeViewProps
@@ -140,6 +145,22 @@ describe('MessageItem arms', () => {
     expect(files.map(file => file.textContent)).toEqual(['Dockerfile', 'README.md'])
     expect(files.every(file => file.querySelector('svg') !== null)).toBe(true)
     expect(view.container.textContent).toContain('README.md, please.')
+  })
+
+  it('decorates a slash token as a skill chip only when the step resolved that skill', () => {
+    const message = {
+      kind: 'user' as const,
+      seq: 1,
+      time: 1_000,
+      content: [{ type: 'text', text: '/123 then /demo-skill go' }] as never,
+      source: null,
+    }
+    const plain = render(<MessageItem t={t} node={message} />)
+    expect(plain.container.querySelectorAll('[data-ref-chip]').length).toBe(0)
+    const resolved = render(<MessageItem t={t} node={message} skillNames={['demo-skill']} />)
+    const chips = [...resolved.container.querySelectorAll('[data-ref-chip="skill"]')]
+    expect(chips.map(chip => chip.textContent)).toEqual(['/demo-skill'])
+    expect(resolved.container.textContent).toContain('/123 then ')
   })
 
   it('user bubbles expose clock / copy and neither branch nor edit; copy writes the text', () => {

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-26-document-mobile-rhythm-and-scrollbar.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-26-document-mobile-rhythm-and-scrollbar.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-document-mobile-rhythm-and-scrollbar.md
+document:
+  en: a77221965ed0a1acad21e172f2d3c71f9900916e
+  zh: cbca558d539aaae58983823f15b775b22db227ba
 /agent-note-document-mobile-rhythm-and-shared-scrollbar-geometry:
   en: 8652208cf3e3fb88
   zh: c35a1f03b518db78

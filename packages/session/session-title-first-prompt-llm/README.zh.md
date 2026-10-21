@@ -9,26 +9,19 @@ kind: "package-reference"
 
 可选的 `ctx.sessionTitle` 提供方，通过 `ctx.llm` 总结第一条符合条件的用户消息。它注册 `first-prompt` 节奏，只在全新非 fork 会话首次创建回退时自动运行，并将结果归因于该消息的确切 seq。自动失败会保留回退，之后只能通过 `ctx.sessionTitle.refresh()` 重试。
 
-该插件使用完整且必填的[共享 LLM（大语言模型）配置](../session-title-llm/README.zh.md#configuration)。同时省略 `provider` 与 `model` 时，会继承当前已记录主请求的确切路由；也可以同时设置二者，使标题生成使用独立路由。
+该插件拥有自身的系统指令、JSON 封装与输出解析，并要求自身的 `targetWords` 与 `targetCjkCharacters` 以及共享[执行控制项](../session-title-llm/README.zh.md#configuration)，均无默认值。同时省略 `provider` 与 `model` 时，会继承当前已记录主请求的确切路由；也可以同时设置二者，使标题生成使用独立路由。
 
 ## 概述
 
-`dsh-session-title-first-prompt-llm` 作为可选的 `ctx.sessionTitle` 提供方，通过 `ctx.llm` 总结第一条符合条件的用户消息。它注册 `first-prompt` 节奏，只在全新非 fork 会话首次创建回退时自动运行，并把结果归因于该消息的确切 seq。自动失败会保留回退，之后只能通过 `ctx.sessionTitle.refresh()` 重试。它使用 `dsh-session-title-llm` 的完整必填共享 LLM 配置，因此路由、提示词、预算与取消行为不会漂移。自动行为与配置优先；实现仅在共享策略之上进行轻量注册。
+`dsh-session-title-first-prompt-llm` 作为可选的 `ctx.sessionTitle` 提供方，通过 `ctx.llm` 总结第一条符合条件的用户消息。它注册 `first-prompt` 节奏，只在全新非 fork 会话首次创建回退时自动运行，并把结果归因于该消息的确切 seq。自动失败会保留回退，之后只能通过 `ctx.sessionTitle.refresh()` 重试。该插件拥有自身的系统指令、JSON 封装与输出解析；它与 all-prompts 提供方仅共享 `dsh-session-title-llm` 的执行模块。自动行为与配置优先；实现是该执行器之上的一个小型提供方策略。
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。摘要通过 `ctx.llm` 生成并经标题 seam 对照一个确切 seq 提交；除已提交结果外不保留标题状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -37,11 +30,11 @@ kind: "package-reference"
 
 #### 模型看到什么
 
-标题模型会收到共享标题指令，以及一个只包含第一条符合条件用户消息的 JSON 数组。后续提示词与继承的 fork 历史不会触发再次自动调用。
+标题模型会收到此提供方的标题指令，以及一个只包含第一条符合条件用户消息的 JSON 数组；它永远不会收到 `currentTitle`。后续提示词与继承的 fork 历史不会触发再次自动调用。
 
 #### Token 影响
 
-全新会话最多自动发出一次辅助请求，并受 `maxInputBytes` 与 `maxOutputTokens` 约束；显式刷新可能发出额外调用。主 agent 请求不会增加 token。
+全新会话最多自动发出一次辅助请求，并受 `maxInputBytes` 与 `maxOutputTokens` 约束；显式刷新可能发出额外调用。它选择路由支持的最低推理强度；当路由没有可选强度时则不指定。主 agent 请求不会增加 token。
 
 #### KV Cache 影响
 

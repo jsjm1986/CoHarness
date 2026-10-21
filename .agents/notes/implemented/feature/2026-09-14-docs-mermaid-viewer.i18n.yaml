@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-14-docs-mermaid-viewer.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-14-docs-mermaid-viewer.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-14-docs-mermaid-viewer.md
+document:
+  en: 03aecb7b4df1c79d2eb254375f6b2c68145079ac
+  zh: b66f427a4820eef0d6fa25b163cfc8e3548ec0c6
 /agent-note-documentation-mermaid-viewer:
   en: ba1a156f12503487
   zh: de6cd8986da8842e

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for mcp.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for mcp.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/mcp.md
+document:
+  en: ba7db061d4f970c5f5dd3dda8e5697a591248afb
+  zh: fbfd426165ab1c594026744af99294cf00f4254a
 /mcp:
   en: 8e65e07d162dcc41
   zh: 5f4ae607cd468767

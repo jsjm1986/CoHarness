@@ -7,6 +7,7 @@ import css from './SettingsSelectRow.module.css'
 
 /** Locale namespace of one selector row's copy. */
 export type SettingsSelectRowPrefix =
+  | 'settings.collapseTiming'
   | 'settings.enter'
   | 'settings.links'
   | 'settings.performance'

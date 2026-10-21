@@ -39,9 +39,11 @@ import { deriveEventMessage, foldSurface } from '@deepseek-ai/dsh-session/surfac
 import type {
   ApiProxy, ClientRequest, ClientResponse, HistoryEntry, HostFrame, MuxFrame, RpcReceipt,
   ModelProviderGroup, ModelSelection, RpcRequest, RpcResponse, RpcResult, ServerRequest, ServerResponse,
-  SessionHistoryIndex, SessionSummary, ToolCallView, ToolEventView, ToolResultView, WorkspaceId, WorkspaceView,
+  SessionHistoryIndex, SessionSummary, SkillEntry, ToolCallView, ToolEventView, ToolResultView, WorkspaceId, WorkspaceView,
 } from './api.ts'
 import type { RequestPayload, ResponseValue, RpcMethodMap } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { interactionsUnavailableError } from '@deepseek-ai/dsh-host-apiproxy/api/interactions'
+import type { ConnectionInteractions } from './api.ts'
 import { AbstractApiClient, RpcId, SESSION_SEARCH_RESULT_LIMIT } from './api.ts'
 import { randomUuid } from './random-uuid.ts'
 import type { ClientConnectionRpc } from '../rpc.ts'
@@ -56,13 +58,6 @@ function rpcRequest<P>(payload: P): RpcRequest<P> {
 
 function text(t: string): ContentBlock[] {
   return [{ type: 'text', text: t }]
-}
-
-declare module '@deepseek-ai/dsh-llm' {
-  interface MessageSourceMap {
-    /** Demo-session fixture producer kind; exists only inside this generator. */
-    fixture: { kind: 'fixture' }
-  }
 }
 
 function userMessage(content: ContentBlock[], source: MessageSource = { kind: 'user' }): UserMessage {
@@ -1599,6 +1594,11 @@ interface ReasoningChunkStormState {
 export interface FixtureOptions {
   /** Start with no real Workspace or Session. */
   empty?: boolean
+  /**
+   * The owning connection's interaction mode; 'none' suppresses approval,
+   * question, and forwarded-event traffic the way the Host does.
+   */
+  interactions?: ConnectionInteractions
   /** Reject every prompt before appending its user event. */
   rejectPrompt?: boolean
   /** Publish the Session but fail its Workspace account write. */
@@ -1680,6 +1680,7 @@ export function createFixtureFaces(options: FixtureOptions = {}): FixtureWorld {
 
 /** Build the fixture's legacy API and Remote RPC faces over one state graph. */
 function createFixtureWorld(options: FixtureOptions): FixtureWorld {
+  const noneMode = options.interactions === 'none'
   // The resident fixture sessions all carry history, so none of them is blank.
   const sessions: SessionSummary[] = options.empty ? [] : [
     { sessionId: sid('fx-alpha'), updatedAt: Date.now(), running: true, blank: false, cwd: '/tmp/fixture' },
@@ -1687,6 +1688,17 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     { sessionId: sid('fx-gamma'), updatedAt: Date.now() - 120_000, running: false, blank: false, cwd: '/tmp/fixture' },
   ]
   const logs = new Map<SessionId, SessionEvent[]>([[sid('fx-alpha'), buildAlphaLog()]])
+  const goalActivations = new Map<SessionId, FxGoalRef & { activation: 'armed' | 'disarmed' }>()
+  const fixtureSkills: readonly { summary: SkillEntry; contentMarkdown: string }[] = [
+    {
+      summary: { name: 'fixture-demo', description: 'fixture 技能样本', whenToUse: '仅供 UI 目录渲染验收', modelInvocable: true },
+      contentMarkdown: '# Fixture skill\n\nUse the fixture catalog.\n',
+    },
+    {
+      summary: { name: 'fixture-user-only', description: 'fixture 仅用户技能样本', modelInvocable: false },
+      contentMarkdown: '# User-only fixture skill\n\nFollow the user request.\n',
+    },
+  ]
   const modelSelections = new Map<SessionId, ModelSelection>(sessions.map(session => [
     session.sessionId,
     { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
@@ -1830,9 +1842,13 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   const muxConns = new Set<StreamConn<MuxFrame>>()
   const hostConns = new Set<StreamConn<HostFrame>>()
   const emitMux = (frame: MuxFrame): void => {
+    // Host parity: a 'none' connection never observes interaction traffic.
+    if (noneMode && (frame.type.startsWith('approval/') || frame.type.startsWith('question/'))) return
     for (const conn of muxConns) conn.push({ rpcId: mint(), payload: frame })
   }
   const emitHost = (frame: HostFrame): void => {
+    // Host parity: a 'none' connection gets no forwarded remote events.
+    if (noneMode && frame.type === 'host/remote-event') return
     for (const conn of hostConns) conn.push({ rpcId: mint(), payload: frame })
   }
 
@@ -1924,6 +1940,22 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       data: change,
     })
     return backscanGoal(log) as FxGoalProjection
+  }
+
+  /** Publish process-local activation only after its durable goal revision exists. */
+  const setGoalActivation = (id: SessionId, activation: 'armed' | 'disarmed'): void => {
+    const current = backscanGoal(logOf(id))
+    if (current === null) {
+      if (!goalActivations.delete(id)) return
+      emitHost({ type: 'host/remote-event', event: 'goal/activation-changed', args: [{ sessionId: id }] })
+      return
+    }
+    const previous = goalActivations.get(id)
+    const next = { id: current.goal.id, revision: current.goal.revision, activation }
+    if (previous?.id === next.id && previous.revision === next.revision
+      && previous.activation === activation) return
+    goalActivations.set(id, next)
+    emitHost({ type: 'host/remote-event', event: 'goal/activation-changed', args: [{ sessionId: id, goal: next }] })
   }
 
   type FxGoalRef = { id: string; revision: number }
@@ -2028,6 +2060,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
             goal: { id: `fx-goal-${logOf(id).length}`, revision: 1, objective, phase: 'active', maxGoalRounds: 256 },
             roundsStarted: 0, createdAt: Date.now(), updatedAt: Date.now(),
           })
+          setGoalActivation(id, 'armed')
           text = `Goal created: ${created.goal.objective}`
         }
         const result: CommandResult = { kind: 'success', text }
@@ -2060,15 +2093,14 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     },
   }
 
-  const goalView = (projection: FxGoalProjection): FxGoalView => ({
+  const goalView = (id: SessionId, projection: FxGoalProjection): FxGoalView => ({
     ...projection.goal,
     roundsStarted: projection.roundsStarted,
     createdAt: projection.createdAt,
     updatedAt: projection.updatedAt,
-    activation: projection.goal.phase === 'active' ? 'armed' : 'disarmed',
+    activation: projection.goal.phase === 'active' ? goalActivations.get(id)?.activation ?? 'disarmed' : 'disarmed',
   })
 
-  /** Canonical fixture implementation of the generated Goal Remote contract. */
   /** Canonical fixture implementation of the generated reference-discovery Remote contracts. */
   const referenceRemotes = {
     files(id: SessionId, query: string): RpcResult<{ path: string; kind: 'file' | 'directory' }[]> {
@@ -2114,7 +2146,14 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     },
   }
 
+  /** Canonical fixture implementation of the generated Goal Remote contract. */
   const goalRemotes = {
+    get(id: SessionId): RpcResult<FxGoalView | undefined> {
+      const missing = requireGoalSession(id)
+      if (missing !== undefined) return missing
+      const current = backscanGoal(logOf(id))
+      return { ok: true, value: current === null ? undefined : goalView(id, current) }
+    },
     create(id: SessionId, request: { objective: string; maxGoalRounds?: number }): RpcResult<{ ref: FxGoalRef }> {
       const missing = requireGoalSession(id)
       if (missing !== undefined) return missing
@@ -2134,10 +2173,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         },
         roundsStarted: 0, createdAt: now, updatedAt: now,
       })
+      setGoalActivation(id, 'armed')
       return { ok: true, value: { ref: { id: projection.goal.id, revision: projection.goal.revision } } }
     },
     edit(id: SessionId, ref: FxGoalRef, request: { objective?: string; maxGoalRounds?: number }): RpcResult<FxGoalView> {
-      return mutateGoal(id, ref, current => ({
+      return mutateGoal(id, ref, 'edit', current => ({
         ...current.goal,
         revision: current.goal.revision + 1,
         ...request.objective === undefined ? {} : { objective: request.objective },
@@ -2145,21 +2185,22 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       }))
     },
     pause(id: SessionId, ref: FxGoalRef): RpcResult<FxGoalView> {
-      return mutateGoal(id, ref, current => (
+      return mutateGoal(id, ref, 'pause', current => (
         current.goal.phase === 'active'
           ? { ...current.goal, revision: current.goal.revision + 1, phase: 'paused' }
           : undefined
       ))
     },
     resume(id: SessionId, ref: FxGoalRef): RpcResult<FxGoalView> {
-      return mutateGoal(id, ref, current => (
-        current.goal.phase === 'paused' || current.goal.phase === 'blocked' || current.goal.phase === 'active'
+      return mutateGoal(id, ref, 'resume', current => (
+        current.goal.phase === 'paused' || current.goal.phase === 'blocked'
+          || (current.goal.phase === 'active' && goalActivations.get(id)?.activation !== 'armed')
           ? { ...current.goal, revision: current.goal.revision + 1, phase: 'active' }
           : undefined
       ))
     },
     complete(id: SessionId, ref: FxGoalRef): RpcResult<FxGoalView> {
-      return mutateGoal(id, ref, current => (
+      return mutateGoal(id, ref, 'complete', current => (
         current.goal.phase === 'complete'
           ? undefined
           : { ...current.goal, revision: current.goal.revision + 1, phase: 'complete' }
@@ -2173,6 +2214,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       appendGoalChange(id, {
         kind: 'goal/change', version: 1, operation: 'clear', cleared: tombstone, clearedAt: Date.now(),
       })
+      setGoalActivation(id, 'disarmed')
       return { ok: true, value: tombstone }
     },
   }
@@ -2192,6 +2234,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   function mutateGoal(
     id: SessionId,
     ref: FxGoalRef,
+    operation: 'edit' | 'pause' | 'resume' | 'complete',
     next: (current: FxGoalProjection) => FxGoalProjection['goal'] | undefined,
   ): RpcResult<FxGoalView> {
     const resolved = resolveGoal(id, ref)
@@ -2201,12 +2244,15 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     if (goal === undefined) {
       return goalFailure(`invalid goal transition from "${current.goal.phase}"`)
     }
+    const activation = operation === 'resume' ? 'armed'
+      : operation === 'edit' ? goalActivations.get(id)?.activation ?? 'disarmed'
+        : 'disarmed'
     const projection = appendGoalChange(id, {
-      kind: 'goal/change', version: 1,
-      operation: goal.phase === current.goal.phase ? 'edit' : goal.phase === 'paused' ? 'pause' : goal.phase === 'active' ? 'resume' : 'complete',
+      kind: 'goal/change', version: 1, operation,
       goal, roundsStarted: current.roundsStarted, createdAt: current.createdAt, updatedAt: Date.now(),
     })
-    return { ok: true, value: goalView(projection) }
+    setGoalActivation(id, activation)
+    return { ok: true, value: goalView(id, projection) }
   }
 
   /** At most one in-flight replay per session; cancel clears it. */
@@ -2278,6 +2324,13 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       const log = logOf(sid(id))
       const messageSeqs = log.filter(event => event.type === 'user/message').map(event => event.seq)
       append(sid(id), { type: 'session/title', data: { title, messageSeqs, source: { kind: 'provider', provider: 'fixture' } } })
+    },
+    /** Disarm the only active goal without changing its durable phase or revision. */
+    disarmOnlyGoal(): void {
+      const active = [...logs.entries()].filter(([, log]) => backscanGoal(log)?.goal.phase === 'active')
+      const [entry] = active
+      if (active.length !== 1 || entry === undefined) throw new Error(`fixture: expected one active goal, found ${active.length}`)
+      setGoalActivation(entry[0], 'disarmed')
     },
     /** Start an externally paced reasoning stream for the opt-in browser stress lane. */
     startReasoningChunkStorm(
@@ -3150,12 +3203,17 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       list: (request) => {
         const missing = requireSession(request)
         if (missing !== undefined) return missing
-        return ok(request, {
-          skills: [
-            { name: 'fixture-demo', description: 'fixture 技能样本', whenToUse: '仅供 UI 目录渲染验收', modelInvocable: true },
-            { name: 'fixture-user-only', description: 'fixture 仅用户技能样本', modelInvocable: false },
-          ],
-        })
+        return ok(request, { skills: fixtureSkills.map(skill => skill.summary) })
+      },
+      get: (request) => {
+        const missing = requireSession(request)
+        if (missing !== undefined) return missing
+        const skill = fixtureSkills.find(item => item.summary.name === request.payload.name)
+        return ok(request, skill === undefined ? {} : { skill: {
+          name: skill.summary.name,
+          description: skill.summary.description,
+          contentMarkdown: skill.contentMarkdown,
+        } })
       },
     },
     events: {
@@ -3175,7 +3233,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
             conn.push({ rpcId: mint(), payload: { type: 'session/projection', sessionId: s.sessionId, key, value: values[key], seq: log.length - 1 } })
           }
         }
-        if (approvalPending) {
+        if (approvalPending && !noneMode) {
           conn.push({
             rpcId: pendingApprovalRpcId,
             payload: {
@@ -3185,7 +3243,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
             },
           })
         }
-        if (questionPending) {
+        if (questionPending && !noneMode) {
           conn.push({
             rpcId: pendingQuestionRpcId,
             payload: {
@@ -3239,6 +3297,18 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           ns: 'agent-presets',
           schema: {},
           value: { default: fixtureDefaultPreset, modeSelectionEnabled: fixtureModeSelection },
+          applies: 'live',
+          secrets: [],
+          revision: 0,
+          writable: true,
+        }, {
+          // The welcome notice steps down only when its exact copy version is
+          // acknowledged; this literal must track WELCOME_NOTICE_VERSION in
+          // dsh-client-ui-settings-models (an unacknowledged notice holds the
+          // app root inert and breaks every role query in this lane).
+          ns: 'ui-onboarding',
+          schema: {},
+          value: { welcomeNoticeVersion: '2026-09-28.1' },
           applies: 'live',
           secrets: [],
           revision: 0,
@@ -3383,6 +3453,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         case 'commands/execute': return Promise.resolve(commandRemotes.execute(sessionId, args.line as string, args.images ?? []))
         case 'fileReferences/list': return Promise.resolve(referenceRemotes.files(sessionId, args.query ?? ''))
         case 'sessionReferenceResolver/candidates': return Promise.resolve(referenceRemotes.sessions(sessionId, args.query ?? ''))
+        case 'goals/get': return Promise.resolve(goalRemotes.get(sessionId))
         case 'goals/create': return Promise.resolve(goalRemotes.create(sessionId, {
           objective: args.request?.objective as string,
           ...args.request?.maxGoalRounds === undefined ? {} : { maxGoalRounds: args.request.maxGoalRounds },
@@ -3467,9 +3538,16 @@ export class FixtureApiClient extends AbstractApiClient {
   /** Generic Remote caller backed by the same in-memory state as the legacy fixture API. */
   readonly rpc: ClientConnectionRpc
 
-  constructor() {
-    super()
-    const world = createFixtureWorld(fixtureOptionsFromLocation())
+  /**
+   * @param interactions - the connection's interaction mode; the in-memory
+   *   world applies the same 'none' filtering the Host does.
+   */
+  constructor(interactions?: ConnectionInteractions) {
+    super(undefined, undefined, undefined, interactions)
+    const world = createFixtureWorld({
+      ...fixtureOptionsFromLocation(),
+      ...(interactions === undefined ? {} : { interactions }),
+    })
     this.api = world.api
     this.rpc = world.rpc
   }
@@ -3545,6 +3623,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'workspaceFiles.read': return this.api.workspaceFiles.read(request, signal)
       case 'workspaceFiles.readBytes': return this.api.workspaceFiles.readBytes(request, signal)
       case 'skill.list': return this.api.skills.list(request)
+      case 'skill.get': return this.api.skills.get(request)
       case 'agentPreset.openDocument': return this.api.agentPresets.openDocument(request, new AbortController().signal)
       case 'settings.describe': return this.api.settings.describe(request)
       case 'settings.openDocument': return this.api.settings.openDocument(request, signal)
@@ -3597,6 +3676,9 @@ export class FixtureApiClient extends AbstractApiClient {
    * @returns the carrier receipt from the fixture impl.
    */
   override async respond(message: ClientResponse): Promise<RpcReceipt> {
+    // Same 'none' fail-fast as the HTTP carrier: no requested frame can reach
+    // this connection, so an answer is always a caller bug.
+    if (this.interactions === 'none') throw interactionsUnavailableError()
     this.onEnvelope(message)
     return this.api.respond(message)
   }

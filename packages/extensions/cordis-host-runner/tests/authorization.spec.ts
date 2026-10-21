@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
+import { collaborationCapabilities, CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAction, CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
@@ -30,6 +30,7 @@ function projectAuthority(overrides?: {
     },
     expiresAt: Date.now() + 60_000,
     signal: new AbortController().signal,
+    capabilities() { return collaborationCapabilities(this.participant) },
     authorize: (overrides?.authorize ?? (async sessionId => ({
       sessionId,
       rootSessionId: sessionId,

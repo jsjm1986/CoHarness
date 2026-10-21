@@ -111,7 +111,7 @@ turn/end
 
 会话日志是模型所见上下文的来源。`deriveMessages()` 从中投影出模型历史，原始 `assistant/chunk` 事件则保证回放和 UI 保真。fork、恢复、transcript（文本记录）、遥测和持久化都派生自该事件流。
 
-**模型可见即已记录。** 抵达模型请求的一切都必须能从日志重建，并由一项运行时不变量断言这一点。因此，新增一项模型可见输入就需要新增一个会话事件：扩展 `SessionEventMap` 并从日志渲染。
+**模型可见即已记录。** 每个模型请求都必须能从日志重建。新增模型可见输入需要会话事件。修改现有消息内容的插件注册[纯消息投影](subsystems/session.zh.md#plugin-owned-message-projections)，独立读取器显式传入相同的处理器。 工具变更不依赖能力；[Session 工具历史](../packages/core/session/README.zh.md)提供提供方声明。
 
 [工作目录](subsystems/working-directory.zh.md) 提供用户上下文与执行路径，且不改变原始项目身份、沙箱可写根目录或既有进程目录。
 
@@ -128,7 +128,6 @@ seam 正是替换一个提供方就能改变整个产品的原因。文件系统
 [客户端运行时](../packages/client/runtime/README.zh.md)保留当前 Session 和显式 staged 集合，共用一条连接及有界历史窗口。[对话插件](../packages/client/ui-conversation/README.zh.md)拥有 Session 渲染权并提供根作用域 viewport 能力；可选的 [Workspace 工作台](../packages/client/ui-workbench/README.zh.md)通过其 slots 组合最多四个面板。账户目录遵循 ACL 过滤，并通过 SessionRuntimePool 按需启动目标运行时，因此每个面板拥有独立 principal、事件流和 scope 资源。面板选择只改变浏览器视图状态，Session 日志、模型请求、sandbox 策略和 Collaboration 授权仍由原有模块负责。
 
 远程 Workspace 文件预览是独立的只读能力：Host ApiProxy 在 Gateway 授权后，经 `ctx.fs` 解析 Session 相对路径；Client runtime 将元数据保存在 `WorkspaceResourceRegistry` 中，并经所属 runtime target 路由每次读取。它不会替代 User Documents，不增加第二套写入协议，也不会在云端 Web 调用 `host.openPath`。
-
 
 ## 新行为的归属位置
 

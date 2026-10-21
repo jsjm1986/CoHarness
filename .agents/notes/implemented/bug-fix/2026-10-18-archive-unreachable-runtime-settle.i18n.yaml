@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-archive-unreachable-runtime-settle.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-archive-unreachable-runtime-settle.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-archive-unreachable-runtime-settle.md
+document:
+  en: af4dbefb02693713e479808d9c805338b4ffbc6a
+  zh: 3103955c93b9bf6d7ab6f6afa8c205e986186c81
 /agent-note-admin-archives-can-settle-records-whose-runtime-cannot-confirm:
   en: 3cdbccf8e7f8a9e4
   zh: 71d1432cebda473d

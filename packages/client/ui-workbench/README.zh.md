@@ -15,14 +15,12 @@ kind: "package-reference"
 
 使用 `dsh-client-ui-workbench` 把最多四个既有工作区会话呈现为一个多面板会话工作台，含会话选择器与面板选择、排序、比例与模式控制。每个面板经普通会话槽位属主在显式会话作用域下渲染，注入的控件始终解析到活动面板而非缓存目标。
 
-
 跨运行时加载和创建共用当前导航意图。选择其他窗格、切换展示模式或命名布局，以及卸载插件，都会阻止旧响应替换活动窗格。导航被取代后，已完成的 Host 创建仍保留在目录中。
 
 ## 目录
 
 - [组合](#composition)
 - [视图状态](#view-state)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -32,15 +30,17 @@ kind: "package-reference"
 <a id="composition"></a>
 ## 组合
 
-`apply()` 等待 `conversationViewport`，通过 `ctx.slots.inject()` 注册工作台控件。侧栏面板列出已暂存的面板并提供聚焦与关闭操作，Add 与等宽操作绑定同一个选择器 store 和 viewport 能力，可退出回单会话模式，并声明由 ui-conversation 以紧凑显示偏好行填充的 `conversation.workbench.display` 孔位。提供方拥有有界 Session stage 集合；卸载工作台会释放额外历史窗口，保留普通当前会话视图。Gateway 返回经过 ACL 过滤的账户级目录，选中的项目运行时使用独立的目标传输和 principal assertion。在云端 Web 中，`workspace/resource-open` 请求预览消费方接收明确绑定 runtime 的文件。工具栏按目录读取 Workspace 文件，并在统一右侧栏中打开文件，绑定发起操作的 Session 和 runtime。标签经注入的 `keyedHooks.workspaceResource` 源订阅资源元数据；各预览接收普通的 `WorkspacePreviewResource` face——不可变 `{status, value, error, accessDenied}` 元数据加绑定的 `reload`/`revoke` 回调——从不持有 registry。读取通过带版本保护的 `workspaceFiles.read` 分页；二进制内容使用有界 Base64 窗口。隐藏标签不持有订阅或内容读取器；关闭标签释放对应实例。文件变化需要重新加载，临时重连保留内容，权限拒绝则隐藏内容。本地 loopback 只有在所属连接声明原生打开能力时才调用 Host 的 `openPath`。Session JSONL、持久化格式和 Collaboration 授权语义保持不变。
+`apply()` 等待 `conversationViewport`，通过 `ctx.slots.inject()` 注册工作台控件。侧栏面板列出已暂存的面板并提供聚焦与关闭操作，Add 与等宽操作绑定同一个选择器 store 和 viewport 能力，可退出回单会话模式，并声明由 ui-conversation 以紧凑显示偏好行填充的 `conversation.workbench.display` 孔位。提供方拥有有界 Session stage 集合；卸载工作台会释放额外历史窗口，保留普通当前会话视图。Gateway 返回经过 ACL 过滤的账户级目录，选中的项目运行时使用独立的目标传输和 principal assertion。在云端 Web 中，`workspace/resource-open` 请求预览消费方接收明确绑定 runtime 的文件。工具栏按目录读取 Workspace 文件，并在统一右侧栏中打开文件，绑定发起操作的 Session 和 runtime。标签经注入的 `keyedHooks.workspaceResource` 源订阅资源元数据；各预览接收普通的 `WorkspacePreviewResource` face——不可变 `{status, value, error, accessDenied}` 元数据加绑定的 `reload`/`revoke` 回调——从不持有 registry。读取通过带版本保护的 `workspaceFiles.read` 分页；二进制内容使用有界 Base64 窗口，该回退界面在所属基础 loopback 连接声明原生打开能力时，还会经 `host.openPath` 提供默认应用打开操作。隐藏标签不持有订阅或内容读取器；关闭标签释放对应实例。文件变化需要重新加载，临时重连保留内容，权限拒绝则隐藏内容。Session JSONL、持久化格式和 Collaboration 授权语义保持不变。
 
 Markdown 文件链接在现有鉴权文件标签中打开，并从请求的首行开始显示。再次打开同一文件的不同行号只更新导航，不创建第二个资源。链接目标不会改变文件系统权限。
 
-文件标签按扩展名选择预览正文。Markdown 文件（`md`、`markdown`）累计同样的带版本保护分页，经 `MarkdownText` 渲染且不自动换行。HTML 文件（`html`、`htm`）经 [`preview-readers.ts`](src/client/preview-readers.ts) 的 `readFileBytes` 以 Base64 读取完整源——带版本保护的 `workspaceFiles.readBytes` 窗口按调用方完整文件上限约束——由 [`html/read-relative.ts`](src/client/html/read-relative.ts) 的 `workspaceFileBytes` 解码后打包，收集通过同一授权 Session 和 runtime 目标读取的直接声明相对 `.js` classic 脚本、`.css` 样式表与可识别图片文件。依赖读取限定在 Session 工作区内解析，[`html/pack.ts`](src/client/html/pack.ts) 实施单资源 4 MiB、总量 32 MiB、最多 64 个资源的边界；外部、根相对、module 及 CSS 遍历得到的引用一律不读取。打包后的文档在仅有 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行；替换或卸载预览即吊销 Blob URL。非法 UTF-8、读取失败或超出限制使预览失败，而不会发布残缺包。PDF 与其余 Office 文件保留各自的文档正文，其余文件继续使用文本或有界 Base64 窗口。
+文件标签按扩展名选择预览正文。Markdown 文件（`md`、`markdown`）累计同样的带版本保护分页，经 `MarkdownText` 渲染且不自动换行。文档开头的 YAML frontmatter（首行 `---` 开始，以 `---` 或 `...` 结束）通过包内 `client.frontmatter-fields.js` 分块在正文上方显示为键值列表；字符串值显示解析后的文本，其他标量、集合与别名保留原始 YAML 写法，无效 YAML 或非映射文档原样显示整个块，空块不显示，未闭合的块仍按 Markdown 渲染。HTML 文件（`html`、`htm`）经 [`preview-readers.ts`](src/client/preview-readers.ts) 的 `readFileBytes` 以 Base64 读取完整源——带版本保护的 `workspaceFiles.readBytes` 窗口按调用方完整文件上限约束——由 [`contract/html/read-relative.ts`](src/client/contract/html/read-relative.ts) 的 `workspaceFileBytes` 解码后打包，收集通过同一授权 Session 和 runtime 目标读取的直接声明相对 `.js` classic 脚本、`.css` 样式表与可识别图片文件。依赖读取限定在 Session 工作区内解析，[`contract/html/pack.ts`](src/client/contract/html/pack.ts) 实施单资源 4 MiB、总量 32 MiB、最多 64 个资源的边界；外部、根相对、module 及 CSS 遍历得到的引用一律不读取。打包后的文档在仅有 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行；替换或卸载预览即吊销 Blob URL。非法 UTF-8、读取失败或超出限制使预览失败，而不会发布残缺包。PDF 与其余 Office 文件保留各自的文档正文，其余文件继续使用文本或有界 Base64 窗口。
 
 表格文件（`xlsx`、`xls`、`csv`、`tsv`）经同一条有界 `readFileBytes` 路径读取完整授权 Base64——以配置的 `excelMaxBytes` 为上限——并交由懒加载的工作簿查看器只读渲染，而不再请求转换。一次性 Worker 在配置的字节数、单元格面积与超时限制下解析工作簿，公式连同缓存结果一并保留且不重算；图表、图片、形状与条件格式按不支持的预览特性报告。解析限制来自插件 `Config`（`excelMaxBytes`、`excelMaxCells`、`excelTimeoutMs`）。源版本、重新加载、撤权与隐藏标签的生命周期与其他文件预览一致：迟到或过期的读取被丢弃，权限拒绝立即清空内容。
 
 其余 Office 文件通过同一文件标签请求授权转换；PDF.js 在独立 Worker 中按可见页面渲染，提供可选择文本及缺失字体提示。隐藏正文释放内容与 Worker，标签保留页码偏好。源变化要求重新加载，撤权立即清空内容。普通 PDF 读取仍受 Workspace 单窗口字节限制；Office 输入和输出由转换器限制。引擎及适配规则见[文档转换](../../../docs/subsystems/office-to-pdf.zh.md)。
+
+PDF、转换后的 Office 预览以及位图或 SVG 图片预览共用同一浮动缩放控件，提供**适应宽度**、25%、50%、100%、150% 和 200% 选项，并在 25%–400% 固定范围内按 25% 逐级缩放。适应宽度是默认模式并跟随面板尺寸变化，但不会放大小于面板的内容；100% 表示 PDF 的 96 DPI 页面尺寸或图片的固有 CSS 像素尺寸。在精细指针设备上，控件初始隐藏；指针进入底部 72 个 CSS 像素时向上滑入，离开 420 ms 后向下退出；控件悬停、键盘焦点、菜单展开和手势进行期间保持显示，无 hover 的设备则始终显示。Chromium 将 macOS 触控板捏合映射到与 Ctrl+滚轮相同的实时指针锚定路径，静止后的偏好保留在标签自己的 view 中，正文重新挂载后继续生效，直至标签关闭。缩放视口拥有自己的滚动区，固定缩放可在预览内产生横向和纵向滚动，而文本与二进制面板保留原有滚动器。缩放静止后，可见 PDF 页面按设备像素比乘以缩放比例重绘，旧位图保留到新渲染完成；图片始终在单个 `<img>` 内按固有纵横比显示，SVG 继续使用浏览器的矢量渲染路径。文本、Markdown、HTML 与表格预览不提供缩放控件。
 
 <a id="view-state"></a>
 ## 视图状态
@@ -56,12 +56,6 @@ Markdown 文件链接在现有鉴权文件标签中打开，并从请求的首�
 目录的 `personalComplete` 标记区分已核实的个人目录与暂时无法读取的目录。个人结果不完整时保留已保存的个人窗格元数据，不请求缺失的 runtime；项目成员关系记录仍是权威依据。旧原始 ID 的迁移等待所有可能所有者的完整结果。此时布局编辑及从该布局创建会话暂不可用，界面说明原因并提供显式目录重试；普通单会话使用和工作区启动保持可用。账户目录读取失败不能证明记录不存在；只有明确声明独立模式的 Host 才能从本地目录恢复。
 
 目录仍授权的会话，其 runtime 被手动停止或暂时不可达时，保存布局保留该条目。尚未载入的窗格显示该状态，不显示会话内容；后台恢复不会请求显式启动。既有工作区启动操作及目录刷新可恢复它。明确的授权拒绝或确认不存在的 Session 会移除窗格，账号变化会清空活动视图。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。窗格选择、顺序与比例是 `conversationViewport` 能力之上的组件状态；会话仍由运行时拥有。
-
 
 ## 模型体验
 
@@ -79,7 +73,6 @@ Markdown 文件链接在现有鉴权文件标签中打开，并从请求的首�
 - 浏览器本地视图状态不跨设备或浏览器配置同步。
 - 文件标签提供有界文本、Markdown、HTML 和图片预览，其他二进制文件回退为 Base64。HTML 打包仅覆盖直接声明的相对 classic 脚本、样式表与图片 `src` 引用；`srcset`、module 导入、CSS `url()`/`@import` 与运行时 `fetch` 不会读取 Workspace 文件。表格预览为只读，且省略解析器无法保留的工作簿特性，如图表、图片、形状与条件格式；`doc`、`docx`、`ppt`、`pptx` 仍走转换路径。编辑器和标签内上传尚未实现。
 
-**运行时不变式：** 不发布伴生入口。所有权与生命周期由 Cordis 槽位与视口能力执行。
 
 <a id="dev-note"></a>
 ### 开发备注

@@ -19,7 +19,6 @@ agent 可以在会话期间发现并加载 skill。在首次请求前，如果�
 
 - [目录生命周期](#catalog-lifecycle)
 - [工具：`skill`](#tool-skill)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -53,12 +52,6 @@ agent 可以在会话期间发现并加载 skill。在首次请求前，如果�
 无法解析的名称会报告 skill 未知或已不可用。无效名称和 `invocation.modelInvocable` 为 `false` 的 skill 会产生不同的错误结果。`invocation.userInvocable` 不限制这个面向模型的接口。
 
 工具执行不会添加合成上下文消息。新加载的结果已作为工具结果记录，并在下一个模型步骤可用，无需重复正文。只有目录投影会添加替换摘要。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。工具与目录读取 `ctx.skills` 注册表；提供方注册与内容留在 seam 之后。
-
 
 <a id="model-experience"></a>
 ## 模型体验

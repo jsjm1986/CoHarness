@@ -15,6 +15,8 @@ import SessionStore, {
   type SessionHeader,
   type SessionId as SessionIdValue,
 } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { turnBoundaryProjectionDefinition } from '@deepseek-ai/dsh-agent-loop'
 import SessionQueryEngine, {
   SessionQueryError,
   SessionSearchCursor,
@@ -206,6 +208,10 @@ interface Mounted {
   call(name: string, args: unknown, options?: { agent?: Agent; signal?: AbortSignal }): Promise<ToolExecutionResult>
 }
 
+function registerTurnBoundary(ctx: Context): void {
+  ctx.sessionProjections.register(turnBoundaryProjectionDefinition)
+}
+
 async function mount(
   config: ToolSessionQuery.Config = {},
   callerCwd: string | null = '/work',
@@ -214,6 +220,8 @@ async function mount(
   const ctx = new Context()
   activeContexts.push(ctx)
   await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
+  registerTurnBoundary(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   if (enforceTimeout) await ctx.plugin(TimeoutPolicy)
@@ -1818,7 +1826,7 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
       { query: 'q' },
       { agent: fakeAgent(noStep) },
     )
-    expect(errorCode(missing)).toBe('SESSION_QUERY_TOOL_NO_CURRENT_STEP')
+    expect(errorCode(missing)).toBe('SESSION_QUERY_INVALID_FILTER')
 
     const other = createSession(mounted.ctx, 'paged-events', '/work')
     const cursor = SessionSearchCursor('events-next')
@@ -1838,6 +1846,26 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
     })
     expect(FakeQuery.eventRequests.map(request => request.cursor)).toEqual([undefined, cursor])
     expect(text(result)).toContain('Result cap reached')
+  })
+
+  it('rejects current-session search without the turnBoundary fold', async () => {
+    const ctx = new Context()
+    activeContexts.push(ctx)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(FakeQuery)
+    await ctx.plugin(ToolSessionQuery)
+    const session = createSession(ctx, 'no-boundary-caller', '/work')
+    const result = await ctx.tools.execute({
+      name: 'session_event_search',
+      arguments: { query: 'q' },
+      callId: ToolCallId('call-no-boundary'),
+      signal: new AbortController().signal,
+      agent: fakeAgent(session),
+    })
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_NO_CURRENT_STEP')
   })
 
   it('preserves base results when a title read fails, annotates the code, and logs the full error', async () => {

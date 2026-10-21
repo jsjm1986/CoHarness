@@ -77,7 +77,6 @@ Windows 在无法观察到锁时会对 `EPERM` 重试一次，因为持锁方可
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | `writeFileAtomic` 与 `withFileLock`，即本包的全部接口 |
-| — | 不发布运行时不变式伴生入口；这个纯文件系统原语不维护事件流或可变运行时数据；其替换约定由单元测试覆盖。 |
 
 ### 写入路径
 
@@ -106,7 +105,6 @@ Windows 在无法观察到锁时会对 `EPERM` 重试一次，因为持锁方可
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -120,7 +118,6 @@ Windows 在无法观察到锁时会对 `EPERM` 重试一次，因为持锁方可
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明本包何时不是合适的工具。它们是当前包约束，不是任务积压。
 

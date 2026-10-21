@@ -289,14 +289,18 @@ describe('WebSearchCard', () => {
   function renderWebSearch(state: Partial<WebSearchCardState> = {}, view: 'summary' | 'page' = 'page') {
     const store = createSnapshotStore<WebSearchCardState>({
       ...settled,
+      apiSwitchAvailable: false,
+      apiSwitchBlocked: false,
+      useSearchApi: false,
       baseURL: field(''),
       maxUses: field('5'),
+      count: field(''),
       apiKey: field(''),
       apiKeyConfigured: false,
       apiKeyWritable: true,
       ...state,
     })
-    const actions = cardActions()
+    const actions = { ...cardActions(), setSearchApi: vi.fn() }
     const props: WebSearchCardProps = { ...globalStandard, ...actions, t, view, useWebSearchCard: bindSnapshotSelector(store) }
     render(<WebSearchCard {...props} />)
     return actions

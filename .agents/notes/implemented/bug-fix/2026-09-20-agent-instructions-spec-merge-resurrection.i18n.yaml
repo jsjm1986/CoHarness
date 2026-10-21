@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-20-agent-instructions-spec-merge-resurrection.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-20-agent-instructions-spec-merge-resurrection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-20-agent-instructions-spec-merge-resurrection.md
+document:
+  en: 5e76418d684e31f0057f8a350b5a56a5923da794
+  zh: 5f0cd95a2f1f63e1c7bec41dd967bdf45f9daaed
 /agent-note-restore-agent-instructions-spec-after-merge-resurrection:
   en: e48c46e30a6bc1bc
   zh: b7fb7f962b016572

@@ -4,7 +4,7 @@
 // owned draft, and the history-first hero workspace picker.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { createElement, type ComponentType, type ReactNode } from 'react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, SessionCreateError,
@@ -12,7 +12,10 @@ import {
 import type {
   ConversationSnapshot, ProjectUiPolicySnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationPaneProps, ConversationPaneProps as ConversationRootProps } from '../src/client/skeleton/ConversationRoot.tsx'
+import type {
+  ConversationContentOwnProps as ConversationPaneProps,
+  ConversationContentOwnProps as ConversationRootProps,
+} from '../src/client/skeleton/ConversationRoot.tsx'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
@@ -20,7 +23,7 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 import { createChatStore } from '../src/client/stores.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en, zh } from '../src/client/locales.ts'
-import { ConversationPane as ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
+import { ConversationContent as ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
@@ -216,7 +219,7 @@ function mount(
           renderSlot={renderSlot as never}
           views={views}
           releaseSessionImages={vi.fn()}
-          bindDraftMirror={write => wiring.bindMirror(write)}
+          bindDraftMirror={(write, initialDraft) => wiring.bindMirror(write, initialDraft)}
         />
       )
     }
@@ -299,6 +302,12 @@ function mount(
     inputActions,
     renderSlot,
     renderSlotChain,
+    useFactorySlot: ((
+      _name: string,
+      fallback: ComponentType<{ compact?: boolean; renderSlot: ConversationRootProps['renderSlot'] }>,
+    ) => (localProps: { compact?: boolean }) =>
+      createElement(fallback, { ...localProps, renderSlot })) as ConversationRootProps['useFactorySlot'],
+    renderFactorySlot: (() => null) as ConversationRootProps['renderFactorySlot'],
     selectWorkspace: retargetWorkspace,
     t,
   } as ConversationRootProps
@@ -452,6 +461,57 @@ describe('ConversationRoot resident composer', () => {
     await flushFrames()
     fireEvent.pointerUp(right, { pointerId: 7, clientX: 1142 })
     expect(b.displaySettings.getSnapshot()).toMatchObject({ chatContentWidth: 924, chatFullWidth: false })
+  })
+
+  it('forwards wheel scrolling from a width handle to the transcript', () => {
+    const b = mount(conversationSnapshot())
+    const scrollport = b.view.container.querySelector('[data-conversation-scroll]') as HTMLElement
+    const handle = b.view.container.querySelector('[data-width-handle="right"]') as HTMLElement
+    const scrollBy = vi.fn()
+    Object.defineProperty(scrollport, 'clientHeight', { value: 480, configurable: true })
+    Object.defineProperty(scrollport, 'scrollBy', { value: scrollBy, configurable: true })
+    scrollport.style.lineHeight = '20px'
+
+    fireEvent.wheel(handle, { deltaY: 120, deltaMode: 0 })
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: 120 })
+
+    fireEvent.wheel(handle, { deltaY: 3, deltaMode: 1 })
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: 60 })
+    scrollport.style.lineHeight = 'normal'
+    fireEvent.wheel(handle, { deltaY: 3, deltaMode: 1 })
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: 48 })
+    fireEvent.wheel(handle, { deltaY: -1, deltaMode: 2 })
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: -480 })
+    const calls = scrollBy.mock.calls.length
+    fireEvent.wheel(handle, { deltaY: 0, deltaMode: 0 })
+    fireEvent.wheel(handle, { ctrlKey: true, deltaY: 120, deltaMode: 0 })
+    expect(scrollBy).toHaveBeenCalledTimes(calls)
+
+    scrollport.removeAttribute('data-conversation-scroll')
+    const nestedScrollport = document.createElement('div')
+    nestedScrollport.setAttribute('data-conversation-scroll', '')
+    const nestedScrollBy = vi.fn()
+    Object.defineProperty(nestedScrollport, 'scrollBy', { value: nestedScrollBy, configurable: true })
+    scrollport.append(nestedScrollport)
+    fireEvent.wheel(handle, { deltaY: 120, deltaMode: 0 })
+    expect(scrollBy).toHaveBeenCalledTimes(calls)
+    expect(nestedScrollBy).not.toHaveBeenCalled()
+  })
+
+  it('starts width dragging only from the primary pointer button', () => {
+    const b = mount(conversationSnapshot())
+    const handle = b.view.container.querySelector('[data-width-handle="right"]') as HTMLElement
+    const captured = new Set<number>()
+    Object.defineProperties(handle, {
+      setPointerCapture: { configurable: true, value: (pointerId: number) => { captured.add(pointerId) } },
+      releasePointerCapture: { configurable: true, value: (pointerId: number) => { captured.delete(pointerId) } },
+      hasPointerCapture: { configurable: true, value: (pointerId: number) => captured.has(pointerId) },
+    })
+    fireEvent.pointerDown(handle, { pointerId: 1, button: 1, clientX: 800, clientY: 300 })
+    expect(handle.hasAttribute('data-dragging')).toBe(false)
+    fireEvent.pointerDown(handle, { pointerId: 2, button: 0, clientX: 800, clientY: 300 })
+    expect(handle.hasAttribute('data-dragging')).toBe(true)
+    fireEvent.pointerCancel(handle, { pointerId: 2 })
   })
 
   it('keeps the handles off the hero phase', () => {

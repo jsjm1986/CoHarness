@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-20-agent-note-classification.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-20-agent-note-classification.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-06-20-agent-note-classification.md
+document:
+  en: edb65a772c81b818bf3811c9f3f64ed1a6497647
+  zh: 554a43daea13c9bc331694f669328d0e05315523
 /agent-note-classify-agent-notes-by-kind-via-path-encoded-subdirectories:
   en: 5075db7e28191187
   zh: 55113b141e222f49

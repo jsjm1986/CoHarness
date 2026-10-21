@@ -1,10 +1,13 @@
-# Bilingual-pair consistency record for 2026-07-26-ptc-live-parallel-dispatch.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-ptc-live-parallel-dispatch.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-26-ptc-live-parallel-dispatch.md
+document:
+  en: 55ede3bbb173184d625a556ce97ad8881f2822b4
+  zh: b4fc9735d8b0aec1f474a6d1b3d4d50663d52347
 /agent-note-ptc-mode-live-dispatch-lifecycle-and-native-contract-parallelism:
-  en: 2a71c1feeb1cdce8
-  zh: 76e4dd5cef3a4dea
+  en: 889c12f56d4b3bf2
+  zh: 9d8a38e2481af044
 /agent-note-ptc-mode-live-dispatch-lifecycle-and-native-contract-parallelism/problem:
   en: ce16b44b1db07ec0
   zh: 30681dab84948cd8

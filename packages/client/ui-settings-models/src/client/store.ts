@@ -39,6 +39,13 @@ export interface ProviderRow {
    * dormant and keyless rows, matching the editor's derivation rule.
    */
   derivedCredential?: CredentialView
+  /**
+   * Described state for each catalog-declared native authentication reference
+   * of a keyless row — the environment names the route authenticates with
+   * while the profile names no credential. Endpoint-construction variables
+   * (`baseURLEnv`) are excluded.
+   */
+  credentialChecks?: Record<string, CredentialView>
   /** Models the current runtime policy permits through this route. */
   models: readonly ModelProviderGroup['models'][number][]
   /** Provider catalog failure, when model listing failed for this route. */
@@ -130,10 +137,46 @@ export function protocolChoices(
 }
 
 /**
+ * The reasoning levels a hand-declared route's models may declare, read out of
+ * the owning namespace's own schema for the same reason as
+ * {@link protocolChoices}: the levels the page offers and the keys the
+ * adapter accepts in `reasoningEfforts` come from the same `Config`.
+ * @param namespace - the namespace view whose schema declares the profile shape.
+ * @param schema - settings schema operations.
+ * @returns the levels in the schema's escalation order, or an empty list when the schema has none.
+ */
+export function reasoningLevelChoices(
+  namespace: SettingsNamespaceView | undefined,
+  schema: SettingsSchemaOperations,
+): string[] {
+  if (namespace === undefined) return []
+  const path = ['providers', PROBE_ROUTE, 'models', '0', 'reasoningEfforts']
+  const node = schema.nodeAtPath(schema.rehydrate(namespace.schema), path)
+  // `false | { [level]: value }`: the dict branch's key schema lists the levels.
+  const branches = (node as { list?: readonly { type?: string; sKey?: unknown }[] } | undefined)?.list ?? []
+  const keys = branches.find(branch => branch.type === 'dict')?.sKey as { list?: readonly { value?: unknown }[] } | undefined
+  return (keys?.list ?? []).map(entry => entry.value).filter((value): value is string => typeof value === 'string')
+}
+
+/**
+ * The environment references a keyless route authenticates with natively —
+ * the catalog's declared `nativeAuth.env` names minus any that construct the
+ * endpoint rather than carry a credential.
+ * @param entry - the directory row to inspect.
+ * @returns the native credential references, possibly empty.
+ */
+function nativeAuthRefsOf(entry: ConfigurableProviderView): string[] {
+  const endpoint = entry.baseURLEnv ?? []
+  return (entry.nativeAuth?.env ?? []).filter(ref => !endpoint.includes(ref))
+}
+
+/**
  * The credential reference the page derives for a keyless row, under the
  * ownership scope the directory entry itself declares. External routes owe
  * this page no credential, and a project route without its project id cannot
  * name one — both contribute nothing to the describe.
+ * @param entry - the directory row to inspect.
+ * @returns the derived credential reference, or undefined when none applies.
  */
 function derivedKeyRefOf(entry: ConfigurableProviderView): string | undefined {
   if (entry.management === 'external') return undefined
@@ -163,6 +206,8 @@ export class ModelsSettingsStore {
 
   /** Latest load wins; an older response never overwrites a newer one. */
   private generation = 0
+  /** Callers follow the current refresh's outcome, including callers whose read was superseded. */
+  private readonly pendingLoads = new Set<PromiseWithResolvers<void>>()
 
   /**
    * @param api - the wire face (credentials/llm domains, and settings writes).
@@ -179,42 +224,53 @@ export class ModelsSettingsStore {
    * settings answer in parallel, then one batched credential describe over
    * every referenced ref. Provider failure or absence of an initial settings
    * answer keeps the last good rows and surfaces an error; a failed settings
-   * refresh reuses the mirror's held view.
-   * @returns nothing; the snapshot carries the outcome.
+   * refresh reuses the mirror's held view. Concurrent callers resolve only
+   * after the current refresh publishes its ready or error snapshot.
+   * @returns resolution after the current snapshot is published.
+   * @throws the current read's unexpected rejection; superseded rejections are ignored.
    */
-  async load(): Promise<void> {
+  load(): Promise<void> {
+    const pending = Promise.withResolvers<void>()
+    this.pendingLoads.add(pending)
     const generation = ++this.generation
+    void this.read(generation).then(
+      () => { this.settleLoads(generation, (load) => { load.resolve() }) },
+      (error: unknown) => { this.settleLoads(generation, (load) => { load.reject(error) }) },
+    )
+    return pending.promise
+  }
+
+  /** Publish one joined answer; stale answers leave the current refresh in charge. */
+  private async read(generation: number): Promise<void> {
     this.store.update((s) => { s.status = 'loading'; s.error = null })
-    let providers: ConfigurableProviderView[]
-    let modelGroups: ModelProviderGroup[]
-    let modelFailures: Array<{ id: string; message: string }>
-    let writable: boolean
-    let views: readonly SettingsNamespaceView[]
+    let providersResponse: Awaited<ReturnType<IApiClient['llm']['providers']>>
+    let modelsResponse: Awaited<ReturnType<IApiClient['llm']['models']>>
     try {
-      const [providersResponse, modelsResponse] = await Promise.all([
+      ;[providersResponse, modelsResponse] = await Promise.all([
         this.api.llm.providers({}),
         this.api.llm.models({}),
         this.describeFace.ensure(),
       ])
-      if (!providersResponse.result.ok) throw new Error(providersResponse.result.error.message)
-      if (!modelsResponse.result.ok) throw new Error(modelsResponse.result.error.message)
-      const mirrored = this.describeFace.getSnapshot()
-      if (mirrored.view === undefined) {
-        throw new Error(mirrored.error ?? 'settings are unavailable in this browser')
-      }
-      providers = providersResponse.result.value.providers
-      modelGroups = modelsResponse.result.value.groups
-      modelFailures = modelsResponse.result.value.failures
-      writable = mirrored.view.writable
-      views = mirrored.view.namespaces
     } catch (error) {
-      if (generation !== this.generation) return
-      this.store.update((s) => {
-        s.status = 'error'
-        s.error = error instanceof Error ? error.message : String(error)
-      })
+      // The wire's unexpected kind still publishes a failure — the page shows
+      // its error surface instead of spinning forever — while the rejection
+      // itself reaches every waiting load() caller.
+      if (generation === this.generation) this.failLoad(messageOf(error))
+      throw error
+    }
+    if (generation !== this.generation) return
+    if (!providersResponse.result.ok) { this.failLoad(providersResponse.result.error.message); return }
+    if (!modelsResponse.result.ok) { this.failLoad(modelsResponse.result.error.message); return }
+    const mirrored = this.describeFace.getSnapshot()
+    if (mirrored.view === undefined) {
+      this.failLoad(mirrored.error ?? 'settings are unavailable in this browser')
       return
     }
+    const providers = providersResponse.result.value.providers
+    const modelGroups = modelsResponse.result.value.groups
+    const modelFailures = modelsResponse.result.value.failures
+    const writable = mirrored.view.writable
+    const views = mirrored.view.namespaces
     const namespaces = new Map(views.map(view => [view.ns, view]))
     const modelsByProvider = new Map(modelGroups.map(group => [group.id, group.models]))
     const failuresByProvider = new Map(modelFailures.map(failure => [failure.id, failure.message]))
@@ -239,18 +295,24 @@ export class ModelsSettingsStore {
     const refs = [...new Set(rows.flatMap((row) => {
       if (row.apiKeyEnv !== undefined) return [row.apiKeyEnv]
       const derived = derivedKeyRefOf(row.entry)
-      return derived === undefined ? [] : [derived]
+      return [...derived === undefined ? [] : [derived], ...nativeAuthRefsOf(row.entry)]
     }))]
-    let credentials: Record<string, CredentialView> = {}
+    const credentials: Record<string, CredentialView> = {}
     let credentialError: string | null = null
     if (refs.length > 0) {
       try {
-        const response = await this.api.credentials.describe({ refs })
-        // Credential state is an enrichment for the Models page: neither a
-        // business rejection nor a transport failure fails the load. The
-        // onboarding projection below retains the failure distinction.
-        if (response.result.ok) credentials = response.result.value.credentials
-        else credentialError = response.result.error.message
+        // The describe payload caps `refs` at 64 on the wire schema; catalog
+        // surfaces with many keyless rows (each contributing native-auth refs)
+        // exceed it, so the join describes in slices and merges. Credential
+        // state is an enrichment for the Models page: neither a business
+        // rejection nor a transport failure fails the load, and the onboarding
+        // projection below retains the failure distinction.
+        const slices: string[][] = []
+        for (let index = 0; index < refs.length; index += 64) slices.push(refs.slice(index, index + 64))
+        for (const response of await Promise.all(slices.map(slice => this.api.credentials.describe({ refs: slice })))) {
+          if (response.result.ok) Object.assign(credentials, response.result.value.credentials)
+          else credentialError ??= response.result.error.message
+        }
       } catch (error) {
         credentialError = messageOf(error)
       }
@@ -268,13 +330,34 @@ export class ModelsSettingsStore {
         const named = row.apiKeyEnv === undefined ? undefined : credentials[row.apiKeyEnv]
         const derivedRef = row.apiKeyEnv === undefined ? derivedKeyRefOf(row.entry) : undefined
         const derived = derivedRef === undefined ? undefined : credentials[derivedRef]
+        const nativeRefs = row.apiKeyEnv === undefined ? nativeAuthRefsOf(row.entry) : []
+        const credentialChecks = Object.fromEntries(
+          nativeRefs.flatMap(ref => credentials[ref] === undefined ? [] : [[ref, credentials[ref]]] as const),
+        )
         return {
           ...row,
           ...named === undefined ? {} : { credential: named },
           ...derived === undefined ? {} : { derivedCredential: derived },
+          ...nativeRefs.length === 0 ? {} : { credentialChecks },
         }
       })
       s.namespaces = namespaces
+    })
+  }
+
+  /** Settle callers only while this read still owns the current refresh. */
+  private settleLoads(generation: number, settle: (load: PromiseWithResolvers<void>) => void): void {
+    if (generation !== this.generation) return
+    const pending = [...this.pendingLoads]
+    this.pendingLoads.clear()
+    for (const load of pending) settle(load)
+  }
+
+  /** Publish the current joined read's failure text. */
+  private failLoad(message: string): void {
+    this.store.update((s) => {
+      s.status = 'error'
+      s.error = message
     })
   }
 }

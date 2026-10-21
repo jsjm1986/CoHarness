@@ -41,8 +41,6 @@ Mount alongside `tools` and `workingDirectory`. Call `working_directory({})` to 
 
 The tool delegates validation, recovery, persistence, and context notices to the directory owner. Its canonical result contains `cwd`; native rendering returns that path. The generic tool card displays the arguments and result without a separate GUI renderer.
 
-No runtime invariant companion is published because the tool delegates all directory state and mutations to `workingDirectory`.
-
 </details>
 
 -----

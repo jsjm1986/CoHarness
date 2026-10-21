@@ -11,7 +11,7 @@ kind: "package-reference"
 
 ## 概述
 
-使用本包可为 agent 提供一个具名工具，把工作委派给已配置的子 agent 后端。`one-shot` 模式下，调用默认等待子 agent；`continuable` 模式下，调用默认在后台启动持久化子 agent，并返回可用于后续消息的 id。受支持的后端还可公开获准的子级 LLM 提供方、模型与推理等级供模型选择。每个实例均可设置子 agent 的 persona、工具权限与深度限制，失败的运行会返回错误，而非部分成功。
+使用本包可为 agent 提供一个具名工具，把工作委派给已配置的子 agent 后端。`one-shot` 模式下，调用默认等待子 agent；`continuable` 模式下，调用默认在后台启动持久化子 agent，并返回可用于后续消息的 id。受支持的后端还可公开获准的子级 LLM 提供方、模型与推理等级供模型选择。每个实例均可选择子 agent preset 与深度限制，失败的运行会返回错误，而非部分成功。
 
 ## 目录
 
@@ -33,7 +33,7 @@ kind: "package-reference"
 
 `backgroundMode` 同时选择后台路由与省略 `run_in_background` 时的默认行为。`one-shot` 默认在前台等待；显式传入 `true` 时，它会注册一个归父级所有的普通 Task，并返回规范值 `{ kind: 'background', jobId }`，渲染为 `started background subagent job <id>`，即使提供方支持可继续子 agent 也不例外。通用 Task 工具负责其后续状态、收集、取消和通知；失败 Task 的 detail 会保留终止原因与同一份可选提供方诊断。`continuable` 在参数省略或为 `true` 时于后台运行；显式传入 `false` 时则在前台等待结果。其后台路由要求提供方具备 `prepareContinuable` 能力，调用 `ctx.subagents.startContinuable()`，并返回 `{ kind: 'continuable', subagentId }`，渲染为 `started subagent <childId>`。该路由在 inbox 接受时结算：子 agent 自此拥有自己的轮次，因此该调用既不等待也不收集结果。通过该 id 查看其 transcript（文本记录）仍是其详细输出的来源，可选的全局 `send_message` 工具则向其发送更多工作。每当子 agent 的 Activation 结束，继续执行服务都会投递一条结算通知，其中包含结束结果及可能存在的最终 assistant 消息，且这项投递不依赖 `report`。启动可继续工作不要求加载 `send_message`。见[后台 subagent Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.zh.md)、[可继续的 subagent Agent Note](../../../.agents/notes/implemented/feature/2026-07-28-continuable-subagent-conversations.zh.md)和[后台优先委派 Agent Note](../../../.agents/notes/implemented/feature/2026-08-11-background-first-continuable-delegation.zh.md)。
 
-`toolFilter` 会改变子 agent 的全局工具层，但不是从父级派生的权限上限。见 [agent 作用域的安全非目标](../../../.agents/notes/implemented/architecture/2026-07-08-agent-scope-contexts.zh.md#security-and-authority-are-non-goals)。
+`agentPreset` 默认让每个子 agent 使用独立的 preset，`allowedAgentPresets` 允许模型通过 `agent_preset` 选择 id；未提供 allowlist 时模型无法覆盖已配置的选择。只有进程内 spawn 提供方支持这些字段——fork 与外部后端会拒绝。两者都必须指向已声明的 preset：位于 preset 内的工具在 Agent 初始化时校验，Host 挂载的工具在加载时校验。模型省略选择时使用已配置的 `agentPreset`，未配置默认值时加入父级当前的 preset 修订。在 preset 插件清单中组合 persona 与工具；包含 `persona` 或 `toolFilter` 的工具配置会在加载时以迁移错误失败。
 
 `subagent-model-selection` 设置分区归项目所有。项目管理者仅可修改 `enabled` 与 `allowedModels`；Host 原子校验两者，并拒绝开启但清单为空的设置。该偏好不覆盖运行时模型授权。
 
@@ -48,8 +48,8 @@ kind: "package-reference"
 | `backgroundMode` | 后台生命周期策略，默认 `one-shot`。`one-shot` 默认前台调用；`continuable` 默认后台调用，要求提供方具备 `prepareContinuable` 能力，并返回持久化子 agent ID，且不要求加载后续消息工具。 |
 | `modelSelectionSettings` | 在组合全新的顶层会话时选择性读取 Host allowlist，以便子 agent 选择 provider／model／reasoning；没有记录策略的恢复会话保持禁用，子会话继承父会话记录的策略，之后的设置修改不会改变已记录的会话。默认 `false`，并要求 model-selection settings 插件。 |
 | `agentOptions` | 传给具体提供方的子 agent `provider`、`model`、可选 `reasoningEffort` 和正整数 `maxTokens`；提供方会用显式值覆盖继承的父级选项。 |
-| `persona` | 每个子 agent 独立的 persona；要求提供方具备 `persona` 能力。 |
-| `toolFilter` | 每个子 agent 独立的全局工具限制；要求提供方具备 `toolFilter` 能力。 |
+| `agentPreset` | 默认的独立子 agent preset id；要求进程内 spawn 提供方。 |
+| `allowedAgentPresets` | 非空 preset id allowlist，作为模型可选的 `agent_preset` 枚举公开；同时设置时必须包含 `agentPreset`。 |
 | `maxDepth` | 绝对委派深度上限（`0` 禁止委派）；省略时每次委派读取当前 Host `subagent.maxDepth` 设置（初始为 `1`）。数值上限要求 `depthLimit` 能力，缺失时挂载失败。对于预算由子 harness 拥有的进程外提供方，`'provider-managed'` 不发送上限。工具在达到上限时仍然可见；每次尝试启动都会检查调用 agent 的当前深度，被拒绝时返回出错的工具结果。 |
 
 <a id="concurrency"></a>
@@ -59,7 +59,6 @@ kind: "package-reference"
 
 前台调用和后台调用均并发安全：同一条 assistant 消息中的同级委派会在循环的滚动池（`maxParallelToolCalls`）下重叠执行，结果仍按模型顺序提交。子 agent 在各自的会话中工作，一次运行绝不变更父会话；一次性后台形态对父级拥有状态的唯一写入是注册一个 Task——这是一次同步、可交换、能容忍并发分发的插入，因此重叠的后台调用按分发竞态顺序获得各自的 job id。协调同级工作区效果由模型负责，正如模型已经对后台和可继续子 agent 所承担的那样。见 [并行 subagent Agent Note](../../../.agents/notes/implemented/feature/2026-08-09-parallel-subagent-delegations.zh.md) 和 [并行工具调用 Agent Note](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.zh.md)。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -67,11 +66,11 @@ kind: "package-reference"
 
 #### 模型看到什么
 
-当提供方存在时，以当前实例配置的名称公开已生成的默认 [`subagent` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-subagent)。启用的 Session 策略会添加 `provider`、`model` 与 `reasoning_effort`，以及继承和选择指引；提供方必须支持 `agentOptions`。提供方是否继承上下文会改变工具描述和提示词描述。启用后台模式会添加 `run_in_background`：可继续模式会记录其默认值为 `true`、运行时结算通知与显式前台覆盖；一次性模式会记录其默认值为 `false`，以及用 `job_output` 收集或用 `job_kill` 停止的 job id。当工具在本次组装的作用域中可见时，一个 `tool:<toolName>` 系统提示词 section 会指示模型同时启动相互独立的可继续委派、在它们运行时继续工作，并且仅当下一步动作依赖结果时选择前台；工具限制会同时移除其 schema 和这段指引。
+委派描述使用 `running` 与 `inactive` 表示后续可用性；`inactive` 不代表任务结果。当提供方存在时，以当前实例配置的名称公开已生成的默认 [`subagent` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-subagent)。启用的 Session 策略会添加 `provider`、`model` 与 `reasoning_effort`，以及继承和选择指引；提供方必须支持 `agentOptions`。`allowedAgentPresets` 会添加 `agent_preset` 枚举以及取自各 preset 展示描述的指引。提供方是否继承上下文会改变工具描述和提示词描述。启用后台模式会添加 `run_in_background`：可继续模式会记录其默认值为 `true`、运行时结算通知与显式前台覆盖；一次性模式会记录其默认值为 `false`，以及用 `job_output` 收集或用 `job_kill` 停止的 job id。当工具在本次组装的作用域中可见时，一个 `tool:<toolName>` 系统提示词 section 会指示模型同时启动相互独立的可继续委派、在它们运行时继续工作、仅当下一步动作依赖结果时选择前台，并在只剩等待结果时结束本轮而不是休眠或轮询；工具限制会同时移除其 schema 和这段指引。
 
 #### Token 影响
 
-每个父级请求支付固定的 schema 成本；模型选择会增加三个参数。每个提供方实例增加一个 schema，每个可继续实例还增加一个简短的系统提示词 section。
+每个父级请求支付固定的 schema 成本；LLM 选择会增加三个参数，preset 选择会增加一个枚举参数和各 preset 的描述。每个提供方实例增加一个 schema，每个可继续实例还增加一个简短的系统提示词 section。
 
 #### KV Cache 影响
 
@@ -95,12 +94,12 @@ Session 携带策略的 settings 控制实例会公开子级 LLM 选择字段与
 
 #### 模型看到什么
 
-当 `enableRunInBackground` 与 `backgroundMode: continuable` 同时设置时，模型还会读到 `tool:<toolName>` 系统提示词 section，指示它把相互独立的可继续委派一起启动，并在它们运行时继续工作。使用默认工具名 `subagent` 时，section 文本为：
+当 `enableRunInBackground` 与 `backgroundMode: continuable` 同时设置时，模型还会读到 `tool:<toolName>` 系统提示词 section，指示它把相互独立的可继续委派一起启动、在它们运行时继续工作；当只剩等待它们的结果时，结束本轮，而不是休眠或轮询。使用默认工具名 `subagent` 时，section 文本为：
 
 ##### 工具指导 section
 
 ```markdown
-Use subagent in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set `run_in_background: false` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.
+Use subagent in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set `run_in_background: false` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.
 ```
 
 #### Token 影响
@@ -110,6 +109,26 @@ Use subagent in the background by default. Start independent delegations togethe
 #### KV Cache 影响
 
 只要 section 文本与工具存在性不变，前缀就保持稳定；移除工具或更改 section 会建立不同的父级前缀。
+
+### 运行时深度上下文
+
+#### 模型看到什么
+
+当调用方 agent 达到或超过某个可见工具的有效数值深度上限时，一条可选的运行时上下文快照会告知它直接完成工作。每次请求都会重新解析上限，包括设置变更或会话恢复之后。隐藏工具与 `provider-managed` 上限不贡献深度文本。对于深度为一、上限为一的子 agent:
+
+##### 深度上限提示
+
+```markdown
+Delegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.
+```
+
+#### Token 影响
+
+每个达到上限的工具向 user 角色运行时上下文快照贡献一条简短文本。未变化的快照不会重复追加；低于上限的 agent 不接收额外文本。`includeRuntimeContext: false` 会抑制这条提示，但不改变运行时的深度拦截。
+
+#### KV Cache 影响
+
+深度变化不改变系统提示词或工具 schema。更新后的运行时上下文追加在既有历史之后；如果模型仍尝试委派，提供方依然会拦截。
 
 ### 前台结果
 
@@ -144,7 +163,7 @@ Use subagent in the background by default. Start independent delegations togethe
 
 - **后台运行不通过本工具公开结果**：一次性任务的最终输出通过通用 Task 接口收集，可继续子 agent 的输出留在其自身会话中，按其 subagent id 读取。结算通知会说明该子 agent 如何结束，并携带可能存在的最终 assistant 消息，但它不是本次调用的返回值，也无法在此等待。
 - **等待中的一次性实例较晚才发现重复名称**（`TODO(subagent-dup-toolname)`）：可继续实例会在插件应用期间预留提示词 section 名称，但若要阻止等待中的一次性实例回滚提供方注册，仍需要一份预期名称注册表。
-- **每个实例的子 agent 策略固定**：其他模型、persona、工具过滤器或深度上限都需要另一个名称不同的工具。
+- **每个实例的子 agent 策略固定**：其他模型、preset 或深度上限都需要另一个名称不同的工具。只有进程内 spawn 提供方接受 `agentPreset`/`allowedAgentPresets`；其他后端在加载时拒绝。
 
 <a id="dev-note"></a>
 ### 开发备注

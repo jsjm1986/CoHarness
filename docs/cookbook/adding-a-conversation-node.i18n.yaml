@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for adding-a-conversation-node.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for adding-a-conversation-node.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/adding-a-conversation-node.md
+document:
+  en: c3470c954d1a03ffee83c072024cfab7217bfaa3
+  zh: d8b3f5c87cd0444ae5a444d3a5efc3e2b485da64
 /add-a-web-client-conversation-node:
   en: d2f6f37cff9221e8
   zh: 716a138a43859569
@@ -9,8 +12,8 @@
   en: 595ed3cc02048bab
   zh: b89a3216d70055fc
 /add-a-web-client-conversation-node/2-implement-the-definition-and-typed-chat-payload:
-  en: af5123516abc69fa
-  zh: 57d1a1bd006bbf03
+  en: f7da4a63c18a3f7f
+  zh: 633655bbb2ab12a5
 /add-a-web-client-conversation-node/3-query-an-earlier-business-context-only-at-start:
   en: 0f46347cc684b45b
   zh: bf1fb60485d3030b

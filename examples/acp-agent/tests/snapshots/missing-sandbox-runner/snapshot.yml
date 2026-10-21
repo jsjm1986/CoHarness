@@ -5,6 +5,8 @@ composition: partial-landlock
 recording: authored
 header:
   class: sandbox
+replay:
+  override: true
 platform: posix
 permission: read-only
 environment:

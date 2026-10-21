@@ -169,19 +169,30 @@ function emptyWorkspaces() {
   return bindSnapshotSelector(store)
 }
 
+type StandaloneViewProps = ConvViewProps & {
+  t: (key: LocaleKeysOf<'trajectory'>) => string
+  renderSlot: () => null
+  SessionProvider: ConversationSessionProps['SessionProvider']
+  loadImage: () => Promise<string>
+}
+
 /** Standalone view props: the session-scope standard kit the outlet would bake. */
 function standaloneProps(
   nodes: ConversationSnapshot['nodes'],
-): ConvViewProps & { t: (key: LocaleKeysOf<'trajectory'>) => string } {
+): StandaloneViewProps {
   return {
     sessionId: SID,
     useSession: fakeSession(nodes).useSession,
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
     useProjection: (() => undefined) as never,
+    // Image seats the outlet would bake: standalone renders omit the gallery.
+    renderSlot: () => null,
+    SessionProvider: (({ children }: { children: (sessionId: SessionId) => ReactNode }) => children(SID)) as ConversationSessionProps['SessionProvider'],
+    loadImage: () => Promise.reject(new Error('standalone views load no images')),
     // The locale seat the outlet would inject for the declared namespace.
     t: tZh,
-  } as never as ConvViewProps & { t: (key: LocaleKeysOf<'trajectory'>) => string }
+  } as never as StandaloneViewProps
 }
 
 /** Real-stack bench: root Context + real SlotRegistry ring + the plugin fiber. */
@@ -215,6 +226,10 @@ async function bench(snapshot = historySnapshot(NODES)) {
   // forwarded-event port.
   ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
   ctx.provide('remote', { $on: () => () => {} } as never)
+  ctx.provide('conversation', {
+    resolveImage: () => Promise.resolve('blob:stub'),
+    peekImage: () => undefined,
+  } as never)
   ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
   ctx.plugin({ inject: [...localeInject], apply: localeApply })
   const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -261,6 +276,8 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
       ? (() => {
         const trajectory = injected as TrajectoryViewInjected
         return {
+          loadImage: trajectory.loadImage,
+          renderSlot: () => null,
           loadOlder: trajectory.loadOlder,
           setActualDuration: trajectory.setActualDuration,
           setWrapLines: trajectory.setWrapLines,

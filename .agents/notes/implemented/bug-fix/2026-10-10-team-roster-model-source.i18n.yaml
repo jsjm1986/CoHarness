@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-10-team-roster-model-source.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-10-team-roster-model-source.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-team-roster-model-source.md
+document:
+  en: 3ab0f0d2e4aaabddb32487a48cc67944dc1ea150
+  zh: f704ebf2629e64696156b6ad07c4c1b35764e1f0
 /agent-note-team-roster-model-reads-the-member-s-durable-selection-not-the-spawn-stamp:
   en: 631650a28aab4cb6
   zh: 05920a8c5f8b48bd

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/shell/tool-pwsh/README.md
+document:
+  en: feed0d9f062e345cfc4a3f0859fa5dfedee7f248
+  zh: 6582368450adbb7e9eb2241b91456e5c60eb1c54
 /:
   en: 83e748b077469aac
   zh: f858d23ea8c1c6ba
@@ -24,14 +27,14 @@
   en: addf35c4e607d33c
   zh: 081f511d6b5a79d6
 /deepseek-ai-dsh-tool-pwsh/use-this-package/running-a-command:
-  en: 4f172bd02fa012f4
-  zh: f19375d333d3aed8
+  en: 80195c9b61b29737
+  zh: 0a187f3f52814b90
 /deepseek-ai-dsh-tool-pwsh/use-this-package/foreground-commands-as-jobs:
   en: 4a487e48ef146846
   zh: 0a34dc49bffb03af
 /deepseek-ai-dsh-tool-pwsh/use-this-package/windows-specific-sandbox-behavior:
-  en: 76f3f791f53d1005
-  zh: e5b262db24e6eb83
+  en: cf04096aa06ea9cf
+  zh: 4da2cf659ce0ec64
 /deepseek-ai-dsh-tool-pwsh/use-this-package/what-can-go-wrong:
   en: 9c7bf5c35445a15b
   zh: 0f3bf3e776f95152
@@ -42,8 +45,8 @@
   en: 73b8e46017f19e22
   zh: 70f9f82b010b3dd0
 /deepseek-ai-dsh-tool-pwsh/understand-the-implementation/source-map:
-  en: 09557aa79cbe3a7d
-  zh: e5f36b411d01f844
+  en: aa2adb29a0f27fcd
+  zh: 612829167064acd1
 /deepseek-ai-dsh-tool-pwsh/understand-the-implementation/rendering-and-exit-markers:
   en: facd01af9a403fec
   zh: 7a943dac19a01c39

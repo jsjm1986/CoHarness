@@ -13,7 +13,6 @@ Gateway PostgreSQL `SessionPersistence` provider for shared project runtimes. Th
 
 Use `dsh-session-persistence-gateway` as the Gateway PostgreSQL `SessionPersistence` provider for shared project runtimes: stored headers and events, revisions, idempotent append batches, and crash-repair commits move through the authenticated internal Gateway API under the standard `PersistenceCoordinator` lifecycle.
 
-
 ## Table of Contents
 
 - [Persistence contract](#persistence-contract)
@@ -69,7 +68,6 @@ The provider does not rewrite valid history. Resume can reuse provider cache whe
 - **No raw artifact path** — callers cannot open or export a per-session file through `locate()`.
 - **Bounded request lifetime** — an internal call exceeding `requestTimeoutMs` fails; the coordinator retains its ordinary retry/recovery responsibility rather than treating a timed-out write as absent.
 
-**Runtime invariant:** No companion is published. Backend correctness is covered by the shared persistence contract.
 
 <a id="dev-note"></a>
 ### Dev Note

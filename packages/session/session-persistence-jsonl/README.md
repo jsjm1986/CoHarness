@@ -22,7 +22,6 @@ Historical CoHarness headers and packed streams are decoded by `coharnessJsonlFo
 - [Physical encoding](#physical-encoding)
 - [Durability and crash semantics](#durability-and-crash-semantics)
 - [Write path](#write-path)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -53,6 +52,7 @@ Historical CoHarness headers and packed streams are decoded by `coharnessJsonlFo
 |---|---|---|
 | `root` | `string` (required) | Root directory for all session files. **No default** — a `process.cwd()` default would scatter files as the process's cwd changes (bash calls, subprocesses). An existing root must be a readable directory; an absent root is created on first materialization. |
 | `compression` | `'zstd' \| 'none'` | Defaults to `'zstd'`; `'none'` retains newline-delimited UTF-8 text. |
+| `listConcurrency` | `number` (positive integer) | Maximum concurrent filesystem reads while enumerating sessions; defaults to `3`. |
 
 `locate(meta)` returns `{ kind: 'jsonl', path }` for the fixed transcript inside the resolved project/session directories. It performs no filesystem I/O: the target can be returned before the directory or file exists, and an existing file contains only the last flushed prefix.
 
@@ -81,12 +81,11 @@ The plugin copies frozen session events into one write handle per live session. 
 
 Plaintext body reads scan bounded byte windows and retain decoded events without a complete raw-file buffer. They check cancellation between reads and retry changed revisions. Successor publication rechecks the source revision after writing the temporary file; a changed or missing source refuses publication. Successors are encoded in bounded batches with cancellation checks between events and writes. Compressed reads and logical preparation still retain complete input or event arrays.
 
-<a id="invariants"></a>
-## Invariants
 
-No runtime invariant companion is published: immutable-generation and append ordering are enforced by the storage coordinator and checked against files in persistence tests; this provider keeps no independent domain index.
+Provider-triggered unload waits for injecting consumers to finish before removing live-event routing and closing handles. Consumer cleanup must belong to its injecting scope; concurrent root disposal has no dependency ordering guarantee.
 
 <a id="model-experience"></a>
+
 ## Model Experience
 
 ### Resumed conversation history

@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-18-open-in-app-pick-commit-hover-label.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-18-open-in-app-pick-commit-hover-label.md
+document:
+  en: 6b8123a1e7968e4d1e637702657b7daef01f35fd
+  zh: 55fe08b4f0f4bd8da65e0f922386d18214ed475f
+/agent-note-the-open-in-app-pick-persists-after-its-launch-and-the-hover-label-names-the-application:
+  en: ef17ebf9bd270c44
+  zh: 27a81b741db47bae
+/agent-note-the-open-in-app-pick-persists-after-its-launch-and-the-hover-label-names-the-application/problem:
+  en: caac189fa5b138c6
+  zh: 5fba6a7ab43f04bc
+/agent-note-the-open-in-app-pick-persists-after-its-launch-and-the-hover-label-names-the-application/decision:
+  en: 6bb88d04e672e35c
+  zh: 59f8e40c9bda6057
+/agent-note-the-open-in-app-pick-persists-after-its-launch-and-the-hover-label-names-the-application/files:
+  en: b539096b298bf021
+  zh: 16dd28255968a4b2
+/agent-note-the-open-in-app-pick-persists-after-its-launch-and-the-hover-label-names-the-application/alternatives-considered:
+  en: 6efc09e19e549ed0
+  zh: 24f7adffb22fb41a
+/agent-note-the-open-in-app-pick-persists-after-its-launch-and-the-hover-label-names-the-application/consequences:
+  en: a8805bccc49c93c4
+  zh: 0776b74635e7c71a
+/agent-note-the-open-in-app-pick-persists-after-its-launch-and-the-hover-label-names-the-application/verification:
+  en: 93e60158b48994f1
+  zh: 156c88fd86ab1051

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-22-web-multimodal-image-input-and-durable-attachments.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-22-web-multimodal-image-input-and-durable-attachments.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-22-web-multimodal-image-input-and-durable-attachments.md
+document:
+  en: c09adafa11285a0cb03ab1d264420dffc3c3fa49
+  zh: abbdc0ff4c765a9065bd76d24c96b6a0c9ed026c
 /agent-note-web-multimodal-image-input-and-durable-attachments:
   en: ca760d16926e4fed
   zh: f4f27acff31179bb

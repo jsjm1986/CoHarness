@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-11-api-extractor-reports.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-11-api-extractor-reports.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/process/2026-06-11-api-extractor-reports.md
+document:
+  en: 2aee524596a5b798591fecded539a8d2236a3d96
+  zh: e62b6168efac5c8296b55ff8ee0c7861d1849d31
 /agent-note-api-extractor-reports:
   en: 5bf55ca547e54ed9
   zh: 62bc2de82f342803

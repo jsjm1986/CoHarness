@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-12-cold-history-attach-race.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-12-cold-history-attach-race.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-12-cold-history-attach-race.md
+document:
+  en: 312d89834646b48160450b52250b080790188e00
+  zh: 8801b5ba40287ba49e6a6ee018d6b28446d3f505
 /agent-note-cold-history-reads-recover-through-a-concurrent-attach:
   en: bd8de0a7ba615678
   zh: 6a9c8e33ee0d4135

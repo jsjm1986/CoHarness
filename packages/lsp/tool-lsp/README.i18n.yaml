@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/lsp/tool-lsp/README.md
+document:
+  en: 7f18ed5204432533bc56399a1eefc92a6aec2065
+  zh: c236a04ced7c080b1a94aef36efac84890f30649
 /:
   en: e1b7ba3f757a48e2
   zh: 61495d48365178df
@@ -12,17 +15,14 @@
   en: 61f5312c56bdafcf
   zh: 1371bf41d5759adf
 /deepseek-ai-dsh-tool-lsp/table-of-contents:
-  en: 73329872b7752b58
-  zh: d53118bdf2f499ae
+  en: 9dd49445de96cbdf
+  zh: 42167d4c48d4785f
 /deepseek-ai-dsh-tool-lsp/the-tool:
   en: f74d1a52ff6a7af7
   zh: c432608884da4210
 /deepseek-ai-dsh-tool-lsp/configuration:
-  en: 75edb7b757dd268c
-  zh: 1389babefdd0dc3a
-/deepseek-ai-dsh-tool-lsp/invariants:
-  en: 644bf3d249bfcf9f
-  zh: 6047d9e00eccc42c
+  en: 3535c9608a7a608d
+  zh: 52494a0661c3991a
 /deepseek-ai-dsh-tool-lsp/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

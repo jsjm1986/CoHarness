@@ -17,7 +17,6 @@ SQLite backend for the [storage hub](../storage/README.md): registers as backend
 
 - [Storage model](#storage-model)
 - [Configuration (schemastery)](#configuration-schemastery)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -40,11 +39,6 @@ interface Config {
   journalMode?: 'wal' | 'delete' | 'truncate' | 'persist'   // journal_mode pragma; default 'wal'
 }
 ```
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. All records live in the single database file the backend opens; there is no shadow state.
 
 <a id="model-experience"></a>
 ## Model Experience

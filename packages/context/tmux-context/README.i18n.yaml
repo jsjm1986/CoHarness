@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/tmux-context/README.md
+document:
+  en: cbe0b38f224f1f7935f7dfd826b37e3105a58c87
+  zh: e0f61596aff7a7dd128b1a85556e1ac4bc5c0d8f
 /:
   en: 719f54f022818400
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: 4c62923f1912d201
   zh: 7f2211f9616c0197
 /deepseek-ai-dsh-tmux-context/table-of-contents:
-  en: 5af5196221d77875
-  zh: e57b684fe0cc9cc0
+  en: d1404555c1074c5a
+  zh: 2fca649d591c8a1f
 /deepseek-ai-dsh-tmux-context/config:
   en: e98fa76e848f5fef
   zh: c967c68d0e36dd6e
@@ -21,11 +24,8 @@
   en: 1c151598a372c856
   zh: 7ffd43ff3cb2c6f3
 /deepseek-ai-dsh-tmux-context/timing-semantics:
-  en: f171546b67900d93
-  zh: db4bfa66cc51b0a3
-/deepseek-ai-dsh-tmux-context/invariants:
-  en: 2c7b2c9ffcf8d64c
-  zh: f0b42c9d35a854a4
+  en: beabe3d43f417c1a
+  zh: 12da2f34f4b1637a
 /deepseek-ai-dsh-tmux-context/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

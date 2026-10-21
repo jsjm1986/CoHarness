@@ -24,9 +24,6 @@
       "path": "../user-approval"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../sandbox/sandbox"
     },
     {

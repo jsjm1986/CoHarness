@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-host-webserver",
-  "description": "Web route-registration plugin: HTTP and upgrade routes, structured index injections, and static dist fallback; knows no harness concepts",
+  "description": "Web route-registration plugin: HTTP(S) and upgrade routes, an optional TLS listener, structured index injections, and static dist fallback; knows no harness concepts",
   "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -18,32 +18,27 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./invariant": {
-      "types": "./lib/types/invariant.d.ts",
-      "default": "./lib/invariant.js"
-    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
-    "lib/invariant.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/dsh-invariants": "workspace:*"
+    "@deepseek-ai/cordis": "workspace:~"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:~",
     "compression": "^1.8.1",
+    "ipaddr.js": "^2.5.0",
     "negotiator": "^1.0.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/dsh-invariants": "workspace:*",
     "@types/compression": "^1.8.1",
-    "@types/negotiator": "^0.6.5"
+    "@types/negotiator": "^0.6.5",
+    "selfsigned": "^4.0.1"
   }
 }

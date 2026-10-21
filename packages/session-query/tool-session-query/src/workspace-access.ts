@@ -9,10 +9,9 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Collaboration, CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import {
-  SessionId,
-  type SessionEvent,
   type SessionHeader,
   type SessionId as SessionIdValue,
 } from '@deepseek-ai/dsh-session'
@@ -21,7 +20,8 @@ import type {
   SessionLineageTrace,
   SessionRecord,
 } from '@deepseek-ai/dsh-session-query'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent, TurnBoundaryProjection } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-session-projection'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { serviceBoundary } from './service-boundary.ts'
 
@@ -29,7 +29,8 @@ interface Caller {
   readonly id: SessionIdValue
   readonly agent: Agent
   readonly header: SessionHeader
-  readonly events: readonly SessionEvent[]
+  /** The caller's own-session boundary fold (the `turnBoundary` projection). */
+  readonly boundary: TurnBoundaryProjection | undefined
 }
 
 interface TitleView {
@@ -58,7 +59,7 @@ interface DescendantVisit {
   readonly next: DescendantVisit | undefined
 }
 
-function callerOf(exec: ToolRunContext): Caller {
+function callerOf(exec: ToolRunContext, ctx: Context): Caller {
   const agent = exec.agent
   if (agent === undefined) {
     throw new HarnessError(
@@ -70,13 +71,12 @@ function callerOf(exec: ToolRunContext): Caller {
     id: agent.session.id,
     agent,
     header: agent.session.header,
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-    events: agent.session.snapshotEvents(),
+    boundary: ctx.sessionProjections.stateOf(agent.session, 'turnBoundary'),
   }
 }
 
 function targetId(args: { readonly session_id?: string }, caller: Caller): SessionIdValue {
-  return args.session_id === undefined ? caller.id : SessionId(args.session_id)
+  return args.session_id === undefined ? caller.id : brandString<SessionIdValue>(args.session_id)
 }
 
 /**

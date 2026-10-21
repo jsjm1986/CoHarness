@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-17-creator-skills-progressive-disclosure.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-creator-skills-progressive-disclosure.md
+document:
+  en: 25007ffd2a896f124a530f9fb41a1489f4db2800
+  zh: ca6aecf2bc045114a153cd1de5dd3f3af019e60b
+/agent-note-creator-skills-use-progressive-disclosure-under-the-pruner-threshold:
+  en: 34273c3edd042019
+  zh: aa192f6df4451bf1
+/agent-note-creator-skills-use-progressive-disclosure-under-the-pruner-threshold/problem:
+  en: f39b3545ba0ea7c3
+  zh: f9089ec97e7498cc
+/agent-note-creator-skills-use-progressive-disclosure-under-the-pruner-threshold/decision:
+  en: a07da106a3205fd8
+  zh: bd03e4b0154f86ed
+/agent-note-creator-skills-use-progressive-disclosure-under-the-pruner-threshold/alternatives-considered:
+  en: d314137092199e4e
+  zh: 27be90216b9f85ea
+/agent-note-creator-skills-use-progressive-disclosure-under-the-pruner-threshold/consequences:
+  en: 2c7bd7e8c6dc1a4c
+  zh: f8652393de53fcdd

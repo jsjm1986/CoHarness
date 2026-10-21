@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-npm-release-sequences.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-npm-release-sequences.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-10-npm-release-sequences.md
+document:
+  en: 1037837320906e527754df9032acaab34025bf2d
+  zh: 3f572500277bdc656856d50f33905f4f05b510b2
 /agent-note-private-npm-publication-as-three-independent-sequences:
   en: 176f873a6b094838
   zh: 9baeba69cbaea9cf
@@ -24,8 +27,8 @@
   en: b37223ed00b54d12
   zh: 10df0b6abb8eee01
 /agent-note-private-npm-publication-as-three-independent-sequences/decision/workspace-internal-references-use-the-workspace-protocol:
-  en: 1329bbcdb35b6da5
-  zh: 41288c28b97819e1
+  en: 06b664b0756b338f
+  zh: 8a915c2f98f3989d
 /agent-note-private-npm-publication-as-three-independent-sequences/decision/an-optional-dependency-is-never-loaded-at-module-scope:
   en: 6b8b7699650bd99e
   zh: e9e751584136ae98
@@ -36,8 +39,8 @@
   en: 001dbe6f598c8bef
   zh: 74b90fff8446433c
 /agent-note-private-npm-publication-as-three-independent-sequences/decision/repository-changes-this-carried:
-  en: 80c2319db5e9e31a
-  zh: d4f5d7551f725550
+  en: b431120e10743a82
+  zh: fed1920d6d6dee52
 /agent-note-private-npm-publication-as-three-independent-sequences/decision/relationship-to-the-earlier-proposal:
   en: aa7e2c50cc1986f0
   zh: 74b253625a41cd27

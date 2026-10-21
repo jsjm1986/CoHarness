@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-21-admin-models-editor-schema-injection.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-21-admin-models-editor-schema-injection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-21-admin-models-editor-schema-injection.md
+document:
+  en: a3ebebec4e0aea6372b01d17c439b4d56363eb0f
+  zh: 1eedd25ebbad340fdff5abe8b3e01a06497a5c1f
 /agent-note-admin-organization-models-must-use-the-shared-settings-faces:
   en: eb80dbb6a7f41331
   zh: fb02018684e0de45

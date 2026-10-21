@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/session-search/README.md
+document:
+  en: 3f409dccf4089ef8162075b3c598d837d622cd15
+  zh: 5b2b334ba3cb0f6b9de074b1b86a3f368fc95bf6
+/:
+  en: ac0fb71830f58337
+  zh: 0ece950cf48261a1
+/deepseek-ai-dsh-experimental-session-search:
+  en: f4f9c83d1dd36580
+  zh: f34e5a1c0df5e469
+/deepseek-ai-dsh-experimental-session-search/summary:
+  en: 3461520fc9a6b225
+  zh: aeedca620262e8ae
+/deepseek-ai-dsh-experimental-session-search/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 988e839059414d27
+/deepseek-ai-dsh-experimental-session-search/use-this-package:
+  en: 29e4de34bed1ed2e
+  zh: 539638a62c0a99c3
+/deepseek-ai-dsh-experimental-session-search/understand-the-implementation:
+  en: 7c40cb34ffc89ed4
+  zh: ce6ff516434ba582
+/deepseek-ai-dsh-experimental-session-search/further-exploration:
+  en: fcd73e6db7e973cd
+  zh: b158af8273d11df0
+/deepseek-ai-dsh-experimental-session-search/model-experience:
+  en: e01cb02606d75f9c
+  zh: 38709ef0209996ac
+/deepseek-ai-dsh-experimental-session-search/model-experience/kv-cache-effect:
+  en: 25f20eda0e696067
+  zh: 378c4a15a5704ba0
+/deepseek-ai-dsh-experimental-session-search/known-limitations-and-deferred-work:
+  en: 5ba4aae8ef1f62d2
+  zh: 14bcc4bdf99bd54c
+/deepseek-ai-dsh-experimental-session-search/known-limitations-and-deferred-work/dev-note:
+  en: 279d01435256cd2a
+  zh: 83780964e5de2f54

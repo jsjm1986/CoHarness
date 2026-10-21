@@ -59,9 +59,12 @@ export function apply(ctx: Context): void {
   })
   ctx.effect(() => ctx.locale.register(namespace, { zh, en }), 'ui-sidebar-browser.copy')
   ctx.effect(() => ctx.sidebarRightTabs.register(browserDefinition(t)), 'ui-sidebar-browser.type')
+  const openTabs = ctx.sidebarRight.openTabs
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab', key: BROWSER_ID, locale: namespace, store,
-    inject: (_sessionId, actions) => createBrowserControllers(actions),
+    inject: (sessionId, actions) => createBrowserControllers(actions,
+      // Committed layout membership, independent of mounted bodies and plugin lifetime.
+      tabId => openTabs.getSnapshot().some(tab => tab.sessionId === sessionId && tab.tabId === tabId)),
   }, BrowserBody)), 'ui-sidebar-browser.body')
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab.title', key: BROWSER_ID, store,

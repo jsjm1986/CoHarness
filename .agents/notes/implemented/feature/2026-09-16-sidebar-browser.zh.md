@@ -22,7 +22,7 @@ Status: implemented
 
 每个 tab 获得一个 `BrowserController` class。它的命令接口只有 `loadUrl`、`goBack`、`goForward` 与 `reload`；它负责地址校验和 `BrowserNavigation` 状态机。`BrowserFrame` 接口负责临时 sandbox 与 document 状态以及载体操作，`IframeImpl` 为当前 iframe 载体实现该接口。Slot injection 通过 `useBrowserFrame` 提供按 key 索引的 frame 状态，并提供普通 callback，因此 React body 不接收 controller 或 observable source；它只负责可编辑草稿与 iframe DOM。未来的 `ElectronWebViewImpl` 可以实现相同接口，而不把 URL 或载体状态放进组件。
 
-`BrowserNavigation` 保存 canonical 当前 URL、受控加载 revision、导航状态，以及有上限的序列与当前位置。新地址丢弃 forward 分支；后退和前进移动 index；刷新重建应用最后已知的 URL 且不增加 history。body 重挂载时会重新加载应用最后已知的 URL，并且仅在尚无受控目标时使用可选初始 URL。Session-scoped store 只持久化该 class 的 immutable snapshot，供标题渲染与应用刷新恢复。occurrence abort 会删除其 bucket；`TabDomain` 对 tab 删除与 `ui-sidebar-right` 卸载使用同一个 abort，因此卸载或热重载 Sidebar 会清空 Browser history，即使 DockKit 随后恢复 tab record。
+`BrowserNavigation` 保存 canonical 当前 URL、受控加载 revision、导航状态，以及有上限的序列与当前位置。新地址丢弃 forward 分支；后退和前进移动 index；刷新重建应用最后已知的 URL 且不增加 history。body 重挂载不会自行导航：已保存的 checkpoint 以显式恢复操作呈现，只有该操作或新的显式导航才会加载 iframe；typed-open 初始 URL 每个 occurrence 只消费一次。Session-scoped store 只持久化该 class 的 immutable snapshot，供标题渲染与应用刷新恢复。occurrence abort 会删除其 controller，并且仅当已提交的 open-record 成员关系 `sidebarRight.openTabs` 不再列出该 tab 时才删除已保存导航：`TabDomain` 在 abort 已消失 record 前先发布该成员关系，因此 record 删除会清除 history，而 `ui-sidebar-right` 卸载、热重载与身份换钥会保留它。
 
 Browser 状态只属于呈现层，不进入 Session log、模型请求、resource model 或 DockKit layout operation。现有的[右侧 Sidebar 基础设施](2026-09-04-right-sidebar-docking-infrastructure.zh.md)、[tab 类型契约](../architecture/2026-09-05-sidebar-tab-types-and-navigation.zh.md)、[resource model](../architecture/2026-09-05-client-resource-model.zh.md)和[文档预览操作](../architecture/2026-09-08-document-preview-operations.zh.md)继续负责各自现有职责。
 
@@ -65,7 +65,7 @@ view 对象把非活动 guest 保持连接并停放在自有隐藏 DOM host 中�
 
 ## Verification
 
-单元测试覆盖协议解析、Markdown 链接委托、controller 命令与生命周期、确定性导航状态转换、有界 history、best-effort iframe error 和插件 disposal。Keyless Web 场景启动随附 composition，并覆盖消息链接路由、HTTP(S)、后退、前进、sandbox 控制、unknown 导航和协议拒绝。
+单元测试覆盖协议解析、Markdown 链接委托、controller 命令与生命周期、确定性导航状态转换、有界 history、显式 checkpoint 恢复、区分 record 删除与 domain teardown 的 abort、best-effort iframe error 和插件 disposal。Keyless Web 场景启动随附 composition，并覆盖消息链接路由、HTTP(S)、后退、前进、sandbox 控制、unknown 导航和协议拒绝。
 
 ## Consequences
 

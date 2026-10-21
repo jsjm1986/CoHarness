@@ -19,17 +19,11 @@ Attach images and generic files to prompts and commands, then reuse them after r
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The service validates and commits each image through the mounted provider and returns serializable references; it owns no cache or second record of attachments to compare.
 
 <a id="model-experience"></a>
 ## Model Experience

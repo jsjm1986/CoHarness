@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/tool-subagent/README.md
+document:
+  en: 7d705c8eb08d7ad6c8bb99bd542ceaf460da6294
+  zh: 7275aa29726765d0fd877cbd5f72eb0ac2236542
 /:
   en: 3dc0ccef49097361
   zh: 61495d48365178df
@@ -9,17 +12,17 @@
   en: cad290290c1e115c
   zh: 9486441b9d263bc5
 /deepseek-ai-dsh-tool-subagent/summary:
-  en: 04da983479776bfa
-  zh: 17b955b0390dc448
+  en: 79913f4c31286b6f
+  zh: 4f24e07b47e5bb64
 /deepseek-ai-dsh-tool-subagent/table-of-contents:
   en: 8a77278a6b294e9a
   zh: 76ab3cc83669d193
 /deepseek-ai-dsh-tool-subagent/provider-selection-and-lifecycle:
-  en: ca93f0b19e14f7b9
-  zh: 535b0f1eb6928cb6
+  en: 7e36b2ca4dcc3d24
+  zh: 26314572b5c6ea49
 /deepseek-ai-dsh-tool-subagent/config:
-  en: a8d01bb3c3009742
-  zh: 8cc136fd48794487
+  en: 9cd8d8c1ccf4f9d4
+  zh: 3028eec3b0600082
 /deepseek-ai-dsh-tool-subagent/concurrency:
   en: bcebe73eabc87a4b
   zh: 494e6e05e2800d27
@@ -30,11 +33,11 @@
   en: e4c7376d4f29dbd5
   zh: 6b7a9eaf69c9ea53
 /deepseek-ai-dsh-tool-subagent/model-experience/tool-schema/what-the-model-sees:
-  en: eac63bf7106dd7c3
-  zh: 140cd27ed919e2d3
+  en: 2fa4cd5d2cc233de
+  zh: d5563bd8e827399f
 /deepseek-ai-dsh-tool-subagent/model-experience/tool-schema/token-effect:
-  en: 1aa53b7a4c24cc25
-  zh: bebd5c5ce6443259
+  en: 84552359f40ee2fe
+  zh: 23ed219919fcc5a2
 /deepseek-ai-dsh-tool-subagent/model-experience/tool-schema/kv-cache-effect:
   en: 46f736c6c389052a
   zh: a7765541030e9104
@@ -54,8 +57,8 @@
   en: cf78b9dd5596495f
   zh: bd44560f8c2435e8
 /deepseek-ai-dsh-tool-subagent/model-experience/system-prompt/what-the-model-sees:
-  en: 875f8a89292dde21
-  zh: 670f911b0a149690
+  en: 50b57fc96dbe70be
+  zh: 9c508c6a0fe89a63
 /deepseek-ai-dsh-tool-subagent/model-experience/system-prompt/what-the-model-sees/tool-guidance-section:
   en: 82b3cd08b3961c98
   zh: bdc2a34bcea16cac
@@ -65,6 +68,21 @@
 /deepseek-ai-dsh-tool-subagent/model-experience/system-prompt/kv-cache-effect:
   en: 5f2491d0ee8f440c
   zh: 14c06b9fe7096e09
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context:
+  en: 1e58e87365d88e45
+  zh: 7648aa3b3865057f
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context/what-the-model-sees:
+  en: fde048c427103086
+  zh: 85695e55a5f87ba4
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context/what-the-model-sees/depth-limit-notice:
+  en: 0ae8dbcee66d0cd6
+  zh: 5a69283739ae59e0
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context/token-effect:
+  en: dae9cd59b9649b5a
+  zh: d63aecea02a2f9e6
+/deepseek-ai-dsh-tool-subagent/model-experience/runtime-depth-context/kv-cache-effect:
+  en: 9e6e8bc993992908
+  zh: 3e02cf6ea7a95ebe
 /deepseek-ai-dsh-tool-subagent/model-experience/foreground-result:
   en: d83f1f25a3719c54
   zh: 445ca808e28dc936
@@ -90,8 +108,8 @@
   en: f5d5f97a153f7c70
   zh: afc7da8783b348c6
 /deepseek-ai-dsh-tool-subagent/known-limitations-and-deferred-work:
-  en: 5da378cb7e4b0ec8
-  zh: 7902c231d8747162
+  en: 8fc61a781a0dc0a8
+  zh: 50421ed0291637fa
 /deepseek-ai-dsh-tool-subagent/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

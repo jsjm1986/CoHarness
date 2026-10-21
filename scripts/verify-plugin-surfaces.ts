@@ -47,6 +47,12 @@ export const IMMEDIATE_CLIENT_ALLOWLIST = new Set([
   '@deepseek-ai/dsh-client-connection',
   '@deepseek-ai/dsh-api-remotes',
   '@deepseek-ai/dsh-api-gateway',
+  // The Inspector observes the whole client from boot; lazy loading would
+  // blind it to startup activity, so it opts into immediate materialization.
+  '@deepseek-ai/dsh-experimental-inspector',
+  // Upload intake installs its fetch hook and Remote contribution before the
+  // first prompt; a lazy row would miss pages that skip the composer.
+  '@deepseek-ai/dsh-client-file-upload',
 ])
 
 /** Minimal manifest fields needed by this gate. */

@@ -314,8 +314,13 @@ describe('dsh web keyless CLI smoke', () => {
       const workspaceMessage = captured.messages?.find(message =>
         message.role === 'user' && textOfContent(message.content).includes('web-workspace-context-probe'))
       const expectedWebSection = readFileSync(WEB_SURFACE_PROMPT, 'utf8').trimEnd()
-        .replace('{{webUrl}}', new URL(baseUrl).origin)
       expect(textOfContent(captured.system)).toContain(expectedWebSection)
+      expect(textOfContent(captured.system)).not.toContain(new URL(baseUrl).origin)
+      expect(captured.messages?.filter(message => message.role === 'user')
+        .flatMap(message => typeof message.content === 'string' ? [] : message.content ?? [])
+        .some(block => block.type === 'text'
+          && block.text?.includes(`Current DeepSeek Harness Web GUI URL: ${JSON.stringify(new URL(baseUrl).origin)}.`)))
+        .toBe(true)
       expect(workspaceMessage?.role).toBe('user')
       const blocks = (workspaceMessage?.content ?? []) as MessagesContentBlock[]
       expect(blocks.map(block => block.text)).toEqual([

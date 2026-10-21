@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-workspace-registration-deletion.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-workspace-registration-deletion.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md
+document:
+  en: e67489b8a40d9f972460a4d20a9de83d075d611d
+  zh: ca17792d704d7c83665a8f27d0b8260b42456f74
 /agent-note-workspace-registration-deletion:
   en: 68262d0cd61db2ae
   zh: bb2f78757972aae6
@@ -12,8 +15,8 @@
   en: 70182cd2979bdfd6
   zh: a6580a23cfbe6c07
 /agent-note-workspace-registration-deletion/durable-commit-and-publication:
-  en: f97d526274c3608b
-  zh: b0ae161f4e9febb8
+  en: 930257532b3892c8
+  zh: c510faf75f06a3f9
 /agent-note-workspace-registration-deletion/client-convergence:
   en: 84e56775e22ecf23
   zh: ab146e3179868efb

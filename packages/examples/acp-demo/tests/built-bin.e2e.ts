@@ -32,7 +32,7 @@ const decompress = promisify(zstdDecompress)
 const dshPackages = [
   'examples/agent-spine-demo', 'core/agent', 'core/session', 'core/system-prompt',
   'core/tools', 'core/agent-loop', 'llm/llm', 'shell/shell',
-  'shell/bash-local', 'shell/tool-bash', 'subprocess/subprocess', 'subprocess/subprocess-local', 'context/agent-instructions', 'runtime-diagnostics/invariants', 'boot/app-boot',
+  'shell/bash-local', 'shell/tool-bash', 'subprocess/subprocess', 'subprocess/subprocess-local', 'context/agent-instructions', 'boot/app-boot',
   'session/session-persistence',
   'session/session-checkpoint-policy', 'session/session-persistence-jsonl',
   'acp/acp', 'examples/acp-demo', 'util/home-paths',
@@ -207,7 +207,10 @@ describe.skipIf(!existsSync(acpBin))('dsh-acp-demo BUILT bin (node lib/bin.js, n
     }).toBeTypeOf('string')
     const compressed = await readFile(join(sessionsRoot, log!))
     expect(compressed.subarray(0, 4).toString('hex')).toBe('28b52ffd')
-    expect(JSON.parse((await decompress(compressed)).toString())).toMatchObject({ type: 'session', id: sessionId })
+    // The artifact frames the header separately from event batches, and
+    // single-shot decompressors differ on whether they decode concatenated
+    // frames — read the header line only.
+    expect(JSON.parse((await decompress(compressed)).toString().split('\n', 1)[0] ?? '')).toMatchObject({ type: 'session', id: sessionId })
     expect(stderr.join('')).not.toContain('without inject')
     // stdout purity: every emitted line is a JSON-RPC frame, no logger leak.
     for (const line of rawOut.join('').split('\n').filter(l => l.trim().length > 0)) {

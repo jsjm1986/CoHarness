@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-14-typescript-program-backed-semantic-gates.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-14-typescript-program-backed-semantic-gates.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-14-typescript-program-backed-semantic-gates.md
+document:
+  en: a81fd32154e1583f2fe32e754a7e596c93bb3b51
+  zh: 5972a7eb880c72a7bc2f75b1da19dd77e9eefcae
 /agent-note-typescript-program-backed-semantic-gates:
   en: 8fdfd0e270786dac
   zh: 9d9f6e4938126d7f
@@ -17,18 +20,15 @@
 /agent-note-typescript-program-backed-semantic-gates/decision/a-event-relations-follow-receiver-and-value-types:
   en: 0ec7e6cc9623e532
   zh: 1f5fa2edf9e3dd08
-/agent-note-typescript-program-backed-semantic-gates/decision/b-scoped-event-routing-generates-one-typed-resolver-map:
-  en: 23387f412e248728
-  zh: e92ae52feae44f1d
 /agent-note-typescript-program-backed-semantic-gates/decision/semantic-gaps-fail-explicitly:
-  en: abd17df643b7dc5d
-  zh: 33b985fb5729aa9f
+  en: af138885c830c2ef
+  zh: 5a9ad38c390a5d14
 /agent-note-typescript-program-backed-semantic-gates/verification:
-  en: 09f65bf8592958cd
-  zh: 71ef1203d291b127
+  en: 7578aa4cb1054c4a
+  zh: 474a7524c8b741e6
 /agent-note-typescript-program-backed-semantic-gates/alternatives-considered:
   en: cdd5dd5512457e2a
   zh: ccef89865c42b61f
 /agent-note-typescript-program-backed-semantic-gates/consequences:
-  en: f38bcf04a45b512f
-  zh: 3a0fb0e5302f9e2e
+  en: 9af12314ae2e0bd4
+  zh: 1b72a0bde9ce623f

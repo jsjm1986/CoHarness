@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-markdown-image-hover-preview-and-lightbox.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-markdown-image-hover-preview-and-lightbox.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-markdown-image-hover-preview-and-lightbox.md
+document:
+  en: acdda957a77f4ded0b51aef70a4e97b8a106c1d5
+  zh: 177c0c6104f4a9e94abb76fdd295fbbf41625400
 /agent-note-markdown-images-gain-hover-previews-and-the-shared-lightbox:
   en: 18b017d415a43c3b
   zh: 58035140c185fbd9

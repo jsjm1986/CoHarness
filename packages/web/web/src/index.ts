@@ -6,8 +6,9 @@
  * @module @deepseek-ai/dsh-web
  */
 
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context, Service, type Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type {
   WebFetchProvider,
   WebFetchRequest,
@@ -55,15 +56,37 @@ interface Selection<P> {
 /**
  * Config for the web seam. `searchProvider` / `fetchProvider` pin which provider
  * wins for each capability; both are optional (a single registered usable
- * provider auto-selects). Operational overrides such as environment variables
- * must feed these same fields rather than introduce a hidden priority chain.
+ * provider auto-selects). Each operation reads the current value, so a settings
+ * change applies to the next search or fetch without remounting the service.
+ * Operational overrides such as environment variables must feed these same
+ * fields rather than introduce a hidden priority chain.
  */
 export interface WebRuntimeConfig {
   /** Explicit search provider id. Omitted = auto-select when exactly one usable. */
-  readonly searchProvider?: string
+  readonly searchProvider: Volatile<string | undefined>
   /** Explicit fetch provider id. Omitted = auto-select when exactly one usable. */
-  readonly fetchProvider?: string
+  readonly fetchProvider: Volatile<string | undefined>
 }
+
+/** Settings namespace carrying the provider selection the Web search card edits. */
+export const WEB_SETTINGS_NAMESPACE = settingsNamespace('web')
+
+/**
+ * Settings-layer view of the provider selection. Both fields are optional so
+ * an unset layer leaves the cordis entry and its environment feeds live.
+ */
+export interface WebProviderSelectionSettings {
+  /** Search provider id override. */
+  searchProvider?: string
+  /** Fetch provider id override. */
+  fetchProvider?: string
+}
+
+/** Schema of the `web` settings section. */
+export const WEB_SETTINGS_SCHEMA: z<WebProviderSelectionSettings> = z.object({
+  searchProvider: z.string(),
+  fetchProvider: z.string(),
+})
 
 /**
  * The web access service. Registered as `ctx.web` (one instance per context).
@@ -83,20 +106,49 @@ export class WebRuntime extends Service {
    * `$DSH_WEB_SEARCH_PROVIDER` / `$DSH_WEB_FETCH_PROVIDER` are equivalent to
    * `searchProvider` / `fetchProvider` and are NOT a hidden priority chain.
    */
-  static Config: z<WebRuntimeConfig> = z.object({
-    searchProvider: z.string(),
-    fetchProvider: z.string(),
+  static Config = z.object({
+    searchProvider: z.string().volatile(),
+    fetchProvider: z.string().volatile(),
   })
 
   private searchProviders = new Map<string, WebSearchProvider>()
   private fetchProviders = new Map<string, WebFetchProvider>()
-  private readonly searchProviderId: string | undefined
-  private readonly fetchProviderId: string | undefined
+  private readonly searchProviderEnv: string | undefined
+  private readonly fetchProviderEnv: string | undefined
 
-  constructor(ctx: Context, config: WebRuntimeConfig = {}) {
+  private settingsSource: () => WebProviderSelectionSettings = () => ({})
+
+  constructor(ctx: Context, private readonly config: WebRuntimeConfig) {
     super(ctx, 'web')
-    this.searchProviderId = config.searchProvider ?? process.env.DSH_WEB_SEARCH_PROVIDER
-    this.fetchProviderId = config.fetchProvider ?? process.env.DSH_WEB_FETCH_PROVIDER
+    this.searchProviderEnv = process.env.DSH_WEB_SEARCH_PROVIDER
+    this.fetchProviderEnv = process.env.DSH_WEB_FETCH_PROVIDER
+    const searchProvider = config.searchProvider.get()
+    const fetchProvider = config.fetchProvider.get()
+    const entry: WebProviderSelectionSettings = {
+      ...searchProvider === undefined ? {} : { searchProvider },
+      ...fetchProvider === undefined ? {} : { fetchProvider },
+    }
+    installSettingsSection(ctx, WEB_SETTINGS_NAMESPACE, WEB_SETTINGS_SCHEMA, entry, {
+      label: { en: 'Web access', zh: '网页访问' },
+      owner: 'project',
+      projectWrite: 'manager',
+      projectWritePaths: [['searchProvider'], ['fetchProvider']],
+      setSource: (source) => { this.settingsSource = source },
+      // Provider selection is read per operation, so a committed change needs
+      // no re-registration.
+      onChange: () => {},
+    })
+  }
+
+  /**
+   * Resolve the effective provider id: settings section, then the cordis entry
+   * (volatile, so a live config write still applies), then the environment feed.
+   * @param key - the selection field being resolved.
+   * @param env - the process-environment fallback for the same field.
+   * @returns the configured id, or undefined when no layer names one.
+   */
+  private configuredProviderId(key: keyof WebProviderSelectionSettings, env: string | undefined): string | undefined {
+    return this.settingsSource()[key] ?? this.config[key].get() ?? env
   }
 
   /**
@@ -144,9 +196,10 @@ export class WebRuntime extends Service {
    * @returns the provider's results, capped to `request.maxResults`.
    */
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
+    const configuredId = this.configuredProviderId('searchProvider', this.searchProviderEnv)
     const provider = resolveProvider({
       providers: this.searchProviders,
-      ...this.searchProviderId !== undefined ? { configuredId: this.searchProviderId } : {},
+      ...configuredId !== undefined ? { configuredId } : {},
     })
     const result = await provider.search(request, signal)
     return capSources(result, request.maxResults)
@@ -161,9 +214,10 @@ export class WebRuntime extends Service {
    * @returns the retrieval outcome; non-2xx responses resolve descriptively.
    */
   async fetch(request: WebFetchRequest, signal?: AbortSignal): Promise<WebFetchResult> {
+    const configuredId = this.configuredProviderId('fetchProvider', this.fetchProviderEnv)
     const provider = resolveProvider({
       providers: this.fetchProviders,
-      ...this.fetchProviderId !== undefined ? { configuredId: this.fetchProviderId } : {},
+      ...configuredId !== undefined ? { configuredId } : {},
     })
     return provider.fetch(request, signal)
   }

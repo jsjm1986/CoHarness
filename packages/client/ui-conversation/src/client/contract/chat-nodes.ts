@@ -50,14 +50,17 @@ export interface SystemPromptChatData {
   readonly text: string
 }
 
-/** Turn-level process summary shown before the final answer. */
+/** Turn-level disclosure controlling process rows before the finalized answer. */
 export interface TurnProcessChatData {
   readonly turn: number
   readonly controlAnchorSeq: number
+  readonly processStartSeq: number
+  readonly answerAnchorSeq: number | null
+  readonly answerStep: number | null
+  readonly inlineReasoning: boolean
   readonly messageCount: number
   readonly toolCallCount: number
   readonly subagentCount: number
-  readonly answerAnchorSeq: number | null
 }
 
 /** One durable retry chain rendered as a single row. */

@@ -68,6 +68,8 @@ interface ConnectionRequestBoundary {
   method?: string
   /** URL pathname before any RPC dispatch. */
   pathname?: string
+  /** Full request URL as sent by the client; carriers that cannot set headers declare credentials and modes in its query. */
+  url?: string
 }
 ```
 
@@ -193,6 +195,15 @@ interface CollaborationAuthority {
    * @returns root-inherited access facts.
    */
   authorize(sessionId: SessionId, action: CollaborationAction): Promise<CollaborationAccess>
+
+  /**
+   * The participant's scope-level capabilities without contacting the
+   * authorization backend — the per-principal access snapshot Consumers may
+   * render or gate on. Session-level rules (creator status, visibility locks)
+   * still apply through {@link authorize}.
+   * @returns the action classes this scope permits.
+   */
+  capabilities(): CollaborationCapabilities
 
   /**
    * Filter a batch to sessions this participant may read.

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-workflow-member-session-key.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-workflow-member-session-key.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-workflow-member-session-key.md
+document:
+  en: 0e843f2ed0e962f43816f7698519062904563ff0
+  zh: b95835a1246f1df6e3b24f865bd1a39892f7a7ee
 /agent-note-re-key-workflow-member-navigation-into-presentation-space:
   en: 8bb3f3394a21b106
   zh: bcd92a7208b21f8e

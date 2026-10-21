@@ -148,7 +148,7 @@ export function OpenInAppAction(props: OpenInAppActionProps): React.JSX.Element 
   const currentLabel = t(currentEntry.labelKey)
   const title = phase === 'error' ? t('open.error') : t('open.title', { app: currentLabel })
 
-  const launch = (appId: string): void => {
+  const launch = (appId: string, onSuccess?: () => void): void => {
     if (inFlight.current) return
     inFlight.current = true
     // A pending error decay must not flip the button back to idle mid-launch.
@@ -158,6 +158,7 @@ export function OpenInAppAction(props: OpenInAppActionProps): React.JSX.Element 
     props.launch(appId, cwd).then(() => {
       inFlight.current = false
       clearTimeout(busyTimer.current)
+      onSuccess?.()
       setPhase('idle')
     }, () => {
       inFlight.current = false
@@ -186,14 +187,14 @@ export function OpenInAppAction(props: OpenInAppActionProps): React.JSX.Element 
         setOpen(false)
         // A pick while a launch is in flight is ignored whole: persisting the
         // choice without launching would leave the button naming an app the
-        // gesture never opened.
+        // gesture never opened. A pick persists only once its launch resolves,
+        // so a failed open keeps the last remembered application.
         if (inFlight.current) return
-        props.choose(id)
-        launch(id)
+        launch(id, () => { props.choose(id) })
       }}
       anchor={(
         <div className={css.split}>
-          <Tooltip label={phase === 'error' ? t('open.error') : t('open.tooltip')} side="bottom">
+          <Tooltip label={title} side="bottom">
             <button
               type="button"
               className={css.main}

@@ -5,9 +5,10 @@ import type {
   ConversationViewBuilder, ConversationViewDefinition, LegacyConversationSlice,
   PartialAssistant, RunningToolCall,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { sessionRecallLabels } from '@deepseek-ai/dsh-client-runtime/client'
+import { sessionRecallLabels, skillInvocationName } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatNode } from '../contract/chat-nodes.ts'
 import { isRunningTool } from '../contract/chat-nodes.ts'
+import { orderedVisibleChatNodes, ProcessFlowProjector } from './process-groups.ts'
 
 const EMPTY_KEYS: readonly string[] = []
 const EMPTY_TURNS: readonly number[] = []
@@ -94,17 +95,12 @@ function sameReferences<T>(left: readonly T[], right: readonly T[]): boolean {
 class MutableChatNodeStore implements ChatNodeStore {
   private readonly byKey = new Map<string, ChatConversationViewNode>()
   private valuesCache: readonly ChatConversationViewNode[] = EMPTY_LIST
-  private valuesDirty = false
 
   get(key: string): ChatConversationViewNode | undefined {
     return this.byKey.get(key)
   }
 
   values(): readonly ChatConversationViewNode[] {
-    if (this.valuesDirty) {
-      this.valuesCache = [...this.byKey.values()]
-      this.valuesDirty = false
-    }
     return this.valuesCache
   }
 
@@ -112,7 +108,6 @@ class MutableChatNodeStore implements ChatNodeStore {
     this.byKey.clear()
     for (const node of nodes) this.byKey.set(node.key, node)
     this.valuesCache = [...this.byKey.values()]
-    this.valuesDirty = false
   }
 
   upsert(nodes: readonly ChatConversationViewNode[]): void {
@@ -122,7 +117,9 @@ class MutableChatNodeStore implements ChatNodeStore {
       this.byKey.set(node.key, node)
       changed = true
     }
-    if (changed) this.valuesDirty = true
+    // Eager recompute keeps values() a pure read: published snapshots are
+    // deep-frozen by the dev snapshot-store path, so a lazy write would throw.
+    if (changed) this.valuesCache = [...this.byKey.values()]
   }
 }
 
@@ -205,12 +202,6 @@ function locationCoordinates(location: ConversationLocation): { turn?: number; s
   if (location.kind === 'step') return { turn: location.turn.turn, step: location.step.step }
   if (location.kind === 'turn') return { turn: location.turn.turn }
   return {}
-}
-
-function orderedVisible(nodes: readonly ChatConversationViewNode[]): ChatConversationViewNode[] {
-  return nodes
-    .filter(node => node.visibility === 'visible')
-    .sort((left, right) => left.anchorSeq - right.anchorSeq || left.key.localeCompare(right.key))
 }
 
 function referenceMessageSeq(node: ChatConversationViewNode): number | undefined {
@@ -306,6 +297,214 @@ class ReferenceLabelProjector {
   }
 }
 
+function withSkillNames(
+  node: ChatConversationViewNode,
+  names: readonly string[],
+): ChatConversationViewNode {
+  const candidate = node as ChatNode
+  if (candidate.kind !== 'user' && candidate.kind !== 'steering') return node
+  const current = candidate.data.skillNames ?? EMPTY_KEYS
+  const hasNames = Object.hasOwn(candidate.data, 'skillNames')
+  if (sameReferences(current, names) && hasNames === (names.length > 0)) return node
+  const data: Record<string, unknown> = { ...candidate.data }
+  if (names.length === 0) delete data.skillNames
+  else data.skillNames = names
+  return { ...candidate, data }
+}
+
+/** What skill-name batches are made of; every other Node is transparent. */
+type SlashEntryKind = 'message' | 'skill' | 'boundary'
+
+interface SlashEntry {
+  readonly key: string
+  readonly seq: number
+  readonly kind: SlashEntryKind
+  /** The injected skill name of a `skill` entry. */
+  readonly name: string | null
+}
+
+/**
+ * Classify one Node for batching: a direct message, a `skill-invocation`
+ * context, or a boundary of any other kind. A context that injects no skill
+ * (workspace rules, the catalog, a recall) is transparent and yields null.
+ */
+function slashEntryOf(node: ChatConversationViewNode): SlashEntry | null {
+  const candidate = node as ChatNode
+  if (candidate.kind === 'user' || candidate.kind === 'steering') {
+    return { key: node.key, seq: node.anchorSeq, kind: 'message', name: null }
+  }
+  if (candidate.kind === 'context') {
+    const name = skillInvocationName(candidate.data.source)
+    return name === null ? null : { key: node.key, seq: node.anchorSeq, kind: 'skill', name }
+  }
+  return { key: node.key, seq: node.anchorSeq, kind: 'boundary', name: null }
+}
+
+function sameSlashEntry(left: SlashEntry, right: SlashEntry): boolean {
+  return left.seq === right.seq && left.kind === right.kind && left.name === right.name
+}
+
+/**
+ * Attaches each direct message's step-loaded skill names to its Node.
+ *
+ * A step's `skill-invocation` injections follow the direct messages the host
+ * scanned for `/name` gestures and precede the step's first Node of any other
+ * kind, so every non-message, non-context Node closes a batch. Every ended
+ * Turn publishes its `turn-tail` Node on `turn/end` whatever the reason, so a
+ * batch never spans Turns, and `step/start` precedes the direct message in
+ * the log, so no boundary separates a message from its injections. Names
+ * attach to every direct message of the batch: the bubble decorates only the
+ * tokens its own text carries.
+ *
+ * The index holds only messages, skill injections, and boundaries, ordered by
+ * `anchorSeq`. An apply re-reads just the batches around the Nodes whose
+ * classification changed and never scans the store, so an assistant
+ * streaming frame costs nothing here (the append hot path never scans the
+ * Chat Nodes).
+ */
+export class SkillNameProjector {
+  private readonly entries = new Map<string, SlashEntry>()
+  /** Every indexed entry in `anchorSeq` order. */
+  private sorted: SlashEntry[] = []
+
+  /**
+   * Rebuild the index from a whole Node set and attach names to its messages.
+   * @param nodes - every materialized Chat Node, in any order.
+   * @returns the same Nodes, direct messages carrying their batch's names.
+   */
+  replace(nodes: readonly ChatConversationViewNode[]): readonly ChatConversationViewNode[] {
+    this.entries.clear()
+    this.sorted = []
+    for (const node of nodes) {
+      const entry = slashEntryOf(node)
+      if (entry === null) continue
+      this.entries.set(entry.key, entry)
+      this.sorted.push(entry)
+    }
+    this.sorted.sort((left, right) => left.seq - right.seq)
+    const names = new Map<string, readonly string[]>()
+    for (let index = 0; index < this.sorted.length; index++) {
+      if (this.sorted[index]?.kind === 'boundary') continue
+      const end = this.runEnd(index)
+      this.assignRun(index, end, names)
+      index = end
+    }
+    return nodes.map(node => withSkillNames(node, names.get(node.key) ?? EMPTY_KEYS))
+  }
+
+  /**
+   * Fold one incremental upsert set: re-read only the batches around the
+   * Nodes whose classification changed.
+   * @param upserts - the changed Nodes.
+   * @param store - the resident Nodes, read by key for the messages of an affected batch.
+   * @returns the upserts plus any resident message whose names changed.
+   */
+  apply(
+    upserts: readonly ChatConversationViewNode[],
+    store: ChatNodeStore,
+  ): readonly ChatConversationViewNode[] {
+    const dirty: number[] = []
+    for (const node of upserts) {
+      const next = slashEntryOf(node)
+      const previous = this.entries.get(node.key)
+      if (previous !== undefined) {
+        if (next !== null && sameSlashEntry(previous, next)) {
+          // A rebuilt message Node carries Definition state only, never the
+          // names a previous apply attached: re-read its batch.
+          if (next.kind === 'message') dirty.push(next.seq)
+          continue
+        }
+        this.remove(previous)
+        dirty.push(previous.seq)
+      }
+      if (next === null) continue
+      this.insert(next)
+      dirty.push(next.seq)
+    }
+    if (dirty.length === 0) return upserts
+    const names = new Map<string, readonly string[]>()
+    for (const seq of dirty) this.collectAround(seq, names)
+    const byKey = new Map(upserts.map(node => [node.key, node]))
+    for (const [key, list] of names) {
+      const node = byKey.get(key) ?? store.get(key)
+      if (node === undefined) continue
+      const next = withSkillNames(node, list)
+      if (next !== node || byKey.has(key)) byKey.set(key, next)
+    }
+    return [...byKey.values()]
+  }
+
+  private insert(entry: SlashEntry): void {
+    this.sorted.splice(this.lowerBound(entry.seq), 0, entry)
+    this.entries.set(entry.key, entry)
+  }
+
+  private remove(entry: SlashEntry): void {
+    this.sorted.splice(this.sorted.indexOf(entry), 1)
+    this.entries.delete(entry.key)
+  }
+
+  /** First index whose seq is at least `seq`. */
+  private lowerBound(seq: number): number {
+    let low = 0
+    let high = this.sorted.length
+    while (low < high) {
+      const middle = (low + high) >>> 1
+      if ((this.sorted[middle]?.seq ?? Number.POSITIVE_INFINITY) < seq) low = middle + 1
+      else high = middle
+    }
+    return low
+  }
+
+  /** Last index of the boundary-free run containing `index`. */
+  private runEnd(index: number): number {
+    let end = index
+    while (end + 1 < this.sorted.length && this.sorted[end + 1]?.kind !== 'boundary') end++
+    return end
+  }
+
+  /** First index of the boundary-free run containing `index`. */
+  private runStart(index: number): number {
+    let start = index
+    while (start - 1 >= 0 && this.sorted[start - 1]?.kind !== 'boundary') start--
+    return start
+  }
+
+  /** Record the names every message of the run `[start, end]` carries. */
+  private assignRun(start: number, end: number, names: Map<string, readonly string[]>): void {
+    const list: string[] = []
+    for (let index = start; index <= end; index++) {
+      const entry = this.sorted[index]
+      if (entry?.kind === 'skill' && entry.name !== null && !list.includes(entry.name)) list.push(entry.name)
+    }
+    for (let index = start; index <= end; index++) {
+      const entry = this.sorted[index]
+      if (entry?.kind === 'message') names.set(entry.key, list)
+    }
+  }
+
+  /**
+   * Re-read the run(s) around one changed seq: the run holding a message or
+   * skill entry, or — for a boundary, or a seq that left the index — the runs
+   * on both sides of that position.
+   */
+  private collectAround(seq: number, names: Map<string, readonly string[]>): void {
+    const at = this.lowerBound(seq)
+    const here = this.sorted[at]
+    if (here !== undefined && here.seq === seq && here.kind !== 'boundary') {
+      this.assignRun(this.runStart(at), this.runEnd(at), names)
+      return
+    }
+    if (at - 1 >= 0 && this.sorted[at - 1]?.kind !== 'boundary') {
+      this.assignRun(this.runStart(at - 1), at - 1, names)
+    }
+    const right = here !== undefined && here.seq === seq ? at + 1 : at
+    if (right < this.sorted.length && this.sorted[right]?.kind !== 'boundary') {
+      this.assignRun(right, this.runEnd(right), names)
+    }
+  }
+}
+
 interface LegacyContribution {
   readonly anchorSeq: number
   readonly nodes: readonly ConversationNode[]
@@ -330,6 +529,7 @@ function legacyContribution(raw: ChatConversationViewNode): LegacyContribution {
     case 'user':
     case 'steering':
     case 'context':
+    case 'turn-trigger':
     case 'command':
     case 'compaction':
     case 'turn-error':
@@ -554,6 +754,8 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
   private readonly navigation = new MutableChatTurnNavigationIndex()
   private readonly legacy = new LegacySliceBuilder()
   private readonly referenceLabels = new ReferenceLabelProjector()
+  private readonly skillNames = new SkillNameProjector()
+  private readonly flow = new ProcessFlowProjector()
   private order: readonly string[] = EMPTY_KEYS
   readonly empty: ChatSnapshot
 
@@ -565,11 +767,12 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     readonly nodes: readonly ChatConversationViewNode[]
     readonly timeline: ConversationTimelineSnapshot
   }): ChatSnapshot {
-    const nodes = this.referenceLabels.replace(input.nodes)
+    const nodes = this.skillNames.replace(this.referenceLabels.replace(input.nodes))
     this.store.replace(nodes)
-    this.order = orderedVisible(nodes).map(node => node.key)
+    this.order = orderedVisibleChatNodes(nodes).map(node => node.key)
     this.locations.rebuild(this.order, this.store)
     this.navigation.rebuild(input.timeline, this.locations, this.store)
+    this.flow.replace(this.order, this.locations, this.store, input.timeline)
     return this.snapshot(input.timeline, this.legacy.replace(nodes, input.timeline))
   }
 
@@ -577,11 +780,13 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     readonly upserts: readonly ChatConversationViewNode[]
     readonly timeline: ConversationTimelineSnapshot
   }): ChatSnapshot {
-    const upserts = this.referenceLabels.apply(input.upserts, this.store)
+    const upserts = this.skillNames.apply(this.referenceLabels.apply(input.upserts, this.store), this.store)
     let structural = false
     const contentOnly: ChatConversationViewNode[] = []
+    const changes: { readonly previous: ChatConversationViewNode | undefined; readonly current: ChatConversationViewNode }[] = []
     for (const node of upserts) {
       const previous = this.store.get(node.key)
+      changes.push({ previous, current: node })
       const nodeStructural = previous === undefined
         || previous.anchorSeq !== node.anchorSeq
         || previous.visibility !== node.visibility
@@ -590,13 +795,16 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       if (!nodeStructural) contentOnly.push(node)
     }
     this.store.upsert(upserts)
+    let orderChanged = false
     if (structural) {
-      const next = orderedVisible(this.store.values()).map(node => node.key)
-      this.order = sameReferences(this.order, next) ? this.order : next
+      const next = orderedVisibleChatNodes(this.store.values()).map(node => node.key)
+      orderChanged = !sameReferences(this.order, next)
+      this.order = orderChanged ? next : this.order
       this.locations.rebuild(this.order, this.store)
     }
     this.locations.touch(contentOnly)
     this.navigation.rebuild(input.timeline, this.locations, this.store)
+    this.flow.apply(changes, this.order, orderChanged, this.locations, this.store, input.timeline)
     return this.snapshot(input.timeline, this.legacy.apply(upserts, input.timeline))
   }
 
@@ -608,6 +816,8 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       order: this.order,
       nodes: this.store,
       locations: this.locations,
+      entries: this.flow.flowEntries,
+      groups: this.flow.groupStore,
       navigation: this.navigation,
       timeline,
       legacy,

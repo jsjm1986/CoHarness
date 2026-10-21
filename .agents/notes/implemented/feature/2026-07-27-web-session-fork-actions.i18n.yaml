@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-web-session-fork-actions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-web-session-fork-actions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-web-session-fork-actions.md
+document:
+  en: 578e59ec92e003fe5c8cdfe951a595f3a7371ecf
+  zh: 8995b4c89b5abc87693da1c6a63e00e1fa303d57
 /agent-note-web-session-fork-actions:
   en: d94cf9bf30f017ca
   zh: a2773ec00a3671ac

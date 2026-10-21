@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-20-gui-testing-system.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-20-gui-testing-system.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-20-gui-testing-system.md
+document:
+  en: 20e2709d070439f33664d07c6424c864cd84e850
+  zh: 88490dc90b34488391a80c155f423336d64adc3d
 /agent-note-gui-testing-system-the-three-tier-structure:
   en: 5a985aa235b640fc
   zh: 265f368a629a0ff5

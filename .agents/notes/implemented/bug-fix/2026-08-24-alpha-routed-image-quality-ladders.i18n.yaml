@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-24-alpha-routed-image-quality-ladders.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-24-alpha-routed-image-quality-ladders.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-24-alpha-routed-image-quality-ladders.md
+document:
+  en: cdf5e7bd908782781e66a4f6494428f0f174e258
+  zh: fbe8215b0ca1c606cd66d60fe1109d2f9aa1cbad
 /agent-note-alpha-routed-image-quality-ladders-replace-colour-count-codec-routing:
   en: b2c958d45911a787
   zh: b826c61174b3640f

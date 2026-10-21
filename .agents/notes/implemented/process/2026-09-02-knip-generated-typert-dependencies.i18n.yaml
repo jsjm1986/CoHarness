@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-02-knip-generated-typert-dependencies.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-02-knip-generated-typert-dependencies.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-02-knip-generated-typert-dependencies.md
+document:
+  en: 76e195ed74f17a357c0507c91e803e5096546ca3
+  zh: db7577257e092caab1202aa6ae9083c561066416
 /agent-note-knip-accounts-for-generated-typert-runtime-dependencies:
   en: 7e3bd796fa4a6ab4
   zh: f88ae3d45c922931

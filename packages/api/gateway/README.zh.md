@@ -22,7 +22,6 @@ Client 调用根据已声明的 Session 地址或调用方 Agent Context 选择�
 - [Host 服务：`TypertGatewayService`（ctx key：`typertGateway`）](#host-service-typertgatewayservice-ctx-key-typertgateway)
 - [媒体引用](#media-references)
 - [Client 服务：`ClientRemote`（ctx key：`remote`）](#client-service-clientremote-ctx-key-remote)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -57,12 +56,6 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 生成的声明合并通过共享的 `TypertClientRemote` 约定提供 TypeScript API。Client 入口不包含 Host 服务或 Host Cordis 接口合并；方法查找和调用使用普通对象与函数，而不使用 JavaScript Proxy。
 
 调用 waterfall 只包装已解析的业务方法。授权与 Agent 查找先完成，防止请求身份包装器把调用人的权限借给冷查找任务。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次调用都在调用时解析实时的描述符、业务 Service 与编解码器；网关不保留任何可能与已注册贡献产生分歧的按端点状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

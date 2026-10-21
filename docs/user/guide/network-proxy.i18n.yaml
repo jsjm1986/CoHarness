@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for network-proxy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for network-proxy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/network-proxy.md
+document:
+  en: ee7b7b9dffc7520996ec858ebcaafab807aefd54
+  zh: 3243bd52b3c175c2ab51a5b01bc8adf66bf283fe
 /run-dsh-behind-a-network-proxy:
   en: 7659888fbb3e2e0d
   zh: 96c019583f5bf7ab

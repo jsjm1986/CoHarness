@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for defensive-patterns.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for defensive-patterns.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/defensive-patterns.md
+document:
+  en: 9db582354628a13abd43c5bd052dbbfd6e52f79f
+  zh: 11b2a34a40957acf6bfc97a36c1e9b9b9633cf9b
 /defensive-patterns:
   en: 6316b1da0ae4561b
   zh: f059647429c707d5

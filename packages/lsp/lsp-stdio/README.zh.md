@@ -21,7 +21,6 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 - [配置](#configuration)
 - [协议行为](#protocol-behavior)
 - [安全边界](#security-boundary)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -69,12 +68,6 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 ## 安全边界
 
 提供方信任其配置的服务器，不提供任何沙箱隔离。它把规范化身份、包含关系、普通文件流式读取、UTF-8 验证和文件 URI 编码委托给 `ctx.fs`；并在服务器启动前拒绝缺失、非普通文件、非 UTF-8、过大，或规范化后位于 Workspace 外部的查询源。包含关系在打开流之前评估，不承诺在并发路径替换期间保持稳定句柄身份。结果位置可以在外部，但外部路径不能成为查询源。部署必须挂载描述同一执行世界的文件系统与进程管理提供方；分裂世界组合无效。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每个已注册提供方通过 `ctx.subprocess` 拥有一个 language-server 子进程；生命周期与隔离由提供方规格覆盖，插件不保留跨服务器状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

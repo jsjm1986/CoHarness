@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-19-compact-chrome-density.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-19-compact-chrome-density.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-compact-chrome-density.md
+document:
+  en: 4f41ff30022ba2f375500bd3d542d12da8c62f52
+  zh: 8354903f9999f116c6692928aef9efae15a4eb1e
 /agent-note-compact-chrome-density-for-phone-viewports:
   en: 5f8d0c311065a828
   zh: 68795bc2ef993caa

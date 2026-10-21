@@ -29,7 +29,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share + locale seat. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.overlay' | 'shell.mobile.header.actions'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.bottom' | 'shell.overlay' | 'shell.mobile.header.actions'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'layout'>
   & { dismissRightbar: () => void }
@@ -507,6 +507,9 @@ export function AppFrame({
           ...(panels.detailsSessionId === undefined ? {} : { targetSessionId: panels.detailsSessionId }),
         })}
       </DetailsColumn>
+      <div className={css.bottomRow} data-shell-bottom>
+        {renderSlot('shell.bottom', {})}
+      </div>
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>

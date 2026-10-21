@@ -6,14 +6,15 @@
  * lightningcss inside the bundle: `x.module.css` yields its hashed class map
  * and injects a tagged style at factory execution, while `x.css?inline`
  * exports compiled text for a plugin-owned lifecycle effect. The virtual
- * loaders register each real stylesheet as a watch dependency.
+ * loaders register each real stylesheet as a watch dependency. SVG, PNG, and
+ * WebP imports become watched base64 data URLs inside the bundle.
  * Non-experimental client outputs reject experimental module and stylesheet
  * inputs, including origins recorded by chained source maps.
  */
 import { readFile, stat, utimes } from 'node:fs/promises'
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import { createRequire, isBuiltin } from 'node:module'
-import { basename, dirname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Rolldown, type TsdownPlugin, type UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
@@ -32,6 +33,9 @@ const GLOBAL_CSS_VIRTUAL_PREFIX = '\0dsh-global-css:'
 const INLINE_CSS_VIRTUAL_PREFIX = '\0dsh-inline-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 const INLINE_CSS_QUERY = '?inline'
+
+/** Image imports become base64 data URLs embedded in the plugin's own bundle. */
+const IMAGE_MEDIA_TYPES = new Map([['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.webp', 'image/webp']])
 
 /** Emit one plugin-owned style injector and an optional CSS Modules export. */
 function styleInjectionModule(
@@ -66,7 +70,7 @@ function styleInjectionModule(
  * Everything else under @deepseek-ai/* is either a module-table entry
  * (external) or a leak the purity gate rejects.
  */
-export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:host-apiproxy|file-reference|session|llm|tools|brand|client-userdoc-upload|output-retention|typert-protocol|util-crypto|util-values|util-workspace-path)(?:\/|$)|@deepseek-ai\/dsh-session-format\/surface$|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-host-open-in-app\/shared$|@deepseek-ai\/dsh-plugin-manager\/registry$|@deepseek-ai\/dsh-agent-presets\/display$|@deepseek-ai\/dsh-spill-policy\/notice$)/
+export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:host-apiproxy|file-reference|session|llm|tools|brand|client-userdoc-upload|output-retention|typert-protocol|util-crypto|util-values|util-workspace-path)(?:\/|$)|@deepseek-ai\/dsh-session-format\/surface$|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-host-open-in-app\/shared$|@deepseek-ai\/dsh-plugin-manager\/registry$|@deepseek-ai\/dsh-agent-preset-registry\/display$|@deepseek-ai\/dsh-spill-policy\/notice$)/
 
 /**
  * Vendored framework libraries: rescoped into @deepseek-ai, so the gate below
@@ -104,19 +108,20 @@ function browserSourcePath(source: string, sourcemapPath: string): string {
  * the package without lib/index.js and the host Loader cannot import its node
  * half. The Client build consumes `lib/types` and chains those tsc maps, with
  * original source content, into the standalone plugin map.
- * @param id - plugin id (package name), stamped into the __ModuleLoader__.load
- * handoff and onto the injected style tags.
- * @param libEntry - node-half entries, spelled at the call site so the
- * package-invariants gate can see `lib/types/invariant.js` in each package's
- * own tsdown.config.ts (a preset-side glob hides it from the mechanical check).
+ * @param packageRef - plugin id (package name) or the package's own directory
+ * (`import.meta.dirname`); the directory form reads `package.json` for the name.
+ * The name is stamped into the __ModuleLoader__.load handoff and onto the
+ * injected style tags.
+ * @param libEntry - node-half entries.
  * @param options - phase placement, lib overrides, companion Node configs, and optional per-file Client banner.
  * @returns ENV-selected tsdown config for the current build face.
  */
 export function clientBundle(
-  id: string,
+  packageRef: string,
   libEntry: readonly string[],
   options: ClientBundleOptions = {},
 ): BuildFaceConfig {
+  const id = packageId(packageRef)
   const lib = clientLibraryConfig(id, libEntry, options.lib)
   return ({ env }) => {
     const face = buildFace(env?.DSH_BUILD_FACE)
@@ -153,13 +158,15 @@ export function clientBundle(
  * 4. stylesheets ship with the package: a relative `.css` import survives as a
  *    relative external and the sheet is emitted under `lib/` at its
  *    `src`-relative path, so vite stays the only owner of class hashing.
- * @param id - package name, used in tsdown diagnostics.
+ * @param packageRef - package name or the package's own directory
+ * (`import.meta.dirname`); the directory form reads `package.json` for the name.
  * @param libEntry - emitted JavaScript entries consumed from `lib/types`, one
  * bundle each: a multi-entry build would emit a hash-named shared chunk that
  * the exact `files` list cannot publish.
  * @returns ENV-selected tsdown config for the Client build face.
  */
-export function staticLinked(id: string, libEntry: readonly string[]): BuildFaceConfig {
+export function staticLinked(packageRef: string, libEntry: readonly string[]): BuildFaceConfig {
+  const id = packageId(packageRef)
   // Each entry names its own output file, so two entries with the same basename
   // would overwrite one artifact instead of emitting two.
   const names = new Set(libEntry.map(entry => basename(entry, '.js')))
@@ -183,12 +190,13 @@ export function isStaticLinkedConfig(configs: readonly UserConfig[]): boolean {
 
 /**
  * Build a Client-only Node library during the Client pass.
- * @param id - Package name used in tsdown diagnostics.
+ * @param packageRef - Package name used in tsdown diagnostics, or the package's
+ * own directory (`import.meta.dirname`) whose `package.json` supplies it.
  * @param libEntry - Emitted JavaScript entries consumed from `lib/types`.
  * @returns ENV-selected tsdown config for the Client build face.
  */
-export function clientLibrary(id: string, libEntry: readonly string[]): BuildFaceConfig {
-  const lib = clientLibraryConfig(id, libEntry)
+export function clientLibrary(packageRef: string, libEntry: readonly string[]): BuildFaceConfig {
+  const lib = clientLibraryConfig(packageId(packageRef), libEntry)
   return clientOnly([lib])
 }
 
@@ -356,6 +364,24 @@ interface WorkspaceManifest {
 const manifestCache = new Map<string, WorkspaceManifest>()
 const productionExternalCache = new Map<string, readonly RegExp[]>()
 const clientExternalCache = new Map<string, ReadonlySet<string>>()
+
+/**
+ * Accept either spelling of the calling package's identity — its published name
+ * or its own directory (`import.meta.dirname`) — and resolve the package name.
+ * @param packageRef - package name, or a directory holding `package.json`.
+ * @returns the manifest's `name`.
+ * @throws {Error} when the directory's manifest declares no name.
+ */
+function packageId(packageRef: string): string {
+  if (packageRef.startsWith('@')) return packageRef
+  const parsed = JSON.parse(
+    readFileSync(resolvePath(packageRef, 'package.json'), 'utf8'),
+  ) as WorkspaceManifest
+  if (typeof parsed.name !== 'string' || parsed.name.length === 0) {
+    throw new Error(`tsdown: ${resolvePath(packageRef, 'package.json')} declares no package name`)
+  }
+  return parsed.name
+}
 
 /**
  * Read one workspace package's manifest. Located by package name rather than by
@@ -611,6 +637,19 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
         const source = await readFile(fileId)
         const { code } = transform({ filename: fileId, code: source, minify: true })
         return styleInjectionModule(id, fileId, code.toString())
+      },
+    }, {
+      name: 'dsh-image-inline',
+      resolveId(source: string, importer: string | undefined) {
+        if (importer === undefined || !IMAGE_MEDIA_TYPES.has(extname(source))) return null
+        return sourceAssetPath(source, importer)
+      },
+      async load(fileId: string) {
+        const mediaType = IMAGE_MEDIA_TYPES.get(extname(fileId))
+        if (mediaType === undefined) return null
+        this.addWatchFile(fileId)
+        const data = await readFile(fileId)
+        return `export default ${JSON.stringify(`data:${mediaType};base64,${data.toString('base64')}`)};`
       },
     }],
     outputOptions: {

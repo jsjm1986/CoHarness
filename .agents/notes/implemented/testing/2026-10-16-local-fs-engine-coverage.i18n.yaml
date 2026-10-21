@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-16-local-fs-engine-coverage.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-16-local-fs-engine-coverage.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-16-local-fs-engine-coverage.md
+document:
+  en: be1918f289e5000c938837ea39d8f952b018daaf
+  zh: 8ad73c5dccb12f53a5dfb9be51f58dbe93855504
 /agent-note-local-document-engine-coverage-closes-over-shared-scan-and-lifecycle-branches:
   en: f97e45687695e4d3
   zh: e7a57fa432bddf6b

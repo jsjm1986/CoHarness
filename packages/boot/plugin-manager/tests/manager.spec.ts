@@ -4,8 +4,8 @@ import { realpath } from 'node:fs/promises'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import type { Socket } from 'node:net'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { execa } from 'execa'
 import type { Context } from '@deepseek-ai/cordis'
@@ -243,7 +243,7 @@ it.each(['missing package', 'invalid manifest', 'not a bundle', 'missing patch',
     })
     expect([...ctx.loader.entries()].some(entry => entry.id === 'include:managed')).toBe(false)
     expect((await manager.listBundles()).find(row => row.name === 'extra')).toMatchObject({
-      enabled: true, error: { code: failure === 'not a bundle' ? 'not-bundle' : 'operation-error' }, rows: [],
+      enabled: true, source: 'extra@1.0.0', error: { code: failure === 'not a bundle' ? 'not-bundle' : 'operation-error' }, rows: [],
     })
     expect(await manager.setBundleEnabled('extra', false)).toMatchObject({ changed: true, application: 'applied' })
     expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core'])
@@ -303,7 +303,7 @@ it('lists bundle versions and current-profile plugin targets', async () => {
       rows: [{ rowId: 'manager', moduleName: 'cordis:manager', entryId: 'include:manager' }], overrides: [],
     },
     {
-      name: 'extra', version: '1.0.0', enabled: true, installed: true, optional: false, removable: true,
+      name: 'extra', version: '1.0.0', source: 'extra@1.0.0', enabled: true, installed: true, optional: false, removable: true,
       meta: { title: 'extra' },
       rows: [{ rowId: 'managed', moduleName: pathToFileURL(join(dir, 'node_modules', 'extra', 'plugin.mjs')).href, entryId: 'include:managed' }], overrides: [],
     },
@@ -325,7 +325,7 @@ it('describes a bundle by its manifest and patch: one-liner, rows without a live
   writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
   const moduleName = pathToFileURL(join(dir, 'node_modules', 'described', 'plugin.mjs')).href
   expect((await manager.listBundles()).find(row => row.name === 'described')).toEqual({
-    name: 'described', version: '2.0.0', description: 'Describes itself.', enabled: false, installed: true, optional: false, removable: true,
+    name: 'described', version: '2.0.0', description: 'Describes itself.', source: 'described@2.0.0', enabled: false, installed: true, optional: false, removable: true,
     meta: { title: 'described', description: 'Describes itself.' },
     rows: [{ rowId: 'described-row', moduleName }], overrides: ['managed'],
   })
@@ -336,6 +336,36 @@ it('describes a bundle by its manifest and patch: one-liner, rows without a live
   // Off again, the rows lose their entries.
   await manager.setBundleEnabled('described', false)
   expect((await manager.listBundles()).find(row => row.name === 'described')?.rows).toEqual([{ rowId: 'described-row', moduleName }])
+})
+
+it('names where each installed bundle comes from as a spec pnpm installs', async () => {
+  const { manager, dir, bundle, profile } = await fixture()
+  const recorded: Record<string, string> = {
+    extra: '^1.0.0', tagged: 'latest', aliased: 'npm:@acme/aliased@2', jsr: 'jsr:@acme/jsr@^1', github: 'github:someone/dsh-plugin#v1',
+    ssh: 'git@github.com:someone/dsh-plugin.git', deploy: 'deploy@git.corp:team/dsh-plugin.git',
+    sshUrl: 'git+ssh://git@github.com/someone/dsh-plugin.git', email: 'git+http://user@example.com:secret@git.example.com/repo.git',
+    tarball: 'https://cdn.example.com/dsh-x-1.0.0.tgz', token: 'https://ghp_secret@cdn.example.com/dsh-x-1.0.0.tgz',
+    password: 'git+https://someone:secret@git.example.com/someone/dsh-plugin.git#main',
+    relative: 'file:../plugins/relative', linked: 'link:/plugins/linked', home: 'file:~/plugins/home',
+    aliasLocal: 'file:../plugins/original', shadowed: '1.0.0',
+  }
+  for (const name of Object.keys(recorded)) bundle(name, [])
+  // Installed under a name other than its own, the package keeps that name only when the spec carries it.
+  writeFileSync(join(dir, 'node_modules', 'aliasLocal', 'package.json'), JSON.stringify({ name: 'original', version: '1.0.0', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
+  const manifest = readProfileManifest('test', dir)
+  manifest.dependencies = recorded
+  writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+  // The installation's own copy of a bundle is the one that loads, so the profile's dependency on it names nothing.
+  writeFileSync(profile.installAnchor, JSON.stringify({ name: 'installation', dependencies: { shadowed: '1.0.0' } }))
+  expect(Object.fromEntries((await manager.listBundles()).map(row => [row.name, row.source]))).toEqual({
+    core: undefined, extra: 'extra@^1.0.0', tagged: 'tagged@latest', aliased: 'aliased@npm:@acme/aliased@2', jsr: 'jsr@jsr:@acme/jsr@^1',
+    github: 'github:someone/dsh-plugin#v1', ssh: 'git@github.com:someone/dsh-plugin.git', deploy: 'deploy@git.corp:team/dsh-plugin.git',
+    sshUrl: 'git+ssh://git@github.com/someone/dsh-plugin.git', email: 'git+http://git.example.com/repo.git',
+    tarball: 'https://cdn.example.com/dsh-x-1.0.0.tgz', token: 'https://cdn.example.com/dsh-x-1.0.0.tgz',
+    password: 'git+https://git.example.com/someone/dsh-plugin.git#main',
+    relative: `file:${resolve(dir, '../plugins/relative')}`, linked: `link:${resolve(dir, '/plugins/linked')}`,
+    home: `file:${resolve(homedir(), 'plugins/home')}`, aliasLocal: `aliasLocal@file:${resolve(dir, '../plugins/original')}`, shadowed: undefined,
+  })
 })
 
 it.each(['native', 'runtime'] as const)('reads a disabled bundle and its independent exported plugins without running them with %s resolution', async (mode) => {
@@ -418,7 +448,7 @@ it.each([
   writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
 
   expect((await manager.listBundles()).find(row => row.name === 'unnamed')).toEqual({
-    name: 'unnamed', version: '1.0.0', enabled: false, installed: true, optional: false, removable: true,
+    name: 'unnamed', version: '1.0.0', source: 'unnamed@1.0.0', enabled: false, installed: true, optional: false, removable: true,
     rows: [], overrides: [], ...expected,
   })
 })
@@ -478,6 +508,9 @@ it('installs only valid bundle declarations and honors installation without acti
   const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async (_context, args) => {
     const name = String(args[1])
     bundle(name, [{ id: name, name: './plugin.mjs', config: { service: name } }])
+    if (name === 'another-bundle') {
+      writeFileSync(join(dir, 'node_modules', name, 'package.json'), JSON.stringify({ name, dsh: { bundle: { patch: './cordis.patch.yml' } } }))
+    }
     const manifest = readProfileManifest('test', dir)
     manifest.dependencies = { ...manifest.dependencies, [name]: '1.0.0' }
     writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
@@ -485,12 +518,14 @@ it('installs only valid bundle declarations and honors installation without acti
   })
   onTestFinished(() => { install.mockRestore() })
   expect(await manager.installBundle('new-bundle', { enabled: false })).toMatchObject({
-    changed: true, application: 'applied', stage: 'enable', target: 'new-bundle', bundle: 'new-bundle', packageResult: { exitCode: 0 },
+    changed: true, application: 'applied', stage: 'enable', target: 'new-bundle', bundle: 'new-bundle', version: '1.0.0', packageResult: { exitCode: 0 },
   })
   expect((await manager.listBundles()).find(row => row.name === 'new-bundle')?.enabled).toBe(false)
   expect(await manager.setBundleEnabled('new-bundle', true)).toMatchObject({ application: 'applied' })
   expect((await manager.listPlugins()).find(row => row.patchId === 'new-bundle')?.fiberPhase).toBe('active')
-  expect(await manager.installBundle('another-bundle')).toMatchObject({ application: 'applied' })
+  const another = await manager.installBundle('another-bundle')
+  expect(another).toMatchObject({ application: 'applied', bundle: 'another-bundle' })
+  expect(another).not.toHaveProperty('version')
   expect((await manager.listBundles()).find(row => row.name === 'another-bundle')?.enabled).toBe(true)
 })
 
@@ -1397,7 +1432,7 @@ it.each(['live', 'startup'] as const)('requires exact risk acknowledgement and p
   expect(managed()).toBeUndefined()
   expect((await manager.listBundles()).find(bundle => bundle.name === 'extra')?.error).toEqual({
     code: 'incompatible-version',
-    incompatible: [{ name: 'extra', version: '1.0.0', runtimeVersion: runtime, peers: { '@deepseek-ai/dsh': '999.0.0' } }],
+    incompatible: [{ name: 'extra', version: '1.0.0', runtimeVersion: runtime, requirements: { '@deepseek-ai/dsh': '999.0.0' } }],
   })
   expect(await manager.setBundleEnabled('extra', true)).toMatchObject({ changed: false, application: 'failed' })
   expect(await manager.setVersionExemption('extra@1.0.0', runtime, true)).toMatchObject({ changed: false, application: 'failed' })
@@ -1422,7 +1457,7 @@ it.each(['live', 'startup'] as const)('requires exact risk acknowledgement and p
 
 it('reports a package run refused for compatibility as a typed refusal', async () => {
   const { manager } = await fixture()
-  const incompatible = [{ name: 'dsh-x', version: '2.0.0', runtimeVersion: getDshRuntimeVersion(), peers: { '@deepseek-ai/dsh': '999.0.0' } }]
+  const incompatible = [{ name: 'dsh-x', version: '2.0.0', runtimeVersion: getDshRuntimeVersion(), requirements: { '@deepseek-ai/dsh': '999.0.0' } }]
   const install = vi.spyOn(operations, 'runProfilePnpm').mockResolvedValue({
     exitCode: 1, output: 'dsh: installation rejected', truncated: false, logPath: 'pnpm.log', kind: 'unknown', incompatible,
   })

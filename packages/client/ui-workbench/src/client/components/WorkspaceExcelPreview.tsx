@@ -1,14 +1,14 @@
 /** Browser-parsed spreadsheet preview over the existing authorized Workspace resource lifetime. */
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
+import { lazy, Suspense, useMemo } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import { isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
-import { workspaceFileBytes } from '../html/read-relative.ts'
-import type { ReadWorkspaceFileData, WorkspaceFileData } from '../html/read-relative.ts'
+import { workspaceFileBytes } from '../contract/html/read-relative.ts'
+import type { ReadWorkspaceFileData } from '../contract/html/read-relative.ts'
 import type { ExcelLimits } from '../excel/model.ts'
 import type {} from '../excel/locales.ts'
-import type { WorkspacePreviewResource } from './WorkspaceFileTab.tsx'
+import { useWorkspacePreviewRead } from '../contract/preview/use-preview-read.ts'
+import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import { WorkspacePreviewChrome } from './WorkspacePreviewChrome.tsx'
 import css from './Workbench.module.css'
 
 const LazyExcelBody = lazy(async () => ({ default: (await import('../excel/LazyExcelBody.tsx')).LazyExcelBody }))
@@ -29,68 +29,29 @@ export function WorkspaceExcelPreview({ request, resource, read, excelT, limits,
   close: () => void
   labels: { close: string; reload: string; changed: string }
 }) {
-  const { metadata, revoke } = resource
-  const [result, setResult] = useState<WorkspaceFileData>()
-  const [error, setError] = useState<Error>()
-  const [attempt, setAttempt] = useState(0)
-  const [pending, setPending] = useState(false)
-  const [reloading, setReloading] = useState(false)
-  const denied = metadata.accessDenied || isWorkspaceAccessFailure(error)
-  const version = metadata.value?.changed === true && result !== undefined ? result.version : metadata.value?.version
-  const lifetime = useMemo(() => new AbortController(), [request, denied])
-  useEffect(() => () => { lifetime.abort() }, [lifetime])
-  useEffect(() => {
-    if (denied) { setResult(undefined); return }
-    // The user's metadata reload owns this transition: while its stat is open,
-    // the still-old snapshot cannot authorize a new content read.
-    if (reloading) return
-    if (version === undefined) return
-    const abort = new AbortController()
-    const signal = AbortSignal.any([abort.signal, lifetime.signal])
-    setPending(true)
-    setError(undefined)
-    void read({ resource: request, version, maxBytes: limits.maxBytes }, signal).then((value) => {
-      if (!signal.aborted) setResult(value)
-    }, (cause: unknown) => {
-      if (signal.aborted) return
-      const failure = cause instanceof Error ? cause : new Error(String(cause))
-      setResult(undefined)
-      setError(failure)
-      if (isWorkspaceAccessFailure(failure)) revoke(failure.message)
-    }).finally(() => { if (!signal.aborted) setPending(false) })
-    return () => { abort.abort() }
-  }, [read, request, revoke, version, attempt, denied, lifetime, limits.maxBytes, reloading])
+  const input = useMemo(() => {
+    const version = resource.metadata.value?.version
+    return version === undefined ? undefined : { version, maxBytes: limits.maxBytes }
+  }, [resource.metadata.value?.version, limits.maxBytes])
+  const readFile = useMemo(() => (next: { version: string; maxBytes: number }, signal: AbortSignal) =>
+    read({ resource: request, version: next.version, maxBytes: next.maxBytes }, signal), [read, request])
+  const state = useWorkspacePreviewRead({ request, resource, input, read: readFile })
+  const { result, error, denied } = state
   const data = useMemo(() => result === undefined ? undefined : workspaceFileBytes(result), [result])
-  const reload = async (): Promise<void> => {
-    setReloading(true)
-    try {
-      await resource.reload()
-      setError(undefined)
-      setResult(undefined)
-      setAttempt(value => value + 1)
-    } finally {
-      setReloading(false)
-    }
-  }
-  const failure = error ?? metadata.error
+  const failure = error ?? resource.metadata.error
   const message = failure === undefined
     ? undefined
     : (failure instanceof Error ? (failure as { code?: unknown }).code : failure.code) === 'workspace-file/too-large'
       ? excelT('tooLarge')
       : failure.message
   const loading = <p className={css.previewStatus} role="status">{excelT('loading')}</p>
-  return <section aria-label={request.path} className={css.filePreview}>
-    <div className={css.filePreviewActions}>
-      <Button size="sm" onClick={close}>{labels.close}</Button>
-      <Button size="sm" disabled={pending || denied || reloading || metadata.status === 'loading'} onClick={() => { void reload() }}>{labels.reload}</Button>
-    </div>
-    {message !== undefined && <p role="alert">{message}</p>}
-    {!denied && metadata.value?.changed === true && <p role="status">{labels.changed}</p>}
+  return <WorkspacePreviewChrome request={request} resource={resource} state={state}
+    className={css.filePreview} message={message} hasContent={data !== undefined}
+    close={close} labels={{ ...labels, loading: excelT('loading') }}>
     {!denied && data !== undefined && (
       <Suspense fallback={loading}>
         <LazyExcelBody data={data} path={request.path} limits={limits} t={excelT} />
       </Suspense>
     )}
-    {!denied && data === undefined && (pending || metadata.status === 'loading') && <p role="status">{excelT('loading')}</p>}
-  </section>
+  </WorkspacePreviewChrome>
 }

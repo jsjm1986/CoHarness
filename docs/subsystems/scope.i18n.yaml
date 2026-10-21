@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for scope.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for scope.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/scope.md
+document:
+  en: c425217de224839d719da213e33f58bd2e6bf002
+  zh: 448f9fbfdc2211e9134cdf831a6e5311511acdfe
 /scoped-registration:
   en: f8d10f304947d145
   zh: 261859481d26f090

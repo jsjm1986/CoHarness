@@ -8,9 +8,9 @@ import { releasedV4SessionFormatCodec, sessionFormatV3ToV4 } from '@deepseek-ai/
 import { releasedV5SessionFormatCodec, sessionFormatV4ToV5 } from '@deepseek-ai/dsh-session-format-v4-to-v5'
 import { assertReleasedV6Header, releasedV6SessionFormatCodec, restoreReleasedV6Artifact, sessionFormatV5ToV6 } from '@deepseek-ai/dsh-session-format-v5-to-v6'
 import { ADMITTED_V6_EVENT_TYPES } from '@deepseek-ai/dsh-session-format-v6-to-v7'
+import { coharnessDialectCodec, coharnessDialectMigration, createCoharnessJsonlCatalog } from './coharness-physical.ts'
 
-/** V0–V6 decoding for historical child identity; never publishes or completes parent catalogs. */
-export const historicalSessionFormatCatalog = createSessionFormatCatalog({
+const historicalOptions = {
   currentVersion: 6,
   codecs: [
     releasedV0SessionFormatCodec,
@@ -30,10 +30,22 @@ export const historicalSessionFormatCatalog = createSessionFormatCatalog({
     sessionFormatV4ToV5,
     sessionFormatV5ToV6,
   ],
-  restoreCurrent: artifact => restoreReleasedV6Artifact(artifact, ADMITTED_V6_EVENT_TYPES),
-  restoreTransformedCurrent: artifact => restoreReleasedV6Artifact(artifact, ADMITTED_V6_EVENT_TYPES),
-  restoreCurrentHeader(header) {
+  restoreCurrent: (artifact: Parameters<typeof restoreReleasedV6Artifact>[0]) =>
+    restoreReleasedV6Artifact(artifact, ADMITTED_V6_EVENT_TYPES),
+  restoreTransformedCurrent: (artifact: Parameters<typeof restoreReleasedV6Artifact>[0]) =>
+    restoreReleasedV6Artifact(artifact, ADMITTED_V6_EVENT_TYPES),
+  restoreCurrentHeader(header: Parameters<typeof assertReleasedV6Header>[0]) {
     assertReleasedV6Header(header)
     return header
   },
-})
+}
+
+/** V0–V6 decoding for historical child identity; never publishes or completes parent catalogs. */
+export const historicalSessionFormatCatalog = createCoharnessJsonlCatalog(
+  createSessionFormatCatalog({
+    ...historicalOptions,
+    codecs: historicalOptions.codecs.map(coharnessDialectCodec),
+    migrations: historicalOptions.migrations.map(coharnessDialectMigration),
+  }),
+  createSessionFormatCatalog(historicalOptions),
+)

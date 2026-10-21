@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/hooks/hooks-claude-code/README.md
+document:
+  en: 4d03ef03b5052269d8c326f83e610e75dffae29e
+  zh: e61b191684de27cb382c896e3a1e4513edb75b2a
 /:
   en: ccc724007b5c1ec9
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: fd56bd2d9107d126
   zh: de7e8358840e23b1
 /deepseek-ai-dsh-hooks-claude-code/table-of-contents:
-  en: 32eb5b63c21ec432
-  zh: 0de1faddbd147d8c
+  en: 93e4646f288f7b04
+  zh: 2ccbbcb65e14d93a
 /deepseek-ai-dsh-hooks-claude-code/config:
   en: a018b41f5f90a280
   zh: ca65ce8361e53fb9
@@ -21,11 +24,8 @@
   en: 343c23ee3799e587
   zh: 91df37c437f5ad92
 /deepseek-ai-dsh-hooks-claude-code/context-source:
-  en: c8f4c796680fe46f
-  zh: c7e8cca6f51beaac
-/deepseek-ai-dsh-hooks-claude-code/invariants:
-  en: c064bb1ecf126bf9
-  zh: 7ee7df985d43aae0
+  en: ae05e9048e6993ba
+  zh: 7e4610f77a0be844
 /deepseek-ai-dsh-hooks-claude-code/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

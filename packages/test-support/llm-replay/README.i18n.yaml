@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/test-support/llm-replay/README.md
+document:
+  en: 32f60d39ea5871f02515ad63c9a673e1f9becc4e
+  zh: 86ecb05c487fa3cdba843d66810bab7cf2481531
 /:
   en: 859b61dd561538fb
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: 9db70d252b8e2902
   zh: 26c3e40a0fef9b53
 /deepseek-ai-dsh-llm-replay/table-of-contents:
-  en: 576769798833f610
-  zh: 4c96828ecda030bf
+  en: 73b3b8f6928640e6
+  zh: ccde2ecb3c706cec
 /deepseek-ai-dsh-llm-replay/how-the-fixture-works:
   en: dd48fd371bf3e4e5
   zh: 362ab97dda7a4b61
@@ -27,11 +30,8 @@
   en: 25c397927b3a2efc
   zh: abb7736ff5c9e8af
 /deepseek-ai-dsh-llm-replay/plugin-export-shape:
-  en: 091a74a3d5a9233a
-  zh: db1966f32da03a99
-/deepseek-ai-dsh-llm-replay/invariants:
-  en: 04dbc8ceafd6daa4
-  zh: 2b1dc17dc98f8b89
+  en: 81c1a05fc0204072
+  zh: 4d70d5c205981cba
 /deepseek-ai-dsh-llm-replay/model-experience:
   en: ad4fe7025029da90
   zh: 1cced10c67323c37

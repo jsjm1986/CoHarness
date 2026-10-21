@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-account-qualified-permission-pickers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-account-qualified-permission-pickers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-account-qualified-permission-pickers.md
+document:
+  en: d802536dab07a4bbe18532aab4b768a5e19686cc
+  zh: 242f76fda5b065c0ae397b6dd00446cda31b6af9
 /agent-note-account-qualified-permission-pickers:
   en: 48c54d7928401edd
   zh: bf6239609cc17642

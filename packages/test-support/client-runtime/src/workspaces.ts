@@ -1,7 +1,7 @@
 /** Test-owned workspaces face: the renderer standard-kit observable plus recorded actions. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  DirectoryListing, IWorkspaces, SessionId, SnapshotStore, WorkspaceId, WorkspaceListState, WorkspaceView,
+  DirectoryListing, IWorkspaces, SessionId, SnapshotStore, StartSessionOptions, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceListState } from './fixtures.ts'
 import type { Stabilizer } from './fixtures.ts'
@@ -48,16 +48,18 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
-   * Connect a workspace to its reusable/new blank session (recorded). The
-   * default resolves the workspace id back as the session id; stub for
+   * Connect a workspace to its reusable/new blank session (recorded) — the
+   * reconnection arm; a bare `startSession` mints fresh and never lands here.
+   * The default resolves the workspace id back as the session id; stub for
    * cross-session flows.
    * @param workspaceId - target workspace.
+   * @param options - `agentPreset` names the composition the conversation runs.
    * @returns the connected session id.
    */
-  async connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId> {
-    this.calls.push({ method: 'connectWorkspace', args: [workspaceId] })
+  async connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId> {
+    this.calls.push({ method: 'connectWorkspace', args: options === undefined ? [workspaceId] : [workspaceId, options] })
     const stub = this.stubs.get('connectWorkspace')
-    if (stub !== undefined) return await (stub(workspaceId) as Promise<SessionId>)
+    if (stub !== undefined) return await (stub(workspaceId, options) as Promise<SessionId>)
     return `session-of-${workspaceId}` as SessionId
   }
 
@@ -65,22 +67,26 @@ export class TestWorkspaces implements IWorkspaces {
    * Open a Workspace's most recent historical Session (recorded). The default
    * resolves the workspace id back as the session id; stub for navigation tests.
    * @param workspaceId - target workspace.
+   * @param options - forwarded preset options for the fallback connect.
    * @returns the session id selected by the history-first entry flow.
    */
-  async openWorkspace(workspaceId: WorkspaceId): Promise<SessionId> {
-    this.calls.push({ method: 'openWorkspace', args: [workspaceId] })
+  async openWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId> {
+    this.calls.push({ method: 'openWorkspace', args: options === undefined ? [workspaceId] : [workspaceId, options] })
     const stub = this.stubs.get('openWorkspace')
-    if (stub !== undefined) return await (stub(workspaceId) as Promise<SessionId>)
+    if (stub !== undefined) return await (stub(workspaceId, options) as Promise<SessionId>)
     return `session-of-${workspaceId}` as SessionId
   }
 
   /**
-   * New-session flow (recorded; stubbed behavior runs when installed).
+   * New-session flow (recorded; stubbed behavior runs when installed). A call
+   * without draft options mints a fresh Session+Agent on the real service;
+   * draft options ride the reconnect arm.
    * @param workspaceId - optional explicit workspace target.
+   * @param options - draft initialization and failure observer for the landed Session.
    */
-  startSession(workspaceId?: WorkspaceId): void {
-    this.calls.push({ method: 'startSession', args: [workspaceId] })
-    this.stubs.get('startSession')?.(workspaceId)
+  startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void {
+    this.calls.push({ method: 'startSession', args: [workspaceId, options].filter(arg => arg !== undefined) })
+    this.stubs.get('startSession')?.(workspaceId, options)
   }
 
   /**

@@ -3,6 +3,13 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider, CredentialRecord } from '@deepseek-ai/dsh-credentials'
+import {
+  INTERACTIONS_HEADER,
+  INTERACTIONS_QUERY,
+  LAUNCH_TOKEN_QUERY,
+  parseInteractions,
+  type ConnectionInteractions,
+} from '@deepseek-ai/dsh-host-apiproxy/api/interactions'
 import type {
   ConnectionIndexRequest,
   ConnectionIndexResponse,
@@ -12,7 +19,7 @@ import type {
 const AUTH_RECORD_KEY = credentialKey('client-connection', 'browser-session')
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000
 const SECRET_BYTES = 32
-const TOKEN_QUERY = 'token'
+const TOKEN_QUERY = LAUNCH_TOKEN_QUERY
 const COOKIE_PREFIX = 'dsh-auth-'
 const COOKIE_PAYLOAD_VERSION = 1
 const STORED_SECRET_VERSION = 1
@@ -66,12 +73,13 @@ function header(
   return typeof value === 'string' ? value : undefined
 }
 
-/** Canonical request authority used as the cookie name and signed audience. */
-function requestAuthority(headers: ConnectionTrustRequest['headers']): string | undefined {
+/** Protocol-scoped cookie audience; HTTP retains its existing authority-only spelling. */
+function requestAudience(headers: ConnectionTrustRequest['headers'], secure: boolean): string | undefined {
   const host = header(headers, 'host')
   if (host === undefined) return undefined
   try {
-    return new URL(`http://${host}`).host
+    const url = new URL(`${secure ? 'https:' : 'http:'}//${host}`)
+    return secure ? url.origin : url.host
   } catch {
     return undefined
   }
@@ -103,6 +111,14 @@ function tokenMatches(actual: string, expected: string): boolean {
   return actualBytes.byteLength === expectedBytes.byteLength && timingSafeEqual(actualBytes, expectedBytes)
 }
 
+/** Read the Bearer credential out of one Authorization header, or undefined when the scheme is not Bearer. */
+function bearerToken(authorization: string | undefined): string | undefined {
+  if (authorization === undefined) return undefined
+  const at = authorization.indexOf(' ')
+  if (at === -1 || authorization.slice(0, at).toLowerCase() !== 'bearer') return undefined
+  return authorization.slice(at + 1).trim()
+}
+
 function cookieName(authority: string): string {
   return COOKIE_PREFIX + encodeBase64Url(createHash('sha256').update(authority).digest())
 }
@@ -118,8 +134,15 @@ function cookieValue(headerValue: string, name: string): string | undefined {
 }
 
 /** Serialize the fixed browser-session attributes; generated names and values are cookie-safe base64url. */
-function sessionCookie(name: string, value: string, expiresAt: number, maxAgeSeconds: number): string {
-  return `${name}=${value}; Max-Age=${String(maxAgeSeconds)}; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Strict`
+function sessionCookie(
+  name: string,
+  value: string,
+  expiresAt: number,
+  maxAgeSeconds: number,
+  secure: boolean,
+): string {
+  const attributes = `${name}=${value}; Max-Age=${String(maxAgeSeconds)}; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Strict`
+  return secure ? `${attributes}; Secure` : attributes
 }
 
 function signature(secret: Buffer, body: string): Buffer {
@@ -236,9 +259,13 @@ export class BrowserAuth {
    * @param provider - a deployment provider's decision, when one answered:
    *   `false` writes the ordinary 401 before any token exchange and `true`
    *   admits without minting a cookie; `undefined` keeps token/cookie behavior.
+   * @param secure - whether the listener receiving this request serves TLS; the
+   *   minted cookie carries `Secure` when it does. Only that listener's own
+   *   protocol decides, never a `publicUrl` announcement or a forwarded header:
+   *   those describe a hop this process does not terminate.
    * @returns true only when the caller may serve index.html.
    */
-  authorizeIndex(req: ConnectionIndexRequest, res: ConnectionIndexResponse, provider?: boolean): boolean {
+  authorizeIndex(req: ConnectionIndexRequest, res: ConnectionIndexResponse, provider?: boolean, secure = false): boolean {
     if (provider === false) {
       this.writeUnauthorized(req, res)
       return false
@@ -248,7 +275,7 @@ export class BrowserAuth {
     const url = new URL(req.url ?? '/', 'http://dsh.invalid')
     const tokens = url.searchParams.getAll(TOKEN_QUERY)
     if (tokens.length > 0) {
-      const authority = requestAuthority(req.headers)
+      const authority = requestAudience(req.headers, secure)
       if (req.method === 'GET' && url.pathname === '/' && tokens.length === 1
         && authority !== undefined && tokenMatches(tokens.join(''), this.launchToken)) {
         const issuedAt = Date.now()
@@ -264,13 +291,13 @@ export class BrowserAuth {
           'location': './',
           'referrer-policy': 'no-referrer',
           'set-cookie': sessionCookie(
-            cookieName(authority), value, expiresAt, Math.floor(this.maxAgeMilliseconds / 1000),
+            cookieName(authority), value, expiresAt, Math.floor(this.maxAgeMilliseconds / 1000), secure,
           ),
         })
         res.end()
         return false
       }
-      if (req.method === 'GET' && url.pathname === '/' && this.isAuthenticated(req)) {
+      if (req.method === 'GET' && url.pathname === '/' && this.isAuthenticated(req, secure)) {
         res.writeHead(303, {
           'cache-control': 'no-store',
           'location': './',
@@ -282,18 +309,63 @@ export class BrowserAuth {
       this.writeUnauthorized(req, res)
       return false
     }
-    if (this.isAuthenticated(req)) return true
+    if (this.isAuthenticated(req, secure)) return true
     this.writeUnauthorized(req, res)
     return false
   }
 
   /**
+   * Verify a non-cookie operator credential: the process launch token
+   * presented as an `Authorization: Bearer` header or the `?token=` query of
+   * the request URL — the same credential the index exchange redeems, held
+   * by programmatic connections that never mint a cookie — plus the optional
+   * `x-dsh-interactions`/`?interactions=` mode declaration.
+   * @param request - request headers and URL.
+   * @returns the declared mode or 'none' when the credential is valid,
+   *   'invalid' for a mismatched token or a malformed mode declaration, or
+   *   undefined when no operator credential is present.
+   */
+  operatorInteractions(request: ConnectionIndexRequest): ConnectionInteractions | 'invalid' | undefined {
+    const bearer = bearerToken(header(request.headers, 'authorization'))
+    const url = new URL(request.url ?? '/', 'http://dsh.invalid')
+    const token = bearer ?? url.searchParams.get(TOKEN_QUERY) ?? undefined
+    if (token === undefined || token === '') return bearer === '' ? 'invalid' : undefined
+    if (!tokenMatches(token, this.launchToken)) return 'invalid'
+    const declared = parseInteractions(
+      header(request.headers, INTERACTIONS_HEADER) ?? url.searchParams.get(INTERACTIONS_QUERY) ?? undefined,
+    )
+    if (declared === 'invalid') return 'invalid'
+    // The launch credential admits a non-page connection; its interaction
+    // participation defaults to 'none' until the client declares otherwise.
+    return declared ?? 'none'
+  }
+
+  /**
+   * Resolve the interaction scope one admitted request binds: a valid
+   * declared mode wins; otherwise a valid operator credential defaults to
+   * 'none' and every other request keeps the historical full 'answer'
+   * participation.
+   * @param request - accepted request headers and URL.
+   * @returns the mode the request scope binds for this dispatch.
+   */
+  scopeInteractions(request: ConnectionIndexRequest): ConnectionInteractions {
+    const url = new URL(request.url ?? '/', 'http://dsh.invalid')
+    const declared = parseInteractions(
+      header(request.headers, INTERACTIONS_HEADER) ?? url.searchParams.get(INTERACTIONS_QUERY) ?? undefined,
+    )
+    if (declared !== undefined && declared !== 'invalid') return declared
+    const operator = this.operatorInteractions(request)
+    return operator === undefined || operator === 'invalid' ? 'answer' : operator
+  }
+
+  /**
    * Verify the authority-bound browser cookie on a Host request.
    * @param request - request headers carrying Host and Cookie.
+   * @param secure - whether the receiving listener uses TLS, including its default port.
    * @returns true only for an unexpired cookie signed by this activation's loaded secret.
    */
-  isAuthenticated(request: ConnectionTrustRequest): boolean {
-    const authority = requestAuthority(request.headers)
+  isAuthenticated(request: ConnectionTrustRequest, secure = false): boolean {
+    const authority = requestAudience(request.headers, secure)
     const rawCookie = header(request.headers, 'cookie')
     if (authority === undefined || rawCookie === undefined) return false
     const value = cookieValue(rawCookie, cookieName(authority))

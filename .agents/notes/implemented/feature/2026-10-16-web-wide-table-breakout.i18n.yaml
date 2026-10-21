@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-16-web-wide-table-breakout.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-16-web-wide-table-breakout.md
+document:
+  en: 2a6fb03207ba92f230345215727ac3c3e7c3f395
+  zh: 8fa61ba3431bb2df838a31797c7288e803a1e708
+/agent-note-wide-markdown-tables-break-out-to-the-transcript-width:
+  en: 5624a2d7893b0c55
+  zh: 35932b7bd05b1869
+/agent-note-wide-markdown-tables-break-out-to-the-transcript-width/problem:
+  en: 54c17d8fb2d54468
+  zh: 919d6691811871b1
+/agent-note-wide-markdown-tables-break-out-to-the-transcript-width/decision:
+  en: 6975e8dbf3bb1880
+  zh: 6d260b4c70763ef4
+/agent-note-wide-markdown-tables-break-out-to-the-transcript-width/alternatives-considered:
+  en: d6dfc2662bc20d51
+  zh: 08724544e1d3dc1d
+/agent-note-wide-markdown-tables-break-out-to-the-transcript-width/consequences:
+  en: 5b555f304035161b
+  zh: 97295e2649c6363d

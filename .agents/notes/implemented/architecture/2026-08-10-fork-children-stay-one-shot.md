@@ -16,7 +16,7 @@ The model-facing `send_message` tool is registered globally for every Agent in a
 
 The base and headless compositions retain one-shot fork as their conservative lifecycle policy. The `ptc`, `cordis`, and `standard` Web app agent presets may bind fork to the continuable lifecycle because that binding no longer inserts child-only request-head fields. `ForkInProcessProvider.prepareContinuable()` and `ctx.subagents.startContinuable()` remain the implementation seam for those presets.
 
-Byte-identical prefix reuse is qualified by explicit deployment choices. A fork delegation that applies a child persona or `toolFilter` may still change the request head. In particular, filtering out `send_message` removes both the schema and the return guidance from the child; the runtime does not bypass an explicit allow-list.
+Byte-identical prefix reuse depends on the assembled inputs. Structured output or generated SDK differences can change the request head. Historical child descriptors can also restore persona or tool restrictions during cold resume; filtering out `send_message` removes both its schema and return guidance. New fork starts inherit the parent preset without these override fields.
 
 ## Alternatives considered
 
@@ -26,11 +26,11 @@ Byte-identical prefix reuse is qualified by explicit deployment choices. A fork 
 
 **Add the return instruction to the system prompt.** This would place child-only bytes ahead of inherited messages. Appending it to the initial user task preserves the inherited prefix and keeps the parent id next to the task that needs it.
 
-**Ignore an explicit child `toolFilter`.** Structural return tools previously bypassed the child allow-list. Rejected because a declared tool restriction must determine both schema visibility and guidance; hidden authority would make the model-facing roster inaccurate.
+**Ignore a historical child `toolFilter` on resume.** A stored restriction must continue to determine both schema visibility and guidance; silently discarding it changes the restored agent’s behavior.
 
 ## Consequences
 
-- Parent and continuable-fork child expose byte-identical ordered tool schemas when the delegation does not request a persona or tool filter.
+- Parent and continuable-fork child expose byte-identical ordered tool schemas when they use the same preset and have no child-only structured output or restored historical overrides.
 - The inherited Session seed precedes the child's initial task and return guidance.
 - The base and headless profiles keep one-shot fork, while the Web app agent presets exercise continuable fork without a child-only request-head addition.
 - A child sends zero or more messages to its direct parent explicitly; its final answer is not implicitly copied. The manager-owned settlement notice remains unconditional and separate.
@@ -38,4 +38,4 @@ Byte-identical prefix reuse is qualified by explicit deployment choices. A fork 
 
 ### Accepted risks
 
-Provider-side prefix reuse still depends on the selected provider and model and on the absence of explicit persona or tool-filter differences. The harness proves equality of its assembled request-head inputs, not a provider's cache behavior.
+Provider-side prefix reuse still depends on the selected provider and model and matching assembled inputs. The harness tests equality of its assembled request-head inputs, not a provider’s cache behavior.

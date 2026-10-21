@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-12-web-image-intake-and-limits-alignment.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-12-web-image-intake-and-limits-alignment.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-12-web-image-intake-and-limits-alignment.md
+document:
+  en: 7308229edb1e55c486b60c3b07e5f81d705e6fa5
+  zh: b750338c848b1ad51434d2d258dba76e78c2c501
 /agent-note-whole-page-image-drop-projected-intake-limits-and-thumbnail-tiling:
   en: b3660ba0794647c0
   zh: ad0c2cacda430a32

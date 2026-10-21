@@ -26,6 +26,7 @@ import type {
   ConversationSessionInjected, DetailsInjected,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { createChatStore } from '../src/client/stores.ts'
+import type { DraftSnapshot } from '../src/client/input/contract.ts'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
@@ -81,7 +82,7 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   // The host face (store resolution) exists only inside the installed
   // renderer, so materialize it the way the shell does.
   runtime.renderRoot()
-  const entryOf = (key: 'main' | 'conversation.pane' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
+  const entryOf = (key: 'main' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
     runtime.slots.entries(key)[0]!
   /** Resolve store instance + call the inject the way the outlet would. */
   const conversationApi = (id: SessionId) => {
@@ -99,8 +100,8 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
     return { instance, injected }
   }
   const residentApi = (id: SessionId | undefined) => {
-    const entry = entryOf('conversation.pane')
-    return (entry.inject as unknown as (sessionId: SessionId | undefined) => ConversationInjected)(id)
+    const definition = runtime.factoryOf('conversation.content')
+    return (definition.inject as unknown as (sessionId: SessionId | undefined) => ConversationInjected)(id)
   }
   const composerApi = (id: SessionId | undefined) => {
     const entry = entryOf('conversation.composer.bar')
@@ -205,10 +206,11 @@ describe('conversation slot inject API', () => {
     // The provide contribution is idempotent per session: one shell identity.
     expect(b.inputApi(ROOT).state).toBe(state)
     // The draft mirror rides the conversation inject face.
-    const mirrored: string[] = []
+    const mirrored: (string | DraftSnapshot)[] = []
     const unbind = injected.bindDraftMirror(text => mirrored.push(text))
+    expect(mirrored).toEqual(['typed during flight'])
     actions.setDraft('mirrored text')
-    expect(mirrored).toEqual(['mirrored text'])
+    expect(mirrored).toEqual(['typed during flight', 'mirrored text'])
     unbind()
     // Stop failure is swallowed (promptError owns the display).
     b.sessionFake.cancel.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'x', details: {} } })
@@ -344,8 +346,8 @@ describe('conversation slot inject API', () => {
     })
     expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openWorkspace', args: ['workspace-1'] })
     expect(state.getSnapshot().draft).toBe('carry me')
-    // Cross-session history entry: the draft remains in the old session unless
-    // the caller explicitly confirms the discard flow.
+    // Cross-session history entry: the draft moves to the opened session
+    // unless the caller explicitly confirms the discard flow.
     const OTHER = 'other-1' as SessionId
     await b.runtime.sessions.add({ id: OTHER }, { current: false })
     b.runtime.workspaces.stub('openWorkspace', () => Promise.resolve(OTHER))
@@ -353,8 +355,8 @@ describe('conversation slot inject API', () => {
     await vi.waitFor(() => {
       expect(b.runtime.sessions.calls).toContainEqual({ method: 'open', args: [OTHER] })
     })
-    expect(state.getSnapshot().draft).toBe('carry me')
-    expect(b.inputApi(OTHER).state.getSnapshot().draft).toBe('')
+    expect(state.getSnapshot().draft).toBe('')
+    expect(b.inputApi(OTHER).state.getSnapshot().draft).toBe('carry me')
     actions.setDraft('discard me')
     void resident.selectWorkspace('workspace-3' as never, { discardDraft: true })
     await vi.waitFor(() => {

@@ -19,6 +19,8 @@
       - /url: /admin/webhooks
     - link "桌面":
       - /url: /admin/desktops
+    - link "远程桌面":
+      - /url: /admin/remote-desktops
     - link "审计":
       - /url: /admin/audit
   - combobox "界面语言":

@@ -15,6 +15,9 @@
       "path": "../session-projection"
     },
     {
+      "path": "../session-persistence-jsonl"
+    },
+    {
       "path": "../../storage/storage"
     },
     {
@@ -24,7 +27,16 @@
       "path": "../../storage/storage-json"
     },
     {
+      "path": "../../util/values"
+    },
+    {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/include"
+    },
+    {
+      "path": "../../../vendor/loader"
     },
     {
       "path": "../../../vendor/cosmokit"

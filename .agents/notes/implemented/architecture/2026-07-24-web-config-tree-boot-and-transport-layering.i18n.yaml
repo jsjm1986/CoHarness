@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-24-web-config-tree-boot-and-transport-layering.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-24-web-config-tree-boot-and-transport-layering.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-24-web-config-tree-boot-and-transport-layering.md
+document:
+  en: 787e0edab0f5cc17b477314c08b4b8d167821932
+  zh: a22552b47a7faab2d7d5e5ab09dd29c9cb3f8f1e
 /agent-note-dsh-web-config-tree-boot-and-the-web-transport-layering:
   en: 2d06ffcaaeb373e7
   zh: 01822cfd7339167f

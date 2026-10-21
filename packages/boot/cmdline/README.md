@@ -97,7 +97,6 @@ The parse path is one small family with two owners: `provideCmdline` freezes the
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | `CmdlineArgs`/`AppExit` types, `provideCmdline`, `parseCmdline`, commander exit/output routing |
-| — | No runtime invariant companion is published; `cmdlineArgs` is an immutable launcher fact that any number of ordinary plugins may read. App-owned providers and consumers use normal Cordis service injection, whose missing dependencies are already reported by Loader settlement. |
 
 </details>
 
@@ -126,7 +125,6 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits describe where app-owned command lines are a poor fit or need special care. They are current package constraints, not a task backlog.
 

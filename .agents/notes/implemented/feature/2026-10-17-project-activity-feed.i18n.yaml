@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-17-project-activity-feed.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-17-project-activity-feed.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md
+document:
+  en: 04388f27d3f74a85e083383494810f293700b4c1
+  zh: 51d0bf96546c6c49de0e2e371896a9dcada57174
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input:
   en: 032f3b6dc17cbb4f
   zh: a67b58c5bcc837c9

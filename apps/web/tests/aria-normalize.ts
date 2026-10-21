@@ -1,9 +1,12 @@
 /** ARIA comparison preserves prose and only redacts measurements in named UI statistics. */
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 
-type RuntimeScope = 'timing' | 'clock' | 'ago' | 'elapsed' | undefined
+type RuntimeScope = 'timing' | 'clock' | 'ago' | 'elapsed' | 'minute' | undefined
 
 function runtimeScope(key: string): RuntimeScope {
+  // A wake's <time> prints a bare HH:MM for same-day triggers — live wall
+  // clock — while dated stamps ("9/1 13:31") are fixture-pinned and literal.
+  if (key === 'time') return 'minute'
   if (/^group "(?:Message time and speed|消息时间与速度)"$/.test(key)) return 'clock'
   // The reply row's trailing label prints the late answer's wall-clock time.
   if (/^group "(?:Reply to earlier pending questions|Dismissed earlier pending questions|回答先前等待中的问题|放弃回答先前等待中的问题)"$/.test(key)) return 'clock'
@@ -19,6 +22,9 @@ function runtimeScope(key: string): RuntimeScope {
 
 function normalizeMeasurement(value: string, scope: RuntimeScope): string {
   if (scope === undefined) return value
+  if (scope === 'minute') {
+    return value.replace(/^\d{1,2}:\d{2}$/, '{{clock}}')
+  }
   if (scope === 'ago') {
     // Session rows date their trailing label against the live clock; a seeded
     // row's "now" drifts to "1min" and beyond as the suite runs.
@@ -49,13 +55,26 @@ function replacePath(value: string, path: string, token: string): string {
   return value.replace(new RegExp(`(?<![\\w/\\\\-])${escaped}(?![\\w.-])`, 'g'), token)
 }
 
+/** A declared temporary path (literal `path`) or its truncated form (`pattern`) to tokenize. */
+export interface AriaPathDecl {
+  readonly path?: string
+  readonly pattern?: RegExp
+  readonly token: string
+}
+
 /**
  * Normalize declared temporary paths and named timing groups without changing body text.
  * @param snapshot - Playwright's default YAML ARIA snapshot.
  * @param workspaceCwd - The scenario-owned temporary workspace.
+ * @param paths - additional declared temporary paths, each replaced by its token;
+ *   a `pattern` entry covers truncations that keep only the path's head.
  * @returns The same YAML, with changed scalars quoted and all other bytes retained.
  */
-export function normalizeAria(snapshot: string, workspaceCwd: string): string {
+export function normalizeAria(
+  snapshot: string,
+  workspaceCwd: string,
+  paths: readonly AriaPathDecl[] = [],
+): string {
   const document = parseDocument(snapshot)
   if (document.errors.length > 0) throw new Error(`invalid ARIA snapshot: ${document.errors[0]!.message}`)
   const edits: { start: number; end: number; value: string }[] = []
@@ -67,6 +86,10 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
       const scope = baseScope ?? (node.value.startsWith('treeitem ') ? 'ago' as const : undefined)
       let value = replacePath(node.value, workspaceCwd, '{{cwd}}')
       value = replacePath(value, base, '{{workspace}}')
+      for (const { path, pattern, token } of paths) {
+        value = replacePath(value, path ?? '', token)
+        if (pattern !== undefined) value = value.replace(pattern, token)
+      }
       // Minted session/agent ids reach prose (a child's parent-agent
       // instructions quote the parent id verbatim), so collapse them like
       // paths rather than leaving them to a scope. Bare uuids stay literal:
@@ -84,6 +107,18 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
       // The compaction badge's ~N tokens is priced from seeded content that
       // embeds the workspace path, whose length varies by platform tmpdir.
       value = value.replace(/~\d[\d,]* tokens/g, '~{{tokens}} tokens')
+      // Wake headers carry the trigger's live minute as the accessible-name
+      // tail; a leading date ("9/1 13:31") pins the stamp and stays literal.
+      value = value.replace(/(?<![\d/]) \d{1,2}:\d{2}(?="\s*(?:\[[^\]]*\])*\s*$)/g, ' {{clock}}')
+      // The turn-process outcome label prints the turn's live wall-clock
+      // duration; keep the label, redact the measurement.
+      value = value.replace(/((?:Completed in|已完成，用时) )(?:\d+d(?: \d+h(?: \d+m \d+s)?)?|\d+h \d+m \d+s|\d+m ?\d+s|\d+(?:\.\d+)?s|\d+(?:\.\d+)?ms|\d+(?:天|小时|分|秒)[\d天小时分秒]*)/g, '$1{{duration}}')
+      // Package-manager output inside install cards reports its own live
+      // wall-clock total ("Done in 266ms"); the command text stays literal.
+      value = value.replace(/Done in \d+(?:\.\d+)?m?s/g, 'Done in {{duration}}')
+      // The settings footer prints the build's product version; keep the
+      // label, redact the value that changes with every release.
+      value = value.replace(/(当前版本：|Current version: )\S+/g, '$1{{version}}')
       value = normalizeMeasurement(value, scope)
       if (value !== node.value) {
         if (node.range == null) throw new Error('ARIA scalar has no source range')
@@ -93,9 +128,13 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
       for (const item of node.items) visit(item, baseScope)
     } else if (isMap(node)) {
       for (const pair of node.items) {
-        const childScope = isScalar(pair.key) && typeof pair.key.value === 'string'
-          ? runtimeScope(pair.key.value) ?? baseScope
-          : baseScope
+        const declared = isScalar(pair.key) && typeof pair.key.value === 'string'
+          ? runtimeScope(pair.key.value)
+          : undefined
+        // `time`'s bare-minute refinement only fills an unscoped position: an
+        // inherited scope (the reminders list's volatile dated clock) keeps
+        // ownership of the pair's value.
+        const childScope = declared === 'minute' ? baseScope ?? 'minute' : declared ?? baseScope
         visit(pair.key, baseScope)
         visit(pair.value, childScope)
       }

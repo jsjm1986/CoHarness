@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/deliverables/tool-present/README.md
+document:
+  en: 0eb6d7bc3dd8c9d3a7ee918d149ba2b24a43da04
+  zh: 9e4fe4c18c96c900a90d643a2b53574ffebf0389
 /:
   en: 77fa72665646fedb
   zh: 2d360098a76804c8
@@ -18,8 +21,8 @@
   en: 9eacf90239582fdb
   zh: cc35adff5bbc03b1
 /deepseek-ai-dsh-tool-present/understand-the-implementation:
-  en: bd8bbcf7a3841fbe
-  zh: c1d44ace79545033
+  en: c62fd98e1d9fb96d
+  zh: 4d2b096eb3927e55
 /deepseek-ai-dsh-tool-present/further-exploration:
   en: d83a54da0b5a0797
   zh: 02b97bfaf6d6879e
@@ -30,8 +33,8 @@
   en: 695c689adf61838a
   zh: 695c689adf61838a
 /deepseek-ai-dsh-tool-present/model-experience/present/what-the-model-sees:
-  en: 3dcc5c0e182a3032
-  zh: 646f27cd4038017e
+  en: 68c10f79959c6509
+  zh: 20848cf97a8d1207
 /deepseek-ai-dsh-tool-present/model-experience/present/token-effect:
   en: fbe1ca0b530500a0
   zh: e198e106b85714b6

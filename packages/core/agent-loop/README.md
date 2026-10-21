@@ -35,7 +35,6 @@ Creation and resume are one rollback-covered transaction: construct a private se
 
 The internal publication operation returns a Promise and is awaited inside the setup transaction's rollback handler. Setup and publication run as maintenance: waking input stays queued until publication succeeds, and failed publication suppresses queued wakes before cleanup and rejection. Cancellation clears existing wake requests even with `keepInbox`; a later waking send can resume retained input after ordinary cancellation. Maintenance cancelled with `disposed` never replays a pending wake. Creation listeners must not await `agent.whenIdle()` or their own owner's disposal. `agent/created` listeners run serially and are awaited, with rejection rolling back publication.
 
-
 The caller fiber and the AgentLoop provider are co-owners. `AgentFactory.createAgent(ownerCtx, options)` and `resume(ownerCtx, options)` receive caller ownership explicitly, while the factory keeps its own dependency context for `sessions`/`llm`/`tools`/`systemPrompt`; this lets a caller inject only `agents` without shrinking the new agent's service set. Caller unload, handle disposal, or provider unload converge on one memoized quiescence boundary. Provider shutdown waits both resource teardown and the public create/resume wrapper that observed deactivation, so no continuation can publish after dependencies disappear. Factory unload retains the inbox and turn-boundary projections through scope cleanup, including cancellation from scoped abort listeners, until every Agent teardown and startup task settles; cleanup failures do not release those projections early.
 
 When `ctx.sessionPersistence` is mounted, every create path — `ctx.agentLoop.create()` included — acquires one write `SessionHandle` before publication. A fresh create registers its header through the handle; a resume opens the existing id. The handle remains owned by the published lifecycle and closes after the Agent and Session have drained, so a second writer is rejected before publication and the id is reusable after teardown.
@@ -54,10 +53,6 @@ The config-driven `ctx.agentLoop.create()` path keeps its agent owned by the loo
 ### Injected services
 
 `agents`, `sessions`, `llm`, `tools`, `systemPrompt` — all five interface services.
-
-### Invariant companion
-
-The optional `@deepseek-ai/dsh-agent-loop/invariant` companion registers request reconstruction with `ctx.invariants`. The loop records each exact frozen request in the process-local identity set owned by `dsh-llm`; the companion then requires a live session and independently rebuilds the message boundary and folded request header from the log. Direct one-shot calls remain outside this contract even when callers freeze them or attach a session id.
 
 ### Configuration (schemastery)
 

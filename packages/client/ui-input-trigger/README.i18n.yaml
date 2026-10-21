@@ -1,22 +1,22 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-input-trigger/README.md
+document:
+  en: dab8c74417fda2f91b28f2335901624eb626ca8e
+  zh: 88bf8dd29161e6d683f5be66f9d057c760a3b494
 /:
   en: ed1c9c3210382c5b
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-ui-input-trigger:
-  en: b4f94382bfe23c5a
-  zh: c46553111ce8e7a3
+  en: 9e9df4faf60d4097
+  zh: d4e4fdcf8aa5aa83
 /deepseek-ai-dsh-client-ui-input-trigger/summary:
   en: 2a968a6e0bc65ac4
   zh: 883f1be84003a5c5
 /deepseek-ai-dsh-client-ui-input-trigger/table-of-contents:
-  en: b59e55619aaa595f
-  zh: a35cee05e12c8f29
-/deepseek-ai-dsh-client-ui-input-trigger/invariants:
-  en: 50f7dfc31720dc11
-  zh: 0f8a7c7c6cb496c5
+  en: b4683d2a53256fda
+  zh: 4e65ff63dc8c48fe
 /deepseek-ai-dsh-client-ui-input-trigger/model-experience:
   en: 5d1596f50088f468
   zh: 3c72b4f6b1ba27ee

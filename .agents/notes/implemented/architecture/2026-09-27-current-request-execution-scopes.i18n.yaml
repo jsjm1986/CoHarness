@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-27-current-request-execution-scopes.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-27-current-request-execution-scopes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md
+document:
+  en: a603147a9997fe364a688cdedced7520d1fa67d2
+  zh: c131ad3a4986f0d8317aadf6d9cd3c567549b90c
 /agent-note-current-request-execution-scopes:
   en: 5f02aba590ad0458
   zh: 0c88e69856c07a35

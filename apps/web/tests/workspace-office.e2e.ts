@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-office-to-pdf'
 import { realOfficeBytes } from './office-fixture.ts'
 import { launchWebScaffold, seedSession, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { expectPdfResolution, hideDocumentZoom, newEnglishPage, revealDocumentZoom, saveFailureShot } from './support.ts'
 
 const FORMATS = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'] as const
 // Workbooks take the read-only browser-parsed sheet surface, not Office→PDF.
@@ -62,6 +62,29 @@ describe('web e2e: authorized Office preview', () => {
     if (extension === 'docx') {
       const snapshot = await captureStableAria(page, '[data-pdf-preview]', scaffold.workspaceCwd)
       await compareOrRefreshGolden(GOLDEN, snapshot, webSnapshotMode())
+      const zoomControls = preview.locator('[data-document-zoom-controls]')
+      await expect.poll(() => zoomControls.getAttribute('data-document-zoom-visible')).toBeNull()
+      await expectPdfResolution(canvas)
+      let zoomMenu = await revealDocumentZoom(page, preview)
+      await hideDocumentZoom(page, preview)
+      zoomMenu = await revealDocumentZoom(page, preview)
+      const cssWidth = (await canvas.boundingBox())!.width
+      const intrinsicWidth = await canvas.evaluate(node => Number.parseFloat(node.style.getPropertyValue('--pdf-page-width')))
+      await zoomMenu.click()
+      await page.getByRole('menuitem', { name: '150%', exact: true }).click()
+      await expect.poll(async () => (await canvas.boundingBox())!.width / intrinsicWidth).toBeCloseTo(1.5, 1)
+      await expectPdfResolution(canvas)
+      const zoomScrollport = preview.locator('[data-document-zoom-scrollport]')
+      expect(await zoomScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true)
+      // The selectable text layer survives the device-resolution redraw.
+      await expect.poll(async () => (await preview.locator('[data-pdf-text]').allTextContents()).join(''))
+        .toContain('Office preview')
+      zoomMenu = await revealDocumentZoom(page, preview)
+      await zoomMenu.click()
+      await page.getByRole('menuitem', { name: 'Fit width', exact: true }).click()
+      await expect.poll(async () => (await canvas.boundingBox())!.width).toBeCloseTo(cssWidth, 0)
+      await expectPdfResolution(canvas)
+      expect(await zoomScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(false)
     }
     await preview.getByRole('button', { name: 'Close preview', exact: true }).click()
     await expect.poll(() => preview.count()).toBe(0)

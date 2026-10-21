@@ -14,6 +14,14 @@ export interface SessionCreateOptions {
   readonly visibility?: 'project' | 'private'
   /** Registered SSH target the session executes on; fixed at creation. */
   readonly sshTarget?: number
+  /** Agent preset the conversation runs; the deployment default when omitted. */
+  readonly agentPreset?: string
+  /**
+   * Treat `sessionId` as a blank-reuse candidate instead of an explicit
+   * adoption: the Host leaves a candidate that filled or lost its writer
+   * untouched and answers a fresh Session. Only meaningful with `sessionId`.
+   */
+  readonly reuseWorkspaceBlank?: boolean
 }
 
 /** One existing blank session offered against fully prepared root-create options. */

@@ -1,20 +1,24 @@
-- button "返回插件列表":
-  - img
-  - text: 插件列表
+- button "返回插件": 插件
 - heading "网页搜索" [level=3]
 - paragraph: DeepSeek 搜索提供方。
+- text: 启用新版 Web 搜索 API
+- switch "启用新版 Web 搜索 API" [disabled]
+- paragraph:
+  - text: 默认关闭，搜索通过 DeepSeek Messages 完成。新版 Web 搜索 API 功能与计费详见
+  - link "网页搜索与抓取指南":
+    - /url: https://api-docs.deepseek.com/zh-cn/guides/search
 - text: API Key 已配置密钥。
 - textbox "API Key" [disabled]: plugin-fixture-replacement
 - paragraph: 此密钥由部署管理员管理，项目空间中不能修改。
-- text: 接口地址
-- textbox "接口地址":
+- text: Messages API 基础地址
+- textbox "Messages API 基础地址":
   - /placeholder: ""
-- paragraph: 留空则使用提供方默认地址。
+- paragraph: 填写含 API 前缀的地址，例如 https://api.deepseek.com/anthropic/v1；程序追加 /messages，留空恢复默认。
 - text: 单次请求最多搜索次数
 - textbox "单次请求最多搜索次数":
   - /placeholder: ""
   - text: "5"
-- paragraph: 一次请求在必须作答前最多可以搜索多少次。
+- paragraph: 辅助模型在一次 Messages 请求内最多可执行的搜索次数，仅适用于 Messages API。
 - status: 本部署没有接受这些值，已保留供你修改。
 - text: 未保存
 - button "放弃修改"

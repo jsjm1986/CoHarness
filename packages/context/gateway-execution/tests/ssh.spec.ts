@@ -26,7 +26,12 @@ it('resolves coordinates for the interactive caller and returns a revocable sign
   const f = fixture()
   const resolved = await f.service.resolve(42, f.signal)
   expect(resolved.userId).toBe(12)
-  expect(resolved.config).toEqual(config)
+  expect(resolved.config).toEqual({
+    host: config.host, helper: config.helper, helperHash: config.helperHash, workspace: config.workspace,
+    launch: { kind: 'node-script', node: config.node, bootstrapPath: config.bootstrapPath, bootstrapHash: config.bootstrapHash },
+    requestTimeoutMs: config.requestTimeoutMs, maxFrameBytes: config.maxFrameBytes,
+    maxPending: config.maxPending, leaseMs: config.leaseMs,
+  })
   expect(resolved.signal.aborted).toBe(false)
   expect(JSON.parse(f.request.mock.calls[0]![1]!.body as string)).toEqual({ targetId: 42 })
   expect(f.request.mock.calls[0]![1]!.principal).toMatchObject({ claims: { user: { id: 12 } } })
@@ -105,7 +110,10 @@ it('resolves a minimal configuration under the provider lifetime and releases th
   const f = fixture()
   f.request.mockResolvedValueOnce(Response.json({ userId: 12, config: minimal }))
   const resolved = await f.service.resolve(1)
-  expect(resolved.config).toEqual(minimal)
+  expect(resolved.config).toEqual({
+    host: minimal.host, helper: minimal.helper, helperHash: minimal.helperHash, workspace: minimal.workspace,
+    launch: { kind: 'node-script', node: minimal.node },
+  })
   resolved.release?.()
   expect(resolved.signal.aborted).toBe(true)
 })

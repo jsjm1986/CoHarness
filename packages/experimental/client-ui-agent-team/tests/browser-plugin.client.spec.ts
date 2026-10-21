@@ -55,7 +55,7 @@ async function bench(options: {
   }
   const view = {
     members: [{
-      id: SESSION, name: 'lead', role: 'lead' as const, status: 'idle' as const, diagnostics: [],
+      id: SESSION, name: 'lead', role: 'lead' as const, status: 'inactive' as const, diagnostics: [],
     }], tasks: [task],
   }
   ctx.provide('remote.agentTeams', {
@@ -145,7 +145,7 @@ describe('ui-team browser plugin', () => {
       id: SESSION,
       name: 'lead',
       role: 'lead',
-      status: 'idle',
+      status: 'inactive',
       diagnostics: [],
     })
     expect(b.navigation).toEqual([['openSession', SESSION]])

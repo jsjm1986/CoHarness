@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-16-replace-changed-package-modules-on-recomposition.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-16-replace-changed-package-modules-on-recomposition.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-16-replace-changed-package-modules-on-recomposition.md
+document:
+  en: 47005960de25ba83f7db74685c2be9326462334e
+  zh: 985da8c7c7a3547ee10b5d4d8d18f1939976587a
 /agent-note-replace-plugins-whose-loaded-package-files-changed-during-profile-recomposition:
   en: 6df7f1d538eab11c
   zh: 76e297d2336375c2

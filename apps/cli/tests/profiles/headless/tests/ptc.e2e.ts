@@ -212,7 +212,9 @@ describe('PTC mode typed values: keyless real-process contracts', () => {
       });
       return started.jobId;
     `))
-    expect(jobId).toBe('bash-1')
+    // The registry mints `<kind>-<16 lowercase hex>`; the id is captured, not predicted.
+    if (typeof jobId !== 'string') throw new Error(`background job id was not a string: ${JSON.stringify(jobId)}`)
+    expect(jobId).toMatch(/^bash-[0-9a-f]{16}$/)
 
     const polled = completion(await runCode(ctx, `
       return await tools.job_output({ job_id: ${JSON.stringify(jobId)}, wait: true, timeout_ms: 5000 });
@@ -250,19 +252,21 @@ describe('PTC mode typed values: keyless real-process contracts', () => {
       await new Promise(resolve => setTimeout(resolve, 10))
     }
     const job = ctx.jobs.list()[0]
-    expect(job).toMatchObject({ id: 'bash-1', status: 'running' })
+    expect(job?.status).toBe('running')
+    if (typeof job?.id !== 'string') throw new Error(`background job id was not a string: ${JSON.stringify(job?.id)}`)
+    expect(job.id).toMatch(/^bash-[0-9a-f]{16}$/)
     afterPublication.abort('outer-call-cancelled')
     expect((await running).isError).toBe(true)
-    expect(ctx.jobs.list()[0]).toMatchObject({ id: job!.id, status: 'running' })
+    expect(ctx.jobs.list()[0]).toMatchObject({ id: job.id, status: 'running' })
 
     const killed = completion(await runCode(ctx, `
-      return await tools.job_kill({ job_id: ${JSON.stringify(job!.id)}, reason: 'test owns cancellation' });
+      return await tools.job_kill({ job_id: ${JSON.stringify(job.id)}, reason: 'test owns cancellation' });
     `))
-    expect(killed).toMatchObject({ outcome: 'cancellation-requested', job: { id: job!.id } })
+    expect(killed).toMatchObject({ outcome: 'cancellation-requested', job: { id: job.id } })
     const settled = completion(await runCode(ctx, `
-      return await tools.job_output({ job_id: ${JSON.stringify(job!.id)}, wait: true, timeout_ms: 5000 });
+      return await tools.job_output({ job_id: ${JSON.stringify(job.id)}, wait: true, timeout_ms: 5000 });
     `))
-    expect(settled).toMatchObject({ job: { id: job!.id, status: 'killed' } })
+    expect(settled).toMatchObject({ job: { id: job.id, status: 'killed' } })
   }, 15_000)
 
   it('keeps foreground bash coupled to the outer signal', async () => {
@@ -286,9 +290,9 @@ describe('PTC mode typed values: keyless real-process contracts', () => {
     await ctx.plugin(CordisInspectProviders)
     await ctx.plugin(ToolCordis)
     const agent = {
+      ctx,
       id: SessionId('ptc-cordis'),
       session: ctx.sessions.create(SessionId('ptc-cordis'), { meta: { cwd: process.cwd() } }),
-      ctx,
     } as Agent
 
     const value = completion(await runCode(ctx, `

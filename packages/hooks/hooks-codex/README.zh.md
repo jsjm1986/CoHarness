@@ -28,7 +28,6 @@ kind: "package-reference"
 - [配置](#config)
 - [Hook 点 → 类型化 Decision](#hook-points--typed-decisions)
 - [上下文源](#context-source)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -82,12 +81,6 @@ hook 本身会在 Agent 的 Session 当前目录中运行：对 agent scope 点�
 ## 上下文源
 
 注入上下文携带显式 `{ kind: 'plugin', plugin: 'hooks-codex' }` 来源，因此持久消息绝不会被误认为用户提示词。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。桥接层把每次规范化拦截翻译为一次 Codex 钩子调用并把决定映射回来；钩子行为由规格固定，事件之间不保留关系。
-
 
 <a id="model-experience"></a>
 ## 模型体验

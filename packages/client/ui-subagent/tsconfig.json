@@ -21,6 +21,9 @@
       "path": "../ui-primitives"
     },
     {
+      "path": "../ui-sidebar-right"
+    },
+    {
       "path": "../ui-slots"
     },
     {

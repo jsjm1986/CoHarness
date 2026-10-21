@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for rescope.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for rescope.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/rescope.md
+document:
+  en: dcc293c87bc6de484831418b9ca65b99816b4c0d
+  zh: ce21611475d776c8a2994a6ac15b3a31af0ce259
 /vendored-package-rescope:
   en: 1b887a622b2dc074
   zh: c8ee539ab1cc6cfe

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-config-plane-boundaries.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-config-plane-boundaries.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-config-plane-boundaries.md
+document:
+  en: aab0d7a80c2732b33637ec721a9ab7c1b50fce3f
+  zh: 7e01aad93947266362cec31fdeab18524ea14cd9
 /agent-note-what-the-configuration-plane-exposes-and-who-may-overwrite-what:
   en: 9951856882b247b7
   zh: 64587e7a5ce09bba

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/boot/plugin-manager/README.md
+document:
+  en: 441257e5dc490f6bf697478c8cc7caad87bd89c9
+  zh: 6d1dd09b6b4ff48050ba5f8eeceeed6f0a6c087b
 /:
   en: 65283627208ef4c9
   zh: aa3f833ec24bb65a
@@ -15,8 +18,8 @@
   en: 87679c51aa3693f5
   zh: 11684a48a5806afb
 /deepseek-ai-dsh-plugin-manager/use-this-package:
-  en: d0e2057efad4243d
-  zh: f084b11c5d1c8aec
+  en: 5bcecb55c48c7180
+  zh: fce34b1432fe096e
 /deepseek-ai-dsh-plugin-manager/use-this-package/version-compatibility-and-exemptions:
   en: 920c0acb3b9feaf3
   zh: ba6e832a256880a7
@@ -24,8 +27,8 @@
   en: abb1c5327c019fe4
   zh: ff44866bc8706660
 /deepseek-ai-dsh-plugin-manager/understand-the-implementation:
-  en: 7a527e3cb92b0324
-  zh: 09ebf948a2bd9dc6
+  en: e7bda76ea497b14d
+  zh: 76125a866ac6f39a
 /deepseek-ai-dsh-plugin-manager/further-exploration:
   en: 2889b65d85653d16
   zh: 7936f9b4a51b5342

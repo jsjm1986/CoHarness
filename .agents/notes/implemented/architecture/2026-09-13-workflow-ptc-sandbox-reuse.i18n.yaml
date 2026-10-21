@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-13-workflow-ptc-sandbox-reuse.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-13-workflow-ptc-sandbox-reuse.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.md
+document:
+  en: 7588b8235dc7ef515171129fdd5188412d5084fc
+  zh: 1adea81d1c5a928463313070694236e629d589c2
 /agent-note-reuse-the-ptc-node-sandbox-for-workflows:
   en: 6db90d1dcfccd294
   zh: 0b66b16319b023a0

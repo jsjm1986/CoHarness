@@ -114,7 +114,6 @@ await mock.streams.drained('session/follow')
 | [`src/streams.ts`](src/streams.ts) | `frames` / `openStream` 脚本、`streamHandle` / `streamMethod` 桩类型、`MockStream`（句柄 + `AsyncIterable`） |
 | [`src/log.ts`](src/log.ts) | 带共享 `seq` 计数器的日志存储 |
 | [`src/transports.ts`](src/transports.ts) | `MockAccountPreferences` / `MockProjectModelSettings` 种子传输 |
-| — | 不发布运行时不变量伴随物；此测试支持库不拥有生产事件流或可变的进程状态，其行为由其包测试覆盖。 |
 
 </details>
 

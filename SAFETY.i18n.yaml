@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for SAFETY.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for SAFETY.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write SAFETY.md
+document:
+  en: f6c27600df7ea45912736d40d331725303cfe7a3
+  zh: 8a9d9868083c13ecbb6013e58505d5cc7108573c
 /safety:
   en: a374f70c56b3f221
   zh: a07f7a9ba9af40fc

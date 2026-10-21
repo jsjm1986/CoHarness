@@ -92,13 +92,10 @@ loopback 始终被绕过——`localhost`、整个 `127.0.0.0/8` 段、`::1`、`
 
 -----
 
-**运行时不变式：** 不发布伴生入口。本包唯一的可变状态——生效中的策略——由单元测试对照它所安装的 dispatcher 断言：测试会对该注册执行 dispose（资源释放）并观察一个真实的 loopback 代理。
-
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制界定了本包不适用的场景，属于当前的包级约束。
 
@@ -108,9 +105,6 @@ loopback 始终被绕过——`localhost`、整个 `127.0.0.0/8` 段、`::1`、`
 - **遥测按设计直连**——OTLP 导出器通过 `node:http` 投递，全局 dispatcher 触及不到。要让它走代理，要么依赖 `http.Agent` 的 `proxyEnv`，而该选项晚于本项目支持的最低 Node 版本；要么改用 SDK 的 `fetch` 传输，但它没有压缩能力，而随附配置启用了 gzip。遥测是唯一一条丢失了对用户毫无代价的通道，因此维持原状；`DSH_TELEMETRY_MODE=DISABLED` 可关闭它。
 - **执行模型编写代码的 worker 完全不获得代理**——`ptc-runtime` worker 与 `workflow` worker 都不接收代理配置，它们自身的请求直连。代理 URL 可能携带 `user:password`，而两者运行的都是模型写的脚本。
 - **防回归门禁只看源码，看不到依赖内部**——`verify-no-bare-dispatcher` 解析 `packages/*/*/src` 与 `apps/*/src`；测试、脚本以及第三方 SDK 的内部都在其之外。这正是每个出网点还各配一份 `egress.spec.ts` 的原因。
-
-
-**运行时不变量：** 包伴生入口不注册运行时检查。本启动库不暴露 Cordis 事件流或由 owner 管理的可变数据；出站测试会对照它安装的 dispatcher 断言生效策略。
 
 <a id="dev-note"></a>
 ### 开发备注

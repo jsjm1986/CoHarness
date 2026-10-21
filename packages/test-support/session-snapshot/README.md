@@ -90,7 +90,7 @@ A scenario requiring a non-Windows host declares `posixOnly`, which skips its ru
 
 ### What can go wrong
 
-- **A child turn wait fails** — `waitForSubagentTurnEnd` identifies the child, requested turn, and deadline even when the first log harvest exceeds that deadline, and retains the underlying failure as the error cause.
+- **A turn-end wait fails** — `waitForTurnEnd` and `waitForSubagentTurnEnd` identify the session or child and deadline even when the first log harvest exceeds that deadline. Child waits also name the requested turn. Both retain the underlying failure as the error cause.
 - **A fixture guard rejects the committed files** — orphan scenario dirs, missing files, multiple pins for one header class, duplicate sidecar content, unscrubbed prompt text or tool schemas, a `request/header` with no preceding `system/message`, and malformed pinning headers all fail the suite before comparisons run.
 - **The session harvest needs raw JSONL mode** — snapshot configs set the JSONL backend's `compression: 'none'`; compressed JSONL has no snapshot-harvest path.
 - **Built mode needs current artifacts** — run `pnpm run build` before selecting `DSH_EXAMPLE_MODE=lib`; source mode remains the zero-build path.
@@ -122,7 +122,6 @@ The shared core owns manifests, generation-qualified role selection, workspace s
 | [`src/workspace.ts`](src/workspace.ts) | Scenario workspace setup and complete expected-state comparison |
 | [`src/suite.ts`](src/suite.ts) | Scenario-table suite factory, fixture guards, record/refresh write-back |
 | [`src/index.ts`](src/index.ts) | Package entry re-exporting the four layers |
-| — | No runtime invariant companion is published; this test-support package owns no production event stream or mutable data; consuming test suites exercise its behavior. |
 
 ### Data flow
 
@@ -156,7 +155,6 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the kit needs special care. They are current package constraints, not a task backlog.
 

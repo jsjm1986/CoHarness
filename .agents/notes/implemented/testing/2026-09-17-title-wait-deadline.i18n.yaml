@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-title-wait-deadline.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-title-wait-deadline.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-17-title-wait-deadline.md
+document:
+  en: 1495cb61cdd013d84f34dbf12b35277f5fef39be
+  zh: 111a56c92dda56bd52ae08b9f78cd4031fee83b1
 /agent-note-title-wait-deadline-diagnostics:
   en: aa538eb1d1c7bf65
   zh: 4f33a8bdab514ef8

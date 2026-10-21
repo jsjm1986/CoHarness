@@ -7,11 +7,13 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-主题插件：基于 --dsw-* token 基础样式表（静态尺度 + 别名语义层）的 ThemeRuntime。该服务拥有实时主题偏好（`light`／`dark`／`system`），将 `system` 通过 `prefers-color-scheme` 解析为实际主题，并发布不可变的 `ThemeSnapshot`，通过 `theme/change` 事件通知变化；它绝不接触 DOM：ui-layout 的呈现器会应用解析后的快照（`html { color-scheme }`、`body[data-ds-dark-theme]`，以及主题的别名 token 内联变量）。来自回环地址的浏览器会先以 `system` 立即提供该服务，随后在后台加载 `ui-theme.preference`，并将每次内置主题选择通过 Host settings API 写入；其本地提供方默认将设置存入 `$DSH_HOME/settings.yaml`。收到推送的 settings 变更时或重连后，浏览器都会重新拉取该设置；连续快速选择会按操作顺序携带 namespace revision 串行写入，最新写入被拒时则重新加载持久化值。经网关把 `Host` 改写成实例回环的公网页写入同一条 Host 设置；未通过特权方法栅栏的请求停在内存默认值。已注册的第三方主题 id 仍是进程内扩展，不会跨越内置 settings schema；移除其中任意一个都绝不会覆盖最后一个持久化的内置偏好。该持久化边界由[Host settings 支撑的偏好决策](../../../.agents/notes/implemented/bug-fix/2026-08-06-host-backed-web-preferences.zh.md)拥有。
+主题插件：基于 --dsw-* token 基础样式表（静态尺度 + 别名语义层）的 ThemeRuntime。该服务拥有实时主题偏好（`light`／`dark`／`system`）、正文／代码／终端三档字号与三组字体列表，将 `system` 通过 `prefers-color-scheme` 解析为实际主题，并发布不可变的 `ThemeSnapshot`，通过 `theme/change` 事件通知变化；它绝不接触 DOM：ui-layout 的呈现器会应用解析后的快照（`html { color-scheme }`、`body[data-ds-dark-theme]`、主题的别名 token 内联变量，以及 `--dsh-*-font-size`／`--dsh-font-family-*` 变量）。来自回环地址的浏览器会先以 schema 默认值立即提供该服务，随后在后台加载 `ui-theme` 命名空间，并将每次被接受的变更通过 Host settings API 写入；其本地提供方默认将设置存入 `$DSH_HOME/settings.yaml`。收到推送的 settings 变更时或重连后，浏览器都会重新拉取该设置；连续快速选择会按操作顺序携带 namespace revision 串行写入，最新写入被拒时则重新加载持久化值。自有写入未决期间，服务忽略重新拉取到的分区，使较早写入的回声不会覆盖更新的本地变更；写入落定后再采纳持久化分区。经网关把 `Host` 改写成实例回环的公网页写入同一条 Host 设置；未通过特权方法栅栏的请求停在内存默认值。已注册的第三方主题 id 仍是进程内扩展，不会跨越内置 settings schema；移除其中任意一个都绝不会覆盖最后一个持久化的内置偏好。该持久化边界由[Host settings 支撑的偏好决策](../../../.agents/notes/implemented/bug-fix/2026-08-06-host-backed-web-preferences.zh.md)拥有。
 
-当主机组合包含 HTTP 服务器时，主机侧紧接 `<body>` 起始标签注入同步引导代码。每份 index 响应会嵌入已注册的 Host 设置 `ui-theme.preference`，没有 settings provider 时则嵌入 `system`；浏览器按操作系统配色解析 `system`，随后在外壳加载页面渲染前设置 `color-scheme` 和 `body[data-ds-dark-theme]`。不含 HTTP 服务器的组合不受影响，插件树激活后，ThemeRuntime 与 ui-layout 仍分别是客户端状态和后续 DOM 更新的权威来源。
+用户在设置（通用分组）中切换配色方案、字号与字体；这些选择在回环浏览器上跨重启持久化。插件在通用分组注册外观偏好方块与正文字号步进器；步进器之后的"更多字体设置"按钮展开一个区域（每次打开设置时默认收起），内含正文、代码、终端各一行字体输入框，以及代码与终端字号步进器。正文步进器接受 10 至 22 px 的整数值，默认 14 px；代码步进器接受 10–16 px（默认 11），设置代码块字号，行内代码保持大 1 px；终端步进器接受 10–20 px（默认 13），设置侧栏终端单元格字号。每个字体输入框接受逗号分隔的字体名，失焦或回车提交；清空则恢复内置字体栈。服务对每个列表做规范化：丢弃引号、反斜杠、尖括号与控制字符，除 CSS 通用字族外给每个名称加双引号，然后写入 `textFontFamily`、`codeFontFamily` 或 `terminalFontFamily`。用户列表排在该角色内置字体栈之前，机器上缺失的字体回退到默认栈；输入框接受任何已安装字体名，不枚举本机字体。桌面运行时上，固定快捷键 Primary+=／Primary+Shift+= 与 Primary+- 在各自范围内同步增减三档字号。
 
-`src/styles/` 下有七张样式表，由 ui-theme 的动态客户端 entry 依次导入：`base.css`、`corner-shape.css`、`design-platform.css`、`metrics.css`、`scrollbar.css`、`gradient-shadow-text.css` 与 `shiki.css`。客户端 bundle 将其编译并注入为插件持有的全局样式，因此卸载与 HMR 会随 ui-theme 一同移除这些样式，而不会把主题 CSS 留在静态 Web 外壳中。`metrics.css` 提供客户端包共用的间距、安全区、圆角、触控目标、手机 Sheet 几何、compact 排版／图标角色以及有状态控件几何。有状态的手机控件必须保留可读的当前值文字，并使用统一设置 Sheet 语言，不得由功能包自行发明选择器外观。`scrollbar.css` 是 `--dsw-alias-scrollbar-*` token 的唯一消费方，必须排在声明这些 token 的 `design-platform.css` 之后。`design-platform.css` 还负责代码差异底色的别名及其静态透明度色阶；`shiki.css` 负责语法颜色。
+当主机组合包含 HTTP 服务器时，主机侧紧接 `<body>` 起始标签注入同步引导代码。每份 index 响应会嵌入已注册的 `ui-theme` 设置，没有 settings provider 时则嵌入 schema 默认值；浏览器按操作系统配色解析 `system`，随后在外壳加载页面渲染前设置 `color-scheme` 和 `body[data-ds-dark-theme]`。同一段 body 脚本还会写入 `--dsh-content-font-size`、`--dsh-code-font-size`、`--dsh-terminal-font-size` 与各非空的 `--dsh-font-family-<role>` 列表，使首帧就使用已保存的排版，`ThemeRuntime` 也据此启动而不是先渲染默认值。不含 HTTP 服务器的组合不受影响，插件树激活后，ThemeRuntime 与 ui-layout 仍分别是客户端状态和后续 DOM 更新的权威来源。
+
+`src/styles/` 下有七张样式表，由 ui-theme 的动态客户端 entry 依次导入：`base.css`、`corner-shape.css`、`design-platform.css`、`metrics.css`、`scrollbar.css`、`gradient-shadow-text.css` 与 `shiki.css`。`base.css` 还持有字体 token：`--dsh-font-family-text-default` 与 `--dsh-font-family-code-default` 在 `:root` 上声明内置字体栈；在 `body` 上，`--dsw-font-family` 与 `--ds-font-family-code` 把 `--dsh-font-family-text` 与 `--dsh-font-family-code` 排在内置栈之前，未设置的列表解析为内置栈（重复一次，字体匹配会忽略）。客户端 bundle 将其编译并注入为插件持有的全局样式，因此卸载与 HMR 会随 ui-theme 一同移除这些样式，而不会把主题 CSS 留在静态 Web 外壳中。`metrics.css` 提供客户端包共用的间距、安全区、圆角、触控目标、手机 Sheet 几何、compact 排版／图标角色以及有状态控件几何。有状态的手机控件必须保留可读的当前值文字，并使用统一设置 Sheet 语言，不得由功能包自行发明选择器外观。`scrollbar.css` 是 `--dsw-alias-scrollbar-*` token 的唯一消费方，必须排在声明这些 token 的 `design-platform.css` 之后。`design-platform.css` 还负责代码差异底色的别名及其静态透明度色阶；`shiki.css` 负责语法颜色。
 
 滚动条重新绑定约定：`scrollbar.css` 在 `body` 上把 `--dsh-scrollbar-thumb` 与 `--dsh-scrollbar-thumb-hover` 绑定到 l1（基础表面）token，两条渲染路径都读取这一组变量。高层级表面（菜单、浮层、对话框）在自己的容器上设置 `--dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2)` 与 `--dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2)`；一次重新绑定即可为引擎实际走的那条路径换色。这组变量的另一个合法目标是 `transparent`，即完全不绘制滑块——[ui-sidebar](../ui-sidebar/README.zh.md) 在指针不在栏内时就这样重新绑定自己的列。绑回 l1 那组不算重新绑定，它只是重述基础表面的默认值。基于 WebKit 的浏览器默认使用 5px 的 `--dsh-scrollbar-width`，并读取 `--dsh-scrollbar-thumb-border` 与 `--dsh-scrollbar-track-margin`；滚动表面可以重新绑定这两个几何变量，在较窄的可见滑块外保留一条更宽的拖拽轨道，或把轨道从圆角端点内缩——[ui-conversation](../ui-conversation/README.zh.md) 读取宽度作为覆盖 composer 座位的 `right` 偏移，卡片内部的滚动区重新绑定 `thumb-border`，确保滚动条变窄后仍有可见的有色内芯。scrollbar-styles 规格会把这些值与消费者配对检查。
 
@@ -19,16 +21,15 @@ kind: "package-reference"
 
 `corner-shape.css` 平滑每一个圆角：在 `@supports (corner-shape: superellipse(1.5))` 内定义 `--dsw-corner-shape`，并通过通用选择器应用到所有元素及其 `::before`／`::after`，因此不支持 `corner-shape` 的引擎保持圆弧角。全圆形状——`border-radius: 50%` 的圆与胶囊圆角——须在所属组件样式表里把 `corner-shape: round` 与其 radius 配对，因为超椭圆会使它们变形；corner-shape 样式表 spec 会在全部包样式表上强制这一配对（[圆角平滑 note](../../../.agents/notes/implemented/feature/2026-09-01-web-superellipse-corner-smoothing.zh.md)）。
 
-`gradient-shadow-text.css` 拥有阴影刻度（`--dsw-shadow-lv*`）与 elevation token：`--dsw-elevation-stroke` 通过可重绑定的 `--dsw-elevation-stroke-color` 画出 0.5px 发丝描边，`--dsw-elevation-panel`／`--dsw-elevation-prominent`／`--dsw-elevation-soft`（composer 使用的更大模糊、更低透明度一档）在该描边之上叠两层极淡的柔光，因此悬浮表面设置 `border: 0`、不再携带占布局的轮廓；派生 token 逐元素重新声明，使表面对描边色的重绑定生效。扁平控件保留真实边框，但统一为 `0.5px solid` 发丝粗细；elevation 样式表 spec 会在全部包样式表上扫描这两条规则（[elevation note](../../../.agents/notes/implemented/feature/2026-09-01-web-elevation-stroke-shadows.zh.md)）。
+`gradient-shadow-text.css` 从 `--dsh-content-font-size` 派生 `--dsh-content-font-delta`，并按该增量平移 Markdown 标题与正文字阶，另有次级梯队 `--dsh-content-font-size-secondary` 供表格变体与比正文小一级的流程行使用；代码变体（`--dsw-font-markdown-code`、`-code-block`、`-code-block-small`）的字号与行高按 `--dsh-code-font-delta`（即 `--dsh-code-font-size` 与 11 px 之差）平移。它还拥有阴影刻度（`--dsw-shadow-lv*`）与 elevation token：`--dsw-elevation-stroke` 通过可重绑定的 `--dsw-elevation-stroke-color` 画出 0.5px 发丝描边，`--dsw-elevation-panel`／`--dsw-elevation-prominent`／`--dsw-elevation-soft`（composer 使用的更大模糊、更低透明度一档）在该描边之上叠两层极淡的柔光，因此悬浮表面设置 `border: 0`、不再携带占布局的轮廓；派生 token 逐元素重新声明，使表面对描边色的重绑定生效。扁平控件保留真实边框，但统一为 `0.5px solid` 发丝粗细；elevation 样式表 spec 会在全部包样式表上扫描这两条规则（[elevation note](../../../.agents/notes/implemented/feature/2026-09-01-web-elevation-stroke-shadows.zh.md)）。
 
 ## 概述
 
-`dsh-client-ui-theme` 让 Web GUI 用户在设置中选择 `light`、`dark` 或 `system`，并把会话正文字号设为 12 至 17 px。回环客户端把两个值存入 `ui-theme` 设置命名空间，本地提供方默认将其持久化到 `$DSH_HOME/settings.yaml`。插件通过 `prefers-color-scheme` 解析 `system` 并发布不可变的 `ThemeSnapshot`；ui-layout 把每份快照应用到文档。本包还提供 `--dsw-*` token 样式表，并注入同步引导，使所选调色板与字号在外壳加载前生效。第三方主题可通过 `ctx.theme` 注册别名 token 覆盖。
+`dsh-client-ui-theme` 让 Web GUI 用户在设置中选择 `light`、`dark` 或 `system`，并可分别设置正文、代码与终端的字体和字号。回环客户端把这些值存入 `ui-theme` 设置命名空间，本地提供方默认将其持久化到 `$DSH_HOME/settings.yaml`。插件通过 `prefers-color-scheme` 解析 `system` 并发布不可变的 `ThemeSnapshot`；ui-layout 把每份快照应用到文档。本包还提供 `--dsw-*` token 样式表，并注入同步引导，使所选调色板、字号与字体在外壳加载前生效。第三方主题可通过 `ctx.theme` 注册别名 token 覆盖。
 
 ## 目录
 
 - [设置权限与兼容性](#settings-authority-and-compatibility)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -38,13 +39,7 @@ kind: "package-reference"
 <a id="settings-authority-and-compatibility"></a>
 ## 设置权限与兼容性
 
-外观控件显示账户偏好；项目策略可以强制当前界面使用浅色或深色方案。账户级 scope 在报告 `loading`、`writable: false` 或写入处于 `saving` 时禁用选择；项目和提供方限制会在行内显示，服务在取得可写账户视图前也会拒绝直接调用 `setTheme`。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该偏好的持久归属是 Host settings namespace；`ThemeRuntime` 只保留已解析快照，其针对推送变更与重连的行为由单元规格断言。
-
+外观控件显示账户偏好；项目策略可以强制当前界面使用浅色或深色方案。账户级 scope 在报告 `loading`、`writable: false` 或写入处于 `saving` 时禁用选择；项目和提供方限制会在行内显示，服务在取得可写账户视图前也会拒绝直接调用 `setTheme`。字号与字体写入经由同一绑定 scope：scope 只读时行仍可交互，但写入被拒绝，服务继续显示持久化值。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
 
 <a id="model-experience"></a>
 ## 模型体验

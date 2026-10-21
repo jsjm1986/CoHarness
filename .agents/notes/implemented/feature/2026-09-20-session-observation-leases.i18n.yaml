@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-20-session-observation-leases.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-20-session-observation-leases.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-20-session-observation-leases.md
+document:
+  en: 235a7d5e896e91884272b6f7f4cb972b3e5d7b82
+  zh: defc40926e3478a12179ab1e535884ac3c3935df
 /agent-note-session-observation-leases:
   en: 3a0f8d57613cd3dd
   zh: 5301c0d185a4490f

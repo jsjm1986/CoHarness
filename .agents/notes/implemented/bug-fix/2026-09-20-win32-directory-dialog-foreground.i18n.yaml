@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-20-win32-directory-dialog-foreground.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-20-win32-directory-dialog-foreground.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-20-win32-directory-dialog-foreground.md
+document:
+  en: 774b2b1ac7df7ab9183a8cd786c6d25220b2b509
+  zh: 9b7af0625e390887f39f5f137b6ab56cb829bb26
 /agent-note-win32-directory-dialog-foreground-activation:
   en: ac199da20c5be91f
   zh: c789d18cf6d92864

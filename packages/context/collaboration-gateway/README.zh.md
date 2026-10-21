@@ -13,11 +13,9 @@ kind: "package-reference"
 
 使用 `dsh-collaboration-gateway` 作为 `dsh-collaboration` 服务定义的 Gateway 后端提供方。它从 `dsh-gateway-runtime` 派生参与者，把成员关系与根会话 ACL 决策委托给已认证的 Gateway 内部端点，并在向消费方发布前校验每个返回字段。
 
-
 ## 目录
 
 - [运行时约定](#runtime-contract)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -32,12 +30,6 @@ kind: "package-reference"
 - 个人 scope 将已有会话 id 视为可读并接受交互抢占；项目 scope 始终向 Gateway 请求权威结果。
 - 创建项目根对话要求 `rw` 成员身份，并在请求的可见性下运行。个人创建直接通过，不附加项目元数据。
 - 卸载提供方会中止其生命周期信号，并使每份已捕获 authority 在再次请求前失败关闭。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。参与者与 ACL 答案逐请求对照已认证的 Gateway 端点校验；本地不持有账户状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

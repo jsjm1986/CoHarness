@@ -23,6 +23,7 @@ export class BrowserController {
   /** Renderer-facing iframe and sandbox state. */
   readonly frame: BrowserFrame
   private readonly navigation: BrowserNavigation
+  private started = false
   private disposed = false
 
   /**
@@ -35,6 +36,16 @@ export class BrowserController {
       (revision) => { this.frameLoaded(revision) },
     )
     options.signal.addEventListener('abort', () => { this.dispose() }, { once: true })
+  }
+
+  /**
+   * Consume the typed-open address once; a saved checkpoint alone never starts a load.
+   * @param initialUrl - explicit navigation supplied with the tab record, when any.
+   */
+  start(initialUrl: string | undefined): void {
+    if (this.started || this.disposed) return
+    this.started = true
+    if (initialUrl !== undefined) this.loadUrl(initialUrl)
   }
 
   /**
@@ -54,31 +65,31 @@ export class BrowserController {
       this.reload()
       return
     }
-    this.start(this.navigation.navigate(parsed.target))
+    this.beginLoad(this.navigation.navigate(parsed.target))
   }
 
   /** Move to the preceding application-known address when Web history remains usable. */
   goBack(): void {
     if (this.disposed) return
     const request = this.navigation.back()
-    if (request !== undefined) this.start(request)
+    if (request !== undefined) this.beginLoad(request)
   }
 
   /** Move to the following application-known address when Web history remains usable. */
   goForward(): void {
     if (this.disposed) return
     const request = this.navigation.forward()
-    if (request !== undefined) this.start(request)
+    if (request !== undefined) this.beginLoad(request)
   }
 
   /** Reload the last application-known address without adding history. */
   reload(): void {
     if (this.disposed) return
     const request = this.navigation.reload()
-    if (request !== undefined) this.start(request)
+    if (request !== undefined) this.beginLoad(request)
   }
 
-  private start(request: NonNullable<BrowserTabState['request']>): void {
+  private beginLoad(request: NonNullable<BrowserTabState['request']>): void {
     this.publish()
     this.frame.clearDocument()
     this.frame.setDocument({ target: request.target, src: request.target.url, revision: request.revision })
@@ -111,8 +122,9 @@ export interface BrowserInjected {
    * @param signal - occurrence lifetime.
    * @param applicationOrigin - current application origin.
    * @param initial - persisted tab state.
+   * @param initialUrl - explicit typed-open address; consumed once per occurrence.
    */
-  mount(tabId: TabId, signal: AbortSignal, applicationOrigin: string, initial?: BrowserTabState): void
+  mount(tabId: TabId, signal: AbortSignal, applicationOrigin: string, initial?: BrowserTabState, initialUrl?: string): void
   /** @param tabId - tab occurrence. @param value - address-bar or typed-open value. */
   loadUrl(tabId: TabId, value: string): void
   /** @param tabId - tab occurrence. */
@@ -132,18 +144,24 @@ export interface BrowserInjected {
 /**
  * Bind Browser controllers to one Session and its persistence writer.
  * @param actions - Browser store mutation face.
+ * @param isTabOpen - authoritative open-record membership; aborts without it forget saved navigation.
  * @returns a per-tab controller registry exposed as plain Slot callbacks.
  */
 export function createBrowserControllers(
   actions: BoundActions<BrowserStore>,
+  isTabOpen: (tabId: TabId) => boolean,
 ): BrowserInjected {
   const controllers = new Map<TabId, { readonly signal: AbortSignal; readonly controller: BrowserController }>()
   const controller = (tabId: TabId): BrowserController | undefined => controllers.get(tabId)?.controller
   return {
     keyedHooks: { browserFrame: key => controller(key as TabId)?.frame },
-    mount(tabId, signal, applicationOrigin, initial) {
+    mount(tabId, signal, applicationOrigin, initial, initialUrl) {
+      if (signal.aborted) return
       const held = controllers.get(tabId)
-      if (held?.signal === signal) return
+      if (held?.signal === signal) {
+        held.controller.start(initialUrl)
+        return
+      }
       const created = new BrowserController({
         tabId, signal, applicationOrigin, actions,
         ...(initial === undefined ? {} : { initial }),
@@ -152,8 +170,10 @@ export function createBrowserControllers(
       signal.addEventListener('abort', () => {
         if (controllers.get(tabId)?.controller !== created) return
         controllers.delete(tabId)
-        actions.forget(tabId)
+        // Domain disposal aborts every live occurrence too; only record removal deletes saved navigation.
+        if (!isTabOpen(tabId)) actions.forget(tabId)
       }, { once: true })
+      created.start(initialUrl)
     },
     loadUrl: (tabId, value) => { controller(tabId)?.loadUrl(value) },
     goBack: (tabId) => { controller(tabId)?.goBack() },

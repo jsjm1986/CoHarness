@@ -5,19 +5,24 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - button "System prompt":
   - img
   - img
   - text: System prompt
-- text: /user-invoke-demo and confirm the fixture wiring
+- button "/user-invoke-demo"
+- text: and confirm the fixture wiring
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - paragraph: USER_INVOKE_REPLY acknowledged; following the injected skill.
 - button "Copy":
   - img

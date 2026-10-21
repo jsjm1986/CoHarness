@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-web-chat-sender-attribution.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-web-chat-sender-attribution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.md
+document:
+  en: 343d53c8719f3f62ef44d43f90d44a401229f9f8
+  zh: ac5ed9f1844e0c33f6e172ba9acacc8096111815
 /agent-note-web-chat-labels-project-senders-on-bubbles:
   en: 739dba3fc337c874
   zh: 9297a8dc8b94c47d

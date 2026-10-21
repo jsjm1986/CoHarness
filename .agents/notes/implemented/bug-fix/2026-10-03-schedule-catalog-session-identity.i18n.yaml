@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-03-schedule-catalog-session-identity.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-03-schedule-catalog-session-identity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-03-schedule-catalog-session-identity.md
+document:
+  en: d3dad602292eeefdfaa03c95807cfa2979ebab7e
+  zh: 017cf8f709d9821dbf0592c3508ddc368ad9afce
 /agent-note-schedule-catalog-session-identity-and-linked-session-reveal:
   en: 6b70cf1c2fef7f7f
   zh: c8561050cd88e1f0

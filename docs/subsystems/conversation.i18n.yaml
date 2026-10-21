@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for conversation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for conversation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/conversation.md
+document:
+  en: 12e0a63d70d7484c1e3459477ddc5b6b4fd10f0b
+  zh: 01ce0c9e6d1fba4e254d6eb22c6699f31c9fa60a
 /conversation-assembly:
   en: b884067f36f802cc
   zh: f04273c1ffaf7fe0

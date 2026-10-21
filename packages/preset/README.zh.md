@@ -11,7 +11,8 @@ kind: "package-group"
 
 | 包 | 职责 | ctx 键 |
 |---|---|---|
-| `agent-presets/` | preset 词汇体系、对受信任根目录和用户自定义根目录的文件系统发现，以及受防护的按 agent 挂载 | `ctx.agentPresets` |
+| `agent-preset-registry/` | preset 词汇体系、对受信任根目录和用户自定义根目录的文件系统发现，以及受防护的按 agent 挂载 | `ctx.agentPresets` |
+| `agent-preset/` | 用一条普通 cordis 行声明 preset 组合，代替 preset 目录 | — |
 | `persona/` | 把 agent 人设做成可组装的行，使 preset 不止能改工具、也能改身份 | — |
 
 部署交付哪些 preset，看 [`apps/cli/config/agent-presets/`](../../apps/cli/config/agent-presets)——一个 preset 一个目录，那份目录列表就是清单。在这里再列一遍只会多出一份需要同步的名单，而且总是它先过时。
@@ -20,9 +21,8 @@ kind: "package-group"
 
 设计详见 [按会话组装 agent preset 的 Agent Note](../../.agents/notes/implemented/architecture/2026-08-03-per-session-agent-presets.zh.md)。
 
-[`AgentPresets` 参考](../../docs/subsystems/core.zh.md#ctxagentpresets--agentpresets)记录发现、挂载、继承与重组；[scope](../../docs/subsystems/scope.zh.md)负责挂载加入 agent 所用的 scope 键与父链，[system prompt](../../docs/subsystems/system-prompt.zh.md)负责预设提示词节的注册与装配。
-
+[`AgentPresetRegistry` 参考](../../docs/subsystems/core.zh.md#ctxagentpresets--agentpresetregistry)记录发现、挂载、继承与重组；[scope](../../docs/subsystems/scope.zh.md)负责挂载加入 agent 所用的 scope 键与父链，[system prompt](../../docs/subsystems/system-prompt.zh.md)负责预设提示词节的注册与装配。
 
 ## 概述
 
-preset 组提供按会话的 agent（智能体）组装：agent preset 是一个目录，内含一份 `agent.cordis.yml`；从 preset 组装的会话会使用该 preset 的工具、提示词段落与 skill（技能），而其他会话仍各自使用自己的工具、提示词段落与 skill。`agent-presets` 拥有名单——对已配置根目录与 harness home 的发现、受防护的按 agent 挂载，以及仅通过复制创建 preset 的方式——`persona` 则提供可组装的行，让 preset 不止能改变 agent 的工具，也能改变它的身份。两者合起来让一个进程可以同时运行多个组装方式不同的 agent。
+preset 组提供按会话的 agent（智能体）组装：agent preset 是一个目录，内含一份 `agent.cordis.yml`；从 preset 组装的会话会使用该 preset 的工具、提示词段落与 skill（技能），而其他会话仍各自使用自己的工具、提示词段落与 skill。`agent-preset-registry` 拥有名单——对已配置根目录与 harness home 的发现、受防护的按 agent 挂载，以及仅通过复制创建 preset 的方式——`persona` 则提供可组装的行，让 preset 不止能改变 agent 的工具，也能改变它的身份。两者合起来让一个进程可以同时运行多个组装方式不同的 agent。

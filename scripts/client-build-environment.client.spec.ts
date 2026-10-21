@@ -246,7 +246,6 @@ describe('client build environment', { timeout: 15_000 }, () => {
 
     const configs = clientBundle('@deepseek-ai/dsh-client-ui-sidebar', [
       'lib/types/index.js',
-      'lib/types/invariant.js',
     ])({ env: { DSH_BUILD_FACE: 'client' } })
     if (!Array.isArray(configs)) throw new TypeError('client bundle config must be an array')
     const dynamic = configs.find(config => config.name === '@deepseek-ai/dsh-client-ui-sidebar/client')

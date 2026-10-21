@@ -16,6 +16,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type { MessageFeedbackItem, MessageFeedbackVersion } from '@deepseek-ai/dsh-message-feedback/types'
 import type { FeedbackDialogInjected, MessageFeedbackInjected } from '../src/client/slots.ts'
+import type { SessionFeedbackActionInjected } from '../src/client/SessionFeedbackAction.tsx'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
@@ -75,7 +76,11 @@ async function bench() {
   await ctx.plugin(SlotRegistry).await()
   ctx.slots.register({
     name: 'root',
-    children: { 'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' }, 'conversation.input.overlay': { kind: 'list', scope: 'session' } },
+    children: {
+      'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
+      'conversation.input.overlay': { kind: 'list', scope: 'session' },
+      'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
+    },
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -102,6 +107,12 @@ async function bench() {
   }
 }
 
+/** Call a slot entry's erased inject face; the caller asserts the declared injected type. */
+function callInject(entry: { inject?: unknown } | undefined, ...args: unknown[]): unknown {
+  if (typeof entry?.inject !== 'function') throw new Error('slot entry declares no inject face')
+  return (entry.inject as (...args: unknown[]) => unknown)(...args)
+}
+
 describe('ui-message-feedback browser plugin', () => {
   it('registers the feedback entry with the documented id, order, and locale', async () => {
     const b = await bench()
@@ -111,11 +122,30 @@ describe('ui-message-feedback browser plugin', () => {
     expect(b.entry()?.inject).toBeTypeOf('function')
   })
 
+  it('opens the Session feedback draft through feedbackUi and the header entry', async () => {
+    const b = await bench()
+    await b.fiber.await()
+    try {
+      const header = b.ctx.slots.entries('conversation.session.header.utilities')
+        .find(entry => entry.options.id === 'session-feedback')
+      expect(header).toMatchObject({ locale: 'feedback' })
+      const injectDialog = (id: SessionId) => callInject(b.ctx.slots.entries('conversation.input.overlay')[0], id) as FeedbackDialogInjected
+      const dialog = injectDialog(sid('s1'))
+      const open = (id: SessionId) => callInject(header, id) as SessionFeedbackActionInjected
+      open(sid('s1')).openFeedback()
+      expect(dialog.hooks.dialog.getSnapshot().target).toEqual({ kind: 'session' })
+      // The service opens the same draft for plugins that hold no slot reach.
+      dialog.dismiss()
+      b.ctx.feedbackUi.openSession(sid('s2'))
+      expect(injectDialog(sid('s2')).hooks.dialog.getSnapshot().target).toEqual({ kind: 'session' })
+    } finally { await b.fiber.dispose() }
+  })
+
   it('records the Session dialog only on submit and isolates drafts by Session', async () => {
     const b = await bench()
     await b.fiber.await()
     try {
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = (id: SessionId) => callInject(b.ctx.slots.entries('conversation.input.overlay')[0], id) as FeedbackDialogInjected
       const one = injectDialog(sid('s1'))
       const two = injectDialog(sid('s2'))
       const action = b.decorations[0]?.ui
@@ -137,7 +167,7 @@ describe('ui-message-feedback browser plugin', () => {
     try {
       b.detach(sid('gone'))
       expect(() => b.entry()!.inject!(sid('gone'))).toThrow(/requires a retained Session: gone/)
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = (id: SessionId) => callInject(b.ctx.slots.entries('conversation.input.overlay')[0], id) as FeedbackDialogInjected
       expect(() => injectDialog(sid('gone'))).toThrow(/requires a retained Session: gone/)
     } finally { await b.fiber.dispose() }
   })
@@ -146,7 +176,7 @@ describe('ui-message-feedback browser plugin', () => {
     const b = await bench()
     await b.fiber.await()
     try {
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = (id: SessionId) => callInject(b.ctx.slots.entries('conversation.input.overlay')[0], id) as FeedbackDialogInjected
       const dialog = injectDialog(sid('s1'))
       const decoration = b.decorations[0]
       const action = decoration?.ui
@@ -167,7 +197,7 @@ describe('ui-message-feedback browser plugin', () => {
     const b = await bench()
     await b.fiber.await()
     try {
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = (id: SessionId) => callInject(b.ctx.slots.entries('conversation.input.overlay')[0], id) as FeedbackDialogInjected
       const dialog = injectDialog(sid('s1'))
       const action = b.decorations[0]?.ui
       if (action?.kind !== 'action') throw new Error('feedback action was not registered')
@@ -197,7 +227,7 @@ describe('ui-message-feedback browser plugin', () => {
       const firstScope = b.mint(sid('s1'))
       const first = b.entry()!.inject!(sid('s1'))
       await first.ensure()
-      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const injectDialog = (id: SessionId) => callInject(b.ctx.slots.entries('conversation.input.overlay')[0], id) as FeedbackDialogInjected
       const dialog = injectDialog(sid('s1'))
       const action = b.decorations[0]?.ui
       if (action?.kind !== 'action') throw new Error('feedback action was not registered')

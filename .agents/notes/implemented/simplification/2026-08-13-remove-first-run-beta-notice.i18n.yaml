@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-13-remove-first-run-beta-notice.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-13-remove-first-run-beta-notice.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-13-remove-first-run-beta-notice.md
+document:
+  en: cf3ab95b367ef06feee46bf09743e64713548f84
+  zh: 9d74dd086583fad408cb630397d6d53d16e115fd
 /agent-note-remove-the-first-run-beta-notice:
   en: c327beb6b4ff0d04
   zh: 3e95e3d59deb4bc9

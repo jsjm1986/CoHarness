@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-18-structured-browser-draft-persistence.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-structured-browser-draft-persistence.md
+document:
+  en: 518ef366ec0be257d11ea4e925d1a111e92107a5
+  zh: 8ccae3577a525937bf131d0eea66e9f07cc23b21
+/agent-note-structured-browser-draft-persistence:
+  en: 3aff115d66e13e07
+  zh: 1aaac34529dba719
+/agent-note-structured-browser-draft-persistence/problem:
+  en: 98725b88a2715310
+  zh: dc97411f81cc438a
+/agent-note-structured-browser-draft-persistence/decision:
+  en: ac0991edb310b216
+  zh: 13a8d5471e925286
+/agent-note-structured-browser-draft-persistence/alternatives-considered:
+  en: 72e74452ff56a21d
+  zh: 9f421b2ff2f88e61
+/agent-note-structured-browser-draft-persistence/consequences:
+  en: 15d18b8a032001b0
+  zh: 89550a1d05eb9605
+/agent-note-structured-browser-draft-persistence/verification:
+  en: 468600ffe6b8e316
+  zh: 1a8ba069cba92774

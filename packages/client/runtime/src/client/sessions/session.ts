@@ -19,6 +19,7 @@ import { transportError } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {
   BeginSubmissionInput, PendingSubmissionRetirement, SessionFace, SubmissionHandle,
 } from '../contract/session.ts'
+import { MutableSessionEventSource, sessionEventLikeEntry } from '../contract/events.ts'
 import { ClientAssistantStream } from './assistant-stream.ts'
 import { ConversationNodeAssembler } from './conversation-assembler.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
@@ -154,6 +155,13 @@ export class Session implements SessionFace {
   private readonly disposeInboxProjection: () => void
   /** Session-owned business Context engine over the contiguous raw window. */
   private readonly conversation: ConversationNodeAssembler
+  /**
+   * Raw event window read seam for inspection-style consumers. It mirrors the
+   * same committed conversation inputs (durable events plus transient
+   * assistant live chunks), so it publishes exactly when the conversation
+   * does, at the same mutation points.
+   */
+  readonly eventSource = new MutableSessionEventSource()
   private running = false
   private address: SubagentAddress | undefined
   private parentAvailable = false
@@ -344,6 +352,7 @@ export class Session implements SessionFace {
     this.stitching = false
     this.repairRequested = false
     this.conversation.replaceWindow([], false)
+    this.eventSource.replace([], false)
     this.notifier.markDirty()
   }
 
@@ -775,6 +784,9 @@ export class Session implements SessionFace {
         return
       }
       case 'approval/requested': {
+        // A 'none' carrier never receives this frame from the Host; dropping it
+        // here is defense in depth so no answerable object can be minted.
+        if (this.api.interactions === 'none') return
         const { type: _type, sessionId: _sid, ...payload } = frame
         this.mint(new PendingWait('approval', rpcId, this.sessionId, payload, m => this.api.respond(m)))
         this.notifier.markDirty()
@@ -788,6 +800,8 @@ export class Session implements SessionFace {
         return
       }
       case 'question/requested': {
+        // Same 'none' guard as approval/requested above.
+        if (this.api.interactions === 'none') return
         const { type: _type, sessionId: _sid, ...payload } = frame
         this.mint(new PendingWait('question', rpcId, this.sessionId, payload, m => this.api.respond(m)))
         this.notifier.markDirty()
@@ -910,6 +924,7 @@ export class Session implements SessionFace {
     this.views = []
     this.omittedSpans = []
     this.baseSeq = 0
+    this.eventSource.replace([], false)
   }
 
   /** Requested-frame arrival: the wait enters the pending map under its own key. */
@@ -1115,7 +1130,9 @@ export class Session implements SessionFace {
     if (visible !== undefined) this.markConversationContent(visible.seq)
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
     for (const event of this.events) this.observeSubmissionEvent(event)
-    this.conversation.replaceWindow(this.rebuildWindowInputs(), hasMore)
+    const windowInputs = this.rebuildWindowInputs()
+    this.conversation.replaceWindow(windowInputs, hasMore)
+    this.eventSource.replace(windowInputs.map(input => sessionEventLikeEntry(input.event)), hasMore)
     if (projections !== undefined) {
       this.projections.seed(projections)
       // A new follow baseline replaces confirmed optimistic inputs with
@@ -1185,10 +1202,12 @@ export class Session implements SessionFace {
         break
       default: {
         publication = this.conversation.append({ event, view })
+        this.eventSource.append({ type: 'event', event })
         if (folded?.type === 'publish' && folded.retireAttemptId !== undefined) {
           // A successful message published at stream end keeps its transient
           // rows until the Step boundary; this publication is that boundary.
           const retired = this.conversation.settleAssistant(folded.retireAttemptId)
+          this.eventSource.settleAssistant(folded.retireAttemptId)
           if (retired === 'immediate') publication = 'immediate'
         }
         break
@@ -1213,22 +1232,26 @@ export class Session implements SessionFace {
     switch (result?.type) {
       case 'transient':
         this.scheduleConversation(this.conversation.append({ event: result.entry.event, view: undefined }))
+        this.eventSource.append(sessionEventLikeEntry(result.entry.event))
         return
       case 'publish': {
         const view = this.stagedViews.get(result.entry.event.seq)
         this.stagedViews.delete(result.entry.event.seq)
         this.scheduleConversation(this.conversation.append({ event: result.entry.event, view }))
+        this.eventSource.append(sessionEventLikeEntry(result.entry.event))
         return
       }
       case 'settlement': {
         const view = this.stagedViews.get(result.entry.event.seq)
         this.stagedViews.delete(result.entry.event.seq)
         const pub = this.conversation.settleAssistant(result.attemptId, { event: result.entry.event, view })
+        this.eventSource.settleAssistant(result.attemptId, { type: 'event', event: result.entry.event })
         this.scheduleConversation(pub)
         return
       }
       case 'abandonment':
         this.scheduleConversation(this.conversation.settleAssistant(result.attemptId))
+        this.eventSource.settleAssistant(result.attemptId)
         return
       case 'rebaseline':
         this.rebaselineAssistantStream()
@@ -1244,7 +1267,9 @@ export class Session implements SessionFace {
    * tail so the attempt's durable settlement lands through the append path.
    */
   private rebaselineAssistantStream(): void {
-    this.conversation.replaceWindow(this.rebuildWindowInputs(), this.hasMore)
+    const inputs = this.rebuildWindowInputs()
+    this.conversation.replaceWindow(inputs, this.hasMore)
+    this.eventSource.replace(inputs.map(input => sessionEventLikeEntry(input.event)), this.hasMore)
     this.notifier.markDirty()
     void this.repairGap()
   }
@@ -1509,6 +1534,7 @@ export class Session implements SessionFace {
     if (page.entries.length === 0 && page.omittedSpans.length === 0) {
       this.hasMore = page.hasMore
       this.conversation.prepend([], this.hasMore)
+      this.eventSource.prepend([], this.hasMore)
       return true
     }
     const olderTail = logicalTailSeq(page.entries.map(entry => entry.event), page.omittedSpans)
@@ -1517,6 +1543,7 @@ export class Session implements SessionFace {
       console.error(`[web-runtime] history page discontinuous: tail seq ${olderTail} vs baseSeq ${this.baseSeq}`)
       this.hasMore = false
       this.conversation.prepend([], false)
+      this.eventSource.prepend([], false)
       return false
     }
     this.applyOlderPages([page], page.hasMore)
@@ -1546,6 +1573,7 @@ export class Session implements SessionFace {
     this.dropCoveredSpans()
     this.hasMore = hasMore
     this.conversation.prepend(fresh.map(conversationInput), this.hasMore)
+    this.eventSource.prepend(fresh.map(entry => sessionEventLikeEntry(entry.event)), this.hasMore)
   }
 
   /**
@@ -1622,6 +1650,7 @@ export class Session implements SessionFace {
     } else if (!hasMore) {
       this.hasMore = false
       this.conversation.prepend([], false)
+      this.eventSource.prepend([], false)
     }
     this.historyWindowMode = complete && !this.hasMore ? 'live' : 'tail'
     this.notifier.markDirty()
@@ -1707,13 +1736,18 @@ export class Session implements SessionFace {
       // the resident rows keep their node identity and only new rows assemble.
       for (const entry of fresh) this.appendLive(entry.event, entry.view)
       this.omittedSpans = [...this.omittedSpans, ...page.omittedSpans]
-      if (this.hasMore !== previousHasMore) this.conversation.prepend([], this.hasMore)
+      if (this.hasMore !== previousHasMore) {
+        this.conversation.prepend([], this.hasMore)
+        this.eventSource.prepend([], this.hasMore)
+      }
     } else {
       this.mergeHistoryEntries(page.entries)
       this.omittedSpans = [...this.omittedSpans, ...page.omittedSpans]
       this.dropCoveredSpans()
       this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? this.baseSeq
-      this.conversation.replaceWindow(this.rebuildWindowInputs(), this.hasMore)
+      const inputs = this.rebuildWindowInputs()
+      this.conversation.replaceWindow(inputs, this.hasMore)
+      this.eventSource.replace(inputs.map(input => sessionEventLikeEntry(input.event)), this.hasMore)
     }
     const buffered = this.liveBuffer
     this.liveBuffer = []
@@ -1826,10 +1860,9 @@ export class Session implements SessionFace {
         )
         this.mergeHistoryEntries(result.value.events)
         this.dropCoveredSpans()
-        this.conversation.replaceWindow(
-          this.events.map((event, index) => ({ event, view: this.views[index] })),
-          this.hasMore,
-        )
+        const detailInputs = this.events.map((event, index) => ({ event, view: this.views[index] }))
+        this.conversation.replaceWindow(detailInputs, this.hasMore)
+        this.eventSource.replace(detailInputs.map(input => sessionEventLikeEntry(input.event)), this.hasMore)
         this.notifier.markDirty()
         if (oldest <= windowBase || !result.value.hasMore || oldest >= previousOldest) break
         previousOldest = oldest

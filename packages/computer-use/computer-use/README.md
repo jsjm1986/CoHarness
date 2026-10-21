@@ -49,8 +49,6 @@ The optional `computerUseAuthorization.confirmation` controller reads and change
 
 One private name owns the slot. Cordis effects remove contributions when their plugin unloads; a repeated disposer cannot remove a later registration. The [source](src/index.ts) keeps driver schemas outside the service and delegates managed effects to the deployment policy.
 
-No runtime invariant companion is published: the registry has one authoritative field and exposes no independently maintained observation that can diverge. Duplicate rejection and plugin disposal are covered by the owning tests.
-
 </details>
 
 -----

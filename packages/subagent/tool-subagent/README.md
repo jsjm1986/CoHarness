@@ -11,7 +11,7 @@ The model-facing delegation tool over one configured `ctx.subagents` provider. C
 
 ## Summary
 
-Use this package to give an agent a named tool that delegates work to a configured child-agent backend. In `one-shot` mode, calls wait for the child by default; in `continuable` mode, they start a persistent child in the background and return an id for later messages. Supported backends can also expose approved child LLM providers, models, and reasoning effort for selection. Each instance can set child persona, tool access, and depth limits, while failed runs return errors instead of partial success.
+Use this package to give an agent a named tool that delegates work to a configured child-agent backend. In `one-shot` mode, calls wait for the child by default; in `continuable` mode, they start a persistent child in the background and return an id for later messages. Supported backends can also expose approved child LLM providers, models, and reasoning effort for selection. Each instance can select a child preset and depth limits, while failed runs return errors instead of partial success.
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ A foreground call passes the execution signal through startup and execution, awa
 
 `backgroundMode` selects both the background route and the omitted `run_in_background` default. `one-shot` waits in the foreground by default; an explicit `true` registers a plain parent-owned Task and returns canonical `{ kind: 'background', jobId }`, rendered as `started background subagent job <id>`, even when the provider supports continuable children. Generic task tools own its later status, collection, cancellation, and notices; a failed Task keeps the stop reason and the same optional provider diagnostic in its detail. `continuable` runs in the background when the argument is omitted or `true`; an explicit `false` waits for the result in the foreground. Its background route requires a provider with the `prepareContinuable` capability, calls `ctx.subagents.startContinuable()`, and returns `{ kind: 'continuable', subagentId }`, rendered as `started subagent <childId>`. The route resolves at inbox acceptance: the child owns its own turns from there, so this call neither waits for nor collects a result. The child's transcript by that id remains the source of its detailed output, and the optional global `send_message` tool sends it more work. The continuation service delivers one settlement notice whenever the child's Activation ends, containing its outcome and any final assistant message independently of `report`. Starting continuable work does not require `send_message` to be loaded. See the [background subagent Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.md), the [continuable subagents Agent Note](../../../.agents/notes/implemented/feature/2026-07-28-continuable-subagent-conversations.md), and the [background-first delegation Agent Note](../../../.agents/notes/implemented/feature/2026-08-11-background-first-continuable-delegation.md).
 
-`toolFilter` changes the child's global tool layer but is not a parent-derived authority ceiling. See the [agent-scope security non-goal](../../../.agents/notes/implemented/architecture/2026-07-08-agent-scope-contexts.md#security-and-authority-are-non-goals).
+`agentPreset` gives every child an independent preset by default, and `allowedAgentPresets` lets the model choose an id through `agent_preset`; without the allowlist the model cannot override the configured choice. Only the in-process spawn provider supports these fields — fork and external backends reject them. Both must name declared presets: a tool inside a preset validates them during Agent initialization, while a Host-mounted tool validates at load. An omitted model choice uses the configured `agentPreset`, or joins the parent's current preset revision when no default is configured. Compose persona and tools in the preset plugin list; tool configuration containing `persona` or `toolFilter` fails at load with a migration error.
 
 The `subagent-model-selection` settings section is project-owned. Project managers may change only `enabled` and `allowedModels`; the Host validates them atomically, including rejection of an enabled empty allowlist. This preference does not override runtime model authorization.
 
@@ -48,8 +48,8 @@ The `subagent-model-selection` settings section is project-owned. Project manage
 | `backgroundMode` | Background lifecycle policy, default `one-shot`. `one-shot` defaults calls to foreground; `continuable` defaults them to background, requires the provider's `prepareContinuable` capability, and returns a durable child id without requiring the follow-up tool. |
 | `modelSelectionSettings` | Opt-in sampling of the host allowlist for child provider/model/reasoning selection when a fresh top-level Session is composed; a restored Session without a recorded policy stays disabled, a child inherits its parent's recorded policy, and later settings edits never change a recorded Session. Defaults to `false` and requires the model-selection settings plugin. |
 | `agentOptions` | Provider-specific child `provider`, `model`, optional `reasoningEffort`, and positive `maxTokens`; the provider treats explicit values as overrides of inherited parent options. |
-| `persona` | Per-child persona; requires provider `persona` capability. |
-| `toolFilter` | Per-child global-tool restriction; requires `toolFilter` capability. |
+| `agentPreset` | Default independent child preset id; requires the in-process spawn provider. |
+| `allowedAgentPresets` | Non-empty preset-id allowlist exposed as the model's optional `agent_preset` enum; must include `agentPreset` when both are set. |
 | `maxDepth` | Absolute delegation-depth cap (`0` forbids delegation); omission reads the current Host `subagent.maxDepth` setting, initially `1`, at each delegation. A numeric cap requires the `depthLimit` capability and fails the mount without it. `'provider-managed'` sends no cap for an out-of-process provider whose budget belongs to the child harness. The tool stays visible at the cap; each attempted start checks the calling agent's current depth and returns an errored tool result when rejected. |
 
 <a id="concurrency"></a>
@@ -66,11 +66,11 @@ Foreground and background calls are concurrency-safe: sibling delegations in one
 
 #### What the model sees
 
-The generated default [`subagent` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent) under this instance's configured name while its provider exists. An enabled Session policy adds `provider`, `model`, and `reasoning_effort` plus inheritance and selection guidance; the provider must support `agentOptions`. Provider context inheritance changes the tool and prompt descriptions. Enabled background mode adds `run_in_background`: continuable mode documents its `true` default, runtime settlement notice, and explicit foreground override, while one-shot mode documents its `false` default and the job id collected with `job_output` or stopped with `job_kill`. While the tool is visible in an assembly's scope, a `tool:<toolName>` system-prompt section tells the model to start independent continuable delegations together, keep working while they run, and choose foreground only when its next action depends on the result; a tool restriction removes both its schema and this guidance.
+The delegation description uses `running` and `inactive` for follow-up availability; `inactive` does not imply a task result. The generated default [`subagent` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent) under this instance's configured name while its provider exists. An enabled Session policy adds `provider`, `model`, and `reasoning_effort` plus inheritance and selection guidance; the provider must support `agentOptions`. `allowedAgentPresets` adds the `agent_preset` enum and guidance drawn from the presets' display descriptions. Provider context inheritance changes the tool and prompt descriptions. Enabled background mode adds `run_in_background`: continuable mode documents its `true` default, runtime settlement notice, and explicit foreground override, while one-shot mode documents its `false` default and the job id collected with `job_output` or stopped with `job_kill`. While the tool is visible in an assembly's scope, a `tool:<toolName>` system-prompt section tells the model to start independent continuable delegations together, keep working while they run, choose foreground only when its next action depends on the result, and end its turn instead of sleeping or polling when only waiting for their results remains; a tool restriction removes both its schema and this guidance.
 
 #### Token effect
 
-Fixed schema cost per parent request; model selection adds three parameters. Each provider instance adds one schema, and each continuable instance adds one short system-prompt section.
+Fixed schema cost per parent request; LLM selection adds three parameters, while preset selection adds one enum parameter and the preset descriptions. Each provider instance adds one schema, and each continuable instance adds one short system-prompt section.
 
 #### KV Cache effect
 
@@ -94,12 +94,12 @@ The schema is prefix-stable across adapter registration and catalog changes. Eac
 
 #### What the model sees
 
-When `enableRunInBackground` and `backgroundMode: continuable` are both set, the model additionally reads a `tool:<toolName>` system-prompt section telling it to start independent continuable delegations together and keep working while they run. With the default tool name `subagent`, the section text is:
+When `enableRunInBackground` and `backgroundMode: continuable` are both set, the model additionally reads a `tool:<toolName>` system-prompt section telling it to start independent continuable delegations together, keep working while they run, and end its turn instead of sleeping or polling when only waiting for their results remains. With the default tool name `subagent`, the section text is:
 
 ##### Tool-guidance section
 
 ```markdown
-Use subagent in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set `run_in_background: false` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.
+Use subagent in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set `run_in_background: false` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.
 ```
 
 #### Token effect
@@ -109,6 +109,26 @@ One short fixed section per continuable instance, paid on every parent request w
 #### KV Cache effect
 
 Prefix-stable while the section text and tool presence are unchanged; removing the tool or changing the section establishes a different parent prefix.
+
+### Runtime depth context
+
+#### What the model sees
+
+When the calling agent reaches or exceeds a visible tool's effective numeric depth cap, an optional runtime-context snapshot tells it to do the work directly. The cap is resolved again at each request, including after settings changes or session resume. Hidden tools and `provider-managed` limits contribute no depth text. For a child at depth one with a cap of one:
+
+##### Depth-limit notice
+
+```markdown
+Delegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.
+```
+
+#### Token effect
+
+One short contribution per capped tool joins the user-role runtime-context snapshot. Unchanged snapshots are not appended again; agents below the cap receive no additional text. `includeRuntimeContext: false` suppresses this notice without changing runtime depth enforcement.
+
+#### KV Cache effect
+
+Depth changes do not alter the system prompt or tool schemas. Updated runtime context appends after existing history; the provider still enforces the cap if the model attempts delegation.
 
 ### Foreground result
 
@@ -142,7 +162,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **Background runs expose no result through this tool** — a one-shot task's final output is collected through the generic task surface, and a continuable child's output stays in its own session, read by its subagent id. The settlement notice states how that child ended and carries any final assistant message, but it is not this call's return value and cannot be awaited here.
 - **Duplicate names across waiting one-shot instances are detected late** (`TODO(subagent-dup-toolname)`) — continuable instances reserve their prompt-section name during plugin application, but preventing provider-registration rollback for waiting one-shot instances requires a registry of intended names.
-- **Child policy is fixed per instance** — another model, persona, tool filter, or depth cap requires another distinctly named tool.
+- **Child policy is fixed per instance** — another model, preset, or depth cap requires another distinctly named tool. Only the in-process spawn provider accepts `agentPreset`/`allowedAgentPresets`; other backends reject them at load.
 
 <a id="dev-note"></a>
 ### Dev Note

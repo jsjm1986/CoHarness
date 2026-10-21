@@ -1,15 +1,15 @@
 /** Complete HTML rendered in a script-enabled opaque iframe over the authorized resource lifetime. */
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import { isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
-import { workspaceFileBytes } from '../html/read-relative.ts'
-import type { ReadWorkspaceFileData, WorkspaceFileData } from '../html/read-relative.ts'
-import { MAX_TOTAL_BYTES } from '../html/pack.ts'
+import { workspaceFileBytes } from '../contract/html/read-relative.ts'
+import type { ReadWorkspaceFileData } from '../contract/html/read-relative.ts'
+import { MAX_TOTAL_BYTES } from '../contract/html/pack.ts'
 import type {} from '../html/locales.ts'
-import type { WorkspacePreviewResource } from './WorkspaceFileTab.tsx'
+import { useWorkspacePreviewRead } from '../contract/preview/use-preview-read.ts'
+import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import { WorkspacePreviewChrome } from './WorkspacePreviewChrome.tsx'
 import css from './Workbench.module.css'
 
 /** @param path - workspace-relative filename. @returns whether the HTML renderer handles its content. */
@@ -68,63 +68,21 @@ export function WorkspaceHtmlPreview({ request, resource, read, htmlT, renderHtm
   close: () => void
   labels: { close: string; reload: string; changed: string }
 }) {
-  const { metadata, revoke } = resource
-  const [result, setResult] = useState<WorkspaceFileData>()
-  const [error, setError] = useState<Error>()
-  const [attempt, setAttempt] = useState(0)
-  const [pending, setPending] = useState(false)
-  const [reloading, setReloading] = useState(false)
-  const denied = metadata.accessDenied || isWorkspaceAccessFailure(error)
-  const version = metadata.value?.changed === true && result !== undefined ? result.version : metadata.value?.version
-  const lifetime = useMemo(() => new AbortController(), [request, denied])
-  useEffect(() => () => { lifetime.abort() }, [lifetime])
-  useEffect(() => {
-    if (denied) { setResult(undefined); return }
-    // The user's metadata reload owns this transition: while its stat is open,
-    // the still-old snapshot cannot authorize a new content read.
-    if (reloading) return
-    if (version === undefined) return
-    const abort = new AbortController()
-    const signal = AbortSignal.any([abort.signal, lifetime.signal])
-    setPending(true)
-    setError(undefined)
-    void read({ resource: request, version, maxBytes: MAX_TOTAL_BYTES }, signal).then((value) => {
-      if (!signal.aborted) setResult(value)
-    }, (cause: unknown) => {
-      if (signal.aborted) return
-      const failure = cause instanceof Error ? cause : new Error(String(cause))
-      setResult(undefined)
-      setError(failure)
-      if (isWorkspaceAccessFailure(failure)) revoke(failure.message)
-    }).finally(() => { if (!signal.aborted) setPending(false) })
-    return () => { abort.abort() }
-  }, [read, request, revoke, version, attempt, denied, lifetime, reloading])
+  const input = useMemo(() => resource.metadata.value?.version, [resource.metadata.value?.version])
+  const readFile = useMemo(() => (version: string, signal: AbortSignal) =>
+    read({ resource: request, version, maxBytes: MAX_TOTAL_BYTES }, signal), [read, request])
+  const state = useWorkspacePreviewRead({ request, resource, input, read: readFile })
+  const { result, error, denied, lifetime } = state
   const data = useMemo(() => result === undefined ? undefined : workspaceFileBytes(result), [result])
-  const reload = async (): Promise<void> => {
-    setReloading(true)
-    try {
-      await resource.reload()
-      setError(undefined)
-      setResult(undefined)
-      setAttempt(value => value + 1)
-    } finally {
-      setReloading(false)
-    }
-  }
-  const failure = error ?? metadata.error
-  return <section aria-label={request.path} className={css.filePreview}>
-    <div className={css.filePreviewActions}>
-      <Button size="sm" onClick={close}>{labels.close}</Button>
-      <Button size="sm" disabled={pending || denied || reloading || metadata.status === 'loading'} onClick={() => { void reload() }}>{labels.reload}</Button>
-    </div>
-    {failure !== undefined && <p role="alert">{failure.message}</p>}
-    {!denied && metadata.value?.changed === true && <p role="status">{labels.changed}</p>}
+  const failure = error ?? resource.metadata.error
+  return <WorkspacePreviewChrome request={request} resource={resource} state={state}
+    className={css.filePreview} message={failure?.message} hasContent={data !== undefined}
+    close={close} labels={{ ...labels, loading: htmlT('loading') }}>
     {!denied && data !== undefined && (
       <HtmlFrame
         key={request.address} data={data} read={read} request={request}
         lifetime={lifetime.signal} renderHtml={renderHtml} t={htmlT}
       />
     )}
-    {!denied && data === undefined && (pending || metadata.status === 'loading') && <p role="status">{htmlT('loading')}</p>}
-  </section>
+  </WorkspacePreviewChrome>
 }

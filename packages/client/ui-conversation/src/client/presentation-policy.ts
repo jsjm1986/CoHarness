@@ -5,12 +5,14 @@
  */
 
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
-import type { TranscriptViewMode } from '../submission-settings.ts'
+import type { CollapseTiming, TranscriptViewMode } from '../submission-settings.ts'
 
 /** Presentation capabilities that one work-details mode enables. */
 export interface ChatPresentationPolicy {
   /** Mode this policy was derived from; for diagnostics, never for branching in renderers. */
   readonly mode: TranscriptViewMode
+  /** Saved collapse timing; completion retains the default immediate folding. */
+  readonly collapseTiming: CollapseTiming
   /** Whether a normally completed Turn folds its process rows behind the whole-Turn control. */
   readonly foldCompletedTurns: boolean
   /** Collapsible group headers for all Turns, historical Turns only, or no Turns. */
@@ -21,7 +23,7 @@ export interface ChatPresentationPolicy {
   readonly settledReasoningPreview: boolean
 }
 
-const POLICIES: Readonly<Record<TranscriptViewMode, ChatPresentationPolicy>> = {
+const POLICIES: Readonly<Record<TranscriptViewMode, Omit<ChatPresentationPolicy, 'collapseTiming'>>> = {
   compact: {
     mode: 'compact',
     foldCompletedTurns: true,
@@ -52,27 +54,45 @@ const POLICIES: Readonly<Record<TranscriptViewMode, ChatPresentationPolicy>> = {
   },
 }
 
+const COMBINED_POLICIES = new Map<string, ChatPresentationPolicy>()
+
 /**
- * Resolve the policy constant for one mode. The same mode always yields the
- * same object, so selectors over a policy see stable identities.
+ * Resolve the policy constant for one mode and collapse timing. The same pair
+ * always yields the same object, so selectors over a policy see stable identities.
  * @param mode - persisted work-details mode.
- * @returns the mode's presentation policy.
+ * @param collapseTiming - when completed work details fold.
+ * @returns the pair's presentation policy.
  */
-export function presentationPolicyFor(mode: TranscriptViewMode): ChatPresentationPolicy {
-  return POLICIES[mode]
+export function presentationPolicyFor(
+  mode: TranscriptViewMode,
+  collapseTiming: CollapseTiming = 'completion',
+): ChatPresentationPolicy {
+  const key = `${mode}:${collapseTiming}`
+  let policy = COMBINED_POLICIES.get(key)
+  if (policy === undefined) {
+    policy = { ...POLICIES[mode], collapseTiming }
+    COMBINED_POLICIES.set(key, policy)
+  }
+  return policy
 }
 
 /**
- * Derive a policy observable from the mode observable without a subscription of
- * its own: reads are a table lookup and change notifications are the mode's.
+ * Derive a policy observable from the mode and timing observables. The merged
+ * snapshot keeps one stable identity until either input changes.
  * @param mode - live work-details mode.
- * @returns observable policy that changes exactly when the mode changes.
+ * @param collapseTiming - live collapse timing.
+ * @returns observable policy that changes exactly when an input changes.
  */
 export function derivePresentationPolicy(
   mode: ObservableSnapshot<TranscriptViewMode>,
+  collapseTiming: ObservableSnapshot<CollapseTiming>,
 ): ObservableSnapshot<ChatPresentationPolicy> {
   return {
-    getSnapshot: () => POLICIES[mode.getSnapshot()],
-    subscribe: listener => mode.subscribe(listener),
+    getSnapshot: () => presentationPolicyFor(mode.getSnapshot(), collapseTiming.getSnapshot()),
+    subscribe: (listener) => {
+      const releaseMode = mode.subscribe(listener)
+      const releaseTiming = collapseTiming.subscribe(listener)
+      return () => { releaseMode(); releaseTiming() }
+    },
   }
 }

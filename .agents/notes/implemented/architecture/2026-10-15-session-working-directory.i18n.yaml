@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-session-working-directory.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-session-working-directory.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-15-session-working-directory.md
+document:
+  en: 1839ef07bc39f7df7a7de9de51f7183be57fd6b2
+  zh: 92bf9ea1c1c08f24351a52213be73e05cd7b6c62
 /agent-note-session-working-directory:
   en: b22f0364aacb36b4
   zh: 06c608888d86979e

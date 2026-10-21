@@ -69,7 +69,10 @@ export function sessionAddressApi(
       readBytes: method(a => a.workspaceFiles.readBytes.bind(a.workspaceFiles), ['sessionId']),
       renderOffice: method(a => a.workspaceFiles.renderOffice.bind(a.workspaceFiles), ['sessionId']),
     },
-    skills: { list: method(a => a.skills.list.bind(a.skills), ['sessionId']) },
+    skills: {
+      list: method(a => a.skills.list.bind(a.skills), ['sessionId']),
+      get: method(a => a.skills.get.bind(a.skills), ['sessionId']),
+    },
     respond: api.respond.bind(api),
   }
 }

@@ -54,7 +54,7 @@ kind: "package-reference"
 
 fresh child 不带 parent 历史 seed。fork child 只捕获一次 Lead 的已完成 turn 前缀，不包含正在执行 delegation 的 turn。继承的 Team 记录带有旧 Root 的 `TeamId`，普通 fork 成为独立运行时 Root 后会忽略这些记录。roster 之外、由 provider 管理的 subagent 不会被误认为嵌套 Team Lead。
 
-roster 同时报告持久 provisioning／failed phase 与实时 `running`／`idle` 状态。active 但不驻留的 teammate 显示为 `inactive`；后续 wakeup 投递会经 continuation owner 冷恢复它。成员恢复在各自 `agent/created` 初始化时启动并在后台运行：创建不会等待冷恢复的邮箱队列——邮箱投递可能已持有该成员的串行队列，从创建侧等待会互相等待而无法完成。
+roster 同时报告持久 provisioning／failed phase 与 `running`／`inactive` 轮次可用状态——`inactive` 同时涵盖已加载轮次间隙与仅存于存储的成员，不描述任务结果；后续 wakeup 投递会经 continuation owner 冷恢复存储成员。成员恢复在各自 `agent/created` 初始化时启动并在后台运行：创建不会等待冷恢复的邮箱队列——邮箱投递可能已持有该成员的串行队列，从创建侧等待会互相等待而无法完成。
 
 <a id="durable-mailbox"></a>
 ## 持久 mailbox
@@ -75,9 +75,6 @@ roster 同时报告持久 provisioning／failed phase 与实时 `running`／`idl
 `writeScopes` 会规范化为 workspace-relative 路径前缀。view 会对与 in-progress 任务的重叠发出警告，但绝不会阻止 claim 或授予文件写权限。它们是协作提示，不是锁。
 
 `waitForChange()` 可以等待注册后发生的下一条 roster、task、mailbox 或实时 status 边，时长范围为 10 秒到 1 小时；它只报告等待是否超时，也不会回放调用前已经发生的变化。运行时 dispose 会释放当前等待，并使后续等待不经超时立即返回。调用方需要在唤醒或超时后重新读取权威状态。取消会保留 Error reason；非 Error reason 则通过 `TEAM_WAIT_ABORTED` 以结构化检查结果报告，不再强制转成 object 字符串。`interrupt()` 仅限 Lead，并委托 continuable-subagent 的 interrupt 路径以 `keepInbox` 只取消 live teammate 的当前 turn；它既不释放任务 owner，也不删除持久 mail。
-
-独立的 `./invariant` 配套模块会把每条候选 Team event 对照已提交 Session 前缀回放。回放会先验证每个当前版本 Team payload，再将其纳入折叠状态；随后会在 append 前拒绝非法 member 转换、名字复用、超出范围的数字 task id、不连续任务 revision、非法任务依赖、重复 queue／ack，以及 target 不匹配的 acknowledgement。顺序与时间由 Session event 的 `seq` 和 `time` 负责，不在 snapshot 中重复保存。
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -102,7 +99,7 @@ Peer 消息追加在 target 可复用历史前缀之后。冷恢复会先复用�
 - **单进程、共享 checkout**：所有成员共享 cwd，修改立即可见；本包不提供 worktree、远端成员、自动 merge 或文件锁。
 - **write scope 仅作提示**：Bash、formatter、codegen 和直接外部写入可以绕过文件版本检查；Lead 必须协调 owner 并检查最终 diff。
 - **扁平且不可变的 roster**：只有 Lead 可以创建直接 teammate；不支持嵌套 Team、重命名、删除或名字复用。
-- **不会自动释放 owner**：idle、interrupt、进程退出与工作失败都不会释放任务 owner。
+- **不会自动释放 owner**：inactivity、interrupt、进程退出与工作失败都不会释放任务 owner。
 - **mailbox 不保证跨进程 exactly-once**：不支持多个 harness 进程并发操作同一 Team。
 
 <a id="dev-note"></a>

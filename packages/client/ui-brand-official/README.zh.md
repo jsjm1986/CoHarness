@@ -17,18 +17,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。插件在构建标志下以静态占位内容填充品牌 slot，除此之外不注册任何内容；它不拥有可变状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

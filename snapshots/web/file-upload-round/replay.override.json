@@ -17,7 +17,7 @@
               "type": "tool-call",
               "id": "call_00_ET_x83IHPfS8ouwILXe8u729956",
               "name": "read",
-              "arguments": "{\"file_path\": \"{{fromRequest:saved at \\\"([^\\\"]+)\\\"}}\"}"
+              "arguments": "{\"file_path\": \"{{fromRequest:document \\\"[^\\\"]+\\\" at \\\"([^\\\"]+)\\\"}}\"}"
             }
           },
           {

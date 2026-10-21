@@ -4,7 +4,7 @@ import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { composeProfilePatches, composeRows, resolveShippedPresetPatch } from '../src/profile-boot.ts'
 
 function row(config: unknown): EntryOptions {
-  return { id: 'agent-presets', config } as EntryOptions
+  return { id: 'agent-preset-registry', config } as EntryOptions
 }
 
 describe('launcher-derived shipped agent-preset root', () => {
@@ -14,7 +14,7 @@ describe('launcher-derived shipped agent-preset root', () => {
       { insert: [row({ default: 'custom', includeUserRoot: false, roots: [configured] })] },
     ]]))
     expect(patch).toMatchObject({
-      id: 'agent-presets',
+      id: 'agent-preset-registry',
       config: {
         default: 'custom',
         includeUserRoot: false,

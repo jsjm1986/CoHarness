@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { CollaborationError, type CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
+import { collaborationCapabilities, CollaborationError, type CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import {
@@ -57,6 +57,7 @@ function controlledAuthority(): {
       },
       expiresAt: Date.now() + 60_000,
       signal: new AbortController().signal,
+      capabilities() { return collaborationCapabilities(this.participant) },
       authorize: sessionId => Promise.resolve({
         sessionId,
         rootSessionId: sessionId,

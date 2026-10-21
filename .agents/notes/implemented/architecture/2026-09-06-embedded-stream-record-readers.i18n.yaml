@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-06-embedded-stream-record-readers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-06-embedded-stream-record-readers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-embedded-stream-record-readers.md
+document:
+  en: efad86a4f940bf3b56d4b141a8fe1e3659c8dd9c
+  zh: f7131a27171163954bca8b7013dc6d90f907c552
 /agent-note-embedded-assistant-stream-consumers-read-compact-records:
   en: ddc3fed8aa76c1b8
   zh: 409dcb67ef28080e

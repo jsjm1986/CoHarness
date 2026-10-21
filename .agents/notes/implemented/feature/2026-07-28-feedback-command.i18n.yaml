@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-28-feedback-command.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-28-feedback-command.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-feedback-command.md
+document:
+  en: b561b28190756ca3823eca8038ca37c8245ba1b8
+  zh: e2543d80813f8c7dea71bac0826b363f7faa0b53
 /agent-note-feedback-command:
   en: 151544a6d2afe2e3
   zh: c3acf2fdf5ae5d92
@@ -27,5 +30,5 @@
   en: 95a35ce9cf22ae6d
   zh: 1978218707724e2f
 /agent-note-feedback-command/consequences:
-  en: 05fcc1ed2a938e5e
+  en: f0f2e1b752f99a52
   zh: fe554958d93cc159

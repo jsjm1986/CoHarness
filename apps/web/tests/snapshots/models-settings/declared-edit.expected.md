@@ -7,6 +7,9 @@
     - button "模型":
       - img
       - text: 模型
+    - button "内置插件":
+      - img
+      - text: 内置插件
     - button "Agent 预设":
       - img
       - text: Agent 预设
@@ -43,9 +46,9 @@
           - text: https://gateway.acme.example/v1
         - text: API 协议
         - combobox "API 协议":
-          - option "openai-completions" [selected]
-          - option "openai-responses"
-          - option "anthropic-messages"
+          - option "OpenAI Chat Completions" [selected]
+          - option "OpenAI Responses"
+          - option "Anthropic Messages"
         - region "模型目录":
           - text: 模型目录 已自定义模型目录
           - button "恢复默认模型"
@@ -63,6 +66,3 @@
   - button "添加提供方":
     - img
     - text: 添加提供方
-  - button "添加自定义提供方":
-    - img
-    - text: 添加自定义提供方

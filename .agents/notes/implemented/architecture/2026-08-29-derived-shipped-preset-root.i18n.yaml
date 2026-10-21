@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-29-derived-shipped-preset-root.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-29-derived-shipped-preset-root.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-29-derived-shipped-preset-root.md
+document:
+  en: 7f92b99b65aa032d8e52774f562d45f979e9635e
+  zh: ae43b90f1da87f51b62a3e6c7dc176dd8ecf7199
 /agent-note-derive-the-shipped-preset-root-for-every-profile-composition:
   en: 11c907aefd2f0f80
   zh: 4bff30e739567ffd

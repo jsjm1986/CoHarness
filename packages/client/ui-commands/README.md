@@ -35,7 +35,6 @@ Typing a `/` command opens a registered popup, a client action, a host command's
 
 - [Non-submitting actions](#non-submitting-actions)
 - [Popup availability](#popup-availability)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -51,11 +50,6 @@ An action consumes only the still-current trigger token and keeps attached image
 ## Popup availability
 
 Popup options can be disabled with an explanation; pointer and keyboard selection both refuse them. A business spec may subscribe to invalidation of its captured options. That subscription exists only while its popup is open and dismisses only that popup; close, replacement, successful selection, and scope disposal release it. Reopening obtains fresh options without another directory cache.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The command directory is a session-keyed cache refetched through the owning command surface; it mirrors host data rather than owning a relation.
 
 <a id="model-experience"></a>
 ## Model Experience

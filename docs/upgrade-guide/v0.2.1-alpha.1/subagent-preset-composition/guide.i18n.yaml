@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/subagent-preset-composition/guide.md
+document:
+  en: df02e5f1407957405a4ccd7bb4df48855c27c8ec
+  zh: 3b444b1c099f0948d1830d958b0d2ea045072605
+/:
+  en: 0351f79f0f7acc90
+  zh: c6815e557ffa1a2f
+/configure-subagent-composition-through-presets:
+  en: aab975172f278acf
+  zh: 4e6dad4ef487cc52
+/configure-subagent-composition-through-presets/change:
+  en: 1efa039a5a83c3c3
+  zh: 30a9453178ded4de
+/configure-subagent-composition-through-presets/migration:
+  en: 0ae5b3e77d8c4b83
+  zh: 746b44875e23dea6

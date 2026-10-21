@@ -219,7 +219,6 @@ interface SubprocessCollectedOutputs {
 }
 ```
 
-
 ## 结果只承载退出事实
 
 `done` 报告 Node close 事件的词汇，不携带原因分类：服务会在中止时终止进程，但绝不判定原因（调用方读取归自己所有的 deadline 信号，例如 bash 执行器的 `timedOut`/`aborted` 拆分）。收集到的输出在结算后仍可经 `handle.collected` 读取，因此批量与流式调用方共用一条访问路径。

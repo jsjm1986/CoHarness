@@ -14,7 +14,6 @@ Historical generated-Plugin cards and a frame-wide panel for existing process-lo
 ## Table of Contents
 
 - [Presentation and ownership](#presentation-and-ownership)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -32,10 +31,6 @@ Host activation and page-local loading are separate facts. A page may offer load
 
 The `/client` entry exports the plugin body and its injected face, run-state, port, and event types. [The Client runner](../cordis-client-runner/README.md) owns browser loading and cleanup; [the Host runner](../cordis-host-runner/README.md) owns definitions and execution.
 
-<a id="invariants"></a>
-## Invariants
-
-No invariant companion is published. The panel consumes Host state and the cards project durable events; this package owns no independent definition state.
 
 <a id="model-experience"></a>
 ## Model Experience

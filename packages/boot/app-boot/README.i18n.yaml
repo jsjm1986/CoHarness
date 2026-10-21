@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/boot/app-boot/README.md
+document:
+  en: 6a73ef9768fb20427ec08279537a2041d24139dc
+  zh: e867d24a995ef8d811026f3cb39ce10281eaf77e
 /:
   en: 822ef8977098c703
   zh: c0673e854310840f
@@ -21,11 +24,11 @@
   en: 2fdfe02f2ed4a258
   zh: d748228ece579c4a
 /deepseek-ai-dsh-app-boot/use-this-package/starting-the-app:
-  en: 1099528bde0e2aee
+  en: 4a424cd401556f20
   zh: b68772bdb9bb7856
 /deepseek-ai-dsh-app-boot/use-this-package/profiles:
-  en: 6d03411a7554d384
-  zh: 87c60d5e3e15a87f
+  en: b48fcaca81973ce3
+  zh: 37e7a1f972e6783c
 /deepseek-ai-dsh-app-boot/use-this-package/previewing-the-effective-configuration:
   en: 646a0ccdd7881ad1
   zh: e3696acb1573dd7b
@@ -33,14 +36,11 @@
   en: c4a301652b851ce9
   zh: 784871e19cd9db0a
 /deepseek-ai-dsh-app-boot/use-this-package/reading-plugin-display-metadata:
-  en: 480ad3a4d96112f0
-  zh: 10a92f1013aa5ac4
+  en: 98ef2935171952c0
+  zh: 8c160bdeffd68b0f
 /deepseek-ai-dsh-app-boot/use-this-package/startup-and-reload-failures:
-  en: abe8b360f8796a45
-  zh: 31c769ae3de5d97d
-/deepseek-ai-dsh-app-boot/use-this-package/telling-the-agent-where-the-harness-lives:
-  en: 07c459f26f4f8517
-  zh: 210f1e4894731b1a
+  en: dc13dfa1f79292e4
+  zh: d51682ced7a18ac2
 /deepseek-ai-dsh-app-boot/understand-the-implementation:
   en: f4a2695cb4c8a570
   zh: 89837235d2f376cf
@@ -48,20 +48,20 @@
   en: ed279614d9fb510f
   zh: b766d10475a6e833
 /deepseek-ai-dsh-app-boot/understand-the-implementation/helper-behavior:
-  en: f7bc3a8dd4b00bdd
-  zh: 30098428aa769ad0
+  en: 6fa850d1bb000d0e
+  zh: aa83a40a9d3db295
 /deepseek-ai-dsh-app-boot/understand-the-implementation/source-map:
-  en: e7e47282e4889956
-  zh: 4bb6f96c14971538
+  en: 541700d5c39e0ab4
+  zh: 7522dbd9cd68c930
 /deepseek-ai-dsh-app-boot/further-exploration:
   en: ffd10e94443a10ca
   zh: cd11495bae751bdd
 /deepseek-ai-dsh-app-boot/model-experience:
-  en: 769777f1cb1a9408
-  zh: f02b2834179df50d
+  en: d2d0a21502d88c50
+  zh: 82a60c7a490a6834
 /deepseek-ai-dsh-app-boot/model-experience/kv-cache-effect:
-  en: c4d49630b68ae896
-  zh: 6f450ec6ba39bb81
+  en: 5a1d9344c8fdc790
+  zh: 0b32579f658b2ca1
 /deepseek-ai-dsh-app-boot/known-limitations-and-deferred-work:
   en: 1400c4f22a79b59a
   zh: 269f6c91584aec3e

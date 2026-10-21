@@ -35,9 +35,6 @@ SDK 使用 base 默认提供的 `read`、`write` 和 `edit`。要添加 `str_rep
 
 -----
 
-
-**运行时不变式：** 不发布伴生入口。该 bundle 增加进程传输与启动 latch；帧纯度、help 排除和关闭行为由源码及构建产物的 stdio 测试负责。
-
 <a id="model-experience"></a>
 ## 模型体验
 

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-05-turn-tail-actions-require-a-completed-turn.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-05-turn-tail-actions-require-a-completed-turn.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-05-turn-tail-actions-require-a-completed-turn.md
+document:
+  en: 44a890c955089096204a5b2a2833905c9ef9f7ed
+  zh: 71eb7acc42e3c03065891a92c2ce82ce12e2cda0
 /agent-note-turn-tail-iconactions-require-a-completed-turn:
   en: 67dae946350c556d
   zh: ad8ca679c73e5dbb

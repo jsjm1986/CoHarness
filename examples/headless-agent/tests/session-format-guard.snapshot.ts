@@ -16,7 +16,7 @@ import SessionStore, {
   SessionId,
   type SessionEvent,
   type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { eventLines, generationLogPath } from '@deepseek-ai/dsh-session-persistence-jsonl/src/format.ts'
 import { describe, expect, it } from 'vitest'
 

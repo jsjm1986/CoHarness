@@ -4,7 +4,7 @@ import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runti
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ReadWorkspaceDocument } from './components/WorkspaceDocumentPreview.tsx'
 import type { ReadWorkspacePreview, ReadWorkspaceBytesPreview } from './components/WorkspaceFilePreview.tsx'
-import type { ReadWorkspaceFileData } from './html/read-relative.ts'
+import type { ReadWorkspaceFileData } from './contract/html/read-relative.ts'
 
 /** Create readers sharing the application's existing connection pool.
  * @param connection - authorized base connection and target resolver.

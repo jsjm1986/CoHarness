@@ -1,31 +1,31 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-settings-plugins/README.md
+document:
+  en: cab5c02ed98ed20377e443d311984d7873fe1679
+  zh: 9478a442294eb852e7f82304989936562d30e2be
 /:
   en: 70fcbb55853a15d6
   zh: 61495d48365178df
 /dsh-client-ui-settings-plugins:
-  en: b3f959da7fb1ef7d
-  zh: 4e1e8cc699000385
+  en: a3d57e69c83c7f12
+  zh: b5dad16da0cfe897
 /dsh-client-ui-settings-plugins/summary:
-  en: 754902de3a2d3db5
-  zh: b92b6fad042d822f
+  en: f8db1f758bd5682b
+  zh: 8a6fba32e5b189a1
 /dsh-client-ui-settings-plugins/table-of-contents:
-  en: 6e8d92945cfa4e11
-  zh: 6827cb51ca55fc8e
+  en: 09abf5f967dd84a8
+  zh: cd83217568b7d875
 /dsh-client-ui-settings-plugins/what-appears-here:
-  en: 26624fe099921bfb
-  zh: 7313181db1e6879a
+  en: a5ba3ac6420e4d87
+  zh: bd12df2d68ecb357
 /dsh-client-ui-settings-plugins/extension-point:
   en: d944391a7dd5320b
   zh: aa00f85ae001fc3d
 /dsh-client-ui-settings-plugins/writes:
-  en: ced63964ab447a24
-  zh: 42f57278db111619
-/dsh-client-ui-settings-plugins/invariants:
-  en: e0a1e4d047714943
-  zh: 1f5447851a8fdce8
+  en: df9f323c49a0eef5
+  zh: 2c6f91e4430b99da
 /dsh-client-ui-settings-plugins/model-experience:
   en: 6b7c6f82ab6c8435
   zh: 3328550d96a6368b
@@ -33,8 +33,8 @@
   en: ca75c51c89c2c9b0
   zh: 2026c1566df4f78c
 /dsh-client-ui-settings-plugins/known-limitations-and-deferred-work:
-  en: 0d00e3bf351df936
-  zh: d6d0f631cf46c403
+  en: 090b216426b299d2
+  zh: 245e50014214e3be
 /dsh-client-ui-settings-plugins/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

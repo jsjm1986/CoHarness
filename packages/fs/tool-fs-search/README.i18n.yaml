@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/tool-fs-search/README.md
+document:
+  en: 90f06672b2df2b4300ab3fcc17a3cdbae3ec1deb
+  zh: e57132509863916f8fb415dded3e03d8feb2ce30
 /:
   en: e7dc8e2a51b03faa
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: a2d8407299a71efe
   zh: d43338a4c7954a39
 /deepseek-ai-dsh-tool-fs-search/table-of-contents:
-  en: 83d26943ae08fad2
-  zh: e6fe0cb7952b86d8
+  en: 6e6ccc696d484fce
+  zh: 478b654247b7465e
 /deepseek-ai-dsh-tool-fs-search/deployment-requirement-no-host-rg-co-located-workdir-filesystem:
   en: 886917d74cd443ae
   zh: 0d00fdaa2f7a3e9e
@@ -27,11 +30,8 @@
   en: c539602650a2212f
   zh: cf7eb74865cba271
 /deepseek-ai-dsh-tool-fs-search/errors:
-  en: ba92c7431bcc506b
-  zh: c887ab10dd7609ef
-/deepseek-ai-dsh-tool-fs-search/invariants:
-  en: a1c2c4d37fefdd89
-  zh: 5bd70e4ccfed7a17
+  en: e8f118b158739a15
+  zh: 18c370162ae47e3c
 /deepseek-ai-dsh-tool-fs-search/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

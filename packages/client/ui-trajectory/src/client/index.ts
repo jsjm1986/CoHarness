@@ -20,8 +20,10 @@ import { registerTrajectoryConversationView } from './trajectory-snapshot-builde
 import { registerTrajectoryToolDefinition } from './trajectory-tool-definition.ts'
 import { TrajectoryView, type TrajectoryViewInjected } from './TrajectoryView.tsx'
 
-/** Required services: the conversation slot, registries, ordinary Session paging, and the locale service. */
-export const inject = ['slots', 'conversationEvents', 'conversationViews', 'sessions', 'locale']
+export type {} from './trajectory-contract.ts'
+
+/** Required services: conversation image loading, view/event registries, Session paging, and locale. */
+export const inject = ['slots', 'conversation', 'conversationEvents', 'conversationViews', 'sessions', 'locale']
 
 /**
  * Client plugin body: register the trajectory view tab. The registration
@@ -48,6 +50,9 @@ export function apply(ctx: Context): void {
     order: 10,
     locale: NS,
     label: () => t('view.trajectory'),
+    children: {
+      'conversation.trajectory.images': { kind: 'single', scope: 'session' },
+    },
     inject: (sessionId: SessionId): TrajectoryViewInjected => {
       const session = ctx.sessions.binding(sessionId)?.session
       if (session === undefined) {
@@ -60,6 +65,10 @@ export function apply(ctx: Context): void {
           await session.loadOlder()
           return session.getSnapshot().views.get('trajectory') !== before
         },
+        loadImage: Object.assign(
+          (attachment: import('@deepseek-ai/dsh-attachment').ImageAttachmentRef) => ctx.conversation.resolveImage(sessionId, attachment),
+          { peek: (attachment: import('@deepseek-ai/dsh-attachment').ImageAttachmentRef) => ctx.conversation.peekImage(sessionId, attachment) },
+        ),
         setActualDuration: (value) => { duration.set(value) },
         setWrapLines: (value) => { wrap.set(value) },
         ensureHistoryDetail: () => session.ensureHistoryDetail(),

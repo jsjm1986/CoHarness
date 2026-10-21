@@ -36,7 +36,7 @@ kind: "package-reference"
 运行时提供以下执行指引：
 
 ```text
-Each call runs in a fresh Python process. Relative paths use the supplied working directory; only TMPDIR is set in the environment. Direct filesystem access follows this execution's sandbox policy.
+The program is the body of an async Python function. Top-level await and return are supported. Emit output with print(...) or return a lossless JSON value. Only printed values and the returned value become program output. Each call runs in a fresh Python process; variables and imported modules do not persist across calls. Relative paths use the supplied working directory; only TMPDIR is set in the environment. Direct filesystem access follows this execution's sandbox policy.
 ```
 
 ### 你得到什么
@@ -99,7 +99,7 @@ Each call runs in a fresh Python process. Relative paths use the supplied workin
 <a id="further-exploration"></a>
 ## 进一步探索
 
-当 runtime 契约不够时阅读这些。它们从 seam 定义走向设计记录与配套后端。本后端不发布运行时 invariant 伴随物：除 runtime 契约自身的结算与字节上限保证之外，它没有可观察的可变跨组件关系。
+当 runtime 契约不够时阅读这些。它们从 seam 定义走向设计记录与配套后端。
 
 - [PTC 运行时 seam](../../ptc-runtime/ptc-runtime/README.zh.md) — 本后端实现的抽象契约。
 - [fd-3 协议 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.zh.md) — 设计理由与 wire 契约。
@@ -112,7 +112,7 @@ Each call runs in a fresh Python process. Relative paths use the supplied workin
 <a id="model-experience"></a>
 ## 模型体验
 
-间接地，通过 `dsh-tools` 中的 PTC mode；当显式组合挂载本提供方时，它会把程序的完成值或失败渲染成保留的 `run_code` 结果，且已发布 profile 均不挂载这个实验包。
+间接地，通过显式组合中的 `dsh-tools` PTC mode：消费者将本提供方的异步函数、输出和新进程执行指引附加到 `run_code`，并将程序的完成值或失败渲染为工具结果。
 
 #### KV Cache 效应
 
@@ -121,7 +121,6 @@ Each call runs in a fresh Python process. Relative paths use the supplied workin
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制定义本包覆盖与不覆盖的内容；它们是当前包约束，不是任务积压。
 
@@ -151,7 +150,5 @@ Each call runs in a fresh Python process. Relative paths use the supplied workin
 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
-
-无 `./invariant` 伴随物：本后端没有可供断言观察的可变跨组件关系。其保证是 runtime 契约的逐次运行结算与字节上限结果，经由协议镜像与 spec 套件验证，而非共享状态报告器。
 
 </details>

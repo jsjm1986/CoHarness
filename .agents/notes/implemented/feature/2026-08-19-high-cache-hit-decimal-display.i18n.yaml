@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-19-high-cache-hit-decimal-display.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-19-high-cache-hit-decimal-display.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-high-cache-hit-decimal-display.md
+document:
+  en: 952d838fdf330175915e13ef767fd80d145506b2
+  zh: ba33bd8a265211c8514fda4babda5ba94ed02884
 /agent-note-high-cache-hit-decimal-display:
   en: 3b50cb7e702db756
   zh: 76a9c847745a6f36

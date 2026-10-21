@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-28-themed-scrollbars-and-reserved-gutter.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-28-themed-scrollbars-and-reserved-gutter.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-28-themed-scrollbars-and-reserved-gutter.md
+document:
+  en: 3dbaf73158d7c5182b0992d1120965b008aff649
+  zh: fa90304d541d097c9aabad3c5448f9ead0a3a213
 /agent-note-the-scrollbar-tokens-get-their-consumer-and-the-workspace-list-reserves-its-gutter:
   en: 6b7a2fc996c02058
   zh: 75b4991ed827cd25

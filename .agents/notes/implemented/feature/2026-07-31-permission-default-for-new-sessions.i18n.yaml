@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-permission-default-for-new-sessions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-permission-default-for-new-sessions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-permission-default-for-new-sessions.md
+document:
+  en: ebf7fe39712d64c18e12b9b26d86201a61ad6cfd
+  zh: c0f450c8efca8647e3058fb305724cf0a554cc8d
 /agent-note-permission-settings-default-for-new-sessions:
   en: 52931160e9dd9cf1
   zh: 79e4b385445f05dc

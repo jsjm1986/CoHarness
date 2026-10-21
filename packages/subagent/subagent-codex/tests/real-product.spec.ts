@@ -34,6 +34,7 @@ import {
 } from './responses-fixture.ts'
 import { cleanupRealProduct } from './real-product-cleanup.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { parentAgent } from './agent-fixture.ts'
 
 const execFileAsync = promisify(execFile)
 const packageRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -157,11 +158,7 @@ async function realHarness(
     ...permissionMode === undefined ? {} : { permissionMode },
     disposeGraceMs: 2_000,
   })
-  const parent = {
-    id: 'real-parent',
-    ctx,
-    session: { header: { cwd: instance.workspace } },
-  } as unknown as Agent
+  const parent = parentAgent(instance.workspace, 'real-parent', ctx)
   return {
     harness: {
       ctx,
@@ -344,16 +341,8 @@ describe('real @openai/codex 0.153.4 product', () => {
       permissionMode: 'dangerously-bypass-approvals-and-sandbox',
       disposeGraceMs: 2_000,
     })
-    const safeParent = {
-      id: 'safe-parent',
-      ctx,
-      session: { header: { cwd: safeInstance.workspace } },
-    } as unknown as Agent
-    const bypassParent = {
-      id: 'bypass-parent',
-      ctx,
-      session: { header: { cwd: bypassInstance.workspace } },
-    } as unknown as Agent
+    const safeParent = parentAgent(safeInstance.workspace, 'safe-parent', ctx)
+    const bypassParent = parentAgent(bypassInstance.workspace, 'bypass-parent', ctx)
     const safeController = new AbortController()
 
     const [safeRun, bypassRun] = await Promise.all([

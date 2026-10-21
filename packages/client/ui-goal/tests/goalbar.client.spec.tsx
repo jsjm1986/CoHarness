@@ -134,9 +134,27 @@ describe('GoalBar', () => {
 
   it('active goal: the pause action pauses', () => {
     const actions = makeActions()
-    render(<GoalBar goal={makeGoal()} {...actions} t={t} />)
+    render(<GoalBar goal={makeGoal()} activation="armed" {...actions} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: '暂停目标' }))
     expect(actions.onPause).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps pause available when active goal activation is unknown', async () => {
+    const actions = makeActions()
+    render(<GoalBar goal={makeGoal()} {...actions} t={t} />)
+    expect(screen.queryByRole('button', { name: '恢复目标' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '暂停目标' })) })
+    expect(actions.onPause).toHaveBeenCalledTimes(1)
+    expect(actions.onResume).not.toHaveBeenCalled()
+  })
+
+  it('active disarmed goal: "未运行的目标" with a resume action instead of pause', () => {
+    const actions = makeActions()
+    render(<GoalBar goal={makeGoal()} activation="disarmed" {...actions} t={t} />)
+    expect(screen.getByText('未运行的目标')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '恢复目标' }))
+    expect(actions.onResume).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: '暂停目标' })).toBeNull()
   })
 
   it('paused goal: "已暂停的目标" with a resume action before edit', () => {
@@ -166,7 +184,7 @@ describe('GoalBar', () => {
     vi.useFakeTimers()
     try {
       const actions = makeActions()
-      render(<GoalBar goal={makeGoal()} {...actions} t={t} />)
+      render(<GoalBar goal={makeGoal()} activation="armed" {...actions} t={t} />)
       fireEvent.mouseEnter(screen.getByRole('button', { name: '暂停目标' }))
       act(() => { vi.advanceTimersByTime(500) })
       const tooltip = screen.getByRole('tooltip')

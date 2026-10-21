@@ -26,6 +26,7 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
 import * as ToolWorkingDirectory from '@deepseek-ai/dsh-tool-working-directory'
+import * as ToolWorktree from '@deepseek-ai/dsh-experimental-tool-worktree'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type { UserDocStore } from '@deepseek-ai/dsh-userdoc'
@@ -56,7 +57,8 @@ import * as ToolStrReplaceEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
 import TerminalSessionService from '@deepseek-ai/dsh-terminal'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
 import * as ToolGoal from '@deepseek-ai/dsh-tool-goal'
-import * as ToolSchedule from '@deepseek-ai/dsh-schedule'
+import * as ToolSchedule from '@deepseek-ai/dsh-tool-schedule'
+import type ScheduleService from '@deepseek-ai/dsh-schedule'
 import Lsp from '@deepseek-ai/dsh-lsp'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
 import type MemoryService from '@deepseek-ai/dsh-memory'
@@ -66,6 +68,8 @@ import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
+import type PluginMarket from '@deepseek-ai/dsh-plugin-market'
+import * as PluginMarketTools from '@deepseek-ai/dsh-plugin-market/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
 import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
@@ -125,7 +129,7 @@ class CatalogWorkflowEngine extends WorkflowEngine {
 function registerCatalogSubagentProvider(ctx: Context, name: string): void {
   const provider: SubagentProvider = {
     name,
-    capabilities: { agentOptions: true, outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
+    capabilities: { agentOptions: true, agentPreset: true, outputSchema: true, depthLimit: true },
     inheritsParentContext: false,
     start: () => Promise.reject(new Error('tool-catalog provider cannot start a child')),
     // Declared so consumers configured for continuable background mode mount.
@@ -136,26 +140,6 @@ function registerCatalogSubagentProvider(ctx: Context, name: string): void {
 
 /** Minted child-scope keys for packages whose tools are never global. */
 const catalogChildScopes = new WeakMap<Context, Agent>()
-
-/**
- * Install one scope-local tool package into an agent-like child scope for
- * schema harvest, without starting a model, Agent loop, or persistence backend.
- * @param ctx - catalog context owning the scope.
- * @param mountScoped - package installer for the scoped context.
- * @param key - agent-like scope key exposed to the package's scope selector.
- * @param inject - services the package installer must await before mounting.
- */
-async function mountCatalogChildScope(
-  ctx: Context,
-  mountScoped: (childCtx: Context) => void,
-  key: Agent = { id: SessionId('tool-catalog-child') } as Agent,
-  inject: string[] = ['tools', 'systemPrompt', 'subagents'],
-): Promise<void> {
-  await ctx.plugin(Object.assign((inner: Context) => {
-    mountScoped(createScope(inner, key).ctx)
-  }, { inject }))
-  catalogChildScopes.set(ctx, key)
-}
 
 /**
  * Tool package plus its hand-maintained boot recipe. The caller mounts the
@@ -221,6 +205,18 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
   },
   {
+    pkg: '@deepseek-ai/dsh-plugin-market',
+    dir: 'plugin-market',
+    source: 'packages/boot/plugin-market/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.pluginMarket'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never fetches an index.
+      ctx.provide('pluginMarket', {} as PluginMarket)
+      await ctx.plugin(PluginMarketTools)
+    },
+  },
+  {
     pkg: '@deepseek-ai/dsh-mcp-resources',
     dir: 'mcp-resources',
     source: 'packages/mcp/mcp-resources/src/tools.ts',
@@ -272,7 +268,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     toolsConfig: { mode: 'ptc' },
     async mount() {},
     note:
-      'Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` / `mode: both` (see the PTC mode Agent Note). Under `ptc` it is the registry\'s only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime\'s language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result.',
+      'Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` (see the PTC mode Agent Note). Under `ptc` it is the registry\'s only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime\'s language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result.',
   },
   {
     pkg: '@deepseek-ai/dsh-plan-mode',
@@ -474,22 +470,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
       'create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds.',
   },
   {
-    pkg: '@deepseek-ai/dsh-schedule',
-    dir: 'schedule',
-    source: 'packages/schedule/schedule/src/tools.ts',
-    requires: ['ctx.tools', 'ctx.schedule', 'a live root Agent'],
+    pkg: '@deepseek-ai/dsh-tool-schedule',
+    dir: 'tool-schedule',
+    source: 'packages/schedule/tool-schedule/src/index.ts',
+    requires: ['ctx.tools', 'ctx.schedule'],
     writes: ['tool/call', 'Schedule storage domain create, update, or delete', 'tool/result'],
     async mount(ctx) {
-      await ctx.plugin(SessionStore)
-      const session = ctx.sessions.create(SessionId('tool-catalog-schedule'))
-      const agent = { id: session.id, session } as Agent
-      await mountCatalogChildScope(ctx, (childCtx) => {
-        ToolSchedule.registerScheduleTools(ctx, childCtx, agent)
-      }, agent, ['tools', 'systemPrompt'])
+      // Schema harvest never executes a tool, so the Host service is a
+      // declaration-only stub.
+      ctx.provide('schedule', {} as ScheduleService)
+      await ctx.plugin(ToolSchedule)
     },
-    scope: ctx => catalogChildScopes.get(ctx) as Agent,
     note:
-      'Registered in live root Agent scopes while the Schedule service is loaded. '
+      'A preset or Agent scope mounts this package; the preset decides which agents receive the four '
+      + 'management tools. Each call acts on the calling Agent\'s Session. '
       + 'Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly '
       + 'local times in an explicit IANA zone, and cron as a five-field expression. '
       + 'Management uses the Host storage domain; due messages resume the original Session.',
@@ -680,6 +674,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolWorkingDirectory)
     },
     note: 'Reads or changes the calling Session directory. Existing shells and processes retain their own directories; origin metadata and permission roots stay fixed.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-tool-worktree',
+    dir: 'tool-worktree',
+    source: 'packages/experimental/tool-worktree/src/index.ts',
+    requires: ['ctx.tools', 'ctx.worktrees', 'a calling Agent'],
+    writes: ['tool/call', 'Git branch and checkout', 'working-directory/change', 'tool/result'],
+    async mount(ctx) {
+      ctx.provide('worktrees', {
+        create: () => Promise.reject(new Error('gen-tool-catalog: worktree creation is unavailable during schema harvest')),
+      })
+      await ctx.plugin(ToolWorktree)
+    },
+    note: 'Explicit experimental composition only. Creates a new branch and checkout from a pinned local commit under existing write permissions, then changes the Session directory. Leaving retains the branch and checkout.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-workflow',

@@ -55,7 +55,7 @@ root
             └─ models (order 10)         ui-settings-models 注册
 ```
 
-section/item contribution 使用 `ctx.slots.inject()`，不依赖 client manifest（元数据清单）的 apply 顺序；本地化 label 走 [全量接入 Note](../../implemented/architecture/2026-07-30-client-locale-full-rollout.zh.md) 的 label thunk。SlotMap 类型分家：trigger/header/close/section 正家在 ui-settings 约定（消费方 general/models 均依赖壳，无环）；`settings.general.item` 正家在 locale 包——它是全部 item 注册方的最低公共依赖（设置行必带文案），而声明方 general 的约定对 locale/ui-theme 不可达（会成环）；ui-theme 经 re-export 出口消费。
+section/item contribution 使用 `ctx.slots.inject()`，不依赖 client manifest（元数据清单）的 apply 顺序；本地化 label 走 [全量接入 Note](../../archived/architecture/2026-07-30-client-locale-full-rollout.md) 的 label thunk。SlotMap 类型分家：trigger/header/close/section 正家在 ui-settings 约定（消费方 general/models 均依赖壳，无环）；`settings.general.item` 正家在 locale 包——它是全部 item 注册方的最低公共依赖（设置行必带文案），而声明方 general 的约定对 locale/ui-theme 不可达（会成环）；ui-theme 经 re-export 出口消费。
 
 ### slot 声明是一等可注入等待对象
 

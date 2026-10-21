@@ -18,7 +18,6 @@ The model-facing control tools for [`ctx.goals`](../goal/README.md): `get_goal`,
 - [Tools](#tools)
 - [Authority](#authority)
 - [Config](#config)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -58,11 +57,6 @@ Complete and blocked also accept the exact current goal round: a goal-sourced `u
 ```
 
 The value must be a positive safe integer. It supplies both the hard lower bound on model self-blocking and the number named in model guidance.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The tools are registrations over `ctx.goals`; goal state is owned by the goal domain.
 
 <a id="model-experience"></a>
 ## Model Experience

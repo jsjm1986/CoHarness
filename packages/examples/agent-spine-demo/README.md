@@ -15,14 +15,12 @@ Read this package for the whole plugin tree and its composition order.
 
 Use `dsh-agent-spine-demo` as the default executor-less, UI-less agent spine in one Cordis bundle plugin: the fixed services every harness agent needs, with the loop's `agents` list forwarded as config — an app composes a working agent by adding only an entry point and swappable backends.
 
-
 ## Table of Contents
 
 - [The tree it loads](#the-tree-it-loads)
 - [What it deliberately leaves OUTSIDE the bundle](#what-it-deliberately-leaves-outside-the-bundle)
 - [Config](#config)
 - [Why a code bundle, not a shared YAML include](#why-a-code-bundle-not-a-shared-yaml-include)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -49,12 +47,6 @@ Use `dsh-agent-spine-demo` as the default executor-less, UI-less agent spine in 
 @deepseek-ai/dsh-goal-round-driver     optional same-session goal-round driver
 @deepseek-ai/dsh-llm-retry        provider-routed request retry policy
 @deepseek-ai/dsh-jobs-local      generic background-job registry
-@deepseek-ai/dsh-invariants       configurable invariant registry service
-@deepseek-ai/dsh-session/invariant
-@deepseek-ai/dsh-agent/invariant
-@deepseek-ai/dsh-scope/invariant
-@deepseek-ai/dsh-agent-loop/invariant
-                                  package-owned relational checks
 @deepseek-ai/dsh-tool-bash        the model-facing bash schema (unless toolBash=false)
 @deepseek-ai/dsh-agent-instructions  AGENTS.md/CLAUDE.md workspace context loader
 @deepseek-ai/dsh-tool-skill       session-prefix skill catalog + model-facing loader schema
@@ -81,13 +73,11 @@ This applies the [Service Definition / Service Provider / Consumer separation](.
 
 ```ts
 import type { Config } from '@deepseek-ai/dsh-agent-spine-demo'
-// { agents?, maxParallelToolCalls?, inbox?, includeHarnessIdentity?, includeRuntimeContext?, persona?, toolOrder?, tools?, dshHome?, sessionTitle?, skills?, workspaceContext, toolBash?, jobs?, toolJobs?, goals?, invariants? }
+// { agents?, maxParallelToolCalls?, inbox?, includeHarnessIdentity?, includeRuntimeContext?, persona?, toolOrder?, tools?, dshHome?, sessionTitle?, skills?, workspaceContext, toolBash?, jobs?, toolJobs?, goals? }
 // workspaceContext requires { maxBytes } or false; the other owner schemas supply defaults.
 ```
 
-The bundle forwards each field to the child that owns it. App packages supply any pre-created agents: headless and JSON-RPC compositions create `main`, while the ACP app creates agents on demand at `session/new`. `inbox.maxMessages` and `inbox.maxBytes` cap pending input per agent, protecting the loop from unbounded queued messages. `includeRuntimeContext: false` is forwarded to `dsh-system-prompt` and suppresses all dynamic context snapshots for fresh sessions without disabling their policy services. Prompt, tool, title, skill, agent-instructions, invariant, goal, and task settings retain the schemas and defaults documented by their owning packages; `jobs.maxConcurrentJobsPerOwner` configures the local provider independently of the model-facing `toolJobs` controls. `pickSpineConfig()` copies only fields owned by this bundle, and conflicting `dshHome` values fail during composition.
-
-For example, `{ invariants: { enabled: true, package_allowlist: ['^@deepseek-ai/dsh-'], package_blocklist: ['agent-loop$'] } }` keeps the package-owned companions mounted but suppresses the blocked owner. Blocklist matches override allowlist matches; see [`dsh-invariants`](../../runtime-diagnostics/invariants/README.md) for regex and lifecycle rules.
+The bundle forwards each field to the child that owns it. App packages supply any pre-created agents: headless and JSON-RPC compositions create `main`, while the ACP app creates agents on demand at `session/new`. `inbox.maxMessages` and `inbox.maxBytes` cap pending input per agent, protecting the loop from unbounded queued messages. `includeRuntimeContext: false` is forwarded to `dsh-system-prompt` and suppresses all dynamic context snapshots for fresh sessions without disabling their policy services. Prompt, tool, title, skill, agent-instructions, goal, and task settings retain the schemas and defaults documented by their owning packages; `jobs.maxConcurrentJobsPerOwner` configures the local provider independently of the model-facing `toolJobs` controls. `pickSpineConfig()` copies only fields owned by this bundle, and conflicting `dshHome` values fail during composition.
 
 <a id="why-a-code-bundle-not-a-shared-yaml-include"></a>
 ## Why a code bundle, not a shared YAML include
@@ -95,11 +85,6 @@ For example, `{ invariants: { enabled: true, package_allowlist: ['^@deepseek-ai/
 A YAML include can deduplicate config but cannot own a bin or provide entry-point defaults. The ACP app package makes protocol-pure stdout wiring the default, though a leaf can still add an unsafe logger. Bundle children register services in the root isolate-keyed store, so injected leaf siblings see them without load-order coupling.
 
 The retry policy may repeat a failed request in a new numbered step. Retry status, provider errors, and failed partial chunks stay outside model history; each provider attempt can still incur billing, always mode has no attempt limit, entry points derive usage across every logged step, and the reconstructed request preserves the prior prefix for provider cache reuse.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The spine is a static composition list; every loaded service owns its own runtime relationships.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -113,7 +98,6 @@ No direct invalidation; the consumer owns any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 - **Most of the spine set is fixed in code** — `apply()` always mounts the core services; config can omit bundled goals, skills, bash, and task-control tools, but swapping the loop or dropping another spine member means composing a different bundle.
-- **The invariant service and companions remain fixed members** — `invariants.enabled: false` or package filters suppress checks but do not remove the service or companion registrations; Session's always-on validation and freezing are separate.
 
 <a id="dev-note"></a>
 ### Dev Note

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-27-document-index-pagination-and-trash-lifecycle.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-27-document-index-pagination-and-trash-lifecycle.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md
+document:
+  en: 277d6c767df9d0030bc496a6ce5e42027460e6a8
+  zh: 27333233841b568e4c31d2eee065f4d6dbe3f7ef
 /agent-note-document-index-pagination-and-recoverable-trash:
   en: 1db4b68735aaf621
   zh: b813714a5cc49fd7

@@ -94,7 +94,6 @@ Each runner's kernel speaks its own denial dialect, carried on every wrap as `de
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: runner chain selection, functional probes, per-call wrap, ACL grant lifecycle |
 | [`src/profiles.ts`](src/profiles.ts) | Per-platform profile builders: bwrap mounts, Landlock grants, Seatbelt SBPL |
-| — | No runtime invariant companion is published; this package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam. |
 
 </details>
 
@@ -109,7 +108,7 @@ Start with the subsystem reference for the shared vocabulary, then the seam cont
 - [Sandbox seam package](../sandbox/README.md) — the service contract this provider implements.
 - [Bash sandbox executor](../../shell/bash-sandbox/README.md) — the confined bash consumer.
 - [Windows ACL restricted-token rung](../sandbox-windows-acl/README.md) — the win32 backend this provider mounts.
-- [The subprocess sandbox decision](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.md) — capability boundary and runner selection semantics.
+- [The subprocess sandbox decision](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — capability boundary and runner selection semantics.
 
 -----
 
@@ -125,7 +124,6 @@ No direct invalidation; the named consumers own any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the provider is a poor fit or needs special operational care. They are current package constraints, not a general platform comparison or a task backlog.
 
@@ -145,6 +143,6 @@ This Dev Note is working context for maintainers: undecided directions and open 
 
 #### Future: environment-coherent groups
 
-The [sandbox decision](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.md) lists an environment-coherent capability group example (for example bash plus fs against one container) as a deferred phase; it is not decided.
+The [sandbox decision](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) lists an environment-coherent capability group example (for example bash plus fs against one container) as a deferred phase; it is not decided.
 
 </details>

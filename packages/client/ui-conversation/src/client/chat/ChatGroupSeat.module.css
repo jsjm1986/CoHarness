@@ -1,0 +1,73 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-tertiary, #8a8f98);
+  cursor: pointer;
+  text-align: left;
+}
+
+.title:hover {
+  color: var(--text-secondary, #5c6169);
+}
+
+.leading {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.activityIcon,
+.chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 120ms ease;
+}
+
+.chevron {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.title:hover .activityIcon {
+  opacity: 0;
+}
+
+.title:hover .chevron {
+  opacity: 1;
+}
+
+.label {
+  min-width: 0;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}

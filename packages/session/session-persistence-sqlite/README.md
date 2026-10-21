@@ -15,7 +15,6 @@ An opt-in SQLite `SessionPersistence` provider. It stores eligible `assistant/ch
 
 Use `dsh-session-persistence-sqlite` as an opt-in SQLite `SessionPersistence` provider: eligible `assistant/chunk` runs store in packed physical rows with selective Zstandard compression and delta-encoded source-event sequences, restoring the exact logical `SessionEvent[]`. No shipped composition selects it; a deployment mounts it explicitly with a database path.
 
-
 ## Table of Contents
 
 - [Storage model](#storage-model)
@@ -99,7 +98,6 @@ Physical packing does not mutate request prefixes. Provider cache reuse depends 
 - **External SQL readers must understand physical tags** — supported consumers read through this provider rather than treating every `events.type` as a logical event type.
 - **No deletion or background historical compaction** — normal appends are insert-only.
 
-**Runtime invariant:** No companion is published. Physical packing is observable only by database round-trip and row-count checks, not a continuous in-process relation.
 
 <a id="dev-note"></a>
 ### Dev Note

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-01-css-produced-file-layout.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-01-css-produced-file-layout.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-01-css-produced-file-layout.md
+document:
+  en: fce7d70b21b05db8970fb249927c36f87abc6b23
+  zh: bc8ad941dbe33af3acc629f0da50e79c4a0954da
 /agent-note-replace-produced-file-probes-with-css-width-bands:
   en: 9d66ea466b949c20
   zh: 66e70bb5405f6435

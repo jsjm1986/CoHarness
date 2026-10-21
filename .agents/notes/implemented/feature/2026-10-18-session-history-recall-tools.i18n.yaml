@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-session-history-recall-tools.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-session-history-recall-tools.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-session-history-recall-tools.md
+document:
+  en: 87b90efa8da338104baf6b713dac15a5ed1b9aac
+  zh: 0ab10666d1b0d627c075c8a73af7954679972c05
 /agent-note-session-history-recall-tools-cjk-full-text-search-and-project-readable-acl:
   en: 472fe1518066247e
   zh: 9b14f14eccf6321b

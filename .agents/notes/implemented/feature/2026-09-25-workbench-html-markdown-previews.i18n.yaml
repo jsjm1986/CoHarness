@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-workbench-html-markdown-previews.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-workbench-html-markdown-previews.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-25-workbench-html-markdown-previews.md
+document:
+  en: 56619c8f6026793075f558de25d7adb7a900a46e
+  zh: ecfe76ce3ab201919fa5784a37c662103afd15e4
 /agent-note-workbench-file-previews-render-markdown-and-html-on-the-shared-workspace-resource-owner:
   en: 9c40a5471cc7aa8c
   zh: 0e6a92714445b89b

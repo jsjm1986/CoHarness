@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-multi-select-custom-answer-composition.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-multi-select-custom-answer-composition.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-multi-select-custom-answer-composition.md
+document:
+  en: db5be2dbed1108ff63c1fddb166be1de934f98d3
+  zh: 796d379312483be5063a3a5d67dd6a0d0e37803e
 /agent-note-multi-select-custom-answer-composition:
   en: dc0c79b12f19a9ee
   zh: ad764a96fa291d57

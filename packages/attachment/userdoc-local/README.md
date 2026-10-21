@@ -23,11 +23,9 @@ The exported `LocalUserDocFs` engine carries the same filesystem operations with
 
 Use `dsh-userdoc-local` as the local `userDocs` backend that stores documents as ordinary files below one configured root. Uploads stream to a sibling `.part` file and publish atomically through an exclusive hard link, so an occupied target is never replaced; untrusted client names are sanitized and collisions receive a ` (2)` suffix. The default deployment migrates a legacy `uploads` tree on first use. An explicit `maxFileBytes` enforces a finite deployment policy.
 
-
 ## Table of Contents
 
 - [Resumable uploads](#resumable-uploads)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -42,11 +40,6 @@ The local provider implements the `resumable-v1` upload session used by the Web 
 `uploadManifestMaxBytes` bounds every manifest read (256 KiB by default). `uploadMaxConcurrent` bounds both expired-session cleanup and finalization workers; queued finalizations are cancelled when the store stops or an upload is cancelled. `uploadCleanupIntervalMs` is capped at Node's maximum timer delay (`2,147,483,647` ms), so an invalid interval cannot be clamped into a busy one-millisecond loop.
 
 The provider records the admission lock owner as a PID in `.admission.lock`. Startup recovers it only when the process probe proves the owner has exited. Concurrent recoverers use a separate recovery lock and re-read ownership before removing the orphan, preserving a replacement writer's lock. Live, malformed or indeterminate owners are not reclaimed. An interrupted recovery's coordination lock requires operator verification; ordinary upload contention retains its 30-second deadline.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Documents are ordinary files below one configured root; the backend holds no index beyond the filesystem tree its specs exercise.
 
 <a id="model-experience"></a>
 ## Model Experience

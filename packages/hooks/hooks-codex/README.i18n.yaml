@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/hooks/hooks-codex/README.md
+document:
+  en: 51760b014a6efc980453928ecb91f15718e592ec
+  zh: 26d66467ea9d73127169788c5ee4acf819e125f8
 /:
   en: a5a29a7f0f69ed5a
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: e02e93d326449402
   zh: 5de5f527d2182537
 /deepseek-ai-dsh-hooks-codex/table-of-contents:
-  en: 32eb5b63c21ec432
-  zh: 0de1faddbd147d8c
+  en: 93e4646f288f7b04
+  zh: 2ccbbcb65e14d93a
 /deepseek-ai-dsh-hooks-codex/config:
   en: be101d5c30434575
   zh: 51c824d97f52a832
@@ -21,11 +24,8 @@
   en: a12027e4ebef6bbc
   zh: 02002b7950b0d528
 /deepseek-ai-dsh-hooks-codex/context-source:
-  en: 98474445b958da6d
-  zh: d93b51dffbe1279b
-/deepseek-ai-dsh-hooks-codex/invariants:
-  en: 204126ac09e6759b
-  zh: 3d1f3a42939cf751
+  en: bf30692a2ebe3bfb
+  zh: 04189a2e15f81ccd
 /deepseek-ai-dsh-hooks-codex/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

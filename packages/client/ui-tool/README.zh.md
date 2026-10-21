@@ -49,7 +49,7 @@ owner 载荷为 `ToolCallOwnerProps`：`callId`、`toolName`、`phase` 判别字
 
 每个注册视图都接收[工具 slot 类型](src/client/contract/slots.ts)声明的显式 `preparing`、`start` 和 `result` props。通用行在三个阶段使用同一个 `ToolRow`。行模型统一选择标题，并组合通用工具名前缀与已有参数摘要，不按生命周期阶段改变前缀；专用标题不附带英文名。准备阶段的共享参数解析入口直接返回无调用，不解析部分 JSON。write/edit 将准备态和派发后阶段拆成两个组件，只有准备态组件调用 `useToolCallArgumentsPartial`，start 与 result 共用派发后组件。Bash、Skill、Cordis 等自定义 renderer 分别处理准备态，其依赖参数的组件接收 `StartedToolCallViewProps`。
 
-本包拥有 generic fallback，以及 shell/pwsh、read、read_image、write/edit、运行中的 `str_replace_editor` `create`／`str_replace`、grep/glob、web、todo、question 与 PTC dispatch 的内置展示。结构化卡片直接从第一方原始 event 字段派生；Host `presentCall` 与 `presentResult` 值不会进入 Client。运行中的原子工具行以同一道高光从左到右扫过标题、分隔符、摘要与后缀；已完成行保持静态。运行中与已完成的前台标准 `bash`/`pwsh` 和 `terminal_send` 调用，无论位于根还是 PTC dispatch 子调用中，都在通过相同的参数、结果和错误检查后使用 terminal 卡片。持久 `bash`/`pwsh` 调用仅在运行中使用 terminal 卡片。以已识别的 spill 策略提示结尾的 shell 输出，在 shell 行中使用可展开的 generic 输出，在 Details 中使用 generic 输出；位置被改变或被省略的退出标记无法证明成功。已完成的持久 shell 结果保持 generic 展示，因为 reset 与部分输出诊断不一定描述单个进程的退出状态；根调用的持久 shell 结果可展开，后台启动回执则保持折叠。带有 `AUTO_REVIEW_DENIED` 的原生或 PTC dispatch 失败会在折叠行显示 Auto review 裁决，展开时显示一行归一化后的“未执行”原因；原因缺失或只有空白时使用本地化 fallback 文案。成功的问题行按稳定 id 配对调用中的问题与回答，展开后显示可读的问答行；回答在结果携带时取自结果，而计时调用的结果只记录了超时时，则取自 `userQuestions` 投影中迟到回复结算它时留下的答案，两者读起来一致。已取消或已中断的问题行显示其裁决与原始问题，不虚构回答。问题行在摘要旁带一个胶囊按钮，按钮上是该行自己的问题图标：只要 `userQuestions` 会话投影仍把该调用列为可回答，点击它就在编辑器位置重新打开这道问题的实时回答面板；调用带着回答结束后，它以只读方式打开同一个面板，展示这些问题与回答。计时调用在没有任何回答的情况下结束时读作已结束且不提供该按钮，已取消或已中断的行同样不提供，问题字段校验失败的已回答调用也不提供；面板能力拒绝时，点击改为展开该行。不受支持、格式错误或含糊的输入回退为压平的工具输入／结果文本。`ui-skill` 展示了业务包自行拥有的 `skill` 注册项。
+本包拥有 generic fallback，以及 shell/pwsh、read、read_image、write/edit、运行中的 `str_replace_editor` `create`／`str_replace`、grep/glob、web、todo、question 与 PTC dispatch 的内置展示。结构化卡片从 wire 块上携带的 Host 计算 `callView`/`resultView` 渲染意图派生。运行中的原子工具行以同一道高光从左到右扫过标题、分隔符、摘要与后缀；已完成行保持静态。运行中与已完成的前台标准 `bash`/`pwsh` 和 `terminal_send` 调用，无论位于根还是 PTC dispatch 子调用中，都在通过相同的参数、结果和错误检查后使用 terminal 卡片。持久 `bash`/`pwsh` 调用仅在运行中使用 terminal 卡片。以已识别的 spill 策略提示结尾的 shell 输出，在 shell 行中使用可展开的 generic 输出，在 Details 中使用 generic 输出；位置被改变或被省略的退出标记无法证明成功。已完成的持久 shell 结果保持 generic 展示，因为 reset 与部分输出诊断不一定描述单个进程的退出状态；根调用的持久 shell 结果可展开。后台 Bash 调用展开为原始参数与作业回执；其输入横向滚动、不软换行且保持可选中，仅横向溢出才产生一个具名的键盘聚焦目标。提供 Inspect 时可用。回执不报告作业的退出状态。带有 `AUTO_REVIEW_DENIED` 的原生或 PTC dispatch 失败会在折叠行显示 Auto review 裁决，展开时显示一行归一化后的“未执行”原因；原因缺失或只有空白时使用本地化 fallback 文案。成功的问题行按稳定 id 配对调用中的问题与回答，展开后显示可读的问答行；回答在结果携带时取自结果，而计时调用的结果只记录了超时时，则取自 `userQuestions` 投影中迟到回复结算它时留下的答案，两者读起来一致。已取消或已中断的问题行显示其裁决与原始问题，不虚构回答。问题行在摘要旁带一个胶囊按钮，按钮上是该行自己的问题图标：只要 `userQuestions` 会话投影仍把该调用列为可回答，点击它就在编辑器位置重新打开这道问题的实时回答面板；调用带着回答结束后，它以只读方式打开同一个面板，展示这些问题与回答。计时调用在没有任何回答的情况下结束时读作已结束且不提供该按钮，已取消或已中断的行同样不提供，问题字段校验失败的已回答调用也不提供；面板能力拒绝时，点击改为展开该行。不受支持、格式错误或含糊的输入回退为压平的工具输入／结果文本。`ui-skill` 展示了业务包自行拥有的 `skill` 注册项。
 
 回答面板按钮归问题 renderer 所有。它使用 `DisclosureRow` 组合自己的操作与 transcript；通用 `ToolRow` 不选择或派发问题操作。
 
@@ -69,11 +69,9 @@ owner 载荷为 `ToolCallOwnerProps`：`callId`、`toolName`、`phase` 判别字
 
 Tool 所有者属性将 Chat 注入的稳定 `useDisclosure` 钩子传给根调用及嵌套调用。工具行在拥有展开正文的位置调用它，中间 renderer 不订阅。每次调用拥有独立展开状态，外层轮次收起时重置该状态，不替换 React 身份；展示模式切换保留该状态。
 
-
 slot 注入的 `useToolCallArgumentsPartial` 钩子按需订阅所属 Step 的 `assistant-step` 来源，并选取当前 callId 的原始参数前缀。来源或调用不存在时返回空字符串。同一步骤中的其他调用可能触发快照检查，但选中的字符串未变时不会刷新使用方。不调用钩子的工具不新增订阅，已派发的调用不再提供参数前缀来源。
 
 ### 卡片
-
 
 每张卡片都直接在调用树中查看；选中调用后不会再显示第二个全高视图。行 renderer 为 terminal、read、diff、search 和 web 卡片各复用同一个纯 card model，image 卡片的图库经由工具自有 `tool.call.images` slot 渲染。这些 model 校验原始调用参数、结果内容、失败状态、持久 metadata、PTC dispatch 的 `parentCallId` 与会话路径信息。不受支持或格式错误的输入使用压平的工具结果文本。文件路径摘要经属主的 `openFile` 打开文件，chat 视图把它路由到右侧 Sidebar 的文本预览；`inspect` 打开轨迹视图；该视图不可用时不提供此回调，卡片随之隐藏 Inspect。terminal、diff、read、search 与 web 卡片的上限与 fallback 规则仍由 [ui-primitives README](../ui-primitives/README.zh.md) 负责；image 卡片的 fallback 规则由本包内的 card model 自行承载。
 
@@ -123,7 +121,6 @@ terminal model 使用浏览器安全入口 `@deepseek-ai/dsh-spill-policy/notice
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 这些限制定义分派深度与视图归属；它们是当前包约束。
 
 - **Host 不把 `run_code` 暴露为 PTC mode 程序 binding**：生产事件只产生一层分发；递归的运行时/UI 约定支持嵌套。
@@ -140,5 +137,3 @@ terminal model 使用浏览器安全入口 `@deepseek-ai/dsh-spill-policy/notice
 无。
 
 </details>
-
-**运行时不变式：** 不发布伴生入口。工具组合只存在于浏览器，不贡献事件或跨插件可变状态；slot 所有权由 ui-slots 校验。

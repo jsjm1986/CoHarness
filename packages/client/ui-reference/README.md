@@ -21,17 +21,11 @@ Use `dsh-client-ui-reference` when Web users need to mention files, folders, or 
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Candidates are fetched per token through the `fileReferences/list` and `sessionReferenceResolver/candidates` remotes under a short-lived `referenceCandidates` Session reference; the source keeps no candidate state between requests.
 
 <a id="model-experience"></a>
 ## Model Experience

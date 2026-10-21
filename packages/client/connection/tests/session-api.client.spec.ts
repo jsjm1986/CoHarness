@@ -39,7 +39,7 @@ it.each([
   ['workspace', 'archiveSession'], ['workspace', 'unarchiveSession'], ['workspace', 'insertSessionBefore'],
   ['workspace', 'pinSession'], ['workspace', 'unpinSession'],
   ['workspaceChanges', 'summary'], ['workspaceChanges', 'diff'], ['workspaceFiles', 'list'], ['workspaceFiles', 'stat'],
-  ['workspaceFiles', 'read'], ['workspaceFiles', 'readBytes'], ['workspaceFiles', 'renderOffice'], ['skills', 'list'],
+  ['workspaceFiles', 'read'], ['workspaceFiles', 'readBytes'], ['workspaceFiles', 'renderOffice'], ['skills', 'list'], ['skills', 'get'],
   ['subagents', 'history'],
 ])('routes the %s.%s public entry to its owner without rewriting content', async (domain, method) => {
   const base = new FixtureApiClient()

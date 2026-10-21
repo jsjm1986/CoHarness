@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-03-project-remote-authorization-coverage.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-03-project-remote-authorization-coverage.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-03-project-remote-authorization-coverage.md
+document:
+  en: 8a02dbb7e4ff08530456adef28ef3c6902faada3
+  zh: 337e6ed4058a4021734508a331981d36f0ffc2e5
 /agent-note-project-scope-remote-authorization-coverage-and-catalog-absent-services:
   en: 7adaf7f04cc5315d
   zh: 9cd37e42cffb4db0

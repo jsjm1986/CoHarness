@@ -77,6 +77,8 @@ kind: "package-reference"
 
 `sidebarRight.openTabs` 仅发布已采用且通过当前身份核验的 Session 标签元数据。产品启动不会扫描来源不明的 localStorage 布局。已采用存储是当前窗口的权威来源；其他窗口写入不会覆盖正在使用的布局。
 
+每个 Session 只有一个当前存储世代。重新创建存储会先释放前一世代的持久化与身份订阅，再采用替代存储。运行时裁剪会清除当前世代的已保存布局、采用关系和资源持有；已退出的实例不能覆盖或清除替代实例。
+
 <a id="extension-seats"></a>
 ## 扩展席位
 
@@ -126,9 +128,6 @@ Tab 域按（Session，Tab id）保留带 brand 的 occurrence id、导航、中
 ## 文案
 
 该列里的每个字符串都来自 `sidebarRight` 语言命名空间，包括套件的无障碍名称。tab 的标题在 tab 铸造时固定；类型的显示名跟随当前语言。
-
-
-**运行时不变量：** 不发布 companion。两个服务（`sidebarRight`、`sidebarRightTabs`）在同一个 effect 内经 `ctx.reflect.provide` 提供并随之拆除；屏幕上的会话与 Tab 域 occurrence 的生命周期由本包的 spec 直接断言，不存在会与之分歧的独立观察。
 
 <a id="model-experience"></a>
 ## 模型体验

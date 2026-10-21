@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-01-alpha23-selective-runtime-adaptation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-01-alpha23-selective-runtime-adaptation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-01-alpha23-selective-runtime-adaptation.md
+document:
+  en: abdb9e16e7ab636c584c8371371f26813d9bfc3c
+  zh: ee10ef27762ad334323864288e68d5da4900f1e5
 /agent-note-selective-alpha-2-and-alpha-3-runtime-adaptation:
   en: 462feeccd8caa7ac
   zh: 59b839038524bbb0

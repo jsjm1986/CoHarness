@@ -128,6 +128,8 @@ class Connection extends HostConnectionService {
 
 class ScriptedModel extends LlmAdapter {
   script: Array<'tool' | 'job-output' | 'text' | 'hold'> = []
+  /** Job id the next 'job-output' action names; filled from the registry's minted id. */
+  jobId = 'bash-1'
   readonly reviews: GenerateOptions[] = []
   readonly entered = Promise.withResolvers<undefined>()
   readonly cancelled = Promise.withResolvers<undefined>()
@@ -156,7 +158,7 @@ class ScriptedModel extends LlmAdapter {
     }
     if (action === 'tool' || action === 'job-output') {
       const name = action === 'tool' ? 'privileged_probe' : 'job_output'
-      const args = action === 'tool' ? '{}' : JSON.stringify({ job_id: 'bash-1' })
+      const args = action === 'tool' ? '{}' : JSON.stringify({ job_id: this.jobId })
       yield { type: 'block-start', index: 0, blockType: 'tool-call' }
       yield { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId(`managed-${name}`), name, arguments: args } }
       yield { type: 'finish', reason: { kind: 'tool-calls' } }
@@ -332,6 +334,7 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
       await ctx.executionAuthority.authorizeSelection(agent, AUTO_PRESET)
       ctx.permissionPresets.set(agent.session, AUTO_PRESET)
     })
+    model.jobId = String(id)
     model.script.push('job-output', 'tool', 'text')
     await world.send(agent, server.principals.admin, 'Read the completed old job and write the privileged probe.')
     await agent.whenIdle()

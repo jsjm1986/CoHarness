@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-web-subagent-conversations.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-web-subagent-conversations.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-web-subagent-conversations.md
+document:
+  en: cc9be4e6be5810ceb8d3f2276e4cb87441f968ff
+  zh: 74b28ec38bc8bbeebdb4c558f42dd4ec94880b8b
 /agent-note-web-subagent-catalog-and-human-continuation:
   en: c6373db2300cb803
   zh: 4d0589f21ec284ff
@@ -15,8 +18,8 @@
   en: 4c0a3f11690edcb2
   zh: 062f8822d0d36469
 /agent-note-web-subagent-catalog-and-human-continuation/product-contract:
-  en: 306e3457a620f92f
-  zh: c9921f8badf56b64
+  en: 1b1720a8f35b73d0
+  zh: e69d99024df4443a
 /agent-note-web-subagent-catalog-and-human-continuation/host-adapter-and-wire-contract:
   en: bfe3ffefddf5b641
   zh: 2b4a768bda35cf16

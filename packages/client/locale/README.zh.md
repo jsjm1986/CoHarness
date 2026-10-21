@@ -19,7 +19,6 @@ locale 插件：LocaleRuntime——偏好以 `locale.preference` 存储在 `$DSH
 
 - [语言包注册](#language-pack-registration)
 - [设置权限](#settings-authority)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -50,12 +49,6 @@ export function apply(ctx) {
 ## 设置权限
 
 Language 行跟随绑定的账户级 settings scope；首次视图仍在 loading、scope 不可用或提供方只读时，选择器会禁用。项目运行时不会接管账户偏好，认证成员的选择通过账户 transport 保存，只有账户路由明确不支持时才回退到 Host。`LocaleRuntime.setLocale` 也执行相同的可写视图检查，因此程序化调用无法绕过禁用行发起 mutation；写入失败时会从恢复后的值重新采用状态。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。活动语言环境是绑定到 Host 拥有的 settings namespace 的一个已解析值；临时、已保存与推送的值遵循由规格断言的单一优先级。
-
 
 <a id="model-experience"></a>
 ## 模型体验

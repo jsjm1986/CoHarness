@@ -23,7 +23,6 @@ Use this package to give agents and users one catalog of reusable, task-specific
 - [Provider Contract](#provider-contract)
 - [Runtime Skills](#runtime-skills)
 - [Consumer boundary](#consumer-boundary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -88,11 +87,6 @@ Definitions remain progressively loaded. `get()` asks the winning provider for t
 ## Consumer boundary
 
 The registry does not render model guidance or register model-facing tools. [`@deepseek-ai/dsh-tool-skill`](../tool-skill) consumes `ctx.skills` to provide durable session catalogs and the `skill` tool, so providers remain independent of model-facing behavior.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The registry is a contribution table over provider registrations with effect-scoped disposal; it owns no skill content.
 
 <a id="model-experience"></a>
 ## Model Experience

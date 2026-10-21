@@ -36,7 +36,7 @@ function fixture() {
   git(source, 'tag', 'dsh-vincrement', increment)
   git(source, 'tag', tag, target)
   // Git substitutes only the fixture transport. The script still invokes the
-  // fixed public URL, and Git performs the real depth-limited object transfer.
+  // fixed public URL, and Git performs the real object transfer.
   git(consumer, 'config', `url.${pathToFileURL(source).href}.insteadOf`, upstreamUrl)
   const write = (path: string, value: string | object): void => {
     mkdirSync(dirname(join(consumer, path)), { recursive: true })
@@ -65,23 +65,23 @@ function fixture() {
 }
 
 describe('pinned upstream CI preflight', () => {
-  it('fetches all three declared snapshots once and leaves older unrequested history absent', () => {
+  it('fetches the pinned tag at full depth so declared commits arrive with complete ancestry', () => {
     const f = fixture()
     expect([f.baseline, f.increment, f.target].map(f.hasCommit)).toEqual([false, false, false])
     const prepared = f.run()
     expect(prepared.status, prepared.output).toBe(0)
     expect([f.baseline, f.increment, f.target].map(f.hasCommit)).toEqual([true, true, true])
-    expect(f.hasCommit(f.unrequested)).toBe(false)
+    // Full-depth transfer carries complete ancestry, including history the
+    // matrix does not name; the commit inventory gate walks it.
+    f.git(f.consumer, 'merge-base', '--is-ancestor', f.unrequested, f.target)
     expect(f.git(f.consumer, 'diff', '--name-only', '--no-renames', f.baseline, f.target)).toBe('input.txt')
     expect(f.git(f.consumer, 'diff', '--name-only', '--no-renames', f.increment, f.target)).toBe('input.txt')
     expect(f.fetches()).toEqual([
-      ['fetch', '--depth=1', '--no-tags', upstreamUrl, `refs/tags/${f.tag}:refs/tags/${f.tag}`],
-      ['fetch', '--depth=1', '--no-tags', upstreamUrl, f.baseline],
-      ['fetch', '--depth=1', '--no-tags', upstreamUrl, f.increment],
+      ['fetch', '--no-tags', upstreamUrl, `refs/tags/${f.tag}:refs/tags/${f.tag}`],
     ])
     const repeated = f.run()
     expect(repeated.status, repeated.output).toBe(0)
-    expect(f.fetches()).toHaveLength(3)
+    expect(f.fetches()).toHaveLength(1)
   })
 
   it.each(['baseline', 'incrementBaseline'] as const)('rejects an invalid %s SHA before fetching', (field) => {
@@ -108,7 +108,7 @@ describe('pinned upstream CI preflight', () => {
     f.write(f.matrixPath, { ...f.matrix, baseline: { commit: unavailable } })
     const result = f.run()
     expect(result.status, result.output).toBe(1)
-    expect(f.fetches().at(-1)).toEqual(['fetch', '--depth=1', '--no-tags', upstreamUrl, unavailable])
+    expect(f.fetches().at(-1)).toEqual(['fetch', '--no-tags', upstreamUrl, unavailable])
     expect(f.hasCommit(unavailable)).toBe(false)
   })
 

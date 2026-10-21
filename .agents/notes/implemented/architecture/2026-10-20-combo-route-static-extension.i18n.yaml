@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-20-combo-route-static-extension.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-20-combo-route-static-extension.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-20-combo-route-static-extension.md
+document:
+  en: 3006e59ab58c3b0d1a93ff6198f2e71efda54ab4
+  zh: 88d595ea65e265a9826e7bd663fccff81d35e3c9
 /agent-note-combo-route-carries-a-static-extension-filename-for-cdn-edge-caching:
   en: 73c9f0c9f2ba8e85
   zh: 1f5cb13e9617fe0f

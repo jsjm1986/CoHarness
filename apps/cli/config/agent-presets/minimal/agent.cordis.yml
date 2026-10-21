@@ -1,10 +1,16 @@
-# The `minimal` agent preset: a fixed-prompt, two-tool coding-agent composition.
+# The `minimal` agent preset: a fixed-prompt, one-tool coding-agent composition.
 #
 # The persona is the complete system prompt, so global identity, Web orientation,
 # tool guidance, and later assembly listeners cannot add prompt text. Runtime
 # context snapshots are suppressed for this preset, and the model composes only
-# the persistent shell (`bash` on POSIX, `pwsh` on win32) and
-# `str_replace_editor`. Context compaction is absent.
+# the persistent shell (`bash` on POSIX, `pwsh` on win32). Context compaction is
+# absent.
+#
+# The file editor is an explicit opt-in, not part of this preset: a deployment
+# adds it back by forking this preset or layering a cordis patch that inserts
+# `fs-local` and `str_replace_editor` — the same pairing the documented
+# `editor.patch.yml` opt-in inserts over sdk-minimal
+# (docs/user/guide/python-sdk.md).
 
 - id: persona
   name: '@deepseek-ai/dsh-persona'
@@ -67,21 +73,3 @@
           * Use native Windows paths (C:\...) and $env:NAME variables; this is PowerShell, not bash.
           * Please avoid commands that may produce a very large amount of output.
           * Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.
-
-# The bare local filesystem shadows the host's sandboxed provider only for this
-# preset. The editor shares that realm and requires absolute paths.
-- id: filesystem
-  name: cordis:group
-  group: true
-  isolate:
-    fs: true
-  config:
-    - id: fs-local
-      name: '@deepseek-ai/dsh-fs-local'
-      config:
-        cwd: !!js process.env.DSH_CWD ?? process.cwd()
-
-    - id: str-replace-editor
-      name: '@deepseek-ai/dsh-tool-str-replace-editor'
-      config:
-        maxOutputChars: 16000

@@ -1,8 +1,8 @@
 /** Prepare pinned, relocatable script interpreters without installing into the build host. */
 
 import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { cpSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { cp } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -10,27 +10,44 @@ import { dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import extractZip from 'extract-zip'
 import { x as extractTar } from 'tar'
-import { parsePrimaryRuntime, workspaceDependencyPaths, type PrimaryRuntimeManifest } from '../../packages/skill/tool-workspace-dependencies/src/index.ts'
+import { copyPrimaryRuntime, parsePrimaryRuntime, workspaceDependencyPaths, type PrimaryRuntimeManifest } from '../../packages/skill/tool-workspace-dependencies/src/index.ts'
+import { prunePrimaryRuntimePythonTests } from './prune-python-tests.ts'
 import lock from './lock.json' with { type: 'json' }
 
 /**
  * Download or reuse an archive only when its bytes match the release lock.
  * @param url - Locked archive URL.
- * @param sha256 - Expected SHA-256 digest.
+ * @param sha256 - Expected hexadecimal digest for the selected algorithm.
  * @param cache - Download cache directory.
+ * @param algorithm - Digest algorithm; npm archives use SHA-512.
  * @returns Verified local archive path.
  */
-export async function downloadPrimaryRuntimeAsset(url: string, sha256: string, cache: string): Promise<string> {
+export async function downloadPrimaryRuntimeAsset(url: string, sha256: string, cache: string, algorithm: 'sha256' | 'sha512' = 'sha256'): Promise<string> {
+  mkdirSync(cache, { recursive: true })
   const destination = join(cache, sha256)
   let bytes: Buffer
+  let cached = true
   try { bytes = readFileSync(destination) } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    const response = await fetch(url)
+    cached = false
+    const timeout = Number(process.env.DSH_RESOURCE_DOWNLOAD_TIMEOUT_MS ?? '300000')
+    if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 2_147_483_647) throw new Error('DSH_RESOURCE_DOWNLOAD_TIMEOUT_MS must be an integer from 1 to 2147483647')
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeout) })
     if (!response.ok) throw new Error(`primary runtime download: ${String(response.status)} ${url}`)
     bytes = Buffer.from(await response.arrayBuffer())
   }
-  if (createHash('sha256').update(bytes).digest('hex') !== sha256) throw new Error(`primary runtime download: checksum mismatch for ${url}`)
-  writeFileSync(destination, bytes)
+  if (createHash(algorithm).update(bytes).digest('hex') !== sha256) {
+    rmSync(destination, { force: true })
+    throw new Error(`primary runtime download: checksum mismatch for ${url}`)
+  }
+  if (cached) return destination
+  const temporary = join(cache, `.${randomUUID()}`)
+  try {
+    writeFileSync(temporary, bytes)
+    renameSync(temporary, destination)
+  } finally {
+    rmSync(temporary, { force: true })
+  }
   return destination
 }
 
@@ -63,7 +80,7 @@ export function primaryRuntimePayloadDigest(
   // Identity preserves key order within the selected target, wheel records and distribution map, plus wheel-entry order.
   // Bump format when extraction or assembly changes payload bytes without changing locked inputs.
   return createHash('sha256').update(JSON.stringify({
-    format: 4, target, pythonVersion, pythonRelease, nodeVersion: pnpmVersion === undefined ? undefined : nodeVersion,
+    format: 7, target, pythonVersion, pythonRelease, nodeVersion: pnpmVersion === undefined ? undefined : nodeVersion,
     artifact: runtimeLock.targets[target], wheels, pythonPackages, pnpm: pnpmVersion,
   })).digest('hex')
 }
@@ -188,10 +205,11 @@ export async function preparePrimaryRuntime(options: PreparePrimaryRuntimeOption
     for (const wheel of [...artifact.wheels, ...lock.wheels]) {
       await unpackPrimaryRuntimeWheel(await downloadPrimaryRuntimeAsset(wheel.url, wheel.sha256, paths.downloads), entries.pythonPackages)
     }
+    prunePrimaryRuntimePythonTests(entries.pythonPackages)
     writeFileSync(join(output, 'runtime.json'), `${JSON.stringify(manifest, undefined, 2)}\n`)
     const destination = join(paths.runtime, 'primary-runtime')
     rmSync(destination, { recursive: true, force: true })
-    await cp(output, destination, { recursive: true, dereference: true })
+    await copyPrimaryRuntime(output, destination, manifest)
   } finally {
     rmSync(staging, { recursive: true, force: true })
   }
@@ -212,10 +230,20 @@ export function smokePrimaryRuntime(root: string, environment: NodeJS.ProcessEnv
   if (manifest.platform !== process.platform || manifest.arch !== process.arch) return
   if (Object.keys(manifest.pythonPackages).length === 0) throw new Error('primary runtime: missing Python distribution versions; prepare the payload before running its smoke checks.')
   const entries = workspaceDependencyPaths(root, manifest)
+  if (manifest.platform !== 'win32') {
+    const interpreter = `python${manifest.python.split('.').slice(0, 2).join('.')}`
+    for (const name of ['python', 'python3']) {
+      const path = join(dirname(entries.python), name)
+      if (!lstatSync(path).isSymbolicLink() || readlinkSync(path) !== interpreter) {
+        throw new Error(`primary runtime: Python commands must be relative aliases of ${interpreter}`)
+      }
+    }
+    if (!lstatSync(join(dirname(entries.python), interpreter)).isFile()) throw new Error('primary runtime: versioned Python must be a regular file')
+  }
   const options = { stdio: 'inherit', timeout: 120_000, env: environment } as const
   execFileSync(entries.python, ['-I', '-B', '-c', 'import decimal, xml.parsers.expat, lzma, uuid, numpy, pandas; assert numpy.arange(4).sum() == 6; assert pandas.DataFrame({"n": [1, 2]}).n.sum() == 3'], options)
   execFileSync(entries.python, ['-I', '-B', join(import.meta.dirname, 'smoke.py'), JSON.stringify(manifest.pythonPackages),
-    manifest.python, join(dirname(root), 'office-skills', 'scripts', 'check_office.py')], options)
+    manifest.python], options)
   execFileSync(entries.python, ['-I', '-B', '-m', 'pip', 'check'], options)
   if (entries.node !== undefined) execFileSync(entries.node, ['-e', `if (process.versions.node !== ${JSON.stringify(manifest.node)}) process.exit(1)`], options)
   if (entries.pnpm !== undefined && entries.node !== undefined) execFileSync(entries.node, [entries.pnpm, '--version'], options)

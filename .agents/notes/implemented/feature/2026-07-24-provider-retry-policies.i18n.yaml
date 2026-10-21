@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-24-provider-retry-policies.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-24-provider-retry-policies.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-24-provider-retry-policies.md
+document:
+  en: 96979b219aebece96a1bcc09aa3dd572d2b9222d
+  zh: 127769364957788f799ee910d31996201c027789
 /agent-note-per-provider-request-retry-policies:
   en: 2f297e08c7f61564
   zh: 2294afe701fce200

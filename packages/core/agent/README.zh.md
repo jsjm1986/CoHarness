@@ -102,7 +102,6 @@ await handle.agent.whenIdle()
 | [`src/dispatch.ts`](src/dispatch.ts) | `agentEvents` 融合分发器与 `assembleContextFor(agent)` |
 | [`src/consumed-work.ts`](src/consumed-work.ts) | `foldConsumedWork(events)`：日志消费掉的工作最终怎样了 |
 | [`src/model-selection.ts`](src/model-selection.ts) | `installModelSelection`：把一个选择耦合到组装与路由 |
-| [`src/invariant.ts`](src/invariant.ts) | 不变式配套：无操作的 `agent/status` 转换会失败 |
 
 ### 注册表与生命周期
 
@@ -134,7 +133,6 @@ await handle.agent.whenIdle()
 - [core 分组地图](../README.zh.md)——core 各包如何组合。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -171,7 +169,6 @@ await handle.agent.whenIdle()
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明本包何时需要特别留意。它们是当前包约束，不是任务积压。
 

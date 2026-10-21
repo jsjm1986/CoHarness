@@ -54,7 +54,7 @@ Every ordinary runtime root is the implicit Lead of a Team whose `TeamId` equals
 
 Fresh children have no parent-history seed. Fork children capture the Lead's completed-turn prefix once; the in-flight delegation turn is excluded. Inherited Team records carry the old root's `TeamId` and are ignored when an ordinary fork becomes an independent runtime root. Provider-owned subagents outside the roster do not become nested Team Leads.
 
-The roster reports durable provisioning/failed phases and live `running`/`idle` status. An active but non-resident teammate is `inactive`; later waking delivery cold-resumes it through the continuation owner. Member recovery starts on each member's `agent/created` initialization and runs in the background: creation does not wait for a cold-resumed mailbox queue, because mailbox delivery can already hold that member's serial queue and awaiting it from creation would deadlock.
+The roster reports durable provisioning/failed phases and `running`/`inactive` turn availability — `inactive` covers loaded-between-turns and stored members alike and says nothing about task outcome; later waking delivery cold-resumes a stored member through the continuation owner. Member recovery starts on each member's `agent/created` initialization and runs in the background: creation does not wait for a cold-resumed mailbox queue, because mailbox delivery can already hold that member's serial queue and awaiting it from creation would deadlock.
 
 <a id="durable-mailbox"></a>
 ## Durable mailbox
@@ -75,8 +75,6 @@ Dependencies must name current non-deleted tasks and form a complete DAG with no
 `writeScopes` are normalized workspace-relative prefixes. Views warn when they overlap an in-progress task, but they never block claim or authorize filesystem writes. They are coordination hints, not locks.
 
 `waitForChange()` waits for one roster, task, mailbox, or live-status edge that occurs after registration, for 10 seconds through one hour; it reports only whether the wait timed out and does not replay a change that already happened. Runtime disposal releases current waits and makes later waits return immediately without a timeout. Callers re-read authoritative state after wakeup or timeout. Cancellation preserves an Error reason or reports a non-Error reason through `TEAM_WAIT_ABORTED` with structural inspection instead of object coercion. `interrupt()` is Lead-only and delegates to the continuable-subagent interrupt path, which cancels only a live teammate's current turn with `keepInbox`; it neither releases task ownership nor deletes durable mail.
-
-The separate `./invariant` companion replays each candidate Team event against its committed Session prefix. Replay validates every current-version Team payload before it enters folded state, then rejects invalid member transitions, reused names, out-of-range numeric task ids, discontinuous task revisions, invalid task dependencies, duplicate queue/ack records, and acknowledgements with the wrong target before append. Session event `seq` and `time` own ordering and timing instead of duplicated snapshot timestamps.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -100,7 +98,7 @@ Peer messages append after the target's reusable history prefix. Cold resume reu
 - **One process and one shared checkout** — members share cwd and observe edits immediately; this package provides no worktree, remote member, merge, or filesystem lock.
 - **Advisory write scopes** — Bash, formatters, code generators, and direct external writers can bypass filesystem version checks; Leads must coordinate ownership and review the final diff.
 - **Flat immutable roster** — only the Lead creates direct teammates; there is no nested Team, rename, deletion, or name reuse.
-- **No automatic ownership release** — idle, interruption, process exit, and failed work do not release a task owner.
+- **No automatic ownership release** — inactivity, interruption, process exit, and failed work do not release a task owner.
 - **Mailbox is not cross-process exactly-once** — concurrent harness processes over one Team are unsupported.
 
 <a id="dev-note"></a>

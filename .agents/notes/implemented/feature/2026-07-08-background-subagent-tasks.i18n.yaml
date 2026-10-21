@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-08-background-subagent-tasks.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-08-background-subagent-tasks.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.md
+document:
+  en: 4dcd961ee5a5db925f8f6ad83e97890eaedb8e63
+  zh: f35ac9e040b02c55694cfe5255b7f62ddbb40281
 /agent-note-background-subagent-tasks:
   en: 81e6c52af991b288
   zh: 338e4f208ff8113e

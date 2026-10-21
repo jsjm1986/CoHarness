@@ -1,19 +1,22 @@
-# Bilingual-pair consistency record for 2026-08-10-default-presets-single-editor.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-default-presets-single-editor.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-10-default-presets-single-editor.md
+document:
+  en: 793e7fc202031d7327818e1f2cb04f0be9925f64
+  zh: ca0d73fa26a692aa27ff1c9d1a8486e582273f7f
 /agent-note-one-editor-family-in-general-purpose-presets:
   en: c9842a3e891c8d20
   zh: 6c0740bfb1b6402e
 /agent-note-one-editor-family-in-general-purpose-presets/problem:
-  en: 80c8b23407bfd442
-  zh: 56c5ee2bf89f98eb
+  en: 21d76f3a824e9c9e
+  zh: 000fcc53803d9083
 /agent-note-one-editor-family-in-general-purpose-presets/decision:
-  en: f0c2d95bddd0adc0
-  zh: a7e9c802c5dc8520
+  en: a104899484602103
+  zh: 2845710e2d810f00
 /agent-note-one-editor-family-in-general-purpose-presets/alternatives-considered:
-  en: 5bcedee2a30c9cbb
-  zh: 9591e75f21d6f22a
+  en: 156b02fe3f458d70
+  zh: 4bde76af8d34112b
 /agent-note-one-editor-family-in-general-purpose-presets/consequences:
-  en: afd411bdbf35d178
-  zh: 859357b759418660
+  en: fb317fa211a21a30
+  zh: 75596036735e3b13

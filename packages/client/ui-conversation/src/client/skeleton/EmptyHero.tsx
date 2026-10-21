@@ -10,7 +10,7 @@ import {
   CoHarnessMascot, IconChevronDownOutline14, IconWorkspaceOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationPaneSlotProps, ConversationSlotProps } from '../contract/slots.ts'
+import type { ConversationContentProps, ConversationSlotProps } from '../contract/slots.ts'
 import css from './HeroShell.module.css'
 
 /** The owner's locale seat type, passed to hero chrome as a plain prop. */
@@ -101,7 +101,7 @@ export interface HeroShellProps {
   /** The owner's locale seat, passed down as a plain prop. */
   t: HeroTranslate
   /** Authorized renderer for the hero brand-mark slot. */
-  renderSlot: ConversationPaneSlotProps['renderSlot']
+  renderSlot: ConversationContentProps['renderSlot']
   /** Overlay content after the stack (modals). */
   children?: ReactNode
 }

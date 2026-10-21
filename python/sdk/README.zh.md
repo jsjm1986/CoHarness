@@ -39,6 +39,14 @@ print(result.final_response)
 
 `DeepSeekHarness` 延迟启动运行时，并在调用 `close()` 或退出上下文管理器前复用该进程。首次 profile 握手通过 `initialize_timeout_seconds` 使用独立的 30 秒默认上限；普通轮次在未设置 `request_timeout_seconds` 时仍不设上限。超时信息包含保留的运行时诊断。`cwd` 是 agent workspace；`runtime_cwd` 独立选择子进程工作目录。两者都会在启动前转成绝对路径。`provider`、`model`、可选的 `reasoning_effort` 和可选的正整数 `max_tokens` 通过 JSON-RPC 初始化发送。子进程环境继承启动进程的环境；`base_url` 与 `api_key` 会显式覆盖其中的 `DEEPSEEK_BASE_URL` 与 `DEEPSEEK_API_KEY`。输入行、挂起请求、入站请求、通知和输出都受 `HarnessConfig` 限制；初始化、请求和关闭超时必须是 SDK 计时器范围内的正有限秒数。
 
+`harness.resume_session(saved_session_id)` 恢复持久化历史，并返回可调用 `run()` 的 `Session`。请保存原会话 id，并沿用其 `dsh_home` 和工作区。恢复会保留存储的目录、修复最后一个被中断的轮次，且不发送新输入。会话缺失、不可读、不兼容或被占用时会抛出异常，不创建替代会话。`start_session(id)` 只打开惰性句柄，不会请求持久化恢复。此 API 不恢复 shell、浏览器或其他外部进程。
+
+```py
+with DeepSeekHarness(dsh_home="/absolute/path/to/saved-home") as harness:
+    session = harness.resume_session(saved_session_id)
+    result = session.run("Continue the task.")
+```
+
 ## 自定义插件
 
 持久自定义属于 `dsh` profile。使用运行时 wheel 包提供的 `dsh` 命令初始化随附的 SDK profile，并安装外部 bundle：

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/cordis-client-runner/README.md
+document:
+  en: fdac5fe0b8254c0b8e78534494d68248253b9543
+  zh: d08e4198e7fa1cf21b5216a8ba360f3a3d304516
 /:
   en: 0d1382466301a0cb
   zh: 64ee27ce126adad2
@@ -43,7 +46,7 @@
   zh: 7949755b8a782b08
 /deepseek-ai-dsh-cordis-client-runner/further-exploration:
   en: dcfcc126e7345db1
-  zh: e6b2382a80a9a135
+  zh: 47b564ef00a83297
 /deepseek-ai-dsh-cordis-client-runner/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -75,5 +78,5 @@
   en: a728aeb4aa18db7d
   zh: b596309cd6707da7
 /deepseek-ai-dsh-cordis-client-runner/known-limitations-and-deferred-work/dev-note:
-  en: c4cff307d238c93a
+  en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

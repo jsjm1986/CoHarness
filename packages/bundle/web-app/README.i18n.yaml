@@ -1,43 +1,46 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/bundle/web-app/README.md
+document:
+  en: d7d813f7bb8d0254b46fe236cb9db0726d407bd7
+  zh: 30acd71366c3b8a4fac41fdccde225efad3f0351
 /:
-  en: 7ea695fa475b2d81
+  en: 80e3e776c4e43e54
   zh: 07bde2df0c861ceb
 /deepseek-ai-dsh-web-app:
-  en: be14c62aecdf63a9
-  zh: 0822f94794804e4e
+  en: 7d0341179b74ee70
+  zh: 2dcdaa610331c8d9
 /deepseek-ai-dsh-web-app/summary:
-  en: 0ebb6c3ca8c0a84e
-  zh: 4d85e02c769ddae0
+  en: 1d11038e3b2ed2e7
+  zh: 1adfbcfc632f10a7
 /deepseek-ai-dsh-web-app/table-of-contents:
-  en: 018f36b2d7ad7945
-  zh: 878c3a7b62fa839e
+  en: 182dffb08b12293d
+  zh: 9db0173488f94d63
+/deepseek-ai-dsh-web-app/listening-trust-and-public-deployments:
+  en: 29f5eff643953e6d
+  zh: 1b7c549b589c5b43
 /deepseek-ai-dsh-web-app/model-retry-defaults:
-  en: 93b1ef4c4e0b1a12
-  zh: db9669fac3e83b71
-/deepseek-ai-dsh-web-app/invariants:
-  en: 6e87246df81ece96
-  zh: a499c1b131c7d3ea
+  en: 32e907386c096a4f
+  zh: ea8964d05ec983fd
 /deepseek-ai-dsh-web-app/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
-/deepseek-ai-dsh-web-app/model-experience/harness-source-and-web-surface-context:
-  en: e6febc53efe0f51d
-  zh: 9177816a8678d65d
-/deepseek-ai-dsh-web-app/model-experience/harness-source-and-web-surface-context/what-the-model-sees:
-  en: 359b949dd483477f
-  zh: 1476006614a82282
-/deepseek-ai-dsh-web-app/model-experience/harness-source-and-web-surface-context/token-effect:
-  en: 908fc84d6849a830
-  zh: 56fe5e418bab60ba
-/deepseek-ai-dsh-web-app/model-experience/harness-source-and-web-surface-context/kv-cache-effect:
-  en: da0f568d6d661c5e
-  zh: 14870c360b431b01
+/deepseek-ai-dsh-web-app/model-experience/web-runtime-variable:
+  en: 623bf8a0bf05599d
+  zh: 398ded2e7b20c1ea
+/deepseek-ai-dsh-web-app/model-experience/web-runtime-variable/what-the-model-sees:
+  en: ebaddc153ad7a835
+  zh: 21aa60f73d14f26c
+/deepseek-ai-dsh-web-app/model-experience/web-runtime-variable/token-effect:
+  en: 449fbfa3986f98f0
+  zh: a7d66333594ab2dd
+/deepseek-ai-dsh-web-app/model-experience/web-runtime-variable/kv-cache-effect:
+  en: 37542a8b81a744f5
+  zh: ce3393e1fe420aea
 /deepseek-ai-dsh-web-app/known-limitations-and-deferred-work:
-  en: 368730fe44d6a7de
-  zh: 7fdf9dd20431a5f9
+  en: 4c6e544a19debd7d
+  zh: da5b66791924a1d5
 /deepseek-ai-dsh-web-app/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/timeout/README.md
+document:
+  en: 6fcda527d6084108492ff549e7d7bee3e25a219b
+  zh: 71c1d324e30dfe2611fb35a430a0362effe31bce
 /:
   en: fb62472acb68b006
   zh: 0a51af1cad6486b4
@@ -12,8 +15,8 @@
   en: 13fc36a866f4ae6d
   zh: 02a9ab4bd48e968a
 /dsh-timeout/table-of-contents:
-  en: e33eb48e718c268e
-  zh: 35ce0493ed98ba23
+  en: a223a27d11089494
+  zh: d70c2a8144c8333c
 /dsh-timeout/api:
   en: 0a573a0b3a120fdf
   zh: ff8d693fb168b046
@@ -24,11 +27,8 @@
   en: bc0ea80bbb186c93
   zh: f53afac23e948b86
 /dsh-timeout/what-does-not-get-a-timeout:
-  en: 8ce1592801aa821c
-  zh: 882f06c3e3ea187f
-/dsh-timeout/invariants:
-  en: 5e59c59f775022cf
-  zh: 93814fec4d411f9a
+  en: c1eab85b6902b9d2
+  zh: f52762d47f24787f
 /dsh-timeout/model-experience:
   en: 5c35c77e4625b8ac
   zh: 8142da11ba1a6d11

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-command-row-copy-contract.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-command-row-copy-contract.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-command-row-copy-contract.md
+document:
+  en: f6d5199389b3907780c501894e2861e6add85e77
+  zh: 86f0c044e841a6a0148b1f785582868bba5bb3d0
 /agent-note-command-row-copy-is-split-between-the-row-and-the-handler:
   en: 9349beb196a3e170
   zh: f5d8bc1dc74e759f

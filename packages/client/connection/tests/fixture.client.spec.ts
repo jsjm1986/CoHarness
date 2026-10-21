@@ -4,7 +4,7 @@
  * baseline replay, timing hooks) — this is the vitest-side drift detector for
  * the hand-written fixture/host parallel implementations.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { SessionId, WorkspaceId } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
 import type { HostFrame, MuxFrame, RpcMessage, RpcRequest } from '../src/client/api.ts'
@@ -19,6 +19,7 @@ interface TimingHooks {
   failNextHistory(): void
   appendUser(id: string, msg: string): void
   appendTitle(id: string, title: string): void
+  disarmOnlyGoal(): void
   startReasoningChunkStorm(id: string, chunkCount: number, chunksPerInterval: number, intervalMs: number): string
   reasoningChunkStormState(): {
     sessionId: string
@@ -224,6 +225,11 @@ describe('createFixtureApi', () => {
     }, {
       ns: 'agent-presets',
       value: { default: expect.any(String) as unknown, modeSelectionEnabled: expect.any(Boolean) as unknown },
+      secrets: [],
+      writable: true,
+    }, {
+      ns: 'ui-onboarding',
+      value: { welcomeNoticeVersion: expect.any(String) as string },
       secrets: [],
       writable: true,
     }])
@@ -921,7 +927,7 @@ describe('createFixtureApi', () => {
   it('reconciles a dropped create response and can reject a prompt before acceptance', async () => {
     const sessionId = sid('fx-lost-response')
     const dropped = createFixtureApi({ dropSessionCreateResponse: true })
-    await expect(Promise.resolve().then(() => dropped.sessions.create(req({
+    await expect(Promise.resolve(undefined).then(() => dropped.sessions.create(req({
       workspaceId: 'fx-ws-fixture' as WorkspaceId,
       sessionId,
     })))).rejects.toThrow(/dropped session\.create response/)
@@ -1074,6 +1080,72 @@ describe('FixtureApiClient (protocol-level fake carrier)', () => {
       .resolves.toEqual({ ok: true, value: [] })
     await expect(client.rpc.call('/api', 'dynamicCordisRunner/syncInspectManifest', { args: { providers: [] } }))
       .resolves.toEqual({ ok: true, value: null })
+  })
+
+  it('forwards activation changes, resumes disarmed active goals, and keeps disarm out of the log', async () => {
+    const client = new FixtureApiClient()
+    const made = await client.sessions.create({})
+    if (!made.result.ok) throw new Error('session create failed')
+    const sessionId = made.result.value.sessionId
+    const abort = new AbortController()
+    const ready = Promise.withResolvers<undefined>()
+    const frames: Extract<HostFrame, { type: 'host/remote-event' }>[] = []
+    const consume = (async () => {
+      for await (const envelope of client.events.host({}, abort.signal, () => { ready.resolve(undefined) })) {
+        const frame = envelope.payload
+        if (frame.type === 'host/remote-event' && frame.event === 'goal/activation-changed') frames.push(frame)
+      }
+    })()
+    const stop = async (): Promise<void> => {
+      abort.abort()
+      await consume
+    }
+    onTestFinished(stop)
+    try {
+      await ready.promise
+      const goal = (method: string, args: Record<string, unknown> = {}) =>
+        client.rpc.call('/api', `goals/${method}`, { args: { agentId: sessionId, ...args } })
+      expect(await goal('get')).toEqual({ ok: true, value: undefined })
+      expect(await goal('get', { agentId: sid('unknown') })).toMatchObject({
+        ok: false, error: { code: 'session-not-found' },
+      })
+      const created = await goal('create', { request: { objective: 'resume this goal' } })
+      if (!created.ok) throw new Error('goal create failed')
+      const ref = (created.value as { ref: { id: string; revision: number } }).ref
+      expect(await goal('get')).toMatchObject({ ok: true, value: { ...ref, activation: 'armed' } })
+      expect((await goal('resume', { ref })).ok).toBe(false)
+
+      timing().disarmOnlyGoal()
+      timing().disarmOnlyGoal()
+      expect(await goal('get')).toMatchObject({
+        ok: true, value: { ...ref, phase: 'active', activation: 'disarmed' },
+      })
+      const nextRef = { id: ref.id, revision: ref.revision + 1 }
+      expect(await goal('resume', { ref })).toMatchObject({
+        ok: true, value: { ...nextRef, phase: 'active', activation: 'armed' },
+      })
+      expect((await goal('clear', { ref: nextRef })).ok).toBe(true)
+      expect(await goal('get')).toEqual({ ok: true, value: undefined })
+      await vi.waitFor(() => {
+        expect(frames.map(frame => frame.args[0])).toEqual([
+          { sessionId, goal: { ...ref, activation: 'armed' } },
+          { sessionId, goal: { ...ref, activation: 'disarmed' } },
+          { sessionId, goal: { ...nextRef, activation: 'armed' } },
+          { sessionId },
+        ])
+      })
+      const history = await client.sessions.history({ sessionId })
+      if (!history.result.ok) throw new Error('goal history failed')
+      const events = history.result.value.events.map((entry): { type: string; data?: unknown } => entry.event)
+      expect(events.filter(event => event.type === 'goal/change'))
+        .toMatchObject([
+          { data: { operation: 'create' } },
+          { data: { operation: 'resume' } },
+          { data: { operation: 'clear' } },
+        ])
+    } finally {
+      await stop()
+    }
   })
 
   it('mints request ids, taps all four full forms, and never touches doFetch', async () => {

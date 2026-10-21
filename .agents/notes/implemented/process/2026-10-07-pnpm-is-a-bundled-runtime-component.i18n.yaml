@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-07-pnpm-is-a-bundled-runtime-component.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-07-pnpm-is-a-bundled-runtime-component.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-07-pnpm-is-a-bundled-runtime-component.md
+document:
+  en: 2eaea9092410158228ea3ef8a5495d1f4788d909
+  zh: 3a8ed4bc08b7b4fecd9baf7d142352e4d05db208
 /agent-note-the-pnpm-dependency-is-a-bundled-runtime-component:
   en: c9258eeabf501980
   zh: 911f3a1b8b703d3d

@@ -22,13 +22,11 @@ fork 用文件级三方合并整合两个 tag（`git merge-file`，base 为上�
 - `bundle/base` 挂载 `web-fetch-http` 并开启 `web_fetch`；fork 三个预设（`code`、`cordis`、`standard`）设 `tool-web.fetch: true`，`code` 预设关闭 `workflow` 工具但保留引擎。2026-08-29 对 `web-fetch-http` 的公网地址 pinning 使该默认值在 fork 的多用户 Gateway 部署中安全。
 - `ui-theme` 新增 `corner-shape.css`、`gradient-shadow-text.css` 与 per-element elevation token。上游样式守卫套用到 fork 自有 CSS：`0.5px` hairline 描边、悬浮面不用中性边框、全圆角元素加 `corner-shape: round`。轮次导航预览层位于代码 banner 之上。
 - 长会话渲染工作中，`buildLocationData(context, scope, previous)` 复用相同的 Location 值，`flush()` 报告是否有 view 被重新发布，`ui-slots`/`ui-renderer` 新增 inject `keyedHooks` 隔间，`InputBar` 做 memo，产出文件芯片用 CSS 布局。
-- `ptc-runtime-python` 整包替换为 `packages/experimental/ptc-runtime-python` 的上游 experimental 包，适配 fork 导入（`snapshotJsonValue` 来自 `dsh-session`）、保持 `private`、补 fork 的 `./invariant` 伴生。需要 CPython 3.10 或更新。
 - 修复 alpha.2/alpha.3 同步引入的两处 fork 回归：`loadLiveSnapshot` 的 `!state.materialized` 守卫，以及 `list-children` 的 seq gate 与 `origin`/`agentPreset` 生命周期见证键。
 
 代码有意保留以下 CoHarness 决定：
 
 - 不采纳 per-record 投影缓存布局，因而不采纳 alpha.5 的 `compatibleVersions`/`invalidRecords`/`backupRecord` 修复；fork 的整介质 version 3 缓存保留。缓存身份采纳可选 lineage 字段（`isSeeded`、`inheritedEventCount`）且不升 medium 版本，未 seeded 会话的既有行继续可读、seeded 会话自动重折，在 fork 架构内覆盖同一升级风险。
-- invariant 伴生清理（#3367）拆到独立 PR；包括新 experimental Python 包在内的每个包都保留 `./invariant` 导出。
 - 不采纳 `ui-trajectory` 驻留分页、composer 座位归属迁移（`conversation.input.*`/`conversation.composer.dock` 挂到 `composer.bar` 下并去掉 `owner: InputZone`）以及 `ChatNodeStore` 的 per-node observable source；fork 保留服务端历史窗口、三座位 `InputBar` 与插件可见的 slot 归属。
 - 上游共享工具包（`dsh-util-values`、`dsh-util-time`）、Remote controller、`RemoteError`、focused `ui-chat`/`ui-session` 包继续不采纳；导入映射到 `dsh-session` 与 `dsh-llm` 的等价物。
 - fork 有意删除的行为对应的上游测试（route pricing、request `series`、turn rail、registry `hydrate`、`titleInput`、运行时品牌）不回收。

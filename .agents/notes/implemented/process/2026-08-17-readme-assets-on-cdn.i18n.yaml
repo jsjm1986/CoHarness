@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-readme-assets-on-cdn.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-readme-assets-on-cdn.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-17-readme-assets-on-cdn.md
+document:
+  en: ed7511d1ef712b4f41f7c437b76a403ad08411d4
+  zh: f701d7682026b00671adc5dc57935ddcdba4dc44
 /agent-note-readme-assets-publish-from-a-dedicated-repository:
   en: 3363410cf5d0a4ba
   zh: 4dafb4ef690b7b61

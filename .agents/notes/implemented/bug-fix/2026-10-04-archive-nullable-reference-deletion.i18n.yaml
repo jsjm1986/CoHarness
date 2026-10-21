@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-archive-nullable-reference-deletion.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-archive-nullable-reference-deletion.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-archive-nullable-reference-deletion.md
+document:
+  en: bbb8d7c190f9254e8da86666be6715aebc838199
+  zh: 76bd7296d7420eb43bdd2dd0bfc63dfe2923d17a
 /agent-note-null-only-nullable-archive-references-on-deletion:
   en: 90c7f06191092b51
   zh: aff51bee9ee0a408

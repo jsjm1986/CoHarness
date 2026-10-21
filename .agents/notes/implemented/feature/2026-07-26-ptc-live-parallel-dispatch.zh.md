@@ -4,7 +4,7 @@ Status: implemented
 
 [English](2026-07-26-ptc-live-parallel-dispatch.md) | 中文
 
-> 范围：`tool/ptc-dispatch-start` 事件、Web chat 中每个子调用的运行状态，以及桥接层调度器对原生并发约定的复用。构建在[宿主侧基础](2026-07-26-ptc-dispatch-ui-foundation.zh.md)与 [chat 子调用行](2026-07-26-ptc-chat-subcall-rows.zh.md)之上；原生约定本身归[并行工具调用 Agent Note](2026-07-10-parallel-tool-call-execution.zh.md) 所有。
+> 范围：`tool/ptc-dispatch-start` 事件、Web chat 中每个子调用的运行状态，以及桥接层调度器对原生并发约定的复用。构建在[宿主侧基础](../../archived/feature/2026-07-26-ptc-dispatch-ui-foundation.md)与 [chat 子调用行](2026-07-26-ptc-chat-subcall-rows.zh.md)之上；原生约定本身归[并行工具调用 Agent Note](2026-07-10-parallel-tool-call-execution.zh.md) 所有。
 
 ## 问题
 

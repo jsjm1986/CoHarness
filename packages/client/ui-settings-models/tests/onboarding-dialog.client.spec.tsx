@@ -239,7 +239,9 @@ describe('DeepSeekOnboardingDialog', () => {
       harness({ apiKeyEnv: null }),
     ]) {
       const view = render(<DeepSeekOnboardingDialog {...h.props} />)
-      await act(async () => { await h.controller.load() })
+      // A transport rejection reaches the caller; the dialog logic reads the
+      // published snapshot either way, so the case only needs it settled.
+      await act(async () => { await h.controller.load().catch(() => {}) })
       expect(screen.queryByRole('dialog')).toBeNull()
       await waitFor(() => { expect(h.complete).toHaveBeenCalledOnce() })
       expect(h.openSection).not.toHaveBeenCalled()

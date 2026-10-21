@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/webhook/webhook-github/README.md
+document:
+  en: 51679715e444fb5d5a2a7c6cf950d9cbd6d05702
+  zh: 78be7db459303c6d5fd6efed2851dce02e8c8979
 /:
   en: 60db7ae899ed9fd9
   zh: 4fe10fa8823aa6d1
@@ -22,7 +25,7 @@
   zh: a98ec470d9d6bc2d
 /deepseek-ai-dsh-webhook-github/dedicated-listener-composition:
   en: bd76943b75b35e11
-  zh: a0e3a2d30b6f3068
+  zh: dd2e4af867089091
 /deepseek-ai-dsh-webhook-github/model-experience:
   en: 17c5ff7cc39c5a2e
   zh: f6fe32ae981dc4b6
@@ -33,5 +36,5 @@
   en: 0c3192c3e300bb46
   zh: 7c84d20e6a8a768e
 /deepseek-ai-dsh-webhook-github/known-limitations-and-deferred-work/dev-note:
-  en: cd9dd4a041ca520e
+  en: e67f633dc6fe7773
   zh: e88aeb617ffb74ea

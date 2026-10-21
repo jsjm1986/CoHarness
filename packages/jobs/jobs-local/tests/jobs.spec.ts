@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -6,12 +7,20 @@ import AgentRegistry, { agentCarrier } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { bindScopeParent, createScope, scopeOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey } from '@deepseek-ai/dsh-scope'
+import { brandString, type Branded } from '@deepseek-ai/dsh-brand'
 import { JobId } from '@deepseek-ai/dsh-jobs'
 import type {
   JobEvent, JobEventFilter, JobHandle, JobHooks, JobKind, JobOutcome, JobOutputSource, JobSpec, JobView,
 } from '@deepseek-ai/dsh-jobs'
 import LocalJobRegistry, { type Config as JobsConfig } from '@deepseek-ai/dsh-jobs-local'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
+
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>()
+  return { ...actual, randomUUID: vi.fn(actual.randomUUID) }
+})
+
+const randomUuid = vi.mocked(randomUUID)
 
 declare module '@deepseek-ai/dsh-jobs' {
   interface JobKindMap {
@@ -277,7 +286,7 @@ describe('LocalJobRegistry.start', () => {
   it('rejects before producer start and id allocation, then admits immediately after settlement', async () => {
     const ctx = await harness({ maxConcurrentJobsPerOwner: 1 })
     const first = producer()
-    expect(ctx.jobs.start(first.spec)).toBe('bash-1')
+    expect(ctx.jobs.start(first.spec)).toMatch(/^bash-[0-9a-f]{16}$/)
 
     const blocked = producer()
     const run = vi.fn((job: JobHandle) => blocked.spec.run(job))
@@ -287,7 +296,7 @@ describe('LocalJobRegistry.start', () => {
 
     first.settle({ status: 'completed' })
     await tick()
-    expect(ctx.jobs.start(blocked.spec)).toBe('bash-2')
+    expect(ctx.jobs.start(blocked.spec)).toMatch(/^bash-[0-9a-f]{16}$/)
   })
 
   it('keeps a stopping job in the bucket until producer settlement', async () => {
@@ -301,7 +310,7 @@ describe('LocalJobRegistry.start', () => {
 
     first.settle({ status: 'killed' })
     await tick()
-    expect(ctx.jobs.start(replacement.spec)).toBe('bash-2')
+    expect(ctx.jobs.start(replacement.spec)).toMatch(/^bash-[0-9a-f]{16}$/)
   })
 
   it.each(['completed', 'killed', 'failed'] as const)(
@@ -341,12 +350,68 @@ describe('LocalJobRegistry.start', () => {
     await disposeAgentScope(oldOwner)
   })
 
-  it('issues kind-prefixed ids from per-kind counters', async () => {
+  it('issues unique kind-prefixed ids', async () => {
     const ctx = await harness()
-    expect(ctx.jobs.start(producer().spec)).toBe('bash-1')
-    expect(ctx.jobs.start(producer().spec)).toBe('bash-2')
-    expect(ctx.jobs.start(producer({ kind: 'subagent' }).spec)).toBe('subagent-1')
-    expect(ctx.jobs.start(producer({ kind: 'workflow' }).spec)).toBe('workflow-1')
+    const first = ctx.jobs.start(producer().spec)
+    const second = ctx.jobs.start(producer().spec)
+    expect(first).toMatch(/^bash-[0-9a-f]{16}$/)
+    expect(second).toMatch(/^bash-[0-9a-f]{16}$/)
+    expect(second).not.toBe(first)
+    expect(ctx.jobs.start(producer({ kind: 'subagent' }).spec)).toMatch(/^subagent-[0-9a-f]{16}$/)
+    expect(ctx.jobs.start(producer({ kind: 'workflow' }).spec)).toMatch(/^workflow-[0-9a-f]{16}$/)
+  })
+
+  it('mints ids unique across registries, so a restart cannot alias a live job', async () => {
+    const firstCtx = await harness()
+    const first = firstCtx.jobs.start(producer().spec)
+    // A restarted registry sees none of the prior registry's jobs; the mint
+    // must therefore not repeat an id the earlier registry issued.
+    const secondCtx = await harness()
+    const second = secondCtx.jobs.start(producer().spec)
+    expect(secondCtx.jobs.list()).toHaveLength(1)
+    expect(secondCtx.jobs.list()[0]).toMatchObject({ id: second })
+    expect(second).toMatch(/^bash-[0-9a-f]{16}$/)
+    expect(second).not.toBe(first)
+  })
+
+  it('retries a short UUID collision without replacing a live job', async () => {
+    const ctx = await harness()
+    randomUuid
+      .mockReturnValueOnce('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+      .mockReturnValueOnce('aaaaaaaa-aaaa-4aaa-8aaa-bbbbbbbbbbbb')
+      .mockReturnValueOnce('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+    try {
+      const first = ctx.jobs.start(producer().spec)
+      const second = ctx.jobs.start(producer().spec)
+      expect(first).toBe('bash-aaaaaaaaaaaa4aaa')
+      expect(second).toBe('bash-bbbbbbbbbbbb4bbb')
+      expect(ctx.jobs.list().map(job => job.id)).toEqual([first, second])
+    } finally {
+      randomUuid.mockRestore()
+    }
+  })
+
+  it('does not resume live jobs from recorded Session history', async () => {
+    const ctx = await harness()
+    // A reopened session can carry records of an earlier job; the registry
+    // reads no Session content, so `list` stays empty until `start` mints one.
+    const agent = stubAgent(ctx, 'reopened-session')
+    const callId = brandString<Branded<'ToolCallId'>>('historic-call')
+    agent.session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: {
+        role: 'tool',
+        source: { kind: 'tool', callId },
+        toolCallId: callId,
+        content: [{ type: 'text', text: 'started background job bash-3f9a1c2e8d4b5a67' }],
+        isError: false,
+        id: brandString<Branded<'MessageId'>>('historic-result'),
+      },
+    }, { surfaceOp: 'append' })
+    await ctx.agents.register(agent)
+    expect(ctx.jobs.list(agent.id)).toEqual([])
+    expect(ctx.jobs.list()).toEqual([])
   })
 })
 
@@ -753,9 +818,9 @@ describe('LocalJobRegistry owner isolation', () => {
     ctx.jobs.attachController('test-controller')
     expect(() => ctx.jobs.start({ ...producer().spec, owner: SessionId('a') }))
       .toThrow('background job ownership requires the agent registry')
-    // The failed registration mutated nothing: no stored job, counter untouched.
+    // The failed registration mutated nothing: no stored job.
     expect(ctx.jobs.list()).toEqual([])
-    expect(ctx.jobs.start(producer().spec)).toBe('bash-1')
+    expect(ctx.jobs.start(producer().spec)).toMatch(/^bash-[0-9a-f]{16}$/)
   })
 
   it('rejects a session without a live agent and attaches cleanup once it has one', async () => {
@@ -780,7 +845,7 @@ describe('LocalJobRegistry owner isolation', () => {
         done: new Promise<JobOutcome>((res) => { settle = res }),
       }),
     })
-    expect(id).toBe('bash-1') // the failed attempt burned no counter
+    expect(id).toMatch(/^bash-[0-9a-f]{16}$/)
     await disposeAgentScope(ghost)
     expect(cancels).toEqual(['owner disposed'])
     expect(ctx.jobs.list(ghost.id)).toEqual([])
@@ -835,7 +900,9 @@ describe('LocalJobRegistry owner cleanup', () => {
     await disposeAgentScope(owner)
     expect(cancels).toEqual(['owner disposed'])
     expect(ctx.jobs.list(owner.id)).toEqual([])
-    expect(seen.map(event => event.type === 'removed' ? event.job.id : undefined)).toEqual(['subagent-1', 'bash-1'])
+    expect(seen.map(event => event.type === 'removed' ? event.job.id : undefined)).toEqual([
+      expect.stringMatching(/^subagent-[0-9a-f]{16}$/), expect.stringMatching(/^bash-[0-9a-f]{16}$/),
+    ])
   })
 
   it('announces teardown settlements with cause teardown', async () => {
@@ -1165,8 +1232,8 @@ describe('LocalJobRegistry events', () => {
   it('announces an unowned job to every session filter, since every caller can see it', async () => {
     const ctx = await harness()
     const seen = collect(ctx, { owner: SessionId('anyone') }, ['registered'])
-    ctx.jobs.start(producer().spec)
-    expect(seen).toMatchObject([{ type: 'registered', job: { id: 'bash-1' } }])
+    const id = ctx.jobs.start(producer().spec)
+    expect(seen).toMatchObject([{ type: 'registered', job: { id } }])
     expect((seen[0] as { job: JobView }).job.owner).toBeUndefined()
   })
 
@@ -1198,7 +1265,7 @@ describe('LocalJobRegistry events', () => {
     const seen = collect(ctx, { owners: 'all' }, ['registered'])
 
     const id = ctx.jobs.start(producer().spec)
-    expect(id).toBe('bash-1')
+    expect(id).toMatch(/^bash-[0-9a-f]{16}$/)
     expect(seen).toHaveLength(1)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('event listener threw on registered'))
   })

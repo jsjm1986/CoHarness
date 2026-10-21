@@ -21,7 +21,6 @@ This service records positive or negative ratings, an optional category from the
 - [Data, lifecycle, and durability](#data-lifecycle-and-durability)
 - [Service and Host Remote contract](#service-and-host-remote-contract)
 - [Compare-and-set and idempotency](#compare-and-set-and-idempotency)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -82,11 +81,6 @@ A matching-version no-op returns the already stored item with unchanged version 
 A per-Session promise queue encloses inspection, durability validation, sidecar read, comparison, and whole-row write. These semantics serialize concurrent mutations through one service instance; storage-domain itself has no cross-process conditional write.
 
 Plugin disposal closes mutation admission, drains every operation already accepted into the per-Session queues, and only then closes the storage domain. A mutation submitted after disposal begins rejects as a lifecycle failure instead of entering a closing domain.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Sidecar rows are persisted through the storage domain they belong to and exposed by the same Remote surface; no second copy exists to diverge.
 
 <a id="model-experience"></a>
 ## Model Experience

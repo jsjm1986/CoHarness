@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-05-dynamic-workflows.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-05-dynamic-workflows.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-05-dynamic-workflows.md
+document:
+  en: 1c08ba3081d41dcff5e5098addc83fabc130b602
+  zh: 0775b73c1fb0b545539e3767bcb1326a2e9f7c71
 /agent-note-dynamic-workflows-a-script-driven-multi-agent-orchestration-seam:
   en: 472dec484bf937c1
   zh: 1d6c38c699d43828

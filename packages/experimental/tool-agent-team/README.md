@@ -17,7 +17,6 @@ This package lets the model create named teammates, send them messages, inspect 
 
 - [Config](#config)
 - [Tools and authority](#tools-and-authority)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -44,14 +43,11 @@ The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experi
 
 Every tool requires the exact calling `Agent`. `spawn_teammate` and `interrupt_agent` enforce Lead authority inside `ctx.agentTeams`, not only in their descriptions. All members can communicate with any peer and use the task board. Task mutations retain the domain's owner/Lead and revision checks.
 
+Creation and listing results identify members by `target` — the durable member name, with no member Session ID in model-facing output. Use that value in message and interrupt calls and in the task tools' `owner` parameter. `inactive` means no turn is executing, whether the member is loaded or must be resumed; it does not describe task completion or outcome. `provisioning` and `failed` describe member creation.
+
 `send_message` succeeds once mail is durable and never wakes an inactive target. `followup_task` also makes the message the target's next turn and can cold-resume it. A `queued` result is accepted durable work and must not be retried. Task readiness does not start an owner. Before arming its 10,000-through-3,600,000-millisecond edge wait, `wait_agent` checks for another member that is running or provisioning; without one it returns `noProgress` immediately with instructions to re-list and use `followup_task`. Otherwise it waits for one post-call Team edge, defaulting to 30,000 milliseconds, and callers re-list after wakeup or timeout because earlier changes are not replayed.
 
 The plugin listens to Agent publication and installs its registrations through that Agent's scope. Fresh creation and cold resume therefore receive the same tool/prompt set before the first model request. Agent disposal and plugin HMR remove every scoped registration; reloading the plugin installs one fresh set in each still-live member without changing its continuation Activation.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The adapter installs tool and policy registrations into team scopes; team definitions and lifecycle stay owned by `ctx.agentTeams`.
 
 <a id="model-experience"></a>
 ## Model Experience

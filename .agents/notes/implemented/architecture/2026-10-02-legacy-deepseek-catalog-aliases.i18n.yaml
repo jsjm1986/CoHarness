@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-02-legacy-deepseek-catalog-aliases.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-02-legacy-deepseek-catalog-aliases.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-02-legacy-deepseek-catalog-aliases.md
+document:
+  en: 42c75fb9ae9e02a0410933b0446b0947d022f899
+  zh: 33c149badf783304e30c2e25e1085f93da1376a4
 /agent-note-legacy-deepseek-catalog-ids-retained-over-pi-ai-0-87-renames:
   en: 80641eb366e87fa0
   zh: 50332e70deab6709

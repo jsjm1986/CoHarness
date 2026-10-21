@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-hover-popup-pointer-grace.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-hover-popup-pointer-grace.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-hover-popup-pointer-grace.md
+document:
+  en: 302592a2e9de8e749ef2450e8877a3ccbffd15d5
+  zh: 4020a6f1f7ab52b6340a07f4c099906a7353a8a5
 /agent-note-hover-popup-pointer-grace:
   en: ae77d638ced9c7f1
   zh: c717334d465a8a49

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-dependencies-over-hand-rolling.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-dependencies-over-hand-rolling.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-dependencies-over-hand-rolling.md
+document:
+  en: 22720c483c1c9e8145497b3e83cbc9f17570b161
+  zh: f0ac041510cfe7fdf8141aee833b1eac23990feb
 /agent-note-prefer-maintained-dependencies-over-hand-rolling:
   en: 5cf63576459c1942
   zh: c3f2dbc5e4656693

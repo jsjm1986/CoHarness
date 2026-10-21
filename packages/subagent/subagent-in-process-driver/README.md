@@ -19,7 +19,6 @@ This package is the shared run driver for the two in-process providers. Spawn pa
 - [Cancellation and ownership](#cancellation-and-ownership)
 - [Spawn and fork inputs](#spawn-and-fork-inputs)
 - [Structured output](#structured-output)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -71,11 +70,6 @@ Depth enforcement is internal to `startInProcessRun`: it reads the parent depth 
 - A monotonic tool guard blocks later calls after capture, and the structured-output execution's `concludeTurn()` marker ends the turn after the result commits.
 
 A clean turn that never commits the required structured value reports `error`; the driver does not re-prompt. All registrations ride the child fiber and disappear with it.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The driver manages one child Agent per call through the host's agent factory; depth, seeding, and result reading are per-call state.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -12,6 +12,9 @@
       "path": "../../core/agent"
     },
     {
+      "path": "../../preset/agent-preset-registry"
+    },
+    {
       "path": "../../core/scope"
     },
     {
@@ -28,9 +31,6 @@
     },
     {
       "path": "../../llm/llm"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     },
     {
       "path": "../../session/session-projection"

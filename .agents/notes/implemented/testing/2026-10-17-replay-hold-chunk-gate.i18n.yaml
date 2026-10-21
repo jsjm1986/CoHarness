@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-17-replay-hold-chunk-gate.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-17-replay-hold-chunk-gate.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-17-replay-hold-chunk-gate.md
+document:
+  en: d6e37773fe179c772f83fb7aae1ee5defed08ed5
+  zh: 9e59f881dc77f8d39c544ff02030a600fa4c708e
 /agent-note-replay-hold-gates-a-scripted-stream-at-a-chosen-chunk:
   en: c79134f2c12a736b
   zh: 5241fd6aff5f7c99

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-24-empty-model-response-is-retryable.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-24-empty-model-response-is-retryable.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-24-empty-model-response-is-retryable.md
+document:
+  en: 021c368a25ce8dd277ba431fa905c0621b752fd0
+  zh: 67809931f959086a4525cec4c879af190e653d4a
 /agent-note-empty-model-completions-are-retryable-empty-response-failures:
   en: 4508351f97d7d0f9
   zh: 6f27bbfe4fb805a8

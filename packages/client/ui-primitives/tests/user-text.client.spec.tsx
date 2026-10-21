@@ -82,6 +82,14 @@ describe('projectUserText', () => {
     expect(chips(container)).toEqual([{ label: '/', kind: 'folder', title: '@/' }])
   })
 
+  it('keeps skill labels inert when only file previews are available', () => {
+    const openFile = vi.fn()
+    const view = render(<div>{projectUserText('@notes.md /review', [], ['review'], 'skill', { openFile })}</div>)
+    expect(view.container.querySelector('[data-ref-chip="skill"]')?.tagName).toBe('SPAN')
+    fireEvent.click(view.getByRole('button', { name: 'notes.md' }))
+    expect(openFile).toHaveBeenCalledWith('notes.md')
+  })
+
   it('opens decoded files and loaded skills without activating session, folder, or command references', () => {
     const openFile = vi.fn()
     const openSkill = vi.fn()

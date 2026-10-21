@@ -13,7 +13,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import * as sdk from '../src/index.ts'
 import {
   DEFAULT_DISPOSE_EOF_GRACE_MS,
@@ -25,11 +24,12 @@ import {
   type SdkRunSpec,
 } from '../src/run.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { parentAgent } from './agent-fixture.ts'
 
 const fakeRuntime = fileURLToPath(new URL('../../../sdk/client/tests/fake-runtime.ts', import.meta.url))
 
-/** A parent Agent stub. The directory fixture reads its session header's cwd as the effective workspace the child inherits. */
-const fakeParent = { id: 'parent', session: { header: { cwd: process.cwd() } } } as unknown as Agent
+/** A parent Agent whose session header cwd is the effective workspace the child inherits. */
+const fakeParent = parentAgent(process.cwd())
 
 function request(text = 'p', signal = new AbortController().signal) {
   return { label: text, prompt: [{ type: 'text' as const, text }], parent: fakeParent, signal }
@@ -464,11 +464,10 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     expect(ctx.subagents.getProvider('sdk-hmr')?.name).toBe('sdk-hmr')
     expect(ctx.subagents.getProvider('sdk-hmr')?.inheritsParentContext).toBe(false)
     expect(ctx.subagents.getProvider('sdk-hmr')?.capabilities).toEqual({
+      agentOptions: true,
+      agentPreset: false,
       outputSchema: false,
       depthLimit: false,
-      toolFilter: false,
-      persona: false,
-      agentOptions: true,
     })
     await fiber.dispose()
     expect(ctx.subagents.getProvider('sdk-hmr')).toBeUndefined()

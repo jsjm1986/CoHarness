@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-admin-ui-dedupes-react-bound-primitive-deps.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-admin-ui-dedupes-react-bound-primitive-deps.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-admin-ui-dedupes-react-bound-primitive-deps.md
+document:
+  en: f5137b4a46e4e4f44b3b486a069c24cbf950a378
+  zh: 55e9164e2a0b8ab605d4ef61a53f8f1021715abb
 /agent-note-admin-ui-dedupes-every-react-bound-package-the-shared-primitives-import:
   en: 39e89d4ad9b8877c
   zh: 80246a753267c69d

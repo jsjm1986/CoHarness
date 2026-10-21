@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-18-session-handoff-tool.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-18-session-handoff-tool.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-session-handoff-tool.md
+document:
+  en: 211d69a435eb24c36f068931cd8c60f3c4911ecc
+  zh: 55262362ca054008789269720d807399834e5bc6
 /agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule:
   en: 45ef43ac1d1b686b
   zh: 9a62821c4d8adf3c

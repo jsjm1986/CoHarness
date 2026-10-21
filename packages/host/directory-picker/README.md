@@ -17,17 +17,11 @@ The web GUI lets an operator choose a workspace directory with either an OS choo
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam declares the capability union; backends own their interaction and process state.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/skill/skill/README.md
+document:
+  en: 55fe6308941a74d6b271ba9dde28bdc76816e9ed
+  zh: afb8fb12e22a66d08c0b1988a5b7396ddd9819d2
 /:
   en: 88bb71903690e574
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: dac8069f518e183c
   zh: 2e4f2983030f9270
 /deepseek-ai-dsh-skill/table-of-contents:
-  en: 68cf943c55b2c0db
-  zh: bb08ce60a1f5e2dd
+  en: f41b000a8abf915d
+  zh: c414b09f976e7672
 /deepseek-ai-dsh-skill/service-skillregistry-ctx-key-skills:
   en: 7008d2e5858afa40
   zh: 178092a22dc8a54e
@@ -39,11 +42,8 @@
   en: acadf4398a822fa4
   zh: f23f105c2b3e37a8
 /deepseek-ai-dsh-skill/consumer-boundary:
-  en: d5c019bcec437e65
-  zh: 23b72b6731ec220e
-/deepseek-ai-dsh-skill/invariants:
-  en: e58b2c2332871147
-  zh: 5cf5e06a1a9d30d4
+  en: 05b8040db4f66061
+  zh: b4dc77feb63fb111
 /deepseek-ai-dsh-skill/model-experience:
   en: 84f7d6e986f88425
   zh: 0fdc2326d8efb13e

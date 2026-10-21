@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-24-separate-context-injection-from-turn-execution.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-24-separate-context-injection-from-turn-execution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-24-separate-context-injection-from-turn-execution.md
+document:
+  en: c3fdeb1436530a77003e98200a5512fb81ebed37
+  zh: c40507dfdf6dc66d5d6b75d77632f966d4f79559
 /agent-note-separate-context-injection-from-turn-execution:
   en: f0090d5d271cbd9d
   zh: 7ff28e03f1273093
@@ -21,8 +24,8 @@
   en: 0efad389c38dfe95
   zh: 13dd73de20226540
 /agent-note-separate-context-injection-from-turn-execution/verification:
-  en: 3f3db450a3fc5848
-  zh: b2027393d570339d
+  en: 56fe8195ed669f6d
+  zh: 503ca0ce723c69b1
 /agent-note-separate-context-injection-from-turn-execution/consequences:
   en: 71079e4dede5e12f
   zh: deb46b5a4f151678

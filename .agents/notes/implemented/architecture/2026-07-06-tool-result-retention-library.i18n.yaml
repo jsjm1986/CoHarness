@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-06-tool-result-retention-library.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-06-tool-result-retention-library.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-06-tool-result-retention-library.md
+document:
+  en: 8d938db8f5fa78398a39e97cc877308200f7d60f
+  zh: 747b545ee8c900c13d80c7aef6caecc8ae8dc0ad
 /agent-note-tool-result-retention-library:
   en: ac27fc655eb29392
   zh: 0930c7466fcb703b

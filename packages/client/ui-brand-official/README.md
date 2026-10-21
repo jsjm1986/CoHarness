@@ -17,17 +17,11 @@ This package gives an `official` client build the DeepSeek Harness mark and name
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The plugin fills brand slots with static occupants under a build flag and otherwise registers nothing; it owns no mutable state.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-02-message-fork-actions-require-completed-turn-tail.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-02-message-fork-actions-require-completed-turn-tail.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-02-message-fork-actions-require-completed-turn-tail.md
+document:
+  en: abdcbc79948c67619bb70a8a87741046f65b8838
+  zh: dc6506bf470443b5de6a7984f983f4cca81452a0
 /agent-note-message-fork-actions-require-a-completed-turn-tail:
   en: 4987ca73c85ff2d9
   zh: d3a7e3f86c9f3557

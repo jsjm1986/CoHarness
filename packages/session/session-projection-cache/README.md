@@ -15,6 +15,7 @@ A stored row `(key → {ver, seq, val})` is a fold shortcut, never an authority:
 - **A `ver` mismatch against the live unit's `stateVersion` discards, never migrates.** A unit bump invalidates its rows at read time; the key refolds from the log.
 - **A row must pass the live unit's `stateSchema`.** A malformed row is omitted from the zero-I/O view and rejected by restore so the cold-read ladder refolds it from the log.
 - **Whole-record writes.** Each write replaces the session's full checkpoint (the registry cut is always complete), snapshotted through the lossless-JSON boundary — a unit state violating the plain-JSON contract fails loud.
+- **Opaque state reads.** Domain validation uses the same lossless JSON rules and retains every state property, including own `__proto__` keys. Each unit's `stateSchema` still decides which states it accepts.
 - **Records are bound to a log lifecycle, not just an id.** Each record stores the complete lifecycle identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`, and the exact `inheritedEventCount`) it was folded from, so a row initialized under another Session format generation or fork cut cannot seed the caller; every read validates it (the live or stored header is the witness) before accepting a row, so a deleted-then-recreated id or a persistence store swapped under a surviving cache discards the unrelated record instead of seeding phantom values.
 - **The log leads, the cache follows.** A live checkpoint flushes the session's buffered events durably BEFORE the cache row lands, so a crash can leave the cache behind the log (a longer tail replay) but never ahead of it.
 
@@ -29,7 +30,6 @@ This package keeps durable per-session projection checkpoints so history lists, 
 - [Cold read (`coldSnapshot(meta, inheritedEventCount, events)`)](#cold-read-coldsnapshotmeta-inheritedeventcount-events)
 - [Upgrade compatibility](#upgrade-compatibility)
 - [Composition](#composition)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -80,11 +80,6 @@ The domain stores one version-stamped document per session under `<root>/session
 ```
 
 Injects `storageDomain`, `sessionProjections`, `sessions`. Without this row the projection system runs live-only (watermark cache; cold reads fall back to full log folds wherever a carrier implements them).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Cache records are durable documents written and read through the storage domain; the service projects that same store and keeps no shadow copy.
 
 <a id="model-experience"></a>
 ## Model Experience

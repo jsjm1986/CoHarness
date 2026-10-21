@@ -191,7 +191,10 @@ describe('Python SDK dsh profile keyless smoke', () => {
       expect(log).toBeDefined()
       const compressed = await readFile(join(sessionsRoot, log!))
       expect(compressed.subarray(0, 4).toString('hex')).toBe('28b52ffd')
-      expect(JSON.parse((await decompress(compressed)).toString())).toMatchObject({ type: 'session', id: 'main' })
+      // single-shot decompressors differ on whether they decode only the first
+      // frame of a concatenated-frame .jsonl.zstd or every frame; the session
+      // header is the first JSONL line either way.
+      expect(JSON.parse((await decompress(compressed)).toString().split('\n', 1)[0] ?? '')).toMatchObject({ type: 'session', id: 'main' })
     } finally {
       // No-op after exit; reject: false settles on every outcome, so cleanup never races teardown.
       child.kill('SIGKILL')
@@ -302,6 +305,7 @@ describe('Python SDK dsh profile keyless smoke', () => {
       const tools = modelRequests[0]?.tools as { name?: string }[]
       expect(tools.map(tool => tool.name)).toEqual([
         process.platform === 'win32' ? 'pwsh' : 'bash',
+        'read_image',
         ...(editorEnabled ? ['str_replace_editor'] : []),
         'working_directory',
       ])
@@ -494,8 +498,11 @@ it.each(['unset', 'empty', 'bundled', 'full', 'python-only', 'python-only-no-cli
   }, () => stderr)
   const names = (requests[0]!.tools as { name: string }[]).map(value => value.name)
   expect(names.includes('load_workspace_dependencies')).toBe(enabled)
+  expect(JSON.stringify(requests[0]!.messages).includes('`office`')).toBe(enabled && mode !== 'missing-assets')
+  expect(names).not.toContain('office_tools')
+  expect(names).not.toContain('render_document')
   for (const name of ['office-docx', 'office-pptx', 'office-xlsx']) {
-    expect(JSON.stringify(requests[0]!.messages).includes(name)).toBe(enabled && mode !== 'missing-assets' && mode !== 'python-only')
+    expect(JSON.stringify(requests[0]!.messages).includes(name)).toBe(enabled && mode !== 'missing-assets')
   }
   if (mode === 'wrong-type') {
     expect(requests).toHaveLength(2)
@@ -524,8 +531,8 @@ it.each(['unset', 'empty', 'bundled', 'full', 'python-only', 'python-only-no-cli
       expect.objectContaining({ role: 'user', content }),
     ]))
   }
-  if (mode === 'python-only') expect(stderr).toContain('node')
-  if (mode === 'missing-assets') expect(stderr).toContain('check_office.py')
+  if (mode === 'python-only') expect(stderr).not.toContain('ENOENT')
+  if (mode === 'missing-assets') expect(stderr).toContain('SKILL.md')
   await send(3, 'shutdown')
   const exit = await child
   expect(exit.timedOut).toBe(false)

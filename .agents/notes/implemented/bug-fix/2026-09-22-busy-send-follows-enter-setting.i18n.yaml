@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-busy-send-follows-enter-setting.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-busy-send-follows-enter-setting.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-busy-send-follows-enter-setting.md
+document:
+  en: 2f40c3354108a5100a64d63ef19bf99d1ef4196d
+  zh: 7aea89ea717aa2b12f14015283926f175f5bd1f2
 /agent-note-busy-send-follows-the-displayed-enter-preference:
   en: 0b04c306ca9b2a60
   zh: f849c2fd24bb4352

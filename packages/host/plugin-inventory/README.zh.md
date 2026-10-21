@@ -61,7 +61,6 @@ Fiber 状态映射到公共阶段词汇，其中 `disposed` 折叠为 `null`—�
 |---|---|
 | [`src/index.ts`](src/index.ts) | `PluginInventoryGateway`：`pluginInventory` Remote 服务与 Loader 投影 |
 | [`src/types.ts`](src/types.ts) | 公共 payload 类型：`PluginInventoryEntry`、`PluginInventorySnapshot`、`PluginFiberPhase` |
-| — | 不发布运行时不变式配套项；每个快照都投影 Loader 持有的状态。 |
 
 Typert 生成由 `./typert` 与 `./remote` 导出的 Host 和 Client Remote 产物。
 
@@ -80,7 +79,6 @@ Typert 生成由 `./typert` 与 `./remote` 导出的 Host 和 Client Remote 产�
 
 -----
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -95,12 +93,11 @@ Typert 生成由 `./typert` 与 `./remote` 导出的 Host 和 Client Remote 产�
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 这些限制说明即时清单无法向客户端提供哪些信息。它们是当前包约束，不是任务积压。
 
 - **仅表示调用当下**——结果不包含持久的失败历史或订阅；只要不存在存活的根 Fiber，就会报告 `null`，而不区分其原因。
 - **无来源与修改能力**——服务不识别条目由哪个 bundle、profile 或 override 引入，也不能在任一平面启用、停用、添加或移除插件。
-- **预设仅随 roster 出现**——未装 `dsh-agent-presets` 的部署只提供 Loader 条目；`agentPresets` 字段缺席而非为空。
+- **预设仅随 roster 出现**——未装 `dsh-agent-preset-registry` 的部署只提供 Loader 条目；`agentPresets` 字段缺席而非为空。
 
 <a id="dev-note"></a>
 ### 开发备注

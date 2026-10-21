@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-20-upstream-alpha2-client-lane-audit.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-20-upstream-alpha2-client-lane-audit.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md
+document:
+  en: b218c819e57354424113ee83cf85ee8d474c7fc1
+  zh: a941df8f2c90ada8c62b9f1e8ed913d62e16ec58
 /agent-note-lane-7a-client-package-audit-against-upstream-alpha-2:
   en: 5146c07849730975
   zh: 3a08a2dbea324ea1

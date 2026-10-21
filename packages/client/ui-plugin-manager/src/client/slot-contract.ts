@@ -1,14 +1,15 @@
 /**
  * The slots the Plugins page declares for other plugins. Three carry a
- * plugin's own configuration: the official plugins listed in the page's
- * Configuration group, one bundle's configuration on its page, and one row's
- * configuration opened from that row. One takes additional add-plugin paths
- * for the header's add menu. Three more take contributions to any detail page —
+ * plugin's own configuration: the official plugins listed beside the official
+ * bundles, one bundle's configuration on its page, and one row's configuration
+ * opened from that row. Three more take contributions to any detail page —
  * its head actions, the badges beside its title, and the sections under its
  * own content — from a plugin that has something to say about bundles, rows,
  * or official plugins it does not own. A registrant merges this contract with
  * `import type` and registers through `ctx.slots`; it never imports this
  * package at runtime.
+ *
+ * A contributed tab, such as Discover, installs through the page's own dialog.
  *
  * Entries accept `page` for the form with its own save control and `summary`
  * for an official card's one-liner or a row's missing-description fallback.
@@ -20,6 +21,14 @@
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+
+/**
+ * Where a bundle's readable files live, as the upstream `BundleInfo.availability`
+ * union names them. The fork's Host does not publish the field; the page
+ * derives it (`manager-store.ts#packageView`), so the same union is declared
+ * here for the detail-slot contract.
+ */
+export type BundleAvailability = 'installation' | 'profile' | 'missing'
 
 /** The view the page asks a configuration entry for. */
 export interface PluginConfigViewProps {
@@ -45,8 +54,12 @@ export interface PluginPackageRef {
   readonly name: string
   /** The installed version, when the Host reports one. */
   readonly version?: string
-  /** Whether the profile's own dependencies hold the package; false for a bundle the installation supplies. */
+  /** Whether the profile declares the package dependency. */
   readonly installed: boolean
+  /** Readable package location; missing entries can retain a dependency declaration. */
+  readonly availability: BundleAvailability
+  /** Whether the installation offers this package in Official. */
+  readonly official: boolean
   /** Whether the bundle is switched on. */
   readonly enabled: boolean
   /** The rows the bundle declares. */
@@ -74,6 +87,33 @@ export interface PluginActivationOwnerProps {
   readonly onOpenDetails: () => void
 }
 
+/** An exact version a tab asks the Plugins page to install, with the text the install dialog shows for it. */
+export interface PluginTabInstall {
+  /** The install spec, such as `name@version` or a pinned `git+https` URL. */
+  readonly spec: string
+  /** The registry to ask first for this install only; absent keeps the dialog's registry choice. */
+  readonly registry?: string
+  /** Display name of the plugin, already localized. */
+  readonly title: string
+  /** The version being installed. */
+  readonly version: string
+}
+
+/** Owner props of a page tab another plugin contributes, such as Discover. */
+export interface PluginTabProps {
+  /**
+   * Install an exact version the person already confirmed: the page's install dialog opens at its check and progress
+   * screens, without the spec form, and names the plugin and version above the spec.
+   * @param target - the spec, optional registry, and display text.
+   */
+  readonly install: (target: PluginTabInstall) => void
+  /**
+   * Switch to the Installed tab and open a bundle's page.
+   * @param packageName - npm package name of the bundle.
+   */
+  readonly openPackage: (packageName: string) => void
+}
+
 /** Add-plugin menu actions, independent of any selected bundle or Session. */
 export interface PluginAddActionsProps {
   /** Close the add-plugin menu before starting the contributed action. */
@@ -84,18 +124,22 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /** Additional MenuItemButton rows after installation: 72px high, with a title and a description capped at two lines. */
     'plugins.add.actions': { kind: 'list'; scope: 'root'; owner: PluginAddActionsProps }
+    /**
+     * Tabs after the page's own Installed tab, such as Discover: `label` names the tab and `order` places it. The
+     * page renders the selected entry under its header and tabs; the entry draws its own content and installs
+     * through the owner's `install`.
+     */
+    'plugins.tab': { kind: 'list'; scope: 'root'; owner: PluginTabProps }
     /** Optional guidance after the user enables a bundle from the list, keyed by npm package name. */
     'plugins.bundle.activation': { kind: 'keyed'; scope: 'root'; owner: PluginActivationOwnerProps }
     /**
-     * One official plugin the Plugins page lists in its Configuration group:
-     * `id` is the host-plane settings namespace the entry edits, `label` the
-     * card's title, and `order` its place. The page renders the entry as the
-     * card's one-liner (`view: 'summary'`) and, once the card is opened, as
-     * the body of the plugin's own page (`view: 'page'`, with `form` bound to
-     * the namespace). A card lists only while the Host serves its namespace,
-     * so a plugin the composition never loads leaves no empty shell. A
-     * bundle's configuration belongs in `plugins.bundle.config` or
-     * `plugins.row.config` instead.
+     * One official plugin the Plugins page lists in its Official group after
+     * the official bundles: `label` is the card's title and `order` its place.
+     * The page renders the entry as the card's one-liner (`view: 'summary'`)
+     * and, once the card is opened, as the body of the plugin's own page
+     * (`view: 'page'`). OCCUPIED by the official settings pages, one companion
+     * package per host-plane namespace; a bundle's configuration belongs in
+     * `plugins.bundle.config` or `plugins.row.config` instead.
      */
     'plugins.item': { kind: 'list'; scope: 'root'; owner: PluginConfigViewProps }
     /**

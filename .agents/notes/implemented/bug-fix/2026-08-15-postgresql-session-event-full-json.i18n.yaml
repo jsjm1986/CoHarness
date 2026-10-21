@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-15-postgresql-session-event-full-json.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-15-postgresql-session-event-full-json.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-15-postgresql-session-event-full-json.md
+document:
+  en: 862d39f132bd451283da7fb1e8f05e8d403ed89f
+  zh: 6c93d22d63c8da14e633f3649e4caf15bf8e39b9
 /agent-note-store-postgresql-session-events-as-full-json:
   en: 8c15741642846c78
   zh: a3cc8598e1bf86e5

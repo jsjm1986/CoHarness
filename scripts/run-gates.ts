@@ -287,7 +287,7 @@ export function gatesForMode(selected: Mode): Gate[] {
     case 'ci-linux-primary':
       // The HMR web test rewrites the shared `lib/` and `apps/web/dist/`
       // trees; let every built-artifact reader in this mode settle first.
-      return [webFixturesGate(), ...ciPrimaryGates(), adminBuildGate(['build']), webSnapshotGate(['built-package-invariants', 'web-fixtures', 'admin-build'], [
+      return [webFixturesGate(), ...ciPrimaryGates(), adminBuildGate(['build']), webSnapshotGate(['build', 'web-fixtures', 'admin-build'], [
         'publint',
         'snapshot',
         'doc-typecheck',
@@ -398,6 +398,7 @@ function consumerSurfaceGates(): Gate[] {
     pnpmScript('client-route-resolution', 'verify-client-route-resolution', { label: 'client route resolution' }),
     pnpmScript('plugin-surfaces', 'verify-plugin-surfaces', { label: 'plugin surfaces' }),
     pnpmScript('no-bare-dispatcher', 'verify-no-bare-dispatcher', { label: 'proxy-aware dispatchers' }),
+    pnpmScript('plugin-record-callers', 'verify-plugin-record-callers', { label: 'plugin record callers' }),
     pnpmScript('no-unknown-casts', 'verify-no-unknown-casts', { label: 'no new unknown casts' }),
   ]
 }
@@ -418,7 +419,6 @@ function ciSharedStaticGates(): Gate[] {
     pnpmScript('constraints', 'constraints'),
     pnpmScript('package-dependencies', 'verify-package-dependencies', { label: 'package dependencies' }),
     pnpmScript('dsh-package-licenses', 'verify-dsh-package-licenses', { label: 'DSH package licenses' }),
-    pnpmScript('package-invariants', 'verify-package-invariants', { label: 'package invariants' }),
     pnpmScript('package-meta', 'verify-package-meta', { label: 'package metadata' }),
     pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
     ...consumerSurfaceGates(),
@@ -452,7 +452,6 @@ function ciPrimaryGates(): Gate[] {
       label: 'node-next types',
       needs: ['build'],
     }),
-    builtPackageInvariantsGate(['build']),
     builtBinSmokeGate(),
   ]
 }
@@ -557,14 +556,12 @@ function ciArtifactGates(): Gate[] {
       label: 'node-next types',
       needs: ['build'],
     }),
-    builtPackageInvariantsGate(['build']),
     builtBinSmokeGate(),
   ]
 }
 
 function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[] {
   const builtTree = ['build']
-  const validatedBuild = ['built-package-invariants']
   // The HMR web test starts `dev:web`, which rewrites the shared `lib/` and
   // `apps/web/dist/` trees. Let every build-artifact reader settle before that
   // writer starts; `after` preserves the web diagnostic even if a reader fails.
@@ -595,25 +592,24 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
       },
     }),
     pnpmScript('publint', 'publint', { needs: builtTree }),
-    builtPackageInvariantsGate(builtTree),
     pnpmScript('lint-and-duplication', 'check:ci:lint:contracts-ready', {
       label: 'lint and duplication',
-      needs: validatedBuild,
+      needs: builtTree,
     }),
-    snapshotGate(validatedBuild),
-    expectedOutputGate(validatedBuild),
+    snapshotGate(builtTree),
+    expectedOutputGate(builtTree),
     ...options.includeWebSnapshot === false
       ? []
-      : [adminBuildGate(validatedBuild), webSnapshotGate([...validatedBuild, 'web-fixtures', 'admin-build'], buildArtifactReaders)],
+      : [adminBuildGate(builtTree), webSnapshotGate([...builtTree, 'web-fixtures', 'admin-build'], buildArtifactReaders)],
     pnpmScript('doc-typecheck', 'doc-typecheck:contracts-ready', {
-      needs: validatedBuild,
+      needs: builtTree,
       env: { DSH_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
     }),
     pnpmScript('node-next-types', 'verify-node-next-types', {
       label: 'node-next types',
-      needs: validatedBuild,
+      needs: builtTree,
     }),
-    builtBinSmokeGate(validatedBuild),
+    builtBinSmokeGate(builtTree),
   ]
 }
 
@@ -719,7 +715,6 @@ function ciWindowsObservationalGates(): Gate[] {
       label: 'node-next types',
       needs: ['build'],
     }),
-    builtPackageInvariantsGate(['build']),
   ]
   return [
     ...predecessors,
@@ -871,13 +866,6 @@ function ciCoverageScopedGates(): Gate[] {
   return [instrumented, incremental]
 }
 
-function builtPackageInvariantsGate(needs?: string[]): Gate {
-  return pnpmScript('built-package-invariants', 'verify-built-package-invariants', {
-    label: 'built package invariants',
-    ...needs === undefined ? {} : { needs },
-  })
-}
-
 function positiveIntArg(envName: string, flag: string): string[] {
   const raw = process.env[envName]
   if (raw === undefined || raw === '') return []
@@ -907,8 +895,6 @@ function hygieneLeafGates(options: { artifactNeeds?: string[] } = {}): Gate[] {
     pnpmScript('package-dependencies', 'verify-package-dependencies', { label: 'package dependencies' }),
     pnpmScript('application-entrypoints', 'verify-application-entrypoints', { label: 'application entrypoints' }),
     pnpmScript('dsh-package-licenses', 'verify-dsh-package-licenses', { label: 'DSH package licenses' }),
-    pnpmScript('package-invariants', 'verify-package-invariants', { label: 'package invariants' }),
-    builtPackageInvariantsGate(options.artifactNeeds),
     pnpmScript('node-next-types', 'verify-node-next-types', {
       label: 'node-next types',
       ...artifactOptions,
@@ -940,7 +926,6 @@ function docSyncLeafGates(options: {
     pnpmScript('cordis-inspect-catalog', 'verify-cordis-inspect-catalog', { label: 'Cordis inspect catalog' }),
     pnpmScript('workflow-guest', 'verify-workflow-guest', { label: 'workflow guest source' }),
     pnpmScript('mermaid', 'verify-mermaid'),
-    pnpmScript('scoped-events', 'verify-scoped-events', { label: 'scoped events' }),
     pnpmScript('translation-pairing', 'verify-translation-pairing', { label: 'translation pairing', quick: true }),
     pnpmScript('markdown-wrap', 'verify-md-wrap', { label: 'markdown wrap', quick: true }),
     pnpmScript('client-catalog', 'verify-client-catalog', { label: 'client catalog' }),

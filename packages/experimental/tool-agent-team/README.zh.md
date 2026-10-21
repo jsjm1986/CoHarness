@@ -17,7 +17,6 @@ kind: "package-reference"
 
 - [配置](#config)
 - [工具与权限](#tools-and-authority)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -44,15 +43,11 @@ kind: "package-reference"
 
 每个工具都要求完全相同的调用 `Agent`。`spawn_teammate` 与 `interrupt_agent` 在 `ctx.agentTeams` 内部强制执行 Lead 权限，而不只依赖描述。所有成员都可以与任意 peer 通讯并使用任务板。任务变更保留领域层的 Owner／Lead 与 revision 校验。
 
+创建与列表结果以 `target`——持久化成员名——标识成员，面向模型的输出不含成员 Session ID。消息、中断调用与任务工具的 `owner` 参数都使用该值。`inactive` 表示没有轮次在执行，无论成员已加载还是需恢复；它不描述任务完成或结果。`provisioning` 与 `failed` 描述成员创建生命周期。
+
 `send_message` 在 mail 持久化后即成功，并且绝不会唤醒 inactive target。`followup_task` 还会让该消息成为 target 的下一个 turn，并可冷恢复 target。`queued` 结果表示持久工作已经接受，不能重试。任务 ready 不会启动 owner。`wait_agent` 在注册 10,000 到 3,600,000 毫秒的边等待前，会检查是否有另一个 running 或 provisioning member；如果没有，它会立即返回 `noProgress`，提示重新 list 并使用 `followup_task`。否则它会等待调用后发生的一条 Team 边，默认 30,000 毫秒；由于不会回放更早的变化，调用方需要在唤醒或超时后重新 list。
 
 插件监听 Agent publication，并通过对应 Agent scope 安装注册。因此，fresh 创建与 cold resume 都会在第一次模型请求前获得相同工具／提示词集合。Agent dispose 和插件 HMR 会移除全部 scoped 注册；重新加载插件会为仍 live 的每个成员安装一套新注册，而不改变 continuation Activation。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。适配器把工具与策略注册安装进团队作用域；团队定义与生命周期由 `ctx.agentTeams` 拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

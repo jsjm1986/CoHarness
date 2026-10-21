@@ -1,6 +1,10 @@
 - region "guide.md":
   - button "Close preview"
   - button "Reload"
+  - term: name
+  - definition: guide
+  - term: description
+  - definition: Packed markdown preview
   - heading "Guide" [level=1]
   - paragraph:
     - text: Packed

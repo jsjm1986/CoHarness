@@ -33,9 +33,9 @@ export interface ImageCardModel {
  * (the value `read_image` persisted from its target's display path, not the
  * author-typed `file_path` argument).
  *
- * Root calls persist it; a nested call (a read_image dispatched from inside
- * run_code) settles without `meta`, so the card falls back to the call's own
- * `file_path` argument for the label.
+ * Calls persist it; a historical nested record (a read_image dispatched from
+ * inside run_code) settles without `meta`, so the card falls back to the
+ * call's own `file_path` argument for the label.
  *
  * The attachment reference deliberately does NOT come from here. The settled
  * `content` already carries the image block with its complete reference, so
@@ -77,8 +77,9 @@ function isImageMediaType(value: string): value is ImageMediaType {
 /**
  * Narrow the persisted metadata, defensively. Every field arrives unvalidated on
  * replay (an obsolete or hand-edited log reaches here), so any mismatch declines
- * to the generic card rather than throwing. An absent `meta` (a nested call
- * persists none) leaves the path to the call's own `file_path` argument.
+ * to the generic card rather than throwing. An absent `meta` (a historical
+ * nested record persists none) leaves the path to the call's own `file_path`
+ * argument.
  *
  * The attachment id is checked for existence only: it is opaque and
  * provider-owned, and consumers must not parse that representation, so
@@ -195,16 +196,17 @@ function fullyRendered(content: readonly unknown[]): boolean {
  *
  * The card is result-side only: a call carries no content until `execute`
  * returns, so a running `read_image` has none and this returns null for it.
- * Both root and nested calls settle as ToolResultNode; the nested one (a
- * read_image dispatched from inside run_code) persists no presentationMeta, so
- * its label falls back to the call's own `file_path` argument.
+ * Both root and nested calls settle as ToolResultNode. Historical nested
+ * records without presentation metadata fall back to the call's own
+ * `file_path` argument for the label.
  * @param block - running or settled Tool block.
  * @param sessionCwd - the session workspace root; a workspace-rooted absolute
  *   path label displays relative to it. Absent leaves the path as authored.
  * @param home - host account home; a leftover POSIX home path displays as `~`.
- * @param nested - whether the block is a run_code sub-dispatch: nested calls
- *   persist no presentationMeta, so their label falls back to the `file_path`
- *   argument. The tree supplies this because the node carries no parent link.
+ * @param nested - whether the block is a run_code sub-dispatch: historical
+ *   nested records persist no presentationMeta, so their label falls back to
+ *   the `file_path` argument. The tree supplies this because the node carries
+ *   no parent link.
  * @returns the image-card props, or null for the generic path.
  */
 export function imageCardModel(
@@ -220,11 +222,11 @@ export function imageCardModel(
   if (call?.name !== 'read_image') return null
   const { file_path: filePath } = call.args
   if (typeof filePath !== 'string' || filePath.trim() === '') return null
-  // The label path: root calls persist it in presentationMeta; a nested call
-  // (dispatched from inside run_code) persists none, so its own file_path
-  // argument fills the label. A root call with missing or malformed meta
-  // declines — malformed tool data falls back to the generic card, which shows
-  // the flattened content rather than an author-typed path.
+  // The label path: calls persist it in presentationMeta; a historical nested
+  // record (dispatched from inside run_code) persists none, so its own
+  // file_path argument fills the label. A root call with missing or malformed
+  // meta declines — malformed tool data falls back to the generic card, which
+  // shows the flattened content rather than an author-typed path.
   const metaPath = imageMeta(block.meta)?.path
   const path = metaPath ?? (nested ? filePath : null)
   if (path === null) return null

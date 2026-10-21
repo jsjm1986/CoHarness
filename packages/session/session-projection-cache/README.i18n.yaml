@@ -1,19 +1,22 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-projection-cache/README.md
+document:
+  en: 87b887f062ee46038f8260a4c2f7fbf688ae27e6
+  zh: b061254baf4b6ba56bb0bf29029206b7f359fb1c
 /:
   en: 28998fd034337b27
   zh: 61495d48365178df
 /deepseek-ai-dsh-session-projection-cache:
-  en: eb132a4a19424936
-  zh: 8984e4a3f607c004
+  en: 91a97e5854a0ae5a
+  zh: 36ec7aefecb760d9
 /deepseek-ai-dsh-session-projection-cache/summary:
   en: bf8d9303afdc56ad
   zh: b6d54b39b6411be5
 /deepseek-ai-dsh-session-projection-cache/table-of-contents:
-  en: f800276dbe0b7573
-  zh: 1ab455086662f515
+  en: 3ebac8b64f3609b7
+  zh: 008a8a2a96b25d20
 /deepseek-ai-dsh-session-projection-cache/write-policy:
   en: 0eeb76feed438508
   zh: def21d82b70876cb
@@ -27,11 +30,8 @@
   en: 3f3d0a6355de87bc
   zh: 812abb93dfb69bb1
 /deepseek-ai-dsh-session-projection-cache/composition:
-  en: ff64adea06c3c2ab
-  zh: bd6627082772ef10
-/deepseek-ai-dsh-session-projection-cache/invariants:
-  en: 968668d52fe63f7a
-  zh: 7cd6c012e6e02ed1
+  en: 0de0aa2185ae836a
+  zh: bfb3485b17f02423
 /deepseek-ai-dsh-session-projection-cache/model-experience:
   en: 25c9652e94565a76
   zh: efd5ca7105d8a561

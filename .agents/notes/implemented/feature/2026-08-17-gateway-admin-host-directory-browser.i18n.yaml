@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-gateway-admin-host-directory-browser.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-gateway-admin-host-directory-browser.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-gateway-admin-host-directory-browser.md
+document:
+  en: 7d9842f74670b1b50dcc834a4ef3882ef169214b
+  zh: 129113796b627ba5574ac91b3299607756d81a8b
 /agent-note-gateway-administrator-host-directory-browser:
   en: e6fc7d96b1598817
   zh: 8d5034a31fed9764

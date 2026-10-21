@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-18-plugin-option-placement.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-18-plugin-option-placement.md
+document:
+  en: dd7782dbe17f71b71451a92ac160539540e00387
+  zh: 2f9920e2917c061807cb6ddfd12c58b3f2367466
+/agent-note-dsh-plugin-reads-profile-only-before-forwarded-pnpm-arguments:
+  en: cc3f08c670d78dd5
+  zh: 25642c6b578d9e66
+/agent-note-dsh-plugin-reads-profile-only-before-forwarded-pnpm-arguments/problem:
+  en: a887ee7633876229
+  zh: df834fed68c888e5
+/agent-note-dsh-plugin-reads-profile-only-before-forwarded-pnpm-arguments/decision:
+  en: fc340105bbe0e012
+  zh: 9b21515815ee1b6d
+/agent-note-dsh-plugin-reads-profile-only-before-forwarded-pnpm-arguments/alternatives-considered:
+  en: e4d244bca099701f
+  zh: 5829033e888047bc
+/agent-note-dsh-plugin-reads-profile-only-before-forwarded-pnpm-arguments/consequences:
+  en: 2b927802abb7d379
+  zh: 81b14bf5144cc96f
+/agent-note-dsh-plugin-reads-profile-only-before-forwarded-pnpm-arguments/verification:
+  en: 66a92a46e2fd9b5f
+  zh: 57fed2c2922212e9

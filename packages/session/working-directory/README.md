@@ -43,8 +43,6 @@ Mount alongside `fs`, `sessionProjections`, and `systemPrompt`. `defaultDirector
 
 The Session projection owns the effective directory and exposes it in Session observations, so cold readers can use it without activating an Agent; the header continues to identify the original project. Changes serialize per Session, validate through the filesystem provider that owns the Session's execution world — a standing-realm `fs` for SSH-bound Sessions, the host `fs` otherwise — check cancellation and Agent lifetime, commit an event, and queue a user-context notice. If notice queuing fails after commit, the operation returns the committed directory and logs a warning; the next request or resume still receives the required directory context. If the provider cannot answer at all (a transport failure rather than a missing-directory answer), validation keeps the recorded directory, commits nothing, and warns once per Session until a later validation succeeds. Prompt assembly validates the current directory before publishing its required context contribution. Existing processes and sandbox grants keep their independent ownership. The [service implementation](src/index.ts) defines the API.
 
-No runtime invariant companion is published because the service reads its only directory state from the Session projection and checks filesystem validity at use.
-
 </details>
 
 -----

@@ -11,7 +11,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Fiber } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
-import { readClientBuildRecord } from '../../../scripts/client-build-environment.ts'
+import { CLIENT_BUILD_RECORD_PATH, readClientBuildRecord } from '../../../scripts/client-build-environment.ts'
 import { REPO_ROOT } from './support.ts'
 
 function spawnSpec(argv: readonly string[], cwd: string, env?: Record<string, string>): SubprocessSpawnSpec {
@@ -24,7 +24,7 @@ function spawnSpec(argv: readonly string[], cwd: string, env?: Record<string, st
   }
 }
 
-function waitForOutput(child: SubprocessHandle, pattern: RegExp, label: string): Promise<string> {
+function waitForOutput(child: SubprocessHandle, pattern: RegExp, label: string, timeoutMs = 60_000): Promise<string> {
   return new Promise((resolveReady, reject) => {
     let output = ''
     let settled = false
@@ -51,7 +51,7 @@ function waitForOutput(child: SubprocessHandle, pattern: RegExp, label: string):
       if (match === null) return
       resolveOnce(match[1] ?? match[0])
     }
-    const timer = setTimeout(() => { rejectOnce(new Error(`${label} not ready:\n${output}`)) }, 60_000)
+    const timer = setTimeout(() => { rejectOnce(new Error(`${label} not ready:\n${output}`)) }, timeoutMs)
     child.stdout?.on('data', onData)
     child.stderr?.on('data', onData)
     void child.done.then((outcome) => {
@@ -87,6 +87,11 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   const distBackupPath = join(distBackup, 'dist')
   await cp(distPath, distBackupPath, { recursive: true })
   const originalSource = await readFile(sourcePath)
+  // A vitest-spawned build stage would bake NODE_ENV=test into every client
+  // bundle — a record digest no restore of the artifact bytes can match. Back
+  // the record up beside them.
+  const recordPath = join(REPO_ROOT, CLIENT_BUILD_RECORD_PATH)
+  const originalRecord = await readFile(recordPath)
   const oldText = 'COHARNESS'
   const sourceNeedle = "'hero.headline': 'COHARNESS'"
   const newText = `HMR UPDATED ${'x'.repeat(80)}`
@@ -106,11 +111,16 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     ]) + '\n')
     subprocessFiber = await subprocessCtx.plugin(LocalSubprocessRuntime)
     watcher = subprocessCtx.subprocess.spawn(spawnSpec(
+      // NODE_ENV=production: any build stage inside dev:web would otherwise
+      // bake vitest's ambient NODE_ENV=test into the bundles it digests.
       ['pnpm', 'run', 'dev:web'],
       REPO_ROOT,
-      { ...clientBuildEnvironment },
+      { ...clientBuildEnvironment, NODE_ENV: 'production' },
     ))
-    await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web')
+    // The first watch-mode compile of the full client graph can exceed the
+    // generic bound several times over on loaded runners, so the bound must
+    // cover the worst observed cold compile plus margin.
+    await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web', 420_000)
     host = subprocessCtx.subprocess.spawn(spawnSpec(
       [process.execPath, binPath, 'web', '--patch', storagePatch, '--no-open', '--port', '0'],
       world,
@@ -140,8 +150,11 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   } catch (error) {
     failures.push(error)
   } finally {
-    await writeFile(sourcePath, originalSource).catch((error: unknown) => failures.push(error))
+    // Stop dev:web before restoring the edited source: a live watcher would
+    // schedule a rebuild for the restore itself, and that emit can land after
+    // the bundle/dist restore below and leave dev-mode artifacts behind.
     if (watcher !== undefined) await stopTree(watcher).catch((error: unknown) => failures.push(error))
+    await writeFile(sourcePath, originalSource).catch((error: unknown) => failures.push(error))
     await Promise.all(originalClientBundles.map(async ([path, content]) => {
       await writeFile(path, content).catch((error: unknown) => failures.push(error))
     }))
@@ -154,10 +167,11 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     await rm(distPath, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
     await cp(distBackupPath, distPath, { recursive: true }).catch((error: unknown) => failures.push(error))
     await rm(distBackup, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
+    await writeFile(recordPath, originalRecord).catch((error: unknown) => failures.push(error))
     if (host !== undefined) await stopTree(host).catch((error: unknown) => failures.push(error))
     await browser?.close().catch((error: unknown) => failures.push(error))
     await subprocessFiber?.dispose().catch((error: unknown) => failures.push(error))
     await rm(world, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
   }
   if (failures.length > 0) throw new AggregateError(failures, 'HMR browser test or cleanup failed')
-}, 120_000)
+}, 480_000)

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/agent-team/README.md
+document:
+  en: 47d9b8bb90bf10671c5912cc0e5404da2b6b82a2
+  zh: d79c0e5659ef21f68cef11bfe863e05919c82a75
 /:
   en: c818b74c14d94f85
   zh: 61495d48365178df
@@ -18,14 +21,14 @@
   en: 2ce1213cb64678f6
   zh: 5ba211ce4341d121
 /deepseek-ai-dsh-experimental-agent-team/team-identity-and-roster:
-  en: 53736f1aa2f89dff
-  zh: 4ea645bfd48c04e8
+  en: c6fbe9250df7bb9c
+  zh: d2e1e646c79a1214
 /deepseek-ai-dsh-experimental-agent-team/durable-mailbox:
   en: 9b9b995f4a5e9ef4
   zh: 48298ad6894e6759
 /deepseek-ai-dsh-experimental-agent-team/shared-task-board:
-  en: 7ea0f0492b486c40
-  zh: 24fc8f5582f4c5e8
+  en: db2ef60598115a7b
+  zh: 399f7f85fa4e642c
 /deepseek-ai-dsh-experimental-agent-team/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -42,8 +45,8 @@
   en: ff845d434b857afe
   zh: e03cddc841344316
 /deepseek-ai-dsh-experimental-agent-team/known-limitations-and-deferred-work:
-  en: 4aef3758efce9c60
-  zh: 631041eaf2b9600e
+  en: 1dab4b39cc6accb9
+  zh: f7ddd64c0951feaf
 /deepseek-ai-dsh-experimental-agent-team/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

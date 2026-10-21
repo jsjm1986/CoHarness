@@ -23,11 +23,9 @@ kind: "package-reference"
 
 使用 `dsh-userdoc-local` 作为本地 `userDocs` 后端，把文档以普通文件存放在一个可配置根目录下。上传先写入同级 `.part` 文件再经排他硬链接原子发布，被占用的目标永不被替换；不可信的客户端名称会被清洗，重名获得 ` (2)` 后缀。默认部署首次使用时迁移旧的 `uploads` 树；显式 `maxFileBytes` 提供有界部署策略。
 
-
 ## 目录
 
 - [可续传上传](#resumable-uploads)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与待完成工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -42,12 +40,6 @@ kind: "package-reference"
 `uploadManifestMaxBytes` 限制每次读取的 manifest 大小（默认 256 KiB）。`uploadMaxConcurrent` 同时限制过期会话清理和最终化 worker 数量；存储停止或取消上传时，排队中的最终化任务会被取消。`uploadCleanupIntervalMs` 限制为 Node 的最大计时器延迟（`2,147,483,647` 毫秒），无效间隔不会被钳制成高频的一毫秒循环。
 
 后端将准入锁所有者的 PID 记录在 `.admission.lock` 中。只有进程探测证明所有者已经退出，启动过程才会恢复该锁。并发恢复者使用独立的恢复锁，并在移除孤儿锁前重新读取所有权，以保留后继写者的锁。存活、格式错误或结果不确定的所有者不会被回收。恢复操作中断后留下的协调锁需要操作员核验；普通上传竞争仍使用 30 秒期限。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。文档是一个已配置根目录下的普通文件；除其规格所覆盖的文件系统树之外，后端不持有其他索引。
-
 
 <a id="model-experience"></a>
 ## 模型体验

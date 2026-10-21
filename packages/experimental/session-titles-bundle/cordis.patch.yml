@@ -1,0 +1,17 @@
+# Experimental all-prompts session titles over the shipped composition, which
+# mounts the first-prompt provider on `session-title-llm`. The layer disables
+# that provider and inserts its replacement under a distinct id so deselecting
+# the bundle restores the shipped row untouched.
+
+- id: session-title-llm
+  disabled: true
+
+- insert:
+    - id: optional-session-title-all-prompts
+      name: '@deepseek-ai/dsh-session-title-all-prompts-llm'
+      config:
+        targetWords: 5
+        targetCjkCharacters: 10
+        maxInputBytes: 4096
+        maxOutputTokens: 64
+        timeoutMs: 60000

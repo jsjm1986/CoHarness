@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-06-backend-continuation-performance.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-06-backend-continuation-performance.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-06-backend-continuation-performance.md
+document:
+  en: a30c7a47a93f0a8827d1cb4d0857aeabe9dd2fee
+  zh: c703ea70e496d279e5965295d308a2919ed2b445
 /agent-note-performance-baselines-for-tool-heavy-backend-continuation:
   en: 542fea07db8861a3
   zh: 3a9d381c2366f5ec

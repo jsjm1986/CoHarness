@@ -5,11 +5,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "Process details" [expanded]:
-  - text: Process details
-  - img
 - button "System prompt":
   - img
   - img
@@ -18,6 +17,9 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Failed
+- button "Failed" [disabled] [expanded]
+- button "Analysis completed"
 - button "Context injection runtime-context":
   - img
   - img

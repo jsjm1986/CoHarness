@@ -76,7 +76,6 @@ None; the model-visible request prefix remains unchanged.
 - **No live Session means no field** — direct or stale-session calls have no canonical log to snapshot; explicit absence semantics remain deferred.
 - **Oversized single event stalls the suffix** — an event larger than `maxBytes` holds the watermark until the limit admits it; raise `maxBytes` to drain it.
 
-
 <a id="dev-note"></a>
 ### Dev Note
 

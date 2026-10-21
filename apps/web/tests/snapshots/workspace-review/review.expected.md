@@ -1,11 +1,11 @@
 - button "Choose the file to review":
   - text: review.txt
   - img
-- text: +1 -1
+- text: +2 -1
 - button "Split view":
   - img
 - button "Line wrap":
   - img
 - button "Open review.txt in sidebar":
   - img
-- text: "@@ -1,1 +1,1 @@ 1 - before the turn 1 + after the turn"
+- text: "@@ -1,1 +1,2 @@ 1 - before the turn 1 + after the turn 2 + and one more line"

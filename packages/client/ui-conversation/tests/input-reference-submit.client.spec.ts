@@ -5,7 +5,8 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import type { ClientContext, ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
-import type { InputTriggerController, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import { InputTriggerController } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import type { DraftAttachmentId, DraftDocumentId, QueuedMessage } from '../src/client/input/contract.ts'
 
@@ -32,8 +33,15 @@ function chip(shell: SessionInputShell): void {
   expect(accepted).toBe(true)
 }
 
+/** Runtime check that the SessionInputShell fake exposes the controller members this spec drives. */
+function isInputTriggerController(value: unknown): value is InputTriggerController {
+  return typeof value === 'object' && value !== null
+    && 'serializeReference' in value && typeof value.serializeReference === 'function'
+    && 'track' in value && typeof value.track === 'function'
+}
+
 describe('reference submission', () => {
-  it('mirrors canonical reference text so a persisted draft remains resolvable after remount', async () => {
+  it('restores reference chips from persisted data and serializes through their owner', async () => {
     const mirror = vi.fn()
     const first = new SessionInputShell({
       actx: {} as ClientContext,
@@ -54,19 +62,64 @@ describe('reference submission', () => {
       draftRev: first.snapshot.draftRev,
     })).toBe(true)
     expect(first.snapshot.draft).toBe('@Research notes ')
-    expect(mirror).toHaveBeenLastCalledWith(`${spacedMention} `)
+    const saved: unknown = JSON.parse(JSON.stringify(mirror.mock.calls.at(-1)?.[0]))
+    expect(saved).toEqual({
+      text: '@Research notes ',
+      references: [{
+        source: 'reference', ref: spacedMention, label: 'Research notes',
+        appearance: 'session', clipboardText: spacedMention, offset: 0, length: 15,
+      }],
+    })
 
     const sink = vi.fn(() => Promise.resolve<SubmitOutcome>({ kind: 'success' }))
+    const serializeReference = vi.fn(() => Promise.resolve(spacedMention))
     const restored = new SessionInputShell({
       actx: {} as ClientContext,
       defaultSink: sink,
+      inputTriggers: () => {
+        const controller: unknown = { serializeReference, track: vi.fn() }
+        if (!isInputTriggerController(controller)) throw new Error('inputTriggers fake is incomplete')
+        return controller
+      },
       commandImages,
     })
-    restored.setDraft(mirror.mock.calls.at(-1)?.[0] as string)
-    restored.submit()
-    await vi.waitFor(() => {
+    const restoredMirror = vi.fn()
+    const unmirror = restored.bindMirror(restoredMirror, saved)
+    try {
+      expect(restored.snapshot.draft).toBe('@Research notes ')
+      expect(restored.snapshot.occurrences).toMatchObject([{
+        source: 'reference', ref: spacedMention, label: 'Research notes',
+        appearance: 'session', offset: 0, length: 15, occurrenceId: expect.any(Number) as number,
+      }])
+      restored.submit()
+      await vi.waitFor(() => { expect(restored.snapshot.draft).toBe('') })
+      expect(serializeReference).toHaveBeenCalledWith('reference', spacedMention, expect.any(AbortSignal))
       expect(sink).toHaveBeenCalledWith(spacedMention, [], [], 'queue', expect.any(AbortSignal))
-    })
+      expect(restoredMirror).toHaveBeenLastCalledWith('')
+    } finally {
+      unmirror()
+      first.dispose()
+      restored.dispose()
+    }
+  })
+
+  it('persists changed reference identity even when display and clipboard text stay the same', () => {
+    const shell = new SessionInputShell({ actx: {} as ClientContext, defaultSink: vi.fn(), commandImages })
+    const mirror = vi.fn()
+    const unmirror = shell.bindMirror(mirror)
+    try {
+      const reference = {
+        source: 'reference', ref: 'first', label: 'same', clipboardText: '@same', offset: 0, length: 5,
+      }
+      shell.setDraft({ text: '@same ', references: [reference] })
+      shell.setDraft({ text: '@same ', references: [{ ...reference, ref: 'second' }] })
+      expect(mirror).toHaveBeenLastCalledWith({
+        text: '@same ', references: [{ ...reference, ref: 'second' }],
+      })
+    } finally {
+      unmirror()
+      shell.dispose()
+    }
   })
 
   it('retains the chip on Host failure and clears it only after a later accepted retry', async () => {

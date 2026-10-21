@@ -32,7 +32,7 @@ function allowedDefault(row: ManagedDataPath, runtime: RuntimeDataOwner): boolea
     { owner: '@deepseek-ai/dsh-storage-json', kind: 'directory', path: join(runtime.dshHome, 'storages') },
     { owner: '@deepseek-ai/dsh-settings-file', kind: 'file', path: join(runtime.dshHome, 'settings.yaml') },
     { owner: '@deepseek-ai/dsh-credentials-local', kind: 'file', path: join(runtime.dshHome, '.credentials.yaml') },
-    { owner: '@deepseek-ai/dsh-agent-presets', kind: 'directory', path: join(runtime.dshHome, '.agent-presets') },
+    { owner: '@deepseek-ai/dsh-agent-preset-registry', kind: 'directory', path: join(runtime.dshHome, '.agent-presets') },
     { owner: '@deepseek-ai/dsh-workspace-changes', kind: 'directory', path: join(runtime.dshHome, 'workspace-reviews') },
     { owner: '@deepseek-ai/dsh-anonymous-user-id', kind: 'file', path: join(runtime.dshHome, '.anonymous-user-id') },
     { owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: join(runtime.home, 'documents') },

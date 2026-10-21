@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { WorkspaceResourceError, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
-import { createReadHtmlRelative, normalizeWorkspacePath } from '../src/client/html/read-relative.ts'
-import { MAX_ASSET_BYTES } from '../src/client/html/pack.ts'
-import type { ReadWorkspaceFileData } from '../src/client/html/read-relative.ts'
+import { createReadHtmlRelative, normalizeWorkspacePath } from '../src/client/contract/html/read-relative.ts'
+import { MAX_ASSET_BYTES } from '../src/client/contract/html/pack.ts'
+import type { ReadWorkspaceFileData } from '../src/client/contract/html/read-relative.ts'
 
 const sessionId = 'html-session' as SessionId
 const request: WorkspaceResourceOpenRequest = {

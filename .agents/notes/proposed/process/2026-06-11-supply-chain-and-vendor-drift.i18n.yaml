@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-11-supply-chain-and-vendor-drift.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-11-supply-chain-and-vendor-drift.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/process/2026-06-11-supply-chain-and-vendor-drift.md
+document:
+  en: a27ae64556dc7366279824f1480e5681b1e86bf1
+  zh: e71737c3787c5758fd0e31fed08b5c64fbb77fbd
 /agent-note-supply-chain-checks-and-vendor-drift-verification:
   en: 14763706c0292472
   zh: bc846b9df1cd559c

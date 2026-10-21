@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for typert.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for typert.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/typert.md
+document:
+  en: d0e5c1805c400db784306c6b01e6d6db9ef21392
+  zh: 3a9f5c382a4be8514b1729c67fdb5fa0863e8a8f
 /typert-remote-calls:
   en: ccc2694e359c2333
   zh: cd68bf5e74e2d685
@@ -9,11 +12,14 @@
   en: 8725fa62f36364d7
   zh: 0f2ff4bdf13ff55b
 /typert-remote-calls/invocation-descriptors:
-  en: 01772f38091394af
-  zh: 87ae9e960ccb187e
+  en: 21e88d68154c2c92
+  zh: 8c9e05c65ef0f34d
+/typert-remote-calls/remote-access-resources:
+  en: 991f0f129d4b622b
+  zh: 5666b0611f02c250
 /typert-remote-calls/typert-registry:
-  en: 29f578ba733cfd5a
-  zh: c486ff4ac2d1e3b4
+  en: 5827ef50011811c9
+  zh: 21a9e7b368ba211a
 /typert-remote-calls/host-gateway:
   en: d2d286412b18c090
   zh: e8874f7a2563c2a1

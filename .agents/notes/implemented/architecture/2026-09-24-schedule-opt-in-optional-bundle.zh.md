@@ -6,7 +6,7 @@ Status: implemented
 
 ## Problem
 
-Schedule 会给每个活跃根 Agent 的请求增加四个工具 schema，并在每个符合条件的步骤追加一条持久时钟消息，因此随发行版交付的 Web 组合不能默认挂载它。使用随发行版 Web profile 的人仍需要产品界面上的开关来打开它；profile patch 层或 `--patch` overlay 都是这个人无法触及的配置文件。
+Schedule 会在每个符合条件的步骤追加一条持久时钟消息，preset 声明的 `@deepseek-ai/dsh-tool-schedule` 则给挂载它的 preset 上每次请求增加四个工具 schema，因此随发行版交付的 Web 组合不能默认挂载该服务。使用随发行版 Web profile 的人仍需要产品界面上的开关来打开它；profile patch 层或 `--patch` overlay 都是这个人无法触及的配置文件。
 
 ## Decision
 
@@ -14,7 +14,7 @@ Schedule 会给每个活跃根 Agent 的请求增加四个工具 schema，并在
 
 `@deepseek-ai/dsh-experimental-schedule-bundle`（`packages/experimental/schedule-bundle/`）在其 `cordis.patch.yml` 中插入两个宿主行、以按 id 定位的 patch 启用驻留的 `ui-schedule` 行，并依赖它们的包。`packages/boot/app-boot/src/profile.ts` 的 `OPTIONAL_BUNDLES` 列出该包，`apps/cli` 将其声明为运行时依赖，因此每次安装都随包携带且默认关闭。[实验性能力作为可选 bundle 的决策](2026-09-21-experimental-capabilities-as-optional-bundles.zh.md)负责 `OPTIONAL_BUNDLES` 的约定，以及 Web 插件管理页在“官方”分组中渲染的本地化 `icon` 与 `meta.title` / `meta.description` 元数据。
 
-启用该 bundle 会插入 `time-context`（每个步骤的时钟读数，包含采样瞬时、附加到当前开放请求的浏览器时区，以及自前一条模型可见消息以来的经过时长）与 `schedule`（持久提醒，以及每个活跃根 Agent 上的 `schedule_create`、`schedule_list`、`schedule_update` 与 `schedule_delete`），并启用 `ui-schedule`（Session 提醒目录与自动化任务页面）。该 bundle 把 `time-context` 与 `schedule` 一起携带，因为提醒请求给出的是挂钟时间目标：采样瞬时正是让模型把“明天九点”这类请求转换成带偏移量的 `at` 值的依据。持久记录、投递与管理操作由 [Schedule 子系统](../../../../docs/subsystems/schedule.zh.md)负责；该 bundle 向其加入这些行的组合由 [Web bundle](../../../../packages/bundle/web-app/README.zh.md) 负责。禁用该 bundle 会恢复随发行版交付的组合，`schedule` 行不存在期间 Host 不再调度；已存储的任务记录保留在 Schedule domain 中。
+启用该 bundle 会插入 `time-context`（每个步骤的时钟读数，包含采样瞬时、附加到当前开放请求的浏览器时区，以及自前一条模型可见消息以来的经过时长）与 `schedule`（持久的提醒存储与投递；`schedule_create`、`schedule_list`、`schedule_update` 与 `schedule_delete` 来自会话 preset 中的 `@deepseek-ai/dsh-tool-schedule` 行），并启用 `ui-schedule`（Session 提醒目录与自动化任务页面）。该 bundle 把 `time-context` 与 `schedule` 一起携带，因为提醒请求给出的是挂钟时间目标：采样瞬时正是让模型把“明天九点”这类请求转换成带偏移量的 `at` 值的依据。持久记录、投递与管理操作由 [Schedule 子系统](../../../../docs/subsystems/schedule.zh.md)负责；该 bundle 向其加入这些行的组合由 [Web bundle](../../../../packages/bundle/web-app/README.zh.md) 负责。禁用该 bundle 会恢复随发行版交付的组合，`schedule` 行不存在期间 Host 不再调度；已存储的任务记录保留在 Schedule domain 中。
 
 ## Alternatives considered
 
@@ -28,8 +28,7 @@ Schedule 会给每个活跃根 Agent 的请求增加四个工具 schema，并在
 
 ## Consequences
 
-- 默认的 `dsh web` 会话不带 Schedule 工具 schema、Session 提醒目录、自动化任务页面与逐步时钟读数。需要它们的安装可从插件管理页启用该可选 bundle，或把该包列进 profile 的 `dsh.profile.bundles`。
-- 启用后的安装会给每个活跃根 Agent 增加四个工具 schema，并在每个符合条件的步骤追加一条持久时钟消息；该读数对模型可见且持久，因此它与其他 user 消息一样参与回放、压缩，并出现在导出的 Session 日志中。
+- 默认的 `dsh web` 会话不带 Schedule 工具 schema（`schedule` 服务缺席时 preset 的 `tool-schedule` 行保持惰性）、Session 提醒目录、自动化任务页面与逐步时钟读数。需要它们的安装可从插件管理页启用该可选 bundle，或把该包列进 profile 的 `dsh.profile.bundles`。
+- 启用后的安装会给 preset 声明 `tool-schedule` 的每个活跃根 Agent 增加四个工具 schema，并在每个符合条件的步骤追加一条持久时钟消息；该读数对模型可见且持久，因此它与其他 user 消息一样参与回放、压缩，并出现在导出的 Session 日志中。
 - 插件管理页在该 bundle 下列出这三行，显示各自包的 `locale/*.json` 声明的标题、它们的状态，并在 bundle 打开时为每行提供开关；关掉其中一行会让 Schedule 缺少这一部分。
 - 未选中该 bundle 时，按 id 定位 `time-context` 或 `schedule` 的 profile 补丁或 `--patch` overlay 匹配不到任何条目，加载器会为它报告 `patch: entry <id> not found` 警告；`ui-schedule` 仍可匹配，因为随发行版交付的组合驻留了它，选中该 bundle 会让它连同宿主行一起启用。
-- 该开关只涉及配置：`src/index.ts` 是空模块，运行时内容由 patch 承载，包本身不拥有可变的运行时状态，因此不发布不变量伴随模块。

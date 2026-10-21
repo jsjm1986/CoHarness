@@ -19,7 +19,6 @@ With `dsh-web-search-perplexity`, the harness searches the web through Perplexit
 
 - [Config](#config)
 - [Mapping](#mapping)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -49,11 +48,6 @@ With `dsh-web-search-perplexity`, the harness searches the web through Perplexit
 ## Mapping
 
 `content` ← `choices[0].message.content` (the generated answer). `sources[]` prefers the structured `search_results[]` (`url`, `title`, `snippet`, `publishedAt` ← `date`), falling back to the URL-only `citations[]` array only when `search_results` is absent — those sources carry just a `url`, which is why `title`/`snippet`/`publishedAt` are optional on the seam. Provider failures surface as `WebError` `WEB_PROVIDER_ERROR`; an aborted request surfaces as `WEB_ABORTED`. HTTP redirects are rejected before the `Location` target is contacted and surface as `WEB_PROVIDER_ERROR`. Perplexity has no result-count control, so `maxResults` is enforced by the seam (truncating `sources[]` and setting `truncated`).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each query is one stateless provider request mapped into normalized results; no search state is retained between calls.
 
 <a id="model-experience"></a>
 ## Model Experience

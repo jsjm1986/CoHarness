@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-sandbox/README.md
+document:
+  en: 2eadf698e32523e2efe120a11bad9ccdde92153c
+  zh: 345cc1917e917509ecf8fb8135081f0285f18237
 /:
   en: b6a3a9697c7d7b0c
   zh: 61495d48365178df
@@ -12,17 +15,14 @@
   en: ae186a7675a9332b
   zh: 323e9043c1d90a83
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/table-of-contents:
-  en: 12fa5a4542da54d6
-  zh: 40d28c6e41b894c3
+  en: 009aaba4f905e49d
+  zh: 9ecfc625703a8dc8
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/the-fence:
   en: 874a8f3d89ce0050
   zh: 0534642931826037
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/threat-model-a-policy-fence-not-a-kernel-boundary:
-  en: 0c4e06dc921f2eca
-  zh: 96a421755cb42696
-/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/invariants:
-  en: e1789848d76d3017
-  zh: 4b2ea8b8a0d665cc
+  en: 57b08a7880ee93a6
+  zh: 9974d8767e0c0662
 /dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

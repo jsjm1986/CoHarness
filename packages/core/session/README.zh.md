@@ -9,8 +9,6 @@ kind: "package-reference"
 
 事件溯源的会话日志和内存存储。`Session` 是 agent（智能体）全部交互历史的仅追加真源，LLM（大语言模型）消息历史由它*派生*。原始日志之上维护一个 **surface** 层（产生消息事件的有序投影），以便高效派生和压缩（compaction）。
 
-可选配套入口 `@deepseek-ai/dsh-session/invariant` 将此包的关系轨迹检查注册到 `ctx.invariants`：序号单调递增、轮次／步骤闭合，以及同一步骤内的工具调用／结果配对。加载或重新加载时，它会回放现有会话；存储校验、快照、冻结、被引用的源事件校验和 surface 准入仍始终由根会话包负责。
-
 ## 概述
 
 `dsh-session` 在仅追加的会话日志中记录每个模型可见事实，并从该记录派生模型历史。消费方可以检查、回放、fork 和刷新会话，同时保留历史事件；压缩（compaction）会在活跃对话中隐藏被取代的条目，但不会删除它们。除非添加持久化后端，否则会话仅保留在内存中；持久性检查点会等待配置的后端。agent 需要可重建的会话记录时请选择本包；它本身不调用模型。
@@ -84,6 +82,18 @@ kind: "package-reference"
 
 会话事件导入将所有权与消息校验分开处理。`snapshotSessionEvent(event)` 会先克隆借用的事件，再校验并冻结其中带标识的消息。`adoptSessionEvent(event)` 原地执行相同的消息处理并返回原事件；调用方只有在移交独占的对象图，且该对象图没有与其他事件共享可变子对象时，才可以使用此函数。两条路径与 `append` 应用相同的规范化载荷与事件本地 surface 元数据校验；不检查历史关联。
 
+<a id="write-experimental-plugin-records"></a>
+
+### 写入实验性插件记录
+
+`appendPluginRecord(session, type, data)` 为 `packages/experimental/` 下的包追加一条插件记录；`verify-plugin-record-callers` 检查会拒绝本仓库中任何其他生产调用方。仓库外的插件也不得调用它，尽管没有任何仓库检查能触及它们。
+
+在 `PluginRecordMap` 中通过 `@deepseek-ai/dsh-session/types` 声明每条记录，在持有方实验包的 `src/` 中给出描述与显式 payload 类型注解。名称使用 `plugin:<owner>/<record>`，其中 `owner` 是包名 `@deepseek-ai/dsh-experimental-<owner>` 的后缀，例如 `plugin:pi-extensions/entry`。TypeScript 按声明校验名称与 payload；写入方的运行时 JSON 快照拒绝无法无损保留的值。扩展定义或其他动态名称放在已声明记录的 payload 内。
+
+[实验性持久化目录](../../../docs/experimental-persistence-catalog.zh.md)列出当前插件记录声明及其持有方、描述、payload 类型注解与源文件。这些声明与 `SessionEventMap`、展开的持久化 schema、已发布的类型历史以及 `KNOWN_SESSION_EVENT_TYPES` 保持分离。记录携带 `ignorable: true`：不识别它的构建在读取时保留并跳过它。记录永不进入模型可见 surface。恢复与派生随日志其余部分一起携带它们；Session 格式迁移以尽力而为方式保留它们。
+
+`pluginRecordOf(event)` 将事件作为记录返回，其他事件返回 `undefined`；把每条事件传给它的 `ctx.sessionProjections` 单元可在恢复时重建插件状态。即使当前 map 声明了名称，其 `data` 仍是 `unknown`。持有方在使用前校验它，因为早期构建可能写入不同的 payload，格式迁移边也可能把未知 ignorable 事件带进同一个 `plugin:` 命名空间。移除或重命名声明不会丢弃已存记录。[ignorable 事件决策](../../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.zh.md)持有兼容策略。
+
 ### 分片行存储编解码器（`chunk-rows.ts`）
 
 共享的[存储编解码器](src/chunk-rows.ts)在事件序列与紧凑行之间无损转换。它会逐字保留无法识别的事件，并拒绝形态错误的编码行；是否启用打包写入由持久化后端决定。
@@ -133,7 +143,6 @@ kind: "package-reference"
 - 持久化插件：订阅 `session/event`（延后写入），并在 `session/flush`（受等待）及 fiber dispose（资源释放）时排空。持久后端读取日志并重新加载到实时会话；这类后端会把元数据约定（`SessionHeader`、`session.header`）与日志一同存储。
 - 回放／fork：`create(id, { seed })` 校验并冻结连续的当前格式日志，再重建 surface；请求头必须包含提供方／模型，assistant 消息必须包含提供方／模型来源。持久化层在构造该当前格式 seed 前负责读取兼容性处理。`fork(source, boundary?, childSessionId?)` 选择已完成轮次前缀并记录谱系。
 - 压缩：`dsh-compaction-basic` 为摘要检查点追加一个替换用 `user/message`，而 `dsh-compaction-tool-result-pruner` 追加仅修改内容的 `tool/result` 替换。工具配对边界策略及其缓存归 [`dsh-compaction` seam](../../compaction/compaction/README.zh.md) 所有；此包拥有有序 surface 成员关系、替换校验与 `replaceGeneration`。
-
 
 <a id="model-experience"></a>
 ## 模型体验

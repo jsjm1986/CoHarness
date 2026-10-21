@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-native-workspace-directory-picker.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-native-workspace-directory-picker.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-native-workspace-directory-picker.md
+document:
+  en: d63ab0b4b59adfa6c7f053c376e0469a75e131e3
+  zh: eef4948b1f6c0e7d1e74ae96fdec6e3ce37eedee
 /agent-note-native-workspace-directory-picker:
   en: 40a953cb72af9fc2
   zh: d6c870c8af825a03

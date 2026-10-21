@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-14-canonical-session-event-ingress.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-14-canonical-session-event-ingress.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-canonical-session-event-ingress.md
+document:
+  en: a26f42ec0e2ea35671385ce5fd3d4bf1df49d78a
+  zh: 16de1d2a5b8870d606c4e0c174743e36564034e6
 /agent-note-canonical-session-event-ingress-validation:
   en: f145df222ae0bfba
   zh: 910da2f4e4356f2d

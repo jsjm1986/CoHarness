@@ -53,7 +53,7 @@ The V4 codec reuses V3 physical framing. Native V4 reads refuse `assistant/chunk
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The [stage](src/migration.ts) owns the per-artifact source-to-target sequence map, the pending attempt group, and the inherited-cut state. Compact runs expand incrementally. The [codec](src/codec.ts) wraps the frozen V3 codec with the chunk refusal; the [restorer](src/validation.ts) delegates to V3 validation on a version-adjusted artifact. No runtime invariant companion is published because this library owns no independently observable registrations or state replicas.
+The [stage](src/migration.ts) owns the per-artifact source-to-target sequence map, the pending attempt group, and the inherited-cut state. Compact runs expand incrementally. The [codec](src/codec.ts) wraps the frozen V3 codec with the chunk refusal; the [restorer](src/validation.ts) delegates to V3 validation on a version-adjusted artifact. This library owns no independently observable registrations or state replicas.
 
 </details>
 

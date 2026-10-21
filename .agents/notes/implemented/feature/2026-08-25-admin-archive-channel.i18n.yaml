@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-25-admin-archive-channel.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-25-admin-archive-channel.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-admin-archive-channel.md
+document:
+  en: 2b52c07461a1d405c9e44af1785bc7f147492ac6
+  zh: 0d6d9887135af11c5550a6d1d179b3770af60629
 /agent-note-admin-archive-channel-and-gateway-lifecycle-index:
   en: 929d4ecda790d490
   zh: bf8ae8391670e8c8

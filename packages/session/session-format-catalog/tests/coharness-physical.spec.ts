@@ -1,6 +1,6 @@
 /** Released CoHarness headers and streams retain identity through immutable-generation restoration. */
 import { expect, it } from 'vitest'
-import { coharnessJsonlFormatCatalog, sessionFormatCatalog } from '../src/index.ts'
+import { coharnessJsonlFormatCatalog, createCoharnessJsonlFormatCatalogWithChildren, sessionFormatCatalog } from '../src/index.ts'
 import type { SessionFormatJsonValue } from '@deepseek-ai/dsh-session-format'
 
 function header(version: number, fields: Record<string, unknown> = {}) {
@@ -8,7 +8,7 @@ function header(version: number, fields: Record<string, unknown> = {}) {
 }
 
 function restore(version: number, rows: unknown[], fields: Record<string, unknown> = {}) {
-  const reader = coharnessJsonlFormatCatalog.createRestore(header(version, fields), { recovery: 'strict', validation: 'current' })
+  const reader = createCoharnessJsonlFormatCatalogWithChildren([]).createRestore(header(version, fields), { recovery: 'strict', validation: 'current' })
   for (const row of rows) reader.decodeRow(row)
   return reader.finish()
 }
@@ -88,7 +88,7 @@ it('verifies stored generations without silently advancing their version', () =>
     const native = coharnessJsonlFormatCatalog.createStoredRestore(header(version, { isSeeded: false }), { recovery: 'strict', validation: 'current' })
     expect(native.finish()).toMatchObject({ header: { version }, events: [] })
   }
-  const current = coharnessJsonlFormatCatalog.createRestore(header(7, { isSeeded: false }), { recovery: 'strict', validation: 'current' })
+  const current = createCoharnessJsonlFormatCatalogWithChildren([]).createRestore(header(7, { isSeeded: false }), { recovery: 'strict', validation: 'current' })
   expect(current.finish()).toMatchObject({ header: { version: 7 }, events: [] })
 })
 

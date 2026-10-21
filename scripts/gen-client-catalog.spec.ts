@@ -218,5 +218,7 @@ describe('the real workspace surface', () => {
     const root = entries.find(entry => entry.key === 'root')
     expect(root?.replaceRisk).toBe('shadows-shipped-ui')
     expect(root?.occupants.join(' ')).toContain('AppFrame')
+    expect(entries.find(entry => entry.key === 'conversation.session')?.declaredBy)
+      .toContain("factory 'conversation.content' (client-ui-conversation)")
   })
 })

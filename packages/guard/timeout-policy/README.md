@@ -16,7 +16,6 @@ Use this package to give tool calls their configured cooperative time limits and
 ## Table of Contents
 
 - [Plugin (namespace: `timeout-policy`)](#plugin-namespace-timeout-policy)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -54,11 +53,6 @@ The derived signal only **notifies**; termination stays with the tool and the ca
 ### Composing with other `tools/execute` wrappers
 
 Multiple `tools/execute` listeners compose by cordis registration order. Combined with a future retry/sandbox/metrics wrapper, registration order chooses the semantics — "timeout covers the whole retry operation" (timeout registered outer) versus "timeout covers each attempt" (timeout registered inner).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each call arms a fresh cooperative deadline read from the tool's own declaration; no cross-call state exists.
 
 <a id="model-experience"></a>
 ## Model Experience

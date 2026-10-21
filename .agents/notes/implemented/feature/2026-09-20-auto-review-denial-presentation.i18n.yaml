@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-20-auto-review-denial-presentation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-20-auto-review-denial-presentation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-20-auto-review-denial-presentation.md
+document:
+  en: 25a589aa9bfbcf804a4024fdffdfdc94c86bc163
+  zh: 2e944d19804a073c5992679c59f8a4f97302982d
 /agent-note-present-auto-review-denials-through-the-generic-tool-row:
   en: 55b0e0d54836c74f
   zh: 3a3c5083c213dc5b

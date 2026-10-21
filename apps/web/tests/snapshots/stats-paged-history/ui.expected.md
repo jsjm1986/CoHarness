@@ -4,6 +4,8 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
@@ -35,13 +37,12 @@
   - button "Jump to turn 26"
   - button "Jump to turn 27"
   - button "Jump to turn 28"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m1
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r1
 - button "Copy":
   - img
@@ -56,13 +57,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m2
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r2
 - button "Copy":
   - img
@@ -77,13 +77,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m3
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r3
 - button "Copy":
   - img
@@ -98,13 +97,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m4
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r4
 - button "Copy":
   - img
@@ -119,13 +117,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m5
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r5
 - button "Copy":
   - img
@@ -140,13 +137,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m6
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r6
 - button "Copy":
   - img
@@ -161,13 +157,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m7
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r7
 - button "Copy":
   - img
@@ -182,13 +177,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m8
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r8
 - button "Copy":
   - img
@@ -203,13 +197,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m9
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r9
 - button "Copy":
   - img
@@ -224,13 +217,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m10
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r10
 - button "Copy":
   - img
@@ -245,13 +237,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m11
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r11
 - button "Copy":
   - img
@@ -266,13 +257,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m12
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r12
 - button "Copy":
   - img
@@ -287,13 +277,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m13
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r13
 - button "Copy":
   - img
@@ -308,13 +297,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m14
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r14
 - button "Copy":
   - img
@@ -329,13 +317,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m15
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r15
 - button "Copy":
   - img
@@ -350,13 +337,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m16
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r16
 - button "Copy":
   - img
@@ -371,13 +357,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m17
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r17
 - button "Copy":
   - img
@@ -392,13 +377,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m18
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r18
 - button "Copy":
   - img
@@ -413,13 +397,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m19
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r19
 - button "Copy":
   - img
@@ -434,13 +417,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m20
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r20
 - button "Copy":
   - img
@@ -455,13 +437,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m21
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r21
 - button "Copy":
   - img
@@ -476,13 +457,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m22
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r22
 - button "Copy":
   - img
@@ -497,13 +477,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m23
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r23
 - button "Copy":
   - img
@@ -518,13 +497,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m24
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r24
 - button "Copy":
   - img
@@ -539,13 +517,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m25
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r25
 - button "Copy":
   - img
@@ -560,13 +537,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m26
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r26
 - button "Copy":
   - img
@@ -581,13 +557,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m27
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r27
 - button "Copy":
   - img
@@ -602,13 +577,12 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: m28
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - paragraph: r28
 - button "Copy":
   - img

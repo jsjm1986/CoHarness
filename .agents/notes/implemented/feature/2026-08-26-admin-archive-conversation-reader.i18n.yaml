@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-26-admin-archive-conversation-reader.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-26-admin-archive-conversation-reader.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-26-admin-archive-conversation-reader.md
+document:
+  en: 2124f2e937b2ab4cb0094ef511dea5b78226713a
+  zh: 66dc47d430b30d4cdaaddc0eddb5ef80e69bdd85
 /agent-note-human-readable-admin-archive-conversation-reader:
   en: 242449f8a7ed2cf3
   zh: 350fb6bfefacb75f

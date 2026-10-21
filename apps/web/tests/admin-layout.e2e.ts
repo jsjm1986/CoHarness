@@ -57,7 +57,7 @@ it('keeps admin form controls aligned inside their sections', async () => {
     deps.maintenance = {
       state: async () => deploymentState, listOperations: async () => [],
       enterMaintenance: async () => deploymentState, exitMaintenance: async () => deploymentState,
-      setNodeStatus: async () => deploymentState,
+      setNodeStatus: async () => { throw new Error('This layout scenario does not change a cluster node') },
       requestRestore: async () => { throw new Error('fixture') }, logOperation: async () => 'operation-fixture',
     }
     deps.backups = { list: async () => [], get: async () => { throw new Error('fixture') },

@@ -18,7 +18,6 @@ kind: "package-reference"
 - [公开 API](#public-api)
 - [快照语义](#snapshot-semantics)
 - [配置](#configuration)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -28,7 +27,7 @@ kind: "package-reference"
 <a id="public-api"></a>
 ## 公开 API
 
-- `listCandidates(agent, query?, limit?)` 会列出 `agent.id` 之外的会话，按 id、cwd 或最新的 projection 标题进行不区分大小写的筛选，再按同 cwd、无 cwd、其他 cwd 记录排序，同时保持每组内的 `listSessions()` 创建顺序。实时 session projection 与持久 projection-cache checkpoint 提供标题，因此每次击键都不必折叠冷日志；没有 projection 的会话在首次打开前使用 id，而未挂载 projection 服务的组合保留有界日志回退。一元 `sessionReferenceResolver/candidates` Remote 方法在配置的候选上限内提供同一发现能力，并为每个候选附上规范 mention，浏览器消费方直接调用 `ctx.remote.sessionReferenceResolver.candidates`，无需 API Proxy 路由。
+- `listCandidates(agent, query?, limit?)` 会列出 `agent.id` 之外的会话，按 id、cwd、最新的 projection 标题或 display title 进行不区分大小写的筛选，再按同 cwd、无 cwd、其他 cwd 记录排序，同时保持每组内的 `listSessions()` 创建顺序。候选的 display title 以 subagent 的持久创建 label 优先于其 projection 标题，规范 mention 在存在时按 `displayTitle` 标注。实时 session projection 与持久 projection-cache checkpoint 提供标题，因此每次击键都不必折叠冷日志；没有 projection 的会话在首次打开前使用 id，而未挂载 projection 服务的组合保留有界日志回退。一元 `sessionReferenceResolver/candidates` Remote 方法在配置的候选上限内提供同一发现能力，并为每个候选附上规范 mention，浏览器消费方直接调用 `ctx.remote.sessionReferenceResolver.candidates`，无需 API Proxy 路由。
 - `prepare(agent, content, references, signal?)` 会保留首次 mention 顺序、对 id 去重，并拒绝自引用或超过已配置不同源上限的情况。它会并行读取所有源，返回与输入脱离的内容，外加零个或一个聚合且带标识的 `UserMessage` 上下文。下游 `agent/pre-step` 监听器接受步骤后，该服务会针对直接用户消息中的规范 mention 调用此方法。
 - `encodeSessionReferenceUri()` 与 `decodeSessionReferenceUri()` 实现 `dsh-session:<base64url(JSON.stringify(sessionId))>`，因此每个 JavaScript 字符串 id 都能精确往返。`formatSessionReferenceMention()` 发出 `@[label](uri)`，`parseSessionReferenceText()` 将 Markdown mention 或裸规范 URI 替换为可读的 `@label` 文本，并返回结构化引用。解析器会拒绝显式 Markdown mention 中任何格式错误的 URI；只当 scheme 后跟非空、符合 base64url 形状的 payload 时，裸文本才被视为引用，匹配但非规范的候选项仍会失败。空 scheme mention 或只含标点符号的 scheme mention 仍是普通讨论文本。
 
@@ -49,12 +48,6 @@ kind: "package-reference"
 | `maxReferenceBytes` | `65536` | 一个引用对象的最大序列化 JSON 字节数。 |
 
 保留会对每个源独立应用 `maxReferenceBytes`，保留 compact 检查点与最新消息，再丢弃较旧的非检查点单元，并使用 `dsh-output-retention` 头部／尾部截断和精确 UTF-8 省略通知。如果某个源的固定序列化字段本身就超出限额，准备会以 `SESSION_REFERENCE_BUDGET_EXCEEDED` 失败，而不返回部分上下文。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。快照是委托给 `ctx.sessionQuery` 的只读视图；解析器自身不保留会话数据。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -112,6 +112,7 @@ function formatDuration(elapsedMs: number, t: TranslateNS<typeof NS>): string {
 /** Localized display copy for the embedded terminal panel. */
 function terminalLabels(t: TranslateNS<typeof NS>): TerminalBlockLabels {
   return {
+    commandLine: line => t('terminal.commandLine', { n: line }),
     // The labels contract requires exit-fact formatters, but this panel never
     // passes exit facts, so TerminalBlock never invokes them.
     /* v8 ignore next */
@@ -433,17 +434,15 @@ export function JobListAction({ sessionId, useSessions, observe, killJob, t }: J
       setKillPhase({ key, state: 'armed' })
       return
     }
-    setKillPhase({ key, state: 'pending' })
+    const pending = { key, state: 'pending' } as const
+    setKillPhase(pending)
+    const fail = (): void => {
+      setKillPhase(current => current === pending ? { key, state: 'failed' } : current)
+    }
+    // Successful admission waits for the authoritative roster status.
     void killJob(sessionId, job.id).then((ok) => {
-      // An admitted kill stays pending: the unary response and the jobs frames
-      // have no cross-carrier ordering, so re-enabling here could offer a
-      // duplicate kill while the row still reads `running`. The authoritative
-      // jobs frame flips the row to `stopping`, which removes the button and
-      // clears the phase through the killable-set effect above.
-      setKillPhase(current => current?.key === key && !ok
-        ? { key, state: 'failed' }
-        : current)
-    })
+      if (!ok) fail()
+    }, fail)
   }
 
   if (visibleCount === 0) return null

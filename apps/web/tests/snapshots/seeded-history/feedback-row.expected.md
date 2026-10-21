@@ -4,14 +4,13 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
-- button "2 tool calls · 2 intermediate messages" [expanded]:
-  - text: 2 tool calls · 2 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
@@ -20,6 +19,11 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Read files"
 - button "Thinking The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
   - img
   - img
@@ -53,9 +57,8 @@
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
 - "button \"compact Compacted 5 history items (~{{tokens}} tokens)\""
-- button "Process details":
-  - text: Process details
-  - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
 - button "Context injection AGENTS.md":
   - img
   - img

@@ -65,7 +65,6 @@ Each Session’s `TurnRecorder` serializes baseline snapshots, file-tool capture
 
 Git uses the selected `subprocess` provider, a scrubbed environment, `GIT_CONFIG_COUNT=0`, `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, configured timeouts and bounded output. Recording or storage failure appends an incomplete announcement, stops the affected turn and blocks later work until a new request passes the storage probe. A recorded capacity requirement must fit the new limit; the filesystem must have room for a maximum-size review. Already executed file effects are not rolled back. Replacing the recorder during an open turn refuses further execution until a new turn can capture its own baseline. Disposal removes temporary Git objects and captures, not durable reviews.
 
-**Runtime invariant:** No companion is published. Artifact reads enforce their Session owner, content digest and file-index relation before returning data; a separate scan would repeat that acceptance check without observing another production authority.
 
 </details>
 

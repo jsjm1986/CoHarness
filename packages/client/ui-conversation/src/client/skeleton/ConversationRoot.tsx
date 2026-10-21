@@ -6,7 +6,7 @@ import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { parseClientSessionKey, SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationPaneSlotProps, ConversationSlotProps, InputZone, WorkbenchLayoutPreset,
+  ConversationContentProps, ConversationSlotProps, ConversationViewsProps, InputZone, WorkbenchLayoutPreset,
 } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { CHAT_CONTENT_WIDTH_RANGE } from '../../submission-settings.ts'
@@ -22,10 +22,10 @@ function hasPointerCapture(target: HTMLElement, pointerId: number): boolean {
   return typeof candidate === 'function' && Reflect.apply(candidate, target, [pointerId]) === true
 }
 
-/** Column budget the content must leave free: 88px per side keeps the width
- * handles fully placeable (24px inset + 40px strip + 24px safe zone) — a
- * larger dragged width would push its own handles off the column and leave no
- * way to drag back. */
+/** Column budget the content must leave free: keeps the width handles fully
+ * placeable with headroom over their geometry (24px inset + 10px strip +
+ * 24px safe zone per side) — a larger dragged width would push its own
+ * handles off the column and leave no way to drag back. */
 const CONTENT_EDGE_BUDGET = 176
 
 /** Resolves the rendered content width for a column width.
@@ -38,6 +38,20 @@ function resolveContentWidth(columnWidth: number, preference: number): number {
     Math.min(CHAT_CONTENT_WIDTH_RANGE.max, columnWidth - CONTENT_EDGE_BUDGET),
   )
   return Math.min(Math.max(preference, CHAT_CONTENT_WIDTH_RANGE.min), max)
+}
+
+const WHEEL_DELTA_LINE = 1
+const WHEEL_DELTA_PAGE = 2
+const FALLBACK_WHEEL_LINE_PX = 16
+
+/** Convert a wheel event's vertical delta to scrollport pixels. */
+function wheelDeltaY(event: React.WheelEvent, scrollport: HTMLElement): number {
+  if (event.deltaMode === WHEEL_DELTA_LINE) {
+    const lineHeight = Number.parseFloat(getComputedStyle(scrollport).lineHeight)
+    return event.deltaY * (Number.isFinite(lineHeight) ? lineHeight : FALLBACK_WHEEL_LINE_PX)
+  }
+  if (event.deltaMode === WHEEL_DELTA_PAGE) return event.deltaY * scrollport.clientHeight
+  return event.deltaY
 }
 
 /** One transcript width handle: pointer capture + rAF-throttled symmetric
@@ -77,6 +91,7 @@ function WidthHandle(props: {
     if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
   }
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
     e.preventDefault()
     invokePointerCapture(e.currentTarget, 'setPointerCapture', e.pointerId)
     origin.current = e.clientX
@@ -114,6 +129,16 @@ function WidthHandle(props: {
     setDragging(false)
     callbacks.current.onEnd()
   }, [])
+  const onWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const body = e.currentTarget.parentElement
+    /* v8 ignore next -- a width handle renders only inside the Conversation body. */
+    if (body === null) return
+    const scrollport = body.querySelector<HTMLElement>(':scope > [data-conversation-scroll]')
+    /* v8 ignore next -- the Conversation body always contains its direct scroll element. */
+    if (scrollport === null) return
+    if (e.ctrlKey || e.deltaY === 0) return
+    scrollport.scrollBy({ top: wheelDeltaY(e, scrollport) })
+  }, [])
 
   return (
     <div
@@ -134,6 +159,7 @@ function WidthHandle(props: {
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       onLostPointerCapture={onPointerCancel}
+      onWheel={onWheel}
       onKeyDown={props.onKeyStep}
     />
   )
@@ -141,14 +167,20 @@ function WidthHandle(props: {
 
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
-export type ConversationPaneProps = ConversationPaneSlotProps
+export type ConversationContentOwnProps = ConversationContentProps
+
+/** Default `views` position: the session view ring under the stored selection. */
+function ConversationSessionView({ renderSlot, compact = false }: ConversationViewsProps) {
+  return <>{renderSlot('conversation.session', { compact })}</>
+}
 
 /** Render one Session's complete conversation surface. */
-export function ConversationPane({
+export function ConversationContent({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
   useDisplaySettings, useProjectPolicy, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace,
-  t, compact = false, active = true, workbench = false, headerLeading,
-}: ConversationPaneProps) {
+  t, useFactorySlot, variant = 'main', compact = false, active = true, workbench = false, headerLeading,
+}: ConversationContentOwnProps) {
+  const Views = useFactorySlot('views', ConversationSessionView)
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
   const pending = useSession(s => s.pending) ?? []
@@ -473,20 +505,20 @@ export function ConversationPane({
   return (
     <div
       ref={rootResizeRef}
-      className={clsx(css.root, workbench && css.workbenchPane)}
+      className={clsx(css.root, workbench && css.workbenchPane, variant === 'embedded' && css.embeddedBody)}
       data-phase={phase}
       data-chat-fill={displaySettings.chatFullWidth || undefined}
       style={widthStyle}
     >
-      {renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
+      {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
       <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
         <div className={css.scrollBody} data-conversation-scroll="">
-          {renderSlot('conversation.session', { compact })}
+          {sessionId === undefined ? null : <Views compact={compact} />}
           {composerSeat}
         </div>
         {/* Width handles only while a transcript is on screen; the hero has no
             content column to size. Both edges write the one centered width. */}
-        {phase === 'active' && !workbench && (['left', 'right'] as const).map(side => (
+        {phase === 'active' && !workbench && variant !== 'embedded' && (['left', 'right'] as const).map(side => (
           <WidthHandle
             key={side}
             side={side}
@@ -645,9 +677,9 @@ export function ConversationRoot(props: ConversationRootProps) {
   }
   if (!workbench) return available ? (
     <div className={css.workbenchRoot}>
-      {props.renderSlot('conversation.pane', { compact, workbench: false, headerLeading: props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed: false, inline: true }) })}
+      {props.renderFactorySlot('conversation.content', { variant: 'main', compact, workbench: false, headerLeading: props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed: false, inline: true }) })}
     </div>
-  ) : props.renderSlot('conversation.pane', { compact })
+  ) : props.renderFactorySlot('conversation.content', { variant: 'main', compact })
   return (
     <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
       {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed, layout: layoutPreset, onSelectLayout: applyLayout })}
@@ -712,7 +744,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                               onSolo: () => { props.onViewportSolo(id) },
                             })}
                             <div className={css.paneBody} hidden={isCollapsed}>
-                              {props.renderSlot('conversation.pane', { compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true })}
+                              {props.renderFactorySlot('conversation.content', { variant: 'main', compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true })}
                             </div>
                           </>
                         )}

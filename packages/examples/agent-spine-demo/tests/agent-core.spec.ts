@@ -27,10 +27,6 @@ import {
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
-import * as sessionInvariant from '@deepseek-ai/dsh-session/invariant'
-import * as agentInvariant from '@deepseek-ai/dsh-agent/invariant'
-import * as scopeInvariant from '@deepseek-ai/dsh-scope/invariant'
-import * as agentLoopInvariant from '@deepseek-ai/dsh-agent-loop/invariant'
 
 const testToolSignal = new AbortController().signal
 
@@ -161,7 +157,6 @@ describe('dsh-agent-spine-demo bundle', () => {
     expect(ctx.get('skills')).toBeDefined()
     expect(ctx.get('agents')).toBeDefined()
     expect(ctx.get('jobs')).toBeDefined()
-    expect(ctx.get('invariants')).toBeDefined()
     expect(ctx.get('agentLoop')).toBeDefined()
     expect(ctx.get('goals')).toBeUndefined()
     await ctx.fiber.dispose()
@@ -216,28 +211,6 @@ describe('dsh-agent-spine-demo bundle', () => {
     expect(ctx.get('goals')).toBeUndefined()
     expect(ctx.tools.get('get_goal')).toBeUndefined()
     await ctx.fiber.dispose()
-  })
-
-  it('mounts package companions and forwards invariant selection config', async () => {
-    const nestedTurn = (ctx: Context): void => {
-      const session = ctx.sessions.create()
-      session.append('turn/start', { turn: 1 })
-      session.append('turn/start', { turn: 2 })
-    }
-
-    const enabled = await mount({ workspaceContext: false })
-    expect(() => { nestedTurn(enabled) }).toThrow(/turn 1 is still open/)
-    await enabled.fiber.dispose()
-
-    for (const invariants of [
-      { enabled: false },
-      { package_allowlist: ['^@deepseek-ai/dsh-agent$'] },
-      { package_blocklist: ['^@deepseek-ai/dsh-session$'] },
-    ]) {
-      const filtered = await mount({ workspaceContext: false, invariants })
-      expect(() => { nestedTurn(filtered) }).not.toThrow()
-      await filtered.fiber.dispose()
-    }
   })
 
   it('loads and configures bounded request recovery for every bundled entry point', async () => {
@@ -759,7 +732,6 @@ describe('dsh-agent-spine-demo bundle', () => {
       toolBash: { enableRunInBackground: false },
       jobs: { maxConcurrentJobsPerOwner: 4 },
       toolJobs: false as const,
-      invariants: { enabled: false },
       goals: false as const,
     }
 
@@ -777,7 +749,6 @@ describe('dsh-agent-spine-demo bundle', () => {
       toolBash: appConfig.toolBash,
       jobs: appConfig.jobs,
       toolJobs: appConfig.toolJobs,
-      invariants: appConfig.invariants,
       goals: appConfig.goals,
     })
     expect(agentCore.pickSpineConfig({ workspaceContext: false })).toEqual({ workspaceContext: false })
@@ -841,15 +812,4 @@ describe('dsh-agent-spine-demo bundle', () => {
     expect(typeof unwrapped.apply).toBe('function')
   })
 
-  it('keeps each standard-spine invariant companion loadable through the real Loader unwrap path', () => {
-    const loader = Object.create(Loader.prototype) as Loader
-    for (const companion of [sessionInvariant, agentInvariant, scopeInvariant, agentLoopInvariant]) {
-      expect('default' in companion).toBe(false)
-      const unwrapped = loader.unwrapExports(companion) as Record<string, unknown>
-      expect(unwrapped).toBe(companion)
-      expect(typeof unwrapped.name).toBe('string')
-      expect(unwrapped.inject).toContain('invariants')
-      expect(typeof unwrapped.apply).toBe('function')
-    }
-  })
 })

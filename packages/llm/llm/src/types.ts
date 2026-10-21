@@ -266,10 +266,28 @@ export interface LlmConfigurableProvider {
   declared?: boolean
   /** Configuration diagnostic for repair; unaffected models may remain serviceable. */
   error?: string
+  /**
+   * Route endpoint the adapter uses when the profile sets no `baseURL`; the
+   * adapter may still send an individual model to that model's own endpoint.
+   * Absent when the route has no fixed endpoint.
+   */
+  defaultBaseURL?: string
+  /** Environment variables used to construct a provider endpoint; absent when none are reported. */
+  baseURLEnv?: readonly string[]
+  /** Authentication the adapter performs when the profile names no credential reference; absent when it reports none. */
+  nativeAuth?: LlmNativeAuth
   /** Optional ownership label supplied by a scoped configuration provider. */
   management?: 'personal' | 'organization' | 'project' | 'external'
   /** Public project id when this route belongs to a project. */
   projectId?: number
+}
+
+/** Authentication a provider route performs without a credential reference in its profile. */
+export interface LlmNativeAuth {
+  /** Environment variables the route's authentication reads, in lookup order; empty when it reads none. */
+  env: readonly string[]
+  /** Whether a stored OAuth sign-in can authenticate the route. */
+  oauth: boolean
 }
 
 /**

@@ -617,7 +617,9 @@ describe.skipIf(MODE === 'record')('web e2e: late-answered question transcript',
     const reply = latePage.locator('[data-question-reply]')
     await reply.waitFor({ state: 'attached', timeout: 15_000 })
     expect(await reply.count()).toBe(1)
-    expect(await latePage.locator('[data-chat-flow-kind="turn-trigger"]').count()).toBe(0)
+    // The late reply's non-user source woke this Turn, so it renders as the
+    // turn's protected trigger row rather than foldable context.
+    expect(await latePage.locator('[data-chat-flow-kind="turn-trigger"]').count()).toBe(1)
     expect(await reply.isVisible()).toBe(false)
     // Verbatim the accessible name of the in-time answered row above: whether
     // the answer beat the timeout is the agent's pacing, not something a reader
@@ -651,6 +653,13 @@ describe.skipIf(MODE === 'record')('web e2e: late-answered question transcript',
     expect(await review.getByRole('button', { name: 'Submit' }).count()).toBe(0)
     expect(await review.getByRole('button', { name: 'Skip' }).count()).toBe(0)
 
+    // The expanding transcript can leave the back-to-bottom affordance up;
+    // click it to pin the canonical tail-resting state before capture.
+    const backToBottom = latePage.getByRole('button', { name: 'Back to bottom' })
+    if (await backToBottom.count() > 0) {
+      await backToBottom.click()
+      await expect.poll(async () => backToBottom.count(), { timeout: 15_000 }).toBe(0)
+    }
     const snapshot = (await captureStableAria(
       latePage,
       '[class*="centerCol"]',

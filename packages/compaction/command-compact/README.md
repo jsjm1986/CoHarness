@@ -95,7 +95,6 @@ Every resolved invocation records the executor-owned log-only pair `command/run`
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `/compact` registration, argument rejection, error-code mapping, lifecycle drain |
-| — | No runtime invariant companion is published; this command adapter owns no state or event stream; the compaction seam owns the balanced durable transaction and the command registry owns registration and dispatch lifecycle. |
 
 </details>
 
@@ -134,7 +133,6 @@ Discovery and command bookkeeping do not affect the cache. The accepted surface 
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the command is a poor fit; they are the current package constraints.
 

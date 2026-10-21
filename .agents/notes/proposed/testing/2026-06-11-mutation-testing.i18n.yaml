@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-11-mutation-testing.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-11-mutation-testing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/testing/2026-06-11-mutation-testing.md
+document:
+  en: 591d9012644a19ee2c67a916b63092d79f78db1f
+  zh: a8e786ab6566d12762c55bc559b436a13f3b32b2
 /agent-note-mutation-testing-as-the-coverage-counterweight:
   en: 521fac2a2df2498e
   zh: 9a508486144b2e74

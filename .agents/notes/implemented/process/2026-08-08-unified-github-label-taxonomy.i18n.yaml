@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-08-unified-github-label-taxonomy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-08-unified-github-label-taxonomy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-08-unified-github-label-taxonomy.md
+document:
+  en: 625c5c1cac951bdc97187c17c964d677f31131c7
+  zh: 855a2b98f44d517abe1f7718ae4e81262cb031b6
 /agent-note-unified-github-label-taxonomy:
   en: 59560a685380483f
   zh: 1bf2324f05c8968a

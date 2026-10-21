@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/session-title-provider-strategy/guide.md
+document:
+  en: bf0eb87a912026a790a073b9fea0b19a9f2c36b5
+  zh: 9bf62d63fe47ed85a05c8ed14af0ba72066353cb
+/:
+  en: 08f294cc358eaffb
+  zh: 46ef86d9f933ea58
+/migrate-session-title-providers:
+  en: c9e33d3bdc0595c6
+  zh: 55a049680ff8ae9b
+/migrate-session-title-providers/change:
+  en: 3a8d72fb2c793d51
+  zh: 9acc89004dd31096
+/migrate-session-title-providers/migration:
+  en: ea9efdc5234c0541
+  zh: 845d80a7c6c05672

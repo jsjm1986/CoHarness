@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-22-document-manager-attach-existing-documents.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-22-document-manager-attach-existing-documents.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-document-manager-attach-existing-documents.md
+document:
+  en: d44a656c456f1b0f0b522c1e393838847a07d091
+  zh: 75be1efa61983974652ff70845d4aeab4e04cd78
 /agent-note-attach-existing-documents-from-the-manager:
   en: 0428d1fb2081aff2
   zh: c6db267929835a23

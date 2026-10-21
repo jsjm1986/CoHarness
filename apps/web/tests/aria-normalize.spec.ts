@@ -72,6 +72,45 @@ describe('ARIA runtime measurements', () => {
     expect(normalizeAria(snapshot.replace('running 0s', 'running 3s').replace('SIGTERM 0s', 'SIGTERM 3s'), cwd)).toBe(result)
   })
 
+  it('redacts same-day wake stamps and turn durations while keeping dated prose', () => {
+    const snapshot = [
+      '- button "Continuing goal 18:03":',
+      '  - text: Continuing goal',
+      '  - time: 18:03',
+      '- button "Plugin status updated 9/1 13:31":',
+      '  - time: 9/1 13:31',
+      '- button "Completed in 5s":',
+      '  - text: Completed in 5s',
+      '- button "已完成，用时 1分2秒"',
+      '- paragraph: deadline 18:03',
+    ].join('\n')
+    const result = normalizeAria(snapshot, cwd)
+    expect(result).toContain('button \\"Continuing goal {{clock}}\\"')
+    expect(result).toContain('time: "{{clock}}"')
+    expect(result).toContain('Plugin status updated 9/1 13:31')
+    expect(result).toContain('time: 9/1 13:31')
+    expect(result).toContain('Completed in {{duration}}')
+    expect(result).toContain('已完成，用时 {{duration}}')
+    expect(result).toContain('deadline 18:03')
+    expect(normalizeAria(snapshot.replace('18:03', '19:04').replace('5s', '6s'), cwd)).toBe(result)
+    expect(normalizeAria(snapshot.replace('9/1 13:31', '9/2 13:31'), cwd)).not.toBe(result)
+  })
+
+  it('keeps an inherited clock scope on dated reminder time scalars', () => {
+    const snapshot = [
+      '- list "Active reminders":',
+      '  - listitem:',
+      '    - time: Aug 25, 2099, 19:59',
+      '  - listitem:',
+      '    - time: 18:03',
+      '- time: 9/1 13:31',
+    ].join('\n')
+    const result = normalizeAria(snapshot, cwd)
+    expect(result).toContain('time: "Aug 25, 2099, {{clock}}"')
+    expect(result).toContain('time: "{{clock}}"')
+    expect(result).toContain('- time: 9/1 13:31')
+  })
+
   const cases = JSON.parse(readFileSync(new URL('../../../packages/test-support/session-snapshot/tests/fixtures/comparison-cases.json', import.meta.url), 'utf8')) as {
     name: string
     left: unknown

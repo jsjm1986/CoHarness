@@ -44,7 +44,7 @@ Client plugins can open a tab through `ctx.sidebarRight.openSessionTab(sessionId
 
 Loopback and localhost refer to the visitor’s machine, not the Gateway or an SSH execution target.
 
-The toolbar provides Back, Forward, Reload, Go, Open in system browser, and a rightmost per-tab sandbox toggle. Disabling the sandbox is temporary and displays a warning. The external action accepts a known HTTP(S) target. The tab title is the Web host.
+The toolbar provides Back, Forward, Reload, Go, Open in system browser, and a rightmost per-tab sandbox toggle. Disabling the sandbox is temporary and displays a warning. The external action accepts a known HTTP(S) target. The tab title is the Web host. A tab reopened from saved history shows the saved address and offers an explicit **Restore page** action instead of loading it.
 
 -----
 
@@ -62,7 +62,7 @@ The address parser accepts HTTP and HTTPS, including loopback targets. It reject
 
 The Web application uses `sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"` by default. The frame has no direct download or top-navigation flag. Popups leave the sandbox; in Web, an escaped popup retains its opener and can navigate the top-level application. The visited origin can use its own cookies and Web storage but a cross-origin target cannot read DSH DOM, storage, or API responses. The iframe sends no referrer and adds no package-owned Permissions Policy, so browser defaults and user grants apply. The toolbar can remove the sandbox for the current tab occurrence; the choice is not persisted. An unsandboxed page can navigate the top-level application under browser activation rules and use downloads, modal dialogs, and input locks. The package does not proxy or probe remote pages.
 
-Web records toolbar submissions and typed tab opens. A navigation state machine treats the first iframe load for each controlled revision as known and a later load as proof that the page changed to an unreadable URL. In that unknown state the address is marked, Back, Forward, and external-open are disabled, and Reload returns to the last controlled URL. A remounted body reloads the latest application-known URL and uses its optional initial URL only before the first controlled target. History API and fragment changes that emit no iframe load remain invisible. An iframe `error` event displays a transient load-failure notice until the next controlled load without changing URL history.
+Web records toolbar submissions and typed tab opens. A navigation state machine treats the first iframe load for each controlled revision as known and a later load as proof that the page changed to an unreadable URL. In that unknown state the address is marked, Back, Forward, and external-open are disabled, and Reload returns to the last controlled URL. A remounted body never navigates by itself: it presents the saved application-known URL with an explicit restore action and loads the iframe only on that action or fresh explicit navigation; a typed-open initial URL is consumed once per occurrence. History API and fragment changes that emit no iframe load remain invisible. An iframe `error` event displays a transient load-failure notice until the next controlled load without changing URL history.
 
 ### Controller
 
@@ -102,7 +102,7 @@ The isolation policy deliberately gives up some browser compatibility:
 - In Web, a popup that escapes the sandbox retains its opener and can use that chain to navigate the top-level application. There is no native browser carrier in this package.
 - A later iframe load reveals that navigation occurred but not the new cross-origin URL. History API and fragment changes may remain invisible; Web Back and Forward are unavailable after the state becomes unknown.
 - Browsers conceal many iframe failures for security: DNS, TLS, mixed-content, CSP, and `X-Frame-Options` failures may emit `load` or no actionable event instead of `error`. The load-failure notice is best-effort.
-- Browser history survives body remounts and ordinary page reloads under a verified principal/runtime/Session key. Identity loss clears live tabs without assigning their stored history to a new account. Closing a tab removes its history. Stored URLs are validated again before restoration; sandbox overrides are never persisted.
+- Browser history survives body remounts and ordinary page reloads under a verified principal/runtime/Session key. Identity loss clears live tabs without assigning their stored history to a new account. Closing a tab removes its history; unloading or hot-reloading the Sidebar preserves it. Stored URLs are validated again before restoration; sandbox overrides are never persisted.
 - Local files are rejected and remain owned by Workspace file preview.
 - The proposed Electron `<webview>` carrier, per-tab cookie partitions, native history, and target-specific CDP connection are not implemented.
 
@@ -115,5 +115,3 @@ The isolation policy deliberately gives up some browser compatibility:
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. `BrowserNavigation` is the sole URL-state writer; the store receives its immutable snapshots, and focused controller and component tests exercise publication and cleanup directly.

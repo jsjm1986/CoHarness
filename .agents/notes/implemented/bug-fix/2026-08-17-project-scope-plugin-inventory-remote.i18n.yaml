@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-project-scope-plugin-inventory-remote.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-project-scope-plugin-inventory-remote.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-project-scope-plugin-inventory-remote.md
+document:
+  en: 52940317a9ca7416ffcdef22e88d4e6ad1f105a5
+  zh: 32a6c8beed5ab81092a69ffd7af4a6b9f328c8a3
 /agent-note-project-scope-remote-classification-for-plugin-surfaces:
   en: 0f399c749a3650db
   zh: 89b338f5f97bfdb3

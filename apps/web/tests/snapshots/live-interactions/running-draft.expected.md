@@ -6,11 +6,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "Process details" [expanded]:
-  - text: Process details
-  - img
 - button "System prompt":
   - img
   - img

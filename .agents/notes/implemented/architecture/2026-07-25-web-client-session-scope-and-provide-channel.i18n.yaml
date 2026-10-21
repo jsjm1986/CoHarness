@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-25-web-client-session-scope-and-provide-channel.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-25-web-client-session-scope-and-provide-channel.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-25-web-client-session-scope-and-provide-channel.md
+document:
+  en: 0ac062107a8d077a7dc3149c0ed275166cea3b9e
+  zh: 76aa54458d16c8cf6c2fd9f6e6ebaca1190d22d9
 /agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide:
   en: 18c843f8d8bfdb52
   zh: bd878ce3b2f126ff
@@ -15,8 +18,8 @@
   en: 9706e291132def28
   zh: 6166b7ca760608d3
 /agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/agent-scope-the-actx-is-the-sole-session-carrier-in-the-client-side-cordis-world:
-  en: 6e6488b3eab757c2
-  zh: 4ee3d1cc415234df
+  en: 86c70a29ef58650c
+  zh: bf42f29583cc5233
 /agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/scope-lifecycle-anchored-to-the-list-mirror-birth-is-entering-view-death-is-prune:
   en: ca8920392ed26284
   zh: 848e17a32fad6dee

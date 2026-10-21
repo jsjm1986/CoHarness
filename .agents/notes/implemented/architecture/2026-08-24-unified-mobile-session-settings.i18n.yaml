@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-24-unified-mobile-session-settings.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-24-unified-mobile-session-settings.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-24-unified-mobile-session-settings.md
+document:
+  en: a5bbe5090ebf2115c663b6ef6db69688795a55d7
+  zh: 5c2548492918697d5bdc3a5971a9d121cf8c07b7
 /agent-note-unified-mobile-session-settings:
   en: 772e6939880c7299
   zh: 32211a868f693d7f

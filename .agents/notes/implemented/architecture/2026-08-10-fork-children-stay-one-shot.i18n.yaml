@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-fork-children-stay-one-shot.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-fork-children-stay-one-shot.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md
+document:
+  en: 0c368ee39af7f57e99398984c47e52c8ed19b652
+  zh: 5555b56c148f86095ca3344d30b16ddc62a3784b
 /agent-note-forked-children-preserve-the-parent-request-prefix:
   en: 5254ea4573dedd96
   zh: 23b047d72d841881
@@ -9,14 +12,14 @@
   en: 1fe344c95a0de36d
   zh: 656c3e0f1117f64e
 /agent-note-forked-children-preserve-the-parent-request-prefix/decision:
-  en: 1fdd303914a0e3c5
-  zh: 17bceb9404c074db
+  en: 6acc992c7cfa98c0
+  zh: c97db62b83709367
 /agent-note-forked-children-preserve-the-parent-request-prefix/alternatives-considered:
-  en: 80504ffd8331e6c5
-  zh: 193261bdde24b4bb
+  en: bc437309b64997ab
+  zh: 947010eed8d6fac4
 /agent-note-forked-children-preserve-the-parent-request-prefix/consequences:
-  en: d35cda0c00d5927d
-  zh: b50953b50f7e7039
+  en: 71fce3715b4f9788
+  zh: a91b3c8022224ff9
 /agent-note-forked-children-preserve-the-parent-request-prefix/consequences/accepted-risks:
-  en: f634caa9973eaedb
-  zh: 820291096c8e7352
+  en: 72f4913b603e8596
+  zh: 50924c62200070d1

@@ -78,7 +78,6 @@ The initial prompt begins a new Session, so it establishes rather than invalidat
 - **Trusted callbacks must cooperate with cancellation** — runtime teardown aborts and awaits them but cannot terminate arbitrary same-process code.
 - **Workspace creation may outlive a failed Session attempt** — an empty Workspace is retained because another concurrent caller may already use it.
 
-
 <a id="dev-note"></a>
 ### Dev Note
 

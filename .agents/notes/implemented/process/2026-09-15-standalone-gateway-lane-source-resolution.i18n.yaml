@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-15-standalone-gateway-lane-source-resolution.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-15-standalone-gateway-lane-source-resolution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-15-standalone-gateway-lane-source-resolution.md
+document:
+  en: e40325e46bd6859f9dfbf8a3461197fd339d8185
+  zh: d1ef8a3ccbefbdd72f72b346a59a9cbd5f4866f6
 /agent-note-workspace-source-resolution-in-the-standalone-gateway-ci-lanes:
   en: b7ca16a1b7f94f3a
   zh: e115b3be030904e7

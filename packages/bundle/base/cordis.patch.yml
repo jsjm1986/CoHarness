@@ -272,10 +272,6 @@
     - id: skill-filesystem
       name: '@deepseek-ai/dsh-skill-filesystem'
 
-    - id: skill-badge
-      name: '@deepseek-ai/dsh-skill-badge'
-      disabled: true
-
     - id: tool-skill
       name: '@deepseek-ai/dsh-tool-skill'
 
@@ -412,13 +408,6 @@
     - id: tool-goal
       name: '@deepseek-ai/dsh-tool-goal'
 
-    # Fresh-agent Ralph iteration over a build-time-fixed script.
-    - id: tool-ralph
-      name: '@deepseek-ai/dsh-tool-ralph'
-      config:
-        subagentProvider: spawn
-        maxRounds: 64
-
     - id: tool-str-replace-editor
       name: '@deepseek-ai/dsh-tool-str-replace-editor'
       config:
@@ -441,7 +430,9 @@
     # resolves and validates every destination, and pins every actual connection.
     # Search is a full auxiliary model request with server-side retrieval, so this
     # shipped DeepSeek route gets 60s while the provider-neutral tool default
-    # remains 30s.
+    # remains 30s. The DeepSeek Search and Fetch APIs register as
+    # deepseek-search-api and deepseek-fetch-api with the same credential; the Web
+    # search settings switch selects both in place of these defaults.
     - id: web
       name: '@deepseek-ai/dsh-web'
       config:
@@ -450,6 +441,11 @@
 
     - id: web-search-deepseek
       name: '@deepseek-ai/dsh-web-search-deepseek'
+      config:
+        apiKeyEnv: DEEPSEEK_API_KEY
+
+    - id: web-deepseek-api
+      name: '@deepseek-ai/dsh-web-deepseek-api'
       config:
         apiKeyEnv: DEEPSEEK_API_KEY
 

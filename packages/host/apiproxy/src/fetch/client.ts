@@ -11,6 +11,7 @@ import { workspaceChangesSummaryValueSchema, workspaceChangesDiffValueSchema } f
 import type { z } from 'zod'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { ApiProxy, HostFrame, MuxFrame } from '../api/index.ts'
+import { INTERACTIONS_QUERY, interactionsUnavailableError, type ConnectionInteractions } from '../api/interactions.ts'
 import type { RequestPayload, ResponseValue, RpcMethodMap } from '../api/rpc-map.ts'
 import type { ClientRequest, ClientResponse, RpcError, RpcMessage, RpcReceipt, RpcRequest, RpcResponse, ServerRequest } from '../api/rpc.ts'
 import { RpcId } from '../api/rpc.ts'
@@ -54,7 +55,7 @@ import {
   workspaceFilesStatValueSchema,
 } from '../api/workspace-files.schema.ts'
 import { jobsKillValueSchema, jobsOutputValueSchema } from '../api/jobs.schema.ts'
-import { skillListValueSchema } from '../api/skills.schema.ts'
+import { skillGetValueSchema, skillListValueSchema } from '../api/skills.schema.ts'
 import { agentPresetOpenDocumentValueSchema } from '../api/agent-presets.schema.ts'
 import {
   settingsDescribeValueSchema, settingsMutateValueSchema, settingsOpenDocumentValueSchema,
@@ -142,6 +143,7 @@ export interface IApiClient {
   }
   skills: {
     list(payload: RequestPayload<'skill.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'skill.list'>>>
+    get(payload: RequestPayload<'skill.get'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'skill.get'>>>
   }
   agentPresets: {
     openDocument(payload: RequestPayload<'agentPreset.openDocument'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.openDocument'>>>
@@ -170,6 +172,13 @@ export interface IApiClient {
   }
   /** client-response passthrough (rpcId is a backfill of the server-request's id — never minted here). */
   respond(message: ClientResponse, signal?: AbortSignal): Promise<RpcReceipt>
+  /**
+   * The connection's interaction-participation mode. Carriers that cannot
+   * report one (legacy fakes) are treated as the historical full 'answer';
+   * a real 'none' carrier suppresses pending-interaction objects client-side
+   * and refuses {@link respond} before any wire traffic.
+   */
+  readonly interactions?: ConnectionInteractions
 }
 
 /**
@@ -219,6 +228,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'workspaceFiles.read': workspaceFilesReadValueSchema,
   'workspaceFiles.readBytes': workspaceFilesReadBytesValueSchema,
   'skill.list': skillListValueSchema,
+  'skill.get': skillGetValueSchema,
   'agentPreset.openDocument': agentPresetOpenDocumentValueSchema,
   'settings.describe': settingsDescribeValueSchema,
   'settings.openDocument': settingsOpenDocumentValueSchema,
@@ -537,12 +547,16 @@ export abstract class AbstractApiClient implements IApiClient {
   /**
    * @param timeoutMs - timeout for bounded unary calls; user-paced calls and streams do not use it.
    * @param maxResponseBytes - maximum successful unary JSON response size.
+   * @param target - optional Gateway runtime target used by multi-workspace clients.
+   * @param interactions - the connection's interaction-participation mode;
+   *   'none' makes {@link respond} fail fast client-side and declares the
+   *   mode on every API URL so server-side filtering cannot be bypassed.
    */
   constructor(
     protected readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
     protected readonly maxResponseBytes: number = DEFAULT_UNARY_RESPONSE_MAX_BYTES,
-    /** Optional Gateway runtime target used by multi-workspace clients. */
     protected readonly target?: { readonly kind: 'personal' } | { readonly kind: 'project'; readonly projectId: number },
+    public readonly interactions: ConnectionInteractions = 'answer',
   ) {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMER_DELAY_MS) {
       throw new RangeError(`timeoutMs must be a positive safe integer no greater than ${String(MAX_TIMER_DELAY_MS)}`)
@@ -599,7 +613,7 @@ export abstract class AbstractApiClient implements IApiClient {
     return loc?.origin !== undefined && loc.origin !== 'null' ? loc.origin : INTERNAL_BASE
   }
 
-  /** Resolve one API URL and carry an explicitly selected runtime target. */
+  /** Resolve one API URL, carrying an explicit runtime target and the connection's interaction mode. */
   protected resolveUrl(path: string): URL {
     const url = new URL(path, this.resolveBase())
     if (this.target !== undefined) {
@@ -607,6 +621,7 @@ export abstract class AbstractApiClient implements IApiClient {
         ? 'personal'
         : `project:${String(this.target.projectId)}`)
     }
+    url.searchParams.set(INTERACTIONS_QUERY, this.interactions)
     return url
   }
 
@@ -830,6 +845,7 @@ export abstract class AbstractApiClient implements IApiClient {
 
   readonly skills: IApiClient['skills'] = {
     list: (payload, signal) => this.callUnary('skill.list', payload, signal),
+    get: (payload, signal) => this.callUnary('skill.get', payload, signal),
   }
 
   // Annotated like every sibling, and load-bearing rather than cosmetic:
@@ -867,6 +883,9 @@ export abstract class AbstractApiClient implements IApiClient {
   }
 
   async respond(message: ClientResponse, signal?: AbortSignal): Promise<RpcReceipt> {
+    // Fail fast on a 'none' connection: answering an interaction that was
+    // never deliverable is a caller bug, and the server would refuse it.
+    if (this.interactions === 'none') throw interactionsUnavailableError()
     this.onEnvelope(message)
     const posted = await this.postJson('/api/respond', message, signal)
     try {
@@ -883,12 +902,19 @@ export abstract class AbstractApiClient implements IApiClient {
  * in-process injection is this package's own capability (handler and client are both local).
  */
 export class InProcessApiClient extends AbstractApiClient {
+  /**
+   * @param handler - injected fetch-shaped Host handler.
+   * @param timeoutMs - bounded unary timeout.
+   * @param maxResponseBytes - successful unary response budget.
+   * @param interactions - the connection's interaction mode; 'none' blocks respond and suppresses interaction frames.
+   */
   constructor(
     private readonly handler: { fetch: typeof fetch },
     timeoutMs?: number,
     maxResponseBytes?: number,
+    interactions?: ConnectionInteractions,
   ) {
-    super(timeoutMs, maxResponseBytes)
+    super(timeoutMs, maxResponseBytes, undefined, interactions)
   }
 
   /**

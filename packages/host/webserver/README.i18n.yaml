@@ -1,16 +1,19 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/webserver/README.md
+document:
+  en: 5cb34e27535b7360131d03abd3a3c3f1a4d84638
+  zh: a83cd7b1e64ce125f66be34d9040cf849bae1df5
 /:
-  en: e6ad68e29351b683
+  en: 6d29f2478cf20e93
   zh: 61495d48365178df
 /deepseek-ai-dsh-host-webserver:
-  en: 928f05e9882f2d06
-  zh: 49fc7e19c7f267db
+  en: 32797fe476e7fdf4
+  zh: ca691aa8b4ab47aa
 /deepseek-ai-dsh-host-webserver/summary:
-  en: 2b56ae0c86dae540
-  zh: 9dd7e304074703d4
+  en: 0d1ffed238b25446
+  zh: 9f66adce1c593c53
 /deepseek-ai-dsh-host-webserver/table-of-contents:
   en: b4683d2a53256fda
   zh: 4e65ff63dc8c48fe
@@ -21,8 +24,8 @@
   en: ca75c51c89c2c9b0
   zh: 2026c1566df4f78c
 /deepseek-ai-dsh-host-webserver/known-limitations-and-deferred-work:
-  en: 028a6f5800df46cc
-  zh: 7b017d13003dcf0b
+  en: 05237b5cf7297921
+  zh: fc1ed3741469bb53
 /deepseek-ai-dsh-host-webserver/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 245b35764295ba1e
+  zh: a15b132b111bfef0

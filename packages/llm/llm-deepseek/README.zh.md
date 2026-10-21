@@ -193,9 +193,7 @@ loop 保留的响应块会追加到下一个请求，并保留其更早的可复
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
-
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明适配器在哪里停止、由未来工作接续。它们是当前包约束，不是通用 DeepSeek 对比或任务积压。
 
@@ -211,8 +209,6 @@ loop 保留的响应块会追加到下一个请求，并保留其更早的可复
 ### 开发备注
 
 无。
-
-**运行时不变式：** 不发布伴生入口。本包没有独立事件序列或可变数据关系，相关约定在所属 seam 强制执行。
 
 `deepseek-official` 仅使用配置的 API Key 引用。Chat 和 Files 请求拒绝重定向，凭据不会离开已配置的来源。
 

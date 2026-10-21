@@ -1,2 +1,5 @@
 - tree "Subagent sessions":
-  - "treeitem \"example editor resumable · not running 0 tok · {{ago}}\" [level=1]": "example editor resumable · not running 0 tok {{ago}}"
+  - "treeitem \"example editor resumable · not running 0 tok · {{ago}}\" [level=1]":
+    - text: "example editor resumable · not running 0 tok {{ago}}"
+    - button "Open example editor in sidebar":
+      - img

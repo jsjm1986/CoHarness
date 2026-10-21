@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-24-personal-model-registration-audit.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-24-personal-model-registration-audit.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-personal-model-registration-audit.md
+document:
+  en: 83ff39021b8ab67e0dd0e74b261a1e5628cb4f37
+  zh: 2727bf5d4ff3dc483b8f2e53f20cdce405972607
 /agent-note-personal-provider-and-model-registration-audit:
   en: 9f55127a45f587b4
   zh: 47cd2a9c8102606f

@@ -19,7 +19,6 @@ Use this package to add ranked SQLite FTS5 search across session history, either
 - [Source and index lifecycle](#source-and-index-lifecycle)
 - [Configuration](#configuration)
 - [Tokenizer and limits](#tokenizer-and-limits)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -66,11 +65,6 @@ The database is disposable but reset is guarded: every recognized schema version
 The index uses FTS5 `unicode61`. Document and query text pass the same normalizer, which separates every Han-adjacent character pair with a reserved zero-width space, so each CJK character becomes its own token and phrase matching yields substring semantics at any length (`记忆` matches inside `记忆系统`, and mixed runs such as `试A版` split too). Non-Han runs keep the token/phrase trade-off rather than arbitrary substring recall: `AI` does not match the token `BRAID`. Use `ctx.sessionQuery.filterEvents()` with a `text` clause when a literal whitespace-flexible substring scan is required. NUL is rejected in queries; reserved highlight markers and NUL in documents are normalized before indexing so presentation markers cannot collide with source text.
 
 Abort signals stop queued work and flow unchanged through snapshot listing and non-mutating inspection. Once source work starts, the serialized state machine awaits that backend promise itself—even when a backend ignores cancellation—then checks the signal before starting any further listing, inspection, reconciliation, or query work. The caller therefore observes cancellation only after started backend work is quiescent, and a later search cannot enter the serializer while that cleanup is pending. Node's synchronous `DatabaseSync` API cannot interrupt a metadata or MATCH statement already executing on the JavaScript thread; signals are checked immediately before and after those non-preemptible calls.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Search runs over the live-preferred logical corpus and its index lives inside the SQLite store it opens; no second corpus exists.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-26-project-settings-authority-and-zero-rpc-guards.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-26-project-settings-authority-and-zero-rpc-guards.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-26-project-settings-authority-and-zero-rpc-guards.md
+document:
+  en: 8bd093d9f5322c9fb194e17c4787f4bcb5658cdb
+  zh: bc39a000a35e4d555218aef4f343dfb5e7f6a514
 /agent-note-project-settings-authority-and-zero-rpc-write-guards:
   en: d2fda1e7d8ac6a42
   zh: 5fc9760fe7ddd8d3

@@ -19,7 +19,6 @@ DeepSeek Harness uses one anonymous identifier per harness home to correlate tel
 
 - [Storage contract](#storage-contract)
 - [Composition](#composition)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -34,12 +33,7 @@ Reads and writes are synchronous because both boot-time telemetry construction a
 <a id="composition"></a>
 ## Composition
 
-This package is a shared library, not a Cordis plugin. Consumers import `getOrCreateAnonymousUserId()` directly. Its invariant companion is intentionally empty because the package owns no event stream or public mutable relation that can be checked without creating the identity as a side effect. `DSH_TELEMETRY_DISABLED` stops telemetry export only; it does not suppress direct feedback acknowledgement or the DeepSeek provider header.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The id is created once, persisted as a single durable line, and immutable thereafter; there is no changing relation to observe.
+This package is a shared library, not a Cordis plugin. Consumers import `getOrCreateAnonymousUserId()` directly. `DSH_TELEMETRY_DISABLED` stops telemetry export only; it does not suppress direct feedback acknowledgement or the DeepSeek provider header.
 
 <a id="model-experience"></a>
 ## Model Experience

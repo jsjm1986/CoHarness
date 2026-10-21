@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-same-basename-workspace-adoption.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-same-basename-workspace-adoption.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-31-same-basename-workspace-adoption.md
+document:
+  en: a634972448d8a3fea3d08c5713602cec0584a44e
+  zh: 82be4aee3b3da2e9fb02783f1cd9bf470802cae0
 /agent-note-same-basename-workspace-adoption:
   en: ae449bc942719a49
   zh: 593b0b0571ad322f

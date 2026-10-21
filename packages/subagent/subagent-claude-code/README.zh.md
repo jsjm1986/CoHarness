@@ -21,7 +21,6 @@ kind: "package-bundle"
 - [配置](#configuration)
 - [持续成员](#persistent-members)
 - [产品兼容性与证据](#product-compatibility-and-evidence)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -151,12 +150,6 @@ Loader 组合证明 Bundle 默认实例、两个额外命名 Claude 实例与现
 
 限定于项目所有者身份的分发授权涵盖官方 SDK 及每个 SDK 版本声明的官方 CLI／平台载荷。[`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) 会披露当前可选载荷闭包，但不会认定其中声明的条款属于宽松许可；其他无关的非宽松运行时依赖仍会使第三方声明门禁失败。
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次运行通过供应商 SDK 在委托工作区中提交一个任务并返回其结果；运行之间不保留会话状态。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -198,7 +191,7 @@ Claude Code 子级会在一个全新的 SDK query 中接收独立文本任务。
 - **委派时必须存在 SDK 平台载荷**：省略 optional dependencies 的安装、不受支持的平台以及缺失或损坏的载荷都会在第一次 query 时失败；不会回退到宿主 CLI。
 - **没有人工交互路径**：`AskUserQuestion` 被禁用，权限提示会被拒绝，MCP elicitation 会被拒绝，阻塞对话会快速失败而不会挂起。
 - **assistant 载荷仅包含最终文本**：失败运行可以额外公开独立的安全诊断；推理、中间消息、工具通信、用量信息、stderr 和工作区差异仍只保留在产品内部，通用 Job id、通知与状态来自共享作业运行时。
-- **没有可选的共享能力**：对于本提供方，共享服务会拒绝输出 schema、子任务角色设定、工具筛选和 harness 深度强制约束。
+- **没有可选的共享能力**：对于本提供方，共享服务会拒绝 `agentPreset`、`agentOptions`、输出 schema 和 harness 深度强制约束。
 - **没有按实际经过时间触发的超时或副作用回滚**：长时间运行的工作由调用方取消，且取消前已更改的文件或外部系统不会恢复原状。
 
 <a id="dev-note"></a>

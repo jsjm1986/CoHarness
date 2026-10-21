@@ -56,9 +56,6 @@ kind: "package-reference"
 
 普通 Web profile 已经拥有 `ctx.webServer`。把另一个 `dsh-host-webserver` 和此适配器挂载到仅隔离 `webServer` 的 group 内；适配器仍会继承凭据与 `webhookRuntime`。[Webhook 子系统参考](../../../docs/subsystems/webhook.zh.md)区分此可选本机监听器与受管 Gateway 接收。交付的 profile 不启用此路由。
 
-
-**运行时不变式：** 不发布伴生入口。authentication 与 input validation 在对应 HTTP 操作中完成；route/disposer 对称性由 `dsh-host-webserver` 负责。
-
 <a id="model-experience"></a>
 ## 模型体验
 

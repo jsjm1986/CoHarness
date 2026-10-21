@@ -107,6 +107,8 @@ function testViewDefinition(): ConversationViewDefinition<ChatConversationViewNo
       let current: ChatSnapshot = {
         order: EMPTY,
         nodes: store,
+        entries: EMPTY,
+        groups: { get: () => undefined },
         locations: TEST_LOCATIONS,
         navigation: { items: () => EMPTY },
         timeline: { turnOrder: EMPTY, turns: new Map() },
@@ -117,6 +119,8 @@ function testViewDefinition(): ConversationViewDefinition<ChatConversationViewNo
         current = {
           order: nodes.map(node => node.key),
           nodes: store,
+          entries: nodes.map(node => ({ kind: 'node', key: node.key })),
+          groups: { get: () => undefined },
           locations: TEST_LOCATIONS,
           navigation: { items: () => EMPTY },
           timeline,

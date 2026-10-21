@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-telemetry-default-off.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-telemetry-default-off.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-telemetry-default-off.md
+document:
+  en: 3f56817c9c23ec55f2173b66fa915ab05646b2a7
+  zh: ea89ea94dfea3106886e555e172ad8a6ab39305b
 /agent-note-sessiontelemetrybackend-requires-explicit-opt-in:
   en: 111d9e4262d803e5
   zh: 2cc14310639a9356

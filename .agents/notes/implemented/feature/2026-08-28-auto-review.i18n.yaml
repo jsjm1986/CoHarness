@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-28-auto-review.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-28-auto-review.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-28-auto-review.md
+document:
+  en: 9b4e1adf536a1a8662505bed4abc498225487c8b
+  zh: 27f37e2ddd36372fbebca9d539fe0cdfe627c3a7
 /agent-note-experimental-auto-review-before-each-tool-call:
   en: 66cfb9da0816f4f2
   zh: 79f66b9713964a5e
@@ -18,14 +21,14 @@
   en: d93bd9b8af6b0bfc
   zh: 9514c2e5554a721e
 /agent-note-experimental-auto-review-before-each-tool-call/decision/result-and-cancellation:
-  en: a7d68983834a0fdd
-  zh: 97b883cdb80c0b54
+  en: a8aad2b450980759
+  zh: c619a45f83b81d42
 /agent-note-experimental-auto-review-before-each-tool-call/decision/process-catalog-and-children:
   en: c305e3506fb4febc
   zh: aecc99cda8be3de2
 /agent-note-experimental-auto-review-before-each-tool-call/alternatives-considered:
-  en: fe97128ed05b9e43
-  zh: 4aaa344933fa89b4
+  en: 583329d553abf6eb
+  zh: 9600509e45dbcfd5
 /agent-note-experimental-auto-review-before-each-tool-call/consequences:
   en: 1aca35a6d0784f67
   zh: 51cfa397db101600

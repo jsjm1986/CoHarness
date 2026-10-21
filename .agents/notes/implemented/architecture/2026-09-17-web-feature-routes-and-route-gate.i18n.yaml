@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-web-feature-routes-and-route-gate.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-web-feature-routes-and-route-gate.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-17-web-feature-routes-and-route-gate.md
+document:
+  en: 3939bdcd0c53e766827e8fcf05f64fb4d284c59b
+  zh: fb329c8fc1f93b9f979612b7163e838cc521428b
 /agent-note-feature-routes-follow-the-document-base-and-a-gate-keeps-them-there:
   en: ca746e8d558cfc31
   zh: 3524931b0bf9991f

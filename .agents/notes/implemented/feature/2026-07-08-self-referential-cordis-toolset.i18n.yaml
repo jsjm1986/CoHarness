@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-08-self-referential-cordis-toolset.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-08-self-referential-cordis-toolset.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md
+document:
+  en: dde0f860bc8946b4b952bd194879fdd2b91b7c4d
+  zh: 03d6e8e6b0c7583772431a24691606dc70cf56fa
 /agent-note-the-self-referential-cordis-toolset:
   en: a40ef3a00d9b112a
   zh: 4dbb5717926cf838

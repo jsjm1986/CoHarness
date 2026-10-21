@@ -18,6 +18,9 @@ export const configurableProviderViewSchema = z.object({
   active: z.boolean(),
   management: z.enum(['personal', 'organization', 'project', 'external']),
   declared: z.boolean().optional(),
+  defaultBaseURL: z.string().min(1).optional(),
+  baseURLEnv: z.array(z.string()).optional(),
+  nativeAuth: z.object({ env: z.array(z.string()), oauth: z.boolean() }).optional(),
   projectId: z.number().int().positive().optional(),
 }) satisfies z.ZodType<Wire<ConfigurableProviderView>>
 

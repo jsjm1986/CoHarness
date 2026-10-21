@@ -49,8 +49,6 @@ kind: "package-reference"
 
 一个私有名称占用注册位置。Cordis effect 在插件卸载时移除贡献；重复调用清理函数不会移除后续注册。[源码](src/index.ts)不持有驱动 schema，而是将受管操作委派给部署政策。
 
-不发布 `./invariant` 伴随入口：注册表只有一个权威字段，没有可能与之分歧的独立维护观测值。所属测试覆盖重复注册拒绝和插件卸载。
-
 </details>
 
 -----
@@ -63,7 +61,6 @@ kind: "package-reference"
 - [Cua Driver 原生提供方](../../experimental/computer-use-cua-driver-native/README.zh.md) — 使用 npm 运行时。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验

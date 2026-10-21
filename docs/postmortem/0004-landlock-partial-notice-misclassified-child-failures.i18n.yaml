@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 0004-landlock-partial-notice-misclassified-child-failures.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 0004-landlock-partial-notice-misclassified-child-failures.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/postmortem/0004-landlock-partial-notice-misclassified-child-failures.md
+document:
+  en: a41a09ed06554da91aa62ced766776a7691c24b1
+  zh: d9b861e5389f07ed9934014c3c8ddefff28a7bd9
 /post-mortem-0004-landlock-partial-enforcement-notice-misclassified-child-failures:
   en: b71a197449d26d2f
   zh: 2b62b51f43516f16

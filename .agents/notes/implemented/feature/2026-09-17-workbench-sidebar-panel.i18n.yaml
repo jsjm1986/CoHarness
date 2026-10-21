@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-workbench-sidebar-panel.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-workbench-sidebar-panel.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-17-workbench-sidebar-panel.md
+document:
+  en: ccf493c6393d85cb92ef05ae8dc58675aceec6f6
+  zh: 118312f77327a0c32d03a4f37799fa181036cedc
 /agent-note-workbench-sidebar-panel-and-pane-scoped-markdown-tables:
   en: 10c95fde3fbd2743
   zh: 72b44fb4a0187033

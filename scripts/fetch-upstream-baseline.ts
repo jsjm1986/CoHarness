@@ -1,4 +1,9 @@
-/** Prepare the pinned public tag and comparison commits without replacing tags or fetching full history. */
+/**
+ * Prepare the pinned public tag and comparison commits without replacing tags.
+ * Fork clones lack the upstream objects, so endpoints fetch at full depth:
+ * the commit inventory gate walks complete ancestry between baseline and
+ * target, which a shallow fetch cannot satisfy.
+ */
 import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -37,7 +42,7 @@ const commits = new Set([
 const ref = `refs/tags/${manifest.syncedTag}`
 const existing = spawnSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], { cwd: root, encoding: 'utf8' })
 if (existing.status !== 0) {
-  execFileSync('git', ['fetch', '--depth=1', '--no-tags', upstream, `${ref}:${ref}`],
+  execFileSync('git', ['fetch', '--no-tags', upstream, `${ref}:${ref}`],
     { cwd: root, stdio: 'inherit', timeout: 120_000 })
 }
 const commit = execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], { cwd: root, encoding: 'utf8' }).trim()
@@ -46,7 +51,7 @@ if (commit !== manifest.syncedCommit) throw new Error('upstream baseline: fetche
 for (const pinned of commits) {
   const available = spawnSync('git', ['cat-file', '-e', `${pinned}^{tree}`], { cwd: root, stdio: 'ignore' })
   if (available.status !== 0) {
-    execFileSync('git', ['fetch', '--depth=1', '--no-tags', upstream, pinned],
+    execFileSync('git', ['fetch', '--no-tags', upstream, pinned],
       { cwd: root, stdio: 'inherit', timeout: 120_000 })
   }
   const actual = execFileSync('git', ['rev-parse', '--verify', `${pinned}^{commit}`], { cwd: root, encoding: 'utf8' }).trim()

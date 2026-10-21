@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-18-organization-provider-policy-preserves-profile.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-18-organization-provider-policy-preserves-profile.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-organization-provider-policy-preserves-profile.md
+document:
+  en: 944632ed20a91047dd8e0da263acdb7c2cafcb7b
+  zh: 5d7d93a4f4877bedaae63a25de222f7a26906162
 /agent-note-preserve-complete-organization-provider-profiles-in-runtime-policy:
   en: 1b40e66ebde892fe
   zh: 474c96eea052298f

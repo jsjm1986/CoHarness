@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-06-session-handle-agent-lifecycle.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-06-session-handle-agent-lifecycle.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-session-handle-agent-lifecycle.md
+document:
+  en: da853ca679477838c2ac0ac7c0ee5a1ca7b3cdf3
+  zh: eb2097e15e5fa2f68ed31a60eb4b5e4943796c49
 /agent-note-persistence-handles-follow-agent-lifecycle-ownership:
   en: 05fa30c1fd1b0797
   zh: 06deda1307917e79

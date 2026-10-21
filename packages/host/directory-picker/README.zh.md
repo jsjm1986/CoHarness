@@ -17,18 +17,11 @@ web GUI 让操作者通过 OS 选择器或应用内浏览器选择工作区目�
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该 seam 声明能力并集；交互与进程状态由各后端拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

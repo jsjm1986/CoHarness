@@ -1,12 +1,15 @@
 /** Ownerless-copy registrations: the five seats, dictionaries, thunked labels, and HMR recovery. */
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-settings-general/client'
+import { ReleaseChangeGate } from '@deepseek-ai/dsh-client-modules/src/client/release-change.ts'
+import { readRelease } from '@deepseek-ai/dsh-client-modules/src/client/manifest.ts'
+import { HostReleasePrompt, type HostReleasePromptInjected } from '../src/client/HostReleasePrompt.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from '../src/client/chrome.tsx'
 import { GeneralSection } from '../src/client/GeneralSection.tsx'
 import { SettingsDocumentAction } from '../src/client/SettingsDocumentAction.tsx'
@@ -51,6 +54,14 @@ async function bench(isLoopback = true) {
     isLoopback,
   } as never)
   ctx.provide('shortcuts', { register: vi.fn(() => () => {}) } as never)
+  const gate = new ReleaseChangeGate(undefined)
+  ctx.provide('modules', {
+    entries: {
+      releaseChange: gate.change,
+      dismissRelease: () => { gate.dismiss() },
+      sync: (graph: unknown) => { gate.observe(readRelease(graph)); return Promise.resolve() },
+    },
+  } as never)
   new TestRemote(ctx)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, settingsDescribe, settingsOpenDocument }
@@ -80,7 +91,7 @@ function generalEntry(slots: SlotRegistry) {
 
 describe('ui-settings-general apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'settingsScope', 'shortcuts'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'settingsScope', 'shortcuts', 'modules'])
   })
 
   it('fills all five seats for declarations before or after apply', async () => {
@@ -95,7 +106,7 @@ describe('ui-settings-general apply', () => {
     // The nav label is a locale-following thunk; owners resolve at read time.
     expect(resolveSlotLabel(entry.options.label)).toBe('通用设置')
     expect(before.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
-    expect(before.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['developer-tools'])
+    expect(before.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['developer-tools', 'current-version'])
     // The onboarding hole stays declared for feature-owned steps; this plugin
     // no longer seats one.
     expect(before.slots.entries('settings.onboarding')).toEqual([])
@@ -194,12 +205,45 @@ describe('ui-settings-general apply', () => {
     for (const [name, component] of SEATS) {
       expect(b.slots.entries(name)[0]!.component).toBe(component)
     }
-    expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['developer-tools'])
+    expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['developer-tools', 'current-version'])
     expect(b.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
     // The recovered registrations still ride the locale path.
     b.locale.setLocale('en')
     expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('General')
     b.locale.setLocale('zh')
+  })
+
+  it('asks about another Host release in the shell overlay and stops asking once dismissed', async () => {
+    const b = await bench()
+    // The shell overlay seat is declared by ui-layout's root entry; mirror that
+    // declaration so this plugin's slots.inject resolves.
+    b.slots.register(
+      { name: 'root', children: { 'shell.overlay': { kind: 'list', scope: 'root' } } } as never,
+      () => null,
+    )
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const overlay = () => b.slots.entries('shell.overlay').find(row => row.options.id === 'host-release-change')
+    expect(overlay()?.component).toBe(HostReleasePrompt)
+    expect(overlay()?.locale).toBe('settings')
+    const face = overlay()!.inject!()
+    const { dismissRelease, reloadPage, hooks } = face
+    if (typeof dismissRelease !== 'function' || typeof reloadPage !== 'function' || typeof hooks !== 'object' || hooks === null) {
+      throw new TypeError('host-release-change inject face is incomplete')
+    }
+    const injected = { dismissRelease, reloadPage, hooks } as HostReleasePromptInjected
+    expect(injected.hooks.releaseChange).toBe(b.ctx.modules.entries.releaseChange)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const release = { version: '2.0.0' }
+    await b.ctx.modules.entries.sync({ rev: 'next', release, entries: [], batches: [] })
+    expect(injected.hooks.releaseChange.getSnapshot()).toEqual({ page: undefined, previous: undefined, host: release })
+    expect(warn).toHaveBeenCalledOnce()
+    injected.dismissRelease()
+    expect(injected.hooks.releaseChange.getSnapshot()).toBeUndefined()
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    onTestFinished(() => { vi.unstubAllGlobals() })
+    injected.reloadPage()
+    expect(reload).toHaveBeenCalledOnce()
   })
 
   it('removes every seat and the item declaration on teardown', async () => {

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-09-headless-direct-core-entry-point.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-09-headless-direct-core-entry-point.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-09-headless-direct-core-entry-point.md
+document:
+  en: ce1347f1e2d4b1bcfc1819900cb30c4f2f1f6097
+  zh: e1eae6bceb6dbda65c422248e1b207493357cc6c
 /agent-note-headless-is-a-direct-core-entry-point:
   en: afff105fdbd912be
   zh: 3c33a6bb4b77407b

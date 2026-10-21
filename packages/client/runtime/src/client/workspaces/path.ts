@@ -1,6 +1,6 @@
 import { abbreviateHomePath, isAbsoluteWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 
-export { abbreviateHomePath }
+export { abbreviateHomePath, isAbsoluteWorkspacePath }
 
 /**
  * Resolve a workspace-relative path into the Host-facing spelling used by openPath.

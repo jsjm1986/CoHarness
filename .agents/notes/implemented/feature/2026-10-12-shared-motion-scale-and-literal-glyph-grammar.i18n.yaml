@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-shared-motion-scale-and-literal-glyph-grammar.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-shared-motion-scale-and-literal-glyph-grammar.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-12-shared-motion-scale-and-literal-glyph-grammar.md
+document:
+  en: f78b43f70c2a436fefd44f236c3a1c68bdef5398
+  zh: 14673f3c1709811a2c238bf85b1e7673e5becafb
 /agent-note-shared-motion-scale-and-literal-glyph-grammar-across-client-surfaces:
   en: 4cfab709120497ec
   zh: 9565e62f16801d27

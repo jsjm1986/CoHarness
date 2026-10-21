@@ -18,9 +18,13 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
+  "icon": "./icon.svg",
   "files": [
+    "icon.svg",
+    "locale/*.json",
     "lib/index.js",
     "assets",
     "lib/types/**/*.d.ts"

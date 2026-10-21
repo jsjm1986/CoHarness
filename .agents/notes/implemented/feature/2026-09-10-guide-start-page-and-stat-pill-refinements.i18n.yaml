@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-10-guide-start-page-and-stat-pill-refinements.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-10-guide-start-page-and-stat-pill-refinements.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-10-guide-start-page-and-stat-pill-refinements.md
+document:
+  en: f5e980d4f3102a652b584b48f5c429d9906d6ad0
+  zh: 4dffce727c7aee8a2f8c1210def9af7367e6d664
 /agent-note-guide-start-page-and-stat-pill-refinements:
   en: 717caf91226efb1d
   zh: 06fcd0c0bde3cdaa

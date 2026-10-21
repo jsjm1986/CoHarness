@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-25-mobile-documents-workbench.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-25-mobile-documents-workbench.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-mobile-documents-workbench.md
+document:
+  en: 07b42bd688ed1fd449a623d2bd29b5db02a89995
+  zh: d4b1e174d64c225d98a01d3aff90ac5d2b054501
 /agent-note-compact-document-workbench-uses-task-focused-sheets:
   en: d5abcf68e0b5d401
   zh: 26036bdb45b415b4

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/skill/skill-filesystem/README.md
+document:
+  en: 96274a5e7ccaa82b6c3920f9b5e2d66f8815eac3
+  zh: ec0887d65c9ca9bf1e3da4c7ebf747aca43bac0b
 /:
   en: 88f372ab5e279e8d
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: ef659bb1fd748f41
   zh: 9d40999be52526f5
 /deepseek-ai-dsh-skill-filesystem/table-of-contents:
-  en: 04c49f86717a561b
-  zh: c490bd7c5736caf2
+  en: 316c91206a4f2bb8
+  zh: 0053068e6087b2a5
 /deepseek-ai-dsh-skill-filesystem/plugin:
   en: 08de86bb75a5340c
   zh: 79ab8ae84101b26f
@@ -27,11 +30,8 @@
   en: 4837f3d492fe8684
   zh: 40b892c923341287
 /deepseek-ai-dsh-skill-filesystem/skill-format:
-  en: 4a860a0b2f49b87a
-  zh: 6539d80893648823
-/deepseek-ai-dsh-skill-filesystem/invariants:
-  en: 122fd695b3994e4c
-  zh: 3761fef8cbc09184
+  en: bf6ba0aeee857b0a
+  zh: c0f889a91505bdec
 /deepseek-ai-dsh-skill-filesystem/model-experience:
   en: 2276cca067cd120a
   zh: 9986d49d39228243

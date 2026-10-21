@@ -23,9 +23,6 @@
       "path": "../../host/webserver"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {

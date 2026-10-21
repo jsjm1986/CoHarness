@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-menu-material-surface-and-keyboard-guards.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-menu-material-surface-and-keyboard-guards.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-menu-material-surface-and-keyboard-guards.md
+document:
+  en: de1299a1b769f77f90d8735f008e973ee2cbdf40
+  zh: cedc14608ca6a52355f77eb292799f1f9c2d1ef4
 /agent-note-menu-material-surface-and-keyboard-guards:
   en: 1686cdd3d15edce0
   zh: b66ed0dce13c750c

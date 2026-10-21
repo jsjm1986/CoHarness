@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MockInstance } from 'vitest'
-import { agentEvents } from '@deepseek-ai/dsh-agent'
 import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { gatedScheduleBackend, harness, agentFor } from './harness.ts'
@@ -482,44 +481,31 @@ describe('Schedule activation and shutdown', () => {
     expect(warnings).toEqual([expect.stringContaining('fixture close failure')])
   })
 
-  it('attaches existing roots once and leaves owned children without a new registration', async () => {
+  it('registers no tools for existing roots or their owned children', async () => {
     const test = await harness({ beforeService: async (ctx) => {
       const parent = agentFor(ctx, 'existing-root')
       ctx.effect(() => ctx.agents.enter(parent, undefined))
     } })
     tests.push(test)
     const parent = test.ctx.agents.get(SessionId('existing-root'))!
-    expect(test.ctx.tools.get('schedule_create', parent)).toBeDefined()
-    await agentEvents(test.ctx, parent).serial('agent/created', { source: 'startup' })
     const child = agentFor(test.ctx, 'owned-child')
     test.ctx.effect(() => test.ctx.agents.enter(child, parent))
-    await agentEvents(test.ctx, child).serial('agent/created', { source: 'startup' })
     expect(test.ctx.agents.roots()).toEqual([parent])
-    expect(test.ctx.tools.get('schedule_create', parent)).toBeDefined()
+    for (const name of ['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete']) {
+      expect(test.ctx.tools.get(name, parent)).toBeUndefined()
+      expect(test.ctx.tools.get(name, child)).toBeUndefined()
+      expect(test.ctx.tools.get(name)).toBeUndefined()
+    }
   })
 
-  it('registers tools for a new root and rejects management after service teardown', async () => {
+  it('registers no tools for a new root and rejects management after service teardown', async () => {
     const test = await setup()
     const agent = agentFor(test.ctx, 'new-root')
     await test.ctx.agents.register(agent)
-    expect(test.ctx.tools.get('schedule_create', agent)).toBeDefined()
+    expect(test.ctx.tools.get('schedule_create', agent)).toBeUndefined()
     await test.ctx.fiber.dispose()
     await expect(test.service.delete({ sessionId: agent.session.id, id: ScheduleId('gone') }))
       .rejects.toThrow('Schedule service is stopping')
-  })
-
-  it('releases a disposed root Agent from the plugin scope', async () => {
-    const test = await setup()
-    const baseline = test.fiber.getEffects().length
-    const agent = agentFor(test.ctx, 'released-root')
-    const disposeAgent = await test.ctx.agents.register(agent)
-    expect(test.fiber.getEffects().length).toBe(baseline + 1)
-    expect(test.ctx.tools.get('schedule_create', agent)).toBeDefined()
-    await disposeAgent()
-    expect(test.fiber.getEffects().length).toBe(baseline)
-    expect(test.ctx.tools.get('schedule_create', agent)).toBeUndefined()
-    await test.ctx.fiber.dispose()
-    expect(test.fiber.getEffects()).toEqual([])
   })
 
   it('rejects a missing creation selector at the shared service entry', async () => {

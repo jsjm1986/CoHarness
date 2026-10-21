@@ -98,12 +98,13 @@ export class PresentedOpenController {
    * @param sessionId - owning Session.
    * @param seq - change announcement sequence.
    * @param index - summary file index.
+   * @param action - open file or containing directory.
    * @param path - selected file path.
    * @param application - explicit association id, or undefined for the OS default.
    * @returns after the gesture settles.
    */
-  openChanged(sessionId: SessionId, seq: number, index: number, path?: string, application?: string): Promise<void> {
-    return this.request(changedFileUrl(sessionId, seq, index), path, 'open', application)
+  openChanged(sessionId: SessionId, seq: number, index: number, action: PresentedAction = 'open', path?: string, application?: string): Promise<void> {
+    return this.request(changedFileUrl(sessionId, seq, index), path, action, application)
   }
 
   private async request(key: string, path: string | undefined, action: PresentedAction, application: string | undefined): Promise<void> {

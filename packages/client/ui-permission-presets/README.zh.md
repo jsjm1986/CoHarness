@@ -21,7 +21,6 @@ kind: "package-reference"
 
 - [账户资格](#account-qualifications)
 - [桌面确认](#desktop-confirmation)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -41,12 +40,6 @@ Auto 必须逐会话主动启用，不属于新会话默认 schema。默认值�
 ## 桌面确认
 
 受管会话的页头工具位通过所属运行时连接打开个人桌面确认框。保存前显示当前根会话、节点、桌面和账号。确认涵盖该根会话的活动子 Agent，不涵盖另一根会话或历史分支；每位参与者分别确认。服务端核验当前资格并拒绝陈旧目标。断连和会话切换会丢弃待处理响应，保存失败后必须重新读取状态。确认或撤回不会启动模型回合，Full access、Auto 和工具审批也不能代替此确认。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该行绑定一个 Host 拥有的 Settings 描述符，preset 数据留在 host 权限域中；没有包拥有的持久内容可供比较。
-
 
 <a id="model-experience"></a>
 ## 模型体验

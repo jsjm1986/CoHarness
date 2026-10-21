@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-14-gateway-model-governance-live-policy-reload.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-14-gateway-model-governance-live-policy-reload.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-gateway-model-governance-live-policy-reload.md
+document:
+  en: 26ed1984c7d165d7717de1ec1f9262959da78cbc
+  zh: 8acf6bf0f41c20307fd185eb0c91b26238ef58a4
 /agent-note-live-model-governance-policy-reload:
   en: 4f88ea7195c5bd6b
   zh: 7a4d90593f4c2e1f

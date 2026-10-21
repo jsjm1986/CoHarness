@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-15-max-token-replay-state-alignment.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-15-max-token-replay-state-alignment.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-15-max-token-replay-state-alignment.md
+document:
+  en: 256a64403a08377cf35ba645175698678eaa7f8b
+  zh: f7a7280ab7657124541d93e3c592eab9ec75d28e
 /agent-note-replay-state-aligns-with-assembled-content-by-construction:
   en: fb7e4b2ec72c1abb
   zh: bab5f49678dffbc3

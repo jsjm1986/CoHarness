@@ -45,10 +45,7 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../preset/agent-presets"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../preset/agent-preset-registry"
     },
     {
       "path": "../../sandbox/sandbox"

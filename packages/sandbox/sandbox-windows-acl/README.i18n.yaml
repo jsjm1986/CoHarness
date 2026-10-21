@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sandbox/sandbox-windows-acl/README.md
+document:
+  en: c60091bdbcfc299fb34719ef68c8cd7e41db6cea
+  zh: a115920687ad74fab00e3fdb6c20476f7521a5ce
 /:
   en: 14d3fdd57b94c86f
   zh: abcd3b4f9dd908fa
@@ -63,5 +66,5 @@
   en: cc273320f6a1beaf
   zh: 5c57a312ddc50651
 /deepseek-ai-dsh-sandbox-windows-acl/known-limitations-and-deferred-work/dev-note/future-warnings-and-cleanup-surfaces:
-  en: 4c65be775f25c367
-  zh: 8fd1eb4f9e81d2d1
+  en: 8872c7b4c8ce1cc7
+  zh: ab409e3e01ba1a28

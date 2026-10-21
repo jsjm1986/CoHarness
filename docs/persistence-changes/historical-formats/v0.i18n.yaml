@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for v0.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for v0.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/historical-formats/v0.md
+document:
+  en: 61024351bb4562b131a6c8ce4594e8368fb8d717
+  zh: 6bf1813e33148a2967581d131a5e39d08688b580
 /:
   en: 13d883c2a842875a
   zh: 6b6792b05e810088
@@ -183,8 +186,8 @@
   en: c1a26b63c0f4ac65
   zh: 34ef0fb0448250e8
 /session-v0-persistence-format/complete-schemas/resolved-persistence-types/event-agent-preset-selected-0-data:
-  en: a8965b961b89317f
-  zh: 5658601a8577cfb9
+  en: e26e0ec6a3a97cc8
+  zh: 1b21aad567e1b26e
 /session-v0-persistence-format/complete-schemas/resolved-persistence-types/event-agent-inbox-spliced:
   en: 4b2f76eddf1bb4b0
   zh: 0ae76132afb73db5

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-hook-model-feedback-cap.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-hook-model-feedback-cap.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-17-hook-model-feedback-cap.md
+document:
+  en: af46cffdf5b44038ccc6b44c9664f60c47131df5
+  zh: e8b995598f2476b4a903adda3add6583d2a5694e
 /agent-note-hook-authored-model-text-is-capped-by-config:
   en: 36cf3bca92fcf7f9
   zh: 06f081ffb6516510

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-29-exact-per-turn-token-usage.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-29-exact-per-turn-token-usage.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-29-exact-per-turn-token-usage.md
+document:
+  en: 5015201aae397866e05593ced2fd636ef414623d
+  zh: f0a9a25966a0d0375909bc1f46e10464c6fbd369
 /agent-note-show-exact-token-usage-for-complete-turns:
   en: 24dfc61d6cd30919
   zh: 87631be9a04047b2

@@ -23,17 +23,11 @@ Use `dsh-loader-smoke` to boot an application fixture from its real bin and `cor
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A test-support launcher selecting source or built mode; it owns no product state.
 
 <a id="model-experience"></a>
 ## Model Experience

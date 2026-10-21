@@ -1,22 +1,25 @@
-# Bilingual-pair consistency record for 2026-09-19-upstream-alpha2-use-drivers-sync.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-19-upstream-alpha2-use-drivers-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-upstream-alpha2-use-drivers-sync.md
-/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync:
-  en: ef6e56e883d66a68
-  zh: 4cf3d4c090b5f3da
-/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/problem:
-  en: 73e71975572d16f6
-  zh: 67d5ac71c2943d76
-/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/decision:
-  en: e5fd9990670fe1f1
-  zh: 38a68a0819c18c92
-/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/alternatives-considered:
-  en: b1229269f3aa4874
-  zh: 934361e10904363d
-/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/consequences:
-  en: 071aac35b80ad129
-  zh: e72b954c5803c33c
-/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/verification:
-  en: c66029ebbaa49444
-  zh: 598540cb1e7458d9
+document:
+  en: 60da24f22c83c57e52e2e62ad43b0886f0fbffef
+  zh: 9efcaa5a43ac91e0c742f1884e0487bdc326b617
+/agent-note-driver-and-mcp-integration-with-bounded-cancellation:
+  en: e60be247105fa673
+  zh: f683c16b8a80dc73
+/agent-note-driver-and-mcp-integration-with-bounded-cancellation/problem:
+  en: 6c9014e3d6724c1f
+  zh: 4c871a6bc9fcd8a1
+/agent-note-driver-and-mcp-integration-with-bounded-cancellation/decision:
+  en: 28e6a5e2f6685cd8
+  zh: 22bb9265705b7219
+/agent-note-driver-and-mcp-integration-with-bounded-cancellation/alternatives-considered:
+  en: 55036ba0c4e4b567
+  zh: 979ebf12971928b9
+/agent-note-driver-and-mcp-integration-with-bounded-cancellation/consequences:
+  en: 9fb9395b7048bfb2
+  zh: bd5c5e9e881cac06
+/agent-note-driver-and-mcp-integration-with-bounded-cancellation/verification:
+  en: 2ec37486ce3967b8
+  zh: 2b441f598dd52880

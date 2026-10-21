@@ -34,7 +34,7 @@ claude-code V1 的条目是 `{ content, status, activeForm }`；后来（V2）�
 
 ### 校验：低成本的中间路线
 
-schema 强制 type/required/enum。在此之上，`execute` 拒绝为空或重复的 `content`，并在 `allowParallelInProgress` 为 `false` 时拒绝超过一个活跃任务。排序和保持列表最新仍通过工具描述交给模型。被拒绝的写入返回 `isError` 结果，使模型自行修正。必须采用的部署策略，以及持久不变式独立于该策略这一点，均由[并行 in-progress Agent Note](2026-07-26-todo-parallel-in-progress.zh.md)负责。
+schema 强制 type/required/enum。在此之上，`execute` 拒绝为空或重复的 `content`，并在 `allowParallelInProgress` 为 `false` 时拒绝超过一个活跃任务。排序和保持列表最新仍通过工具描述交给模型。被拒绝的写入返回 `isError` 结果，使模型自行修正。必须采用的部署策略由[并行 in-progress Agent Note](2026-07-26-todo-parallel-in-progress.zh.md)负责。
 
 ## 为何没有 cordis-catalog 条目 / 没有 `@mode`
 

@@ -316,6 +316,7 @@ describe('Trajectory conversation Definitions', () => {
         name: 'read',
         arguments: { path: 'README.md' },
         content: [{ type: 'text', text: 'contents' }],
+        meta: { cwd: '/selected', path: '/selected/README.md' },
       }),
       at(7, 'step/end', { turn: 1, step: 1 }),
     ]))
@@ -326,6 +327,7 @@ describe('Trajectory conversation Definitions', () => {
       kind: 'tool-result',
       callId: 'child',
       call: { name: 'read' },
+      meta: { cwd: '/selected', path: '/selected/README.md' },
     }])
   })
 

@@ -1,9 +1,12 @@
 /**
  * Message feedback plugin, browser half: the Like/Dislike entry in the
- * conversation.chat.assistant-actions strip. One MessageFeedbackController per
- * Session backs every message control in that Session, so a single list read
- * seeds the whole transcript. Mutations go through the generated
- * messageFeedback Remote; the Host owns per-item compare-and-set.
+ * conversation.chat.assistant-actions strip, the Session feedback entry in the
+ * header utilities, the `/feedback` decoration, and the Session feedback
+ * dialog. The `feedbackUi` service opens the same dialog for other plugins.
+ * One MessageFeedbackController per Session backs every message control in
+ * that Session, so a single list read seeds the whole transcript. Mutations go
+ * through the generated messageFeedback Remote; the Host owns per-item
+ * compare-and-set.
  * @module @deepseek-ai/dsh-client-ui-message-feedback/client
  */
 
@@ -20,6 +23,8 @@ import { FeedbackDialogController } from './dialog.ts'
 import type { FeedbackDialogInjected } from './slots.ts'
 import { MessageFeedbackController } from './controller.ts'
 import { MessageFeedbackActions } from './MessageFeedbackActions.tsx'
+import { SessionFeedbackAction } from './SessionFeedbackAction.tsx'
+import type { SessionFeedbackActionInjected } from './SessionFeedbackAction.tsx'
 import type { MessageFeedbackInjected } from './slots.ts'
 import { en, zh } from './locales.ts'
 
@@ -27,7 +32,23 @@ export type {
   MessageFeedbackActionResult, MessageFeedbackStatus, MessageFeedbackView, MessageFeedbackRemote,
 } from './controller.ts'
 export type { MessageFeedbackActionProps, MessageFeedbackInjected } from './slots.ts'
+export type { SessionFeedbackActionInjected, SessionFeedbackActionProps } from './SessionFeedbackAction.tsx'
 export type { MessageFeedbackKey } from './locales.ts'
+
+/** Opens the existing Session feedback form without submitting feedback. */
+export interface FeedbackUi {
+  /**
+   * Open the Session feedback draft without recording feedback.
+   * @param sessionId - Session whose feedback draft to open.
+   */
+  openSession(sessionId: SessionId): void
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    feedbackUi: FeedbackUi
+  }
+}
 
 /** Dictionary namespace owned by this plugin. */
 const NS = 'feedback'
@@ -81,6 +102,10 @@ export function apply(ctx: ClientContext): void {
     }
     return dialog
   }
+  const feedbackUi: FeedbackUi = {
+    openSession: (sessionId) => { dialogFor(sessionId).open({ kind: 'session' }) },
+  }
+  ctx.provide('feedbackUi', feedbackUi)
   ctx.effect(() => () => {
     for (const dialog of dialogs.values()) dialog.dispose()
     dialogs.clear()
@@ -99,9 +124,19 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['commandUi'], (scope) => {
     scope.effect(() => scope.commandUi.decorate({
       name: 'feedback', available: () => true,
-      ui: { kind: 'action', run: (session) => { dialogFor(session.sessionId).open({ kind: 'session' }) } },
+      ui: { kind: 'action', run: (session) => { feedbackUi.openSession(session.sessionId) } },
     }), 'ui-message-feedback: session command')
   })
+
+  ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
+    name: 'conversation.session.header.utilities',
+    id: 'session-feedback',
+    order: -20,
+    locale: NS,
+    inject: (sessionId): SessionFeedbackActionInjected => ({
+      openFeedback: () => { feedbackUi.openSession(sessionId) },
+    }),
+  }, SessionFeedbackAction))
 
   // A reconnect can only invalidate what was already read; a cold Session
   // stays cold until something asks for it.

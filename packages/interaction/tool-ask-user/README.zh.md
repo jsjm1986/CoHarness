@@ -87,7 +87,6 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 工具注册：`ask_user_question` schema、执行路径、结果渲染 |
 | [`src/legacy.ts`](src/legacy.ts) | 冻结的超时功能加入前描述、参数、输出和阻塞执行 |
-| — | 不发布运行时不变式伴生入口；此模型侧适配器没有独立的生命周期流；执行关系由其调用的能力 seam 负责。 |
 
 ### 消费方角色
 
@@ -112,7 +111,6 @@ kind: "package-reference"
 - [交互组映射](../README.zh.md)——相邻的审批与命令表面。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -149,7 +147,6 @@ kind: "package-reference"
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明该工具何时不合适。它们是当前包约束，不是 UI 积压事项。
 

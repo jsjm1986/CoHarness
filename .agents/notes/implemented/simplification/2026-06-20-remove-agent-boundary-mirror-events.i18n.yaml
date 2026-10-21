@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-20-remove-agent-boundary-mirror-events.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-20-remove-agent-boundary-mirror-events.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-06-20-remove-agent-boundary-mirror-events.md
+document:
+  en: cb3cb83e7e37fae52b59bb8566284aa80708e23a
+  zh: 85572deb662b544b1de635a063e3a19d2388fda4
 /agent-note-stop-mirroring-durable-boundaries-as-agent-events:
   en: c56ffd5fb5c653a4
   zh: 748b6342eabb6756

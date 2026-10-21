@@ -77,6 +77,8 @@ Persisted ownership uses the original Host ID alongside its account and runtime,
 
 `sidebarRight.openTabs` publishes metadata only for adopted Sessions under the current verified identity. Product startup does not discover unauthenticated localStorage layouts. Adopted stores remain authoritative for the current window; other windows’ writes cannot replace a live layout.
 
+Each Session has one current store generation. Recreating that store releases the previous generation's persistence and identity subscriptions before adopting the replacement. Runtime pruning clears the current generation's saved layout, adoption, and resource holds; a retired instance cannot overwrite or clear its replacement.
+
 <a id="extension-seats"></a>
 ## Extension seats
 
@@ -157,5 +159,3 @@ None; this package neither assembles nor sends a provider request.
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. The two services (`sidebarRight`, `sidebarRightTabs`) are provided through `ctx.reflect.provide` inside one effect and torn down with it; the on-screen Session and the Tab domain's occurrence lifetimes are asserted directly by this package's specs, and no independent observation exists to diverge from them.

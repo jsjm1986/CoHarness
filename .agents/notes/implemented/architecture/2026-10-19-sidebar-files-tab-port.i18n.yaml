@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-19-sidebar-files-tab-port.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-19-sidebar-files-tab-port.md
+document:
+  en: 26dfb0c2b0acc61b6beee677baf34324b9732770
+  zh: 77d2064461177d9d45392abb82ffb4eef58c5008
+/agent-note-the-right-sidebar-files-tab-lands-over-the-fork-s-connection-and-resource-seams:
+  en: 722bfad4efa77c94
+  zh: 9f0d204015bab215
+/agent-note-the-right-sidebar-files-tab-lands-over-the-fork-s-connection-and-resource-seams/problem:
+  en: 5bcfd480fcdbb75a
+  zh: e9b8a0acf052213f
+/agent-note-the-right-sidebar-files-tab-lands-over-the-fork-s-connection-and-resource-seams/decision:
+  en: 7f7ddb8c52d0c4c7
+  zh: 2e3ceca11ef78ec3
+/agent-note-the-right-sidebar-files-tab-lands-over-the-fork-s-connection-and-resource-seams/alternatives-considered:
+  en: 8de5473ceed515ff
+  zh: 80b8ed8b09497619
+/agent-note-the-right-sidebar-files-tab-lands-over-the-fork-s-connection-and-resource-seams/consequences:
+  en: dd9f6c9513d1614e
+  zh: a1f8d55d9e338e9a
+/agent-note-the-right-sidebar-files-tab-lands-over-the-fork-s-connection-and-resource-seams/verification:
+  en: 6b11e6f3054d5e69
+  zh: b2e20bc32a9d4326

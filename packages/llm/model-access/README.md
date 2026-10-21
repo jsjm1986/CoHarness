@@ -13,20 +13,13 @@ Service Definition for deployment-owned authorization of exact `(provider, model
 
 Use `dsh-model-access` as the Service Definition for deployment-owned authorization of exact `(provider, model)` routes: catalogs, model selection, and execution consult the same `ctx.modelAccess` decision, and an absent service means no authorization policy is mounted.
 
-
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The definition declares a decision contract whose absence means no policy; providers own any rule state.
 
 <a id="model-experience"></a>
 ## Model Experience

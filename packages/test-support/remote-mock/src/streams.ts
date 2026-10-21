@@ -1,17 +1,38 @@
 /** Stream scripts and the pushable, abort-aware stream a script drives. */
 
+import type { RemoteStreamHandle } from '@deepseek-ai/dsh-typert-protocol'
 import type { StreamRecord } from './log.ts'
 
 /**
- * Lift a fake stream method written as an async generator function into the
- * signature of the generated method it stands in for. Generated Client stream
- * methods already return `AsyncIterable`, so the lift is the type check: the
- * fake's parameters and items must match the declared signature.
- * @param method - fake taking the method's arguments and yielding its items.
- * @returns the fake, typed as the generated method.
+ * Type a fake stream method's result as the handle a generated Client method
+ * returns. The uplink members are inert: a fake built on it drives the downlink only.
+ * @param source - downlink items the fake yields.
+ * @returns a handle that iterates `source`.
  */
-export function streamMethod<Method extends (...args: never[]) => AsyncIterable<unknown>>(method: Method): Method {
-  return method
+export function streamHandle<Out, In = never>(source: AsyncIterable<Out>): RemoteStreamHandle<Out, In> {
+  return {
+    [Symbol.asyncIterator]: () => source[Symbol.asyncIterator](),
+    send: () => undefined,
+    end: () => undefined,
+    dispose: () => undefined,
+  }
+}
+
+/** Downlink item type of one generated stream method. */
+type StreamItem<Method> = Method extends (...args: never[]) => RemoteStreamHandle<infer Out, unknown> ? Out : never
+
+/**
+ * Lift a fake stream method written as an async generator function into the
+ * signature of the generated method it stands in for.
+ * @param method - fake taking the method's arguments and yielding its downlink items.
+ * @returns the fake returning {@link streamHandle} of each call.
+ */
+export function streamMethod<Method extends (...args: never[]) => RemoteStreamHandle<unknown, unknown>>(
+  method: (...args: Parameters<Method>) => AsyncIterable<StreamItem<Method>>,
+): Method {
+  const lifted = (...args: Parameters<Method>): RemoteStreamHandle<StreamItem<Method>, unknown> =>
+    streamHandle(method(...args))
+  return lifted as Method
 }
 
 /** Test-side controls over one open stream. */

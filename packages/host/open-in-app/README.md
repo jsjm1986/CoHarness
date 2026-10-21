@@ -121,5 +121,3 @@ None; the package never assembles or sends provider requests.
 The promotion decisions — the host/`ui-` package split, why raw webServer routes instead of a Typert Remote, why the catalog stays compile-time fixed, the resolver redesign (verified launchers, one resolution pass, no per-click re-detection), the three-deadline configuration, and the per-platform icon strategies with their rejected alternatives — are recorded in the [promotion Agent Note](../../../.agents/notes/implemented/architecture/2026-09-08-upstream-alpha2-selective-sync.md).
 
 </details>
-
-**Runtime invariant:** No companion is published. The package serves one host resolution pass over three stateless routes; the route registrations prove disposal through their HMR-safety specs, and no independent observations can diverge.

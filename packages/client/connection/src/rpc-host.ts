@@ -13,7 +13,7 @@ import {
   type ServerResponse as RpcServerResponse,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { bridge, type FetchHandler } from './http-bridge.ts'
-import { header, isTrustedApiRequest } from './api-request-trust.ts'
+import { header, isRemoteAuthority, isTrustedApiRequest } from './api-request-trust.ts'
 import { API_PATH } from './api-path.ts'
 import type { BrowserAuth } from './browser-auth.ts'
 import type {
@@ -58,6 +58,12 @@ export interface HostConnectionHandle {
   readonly http: HostConnectionHttp
 
   /**
+   * Whether this deployment accepts authorities beyond loopback: true only
+   * when a validated `trustedHosts` entry names a non-loopback hostname.
+   */
+  readonly allowsRemoteAuthorities: boolean
+
+  /**
    * Apply Connection's Host/Origin fence and browser authentication to one
    * `/api` request. Registered `loopback` subtrees and endpoints keep their
    * machine-caller fence as the complete admission.
@@ -72,7 +78,9 @@ export interface HostConnectionHandle {
    * Authenticate one frontend index request, owning a token redirect, 403, or
    * 401. A mounted `connection/authenticate` provider answers first; its
    * `'allow'` still passes the Host/Origin fence and its `'deny'` refuses
-   * before any token exchange.
+   * before any token exchange. The cookie this mints is `Secure` when the
+   * mounted Web carrier serves TLS, which only that listener's protocol
+   * decides.
    * @param request - root or configured-index HTTP request.
    * @param response - response owned when the result is false.
    * @returns true only when the frontend may serve index.html.
@@ -114,6 +122,8 @@ export class HostConnectionService extends Service implements HostConnectionHand
   private readonly interceptors = new Map<string, ConnectionRpcInterceptor>()
   private readonly httpPrefixes = new Map<string, ConnectionHttpRegistration>()
 
+  readonly allowsRemoteAuthorities: boolean
+
   /**
    * Provide the Host half over the active HTTP server.
    * @param ctx - owning Connection plugin context.
@@ -126,6 +136,12 @@ export class HostConnectionService extends Service implements HostConnectionHand
     private readonly browserAuth: BrowserAuth,
   ) {
     super(ctx, 'connection')
+    this.allowsRemoteAuthorities = trustedHosts.some(isRemoteAuthority)
+  }
+
+  /** Active Web carrier; absent when no Web transport is mounted. */
+  private get carrier(): WebServer | undefined {
+    return this.ctx.get('webServer')
   }
 
   /** Streaming HTTP registry scoped to the Context reading this service. */
@@ -170,7 +186,8 @@ export class HostConnectionService extends Service implements HostConnectionHand
   authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
     // The fence precedes every admission: a deployment provider's admit must
     // never launder a foreign Host or cross-site Origin past the browser fence.
-    if (!isTrustedApiRequest(request, this.trustedHosts)) {
+    const carrier = this.carrier
+    if (!isTrustedApiRequest(request, this.trustedHosts, carrier?.host, carrier?.protocol ?? 'http:')) {
       response.writeHead(403)
       response.end('forbidden')
       return false
@@ -179,7 +196,9 @@ export class HostConnectionService extends Service implements HostConnectionHand
       headers: request.headers, method: request.method, url: request.url, kind: 'index',
     })
     return this.browserAuth.authorizeIndex(
-      request, response, decision === undefined ? undefined : decision === 'allow',
+      request, response,
+      decision === undefined ? undefined : decision === 'allow',
+      carrier?.protocol === 'https:',
     )
   }
 
@@ -202,7 +221,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
     const pathname = new URL(request.url ?? '/', 'http://dsh.internal').pathname
     const registration = this.matchHttpPrefix(pathname)
     if (registration === undefined) return false
-    if (registration.options.authority === 'loopback' && !isTrustedApiRequest(request, [])) {
+    if (registration.options.authority === 'loopback' && !isTrustedApiRequest(request, [], undefined, this.carrier?.protocol ?? 'http:')) {
       response.writeHead(403)
       response.end('forbidden')
       return true
@@ -238,16 +257,17 @@ export class HostConnectionService extends Service implements HostConnectionHand
     return {
       fetch: (request) => {
         const endpoint = endpointFromPath(channel, new URL(request.url).pathname)
+        const protocol = this.carrier?.protocol ?? 'http:'
         if (endpoint !== undefined
           && options?.loopbackEndpoints?.has(endpoint) === true
-          && !isTrustedApiRequest(request, [])) {
+          && !isTrustedApiRequest(request, [], undefined, protocol)) {
           return Promise.resolve(new Response('forbidden', { status: 403 }))
         }
         const interceptor = this.interceptors.get(channel)
         if (endpoint === undefined || interceptor === undefined || !interceptor.matches(endpoint)) {
           return fallback.fetch(request)
         }
-        if (interceptor.options.authority === 'loopback' && !isTrustedApiRequest(request, [])) {
+        if (interceptor.options.authority === 'loopback' && !isTrustedApiRequest(request, [], undefined, protocol)) {
           return Promise.resolve(new Response('forbidden', { status: 403 }))
         }
         return interceptor.fetchHandler.fetch(request)
@@ -280,13 +300,20 @@ export class HostConnectionService extends Service implements HostConnectionHand
     authority: ConnectionRpcAuthority,
     kind: 'http' | 'upgrade',
   ): ConnectionRequestRejection {
-    if (authority === 'loopback') return isTrustedApiRequest(request, []) ? undefined : 403
-    if (!isTrustedApiRequest(request, this.trustedHosts)) return 403
+    const carrier = this.carrier
+    const protocol = carrier?.protocol ?? 'http:'
+    if (authority === 'loopback') return isTrustedApiRequest(request, [], undefined, protocol) ? undefined : 403
+    if (!isTrustedApiRequest(request, this.trustedHosts, carrier?.host, protocol)) return 403
     const decision = this.providerDecision({
       headers: request.headers, method: request.method, url: request.url, kind,
     })
     if (decision !== undefined) return decision === 'allow' ? undefined : 401
-    return this.browserAuth.isAuthenticated(request) ? undefined : 401
+    // The direct-browser flow also admits the launch token as a non-cookie
+    // operator credential; an explicit invalid credential fails before the
+    // cookie fallback rather than being laundered through it.
+    const operator = this.browserAuth.operatorInteractions(request)
+    if (operator !== undefined) return operator === 'invalid' ? 401 : undefined
+    return this.browserAuth.isAuthenticated(request, carrier?.protocol === 'https:') ? undefined : 401
   }
 
   private registerHttpPrefix(
@@ -331,6 +358,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
           headers: req.headers,
           ...(req.method === undefined ? {} : { method: req.method }),
           pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+          ...(req.url === undefined ? {} : { url: req.url }),
         }, async () => {
           await bridge(req, res, fetchHandler)
         })

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-28-web-terminal-card.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-28-web-terminal-card.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-web-terminal-card.md
+document:
+  en: 48a2411bf2ad92d591aeaa2b35bbd2f63ffb0c39
+  zh: 707be2db30d7a6a651a89c04e66ab0ab4a970372
 /agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser:
   en: 689812ed16cd037d
   zh: 93338e1ced5717ab
@@ -9,8 +12,8 @@
   en: d0e5fd6c4c001538
   zh: 4ed3ac43f4a19dd8
 /agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/decision:
-  en: b95f22a610d89c1c
-  zh: df3005391f7153f8
+  en: c65fd2f89abeb07e
+  zh: aa28b908484ccedc
 /agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/decision/inline-output-in-the-chat-row-reverses-a-stated-convention:
   en: 8665929f8070e340
   zh: 61c735e03ca149fb
@@ -21,8 +24,8 @@
   en: d7035604806a47f3
   zh: 4706b96b4bec13de
 /agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/testing:
-  en: 57308713f75b1594
-  zh: 7509fdd6ad875dd3
+  en: f5a1a5c72d063c9c
+  zh: 679042eb9154f33c
 /agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/related:
   en: d30940628f4fbd0c
   zh: 1fd5b61a28f32edc

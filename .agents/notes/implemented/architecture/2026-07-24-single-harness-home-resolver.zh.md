@@ -21,7 +21,7 @@ Status: implemented
 explicit configured path  >  $DSH_HOME  >  ~/.dsh
 ```
 
-空或仅含空白的 `$DSH_HOME` 被当作未设置处理；否则，`resolve('')` 会悄悄把 home 落在当前工作目录。harness 把所有用户数据都放在同一个根目录下；不存在 XDG 的 config/data/cache 拆分。`dshHomePath(...segments)` 将部署负责的子路径拼接到该根目录下，`dsh-app-boot` 在挂载条目前向 Loader `!!js` 配置表达式暴露它，因此出厂组合无需复制解析器即可派生 `sessions` 和 `storages`。`dshHomeDisplay()` 为面向用户的路径以符号形式命名已解析的根目录——默认 home 显示为 `~/.dsh`，任何已配置的 home 显示为 `$DSH_HOME`——这样用户全局的 `AGENTS.md` 标签就绝不会泄露机器上的绝对路径。它取代了 agent-instructions 中自定义的「默认值 vs `$DSH_HOME`」判断。
+空或仅含空白的 `$DSH_HOME` 被当作未设置处理；否则，`resolve('')` 会悄悄把 home 落在当前工作目录。harness 把所有用户数据都放在同一个根目录下；不存在 XDG 的 config/data/cache 拆分。`dshHomePath(...segments)` 将部署负责的子路径拼接到该根目录下，`dsh-app-boot` 在挂载条目前向 Loader `!!js` 配置表达式暴露它，因此出厂组合无需复制解析器即可派生 `sessions` 和 `storages`。`dshHomeDisplay()` 为面向用户的路径以符号形式命名已解析的根目录——默认 home 显示为 `~/.dsh`，任何已配置的 home 显示为 `$DSH_HOME`——这样用户全局的 `AGENTS.md` 标签就绝不会泄露机器上的绝对路径。它取代了 agent-instructions 中自定义的「默认值 vs `$DSH_HOME`」判断。home 属于进程策略而非配置行：`dsh-agent-instructions` 不接受 home 覆盖，因此组合无法把指令加载指向会话、skill 与存储不会读取的根目录。`resolveAgentsHome()` 与 `agentsHomeDisplay()` 对共享 agent 配置根目录（`$DSH_AGENTS_HOME` 或 `~/.agents`）采用相同的优先级、波浪号展开与符号化标签；该根目录位于 harness home 之外，因为其他 agent 工具会共享它（[共享 agents 根目录](2026-10-05-shared-agents-root-instructions.zh.md)）；`dsh-skill-filesystem` 仍接受自己的 `dshHome` 与 `agentsHome` 字段，用于选择它自己的 skill 根目录，并在指令加载改动中改用共享解析器。
 
 `@deepseek-ai/dsh-home` 被删除。它的三个引用方（`dsh-tool-bash`、`dsh-skill-filesystem`、`dsh-agent-spine-demo`）从 `dsh-home-paths` 导入 `resolveDshHome`。
 

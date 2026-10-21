@@ -56,7 +56,7 @@ Invalid metadata, an unparseable body, an unavailable provider route or a per-ru
 
 ### File policy and cancellation
 
-The engine captures the calling Session's current working directory and standing file policy separately. The PTC process retains the captured directory when the parent later moves. The VM retains the documented helper API, but it is not a security boundary: code that reaches Node remains subject to the selected OS file policy. The program-visible environment is empty. Network access is not restricted by the file policy.
+The engine captures the calling Session's current working directory and standing file policy separately. The PTC process retains the captured directory when the parent later moves. A runtime without confinement is accepted only for `danger-full-access`; `read-only` and `workspace-write` fail before execution. Node in-memory mode executes an async wrapper in a temporary environment, so workflow-local variables never join the Agent's retained REPL. The VM retains the documented helper API, but it is not a security boundary: code that reaches Node follows the selected runtime's file policy. The program-visible environment is empty. Network access is not restricted by the file policy.
 
 The workflow requests `timeoutMs: null` from PTC. Its initial VM slice still has `syncTimeoutMs`, and a caller's abort signal still applies, including an enclosing tool deadline. Cancellation immediately aborts the PTC process and pending or active subagents. The caller must dispose every run and await child cleanup; there is no separate workflow cleanup timer.
 
@@ -85,7 +85,6 @@ One self-contained guest program runs the existing VM and workflow helpers insid
 | [`src/runtime.ts`](src/runtime.ts) | VM evaluation, helper contracts and combinators |
 | [`src/realm.ts`](src/realm.ts) | Lossless-JSON materialization across VM realms |
 | [`src/meta.ts`](src/meta.ts) | Metadata validation and normalization |
-| — | No runtime invariant companion is published; the workflow service owns event pairing and PTC owns managed-process observations. |
 
 ### Values and child ownership
 

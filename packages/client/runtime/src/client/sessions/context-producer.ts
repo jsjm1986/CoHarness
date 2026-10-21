@@ -72,6 +72,17 @@ export function sessionRecallLabels(source: unknown): string[] {
 }
 
 /**
+ * Read the skill name a durable skill-invocation injection loaded.
+ * @param source - the logged `user/message` source, exactly as recorded.
+ * @returns the skill name, or null for every other source.
+ */
+export function skillInvocationName(source: unknown): string | null {
+  const record = asRecord(source)
+  if (record === null || readString(record, 'kind') !== 'skill-invocation') return null
+  return readString(record, 'name')
+}
+
+/**
  * Project one durable message source onto its transcript role and producer name.
  *
  * The source arrives over the wire as opaque JSON (`MessageSource` is

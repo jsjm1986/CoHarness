@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for tool-execution-pipeline.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for tool-execution-pipeline.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/tool-execution-pipeline.md
+document:
+  en: c7affa4624be06e4d98412faf5c815e9286dac0c
+  zh: fb24e763f6169f5f22264cf78ba742ef751dc6b5
 /:
   en: 41d772192075e133
   zh: 0eb190f00f396176

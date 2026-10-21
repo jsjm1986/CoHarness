@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-21-follow-instruction-symlinks.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-21-follow-instruction-symlinks.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-follow-instruction-symlinks.md
+document:
+  en: 9f6427ecb5a8a9540a0da1957d32418e936c4b0e
+  zh: f439f53896d2100ac14b73786ffd70b7f9fa9b2c
 /agent-note-follow-symlinked-instruction-files:
   en: aa37067267aa70ff
   zh: 75aff9256b49199f

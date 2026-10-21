@@ -38,7 +38,6 @@ A resource address is `dsh-resource://<type>/…`, and the type — the URI host
 - **Resolution is lexical** — it recognizes POSIX absolute paths, Windows drive paths, and UNC paths, preserves the Workspace path's separator when joining a relative path, and does not access a filesystem or canonicalize `.` and `..` segments.
 - **Home abbreviation is POSIX-only** — Windows paths remain unchanged because a portable browser cannot infer Windows home-path equivalence safely.
 
-
 <a id="dev-note"></a>
 ### Dev Note
 
@@ -48,5 +47,3 @@ A resource address is `dsh-resource://<type>/…`, and the type — the URI host
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. This utility owns no mutable runtime relationship.

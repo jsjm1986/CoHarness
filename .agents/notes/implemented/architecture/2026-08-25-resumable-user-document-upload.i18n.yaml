@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-25-resumable-user-document-upload.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-25-resumable-user-document-upload.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-25-resumable-user-document-upload.md
+document:
+  en: ea0e1d233e62bc83fcad3cc47125fb93553f7421
+  zh: 0ea648f2f3bb729843c15e1e61123487f27ba8ae
 /agent-note-resumable-user-document-uploads:
   en: 18e5399991a0b074
   zh: 18e5399991a0b074

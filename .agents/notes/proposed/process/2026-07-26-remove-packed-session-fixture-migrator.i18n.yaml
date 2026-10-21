@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-remove-packed-session-fixture-migrator.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-remove-packed-session-fixture-migrator.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/process/2026-07-26-remove-packed-session-fixture-migrator.md
+document:
+  en: 0a29ef98828ac07d291392d637b0508937c9a9a6
+  zh: aa9aece710587cef6c84ad9cf078821a2506deb1
 /agent-note-remove-the-packed-session-fixture-branch-migrator:
   en: 0a308bd6231fb8ad
   zh: c72bd0f6f327fadd

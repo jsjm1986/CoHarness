@@ -38,7 +38,6 @@ kind: "package-reference"
 - `replace(ns, section)` — 整体替换用户分节：这是刻意的重置（`replace({})` 重新继承 `base` 与 schema 默认值）。
 - `mutate(ns, ops)` — 在写入排到队首那一刻的分节上，按序施加 `{ op: 'set' | 'unset', path }` 编辑。这是任何持有**不完整**视图的调用方的删除路径：配置 UI 读到的是脱敏后的 descriptor，据此重建分节再整体替换，会把 wire 从未回传的每个机密都删掉，而一条 op 只点名它真正要改的那个字段。
 - 每次写入都可携带可选的 `expectedRevision`。每个 descriptor 都带有该 namespace 的 `revision`——一个针对其**原始**分节的单调计数器；期望值不再匹配的写入会以 `SettingsConflictError`（`code: 'SETTINGS_CONFLICT'`，并附上两个 revision）被拒绝，而不是覆盖先完成写入的写入方。写队列只保证写入的先后次序，它本身分辨不出持有新鲜快照的写入方与持有陈旧快照的写入方。
-- 解析值是深冻结快照。每次提交后观察者收到 `(next, prev)`：同一回调的调用异步、逐次、按提交顺序执行（慢的旧调用绝不会晚于较新的调用生效），异常——同步抛出与异步拒绝——均被隔离。watch 的 disposer 返回后不再启动新的调用（已排队的那一次会被跳过）；已启动的调用仍会结算。`settings/updated` 事件逐监听器扇出，一个抛错的 listener 不会饿死其余 listener；异步 listener 的拒绝会被隔离并记入日志，这正是 `INVARIANT` 编码的失败只从同步 listener 重新抛出的原因。
 - 服务卸载先拒绝新写入与观察者调用的启动，再排干全部排队写入与已启动的观察者调用后才完成；已交给持久化的写入在 registrant 卸载后仍到达存储，但不会提交或通知；仍在等待授权的写入则在存储前拒绝。
 
 <a id="provider-contract"></a>
@@ -54,7 +53,6 @@ kind: "package-reference"
 `settings/document-updated (ns, revision)` 在**原始**用户分节发生变化时触发，无论解析值是否随之改变。配置界面需要的是这一个：存入一个与组合 `base` 相同的覆盖值不会改变解析值，却改变了文档的说法（该字段从继承变成了覆盖），也推进了每个已打开编辑器所持有的 revision。监听器的异常隔离方式与 `settings/updated` 相同。
 
 两条声明都住在 client-safe 的 `./types` 子路径出口，与其签名点名的 `SettingsNamespace`、`SettingsUpdateSource` 类型同处一处；包根继续 re-export 这些类型。于是 Host 编译面之外的消费方读到的正是 Host 发射的那一份签名，而不必再写一遍。
-
 
 <a id="model-experience"></a>
 ## 模型体验

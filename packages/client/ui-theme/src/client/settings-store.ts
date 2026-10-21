@@ -1,11 +1,11 @@
 /**
- * Appearance row slot store: a mirror of the theme service snapshot. The
- * plugin's apply-world change listener is the only writer; the row component
- * reads via props.useStore.
+ * Appearance and font row slot stores: mirrors of the theme service
+ * snapshot. The plugin's apply-world change listener is the only writer; the
+ * row components read via props.useStore.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ThemePreference } from '../theme-settings.ts'
+import { DEFAULT_FONT_SIZES, type FontFamilies, type FontSizes, type ThemePreference } from '../theme-settings.ts'
 
 /** Standalone store default used before the settings transport is attached. */
 const LOCAL_SETTINGS: SettingsControlState = {
@@ -62,6 +62,39 @@ export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState
         d.settings = settings
         if (projectOverride === undefined) delete d.projectOverride
         else d.projectOverride = projectOverride
+      },
+    },
+  })
+}
+
+/** Store state mirrored from the theme snapshot's fonts (shared by the font-size row and the font settings group). */
+export interface FontRowState {
+  /** Persisted font sizes in px by role. */
+  fontSizes: FontSizes
+  /** Persisted normalized font lists by role. */
+  fontFamilies: FontFamilies
+  /** Service revision; -1 until first sync so revision 0 lands as a change. */
+  revision: number
+}
+
+/** Declared action shape giving the exported factory a stable return type. */
+type FontRowActions = {
+  sync: (draft: FontRowState, fontSizes: FontSizes, fontFamilies: FontFamilies, revision: number) => void
+}
+
+/**
+ * Declares the font rows' state and write surface.
+ * @returns the store handle.
+ */
+export function createFontRowStore(): EngineStoreHandle<FontRowState, FontRowActions> {
+  return defineStore({
+    init: (): FontRowState => ({ fontSizes: DEFAULT_FONT_SIZES, fontFamilies: { text: '', code: '', terminal: '' }, revision: -1 }),
+    actions: {
+      sync: (d, fontSizes: FontSizes, fontFamilies: FontFamilies, revision: number) => {
+        if (revision <= d.revision) return
+        d.fontSizes = fontSizes
+        d.fontFamilies = fontFamilies
+        d.revision = revision
       },
     },
   })

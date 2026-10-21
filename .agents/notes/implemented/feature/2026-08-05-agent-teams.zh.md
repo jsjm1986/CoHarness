@@ -64,6 +64,8 @@ Worktree isolation 不是 harness runtime 行为。deployment 或 prompt 可以�
 
 Package test 以逐文件 100% coverage 覆盖身份、名字与权限检查、provider 选择、预留 id 持久化冲突、child-before-Lead flush 顺序、持久 provisioning 失败与 pending-inbox JSONL／SQLite 对账、target-local 并发顺序、pending／history 去重、mailbox 限额、flush 后 notification、取消在途创建与 dispatch 的有界 dispose、failed member cleanup、task CAS 与 DAG 校验、write-scope warning、wait cancel／timeout、保留 inbox 的 interrupt、普通 fork 隔离、旧 control shadowing、声明 schema 的紧凑结果渲染与 scoped registration HMR。一条 keyless headless Loader 快照会组合真实 Team 插件，并记录 teammate 创建、peer mail、依赖任务、等待与 Lead 汇总。
 
+模型可见的成员身份与可用状态遵循[工具投影决策](../simplification/2026-09-15-model-agent-availability-and-team-targets.zh.md)；服务驻留状态和持久身份仍保持区分。
+
 ## Consequences
 
 Lead Session 会随着完整 task／member 快照与 mailbox acknowledgement 增长。该设计用可独立检查的恢复能力换取更紧凑的 delta；配置的 task 与 pending-mail 限额限制 active state，而 deleted 与 delivered 历史会保持 append-only，直到更广泛的 Session retention 生效。

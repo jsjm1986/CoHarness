@@ -21,18 +21,11 @@ kind: "package-library"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。围绕生产 slot 注册表的纯测试类型替身组装；它不拥有产品运行时状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -547,8 +547,23 @@ describe('plugin registration', () => {
       expect(face.hooks.presentedApps.getSnapshot()[key]?.applications).toHaveLength(2)
       await face.openPresented(sessionId, 1, 0, 'open', 'report.txt', 'com.editor.zed')
       expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'open', application: 'com.editor.zed' }, expect.any(AbortSignal))
-      await tab.openChanged(sessionId, 1, 0, '/work/report.txt')
-      await face.openChanged(sessionId, 1, 0, '/work/report.txt')
+      // The review face shares the delivered-file chooser: same association
+      // store, the same host.fileApplications read, and the same openPath RPC
+      // for default-open, registered-application, and reveal gestures.
+      expect(tab.hooks.presentedApps).toBe(face.hooks.presentedApps)
+      const changedKey = '/api/changes.open?sessionId=local-review&seq=1&index=0'
+      tab.loadPresentedApps(changedKey, 'report.txt')
+      await vi.waitFor(() => { expect(tab.hooks.presentedApps.getSnapshot()[changedKey]).toMatchObject({ loading: false, failed: false }) })
+      expect(fileApplications).toHaveBeenLastCalledWith({ path: '/work/report.txt' }, expect.any(AbortSignal))
+      expect(tab.hooks.presentedApps.getSnapshot()[changedKey]?.applications).toHaveLength(2)
+      await tab.openChanged(sessionId, 1, 0, 'open', 'report.txt')
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'open' }, expect.any(AbortSignal))
+      await tab.openChanged(sessionId, 1, 0, 'reveal', 'report.txt')
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'reveal' }, expect.any(AbortSignal))
+      await tab.openChanged(sessionId, 1, 0, 'open', 'report.txt', 'com.editor.zed')
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'open', application: 'com.editor.zed' }, expect.any(AbortSignal))
+      await tab.openChanged(sessionId, 1, 0, 'open', '/work/report.txt')
+      await face.openChanged(sessionId, 1, 0, 'open', '/work/report.txt')
       openPath.mockResolvedValueOnce({ result: { ok: false, error: { code: 'forbidden' } } })
       await face.openPresented(sessionId, 1, 0, 'open', 'report.txt')
       expect(face.hooks.presentedOpen.getSnapshot()['/api/present.open?sessionId=local-review&seq=1&index=0']).toBe('error')
@@ -560,7 +575,11 @@ describe('plugin registration', () => {
       hostDescription.set({ executionAuthorityRequired: true, canOpenPath: true })
       const calls = openPath.mock.calls.length
       await face.openPresented(sessionId, 1, 0, 'open', 'report.txt')
+      await tab.openChanged(sessionId, 1, 0, 'reveal', 'report.txt')
       expect(openPath).toHaveBeenCalledTimes(calls)
+      const appReads = fileApplications.mock.calls.length
+      tab.loadPresentedApps(changedKey, 'report.txt')
+      expect(fileApplications).toHaveBeenCalledTimes(appReads)
       await fiber.dispose()
       expect(face.hooks.changesSummary.getSnapshot()).toEqual({})
       expect(tab.hooks.changesDiff.getSnapshot()).toEqual({})

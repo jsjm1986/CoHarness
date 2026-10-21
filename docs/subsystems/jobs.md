@@ -6,7 +6,7 @@ Types shared by long-running producers, `ctx.jobs`, and job controls. The [seam 
 
 ## Ids and status
 
-`JobId` is a [branded id](core.md#branded-ids) generated as `<kind>-N`. Access control relies on owner authorization, not id secrecy. `JobKind` derives from a merge-extensible map; the registry treats kinds as opaque id namespaces.
+`JobId` is a [branded id](core.md#branded-ids) generated as `<kind>-<short-uuid>`: 16 lowercase UUID hex characters follow the kind. Access control relies on owner authorization, not id secrecy. `JobKind` derives from a merge-extensible map; the registry treats kinds as opaque id namespaces.
 
 ```ts type-equiv
 /**
@@ -77,7 +77,7 @@ interface JobSpec {
  * throwing, so a producer's trailing flush cannot break its own teardown path.
  */
 interface JobHandle {
-  /** The registry-issued id (`<kind>-N`). */
+  /** The registry-issued id (`<kind>-<short-uuid>`). */
   readonly id: JobId
   /**
    * Append one chunk to the output ring. Offsets advance by the chunk's UTF-8
@@ -220,7 +220,7 @@ interface JobOutputRead {
  * stream all consume this one shape.
  */
 interface JobView {
-  /** The registry-issued id (`<kind>-N`). */
+  /** The registry-issued id (`<kind>-<short-uuid>`). */
   readonly id: JobId
   /**
    * The producer kind the job was registered with: a Host-registered
@@ -363,7 +363,7 @@ Implementations must honor these semantics:
  * rejection leaves no job id or execution resource. A throwing starter
  * leaves nothing registered; after it returns, registration cannot fail.
  * @param spec - job identity, owner, output sources, and synchronous starter.
- * @returns the registry-issued `<kind>-N` id.
+ * @returns the registry-issued `<kind>-<short-uuid>` id.
  */
 abstract start(spec: JobSpec): JobId
 

@@ -18,7 +18,6 @@ kind: "package-reference"
 ## 目录
 
 - [写入权限](#write-authority)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -31,11 +30,6 @@ kind: "package-reference"
 项目空间的镜像会暴露当前有效值以及每个 namespace 的所有权元数据。标记为 `projectWrite: manager` 的 namespace 可由项目 owner 或组织管理员写入；其他项目 namespace 会以 `writable: false` 和对应所有者的 `writableReason` 标记只读，设置提供方只读时使用 `provider`。语言、主题、忙碌 Enter、对话宽度和字号等账户级 scope 即使处于项目空间，也会使用账户偏好 transport；只有账户路由明确不支持时才回退到 Host。scope 在首次视图仍处于 loading 或当前权限只读时拒绝 mutation，因此这些状态不会产生任何 mutation RPC。每次接受的写入会发布 `saving`，成功应答折入共享镜像；最新写入被拒绝或失败后先恢复再记录 `error`。功能行渲染这些状态，不会持久化被阻止的选择。
 
 账户读取共用当前请求。强制刷新或接受相同或更高 revision 的 mutation 应答都会使当前请求失效；接受应答后，`ensure()` 从 ready 视图完成，而不等待已失效的 GET。mutation 应答与当前 GET 都不能降低已持有的 revision。释放镜像会阻止传输准入与发布；每次释放调用都会等待所有仍保留的 GET 实际结束，包括已中止或被取代但忽略取消的请求。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。schema 服务对 Host 拥有的文档执行水合与校验，scope 传输层转发各 namespace 分节；该层不拥有偏好值。
 
 <a id="model-experience"></a>
 ## 模型体验

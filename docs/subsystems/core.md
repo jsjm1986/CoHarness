@@ -506,18 +506,21 @@ Types: [SessionHeader](persistence.md)
 
 Source: [`packages/core/agent-loop/src/index.ts`](../../packages/core/agent-loop/src/index.ts)
 
-<a id="ctxagentpresets--agentpresets"></a>
+<a id="ctxagentpresets--agentpresetregistry"></a>
 
-### `ctx.agentPresets` — `AgentPresets`
+### `ctx.agentPresets` — `AgentPresetRegistry`
 
 Registry over the deployment's agent presets.
 
-Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every call so a preset authored while the process runs is visible immediately, and a preset deleted underneath a picker disappears from the next read.
+File discovery is unmemoized: `list()` and `resolve()` re-read the roots on every call so a preset authored while the process runs is visible immediately, and a preset deleted underneath a picker disappears from the next read. A second source joins the same roster: plugins declaring a `PresetDefinition` through AgentPresetRegistry.register, whose rows mount under registry-owned generations the way upstream's declarative model composes them.
 
 ```ts cordis-catalog
 /**
- * Every preset the configured roots currently supply.
- * @returns the presets, first-root-wins per id.
+ * Every preset the roster currently supplies.
+ *
+ * Declared presets are deliberate composition and read as the first root: a
+ * file preset id one declares is shadowed, not duplicated.
+ * @returns the presets, declared first then first-root-wins per id.
  */
 async list(): Promise<AgentPreset[]>
 
@@ -644,8 +647,10 @@ composedPreset(agentCtx: Context): string | undefined
  *
  * Recomposing is limited to a session with no visible conversation content
  * because its history is produced under its preset's tools; the agent and
- * the session survive, only the composition is swapped. Switches on one
- * session queue so a stale blankness read cannot interleave two swaps.
+ * the session survive, only the composition is swapped. A Session whose log
+ * records the preset and whose Agent runs its current generation keeps its
+ * composition; nothing is logged or announced. Switches on one session queue
+ * so a stale blankness read cannot interleave two swaps.
  * @param agent - exact live agent whose composition is swapped.
  * @param agentPreset - the preset to compose instead.
  * @returns the preset id that was recorded.
@@ -704,6 +709,14 @@ async remove(id: string): Promise<void>
 serviceFor<K extends string & keyof Context>(agent: { ctx: Context }, name: K): Context[K] | undefined
 
 /**
+ * Inspect the composition trees this roster mounted, or the one an agent
+ * runs on.
+ * @param ctx - an agent's scope context, or undefined for every live mount.
+ * @returns preset ids with the plugins their trees activated.
+ */
+async inspectCompositions(ctx?: Context): Promise<AgentPresetInspection[]>
+
+/**
  * Re-link one agent to a different preset's standing composition.
  *
  * Only valid while the agent has produced nothing: swapping tools mid
@@ -740,6 +753,17 @@ async recompose(agentCtx: Context, id: string): Promise<AgentPreset>
 async standingKeyFor(id?: string): Promise<ScopeKey>
 
 /**
+ * Acquire the standing scope one preset composes under.
+ *
+ * The returned lease is a read boundary, not a mount: release it when the
+ * cold read ends so a retired generation can collect.
+ * @param id - the preset id, or `undefined` for {@link defaultId}.
+ * @returns the scope key and its release.
+ * @throws when the preset is unknown or its composition is unusable.
+ */
+async acquireScope(id?: string): Promise<{ key: ScopeKey; dispose: () => Promise<void> }>
+
+/**
  * Install the environment hook one realm key resolves to.
  *
  * The hook runs inside each NEW standing generation created under `realm`,
@@ -765,11 +789,19 @@ registerRealm(realm: string, mount: StandingRealmHook): () => void
  * @param realm - the realm key to retire.
  */
 invalidateRealm(realm: string): void
+
+/**
+ * Register and eagerly activate one declared preset.
+ * @param definition - parsed configuration supplied by the declaring plugin.
+ * @returns definition disposer after activation or its diagnostic settles;
+ * the declaring plugin owns it.
+ */
+async register(definition: PresetDefinition): Promise<() => Promise<void>>
 ```
 
 Types: [ScopeKey](scope.md)
 
-Source: [`packages/preset/agent-presets/src/index.ts`](../../packages/preset/agent-presets/src/index.ts)
+Source: [`packages/preset/agent-preset-registry/src/index.ts`](../../packages/preset/agent-preset-registry/src/index.ts)
 
 <a id="ctxagents--agentregistry"></a>
 
@@ -1368,7 +1400,7 @@ A live Agent was re-linked to a different standing preset composition. Consumers
 'agent-preset/recomposed'(): void
 ```
 
-Source: [`packages/preset/agent-presets/src/types.ts`](../../packages/preset/agent-presets/src/types.ts)
+Source: [`packages/preset/agent-preset-registry/src/types.ts`](../../packages/preset/agent-preset-registry/src/types.ts)
 
 <a id="agent-presetselected--emit"></a>
 
@@ -1387,5 +1419,5 @@ One session committed a different agent preset to its durable log. Consumers inv
 'agent-preset/selected'(sessionId: SessionId, agentPreset: string): void
 ```
 
-Source: [`packages/preset/agent-presets/src/types.ts`](../../packages/preset/agent-presets/src/types.ts)
+Source: [`packages/preset/agent-preset-registry/src/types.ts`](../../packages/preset/agent-preset-registry/src/types.ts)
 <!-- END GENERATED cordis-surface -->

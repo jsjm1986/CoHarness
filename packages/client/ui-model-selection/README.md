@@ -29,17 +29,11 @@ The Web GUI lets users switch the model and reasoning effort for an existing ses
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Both surfaces share one host-backed `ModelDirectory` per session; selection and effort state remain owned by that resolver and the session.
 
 <a id="model-experience"></a>
 ## Model Experience

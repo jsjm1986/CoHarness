@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-18-atomic-macos-gateway-releases.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-18-atomic-macos-gateway-releases.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-18-atomic-macos-gateway-releases.md
+document:
+  en: 9e93c0aa6e8cc2be62872909c75c8afdb746af01
+  zh: 5bd021bdc9a2963f053c9c1f09b78acd80d8a86c
 /agent-note-atomic-macos-gateway-release-lifecycle:
   en: d25cec3a8cbaff56
   zh: 00d384b2f405e2f6

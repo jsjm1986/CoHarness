@@ -37,4 +37,4 @@ Status: implemented
 ## 相关
 
 - [引导式插件安装](../architecture/2026-09-15-guided-plugin-installation.zh.md) —— CLI 命令共享的注册表计划与回滚机制。
-- [插件命令注册](2026-07-19-plugin-command-registration.zh.md) —— 这些命令扩展的 `dsh plugin` 分发。
+- [插件命令注册](../../archived/feature/2026-07-19-plugin-command-registration.md) —— 这些命令扩展的 `dsh plugin` 分发。

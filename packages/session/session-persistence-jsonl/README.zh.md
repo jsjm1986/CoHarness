@@ -22,7 +22,6 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - [物理编码](#physical-encoding)
 - [持久性与崩溃语义](#durability-and-crash-semantics)
 - [写入路径](#write-path)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -53,6 +52,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 |---|---|---|
 | `root` | `string`（必需） | 所有会话文件的根目录。**无默认值**：`process.cwd()` 默认值会随进程 cwd 变更（bash 调用、子进程）而分散文件。现有根必须是可读目录；缺失根在第一次实体化时创建。 |
 | `compression` | `'zstd' \| 'none'` | 默认 `'zstd'`；`'none'` 保留换行分隔 UTF-8 文本。 |
+| `listConcurrency` | `number`（正整数） | 枚举会话时文件系统读取的最大并发数；默认 `3`。 |
 
 `locate(meta)` 返回已解析项目/会话目录内固定 transcript 的 `{ kind: 'jsonl', path }`。它不执行文件系统 I/O：可以在目录或文件存在前返回目标，现有文件也只包含最近一次 flush 完成的前缀。
 
@@ -81,12 +81,11 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 
 明文正文按有界字节窗口扫描，保留解码后的事件，不构建完整原始文件缓冲区。读取之间检查取消，revision 变化时重试。后继 generation 写完临时文件后重新校验源 revision；源发生变化或消失时拒绝发布。后继 generation 按有界批次编码，在事件和写入之间检查取消。压缩读取和逻辑 preparation 仍保留完整输入或事件数组。
 
-<a id="invariants"></a>
-## 不变量
 
-不发布运行时不变式伴生插件：存储协调器保证代次不可变和追加顺序，持久化测试直接核对文件；此提供方不保留独立的领域索引。
+移除提供者触发卸载时，插件会等待注入它的消费者完成清理，再移除实时事件路由并关闭句柄。消费者必须在自身的注入作用域内注册清理；并发销毁根作用域不保证依赖清理顺序。
 
 <a id="model-experience"></a>
+
 ## 模型体验
 
 ### 恢复的对话历史

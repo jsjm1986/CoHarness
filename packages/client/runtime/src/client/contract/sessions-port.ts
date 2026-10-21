@@ -15,13 +15,15 @@ import type { ObservableSnapshot } from './store.ts'
 /** Session-list row facts sibling domains read: recency, blank-reuse eligibility, and its cwd canon. */
 export interface SessionsPortSummary {
   id: SessionId
-  /** No-visible-content bit (blank sessions are reused by New Session instead of minting another). */
+  /** No-visible-content bit (blank sessions are reused by Workspace reconnect instead of minting another). */
   blank: boolean
   /** Highest visible-content event sequence known to the Host or live stream. */
   visibleContentSeq?: number
   /** Durable subagent origin; Workspace entry never selects these as the default conversation. */
   origin?: 'subagent'
   cwd?: string
+  /** Preset the Session's log records; a cached hint for cold rows, absent with no roster. */
+  agentPreset?: string
   /** Client-local Workspace association retained while a Session is blank. */
   workspaceId?: WorkspaceId
   updatedAt: number
@@ -62,6 +64,15 @@ export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'run
     opts: SessionCreateOptions & { workspaceId: WorkspaceId },
     reusableSessionIds: readonly SessionId[],
   ): Promise<SessionId>
+  /**
+   * Create or adopt a Session the request names directly — the reuse-candidate
+   * path when `reuseWorkspaceBlank` is set, an explicit adoption otherwise. A
+   * named create skips the blank-confirmation waterfall: the caller names the
+   * exact Session rather than offering candidates.
+   * @param opts - caller-selected create options.
+   * @returns the created, reused, or adopted session id.
+   */
+  create(opts?: SessionCreateOptions): Promise<SessionId>
   /**
    * Select a session as current.
    * @param id - session id (must exist in the list store).

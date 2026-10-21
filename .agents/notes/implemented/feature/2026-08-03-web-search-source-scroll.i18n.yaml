@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-03-web-search-source-scroll.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-03-web-search-source-scroll.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-03-web-search-source-scroll.md
+document:
+  en: 6fe532e2a2989e834b926cf48d531ae60a32f58b
+  zh: 12bc6d3decb3c13ea759a9f25322b94e45db1322
 /agent-note-web-search-source-card-scrolls-instead-of-collapsing:
   en: 93c152369a439c76
   zh: 384f57a1f101d64d

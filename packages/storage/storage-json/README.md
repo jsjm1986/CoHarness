@@ -17,7 +17,6 @@ JSON backend for the [storage hub](../storage/README.md): human-readable JSON un
 
 - [Model](#model)
 - [Config](#config)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -39,11 +38,6 @@ JSON backend for the [storage hub](../storage/README.md): human-readable JSON un
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `root` | string | required — no default (a cwd fallback would scatter files) | Directory holding unit files; created `0o700` on demand |
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The backend maps each domain spec onto files under one root; layout and versioning are asserted by backend specs and no second store exists.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -13,14 +13,13 @@ kind: "package-group"
 |---|---|---|
 | [`skill/`](skill/README.zh.md) | 定义 skill 提供方注册和查找 | `ctx.skills` |
 | [`skill-badge/`](skill-badge/README.zh.md) | 贡献可选的内置 dsh 徽章 skill | 注册到 `ctx.skills` |
-| [`skill-office/`](skill-office/README.zh.md) | 提供 Word、PowerPoint 和 Excel 工作流及结构检查 | 注册到 `ctx.skills` |
+| [`skill-office/`](skill-office/README.zh.md) | 提供 Word、PowerPoint 和 Excel 工作流及 LibreOffice Kit 操作 | 注册到 `ctx.skills` |
 | [`skill-filesystem/`](skill-filesystem/README.zh.md) | 从本地文件系统发现 skill | 注册到 `ctx.skills` |
 | [`tool-skill/`](tool-skill/README.zh.md) | 发布 skill 目录和面向模型的 loader | 注册到 `ctx.tools` |
 
 该能力位于核心控制主干之外，可以使用本地、嵌入式或远程提供方，而无需更改面向模型的约定。
 
 子系统参考——发现优先级、目录快照、`skill` 加载器——见 [docs/subsystems/skills.md](../../docs/subsystems/skills.zh.md)。
-
 
 ## 概述
 

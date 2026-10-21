@@ -522,7 +522,7 @@ Browser 与 Host 各自持有 Zod 实例，不能依赖对象 identity 跨 realm
 
 Connection 的通用 channel API 必须同时适合当前 HTTP carrier 和后续 WebSocket carrier。若 Client Remote 或 Gateway 暴露 `fetch`、HTTP request 或 route handle，WebSocket 迁移会再次穿透 Remote 层，因此这些物理对象必须留在 Connection 内部。
 
-Remote endpoint 使用 Connection 的 `trusted-host` authority。系统默认接受 loopback；LAN 调用方必须通过显式 trusted-host 配置接入，但本层不增加逐方法调用方授权，因此每个 trusted host 都能调用已挂载的 Remote endpoint。
+Remote endpoint 使用 Connection 的 `trusted-host` authority。系统默认接受 loopback 与监听器自身的 bind 地址；其他任何 LAN 权威都需要显式 trusted-host 配置。本层不增加逐方法调用方授权，因此每个被接受的权威都能调用已挂载的 Remote endpoint。
 
 `hasSeen()` 优先保障 strict definition 的安全性，而非 SRC 可用性。strict descriptor 撤回时（例如 HMR 期间），Gateway 会继续认领 endpoint 并报告不可用，而不会回退到弱 SRC descriptor。重新注册即可恢复；只有重启 Typert 注册表才会忘记历史 strict definition。
 

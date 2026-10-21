@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-08-lightweight-routine-documentation-translation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-08-lightweight-routine-documentation-translation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-08-lightweight-routine-documentation-translation.md
+document:
+  en: ff4d6005588b562018bf1ee40d6dabb5569766f0
+  zh: 42645f010d81f43d29411b0cfa4b094f23003f6f
 /agent-note-lightweight-routine-documentation-translation:
   en: 58561d0069f0cb8d
   zh: 346fb7a699c96e26

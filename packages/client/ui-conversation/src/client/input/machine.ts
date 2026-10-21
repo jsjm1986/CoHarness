@@ -16,7 +16,7 @@
 import type { CommandClaim, ReferenceInsert, TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type {
-  ConsumeTokenGuard, EditRange, EditSelection, InputEffect, InputEvent, InputMachineOptions,
+  ConsumeTokenGuard, DraftSnapshot, EditRange, EditSelection, InputEffect, InputEvent, InputMachineOptions,
   InputState, Occurrence, PasteAttemptState, PasteComponent, SubmitAttempt,
 } from './contract.ts'
 
@@ -171,6 +171,7 @@ export class InputMachine {
   dispatch(ev: InputEvent): readonly InputEffect[] {
     switch (ev.type) {
       case 'draft-changed': return this.onDraftChanged(ev.draft, ev.editRange)
+      case 'draft-restored': return this.onDraftRestored(ev.snapshot)
       case 'begin-command': return this.onBeginCommand(ev.claim, ev.span)
       case 'insert-ref': return this.onInsertRef(ev.reference, ev.span)
       case 'consume-token': return this.onConsumeToken(ev.guard)
@@ -210,6 +211,38 @@ export class InputMachine {
     })
     if (this.log.length > LOG_LIMIT) this.log.shift()
     this.redoStack = []
+  }
+
+  /**
+   * Install a carried draft wholesale: stored reference spans re-mint at their
+   * offsets, and any span whose draft text no longer matches its display form
+   * degrades to ordinary text. The command token stays leading text — its
+   * claim's submit closure is source-owned and cannot move — so the trigger
+   * watcher re-claims it on the next track.
+   */
+  private onDraftRestored(snapshot: DraftSnapshot): InputEffect[] {
+    if (this.phase !== 'plain' && this.phase !== 'claimed') return []
+    this.pushTxn()
+    this.typingRun = undefined
+    this.paste = undefined
+    this.reconcile({ start: 0, end: this.draft.length, insertedLength: snapshot.text.length })
+    this.adopt(snapshot.text)
+    const minted: Occurrence[] = []
+    for (const reference of snapshot.references) {
+      const end = reference.offset + reference.length
+      if (reference.offset < 0 || end > this.draft.length) continue
+      if (this.draft.slice(reference.offset, end) !== referenceDraftText(reference)) continue
+      minted.push(this.mint({
+        source: reference.source,
+        ref: reference.ref,
+        label: reference.label,
+        ...(reference.appearance === undefined ? {} : { appearance: reference.appearance }),
+        clipboardText: reference.clipboardText,
+      }, reference.offset, reference.length))
+    }
+    this.withMinted(minted)
+    this.watchClaim()
+    return []
   }
 
   /**

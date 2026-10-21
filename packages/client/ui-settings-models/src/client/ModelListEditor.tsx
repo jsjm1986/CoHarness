@@ -22,7 +22,7 @@ import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
 import {
   acceptsImages, reasoningEffortsOf, reasoningModeOf, THINKING_LEVELS,
 } from './model-capabilities.ts'
-import type { ReasoningEfforts, ReasoningMode, ThinkingLevel } from './model-capabilities.ts'
+import type { ReasoningEfforts, ReasoningMode } from './model-capabilities.ts'
 import { messageOf } from './store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
@@ -103,6 +103,12 @@ export type ModelDiscoveryProbe = (settingsNs: string, request: ModelDiscoveryRe
 export interface ModelListEditorProps {
   /** The rows as currently drafted. */
   models: readonly ModelDraft[]
+  /**
+   * Reasoning levels a hand-declared route's rows may declare in
+   * `reasoningEfforts`, in escalation order; absent falls back to the
+   * adapter's canonical levels, while an empty list hides the level fieldset.
+   */
+  reasoningLevels?: readonly string[] | undefined
   /** Whether the user layer currently owns the whole array; absent on a create. */
   overridden?: boolean
   /** Replace the drafted rows. */
@@ -190,9 +196,9 @@ function modelReasoningMode(model: ModelDraft): ReasoningMode {
 }
 
 /** Read one canonical effort's wire spelling, or an empty field when absent. */
-function effortText(model: ModelDraft, level: ThinkingLevel): string {
+function effortText(model: ModelDraft, level: string): string {
   const value = reasoningEffortsOf(model['reasoningEfforts'])[level]
-  return value === null || value === undefined ? '' : value
+  return typeof value === 'string' ? value : ''
 }
 
 /** Copy one effort map before changing a row, without mutating the draft. */
@@ -293,7 +299,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   }
 
   /** Add/remove one canonical effort from a model's declaration. */
-  const toggleReasoningLevel = (index: number, level: ThinkingLevel, checked: boolean): void => {
+  const toggleReasoningLevel = (index: number, level: string, checked: boolean): void => {
     const next = copyEfforts(models[index] ?? {})
     if (checked) next[level] = level === 'off' ? null : level
     else Reflect.deleteProperty(next, level)
@@ -301,7 +307,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   }
 
   /** Replace one level's provider-specific wire spelling. */
-  const editReasoningWire = (index: number, level: ThinkingLevel, value: string): void => {
+  const editReasoningWire = (index: number, level: string, value: string): void => {
     const next = copyEfforts(models[index] ?? {})
     next[level] = level === 'off' && value.length === 0 ? null : value
     patch(index, { reasoningEfforts: next })
@@ -311,8 +317,9 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   const reasoningField = (model: ModelDraft, index: number): ReactNode => {
     const mode = modelReasoningMode(model)
     const efforts = reasoningEffortsOf(model['reasoningEfforts'])
-    const hasLevel = (level: ThinkingLevel): boolean => Object.prototype.hasOwnProperty.call(efforts, level)
-    const levelLabel = (level: ThinkingLevel): string => {
+    const levels = props.reasoningLevels ?? THINKING_LEVELS
+    const hasLevel = (level: string): boolean => Object.prototype.hasOwnProperty.call(efforts, level)
+    const levelLabel = (level: string): string => {
       switch (level) {
         case 'off': return t('reasoningOff')
         case 'minimal': return t('reasoningMinimal')
@@ -321,6 +328,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
         case 'high': return t('reasoningHigh')
         case 'xhigh': return t('reasoningXHigh')
         case 'max': return t('reasoningMax')
+        default: return level
       }
     }
     return (
@@ -339,12 +347,12 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
             <option value="custom">{t('reasoningCustom')}</option>
           </select>
         </label>
-        {mode !== 'custom'
+        {mode !== 'custom' || levels.length === 0
           ? null
           : (
             <fieldset className={styles['reasoningLevels']}>
               <legend>{t('reasoningLevels')}</legend>
-              {THINKING_LEVELS.map(level => (
+              {levels.map(level => (
                 <div className={styles['reasoningLevel']} key={level}>
                   <label className={styles['modelCheckboxField']}>
                     <input

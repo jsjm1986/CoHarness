@@ -16,7 +16,7 @@ fork 与 spawn 的差异在于：fork 会用 parent 已完成轮次的前缀作�
 
 base 与 headless 组合保留 one-shot fork 作为其保守生命周期策略。`ptc`、`cordis` 和 `standard` 三个 Web 应用 agent preset 可以把 fork 绑定为可继续生命周期，因为该绑定不再插入 child-only 请求头字段。`ForkInProcessProvider.prepareContinuable()` 与 `ctx.subagents.startContinuable()` 仍是这些 preset 使用的实现 seam。
 
-逐字节相同的前缀复用受显式部署选择约束。配置 child persona 或 `toolFilter` 的 fork 委派仍可能改变请求头。尤其是过滤掉 `send_message` 时，child 会同时失去该 schema 与返回指引；运行时不会绕过显式 allow-list。
+逐字节相同的前缀复用取决于组装输入。结构化输出或生成 SDK 差异可以改变请求头。历史子级 descriptor 也可在冷恢复时恢复 persona 或工具限制；过滤掉 `send_message` 会同时移除其 schema 和返回指引。新 fork 启动继承父级 preset，不含这些覆盖字段。
 
 ## 考虑过的替代方案
 
@@ -26,11 +26,11 @@ base 与 headless 组合保留 one-shot fork 作为其保守生命周期策略�
 
 **把返回指令放进系统提示词。** 这会在继承消息之前加入 child-only 字节。将其追加到初始用户任务，可以保留继承前缀，并让 parent id 紧邻需要它的任务。
 
-**忽略显式 child `toolFilter`。** 结构性返回工具过去会绕过 child allow-list。否决该方案，因为声明的工具限制必须同时决定 schema 可见性与指引；隐藏权限会让面向模型的工具清单失真。
+**恢复时忽略历史子级 `toolFilter`。** 存储的限制必须继续决定 schema 可见性和指引；静默丢弃它会改变恢复 agent 的行为。
 
 ## 后果
 
-- 未请求 persona 或工具过滤时，parent 与可继续 fork child 暴露逐字节相同且顺序一致的工具 schema。
+- 使用相同 preset 且没有子级专属结构化输出或恢复的历史覆盖时，父级与可继续的 fork 子级公开逐字节相同、顺序一致的工具 schema。
 - 继承的 Session 种子位于 child 初始任务及其返回指引之前。
 - base 与 headless profile 保持 one-shot fork；Web 应用 agent preset 会在没有 child-only 请求头增量的前提下使用可继续 fork。
 - child 显式向直接 parent 发送零条或多条消息；最终回答不会被隐式复制。管理器负责的结算通知仍然无条件执行，并且与 Agent 消息分离。
@@ -38,4 +38,4 @@ base 与 headless 组合保留 one-shot fork 作为其保守生命周期策略�
 
 ### 已接受风险
 
-提供方侧前缀复用仍取决于选定的提供方和模型，以及是否不存在显式 persona 或工具过滤差异。harness 证明的是自己组装出的请求头输入相等，而不是提供方的缓存行为。
+提供方侧前缀复用仍取决于所选提供方和模型，以及组装输入是否相同。harness 测试的是自身组装请求头输入相等，而非提供方的缓存行为。

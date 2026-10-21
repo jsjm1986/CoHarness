@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-31-released-session-format-migrations.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-31-released-session-format-migrations.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md
+document:
+  en: fdd79d9c26fd608171d0895fcff35ef62073119f
+  zh: 67f611e2efa612b8a6cace9dae688501a3ff3344
 /agent-note-released-session-formats-migrate-through-stateful-streaming-stages:
   en: 1a1d3bd9c2311ed6
   zh: 366eded1272efd63

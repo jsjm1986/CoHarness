@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-08-web-background-job-display.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-08-web-background-job-display.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-08-web-background-job-display.md
+document:
+  en: 8c3b0dff2785e95f151a2b8e34db76c1d04445a0
+  zh: 4283a8a00e9170f139daa5c58c4dc3b3b1a3f88e
 /agent-note-web-background-job-display:
   en: 0d0404b9cce14367
   zh: 2dbf18965256c53f

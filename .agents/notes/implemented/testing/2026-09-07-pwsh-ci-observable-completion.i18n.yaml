@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-07-pwsh-ci-observable-completion.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-07-pwsh-ci-observable-completion.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-07-pwsh-ci-observable-completion.md
+document:
+  en: 6d4fb2aa4e63c20f75d508ad3f0e96cca35922e7
+  zh: 1a81cd1fa4ac9fc1308d0f2317c92ee4c25d42a9
 /agent-note-powershell-ci-completion-and-profile-expectations:
   en: 30366de41f8f71f6
   zh: d343887adae38ef4

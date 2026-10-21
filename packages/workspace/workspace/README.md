@@ -109,7 +109,6 @@ Archive admission is a capability seam over two Host events this package declare
 | [`src/spec.ts`](src/spec.ts) | Domain declaration: record schema, registry state, `defineDomain` spec |
 | [`src/types.ts`](src/types.ts) | Public `Workspace` interface and `WorkspaceId` brand |
 | [`src/paths.ts`](src/paths.ts) | The `realpath` uniqueness canon |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion: the entity cache mirrors the durable table |
 
 ### Durable shape
 
@@ -122,10 +121,6 @@ On start, the registry opens the domain, completes a marked mutation if one is p
 ### Failure and recovery
 
 A create or delete whose second write fails rolls the cache and the prior order back; when both the operation and its rollback fail, the durable marker still names the interrupted operation and the next startup completes or rolls it back. A committed delete whose marker cleanup fails still reports success, and the next startup clears the marker idempotently.
-
-### Invariant
-
-The `workspace-invariant` companion registers the owned relationship: every durable `domain/changed` for the `workspaces` table must name a record the entity cache already holds — a delete is valid only after the registry removed the entity from its cache, so a bypassing write path fails the invariant.
 
 </details>
 
@@ -164,7 +159,6 @@ Independent of live requests: the package never touches a request prefix, so it 
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the project list is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
 

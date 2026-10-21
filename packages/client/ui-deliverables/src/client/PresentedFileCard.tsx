@@ -1,14 +1,13 @@
 /** File identity and explicit default-app, registered-app, or file-manager actions for one delivery. */
 import { useRef, useState } from 'react'
-import type { ReactNode } from 'react'
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  Menu, FileTypeIcon, fileExtension, IconRightUpOutline16,
-  IconChevronDownOutline14, IconFolderOpenOutline16,
+  FileTypeIcon, fileExtension, IconChevronDownOutline14,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PresentedAction, PresentedHost } from '../presented.ts'
 import type { PresentedAppState, PresentedOpenPhase } from './present-open.ts'
+import { NativeOpenMenu } from './NativeOpenMenu.tsx'
 import { basename, type PresentedPath } from './turn-deliverables.ts'
 import type { NS } from './locales.ts'
 import css from './Deliverables.module.css'
@@ -16,14 +15,6 @@ import css from './Deliverables.module.css'
 function cardDescription(description: string | undefined, fallback: string): string {
   const trimmed = description?.replace(/\s*(?:\([^()]*\)|（[^（）]*）)\s*$/u, '').trim()
   return trimmed === undefined || trimmed === '' ? fallback : trimmed
-}
-
-/** One application image with a per-image fallback to the generic opener glyph. */
-function ApplicationIcon({ source }: { source: string | null }): ReactNode {
-  const [failed, setFailed] = useState(false)
-  return source === null || failed
-    ? <IconRightUpOutline16 size={16} className={css.menuActionIcon} />
-    : <img src={source} width={16} height={16} className={css.appIcon} alt="" draggable={false} onError={() => { setFailed(true) }} />
 }
 
 /**
@@ -76,7 +67,8 @@ export function PresentedFileCard({ file, cwd, phase, apps, host, onPreview, onL
         <button ref={previewRef} type="button" className={css.open}
           aria-label={t('presented.previewButton', { name: file.path })}
           onClick={onPreview}>{t('presented.action')}</button>
-        <Menu className={css.menuAnchor} open={menuOpen && !menuDisabled} autoFocus portal align="end" onClose={() => { setMenuOpen(false) }}
+        <NativeOpenMenu className={css.menuAnchor} open={menuOpen && !menuDisabled} apps={apps} host={host} t={t}
+          onClose={() => { setMenuOpen(false) }} onAction={act}
           anchor={<button type="button" className={css.chevron} disabled={menuDisabled}
             aria-haspopup="menu" aria-expanded={menuOpen && !menuDisabled}
             aria-label={t('presented.more', { name: file.path })}
@@ -85,24 +77,7 @@ export function PresentedFileCard({ file, cwd, phase, apps, host, onPreview, onL
               setMenuOpen(value => !value)
             }}>
             <IconChevronDownOutline14 size={11} />
-          </button>}
-          items={[
-            { id: 'open', icon: <IconRightUpOutline16 size={16} className={css.menuActionIcon} />,
-              label: t('presented.defaultApp') },
-            ...(apps?.loading === true ? [{ id: 'apps:loading', label: t('presented.appsLoading'), disabled: true }] : []),
-            ...(apps?.failed === true ? [{ id: 'apps:error', label: t('presented.appsError'), disabled: true }] : []),
-            ...(apps?.applications.map(app => ({
-              id: `app:${app.id}`,
-              icon: <ApplicationIcon source={app.icon} />,
-              label: app.default ? t('presented.appDefault', { app: app.name }) : app.name,
-            })) ?? []),
-          ]}
-          footer={[{ id: 'reveal', icon: <IconFolderOpenOutline16 />, label: t(`presented.${reveal}`) }]}
-          onSelect={(id) => {
-            if (id === 'reveal') act('reveal')
-            else if (id.startsWith('app:')) act('open', id.slice(4))
-            else act('open')
-          }} />
+          </button>} />
       </div>
     </div>
   </div>

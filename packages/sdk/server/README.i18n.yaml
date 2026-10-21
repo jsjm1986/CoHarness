@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sdk/server/README.md
+document:
+  en: 53169c652b4e0b5af1ff21d312f568653d91d4f2
+  zh: 16f4d0898fb509a05162efc9c992c53fb1be4774
 /:
   en: 3d0239c38d00c1c8
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: 1412ec56449364a9
   zh: 604f7127ce6e96b5
 /deepseek-ai-dsh-sdk-jsonrpc-server/table-of-contents:
-  en: 7eed9c417b365f8b
-  zh: bf866e6df9114dee
+  en: 95de6a71212128aa
+  zh: 6d3fa90182ca47df
 /deepseek-ai-dsh-sdk-jsonrpc-server/wiring:
   en: 0c231026b744cb8a
   zh: 97f15abdca2f501e
@@ -27,11 +30,8 @@
   en: 29fca918b95265db
   zh: 28d65a8a5b07ac8e
 /deepseek-ai-dsh-sdk-jsonrpc-server/wire-notes:
-  en: 969dbdf207269101
-  zh: 1fe2ea2c1c7a148d
-/deepseek-ai-dsh-sdk-jsonrpc-server/invariants:
-  en: c3b260c626aa2210
-  zh: c07d568c4f266ead
+  en: 9fd3542cde662df9
+  zh: 2d905a481562b4ed
 /deepseek-ai-dsh-sdk-jsonrpc-server/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

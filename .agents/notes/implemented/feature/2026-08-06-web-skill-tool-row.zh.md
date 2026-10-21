@@ -16,6 +16,8 @@ Web transcript（文本记录）通过通用后备行渲染 `skill` 调用，使
 
 该行的所有可见值均派生自当前 runtime 窗口中已配对的调用／结果片段。skill 名称来自已记录的 `name` 参数，指令来自持久化的结果内容；该行绝不关联当前 skill 目录来读取描述或提供方元数据。如果分页将调用留在窗口外，结果便没有工具身份，并继续使用通用后备路径，而不是扩展 history 协议约定。现有的 ACP（Agent Client Protocol）`skill-load` 记录经由真实的 Web 持久化与组合路径写入，用于无需密钥的交互和无障碍快照。
 
+历史卡片保持独立于已安装注册表。单独的[当前源码预览](../architecture/2026-10-18-session-skill-source-preview.zh.md)遵循当前 Session 的可见性，不替换已记录的指令。
+
 ## 考虑过的替代方案
 
 - 保留通用工具行，只添加一个 `skill` 颜色选择器，并将其放在 `ui-conversation` 中。该方案仍会保留多余的输入外层结构和通用展开体，也会让 conversation 包拥有特定领域的视觉规则。

@@ -1,7 +1,7 @@
 /** Every historical entry generation migrates all preset selections before projection or fork. */
 
 import { describe, expect, it } from 'vitest'
-import { sessionFormatCatalog } from '../src/index.ts'
+import { createSessionFormatCatalogWithChildren } from '../src/index.ts'
 
 describe('catalog preset migration', () => {
   it.each([0, 1, 2])('migrates a seeded v%i header and every inherited/local selection', (version) => {
@@ -18,7 +18,7 @@ describe('catalog preset migration', () => {
       ? [...rows.slice(0, 2), { type: 'session/end-seed', seq: 2, time: 2, data: { inherited: true } }, ...rows.slice(2)]
       : rows
     const before = JSON.stringify({ header, source })
-    const restore = sessionFormatCatalog.createRestore(header, { recovery: 'strict', validation: 'current' })
+    const restore = createSessionFormatCatalogWithChildren([]).createRestore(header, { recovery: 'strict', validation: 'current' })
     for (const row of source) restore.decodeRow(row)
     const artifact = restore.finish()
     expect(artifact.header).toMatchObject({ version: 7, id: 'code', agentPreset: 'ptc', isSeeded: true })
@@ -36,7 +36,7 @@ describe('catalog preset migration', () => {
       delegationDepth: 0, agentPreset: 'code',
     }
     const row = { type: 'agent-preset/selected', seq: 0, time: 1, data: { agentPreset: 'code' } }
-    const restore = sessionFormatCatalog.createRestore(header, { recovery: 'strict', validation: 'current' })
+    const restore = createSessionFormatCatalogWithChildren([]).createRestore(header, { recovery: 'strict', validation: 'current' })
     restore.decodeRow(row)
     expect(restore.finish()).toMatchObject({ header: { agentPreset: 'code' }, events: [row] })
   })

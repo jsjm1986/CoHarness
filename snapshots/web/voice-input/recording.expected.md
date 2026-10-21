@@ -1,0 +1,17 @@
+- textbox "Describe what you want to build": Use the bash tool to
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Cancel":
+  - img
+- img "Recording…"
+- button "Stop and transcribe":
+  - img
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message"

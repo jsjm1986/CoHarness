@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-reference-candidate-session-retention.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-reference-candidate-session-retention.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-reference-candidate-session-retention.md
+document:
+  en: 4289339cf5644d45be7c5dcff63363de08596903
+  zh: 252752e738fcdce2310db4c4526cb8823856d79a
 /agent-note-candidates-retain-the-browsing-session-and-rows-carry-distinguishing-detail-only:
   en: 1cbfe783fc4a553b
   zh: 555fd4e99531d7cf

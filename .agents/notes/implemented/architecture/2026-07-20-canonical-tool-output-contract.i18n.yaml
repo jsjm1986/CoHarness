@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-20-canonical-tool-output-contract.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-20-canonical-tool-output-contract.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-20-canonical-tool-output-contract.md
+document:
+  en: 85d24e11c8cbcc7cd1b26021afb72d68b50f1462
+  zh: fd00331d238e4f53d32babaa64459f6e07397d3e
 /agent-note-canonical-tool-output-contract:
   en: 01677f7875da9579
   zh: 41bae59177ba5125
@@ -9,8 +12,8 @@
   en: d0bc9840998f0530
   zh: 2601671ec694a78d
 /agent-note-canonical-tool-output-contract/decision:
-  en: f0ab3b786cc40a51
-  zh: 66e29a0811c15038
+  en: c78501dd33bcfbca
+  zh: ce2ab37d95468311
 /agent-note-canonical-tool-output-contract/alternatives-considered:
   en: d82a0ac0461ab120
   zh: bedea17fb4fb4f51

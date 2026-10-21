@@ -1,0 +1,8 @@
+- dialog "/user-invoke-demo":
+  - heading "/user-invoke-demo" [level=2]
+  - button "Close":
+    - img
+  - paragraph: Prove user-explicit invocation of a model-hidden skill
+  - text: markdown
+  - button "Copy"
+  - code: Reply with the fixture acknowledgement line.

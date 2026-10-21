@@ -33,12 +33,6 @@ kind: "package-reference"
 
 <a id="model-experience"></a>
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。贡献是序列化每个请求时应用的已校验声明；注册表不持有逐请求关系。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 

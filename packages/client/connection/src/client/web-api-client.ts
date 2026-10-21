@@ -1,6 +1,6 @@
 /** Browser API carrier: HTTP upstream plus one bounded WebSocket downlink per event stream. */
 
-import type { ApiProxy, HostDescription, HostFrame, MuxFrame, RpcRequest, ServerRequest } from './api.ts'
+import type { ApiProxy, ConnectionInteractions, HostDescription, HostFrame, MuxFrame, RpcRequest, ServerRequest } from './api.ts'
 import { AbstractApiClient } from './api.ts'
 import { hostFrameSchema, muxFrameSchema } from '@deepseek-ai/dsh-host-apiproxy/api/events.schema'
 import { serverRequestSchema } from '@deepseek-ai/dsh-host-apiproxy/api/rpc.schema'
@@ -77,6 +77,7 @@ export class WebApiClient extends AbstractApiClient {
    * @param maxResponseBytes - successful unary response budget.
    * @param prepareSocketUrl - optional document identity admission before opening a socket.
    * @param described - callback after a validated Host description, before connection streams become ready.
+   * @param interactions - the connection's interaction mode, declared on every API and socket URL.
    */
   constructor(
     target?: { readonly kind: 'personal' } | { readonly kind: 'project'; readonly projectId: number },
@@ -84,8 +85,9 @@ export class WebApiClient extends AbstractApiClient {
     maxResponseBytes?: number,
     private readonly prepareSocketUrl?: (url: URL, signal: AbortSignal) => Promise<URL>,
     described?: (description: HostDescription) => void,
+    interactions?: ConnectionInteractions,
   ) {
-    super(timeoutMs, maxResponseBytes, target)
+    super(timeoutMs, maxResponseBytes, target, interactions)
     const describe = this.host.describe.bind(this.host)
     this.host.describe = async (payload, signal) => {
       const response = await describe(payload, signal)

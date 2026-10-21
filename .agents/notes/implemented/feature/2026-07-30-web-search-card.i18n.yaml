@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-web-search-card.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-web-search-card.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-search-card.md
+document:
+  en: 930a705fc227d7961e9cb1a51b0b04774a62c6a4
+  zh: 7771097423bda24c7fe254d5747205c1f06a5474
 /agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser:
   en: 22d87ba0f25bd0d5
   zh: 44d03c211702ee74

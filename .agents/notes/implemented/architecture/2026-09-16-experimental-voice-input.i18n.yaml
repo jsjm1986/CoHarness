@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-16-experimental-voice-input.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-16-experimental-voice-input.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md
+document:
+  en: 1223aabf226511654e439e1fdba846b219a381e6
+  zh: 67ed0df6625978e4731462beded89548eb8a3289
 /agent-note-experimental-voice-input-with-explicit-recognition-providers:
   en: 8d4bb68acfedbb76
   zh: e2fd06ac5d0d1f21

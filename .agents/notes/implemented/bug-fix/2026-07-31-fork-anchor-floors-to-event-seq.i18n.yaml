@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-fork-anchor-floors-to-event-seq.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-fork-anchor-floors-to-event-seq.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-31-fork-anchor-floors-to-event-seq.md
+document:
+  en: 760e73266570b149966be6af8264cd3699ffb7e0
+  zh: c25a69462b7cbff4a6194d24793982479cae24e4
 /agent-note-fork-anchor-floors-to-an-event-seq:
   en: baea8b7b4bb38d90
   zh: 0c210dbde4eee39e

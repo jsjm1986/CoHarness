@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-02-user-preference-cluster-shared-settings-scope.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-02-user-preference-cluster-shared-settings-scope.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-user-preference-cluster-shared-settings-scope.md
+document:
+  en: cab6ba64691e81a9bcd1f9426954fa6b02855476
+  zh: a9c3cb0a64241f080bd3483ba83eb1b6b70b4492
 /agent-note-user-preference-cluster-on-the-shared-settings-scope:
   en: 9e3e8a7bfe2c9214
   zh: 97f829d8cca3c90d

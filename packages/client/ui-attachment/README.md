@@ -1,5 +1,5 @@
 ---
-description: "Dynamic attachment presentation plugin for conversation input and message-image slots"
+description: "Dynamic attachment presentation plugin for conversation input, message-image, and trajectory image slots"
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-Dynamic attachment presentation plugin for the conversation UI. It waits for the conversation package's `conversation.input.attachments` and `conversation.message.images` declarations through `ctx.slots.inject`, then registers the composer draft-image rail, document drop target, chat-history image gallery, and original-image lightbox. The conversation slot owner supplies attachment data, image loading, callbacks, and its namespace translator; presentation components remain pure props and are not exported from the package entry.
+Dynamic attachment presentation plugin for the conversation UI. It waits through `ctx.slots.inject` for the conversation and Trajectory packages to declare `conversation.input.attachments`, `conversation.message.images`, `conversation.details.images`, and `conversation.trajectory.images`, then registers the composer draft-image rail, document drop target, history image gallery, and original-image lightbox. Slot owners supply attachment data, image loading, and callbacks; the framework binds the conversation translator. Presentation components remain pure props and are not exported from the package entry.
 
 Only the active conversation pane handles document-level file-drop gestures; picker callbacks retain the Session that opened them.
 
@@ -20,7 +20,6 @@ This package renders everything the conversation UI shows about attachments: one
 - [Attachment rail](#attachment-rail)
 - [Message images and the lightbox](#message-images-and-the-lightbox)
 - [Drop overlay](#drop-overlay)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -41,11 +40,6 @@ This package renders everything the conversation UI shows about attachments: one
 ## Drop overlay
 
 `DropOverlay` is the full-viewport invitation shown while a file drag is over the page: illustration, title, and a limits line while drops are accepted (`disabled` swaps the blocked illustration and hides the limits line). The layer is pointer-inert — the owner's document-level drag listeners keep the enter/leave count and decide accept/reject; the overlay only shows state. It portals to the body like the lightbox.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The package contributes presentation occupants to conversation-declared slots; attachment data, loading, and callbacks arrive through the slot owner's inject face.
 
 <a id="model-experience"></a>
 ## Model Experience

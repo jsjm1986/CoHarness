@@ -8,6 +8,7 @@ export const zh = {
   'openDocument': '打开配置文件',
   'openDocument.error': '无法打开配置文件',
   'general.nav': '通用设置',
+  'general.currentVersion': '当前版本：{version}',
   'nav.compact.general': '通用',
   'nav.compact.models': '模型',
   'nav.compact.plugins': '插件',
@@ -22,6 +23,13 @@ export const zh = {
   'developerTools.title': '显示代码工作视图',
   'developerTools.error': '保存失败，请重试',
   'developerTools.description': '开启后，显示轨迹、本轮代码差异，可选择完整的 Agent 预设切换',
+  'hostRelease.title': '服务版本变化',
+  'hostRelease.description': '服务版本已变化，本页面已暂停热更新，刷新后加载新版本。',
+  'hostRelease.service': '服务',
+  'hostRelease.page': '页面',
+  'hostRelease.unknown': '未解析',
+  'hostRelease.reload': '刷新以加载新版本',
+  'hostRelease.later': '暂不刷新',
 } satisfies Record<string, string>
 
 /** The settings namespace key union. */
@@ -35,6 +43,7 @@ export const en = {
   'openDocument': 'Open configuration file',
   'openDocument.error': 'Could not open configuration file',
   'general.nav': 'General',
+  'general.currentVersion': 'Current version: {version}',
   'nav.compact.general': 'General',
   'nav.compact.models': 'Models',
   'nav.compact.plugins': 'Plugins',
@@ -49,4 +58,11 @@ export const en = {
   'developerTools.title': 'Show coding view',
   'developerTools.error': 'Could not save. Please try again.',
   'developerTools.description': 'Shows trajectory and this turn’s code diff, and enables switching among the full Agent presets',
+  'hostRelease.title': 'Service version changed',
+  'hostRelease.description': 'The service version changed. This page paused live updates; reload to load the new version.',
+  'hostRelease.service': 'Service',
+  'hostRelease.page': 'Page',
+  'hostRelease.unknown': 'Unknown',
+  'hostRelease.reload': 'Reload to load the new version',
+  'hostRelease.later': 'Not now',
 } satisfies Record<SettingsKey, string>

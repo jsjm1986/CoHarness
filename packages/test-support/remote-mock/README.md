@@ -114,7 +114,6 @@ A fake that stands in for a generated stream method returns an `AsyncIterable` â
 | [`src/streams.ts`](src/streams.ts) | `frames` / `openStream` scripts, `streamHandle` / `streamMethod` fake typing, and `MockStream` (handle + `AsyncIterable`) |
 | [`src/log.ts`](src/log.ts) | Log store with the shared `seq` counter |
 | [`src/transports.ts`](src/transports.ts) | `MockAccountPreferences` / `MockProjectModelSettings` seed transports |
-| â€” | No runtime invariant companion is published; this test-support library owns no production event stream or mutable process state, and its behavior is exercised by its package tests. |
 
 </details>
 

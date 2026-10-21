@@ -33,7 +33,6 @@ kind: "package-reference"
 - [权限](#permissions)
 - [热重载](#hot-reload)
 - [安全边界](#security-boundary)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -98,22 +97,17 @@ records:
 
 外部编辑在快照**整体替换**后按变更引用逐个发布 `credentials/reference-updated`——磁盘上删掉的条目绝不在内存滞留。在 Chokidar 打开目标之前，提供方会对层级最深的现有祖先路径执行 realpath 解析，再拼回缺失的后缀；文件访问和诊断仍使用配置路径，从而避免 Windows 混用 8.3 别名与 libuv 的长格式事件路径。提供方自己的写入按内容识别，只发布属于该次提交的一个事件。运行期文档不可读或无效时保留最后可用快照并告警；文件不存在即空存储；启动时不可读或无效则明确报错。
 
+销毁时停止接收刷新请求并等待已排队的操作完成。watcher 关闭后尚未结束的轮询所产生的错误会被接住，不再记录日志或发布变更。
+
 <a id="security-boundary"></a>
 
 <a id="security-boundary"></a>
+
 ## 安全边界
 
 文档在 `0700` 目录下以 `0600` 权限存放，这挡得住其他 OS 用户，**挡不住**模型。工具进程（bash、文件系统工具）以同一用户身份运行，而已交付的 `workspace-write` 文件策略限制的是修改而非读取，因此它们读这个文件与读该用户拥有的任何其他文件毫无二致；也没有任何沙箱模式会把它单独挑出来。harness 真正守住的更窄：它绝不把该文档的解析后路径交给模型，也绝不把它载入进程环境——这与用户的普通环境层 `$DSH_HOME/.env` 不同（见 [app-boot 的 Harness home 各层](../../boot/app-boot/README.zh.md#profiles)）——因此要拿到这个值，需要刻意去读一条并未交给 agent（智能体）的路径。
 
-**运行时不变式：** 不发布伴生入口。Service Definition 的配套入口（`dsh-credentials/invariant`）负责 `credentials/reference-updated` 生命周期约定；本提供方的文件与环境分层属于异步 I/O，并由其单元测试套件加以约束。
-
 这是审慎，不是边界。必须让提供方密钥远离自身 agent 的部署无法靠文件权限做到；OS 钥匙串提供方——一种模型运行所在进程根本无法读取的存储——才是延后的答案，它应当作为平级包与本提供方并列。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次解析在调用时按文档化优先级从分层来源得出答案；文件层行为由规格断言，且不发布凭据缓存。
-
 
 <a id="model-experience"></a>
 ## 模型体验

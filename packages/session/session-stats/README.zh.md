@@ -17,7 +17,6 @@ kind: "package-reference"
 
 - [折叠语义](#fold-semantics)
 - [组合](#composition)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知局限与延后工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -44,12 +43,6 @@ kind: "package-reference"
 ```
 
 注入 `sessionProjections`——这是插件的全部用途；在没有 registry 的装配中 fiber 保持挂起，不注册任何内容。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该单元是经投影 seam 提供的对持久日志的纯折叠；除该折叠外不拥有状态。
-
 
 ## 模型体验
 

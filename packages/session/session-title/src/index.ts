@@ -131,6 +131,12 @@ export interface SessionTitleProviderRequest {
   readonly messages: readonly SessionTitleUserMessage[]
   /** Exact current logged main-request route, when one has been recorded. */
   readonly route?: SessionTitleModelIdentity
+  /**
+   * Latest accepted title captured at invocation, including an accepted
+   * fallback whose event may follow the last eligible message. Absent before
+   * any title is accepted. The provider decides whether and how to use it.
+   */
+  readonly currentTitle?: SessionTitleSnapshot
   /** Cancellation for supersession, disposal, timeout composition, or the explicit caller. */
   readonly signal: AbortSignal
 }
@@ -153,7 +159,7 @@ export interface SessionTitleProvider {
   readonly automatic: SessionTitleAutomaticMode
   /**
    * Produce one title revision.
-   * @param request - message snapshot, current route, session, and cancellation.
+   * @param request - message snapshot, current title, current route, session, and cancellation.
    * @returns proposed title plus exact input seqs and the optional provider/model route used to generate it.
    */
   generate(request: SessionTitleProviderRequest): Promise<SessionTitleProviderResult>
@@ -642,12 +648,18 @@ export class SessionTitleService extends Service {
       this.assertCurrent(session, work)
       await this.ensureFallback(session)
       this.assertCurrent(session, work)
+      // One snapshot supplies both inputs: messages stop at the scheduled
+      // watermark (and drop legacy injected envelopes), while the current
+      // title is not bounded by that watermark.
       // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-      const messages = eligibleTitleMessages(session.snapshotEvents(), work.throughSeq)
+      const events = session.snapshotEvents()
+      const messages = eligibleTitleMessages(events, work.throughSeq)
+      const currentTitle = foldSessionTitle(events)
       const result = await work.registration.provider.generate({
         session,
         messages,
         ...route === undefined ? {} : { route },
+        ...currentTitle === undefined ? {} : { currentTitle },
         signal: work.signal,
       })
       this.assertCurrent(session, work)

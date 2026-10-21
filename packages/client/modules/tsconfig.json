@@ -20,9 +20,6 @@
       "path": "../../host/webserver"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../util/package-manifest"
     },
     {

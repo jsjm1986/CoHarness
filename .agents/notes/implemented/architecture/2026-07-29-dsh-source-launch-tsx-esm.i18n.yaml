@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-29-dsh-source-launch-tsx-esm.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-29-dsh-source-launch-tsx-esm.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-29-dsh-source-launch-tsx-esm.md
+document:
+  en: 425cf46ca802e8d3ac1d49a1955c5e7ea208bd20
+  zh: 87b323c82f28135396d1d16991e2365c691fcc6a
 /agent-note-dsh-source-launch-through-the-tsx-esm-hook:
   en: 55846ac57e07eeda
   zh: 3de03730d4b28863

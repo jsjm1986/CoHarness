@@ -248,8 +248,8 @@ describe('connection client apply', () => {
     const hostFrame = host.next()
     await vi.waitFor(() => { expect(sockets).toHaveLength(2) })
     expect(sockets.map(socket => socket.url)).toEqual([
-      'ws://localhost:3080/api/events.mux?dshTarget=personal&dshPrincipal=7',
-      'ws://localhost:3080/api/events.host?dshTarget=personal&dshPrincipal=7',
+      'ws://localhost:3080/api/events.mux?interactions=answer&dshTarget=personal&dshPrincipal=7',
+      'ws://localhost:3080/api/events.host?interactions=answer&dshTarget=personal&dshPrincipal=7',
     ])
     await vi.waitFor(() => { expect(opened).toEqual(['mux', 'host']) })
 
@@ -334,7 +334,7 @@ describe('connection client apply', () => {
     const abort = new AbortController()
     const iterator = client.events.mux({}, abort.signal)[Symbol.asyncIterator]()
     const pending = iterator.next()
-    await vi.waitFor(() => { expect(sockets[0]?.url).toBe('wss://harness.example/api/events.mux?dshTarget=personal&dshPrincipal=7') })
+    await vi.waitFor(() => { expect(sockets[0]?.url).toBe('wss://harness.example/api/events.mux?interactions=answer&dshTarget=personal&dshPrincipal=7') })
     abort.abort()
     await expect(pending).resolves.toMatchObject({ done: true })
   })

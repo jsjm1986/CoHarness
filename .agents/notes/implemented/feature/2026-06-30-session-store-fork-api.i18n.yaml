@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-30-session-store-fork-api.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-30-session-store-fork-api.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-30-session-store-fork-api.md
+document:
+  en: 61022e940cd44af6162cb552ade32a9df8d9150a
+  zh: dc7ebdc6d8d4f3566f9ff27579e5660d868218e3
 /agent-note-sessionstore-fork-api:
   en: 36f0f38fcbbce292
   zh: f240aff137e6e738

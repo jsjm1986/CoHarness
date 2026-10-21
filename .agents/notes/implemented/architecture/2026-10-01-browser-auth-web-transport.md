@@ -6,13 +6,13 @@ English | [中文](2026-10-01-browser-auth-web-transport.zh.md)
 
 ## Problem
 
-`dsh web` serves its index and every `/api` channel over an HTTP listener that is loopback-only by default and becomes LAN-reachable under `--trusted-host`. Admission was only the Host/Origin DNS-rebinding fence in `api-request-trust.ts`, which its own comment described as explicitly not authentication: any process that could reach the port could drive sessions, workspace files, and gateway operations. Upstream `dsh-v0.2.0-rc.1` carries `packages/client/connection/src/browser-auth.ts`; the local fork had no equivalent.
+`dsh web` serves its index and every `/api` channel over an HTTP(S) listener that is loopback-only by default and becomes LAN-reachable under `--trusted-host`. Admission was only the Host/Origin DNS-rebinding fence in `api-request-trust.ts`, which its own comment described as explicitly not authentication: any process that could reach the port could drive sessions, workspace files, and gateway operations. Upstream `dsh-v0.2.0-rc.1` carries `packages/client/connection/src/browser-auth.ts`; the local fork had no equivalent.
 
 ## Decision
 
 [BrowserAuth](../../../../packages/client/connection/src/browser-auth.ts) authenticates the browser-facing carrier with a launch-token exchange and persistent signed cookies.
 
-`Connection.authenticatedUrl(base)` is the direct-browser entry: `web-app` prints it as the startup URL, embedding a per-process random launch token held in a `WeakMap`. The index owner — `frontend-static` for the shipped composition, or `connection.authorizeIndex` for compositions without it — exchanges `?token` for a `303` that sets `dsh-auth-<sha256(authority)>` with a `{version, authority, issuedAt, expiresAt}` payload HMAC-signed by a secret persisted through the credentials service (`client-connection/browser-session`, versioned grant record). The cookie is `HttpOnly; SameSite=Strict`, named per canonical request authority, so one listener can serve multiple authorities without cross-authority replay.
+`Connection.authenticatedUrl(base)` is the direct-browser entry: `web-app` prints it as the startup URL, embedding a per-process random launch token held in a `WeakMap`. The index owner — `frontend-static` for the shipped composition, or `connection.authorizeIndex` for compositions without it — exchanges `?token` for a `303` that sets `dsh-auth-<sha256(authority)>` with a `{version, authority, issuedAt, expiresAt}` payload HMAC-signed by a secret persisted through the credentials service (`client-connection/browser-session`, versioned grant record). The cookie is `HttpOnly; SameSite=Strict`, named per canonical request authority, so one listener can serve multiple authorities without cross-authority replay. A TLS listener adds `Secure` and binds the `https:` scheme into the cookie's name and signed audience — decided by the mounted listener's own protocol, never a `publicUrl` announcement or a forwarded header — so an HTTP cookie cannot authenticate to a TLS listener on the same authority.
 
 `HostConnectionService.requestRejection` is subtree-aware. Registrations and interceptor endpoints declared `authority: 'loopback'` keep the loopback fence as their complete admission — machine callers such as webhooks and the archive gateway cannot perform a browser token exchange. Absent a provider answer, every other `/api` subtree, generic RPC channel, and upgrade request requires a valid cookie (`401`), and the trust fence still runs first (`403`).
 
@@ -35,6 +35,8 @@ Between the fence and the cookie check sits one generic admission point: `connec
 ## Consequences
 
 Every browser e2e and profile test now performs the token exchange or attaches the minted cookie; unauthenticated `/api` consumers must either declare `authority: 'loopback'` or obtain a cookie through `authorizeIndex`. Rotating the credential record invalidates outstanding cookies. The launch token is not in the log or on disk, so copying a printed URL into another browser after restart fails closed. Under a mounted GatewayRuntime the provider answers `'deny'` for every request without a valid assertion, so a launch-token URL or minted cookie alone receives 401 — the proxy's signed principal is the only browser credential that runtime accepts, and disposing the provider restores the direct-browser flow.
+
+The [native HTTPS listener decision](2026-09-23-native-https-web-listener.md) supersedes the HTTP-only transport and omitted-`Secure` assumptions here. Listener protocol now determines `Secure`; the token exchange, signed-cookie authority, and credential lifetime remain owned by this note.
 
 ## Testing
 

@@ -22,6 +22,7 @@ import { ForkSessionMenuItem } from '../src/client/session-actions/ForkSession.t
 import { PinSessionMenuItem, PinSessionRowButton } from '../src/client/session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from '../src/client/session-actions/RenameSession.tsx'
 import { RowActionToast } from '../src/client/session-actions/RowActionToast.tsx'
+import { SessionIdMenuItem } from '../src/client/session-actions/SessionId.tsx'
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
 import { FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
@@ -228,7 +229,7 @@ describe('ui-workspace apply', () => {
     await Promise.resolve()
     expect(after.slots.entries('conversation.hero.workspace')[0]!.component).toBe(WorkspacePicker)
     // The row actions follow the browser's own declaration, whenever it lands.
-    expect(after.slots.entries(MENU_ITEM)).toHaveLength(4)
+    expect(after.slots.entries(MENU_ITEM)).toHaveLength(5)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(after.slots.entries('shell.overlay')).toHaveLength(3)
   })
@@ -251,6 +252,7 @@ describe('ui-workspace apply', () => {
       ['rename', 200, RenameSessionMenuItem, 'workspace'],
       ['fork', 300, ForkSessionMenuItem, 'workspace'],
       ['archive', 400, ArchiveSessionMenuItem, 'workspace'],
+      ['session-id', 450, SessionIdMenuItem, 'workspace'],
     ])
     expect(rows(ROW_ACTION)).toEqual([
       ['archive', 100, ArchiveSessionRowButton, 'workspace'],
@@ -405,8 +407,8 @@ describe('ui-workspace apply', () => {
     const toast = faceOf(entry(b.slots, 'shell.overlay', 'workspace.row-toast')) as RowToastInjected
 
     // A Host refusal keeps the stable `code: message` form in the notice.
-    b.startSession.mockImplementationOnce((_workspaceId: unknown, onFailure?: (reason: unknown) => void) => {
-      onFailure?.(Object.assign(new Error('workspace connect failed: workspace-archived: gone'), {
+    b.startSession.mockImplementationOnce((_workspaceId: unknown, options?: { onFailure?: (reason: unknown) => void }) => {
+      options?.onFailure?.(Object.assign(new Error('workspace connect failed: workspace-archived: gone'), {
         name: 'WorkspaceConnectError', rpcError: { code: 'workspace-archived', message: 'gone' },
       }))
     })
@@ -418,8 +420,8 @@ describe('ui-workspace apply', () => {
       expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createFailed', message: 'workspace-archived: gone', seq: 1 })
     })
     // Any other failure reports its own message.
-    b.startSession.mockImplementationOnce((_workspaceId: unknown, onFailure?: (reason: unknown) => void) => {
-      onFailure?.(new Error('plain failure'))
+    b.startSession.mockImplementationOnce((_workspaceId: unknown, options?: { onFailure?: (reason: unknown) => void }) => {
+      options?.onFailure?.(new Error('plain failure'))
     })
     b.ctx.uiWorkspace.startSession()
     await vi.waitFor(() => {
@@ -690,7 +692,7 @@ describe('ui-workspace apply', () => {
     declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace', 'shell.overlay')
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.slots.entries(MENU_ITEM)).toHaveLength(4)
+    expect(b.slots.entries(MENU_ITEM)).toHaveLength(5)
     expect(b.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(b.slots.entries('shell.overlay')).toHaveLength(3)
     await fiber.dispose()

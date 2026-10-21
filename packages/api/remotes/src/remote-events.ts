@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-schedule/client'
 import type {} from '@deepseek-ai/dsh-goal/types'
 import type {} from '@deepseek-ai/dsh-memory/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
+import type {} from '@deepseek-ai/dsh-plugin-market/types'
 
 /**
  * Host events this application forwards to consumers verbatim: no projection,
@@ -42,6 +43,7 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   'plugin-manager/changed',
   'plugin-manager/install-log',
   'plugin-manager/install-state',
+  'plugin-market/changed',
   'schedule/changed',
   'settings/document-updated',
 ] as const

@@ -9,9 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../llm/llm"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -19,6 +16,12 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../settings/settings"
     }
   ]
 }

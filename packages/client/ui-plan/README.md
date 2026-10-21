@@ -23,17 +23,11 @@ Plan mode lets you review a plan before implementation. Enter with `/plan` and l
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Plan state is owned by `dsh-plan-mode` and arrives through the `plan` projection; the chip is a pure renderer and the node half is an empty apply.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-11-team-member-model.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-11-team-member-model.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-11-team-member-model.md
+document:
+  en: 47db55da7482c38a587b41be7a93520d4088a050
+  zh: 8266a549a741b04f9949323ae44c71aa54dccd36
 /:
   en: 3d5a424ae7d7e46b
   zh: c22a8e4a62d8cc1a

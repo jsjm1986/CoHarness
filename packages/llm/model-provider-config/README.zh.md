@@ -15,7 +15,6 @@ kind: "package-reference"
 
 使用 `dsh-model-provider-config` 作为组织与项目托管模型提供方的服务定义。提供方在 `ctx.modelProviderConfig` 发布不可变路由快照，并在每次已提交修订后发出 `model-provider-config/updated`；适配器消费方注册这些路由而不复制到用户设置。
 
-
 ## 目录
 
 - [模型体验](#model-experience)
@@ -23,7 +22,6 @@ kind: "package-reference"
 - [开发备注](#dev-note)
 
 -----
-
 
 ## 模型体验
 

@@ -16,6 +16,7 @@ export default defineConfig({
       '@deepseek-ai/schemastery': resolve(__dirname, '../../vendor/schemastery/src/index.ts'),
       '@deepseek-ai/dsh-client-runtime/client': resolve(__dirname, '../../packages/client/runtime/src/client/contract/store.ts'),
       '@deepseek-ai/dsh-client-ui-primitives': resolve(__dirname, 'src/model-settings-primitives.ts'),
+      '@deepseek-ai/dsh-typert-protocol/remote-info': resolve(__dirname, '../../packages/typert/protocol/src/remote-info.ts'),
     },
     dedupe: ['react', 'react-dom', 'lucide-react'],
   },

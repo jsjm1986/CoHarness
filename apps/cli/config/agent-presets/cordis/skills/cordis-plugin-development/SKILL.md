@@ -1,108 +1,50 @@
 ---
 name: cordis-plugin-development
-description: Use when authoring, installing, configuring, or debugging persistent plugins and MCP connections in the current Harness profile.
+description: Use when designing, reviewing, adding, enabling, disabling, installing, configuring, or debugging a plugin, bundle, feature, page, panel, tool, or MCP connection in the current Harness profile, including a shipped plugin that is disabled by default, and for any visual object, decoration, or widget request that names no other destination, which means an installed UI plugin rendered in the Harness Web UI.
 ---
 
 # Persistent Harness plugins
 
-Use ordinary workspace files to author a bundle, then `plugin_manager install_bundle` to install it in the current profile. Changes affect every session in that profile and survive restart. Load `editing-cordis-compositions` for agent preset changes.
+For implementation, use ordinary workspace files to author a bundle, then `plugin_manager` with `action: install_bundle` and the absolute package directory as `target` to install it in the current profile. Changes affect every session in that profile and survive restart. Load `editing-cordis-compositions` for agent preset changes.
+
+Do not write the profile's `package.json` or `cordis.patch.yml`, create packages under `$DSH_HOME`, or run pnpm in the profile directory: `install_bundle` performs those steps, and each hand-made write outside the workspace needs its own approval. Every `plugin_manager` action, including `list_plugins` and `list_bundles`, also needs approval without Full access, so call it only when its result decides the next step.
+
+## Design or review
+
+Read the applicable references below and inspect the proposed or existing plugin against current APIs. Report design choices or findings instead of following the installation workflow. Do not write files, install bundles, or change profile state unless the user requests implementation.
+
+## Enable a shipped plugin
+
+A shipped bundle can resolve a plugin row and leave it `disabled`. The row id and its reason are in the shipped patch, `packages/bundle/*/cordis.patch.yml` in a source checkout. Write a workspace bundle whose patch overrides that row with `disabled: false` and inserts the Host rows it depends on; a source checkout's `apps/cli/config/examples/<feature>/cordis.yml` lists them for opt-in features. Packages shipped with dsh resolve from the dsh installation, so the bundle declares no dependencies on them. Install it with `install_bundle`.
 
 ## Deliver a working plugin first
 
-1. Resolve the requested result and destination. In Creator mode, an unspecified visual destination is the current Harness Web UI. Choose reasonable visual details and implement a small first version.
-2. Discover only the APIs needed for that version: `cordis_inspect_list`, then targeted `cordis_inspect_query` calls. For UI, query Client `Slots.listSubTree` and the selected slot's registration options and props. Treat the recipes below and returned API declarations as the supported implementation path. Once the chosen slot and registration API are known, write the plugin. Before the first installation, resolve missing declarations through inspection; do not re-check these recipes by reading Loader, manifest-parser, package-manager, React, or slot implementation source. Source-level diagnosis starts from a concrete installation or runtime failure.
-3. The first files you write are the installable package, patch, and required Host/Client files in one workspace directory. Check JavaScript syntax and the manifest, then install it. Before that first installation, do not create preview HTML, mock shells, design variants, screenshot scripts, or rasterizer tooling. Use the installed plugin itself as the first preview.
-4. Read the installation result. After `application: applied`, exercise the capability or inspect the live Client registration. Use the connected page for visual verification when browser control is available. State any verification limitation explicitly; installation and slot registration alone do not establish what the user can see.
-5. Fix observed defects in the same plugin. When the requested result works, finish with its location and verification status. Do not continue speculative visual variants, optional features, or a new mock preview. Close any task list you created.
+1. Resolve the requested result and destination. An unspecified visual destination is the current Harness Web UI; a standalone image or HTML file does not complete such a request. Choose reasonable visual details and implement a small first version; install it before visual refinement.
+2. Discover only the APIs needed for that version: `cordis_inspect_list`, then targeted `cordis_inspect_query` calls. For UI, query Client `Slots.listSubTree` and the selected slot's registration options and props. For anything beyond a static decoration, such as tool policy, agent context, session-derived state, or Chat rows, read `references/practices.md` before choosing the extension point; for a user action in plugin UI, also read `references/user-actions.md`. Once the chosen slot and registration API are known, write the plugin.
+3. Read and copy the matching template files into one workspace directory, or author the package, patch, and required Host/Client files there. Before installing, complete the display checklist in `references/host-plugin.md`: meaningful localized titles/descriptions, an original or licensed icon, and exported resources with distribution checks where applicable. This applies to Host-only and configuration-only bundles too; adapt template text and artwork to the request. Check JavaScript syntax and the manifest, then install. Use the installed plugin as the first preview; do not create preview HTML, mock shells, design variants, screenshot scripts, or rasterizer tooling first.
+4. Read the installation result: `application` and `warnings` decide whether the change is live, not logs, process lists, or the page's boot payload. Confirm new rows with approval-free `cordis_inspect_query`, not `list_plugins`. After `application: applied`, exercise the capability or inspect the live Client registration. Verify installed display metadata and the icon using `references/host-plugin.md`. Use the connected page when available; follow `references/verification.md` for page/panel design checks and unavailable browser control, and `references/user-actions.md` for user actions. Restore user state changed during testing. Report verification limits; installation and slot registration alone do not establish what the user sees.
+5. Fix observed defects in the same plugin. When the requested result works, finish with its location, verification status, and the reason for any display-resource exception; never silently accept default artwork. Do not continue speculative variants, optional features, or mock previews. Close any task list.
 
-## Package and install
+## Knowledge sources, in order
 
-A bundle declares `dsh.bundle.patch` in `package.json`. Its YAML patch inserts plugin entries. Give the package and rows unique names; use the Loader's existing YAML syntax, including `!!js` where expressions are needed. Read an existing patch before editing it: a matching override replaces the complete config.
+1. Inspection: `cordis_inspect_query` answers exact Service methods and Event modes (`Service`, `Event`), a mounted plugin's Config JSON Schema (`Config.listConfigs`: filter the paged directory by `name`, then query the `entry` id), the Tools this Agent can call (`Tool`), and live Client Slots and theme tokens (`Slots`, `Theme`).
+2. Package documentation: `Config.listConfigs` with `name` set to the package finds its entries; querying one `entry` returns its `packageDir`, the resolved package directory. Read `<packageDir>/README.md`. Bundled packages resolve from the dsh installation and profile-installed bundles from the profile, so never guess the path from `$DSH_PROFILE_DIR`.
+3. Source: installed packages ship built `lib/index.js` and `lib/types/**/*.d.ts` with JSDoc under that same `packageDir`, not `src/`; a source checkout of DSH has `packages/<group>/<name>/src`. Read them when inspection and the README leave a question open, and start source-level diagnosis from a concrete installation or runtime failure.
 
-For a simple drawing, prefer a slot with allocated space, such as `conversation.composer.dock` when available. Keep the first version within that slot’s flow; do not plan a motion path around host controls. This minimal package needs no dependencies, install scripts, or build tool:
+`DSH_PROFILE` (profile name) and `DSH_PROFILE_DIR` (its directory, whose `node_modules` holds only profile-installed bundles) are set in every shell call of a profile-launched Harness and absent when the Harness was booted without a profile. Bash reads them as `$DSH_PROFILE`; PowerShell, which the Windows preset uses, reads them as `$env:DSH_PROFILE`. With `dsh` on the PATH, `dsh --profile "$DSH_PROFILE" --dump-config` prints the composed profile.
 
-```json
-{
-  "name": "@local/my-decoration",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "exports": { ".": "./index.js", "./client": "./client.js" },
-  "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
-    "client": {
-      "platform": "web",
-      "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-ui-conversation"]
-    }
-  }
-}
-```
+## Read next
 
-`index.js` exports `export function apply() {}`. A Host plugin with behavior exports either a service class as default or named `apply`, `inject`, and optional `Config`; do not mix these forms. The bundle's `cordis.patch.yml`:
+The files below live in this skill's base directory, which the `skill` tool reported, and the table is the complete list: do not enumerate that directory. In every deployment, including a source checkout, read these files with the file-read tool, write copies into the workspace with the file-write tool, and verify a copy by reading it back. In Desktop the directory sits inside `app.asar`, which only the Host process's own file reads can open; shell commands (`ls`, `cat`, `cp`, `cmp`), the glob and search tools (they run a native ripgrep process), `node`, and pnpm all fail on it. Never install or syntax-check a template in place; copy its contents into the workspace first.
 
-```yaml
-- insert:
-    - id: my-decoration
-      name: '@local/my-decoration'
-```
-
-Call `plugin_manager` with `action: install_bundle` and the absolute package directory as `target`. It performs package installation and bundle selection; do not reproduce those steps with shell commands. Only pass `approvedBuilds` after the user explicitly approves the reported pending build scripts.
-
-Use `list_plugins` or `list_bundles` to obtain exact identifiers for existing installations. `set_plugin` and `set_bundle` toggle them; `remove_bundle` removes a bundle. Inspect saved-state and activation outcomes separately: `failed` requires diagnosis, `overridden` means a higher-priority layer wins, and `restart-required` means the change is not live. Installing a new bundle can activate through HMR; replacing an installed package requires restart to load a fresh JavaScript module generation. Do not infer updated browser code from an unchanged slot id.
-
-## Client implementation
-
-The browser artifact registers a lazy factory whose id equals the package name. React comes from the browser module table; no duplicate React installation, CDN script, or UMD search is needed. For compiled sources, use the deployment's Client build tooling to emit this format; declare non-baseline runtime imports in `dsh.client.external`.
-
-This `client.js` example uses `conversation.composer.dock` for a small drawing below the composer. Replace the artwork with the requested drawing. Follow the selected slot's props and options. Do not read another plugin's DOM, stylesheet, or component source to estimate placement; choose a slot that already allocates space. Use `shell.overlay` only when the request needs an overlay and its placement is known.
-
-```js
-window.__ModuleLoader__.load({
-  id: '@local/my-decoration',
-  factory(require) {
-    const React = require('react');
-    const h = React.createElement;
-    function Decoration() {
-      return h('svg', {
-        viewBox: '0 0 64 64', width: 48, height: 48,
-        'aria-hidden': true,
-        style: { display: 'block', pointerEvents: 'none' },
-      }, h('circle', { cx: 32, cy: 32, r: 24, fill: '#247bbf' }));
-    }
-    return {
-      inject: ['slots'],
-      apply(ctx) {
-        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
-          name: 'conversation.composer.dock', id: 'my-decoration', order: 5,
-        }, Decoration));
-      },
-    };
-  },
-});
-```
-
-Keep factories free of side effects. Register styles, timers, listeners and other resources inside `apply` with `ctx.effect`/`ctx.on` and return their cleanup functions. Component-local styles can render as React elements so unmounting removes them. Verify disposal for resources you add. Inherit the host theme for containers and controls; artwork may use its own colors. Route visible UI text through the Client locale service. Do not replace the app root or append a second application to `document.body`.
-
-## Verify in the available environment
-
-Prefer the authenticated page already connected to Harness. Do not launch a separate browser from shell commands, change `HOME`, inspect personal browser profiles, search for authentication tokens, or alter keychains to obtain a screenshot. For a visual-only request without browser control, limit verification to JavaScript syntax, manifest validation, and the live Client slot, then report that visual verification remains unavailable. Before or after installation, do not search for rasterizers, invoke Quick Look, extract SVG into preview files, emulate React/DOM, or implement a custom renderer to compensate for missing browser control. A screenshot of a mock page is not verification of the running plugin.
-
-For any test subprocess or temporary resource, use a unique owned directory, bound execution, and await cleanup. A failed optional preview must not turn into environment repair or block installation.
-
-## Connect an MCP server
-
-Create a configuration-only bundle: its manifest needs a unique name, version, and `dsh.bundle.patch`, but no Host/Client entry files. Insert the already installed MCP client in its patch:
-
-```yaml
-- insert:
-    - id: demo-mcp
-      name: '@deepseek-ai/dsh-mcp-client'
-      config:
-        serverName: demo
-        transport: streamable-http
-        url: http://127.0.0.1:3000/mcp
-        failOnStartupError: true
-```
-
-Replace the endpoint, install the bundle through `plugin_manager`, then call `mcp__demo__ping` or another discovered tool. For stdio, use `transport: stdio`, `command`, and optional `args`, `env`, and `cwd`. Ambient credentials are scrubbed; reference existing credentials with Loader `!!js` rather than copying secrets into conversation text. Repair the same bundle on failure instead of creating duplicates.
+| Task | File |
+|---|---|
+| Bundle manifest, locale resources, icons, installation, Host exports and Config | `references/host-plugin.md` |
+| Web UI: Client manifest, module loader, slot registration | `references/ui-plugin.md` |
+| Connecting an MCP server through a configuration-only bundle | `references/mcp-bundle.md` |
+| Page/panel design checks and verification without browser control | `references/verification.md` |
+| UI plugin template, including display resources | `templates/decoration/package.json`, `templates/decoration/cordis.patch.yml`, `templates/decoration/index.js`, `templates/decoration/client.js`, `templates/decoration/locale/en.json`, `templates/decoration/icon.svg` |
+| MCP bundle template, including display resources | `templates/mcp/package.json`, `templates/mcp/cordis.patch.yml`, `templates/mcp/locale/en.json`, `templates/mcp/icon.svg` |
+| Loader patch dialect and the list of installable plugin packages | the `cordis-composition-reference` skill |
+| Choosing extension points, contexts, and state mechanisms for upgrade stability and performance | `references/practices.md` |
+| Sharing application operations between UI actions and agent tools | `references/user-actions.md` |

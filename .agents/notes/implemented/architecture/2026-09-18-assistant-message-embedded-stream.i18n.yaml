@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-18-assistant-message-embedded-stream.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-18-assistant-message-embedded-stream.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-18-assistant-message-embedded-stream.md
+document:
+  en: b4129d25f9fe96e2c9e6c01869361088c24a8052
+  zh: 4ba34e68f2c590c7695b6a4da2f35fff96b417bf
 /agent-note-assistant-messages-embed-their-provider-stream:
   en: 99f882a01c5982ad
   zh: c38fe694d83b4758

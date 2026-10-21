@@ -277,6 +277,11 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async list(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { skills: [{ name: 'commit-helper', description: 'Git commits', modelInvocable: true }] } } }
       },
+      async get(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: request.payload.name === 'commit-helper' ? { skill: {
+          name: 'commit-helper', description: 'Git commits', contentMarkdown: '# Commits\n\nReview the diff.\n',
+        } } : {} } }
+      },
     },
     settings: {
       async describe(request) {
@@ -562,10 +567,16 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     expect(served.result).toEqual({ ok: true, value: { applications: [{ id: 'app.one', name: 'One', default: true, icon: null }] } })
   })
 
-  it('round-trips skill.list through the wire form', async () => {
+  it('round-trips the skill catalog, current source, and missing preview through the wire form', async () => {
     const c = client()
     const skills = await c.skills.list({ sessionId: 's' as never })
     expect(skills.result).toEqual({ ok: true, value: { skills: [{ name: 'commit-helper', description: 'Git commits', modelInvocable: true }] } })
+    expect((await c.skills.get({ sessionId: 's' as never, name: 'commit-helper' })).result).toEqual({
+      ok: true, value: { skill: {
+        name: 'commit-helper', description: 'Git commits', contentMarkdown: '# Commits\n\nReview the diff.\n',
+      } },
+    })
+    expect((await c.skills.get({ sessionId: 's' as never, name: 'missing' })).result).toEqual({ ok: true, value: {} })
   })
 
   it('lets host.pickDirectory finish after the 30-second default unary deadline', async () => {

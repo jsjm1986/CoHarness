@@ -409,6 +409,30 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.helpButton {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: var(--dsw-space-1, 4px);
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 50%;
+  corner-shape: round;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 11px;
+  line-height: 15px;
+  text-align: center;
+  cursor: help;
+  vertical-align: 1px;
+}
+
+.helpButton:hover,
+.helpButton:focus-visible {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-label-tertiary);
+}
+
 .editorActions {
   display: flex;
   justify-content: flex-end;
@@ -460,6 +484,11 @@
   flex-direction: column;
   gap: 14px;
   list-style: none;
+}
+
+/* The mode switch sits above the mounted panels inside the same card. */
+.addModes {
+  margin-bottom: 2px;
 }
 
 /* Nested in a card that already carries the module chrome. */
@@ -749,6 +778,43 @@ select.input {
 }
 
 .input:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.keyInput {
+  position: relative;
+}
+
+.keyInputFilled {
+  padding-right: 40px;
+}
+
+.keyToggle {
+  position: absolute;
+  inset: 1px 1px 1px auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--dsw-radius-md);
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.keyToggle:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+}
+
+.keyToggle:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+.keyToggle:disabled {
   opacity: 0.6;
   cursor: default;
 }
