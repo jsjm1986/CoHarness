@@ -2,36 +2,6 @@
   {
     "tools": [
       {
-        "name": "edit",
-        "description": "Edit an existing UTF-8 text file by replacing literal text.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
-            },
-            "old_string": {
-              "type": "string",
-              "description": "Literal text to replace."
-            },
-            "new_string": {
-              "type": "string",
-              "description": "Literal replacement text. Use an empty string to delete the match."
-            },
-            "replace_all": {
-              "type": "boolean",
-              "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
-            }
-          },
-          "required": [
-            "file_path",
-            "old_string",
-            "new_string"
-          ]
-        }
-      },
-      {
         "name": "pwsh",
         "description": "Run commands in a PowerShell shell\n* When invoking this tool, the contents of the \"command\" parameter does NOT need to be XML-escaped.\n* You don't have access to the internet via this tool.\n* State is persistent across command calls and discussions with the user.\n* Use native Windows paths (C:\\...) and $env:NAME variables; this is PowerShell, not bash.\n* Please avoid commands that may produce a very large amount of output.\n* Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.",
         "parameters": {
@@ -44,30 +14,6 @@
           },
           "required": [
             "command"
-          ]
-        }
-      },
-      {
-        "name": "read",
-        "description": "Read a UTF-8 text file and return line-numbered content.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to read, resolved by the filesystem backend."
-            },
-            "offset": {
-              "type": "number",
-              "description": "1-based first line to return. Defaults to 1."
-            },
-            "limit": {
-              "type": "number",
-              "description": "Maximum number of lines to return. Defaults to 2000."
-            }
-          },
-          "required": [
-            "file_path"
           ]
         }
       },
@@ -184,33 +130,12 @@
             }
           }
         }
-      },
-      {
-        "name": "write",
-        "description": "Create or fully replace a UTF-8 text file.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
-            },
-            "content": {
-              "type": "string",
-              "description": "Full UTF-8 text content to write."
-            }
-          },
-          "required": [
-            "file_path",
-            "content"
-          ]
-        }
       }
     ],
     "messages": [
       {
         "role": "system",
-        "text": "You are a helpful software engineer assistant.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
+        "text": "You are a helpful software engineer assistant."
       },
       {
         "role": "user",
@@ -221,36 +146,6 @@
   {
     "tools": [
       {
-        "name": "edit",
-        "description": "Edit an existing UTF-8 text file by replacing literal text.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
-            },
-            "old_string": {
-              "type": "string",
-              "description": "Literal text to replace."
-            },
-            "new_string": {
-              "type": "string",
-              "description": "Literal replacement text. Use an empty string to delete the match."
-            },
-            "replace_all": {
-              "type": "boolean",
-              "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
-            }
-          },
-          "required": [
-            "file_path",
-            "old_string",
-            "new_string"
-          ]
-        }
-      },
-      {
         "name": "pwsh",
         "description": "Run commands in a PowerShell shell\n* When invoking this tool, the contents of the \"command\" parameter does NOT need to be XML-escaped.\n* You don't have access to the internet via this tool.\n* State is persistent across command calls and discussions with the user.\n* Use native Windows paths (C:\\...) and $env:NAME variables; this is PowerShell, not bash.\n* Please avoid commands that may produce a very large amount of output.\n* Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.",
         "parameters": {
@@ -263,30 +158,6 @@
           },
           "required": [
             "command"
-          ]
-        }
-      },
-      {
-        "name": "read",
-        "description": "Read a UTF-8 text file and return line-numbered content.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to read, resolved by the filesystem backend."
-            },
-            "offset": {
-              "type": "number",
-              "description": "1-based first line to return. Defaults to 1."
-            },
-            "limit": {
-              "type": "number",
-              "description": "Maximum number of lines to return. Defaults to 2000."
-            }
-          },
-          "required": [
-            "file_path"
           ]
         }
       },
@@ -403,33 +274,12 @@
             }
           }
         }
-      },
-      {
-        "name": "write",
-        "description": "Create or fully replace a UTF-8 text file.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
-            },
-            "content": {
-              "type": "string",
-              "description": "Full UTF-8 text content to write."
-            }
-          },
-          "required": [
-            "file_path",
-            "content"
-          ]
-        }
       }
     ],
     "messages": [
       {
         "role": "system",
-        "text": "You are a helpful software engineer assistant.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
+        "text": "You are a helpful software engineer assistant."
       },
       {
         "role": "user",
@@ -454,36 +304,6 @@
   {
     "tools": [
       {
-        "name": "edit",
-        "description": "Edit an existing UTF-8 text file by replacing literal text.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
-            },
-            "old_string": {
-              "type": "string",
-              "description": "Literal text to replace."
-            },
-            "new_string": {
-              "type": "string",
-              "description": "Literal replacement text. Use an empty string to delete the match."
-            },
-            "replace_all": {
-              "type": "boolean",
-              "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
-            }
-          },
-          "required": [
-            "file_path",
-            "old_string",
-            "new_string"
-          ]
-        }
-      },
-      {
         "name": "pwsh",
         "description": "Run commands in a PowerShell shell\n* When invoking this tool, the contents of the \"command\" parameter does NOT need to be XML-escaped.\n* You don't have access to the internet via this tool.\n* State is persistent across command calls and discussions with the user.\n* Use native Windows paths (C:\\...) and $env:NAME variables; this is PowerShell, not bash.\n* Please avoid commands that may produce a very large amount of output.\n* Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.",
         "parameters": {
@@ -496,30 +316,6 @@
           },
           "required": [
             "command"
-          ]
-        }
-      },
-      {
-        "name": "read",
-        "description": "Read a UTF-8 text file and return line-numbered content.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to read, resolved by the filesystem backend."
-            },
-            "offset": {
-              "type": "number",
-              "description": "1-based first line to return. Defaults to 1."
-            },
-            "limit": {
-              "type": "number",
-              "description": "Maximum number of lines to return. Defaults to 2000."
-            }
-          },
-          "required": [
-            "file_path"
           ]
         }
       },
@@ -636,33 +432,12 @@
             }
           }
         }
-      },
-      {
-        "name": "write",
-        "description": "Create or fully replace a UTF-8 text file.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
-            },
-            "content": {
-              "type": "string",
-              "description": "Full UTF-8 text content to write."
-            }
-          },
-          "required": [
-            "file_path",
-            "content"
-          ]
-        }
       }
     ],
     "messages": [
       {
         "role": "system",
-        "text": "You are a helpful software engineer assistant.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
+        "text": "You are a helpful software engineer assistant."
       },
       {
         "role": "user",
@@ -701,36 +476,6 @@
   {
     "tools": [
       {
-        "name": "edit",
-        "description": "Edit an existing UTF-8 text file by replacing literal text.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
-            },
-            "old_string": {
-              "type": "string",
-              "description": "Literal text to replace."
-            },
-            "new_string": {
-              "type": "string",
-              "description": "Literal replacement text. Use an empty string to delete the match."
-            },
-            "replace_all": {
-              "type": "boolean",
-              "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
-            }
-          },
-          "required": [
-            "file_path",
-            "old_string",
-            "new_string"
-          ]
-        }
-      },
-      {
         "name": "pwsh",
         "description": "Run commands in a PowerShell shell\n* When invoking this tool, the contents of the \"command\" parameter does NOT need to be XML-escaped.\n* You don't have access to the internet via this tool.\n* State is persistent across command calls and discussions with the user.\n* Use native Windows paths (C:\\...) and $env:NAME variables; this is PowerShell, not bash.\n* Please avoid commands that may produce a very large amount of output.\n* Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.",
         "parameters": {
@@ -743,30 +488,6 @@
           },
           "required": [
             "command"
-          ]
-        }
-      },
-      {
-        "name": "read",
-        "description": "Read a UTF-8 text file and return line-numbered content.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to read, resolved by the filesystem backend."
-            },
-            "offset": {
-              "type": "number",
-              "description": "1-based first line to return. Defaults to 1."
-            },
-            "limit": {
-              "type": "number",
-              "description": "Maximum number of lines to return. Defaults to 2000."
-            }
-          },
-          "required": [
-            "file_path"
           ]
         }
       },
@@ -883,33 +604,12 @@
             }
           }
         }
-      },
-      {
-        "name": "write",
-        "description": "Create or fully replace a UTF-8 text file.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
-            },
-            "content": {
-              "type": "string",
-              "description": "Full UTF-8 text content to write."
-            }
-          },
-          "required": [
-            "file_path",
-            "content"
-          ]
-        }
       }
     ],
     "messages": [
       {
         "role": "system",
-        "text": "You are a helpful software engineer assistant.\n\nUse the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n\nRead an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n\nRead a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session."
+        "text": "You are a helpful software engineer assistant."
       },
       {
         "role": "user",
