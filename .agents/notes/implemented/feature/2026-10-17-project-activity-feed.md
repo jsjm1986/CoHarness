@@ -40,7 +40,7 @@ The one durable gap is the `callId` on the claim row: `question/requested` carri
 
 ### Presentation (reviewed HTML mock)
 
-L1 hairline list: day → conversation → entry rows separated by 0.5px `border-l1` rules; a segmented `time | conversation | member` grouping switcher, a member filter, and manual refresh in the toolbar; answers render the question text dimmed plus the selected answer as an accent-tinted `radius-full` capsule. All styling uses `ui-theme` tokens.
+Each grouping mode is a folded reading view: `time` folds rows into one collapsible section per day (today open by default) whose entries are single-line summaries that expand an inline detail card — question text, full content, and a jump-to-conversation action; `conversation` renders one folded block per conversation whose header carries a colour dot, title, and recency, whose digest line prefers the newest answer ("chose: question → answer (actor)"), and whose meta row shows actor avatars, entry count, and decision count; `member` renders one folded block per member (avatar, name, counts) with digest lines listing choices before messages. The conversation colour dot hashes `sessionId` into a fixed five-tone palette. Answer rows carry the accent "chose" verb; messages stay plain text; row clicks still `reveal(sessionId, seq)` and the conversation chip `reveal(sessionId, null)`. Fold state is component-local. Toolbar, member filter, refresh, and pagination are unchanged; all styling uses `ui-theme` tokens.
 
 ## Alternatives considered
 

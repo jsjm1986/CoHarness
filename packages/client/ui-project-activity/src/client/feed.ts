@@ -48,9 +48,16 @@ export type ActivityGrouping = 'time' | 'conversation' | 'member'
 export interface ActivitySection {
   readonly id: string
   readonly title: string
-  readonly meta?: string
-  /** Time mode only: the day header above this conversation section. */
+  /** Latest row timestamp (`occurredAt`), for recency labels on folded headers. */
+  readonly latest?: string
+  /** Time mode only: the day (`YYYY-MM-DD`) this section covers. */
   readonly day?: string
+  /** Row surfaced as the collapsed summary: the newest answer, else the newest row. */
+  readonly digest?: ActivityItem
+  /** Distinct actors in feed order. */
+  readonly actors: readonly { userId: number; label: string }[]
+  /** Count of answer rows in this section. */
+  readonly answers: number
   readonly rows: readonly ActivityItem[]
 }
 
@@ -81,9 +88,31 @@ function latestOf(rows: readonly ActivityItem[]): string {
   return latest
 }
 
+/** Attach collapsed-view statistics (digest row, actors, answer count) to a section. */
+function withStats(section: Omit<ActivitySection, 'digest' | 'actors' | 'answers'>): ActivitySection {
+  let digest: ActivityItem | undefined
+  let answers = 0
+  const seen = new Map<number, string>()
+  for (const row of section.rows) {
+    if (row.kind === 'answer') {
+      answers += 1
+      if (digest === undefined) digest = row
+    }
+    if (!seen.has(row.actorUserId)) seen.set(row.actorUserId, row.actorLabel)
+  }
+  const pick = digest ?? section.rows[0]
+  return {
+    ...section,
+    ...(pick === undefined ? {} : { digest: pick }),
+    actors: [...seen.entries()].map(([userId, label]) => ({ userId, label })),
+    answers,
+  }
+}
+
 /**
- * Group feed rows into sections. `time` nests day → conversation; `conversation`
- * and `member` produce one section per distinct key, ordered by latest activity.
+ * Group feed rows into sections. `time` folds rows into one section per day;
+ * `conversation` and `member` produce one section per distinct key, ordered by
+ * latest activity.
  * @param items - feed rows in newest-first order.
  * @param grouping - active toolbar mode.
  * @param conversationTitle - fallback label for a null conversation title.
@@ -96,22 +125,15 @@ export function groupItems(
 ): ActivitySection[] {
   const titleOf = (item: ActivityItem): string => item.conversationTitle ?? conversationTitle(item.sessionId)
   if (grouping === 'time') {
-    const days = new Map<string, Map<string, ActivityItem[]>>()
-    const titles = new Map<string, string>()
+    const days = new Map<string, ActivityItem[]>()
     for (const item of items) {
       const day = dayLabel(item.occurredAt)
-      let conversations = days.get(day)
-      if (conversations === undefined) days.set(day, conversations = new Map<string, ActivityItem[]>())
-      const key = `${titleOf(item)}${item.sessionId}`
-      let rows = conversations.get(key)
-      if (rows === undefined) conversations.set(key, rows = [])
-      titles.set(key, titleOf(item))
+      let rows = days.get(day)
+      if (rows === undefined) days.set(day, rows = [])
       rows.push(item)
     }
-    return [...days.entries()].flatMap(([day, conversations]) =>
-      [...conversations.entries()].map(([key, rows]) => ({
-        id: `${day}/${key}`, day, title: titles.get(key) ?? '', meta: String(rows.length), rows,
-      })))
+    return [...days.entries()].map(([day, rows]) =>
+      withStats({ id: day, day, title: day, rows }))
   }
   const keyed = new Map<string, ActivityItem[]>()
   for (const item of items) {
@@ -124,14 +146,57 @@ export function groupItems(
     .sort((left, right) => latestOf(right[1]).localeCompare(latestOf(left[1])))
     .map(([key, rows]) => {
       const first = rows[0]
-      if (first === undefined) return { id: key, title: '', rows }
-      return {
+      if (first === undefined) return withStats({ id: key, title: '', rows })
+      return withStats({
         id: key,
         title: grouping === 'conversation' ? titleOf(first) : first.actorLabel,
-        meta: timeLabel(latestOf(rows)),
+        latest: latestOf(rows),
         rows,
-      }
+      })
     })
+}
+
+/** Conversation identity tones cycling deterministically by `sessionId`. */
+export const CONV_TONES = ['toneBlue', 'toneGreen', 'toneAmber', 'toneRed', 'toneDeep'] as const
+
+/**
+ * Map a conversation to a stable tone index so one thread keeps one colour
+ * across groupings and refreshes.
+ * @param sessionId - wire session id carried by the feed row.
+ * @returns index into {@link CONV_TONES}.
+ */
+export function convTone(sessionId: string): number {
+  let sum = 0
+  for (const char of sessionId) sum += char.codePointAt(0) ?? 0
+  return sum % CONV_TONES.length
+}
+
+/**
+ * Label a section day relative to today.
+ * @param day - `YYYY-MM-DD` produced by {@link dayLabel}.
+ * @param labels - localized `today` / `yesterday` words.
+ * @returns `today`/`yesterday` words for recent days, else the raw date.
+ */
+export function relativeDayLabel(day: string, labels: { today: string; yesterday: string }): string {
+  const today = dayLabel(new Date().toISOString())
+  if (day === today) return labels.today
+  const yesterday = dayLabel(new Date(Date.now() - 86_400_000).toISOString())
+  if (day === yesterday) return `${labels.yesterday} · ${day.slice(5)}`
+  return day
+}
+
+/**
+ * Label a row's latest activity for collapsed headers: `HH:mm` today,
+ * `yesterday HH:mm` yesterday, else `MM-DD`.
+ * @param iso - timestamp to label.
+ * @param yesterdayLabel - localized yesterday word.
+ * @returns short recency label.
+ */
+export function agoLabel(iso: string, yesterdayLabel: string): string {
+  const day = dayLabel(iso)
+  if (day === dayLabel(new Date().toISOString())) return timeLabel(iso)
+  if (day === dayLabel(new Date(Date.now() - 86_400_000).toISOString())) return `${yesterdayLabel} ${timeLabel(iso)}`
+  return day.slice(5)
 }
 
 /**

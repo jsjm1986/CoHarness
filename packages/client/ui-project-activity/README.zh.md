@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-项目动态插件的浏览器半：一个右侧栏标签类型（`activity`），列出共享项目成员发送了什么、选择了什么——带署名的 `user/message` 行与 `ask_user_question` 回答（提问原文加选中的选项）——通过同源凭据读取账户级 `GET /account/api/activity` 分页。Feed 按 keyset 游标倒序分页；面板用分段控件在时间（按日、再按会话）、按会话、按成员三种分组间切换，并提供成员筛选、刷新与加载更早。点击行通过 `conversationViewport.reveal(sessionId, seq)` 打开对应会话——无锚点的行走 `replaceActive`——让成员直接落到那条日志事件上。
+项目动态插件的浏览器半：一个右侧栏标签类型（`activity`），列出共享项目成员发送了什么、选择了什么——带署名的 `user/message` 行与 `ask_user_question` 回答（提问原文加选中的选项）——通过同源凭据读取账户级 `GET /account/api/activity` 分页。Feed 按 keyset 游标倒序分页；面板用分段控件在三种折叠阅读视图间切换——`时间` 把条目按日折叠（今天默认展开），每条为单行摘要、点行就地展开详情卡；`会话` 把每个会话折成摘要块、块头摘要行优先呈现最新回答；`成员` 把每人折成速写块、摘要行先列「定了」再列「说了」——并提供成员筛选、刷新与加载更早。点击行通过 `conversationViewport.reveal(sessionId, seq)` 打开对应会话——无锚点的行走 `replaceActive`——让成员直接落到那条日志事件上。
 
 标签类型只在 `projectUiPolicy` 报告项目空间时注册：apply 体订阅策略快照，每次切换都挂载或释放 `sidebarRightTabs` 定义，Guide 胶囊与已打开的标签随空间一同来去。带 key 的 `sidebar.right.pane.tab` 正文与 `sidebar.right.pane.tab.title` 座常驻挂载——没有存活的类型时它们不派发任何内容。视图状态（分页、分组、成员筛选）保存在正文注册声明的会话级 store 中；inject 面携带 `refresh`、`loadMore(before)` 与经 `ctx` viewport 服务的 `reveal`。Host 半是惰性的：插件只经 Client 加载器挂载。
 
