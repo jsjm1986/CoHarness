@@ -118,9 +118,8 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
       { ...clientBuildEnvironment, NODE_ENV: 'production' },
     ))
     // The first watch-mode compile of the full client graph can exceed the
-    // generic bound several times over on loaded runners: this script's
-    // watchers cold-build ~70 packages serially, so the bound must cover the
-    // worst observed enumeration (~4 minutes) plus margin.
+    // generic bound several times over on loaded runners, so the bound must
+    // cover the worst observed cold compile plus margin.
     await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web', 420_000)
     host = subprocessCtx.subprocess.spawn(spawnSpec(
       [process.execPath, binPath, 'web', '--patch', storagePatch, '--no-open', '--port', '0'],
