@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { basename, join, posix, resolve } from 'node:path'
 import { DEFAULT_DESKTOP_COORDINATOR_CONFIG, type DesktopCoordinatorConfig } from './desktop-coordinator.ts'
+import { DEFAULT_PROGRESS_CONFIG, type ProgressConfig } from './postgres/progress-service.ts'
 import { DEFAULT_RUNTIME_LOG_CAP_BYTES } from './runtime-log.ts'
 
 export interface GatewayConfig {
@@ -158,6 +159,8 @@ export interface GatewayConfig {
   desktopDriverArgs?: string[]
   /** Resident steward space provisioning and launch identity (HGW_STEWARD_*). */
   steward: StewardSpaceConfig
+  /** Human-facing project progress digest gates and model-call bounds (HGW_PROGRESS_*). */
+  progress: ProgressConfig
 }
 
 /** Resident steward space configuration; disabled unless HGW_STEWARD=on. */
@@ -651,6 +654,30 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (launcher === 'systemd' && (!systemdUnitDir.startsWith('/') || /[\u0000-\u001f\u007f:]/u.test(systemdUnitDir))) {
     throw new Error('HGW_SYSTEMD_UNIT_DIR must be an absolute path without control or colon characters')
   }
+  const progress: ProgressConfig = {
+    enabled: env.HGW_PROGRESS !== 'off',
+    minActivity: positiveSafeInteger(
+      env.HGW_PROGRESS_MIN_ACTIVITY, DEFAULT_PROGRESS_CONFIG.minActivity, 'HGW_PROGRESS_MIN_ACTIVITY'),
+    idleMs: timerDelay(env.HGW_PROGRESS_IDLE_MS, DEFAULT_PROGRESS_CONFIG.idleMs, 'HGW_PROGRESS_IDLE_MS'),
+    intervalMs: timerDelay(
+      env.HGW_PROGRESS_INTERVAL_MS, DEFAULT_PROGRESS_CONFIG.intervalMs, 'HGW_PROGRESS_INTERVAL_MS'),
+    materialWindowDays: positiveSafeInteger(
+      env.HGW_PROGRESS_MATERIAL_WINDOW_DAYS, DEFAULT_PROGRESS_CONFIG.materialWindowDays, 'HGW_PROGRESS_MATERIAL_WINDOW_DAYS'),
+    maxMaterialRows: positiveSafeInteger(
+      env.HGW_PROGRESS_MAX_MATERIAL_ROWS, DEFAULT_PROGRESS_CONFIG.maxMaterialRows, 'HGW_PROGRESS_MAX_MATERIAL_ROWS'),
+    maxAssistantRows: positiveSafeInteger(
+      env.HGW_PROGRESS_MAX_ASSISTANT_ROWS, DEFAULT_PROGRESS_CONFIG.maxAssistantRows, 'HGW_PROGRESS_MAX_ASSISTANT_ROWS'),
+    maxItemsPerSection: positiveSafeInteger(
+      env.HGW_PROGRESS_MAX_ITEMS, DEFAULT_PROGRESS_CONFIG.maxItemsPerSection, 'HGW_PROGRESS_MAX_ITEMS'),
+    maxOutputTokens: positiveSafeInteger(
+      env.HGW_PROGRESS_MAX_OUTPUT_TOKENS, DEFAULT_PROGRESS_CONFIG.maxOutputTokens, 'HGW_PROGRESS_MAX_OUTPUT_TOKENS'),
+    requestTimeoutMs: timerDelay(
+      env.HGW_PROGRESS_TIMEOUT_MS, DEFAULT_PROGRESS_CONFIG.requestTimeoutMs, 'HGW_PROGRESS_TIMEOUT_MS'),
+    leaseMs: timerDelay(env.HGW_PROGRESS_LEASE_MS, DEFAULT_PROGRESS_CONFIG.leaseMs, 'HGW_PROGRESS_LEASE_MS'),
+    sweepMaxProjects: positiveSafeInteger(
+      env.HGW_PROGRESS_SWEEP_MAX, DEFAULT_PROGRESS_CONFIG.sweepMaxProjects, 'HGW_PROGRESS_SWEEP_MAX'),
+    sweepMs: timerDelay(env.HGW_PROGRESS_SWEEP_MS, DEFAULT_PROGRESS_CONFIG.sweepMs, 'HGW_PROGRESS_SWEEP_MS'),
+  }
   return {
     releaseRoot,
     releaseId: releaseRoot === undefined ? undefined : basename(releaseRoot),
@@ -740,5 +767,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       readRoots: env.HGW_STEWARD_READ_ROOTS === undefined ? [] : parseStewardReadRoots(env.HGW_STEWARD_READ_ROOTS),
       runtimeUser: stewardRuntimeUser,
     },
+    progress,
   }
 }

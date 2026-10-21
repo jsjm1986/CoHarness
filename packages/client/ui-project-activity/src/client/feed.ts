@@ -41,8 +41,97 @@ export async function fetchActivity(before: string | undefined, signal: AbortSig
   }
 }
 
+/** One journal line attributed back to its source conversation. */
+export interface ProgressItem {
+  readonly text: string
+  readonly actor?: string
+  readonly sessionId?: string
+  readonly sessionTitle?: string
+  readonly seq?: number
+}
+
+/** Structured digest payload inside a journal entry. */
+export interface ProgressContent {
+  readonly summary?: string
+  readonly sections: {
+    readonly decided: readonly ProgressItem[]
+    readonly done: readonly ProgressItem[]
+    readonly doing: readonly ProgressItem[]
+    readonly blocked: readonly ProgressItem[]
+  }
+}
+
+/** One journal entry as served by `GET /account/api/progress`. */
+export interface ProgressEntry {
+  readonly id: string
+  readonly kind: 'current' | 'period'
+  readonly periodKey?: string
+  readonly content: ProgressContent
+  readonly activityCount: number
+  readonly periodStart?: string
+  readonly periodEnd?: string
+  readonly model?: string
+  readonly generatedAt: string
+}
+
+/** Live digest state shown in the panel footer. */
+export interface ProgressStatus {
+  readonly enabled: boolean
+  readonly pending: number
+  readonly generating: boolean
+  readonly lastRunAt?: string
+  readonly lastError?: string
+  readonly canGenerate: boolean
+}
+
+/** Journal page served by `GET /account/api/progress`. */
+export interface ProgressPage {
+  readonly enabled: boolean
+  readonly current?: ProgressEntry
+  readonly periods: readonly ProgressEntry[]
+  readonly status: ProgressStatus
+}
+
+/**
+ * Read the human-facing progress journal through the account session.
+ * @param signal - abort for superseded or disposed reads.
+ * @returns the normalized page; transport and payload failures reject.
+ */
+export async function fetchProgress(signal: AbortSignal): Promise<ProgressPage> {
+  const response = await fetch('/account/api/progress', { credentials: 'same-origin', signal })
+  // The route is absent wherever the journal service is not mounted — present
+  // that as a feature-off page instead of a transport failure.
+  if (response.status === 400 || response.status === 404) {
+    return {
+      enabled: false, periods: [],
+      status: { enabled: false, pending: 0, generating: false, canGenerate: false },
+    }
+  }
+  if (!response.ok) throw new Error(`project progress request failed: ${String(response.status)}`)
+  return await response.json() as ProgressPage
+}
+
+/** Result of a member-forced digest request. */
+export interface ProgressGenerateResult {
+  readonly started: boolean
+  readonly reason?: string
+}
+
+/**
+ * Ask the gateway to run one digest pass now, overriding the idle gates.
+ * @returns whether a pass was admitted; refusals arrive in `reason`.
+ */
+export async function generateProgress(): Promise<ProgressGenerateResult> {
+  const response = await fetch('/account/api/progress/generate', { method: 'POST', credentials: 'same-origin' })
+  if (!response.ok) throw new Error(`project progress generate failed: ${String(response.status)}`)
+  return await response.json() as ProgressGenerateResult
+}
+
 /** Grouping modes offered by the panel toolbar. */
 export type ActivityGrouping = 'time' | 'conversation' | 'member'
+
+/** Panel modes: the progress journal plus the raw-activity groupings. */
+export type ActivityMode = 'progress' | ActivityGrouping
 
 /** One rendered section: a header label plus its rows in feed order. */
 export interface ActivitySection {

@@ -604,6 +604,151 @@
   opacity: 1;
 }
 
+/* ---------- progress mode: current block, folded periods, digest footer ---------- */
+
+.progress {
+  display: flex;
+  flex-direction: column;
+}
+
+.pCurrent {
+  margin: var(--dsw-space-3) var(--dsw-space-3) 0;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-inset);
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+}
+
+.pCurrentHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dsw-space-2);
+  margin-bottom: 3px;
+}
+
+.pCurrentTag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dsw-alias-link);
+}
+
+.pCurrentTime {
+  font-size: 9.5px;
+  color: var(--dsw-alias-label-dimmed);
+  font-variant-numeric: tabular-nums;
+}
+
+.pSummary {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--dsw-alias-label-primary);
+}
+
+.pSections {
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+  padding: var(--dsw-space-1) 0 var(--dsw-space-2);
+}
+
+.pSection {
+  padding: var(--dsw-space-1) var(--dsw-space-3) 0;
+}
+
+.pHead,
+.pHeadDecided {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dsw-alias-label-tertiary);
+  padding: var(--dsw-space-1) 0 2px;
+}
+
+.pHeadDecided {
+  color: var(--dsw-alias-link);
+}
+
+.pItem {
+  padding: 3px 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.pText,
+.pTextDecided {
+  display: block;
+  color: var(--dsw-alias-label-primary);
+}
+
+.pTextDecided {
+  font-weight: 600;
+}
+
+.pAttr {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1px;
+}
+
+.pWho {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.pWho::after {
+  content: ' ·';
+}
+
+.pFoot {
+  padding: var(--dsw-space-2) var(--dsw-space-3) 0;
+  font-size: 9.5px;
+  color: var(--dsw-alias-label-dimmed);
+}
+
+.pStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+  margin-top: var(--dsw-space-2);
+}
+
+.pStatusText {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.pError {
+  font-size: 10px;
+  color: var(--dsw-alias-state-error-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pGenerate {
+  flex-shrink: 0;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  padding: 0 var(--dsw-space-2);
+  height: 22px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-link);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pGenerate:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.pGenerate:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* ---------- notices ---------- */
 
 .notice {

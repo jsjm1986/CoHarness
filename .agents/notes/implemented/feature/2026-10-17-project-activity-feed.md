@@ -10,7 +10,7 @@ A shared project runtime hosts many conversations used by several members. Today
 
 ## Decision
 
-Add a **project activity feed**: a `ui-project-activity` client plugin that lists member-authored messages and question answers for the connected project, grouped three ways (time / conversation / member), with jump-to-message navigation.
+Add a **project activity feed**: a `ui-project-activity` client plugin that lists member-authored messages and question answers for the connected project, grouped three ways (time / conversation / member), with jump-to-message navigation. The panel later gained a fourth, default `progress` mode rendering the [human-facing progress journal](2026-10-21-project-progress-journal.md); the three feed groupings remain its raw views.
 
 ### Recorded content
 
@@ -45,7 +45,7 @@ Each grouping mode is a folded reading view: `time` folds rows into one collapsi
 ## Alternatives considered
 
 - **Derived `project_activity` table written in `append()`**: unnecessary — `conversation_events` already holds attributed message JSON and the claim join covers answers. A second write path would only duplicate data and add backfill work.
-- **Memory / model-facing recall**: rejected for this feature. Feeding extracted summaries to the model raises attribution-through-compaction, private-conversation leakage, and execution-participation questions the repository has not settled. The feed stays outside the model path entirely.
+- **Memory / model-facing recall**: rejected for this feature. Feeding extracted summaries to the model raises attribution-through-compaction, private-conversation leakage, and execution-participation questions the repository has not settled. The feed stays outside the model path entirely. The human-facing digest the same problem suggested later shipped separately as the [project progress journal](2026-10-21-project-progress-journal.md), which likewise keeps its entries out of every model request.
 - **Approvals in the feed**: removed at design review; the feed's job is quick comprehension of what members typed and chose, and approval noise works against that.
 - **Automation rows (schedule/webhook runs)**: deferred to a separate automation-health view; `conversation_search`'s `source.kind === 'user'` filter already excludes them from this feed.
 

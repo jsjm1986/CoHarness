@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for 2026-10-21-project-progress-journal.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-21-project-progress-journal.md
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity:
+  en: 0e62f9e9949e35e7
+  zh: 19576a7e88941175
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/problem:
+  en: 8665b2ddf2e72edd
+  zh: bd6ccc9645b2b14b
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision:
+  en: bab2b1167bd3cad7
+  zh: 10011b18adbb69a0
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/storage-migration-059:
+  en: a6f4262bdd208e98
+  zh: c4a2d5ad79cf0580
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/material-member-visible-only:
+  en: a8f0fb3b1196e2ee
+  zh: a35ed83889a62b6a
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/trigger-three-gates-never-a-timer-pass:
+  en: 94ee6b9f8f4b67b2
+  zh: 9786d558d2346017
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/pass-single-flight-committed-only-on-success:
+  en: 824d6e2bee497dce
+  zh: 8ea75877e4099221
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/client-progress-as-the-default-mode:
+  en: 29c74cd06d3baa91
+  zh: fef567159e26ce32
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/alternatives-considered:
+  en: 74b03ff932f46613
+  zh: f619da31f57c69da
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/consequences:
+  en: 0cdd94dfea26cb20
+  zh: 4799d35a3a670f67
+/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/testing:
+  en: 42fe93ae9dd51132
+  zh: 864d90b68338af34
