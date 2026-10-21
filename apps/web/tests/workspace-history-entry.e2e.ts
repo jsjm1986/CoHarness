@@ -200,7 +200,9 @@ describe('web e2e: Workspace history-first entry', () => {
     try {
       await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
       const panel = page.locator('[data-sidebar-right-panel]')
-      await panel.getByRole('button', { name: 'Browser Browse HTTP(S) pages', exact: true }).click()
+      // Guide descriptions hide once entries outgrow MAX_DESCRIBED_ENTRIES, so the
+      // accessible name is the entry title alone in that state.
+      await panel.getByRole('button', { name: /^Browser\b/ }).click()
       await panel.locator('[data-dockkit-tab]').first().waitFor()
       await expect.poll(() => panel.getByRole('button', { name: 'Disable sandbox restrictions', exact: true }).isEnabled()).toBe(true)
       expect(await panel.count()).toBe(1)
