@@ -1978,6 +1978,127 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'remoteDesktop',
+    summary: 'Remote-desktop capability.',
+    description: 'Remote-desktop capability. `resolve` is the enforced decision point: it computes the effective spec from matching grants and throws `REMOTE_DESKTOP_FORBIDDEN` rather than silently widening or narrowing. `attach` runs the resolved spec; grant and audit operations attribute actions to an explicit RemoteDesktopActor.',
+    methods: [
+      {
+        signature: 'abstract resolve(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSpec>',
+        description: 'Resolve an attach request into an enforced spec: match live grants, compute the effective level (never exceeding grants), and decide the recording flag. Throws RemoteDesktopError with `REMOTE_DESKTOP_FORBIDDEN` when no live grant authorizes the request.',
+        parameters: [{ name: 'request', description: 'the attach request: target, principal, optional Session, requested level.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the enforced spec, including effective level and recording flag.',
+      },
+      {
+        signature: 'abstract confirm(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSpec>',
+        description: 'Record the caller\'s explicit consent for a resolved spec. Implementations resolve the request first (rejecting unauthorized targets), persist the consent against the resolved grant set and requested level, record a `consent` audit event, and return the spec so the caller learns the effective level and recording flag it acknowledged.',
+        parameters: [{ name: 'request', description: 'the attach request being consented to.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the resolved spec the consent was recorded against.',
+      },
+      {
+        signature: 'abstract attach(request: RemoteDesktopAttachRequest, signal?: AbortSignal): Promise<RemoteDesktopSession>',
+        description: 'Open one attachment. Implementations resolve first — and require a consent recorded by confirm that covers the resolved grant set at the requested level, throwing `REMOTE_DESKTOP_CONSENT_REQUIRED` otherwise — then establish the transport and stream endpoint; the returned session owns detach.',
+        parameters: [{ name: 'request', description: 'the attach request to open.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the live session carrying the one-time stream token.',
+      },
+      {
+        signature: 'abstract serveStream(token: RemoteDesktopToken, socket: Duplex, signal?: AbortSignal): Promise<void>',
+        description: 'Serve one upgraded stream connection for a token minted by `attach`. The transport layer calls this after its handshake; the implementation consumes the token exactly once, resolves the pending spec, and pumps the desktop protocol with the effective level enforced inside the pump.',
+        parameters: [{ name: 'token', description: 'the one-time stream token minted by `attach`.' }, { name: 'socket', description: 'the upgraded client socket to pump.' }, { name: 'signal', description: 'request cancellation.' }],
+      },
+      {
+        signature: 'abstract status( actor: RemoteDesktopActor, target: RemoteDesktopTarget, options?: { sessionId?: SessionId }, signal?: AbortSignal, ): Promise<RemoteDesktopTargetStatus>',
+        description: 'Read the live remote state of one desktop endpoint. Requires at least one live grant for `actor.principal` on the target; `options.sessionId` admits session-scoped grants into the summary.',
+        parameters: [{ name: 'actor', description: 'the caller whose grants authorize the read.' }, { name: 'target', description: 'the desktop endpoint to probe.' }, { name: 'options', description: 'optional Session address for session-scoped grants.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'availability, attachment count, and the caller\'s grant summary.',
+      },
+      {
+        signature: 'abstract listGrants(actor: RemoteDesktopActor, filter?: RemoteDesktopGrantFilter, signal?: AbortSignal): Promise<RemoteDesktopGrant[]>',
+        description: 'List grants, optionally filtered; revoked rows need `includeRevoked`. Non-admin actors are restricted to their own principal.',
+        parameters: [{ name: 'actor', description: 'the caller; non-admin principals see only their own rows.' }, { name: 'filter', description: 'optional target/principal/revocation/attachable filters.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'matching grant rows.',
+      },
+      {
+        signature: 'abstract grant(input: RemoteDesktopGrantInput, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant>',
+        description: 'Issue a grant. `actor.admin === true` is required; implementations publish `remote-desktop/grants-changed` only after the write commits.',
+        parameters: [{ name: 'input', description: 'the grant to issue.' }, { name: 'actor', description: 'the administrator issuing it.' }],
+        returns: 'the committed grant row.',
+      },
+      {
+        signature: 'abstract setLevel(id: RemoteDesktopGrantId, level: RemoteDesktopLevel, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant>',
+        description: 'Change a grant\'s access level; `actor.admin === true` required.',
+        parameters: [{ name: 'id', description: 'the grant to change.' }, { name: 'level', description: 'the new access level.' }, { name: 'actor', description: 'the administrator making the change.' }],
+        returns: 'the updated grant row.',
+      },
+      {
+        signature: 'abstract revoke(id: RemoteDesktopGrantId, actor: RemoteDesktopActor): Promise<RemoteDesktopGrant>',
+        description: 'Revoke a grant by id; `actor.admin === true` required.',
+        parameters: [{ name: 'id', description: 'the grant to revoke.' }, { name: 'actor', description: 'the administrator revoking it.' }],
+        returns: 'the revoked grant row.',
+      },
+      {
+        signature: 'abstract audit( actor: RemoteDesktopActor, filter?: { target?: RemoteDesktopTarget; principal?: string }, signal?: AbortSignal, ): Promise<RemoteDesktopAuditEvent[]>',
+        description: 'Query audit events owned by this capability, newest first. Non-admin actors are restricted to their own principal.',
+        parameters: [{ name: 'actor', description: 'the caller; non-admin actors see only their own events.' }, { name: 'filter', description: 'optional target and principal restrictions.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'recorded events; providers may cap the result window.',
+      },
+    ],
+  },
+  {
+    key: 'remoteDesktopController',
+    summary: '`remoteDesktop/*` Remote namespace.',
+    description: '`remoteDesktop/*` Remote namespace. Every call resolves the caller\'s actor from the request\'s verified principal, then delegates enforcement to `ctx.remoteDesktop` (grant matching, level caps, administrator checks). The browser-visible principal is always the verified user, never caller input.',
+    methods: [
+      {
+        signature: '@Remote async status(agent: Agent, request: RemoteDesktopTargetView, signal: AbortSignal): Promise<RemoteDesktopStatusView>',
+        description: 'Live state of one desktop endpoint for the caller.',
+        parameters: [{ name: 'agent', description: 'caller\'s Session owner; also the session-grant address.' }, { name: 'request', description: 'the desktop to probe.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'endpoint availability and attachment count.',
+      },
+      {
+        signature: '@Remote async confirm( agent: Agent, request: RemoteDesktopTargetView & { level: RemoteDesktopLevelView }, signal: AbortSignal, ): Promise<RemoteDesktopSpecView>',
+        description: 'Record the caller\'s explicit consent for a resolved spec; the returned summary is what the operator acknowledged (level plus recording flag).',
+        parameters: [{ name: 'agent', description: 'caller\'s Session owner; session-scoped grants match its id.' }, { name: 'request', description: 'target plus the level being consented to.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the resolved spec the consent now covers.',
+      },
+      {
+        signature: '@Remote async attach( agent: Agent, request: RemoteDesktopTargetView & { level: RemoteDesktopLevelView }, signal: AbortSignal, ): Promise<RemoteDesktopAttachView>',
+        description: 'Open one attachment under the caller\'s grants.',
+        parameters: [{ name: 'agent', description: 'caller\'s Session owner; session-scoped grants match its id.' }, { name: 'request', description: 'target plus requested level.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the attachment id and one-time stream endpoint.',
+      },
+      {
+        signature: '@Remote async listGrants( agent: Agent, request: { principal?: string; includeRevoked?: boolean; attachable?: boolean }, signal: AbortSignal, ): Promise<RemoteDesktopGrantView[]>',
+        description: 'Grants visible to the caller: administrators see all; others see only rows for their own principal (the service enforces the same scoping). `attachable` restricts to grants the caller may attach under now, matched against the caller\'s Session for session-scoped rows.',
+        parameters: [{ name: 'agent', description: 'caller\'s Session address; supplies session-scope matching.' }, { name: 'request', description: 'optional principal, revoked-row, and attachable filters.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'matching grants, newest administration first.',
+      },
+      {
+        signature: '@Remote async grant(agent: Agent, request: RemoteDesktopGrantInputView, signal: AbortSignal): Promise<RemoteDesktopGrantView>',
+        description: 'Issue a grant; administrator authority required.',
+        parameters: [{ name: 'agent', description: 'administrator\'s Session address bound for routing.' }, { name: 'request', description: 'grant fields; `grantedBy` is the verified caller.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the stored grant row.',
+      },
+      {
+        signature: '@Remote async setLevel( agent: Agent, request: { grantId: string; level: RemoteDesktopLevelView }, signal: AbortSignal, ): Promise<RemoteDesktopGrantView>',
+        description: 'Change a grant\'s level; administrator authority required.',
+        parameters: [{ name: 'agent', description: 'administrator\'s Session address bound for routing.' }, { name: 'request', description: 'grant id and new level.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the updated grant row.',
+      },
+      {
+        signature: '@Remote async revoke(agent: Agent, request: { grantId: string }, signal: AbortSignal): Promise<RemoteDesktopGrantView>',
+        description: 'Revoke a grant; administrator authority required.',
+        parameters: [{ name: 'agent', description: 'administrator\'s Session address bound for routing.' }, { name: 'request', description: 'grant id.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the revoked grant row.',
+      },
+      {
+        signature: '@Remote async audit( agent: Agent, request: { principal?: string; target?: RemoteDesktopTargetView }, signal: AbortSignal, ): Promise<RemoteDesktopAuditEventView[]>',
+        description: 'Audit events visible to the caller, newest first; non-administrators are restricted to events touching their own principal.',
+        parameters: [{ name: 'agent', description: 'caller\'s Session address bound for routing.' }, { name: 'request', description: 'optional target and principal filters.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'matching audit events.',
+      },
+    ],
+  },
+  {
     key: 'sandbox',
     summary: 'Abstract process-sandbox service.',
     description: 'Abstract process-sandbox service. confine must return enforcing argv or fail closed at wrap or runner-execution time; silent unconfined passthrough is forbidden. Functional probes arbitrate multi-runner chains and may be skipped for a sole candidate, whose own refusal remains the fail-closed end.',
@@ -4493,6 +4614,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'progress', description: 'the installation\'s request id and phase, with the attempt while installing.' }],
   },
   {
+    name: 'remote-desktop/attached',
+    mode: 'emit',
+    signature: '\'remote-desktop/attached\'(session: RemoteDesktopSession, attached: boolean): void',
+    summary: 'Emitted after an attachment opens or closes.',
+    description: 'Emitted after an attachment opens or closes.',
+    parameters: [{ name: 'session', description: 'the attachment whose lifecycle event committed.' }, { name: 'attached', description: 'true after attach commits; false after detach commits.' }],
+  },
+  {
+    name: 'remote-desktop/grants-changed',
+    mode: 'emit',
+    signature: '\'remote-desktop/grants-changed\'(): void',
+    summary: 'Emitted after the grant set changes (grant/revoke committed).',
+    description: 'Emitted after the grant set changes (grant/revoke committed). Listeners refresh admin views and cached authorizations.',
+    parameters: [],
+  },
+  {
     name: 'schedule/changed',
     mode: 'emit',
     signature: '\'schedule/changed\'(): void',
@@ -6499,6 +6636,106 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'Reload',
     declaration: 'export interface Reload {\n    filename: string;\n    modules: ReloadModules;\n    runtime?: Plugin.Runtime | undefined;\n}',
+  },
+  {
+    name: 'RemoteDesktopActor',
+    declaration: 'export interface RemoteDesktopActor {\n    readonly principal: string;\n    readonly admin: boolean;\n}',
+  },
+  {
+    name: 'RemoteDesktopAttachRequest',
+    declaration: 'export interface RemoteDesktopAttachRequest {\n    readonly principal: string;\n    readonly target: RemoteDesktopTarget;\n    readonly sessionId?: SessionId;\n    readonly level: RemoteDesktopLevel;\n}',
+  },
+  {
+    name: 'RemoteDesktopAttachView',
+    declaration: 'export interface RemoteDesktopAttachView {\n    readonly id: string;\n    readonly spec: RemoteDesktopSpecView;\n    readonly stream: {\n        readonly path: string;\n        readonly token: string;\n    };\n}',
+  },
+  {
+    name: 'RemoteDesktopAuditEvent',
+    declaration: 'export type RemoteDesktopAuditEvent = {\n    readonly kind: \'consent\';\n    readonly principal: string;\n    readonly target: RemoteDesktopTarget;\n    readonly level: RemoteDesktopLevel;\n    readonly grants: readonly RemoteDesktopGrantId[];\n    readonly at: number;\n} | {\n    readonly kind: \'grant\';\n    readonly grant: RemoteDesktopGrant;\n    readonly actor: RemoteDesktopActor;\n    readonly at: number;\n} | {\n    readonly kind: \'revoke\' | \'set-level\';\n    readonly grant: RemoteDesktopGrant;\n    readonly actor: RemoteDesktopActor;\n    readonly at: number;\n} | {\n    readonly kind: \'attach\' | \'detach\';\n    readonly session: RemoteDesktopSessionId;\n    readonly spec: RemoteDesktopSpec;\n    readonly principal: string;\n    readonly at: number;\n} | {\n    readonly kind: \'level-escalate\';\n    readonly session: RemoteDesktopSessionId;\n    readonly from: RemoteDesktopLevel;\n    readonly to: RemoteDesktopLevel;\n    readonly principal: string;\n    readonly at: number;\n};',
+  },
+  {
+    name: 'RemoteDesktopAuditEventView',
+    declaration: 'export interface RemoteDesktopAuditEventView {\n    readonly kind: \'consent\' | \'grant\' | \'revoke\' | \'set-level\' | \'attach\' | \'detach\' | \'level-escalate\';\n    readonly at: number;\n    readonly principal: string;\n    readonly target?: RemoteDesktopTargetView;\n    readonly grantId?: string;\n    readonly sessionId?: string;\n    readonly level?: RemoteDesktopLevelView;\n    readonly from?: RemoteDesktopLevelView;\n    readonly to?: RemoteDesktopLevelView;\n}',
+  },
+  {
+    name: 'RemoteDesktopGrant',
+    declaration: 'export interface RemoteDesktopGrant {\n    readonly id: RemoteDesktopGrantId;\n    readonly target: RemoteDesktopTarget;\n    readonly principal: string;\n    readonly level: RemoteDesktopLevel;\n    readonly scope: RemoteDesktopGrantScope;\n    readonly recording: boolean;\n    readonly grantedBy: string;\n    readonly createdAt: number;\n    readonly revokedAt?: number;\n}',
+  },
+  {
+    name: 'RemoteDesktopGrantFilter',
+    declaration: 'export interface RemoteDesktopGrantFilter {\n    readonly target?: RemoteDesktopTarget;\n    readonly principal?: string;\n    readonly includeRevoked?: boolean;\n    readonly sessionId?: SessionId;\n    readonly attachable?: boolean;\n}',
+  },
+  {
+    name: 'RemoteDesktopGrantId',
+    declaration: 'export type RemoteDesktopGrantId = Branded<\'RemoteDesktopGrantId\'>;',
+  },
+  {
+    name: 'RemoteDesktopGrantInput',
+    declaration: 'export type RemoteDesktopGrantInput = Omit<RemoteDesktopGrant, \'id\' | \'createdAt\' | \'revokedAt\'>;',
+  },
+  {
+    name: 'RemoteDesktopGrantInputView',
+    declaration: 'export interface RemoteDesktopGrantInputView {\n    readonly target: RemoteDesktopTargetView;\n    readonly principal: string;\n    readonly level: RemoteDesktopLevelView;\n    readonly scope: RemoteDesktopGrantScopeView;\n    readonly recording: boolean;\n}',
+  },
+  {
+    name: 'RemoteDesktopGrantScope',
+    declaration: 'export type RemoteDesktopGrantScope = {\n    readonly kind: \'machine\';\n} | {\n    readonly kind: \'session\';\n    readonly sessionId: SessionId;\n    readonly expiresAt: number;\n};',
+  },
+  {
+    name: 'RemoteDesktopGrantScopeView',
+    declaration: 'export type RemoteDesktopGrantScopeView = {\n    readonly kind: \'machine\';\n} | {\n    readonly kind: \'session\';\n    readonly sessionId: string;\n    readonly expiresAt: number;\n};',
+  },
+  {
+    name: 'RemoteDesktopGrantView',
+    declaration: 'export interface RemoteDesktopGrantView {\n    readonly id: string;\n    readonly target: RemoteDesktopTargetView;\n    readonly principal: string;\n    readonly level: RemoteDesktopLevelView;\n    readonly scope: RemoteDesktopGrantScopeView;\n    readonly recording: boolean;\n    readonly grantedBy: string;\n    readonly createdAt: number;\n    readonly revokedAt?: number;\n}',
+  },
+  {
+    name: 'RemoteDesktopLevel',
+    declaration: 'export type RemoteDesktopLevel = \'view\' | \'control\';',
+  },
+  {
+    name: 'RemoteDesktopLevelView',
+    declaration: 'export type RemoteDesktopLevelView = \'view\' | \'control\';',
+  },
+  {
+    name: 'RemoteDesktopSession',
+    declaration: 'export interface RemoteDesktopSession {\n    readonly id: RemoteDesktopSessionId;\n    readonly spec: RemoteDesktopSpec;\n    readonly stream: RemoteDesktopStream;\n    detach(signal?: AbortSignal): Promise<void>;\n}',
+  },
+  {
+    name: 'RemoteDesktopSessionId',
+    declaration: 'export type RemoteDesktopSessionId = Branded<\'RemoteDesktopSessionId\'>;',
+  },
+  {
+    name: 'RemoteDesktopSpec',
+    declaration: 'export interface RemoteDesktopSpec {\n    readonly target: RemoteDesktopTarget;\n    readonly level: RemoteDesktopLevel;\n    readonly grants: readonly RemoteDesktopGrant[];\n    readonly recording: boolean;\n}',
+  },
+  {
+    name: 'RemoteDesktopSpecView',
+    declaration: 'export interface RemoteDesktopSpecView {\n    readonly target: RemoteDesktopTargetView;\n    readonly level: RemoteDesktopLevelView;\n    readonly recording: boolean;\n}',
+  },
+  {
+    name: 'RemoteDesktopStatusView',
+    declaration: 'export interface RemoteDesktopStatusView {\n    readonly target: RemoteDesktopTargetView;\n    readonly available: boolean;\n    readonly attachments: number;\n    readonly level: RemoteDesktopLevelView;\n    readonly recording: boolean;\n    readonly consented: boolean;\n}',
+  },
+  {
+    name: 'RemoteDesktopStream',
+    declaration: 'export interface RemoteDesktopStream {\n    readonly path: string;\n    readonly token: RemoteDesktopToken;\n}',
+  },
+  {
+    name: 'RemoteDesktopTarget',
+    declaration: 'export interface RemoteDesktopTarget {\n    readonly nodeId: string;\n    readonly desktop?: string;\n}',
+  },
+  {
+    name: 'RemoteDesktopTargetStatus',
+    declaration: 'export interface RemoteDesktopTargetStatus {\n    readonly target: RemoteDesktopTarget;\n    readonly available: boolean;\n    readonly attachments: number;\n    readonly level: RemoteDesktopLevel;\n    readonly recording: boolean;\n    readonly consented: boolean;\n}',
+  },
+  {
+    name: 'RemoteDesktopTargetView',
+    declaration: 'export interface RemoteDesktopTargetView {\n    readonly nodeId: string;\n    readonly desktop?: string;\n}',
+  },
+  {
+    name: 'RemoteDesktopToken',
+    declaration: 'export type RemoteDesktopToken = Branded<\'RemoteDesktopToken\'>;',
   },
   {
     name: 'ReplayEnvelope',

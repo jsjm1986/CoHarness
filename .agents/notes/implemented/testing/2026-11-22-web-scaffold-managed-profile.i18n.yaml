@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-22-web-scaffold-managed-profile.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-22-web-scaffold-managed-profile.md
+/agent-note-web-e2e-scaffold-boots-through-a-real-managed-profile:
+  en: f5f46395cf6d858d
+  zh: 02144fcf098f3ed0
+/agent-note-web-e2e-scaffold-boots-through-a-real-managed-profile/problem:
+  en: f47f02e4693ac829
+  zh: 7b4d9f3b10eacc19
+/agent-note-web-e2e-scaffold-boots-through-a-real-managed-profile/decision:
+  en: 77b9758f26ed0002
+  zh: 38add0c554d94e1a
+/agent-note-web-e2e-scaffold-boots-through-a-real-managed-profile/alternatives-considered:
+  en: ac74cf03126e4546
+  zh: 08ff1c2ca74886ca
+/agent-note-web-e2e-scaffold-boots-through-a-real-managed-profile/consequences:
+  en: 16ff09fbc79f8edb
+  zh: 4fdcfc839139cb3b

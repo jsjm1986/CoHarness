@@ -11,7 +11,7 @@ import {
 const MODULES_ID = '@deepseek-ai/dsh-client-modules'
 
 const comboUrl = (ids: readonly string[], rev: string): string =>
-  `plugins/??${ids.map(id => `${id}/client.js`).join(',')}&rev=${rev}`
+  `plugins/combo.js??${ids.map(id => `${id}/client.js`).join(',')}&rev=${rev}`
 const chunkUrl = (id: string, fileName: string, rev = '0'): string =>
   `plugins/${id}/${fileName}?rev=${rev}`
 const BOOTSTRAP_URL = comboUrl([MODULES_ID], 'bootstrap')
@@ -749,22 +749,22 @@ describe('HMR reset', () => {
 
   it('preserves an absolute combo endpoint when applying the rebuilt revision', async () => {
     const b = bench([
-      row('a', { url: 'https://plugins.example.test/plugins/??a/client.js&rev=0' }),
+      row('a', { url: 'https://plugins.example.test/plugins/combo.js??a/client.js&rev=0' }),
     ], { a: () => ({}) })
     await b.loader.import('a', '', {})
     b.loader.invalidate('a', 'next')
     await b.loader.prefetch('a')
-    expect(b.fetched.at(-1)).toBe('https://plugins.example.test/plugins/??a/client.js&rev=next')
+    expect(b.fetched.at(-1)).toBe('https://plugins.example.test/plugins/combo.js??a/client.js&rev=next')
   })
 
   it('preserves a protocol-relative combo endpoint when applying the rebuilt revision', async () => {
     const b = bench([
-      row('a', { url: '//plugins.example.test/plugins/??a/client.js&rev=0' }),
+      row('a', { url: '//plugins.example.test/plugins/combo.js??a/client.js&rev=0' }),
     ], { a: () => ({}) })
     await b.loader.import('a', '', {})
     b.loader.invalidate('a', 'next')
     await b.loader.prefetch('a')
-    expect(b.fetched.at(-1)).toBe('//plugins.example.test/plugins/??a/client.js&rev=next')
+    expect(b.fetched.at(-1)).toBe('//plugins.example.test/plugins/combo.js??a/client.js&rev=next')
   })
 
   it('uses the current plugin revision when a graph-row invalidation omits an override', async () => {

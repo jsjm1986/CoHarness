@@ -2386,6 +2386,90 @@ export type Config = LocalConfig
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-pwsh-sandbox -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-remote-desktop-stream -->
+<a id="deepseek-aidsh-remote-desktop-stream"></a>
+
+## `@deepseek-ai/dsh-remote-desktop-stream`
+
+- `source`: [`packages/remote-desktop/remote-desktop-stream/src/index.ts:32`](../packages/remote-desktop/remote-desktop-stream/src/index.ts)
+
+```ts config-catalog
+/** Complete config after schemastery applies every field default. */
+type ResolvedConfig = Required<Config>
+
+/** Plugin config: the mounted pathname. */
+export interface Config {
+  /** Exact pathname the stream upgrade route serves; clients append `?token=`. */
+  streamPath?: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-remote-desktop-stream -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-remote-desktop-vnc -->
+<a id="deepseek-aidsh-remote-desktop-vnc"></a>
+
+## `@deepseek-ai/dsh-remote-desktop-vnc`
+
+- `source`: [`packages/remote-desktop/remote-desktop-vnc/src/index.ts:99`](../packages/remote-desktop/remote-desktop-vnc/src/index.ts)
+
+```ts config-catalog
+type ResolvedConfig = Required<Config>
+
+/** Configuration for the VNC remote-desktop provider. */
+export interface Config {
+  /**
+   * VNC endpoints per target (`nodeId` plus optional `desktop`). Duplicate
+   * target keys fail at load.
+   */
+  endpoints?: {
+    /** Node identifier this endpoint serves; matches `RemoteDesktopTarget.nodeId`. */
+    nodeId: string
+    /** Desktop name on the node; omit when the node exposes a single desktop. */
+    desktop?: string
+    /** VNC server hostname or address the RFB client dials. */
+    host: string
+    /** VNC server TCP port (RFB; conventionally 5900 + display number). */
+    port: number
+    /**
+     * Login user name for password-authenticated servers (Apple Remote
+     * Desktop type 30 requires it); meaningless without `passwordRef`.
+     */
+    username?: string
+    /**
+     * Credential reference — an environment-variable name — resolving to the
+     * endpoint's password through `ctx.credentials`. When set, the provider
+     * terminates the RFB security negotiation host-side and the browser
+     * handshake offers only `None`: the password never leaves the host.
+     */
+    passwordRef?: string
+  }[]
+  /**
+   * JSON file `{endpoints: [...]}` maintained by the deployment's
+   * administration surface; when set it replaces the inline list and is
+   * reloaded when the file changes.
+   */
+  endpointsFile?: string
+  /** JSONL grant-store file; `':memory:'` selects a volatile store. */
+  grantsFile?: string
+  /**
+   * Directory for `.rfb` recordings of grants flagged `recording`; empty
+   * disables recording and a flagged attach fails at stream time.
+   */
+  recordingDir?: string
+  /** WebSocket pathname the stream mount serves; clients append `?token=`. */
+  streamPath?: string
+  /** Milliseconds an attach token stays valid before the client connects. */
+  attachTokenTtlMs?: number
+  /** Append-only JSONL audit file; `':memory:'` selects a volatile window. */
+  auditFile?: string
+  /** In-memory audit events retained for `audit()` queries. */
+  auditCapacity?: number
+  /** Milliseconds `status` allows for the endpoint reachability probe. */
+  probeTimeoutMs?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-remote-desktop-vnc -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-repeat-tool-reminder -->
 <a id="deepseek-aidsh-repeat-tool-reminder"></a>
 
@@ -4589,6 +4673,7 @@ export interface Config {
 | `@deepseek-ai/dsh-acp-app` | `cmdlineArgs` | [`packages/bundle/acp-app/src/index.ts`](../packages/bundle/acp-app/src/index.ts) |
 | `@deepseek-ai/dsh-agent` | — | [`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts) |
 | `@deepseek-ai/dsh-api-gateway` | `typert` | [`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts) |
+| `@deepseek-ai/dsh-api-remote-desktop-controller` | `remoteDesktop` · `typert` | [`packages/api/remote-desktop-controller/src/index.ts`](../packages/api/remote-desktop-controller/src/index.ts) |
 | `@deepseek-ai/dsh-api-remotes` | — | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
 | `@deepseek-ai/dsh-authorization` | `credentials` | [`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts) |
 | `@deepseek-ai/dsh-browser-use` | — | [`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts) |
@@ -4618,6 +4703,7 @@ export interface Config {
 | `@deepseek-ai/dsh-client-ui-plan` | — | [`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-project-activity` | — | [`packages/client/ui-project-activity/src/index.ts`](../packages/client/ui-project-activity/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-reference` | — | [`packages/client/ui-reference/src/index.ts`](../packages/client/ui-reference/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-remote-desktop` | — | [`packages/client/ui-remote-desktop/src/index.ts`](../packages/client/ui-remote-desktop/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-renderer` | — | [`packages/client/ui-renderer/src/index.ts`](../packages/client/ui-renderer/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-schedule` | — | [`packages/client/ui-schedule/src/index.ts`](../packages/client/ui-schedule/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings` | — | [`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts) |
@@ -4705,6 +4791,7 @@ export interface Config {
 | `@deepseek-ai/dsh-model-access` | `ModelAccessPolicy` | — | [`packages/llm/model-access/src/index.ts`](../packages/llm/model-access/src/index.ts) |
 | `@deepseek-ai/dsh-model-provider-config` | `ModelProviderConfig` | — | [`packages/llm/model-provider-config/src/index.ts`](../packages/llm/model-provider-config/src/index.ts) |
 | `@deepseek-ai/dsh-ptc-runtime` | `PtcRuntime` | — | [`packages/ptc-runtime/ptc-runtime/src/index.ts`](../packages/ptc-runtime/ptc-runtime/src/index.ts) |
+| `@deepseek-ai/dsh-remote-desktop` | `RemoteDesktop` | — | [`packages/remote-desktop/remote-desktop/src/index.ts`](../packages/remote-desktop/remote-desktop/src/index.ts) |
 | `@deepseek-ai/dsh-sandbox` | `SandboxProvider` | — | [`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts) |
 | `@deepseek-ai/dsh-session-persistence` | `SessionPersistence` | — | [`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts) |
 | `@deepseek-ai/dsh-session-query` | `SessionQueryEngine` | — | [`packages/session-query/session-query/src/index.ts`](../packages/session-query/session-query/src/index.ts) |

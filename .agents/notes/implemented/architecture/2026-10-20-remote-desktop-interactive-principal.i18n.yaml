@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-20-remote-desktop-interactive-principal.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-20-remote-desktop-interactive-principal.md
+/agent-note-remote-desktop-actor-resolves-from-the-request-principal:
+  en: 07ecd4d56d9c0c30
+  zh: e19c8c0186fab66d
+/agent-note-remote-desktop-actor-resolves-from-the-request-principal/problem:
+  en: 4e09fda2bd2cca2e
+  zh: fbd296367e95976e
+/agent-note-remote-desktop-actor-resolves-from-the-request-principal/decision:
+  en: a5750d843fb0975b
+  zh: f09a799ef50b1777
+/agent-note-remote-desktop-actor-resolves-from-the-request-principal/alternatives-considered:
+  en: 5d29b135adc60390
+  zh: 758b9770354b962d
+/agent-note-remote-desktop-actor-resolves-from-the-request-principal/consequences:
+  en: 1024b50cff75b066
+  zh: 272c9667ad093a0f

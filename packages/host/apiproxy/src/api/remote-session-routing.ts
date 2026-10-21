@@ -48,6 +48,14 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'sessionFeedback/record': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
   'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'request' },
   'userQuestions/attachWait': { action: 'read', path: ['agentId'] },
+  'remoteDesktop/status': { action: 'read', path: ['agentId'] },
+  'remoteDesktop/confirm': { action: 'write', path: ['agentId'], execution: 'request' },
+  'remoteDesktop/attach': { action: 'write', path: ['agentId'], execution: 'request' },
+  'remoteDesktop/listGrants': { action: 'read', path: ['agentId'] },
+  'remoteDesktop/grant': { action: 'write', path: ['agentId'], execution: 'none' },
+  'remoteDesktop/setLevel': { action: 'write', path: ['agentId'], execution: 'none' },
+  'remoteDesktop/revoke': { action: 'write', path: ['agentId'], execution: 'none' },
+  'remoteDesktop/audit': { action: 'read', path: ['agentId'] },
 })
 
 /**

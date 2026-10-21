@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-20-remote-desktop-admin-surface-boundary.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-20-remote-desktop-admin-surface-boundary.md
+/agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface:
+  en: 3c1b87c53f2bc18b
+  zh: 64802ef913e0e62b
+/agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface/problem:
+  en: 897d1b0cfa4dd030
+  zh: 37e6dac3cd4705e9
+/agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface/decision:
+  en: 79d741164fdadcb8
+  zh: 17abe25b164c761c
+/agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface/alternatives-considered:
+  en: 2d2d8c656902670d
+  zh: aa27b443a67f24f3
+/agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface/consequences:
+  en: 327e893c55c32c1b
+  zh: 61cc81e309151f70
+/agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface/verification:
+  en: c69fb93b6f864064
+  zh: 5470d51fdb823714

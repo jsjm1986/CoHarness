@@ -157,6 +157,7 @@
   "references": [
     { "path": "./packages/util/deque" },
     { "path": "./packages/api/terminal-controller/tsconfig.host.json" },
+    { "path": "./packages/api/remote-desktop-controller/tsconfig.host.json" },
     { "path": "packages/document/office-to-pdf" },
     { "path": "packages/skill/skill-office" },
     { "path": "./packages/deliverables/tool-present" },
@@ -393,6 +394,9 @@
     { "path": "./packages/experimental/tool-agent-team" },
     { "path": "./packages/browser-use/browser-use" },
     { "path": "./packages/computer-use/computer-use" },
+    { "path": "./packages/remote-desktop/remote-desktop" },
+    { "path": "./packages/remote-desktop/remote-desktop-stream" },
+    { "path": "./packages/remote-desktop/remote-desktop-vnc" },
     { "path": "./packages/webhook/webhook" },
     { "path": "./packages/webhook/webhook-github" },
     { "path": "./packages/workflow/workflow" },

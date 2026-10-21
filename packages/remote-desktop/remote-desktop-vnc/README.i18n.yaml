@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/remote-desktop/remote-desktop-vnc/README.md
+/:
+  en: 9835f98a6bc8c02f
+  zh: 72392264908cad84
+/deepseek-ai-dsh-remote-desktop-vnc:
+  en: ec6e92dcaa1e2a64
+  zh: 8e990964ee192c12
+/deepseek-ai-dsh-remote-desktop-vnc/summary:
+  en: c69ce9c9ebfdfdd1
+  zh: 18901b343143da67
+/deepseek-ai-dsh-remote-desktop-vnc/table-of-contents:
+  en: 44a97d20b47c965f
+  zh: 57e087a65dd06a37
+/deepseek-ai-dsh-remote-desktop-vnc/configuration:
+  en: e0b5e24ba8300a45
+  zh: feb37623c1f16455
+/deepseek-ai-dsh-remote-desktop-vnc/attachment-flow:
+  en: f220c415792f856c
+  zh: 87d9dc23aa4696ea
+/deepseek-ai-dsh-remote-desktop-vnc/managed-credentials:
+  en: 705a94c8588f8ded
+  zh: 94166c42bc8cd1c7
+/deepseek-ai-dsh-remote-desktop-vnc/view-only-enforcement:
+  en: 41efabf9bfe1bea4
+  zh: b4e00d8d0f515310
+/deepseek-ai-dsh-remote-desktop-vnc/model-experience:
+  en: d03dc543ec417a50
+  zh: d51d67f5d2129474
+/deepseek-ai-dsh-remote-desktop-vnc/model-experience/kv-cache-effect:
+  en: 6df5d919e32a2969
+  zh: ce383c7d4273feea
+/deepseek-ai-dsh-remote-desktop-vnc/known-limitations-and-deferred-work:
+  en: 9df34498fe0587dd
+  zh: 099a2fd3481f0d8f
+/deepseek-ai-dsh-remote-desktop-vnc/known-limitations-and-deferred-work/dev-note:
+  en: e6f880c18f52a85c
+  zh: 55ca84ca75079abb

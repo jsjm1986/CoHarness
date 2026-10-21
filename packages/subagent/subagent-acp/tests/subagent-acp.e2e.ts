@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -37,7 +37,7 @@ const childLaunch = resolveExampleLaunch({
 })
 
 /** The ACP backend ignores the parent, but the seam requires one with an execution-scoped ctx. */
-const fakeParent = (scope: Context): Agent => ({ id: 'parent', session: { header: {} }, ctx: scope }) as Agent
+const fakeParent = (scope: Context): Agent => ({ id: 'parent', session: { header: {}, append: vi.fn<Agent['session']['append']>() as Agent['session']['append'] }, ctx: scope }) as Agent
 
 let ctx: Context | undefined
 let workdir: string | undefined

@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/remote-desktop/remote-desktop-stream/README.md
+/:
+  en: dd6e3f8b7140eed8
+  zh: 4ac8752326d094b3
+/deepseek-ai-dsh-remote-desktop-stream:
+  en: 0fbbd230b08349e8
+  zh: c6db9b037f301677
+/deepseek-ai-dsh-remote-desktop-stream/summary:
+  en: f3fd62c524943695
+  zh: 0b04090da56b9bfc
+/deepseek-ai-dsh-remote-desktop-stream/table-of-contents:
+  en: 16875f8b6b5b6579
+  zh: 9d30b93cd02f5d0e
+/deepseek-ai-dsh-remote-desktop-stream/composition:
+  en: 962683f57bd0b212
+  zh: 067e6422e7cd7eae
+/deepseek-ai-dsh-remote-desktop-stream/model-experience:
+  en: 706202677533fc36
+  zh: 11e6716fe9eb3c01
+/deepseek-ai-dsh-remote-desktop-stream/model-experience/kv-cache-effect:
+  en: 2e2853ef95ef37e9
+  zh: edc113df38861abc
+/deepseek-ai-dsh-remote-desktop-stream/known-limitations-and-deferred-work:
+  en: e2d44af2ff61e5fc
+  zh: 861aa830d305c41d
+/deepseek-ai-dsh-remote-desktop-stream/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

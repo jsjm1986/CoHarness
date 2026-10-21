@@ -6,6 +6,7 @@ import {
   FolderKanban,
   LogOut,
   Monitor,
+  ScreenShare,
   Network,
   Terminal,
   Puzzle,
@@ -33,6 +34,7 @@ import { UsagePage } from './pages/UsagePage.tsx'
 import { DocumentsPage } from './pages/DocumentsPage.tsx'
 import { ArchivesPage } from './pages/ArchivesPage.tsx'
 import { DesktopsPage } from './pages/DesktopsPage.tsx'
+import { RemoteDesktopPage } from './pages/RemoteDesktopPage.tsx'
 import { SshPage } from './pages/SshPage.tsx'
 import { DeploymentPage } from './pages/DeploymentPage.tsx'
 import { WebhooksPage } from './pages/WebhooksPage.tsx'
@@ -79,6 +81,7 @@ export function App() {
             <Route path="/steward" element={<StewardPage />} />
             <Route path="/webhooks" element={<WebhooksPage />} />
             <Route path="/desktops" element={<DesktopsPage />} />
+            <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
             <Route path="/audit" element={<AuditPage />} />
           </Routes>
         </main>
@@ -102,6 +105,7 @@ const NAV_ITEMS: Array<{ to: string; labelKey: ChromeCopyKey; icon: LucideIcon; 
   { to: '/steward', labelKey: 'navSteward', icon: ShieldCheck },
   { to: '/webhooks', labelKey: 'navWebhooks', icon: Webhook },
   { to: '/desktops', labelKey: 'navDesktops', icon: Monitor },
+  { to: '/remote-desktops', labelKey: 'navRemoteDesktops', icon: ScreenShare },
   { to: '/audit', labelKey: 'navAudit', icon: ScrollText },
 ]
 
