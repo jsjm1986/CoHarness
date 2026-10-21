@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/event-producer-consumer.md
 document:
-  en: f66ef1948acaacb8c7386a63be48e9a6662e9433
-  zh: 60bd8d6cf2fc81b514e34a9a97f27c5429436b4f
+  en: 6cd469827e98a2cbf6919d4845bceba6c5affedd
+  zh: 577e4a0b593dbc1f5170733121a7fdbe5268da69
 /:
   en: 41d772192075e133
   zh: dda91c6c670cfd9d

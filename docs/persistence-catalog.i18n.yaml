@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-catalog.md
 document:
-  en: a85e293b640592c89115b77d45f9eb1a05c4fbf8
-  zh: b6625099b9ca079e8a325baf659e3a7c92c0caa5
+  en: e6e67aabcfa899b369d9d716c6a36e2682fae191
+  zh: 15fe6efa3768ef60457f6cb3dc092651bbd73a46
 /:
   en: a11f106978c9dce7
   zh: a11f106978c9dce7
@@ -660,8 +660,8 @@ document:
   en: 783510f43f5a57a3
   zh: dd7e2b9d201a0fd0
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-23:
-  en: 529ed12856cbb5d9
-  zh: 1101065cf767c193
+  en: ed634a900326eb7b
+  zh: 18404fc1d06dc4b0
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-24:
   en: 8a275d7a47bf5598
   zh: 7e59e2415eb04dde
@@ -1839,26 +1839,26 @@ document:
   en: f14677e433582079
   zh: 3ddedfd09e05b444
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-assistantmessage:
-  en: ec94942cd1f07e9b
-  zh: fa73df4c00a4484e
+  en: 1bb27164782027c6
+  zh: f98feb2756e655d8
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-contextsnapshotsection:
   en: c4d02c674f617737
   zh: 350ee3ec35a7dff9
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-developermessage:
-  en: b9f9c67281ba0740
-  zh: d0f3e9518a519cb2
+  en: 638d44d388de091c
+  zh: a75c0f646ef7cab1
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-message:
-  en: b87e9a15d3af5f0d
-  zh: a1723c011177d1ef
+  en: 0d04d249528dfe2b
+  zh: e58ef245f37f0000
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-messagesource:
-  en: 2d39c236ec166db5
-  zh: 6453db99cb434db6
+  en: 03a5b320de903ece
+  zh: f82db17bdc5ab54e
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-modelmessagesource:
   en: f9addc885cb2ae4b
   zh: ee851007da4ef5bd
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-systemmessage:
-  en: 812242cf02d03aaa
-  zh: c2a52230c33b7d7b
+  en: 792c7b4b810aecf1
+  zh: f45ca5a3c39beff5
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-systempromptmessagesource:
   en: d36fc90774ac33c0
   zh: 6ed28274c30118f8
@@ -1866,11 +1866,11 @@ document:
   en: 4637929a6d3cd22e
   zh: ceeb690998bb4979
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-toolresultmessage:
-  en: c7a3a6c07e38ff51
-  zh: 74c9cbc30994a6b4
+  en: 19b06f94fcf75ef7
+  zh: e93e5087717fdca2
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-message-ts-usermessage:
-  en: 9bee1b564015a9bb
-  zh: b3a6e81859f64888
+  en: 10a5beaa82ee8f3b
+  zh: e2de5b3d5ae92e53
 /session-persistence-event-catalog/resolved-persistence-types/packages-llm-llm-src-types-ts-contentblock:
   en: 0f4885bc9e544b0c
   zh: dbe86fc5271dd5b5

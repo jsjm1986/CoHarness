@@ -25933,7 +25933,7 @@
         "packages/llm/llm/src/message.ts#SystemMessage"
       ],
       "sources": [
-        "packages/llm/llm/src/message.ts:161"
+        "packages/llm/llm/src/message.ts:157"
       ]
     },
     {
@@ -26626,7 +26626,7 @@
         "packages/llm/llm/src/message.ts#Message"
       ],
       "sources": [
-        "packages/llm/llm/src/message.ts:206"
+        "packages/llm/llm/src/message.ts:202"
       ]
     },
     {
@@ -27001,7 +27001,7 @@
         "packages/llm/llm/src/message.ts#ToolResultMessage"
       ],
       "sources": [
-        "packages/llm/llm/src/message.ts:183"
+        "packages/llm/llm/src/message.ts:179"
       ]
     },
     {
@@ -27022,7 +27022,7 @@
         "packages/llm/llm/src/message.ts#UserMessage"
       ],
       "sources": [
-        "packages/llm/llm/src/message.ts:172"
+        "packages/llm/llm/src/message.ts:168"
       ]
     },
     {
@@ -28556,7 +28556,7 @@
         "packages/llm/llm/src/message.ts#DeveloperMessage"
       ],
       "sources": [
-        "packages/llm/llm/src/message.ts:167"
+        "packages/llm/llm/src/message.ts:163"
       ]
     },
     {
@@ -29165,7 +29165,7 @@
         "packages/llm/llm/src/message.ts#MessageSource"
       ],
       "sources": [
-        "packages/llm/llm/src/message.ts:146"
+        "packages/llm/llm/src/message.ts:142"
       ]
     },
     {
@@ -29790,7 +29790,7 @@
       "digest": "f0290738a0f88f258321ea9f4d44a871ed021e7029e4ef32441e04e6add99f7a",
       "names": [],
       "sources": [
-        "packages/llm/llm/src/message.ts:124"
+        "packages/llm/llm/src/message.ts:120"
       ]
     },
     {
@@ -29964,7 +29964,7 @@
         "packages/llm/llm/src/message.ts#AssistantMessage"
       ],
       "sources": [
-        "packages/llm/llm/src/message.ts:177"
+        "packages/llm/llm/src/message.ts:173"
       ]
     },
     {

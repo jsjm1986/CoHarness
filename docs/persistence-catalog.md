@@ -2437,7 +2437,7 @@ SHA-256: `2aad1179f957631477b582e57cd8f538cb82618fc3fb816bde1171154235b065`
 
 SHA-256: `f0290738a0f88f258321ea9f4d44a871ed021e7029e4ef32441e04e6add99f7a`
 
-Sources: [`packages/llm/llm/src/message.ts:124`](../packages/llm/llm/src/message.ts)
+Sources: [`packages/llm/llm/src/message.ts:120`](../packages/llm/llm/src/message.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7314,7 +7314,7 @@ Sources: [`packages/llm/llm/src/call-config.ts:36`](../packages/llm/llm/src/call
 
 SHA-256: `fa87537f4a9c1e25602990a8bf686b383e9e00352ec8946e16ae24ba7c1625be`
 
-Sources: [`packages/llm/llm/src/message.ts:177`](../packages/llm/llm/src/message.ts)
+Sources: [`packages/llm/llm/src/message.ts:173`](../packages/llm/llm/src/message.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7342,7 +7342,7 @@ Sources: [`packages/llm/llm/src/message.ts:70`](../packages/llm/llm/src/message.
 
 SHA-256: `a3f18b9c0134602b19d592f6c3bd8bcc019d70ae69cc19f0e69274b312e89f7b`
 
-Sources: [`packages/llm/llm/src/message.ts:167`](../packages/llm/llm/src/message.ts)
+Sources: [`packages/llm/llm/src/message.ts:163`](../packages/llm/llm/src/message.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7357,7 +7357,7 @@ Sources: [`packages/llm/llm/src/message.ts:167`](../packages/llm/llm/src/message
 
 SHA-256: `3115e5e4d8e0173661708de88a36f8893bdc0074827edd6a65843b4a5af3931e`
 
-Sources: [`packages/llm/llm/src/message.ts:206`](../packages/llm/llm/src/message.ts)
+Sources: [`packages/llm/llm/src/message.ts:202`](../packages/llm/llm/src/message.ts)
 
 One of:
 
@@ -7373,7 +7373,7 @@ One of:
 
 SHA-256: `c288d90c496110e979e40b5e67c71420dea1f6ca1758f1c19488d6b12a1d2089`
 
-Sources: [`packages/llm/llm/src/message.ts:146`](../packages/llm/llm/src/message.ts)
+Sources: [`packages/llm/llm/src/message.ts:142`](../packages/llm/llm/src/message.ts)
 
 One of:
 
@@ -7521,7 +7521,7 @@ Sources: [`packages/llm/llm/src/message.ts:24`](../packages/llm/llm/src/message.
 
 SHA-256: `09f3f8dc417f278257202714132f98ba7b52957d7b558c4a04456603890eb363`
 
-Sources: [`packages/llm/llm/src/message.ts:161`](../packages/llm/llm/src/message.ts)
+Sources: [`packages/llm/llm/src/message.ts:157`](../packages/llm/llm/src/message.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7561,7 +7561,7 @@ Sources: [`packages/llm/llm/src/message.ts:29`](../packages/llm/llm/src/message.
 
 SHA-256: `4b259f7f8f0a44ad5e90b70a73553ced1df27012d126921d397ff403b6c86731`
 
-Sources: [`packages/llm/llm/src/message.ts:183`](../packages/llm/llm/src/message.ts)
+Sources: [`packages/llm/llm/src/message.ts:179`](../packages/llm/llm/src/message.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7578,7 +7578,7 @@ Sources: [`packages/llm/llm/src/message.ts:183`](../packages/llm/llm/src/message
 
 SHA-256: `4c227064c74bca8db5db564cbf2e0bee889b105b5a0bbd345cd8b6f3f3cc2eb7`
 
-Sources: [`packages/llm/llm/src/message.ts:172`](../packages/llm/llm/src/message.ts)
+Sources: [`packages/llm/llm/src/message.ts:168`](../packages/llm/llm/src/message.ts)
 
 | Property | Presence | Type |
 |---|---|---|
