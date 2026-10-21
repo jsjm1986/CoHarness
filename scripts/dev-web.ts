@@ -131,6 +131,7 @@ export async function watchClientPlugins(
   const handle = await build({
     cwd: root,
     workspace: [...pluginDirs],
+    configLoader: 'native',
     watch: true,
     hooks: {
       'build:done': ({ options }) => {
