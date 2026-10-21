@@ -584,7 +584,7 @@ async function expandTurnProcessesAtTail(page: Page): Promise<void> {
   for (let guard = 0; guard < 32; guard += 1) {
     const pending = page.locator(selector)
     if (await pending.count() === 0) return
-    await pending.last().evaluate(el => (el as HTMLElement).click())
+    await pending.last().evaluate((el) => { (el as HTMLElement).click() })
   }
 }
 
@@ -726,7 +726,7 @@ describe('web e2e: lossless history wire pagination', () => {
     await expandTurnProcessesAtTail(page)
     const toolButton = page.getByRole('button', { name: `Bash ${TOOL_DESCRIPTION}` })
     await toolButton.waitFor({ timeout: 10_000 })
-    await toolButton.evaluate(el => (el as HTMLElement).click())
+    await toolButton.evaluate((el) => { (el as HTMLElement).click() })
     await expect.poll(() => page.getByText(TOOL_OUTPUT, { exact: true }).count(), {
       timeout: 10_000,
     }).toBe(1)
@@ -752,7 +752,7 @@ describe('web e2e: lossless history wire pagination', () => {
     const initialTails = page.locator('[data-chat-flow-kind="turn-tail"]')
     const initialTimeButton = initialTails.nth((await initialTails.count()) - 2)
       .getByRole('button', { name: /Ran for/u })
-    await initialTimeButton.evaluate(el => (el as HTMLElement).click())
+    await initialTimeButton.evaluate((el) => { (el as HTMLElement).click() })
     const initialTimeDetails = page.locator('[data-turn-time-details]')
     await initialTimeDetails.waitFor({ timeout: 10_000 })
     expect((await initialTimeDetails.textContent()) ?? '').toContain('TTFT')
