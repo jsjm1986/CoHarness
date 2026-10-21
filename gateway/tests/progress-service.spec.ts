@@ -189,13 +189,13 @@ describe('PostgresProgressService.generateNow', () => {
       }]) },
       { match: /conversation_interaction_responses/, result: () => rows([]) },
       { match: /role='assistant'/, result: () => rows([]) },
-      { match: /SET generating_since=NULL,updated_at/, result: () => rows([], 1) },
+      { match: /SET generating_since=NULL,last_error=NULL,updated_at/, result: () => rows([], 1) },
     ])
     const service = serviceFor(pool)
     expect(await service.generateNow(9, 7)).toEqual({ started: true })
     // The background pass found no material and released the lease.
     await vi.waitFor(() => {
-      expect(pool.query).toHaveBeenCalledWith(expect.stringMatching(/SET generating_since=NULL,updated_at/), expect.anything())
+      expect(pool.query).toHaveBeenCalledWith(expect.stringMatching(/SET generating_since=NULL,last_error=NULL,updated_at/), expect.anything())
     })
   })
 
@@ -230,7 +230,7 @@ describe('PostgresProgressService.sweep', () => {
           text: 'switch the login page to the new API', actor_label: 'Lin', outcome: null, question_args: null, title: 'Alpha' },
         { kind: 'decision', session_id: '11111111-1111-1111-1111-111111111111', seq: 4, ts: new Date('2026-10-20T09:10:00Z'),
           text: null, actor_label: 'Zhou', outcome: { answers: [{ selected: ['先保留一周'] }] },
-          question_args: '{"arguments":{"questions":[{"question":"旧接口保留多久"}]}}', title: 'Alpha' },
+          question_args: '{"questions":[{"question":"旧接口保留多久"}]}', title: 'Alpha' },
       ]) },
       { match: /role='assistant'/, result: () => rows([]) },
       { match: /SELECT id,kind[\s\S]*kind='period' AND period_key/, result: () => rows([]) },
@@ -319,7 +319,7 @@ describe('PostgresProgressService material folding', () => {
         { kind: 'decision', session_id: 'sess-1', seq: -1, ts: new Date('2026-10-20T09:10:00Z'),
           text: null, actor_label: 'Zhou',
           outcome: { answers: [{ selected: ['stage first'], custom: 'canary 5%' }] },
-          question_args: '{"arguments":{"questions":[{"question":"Roll out now or stage?"}]}}', title: 'Alpha' },
+          question_args: '{"questions":[{"question":"Roll out now or stage?"}]}', title: 'Alpha' },
       ]) },
       { match: /role='assistant'/, result: () => rows([]) },
       { match: /SELECT id,kind[\s\S]*kind='period' AND period_key/, result: () => rows([]) },
@@ -335,5 +335,46 @@ describe('PostgresProgressService material folding', () => {
     expect(captured[0]).toContain('decided')
     expect(captured[0]).toContain('Roll out now or stage? → stage first：canary 5%')
     expect(captured[0]).toContain('Alpha')
+  })
+
+  it('watermarks only the complete prefix when a capped stream trails the other', async () => {
+    const captured: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init: { body: string }) => {
+      captured.push(JSON.parse(init.body).messages[0].content)
+      return new Response(JSON.stringify({ choices: [{ message: { content: '{"summary":"s","decided":[],"done":[],"doing":[],"blocked":[]}' } }] }), { status: 200 })
+    }))
+    const pool = scriptedPool([
+      { match: /GROUP BY pid/, result: () => rows([{ pid: 'p-internal', mx: new Date('2026-10-20T10:00:00Z') }]) },
+      { match: /FROM harness\.project_journal_state/, result: () => rows([]) },
+      { match: /count\(\*\)::int pending/, result: () => rows([{ pending: 9, latest: new Date('2026-10-20T10:00:00Z'), decided: true }]) },
+      { match: /SELECT public_id/, result: () => rows([{ public_id: '9' }]) },
+      { match: /INSERT INTO harness\.project_journal_state/, result: () => rows([], 1) },
+      { match: /conversation_interaction_responses/, result: () => rows([
+        // Member stream at its cap: rows past this key may still be unfetched.
+        { kind: 'member', session_id: 'sess-1', seq: 1, ts: new Date('2026-10-20T09:00:00Z'),
+          text: 'first', actor_label: 'Lin', outcome: null, question_args: null, title: 'Alpha' },
+        { kind: 'member', session_id: 'sess-1', seq: 2, ts: new Date('2026-10-20T09:30:00Z'),
+          text: 'second', actor_label: 'Lin', outcome: null, question_args: null, title: 'Alpha' },
+      ]) },
+      { match: /role='assistant'/, result: () => rows([
+        // Agent row later than the member cap tail: it is inside the fetched
+        // set, but a member row between 09:30 and 10:00 may be missing.
+        { session_id: 'sess-1', seq: 9, ts: new Date('2026-10-20T10:00:00Z'),
+          text: 'agent tail', title: 'Alpha' },
+      ]) },
+      { match: /SELECT id,kind[\s\S]*kind='period' AND period_key/, result: () => rows([]) },
+      { match: /AND kind='current'\s*$/, result: () => rows([]) },
+      { match: /SELECT name FROM harness\.projects/, result: () => rows([{ name: 'P' }]) },
+      { match: /INSERT INTO harness\.project_journal/, result: () => rows([], 1) },
+      { match: /SET watermark_ts/, result: () => rows([], 1) },
+    ])
+    const service = serviceFor(pool, { config: { idleMs: 0, maxMaterialRows: 2 } })
+    await service.sweep()
+    expect(captured).toHaveLength(1)
+    expect(captured[0]).toContain('first')
+    expect(captured[0]).toContain('second')
+    expect(captured[0]).not.toContain('agent tail')
+    const watermark = pool.query.mock.calls.find(([sql]) => String(sql).includes('SET watermark_ts'))
+    expect(watermark?.[1]).toEqual(['org-1', 'p-internal', '2026-10-20T09:30:00.000Z', 'sess-1', 2])
   })
 })

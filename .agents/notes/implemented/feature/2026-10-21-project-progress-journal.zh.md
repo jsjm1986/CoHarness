@@ -33,7 +33,7 @@ Status: implemented
 
 ### Pass：单飞、只在成功时提交
 
-`acquire()` 以一条原子条件 upsert（`ON CONFLICT … DO UPDATE … WHERE` 租约空闲或已陈旧）取 `generating_since` 租约，并发 sweep 与手动 pass 不会双重启动；超过 `leaseMs` 的陈旧租约被回收，崩溃的 pass 不会卡死项目。pass 从模型治理策略（`policyForProject`）解析默认路由、取组织托管凭据，再以编号引用提示词调用 chat-completions 端点。模型输出须校验：`定了/完成/进行中` 的每条必须带能解析到真实素材行的 `ref`（署名从行拷贝，不让模型杜撰），`blocked` 条目允许独立成立，解析不了的引用丢条目，既没有可用 summary 也没有有效条目的输出整轮拒绝。成功时一个事务写入 `current` upsert、`period` upsert 与水位线提交；失败的 pass 记录 `last_error`、水位不动，同样的行进入下一次 pass。无素材的 pass 释放租约、不虚构条目。手动梳理是异步的——HTTP 处理器返回 `{ started }` 后 pass 在后台跑——慢模型不会拖死请求。
+`acquire()` 以一条原子条件 upsert（`ON CONFLICT … DO UPDATE … WHERE` 租约空闲或已陈旧）取 `generating_since` 租约，并发 sweep 与手动 pass 不会双重启动；超过 `leaseMs` 的陈旧租约被回收，崩溃的 pass 不会卡死项目。pass 从模型治理策略（`policyForProject`）解析默认路由、取组织托管凭据，再以编号引用提示词调用 chat-completions 端点。模型输出须校验：`定了/完成/进行中` 的每条必须带能解析到真实素材行的 `ref`（署名从行拷贝，不让模型杜撰），`blocked` 条目允许独立成立，解析不了的引用丢条目，既没有可用 summary 也没有有效条目的输出整轮拒绝。成功时一个事务写入 `current` upsert、`period` upsert 与水位线提交；失败的 pass 记录 `last_error`、同时盖 `last_run_at` 让间隔门把重试退到 `intervalMs`、水位不动，同样的行进入下一次 pass。由于成员与代理素材各自限量，某个到上限的流尾部可能缺另一条流的行——pass 只消化确定完整的前缀（到各到上限流末键的最早者为止），其余留在水位下。无素材的 pass 释放租约、不虚构条目。手动梳理是异步的——HTTP 处理器返回 `{ started }` 后 pass 在后台跑——慢模型不会拖死请求。
 
 ### 客户端：`progress` 作为默认档
 
@@ -54,6 +54,6 @@ Status: implemented
 
 ## 测试
 
-- `gateway/tests/progress-service.spec.ts`（16 例）：ISO 周键、输出引用校验（含 blocked 独立成立例外）、不可用路由、空闲/陈旧/已占租约、活动/决策/静默/间隔门、成功写入加水位提交、记录 `last_error` 不动水位、提问加答案的决策折叠、共享可见素材口径。
+- `gateway/tests/progress-service.spec.ts`（17 例）：ISO 周键、输出引用校验（含 blocked 独立成立例外）、不可用路由、空闲/陈旧/已占租约、活动/决策/静默/间隔门、成功写入加水位提交、记录 `last_error` 不动水位、提问加答案的决策折叠、共享可见素材口径。
 - `packages/client/ui-project-activity` 单测（14）照旧覆盖分组与注册；`apps/web/tests/project-activity.e2e.ts` 增加进展路由 mock 并断言进展优先的默认视图再切到 feed。
 - `apps/web/tests/project-progress.e2e.ts` 在 mock Gateway 上启动真实 Web 组合：纪要落地、期次折叠、署名 chip 跳源、强制 pass 从在途轮询到落地、以及无「立即梳理」入口的不可用态。
