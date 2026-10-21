@@ -834,7 +834,7 @@
     },
     "preset/agent-preset": {
       "sovereignty": "adapted",
-      "note": "packages.md catalog is generated per fork package set; do not take upstream verbatim"
+      "note": "packages/preset/agent-preset/skills/cordis-composition-reference/references/packages.md"
     },
     "preset/agent-preset-registry": {
       "sovereignty": "adapted",
