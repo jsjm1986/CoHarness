@@ -118,8 +118,9 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
       { ...clientBuildEnvironment, NODE_ENV: 'production' },
     ))
     // The first watch-mode compile of the full client graph can exceed the
-    // generic bound on loaded runners.
-    await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web', 120_000)
+    // generic bound several times over on loaded runners, so the bound must
+    // cover the worst observed cold compile plus margin.
+    await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web', 420_000)
     host = subprocessCtx.subprocess.spawn(spawnSpec(
       [process.execPath, binPath, 'web', '--patch', storagePatch, '--no-open', '--port', '0'],
       world,
@@ -173,4 +174,4 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     await rm(world, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
   }
   if (failures.length > 0) throw new AggregateError(failures, 'HMR browser test or cleanup failed')
-}, 180_000)
+}, 480_000)
