@@ -9,7 +9,10 @@ import { resolve } from 'node:path'
 import { collectConfigCatalog, type CatalogEntry } from './gen-config-catalog.ts'
 
 const root = resolve(import.meta.dirname, '..')
-const OUT = 'apps/cli/config/agent-presets/cordis/skills/cordis-composition-reference/references/packages.md'
+const OUTS = [
+  'apps/cli/config/agent-presets/cordis/skills/cordis-composition-reference/references/packages.md',
+  'packages/preset/agent-preset/skills/cordis-composition-reference/references/packages.md',
+]
 
 interface Row {
   pkg: string
@@ -60,22 +63,25 @@ export function render(entries: readonly CatalogEntry[]): string {
 function main(): void {
   const content = render(collectConfigCatalog())
   if (process.argv.includes('--check')) {
-    let committed: string | null
-    try {
-      committed = readFileSync(resolve(root, OUT), 'utf8')
-    } catch {
-      // A missing or unreadable file has the same remedy as a stale one: regenerate.
-      committed = null
-    }
-    if (committed === content) {
-      console.log(`gen-plugin-packages: ${OUT} is up to date.`)
+    const stale = OUTS.filter((out) => {
+      try {
+        return readFileSync(resolve(root, out), 'utf8') !== content
+      } catch {
+        // A missing or unreadable file has the same remedy as a stale one: regenerate.
+        return true
+      }
+    })
+    if (stale.length === 0) {
+      console.log('gen-plugin-packages: package lists are up to date.')
       process.exit(0)
     }
-    console.error(`gen-plugin-packages: ${OUT} is stale. Run \`pnpm run gen-plugin-packages\` and commit ${OUT}.`)
+    console.error(`gen-plugin-packages: stale lists: ${stale.join(', ')}. Run \`pnpm run gen-plugin-packages\` and commit them.`)
     process.exit(1)
   }
-  writeFileSync(resolve(root, OUT), content)
-  console.log(`gen-plugin-packages: wrote ${OUT}.`)
+  for (const out of OUTS) {
+    writeFileSync(resolve(root, out), content)
+    console.log(`gen-plugin-packages: wrote ${out}.`)
+  }
 }
 
 if (process.argv[1] && import.meta.filename === resolve(process.argv[1])) {

@@ -833,7 +833,8 @@
       "note": ".agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md"
     },
     "preset/agent-preset": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "packages.md catalog is generated per fork package set; do not take upstream verbatim"
     },
     "preset/agent-preset-registry": {
       "sovereignty": "adapted",
