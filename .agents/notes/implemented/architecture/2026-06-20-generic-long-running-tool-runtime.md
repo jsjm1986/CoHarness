@@ -19,7 +19,7 @@ The `jobs/` package group owns background-job semantics:
 
 Long-running tools are producers. `dsh-tool-bash` adapts a `ShellProcess` into incremental output and process cancellation; `dsh-tool-subagent` adapts a child run into final output and child disposal. The bash and subagent capability seams remain independent of sessions and the job registry.
 
-`JobRegistry` is the Service Definition in `@deepseek-ai/dsh-jobs`; the process-local provider is `LocalJobRegistry` in `@deepseek-ai/dsh-jobs-local` (the [task-registry contract Agent Note](2026-07-26-job-registry-seam.md) records that split).
+`JobRegistry` is the Service Definition in `@deepseek-ai/dsh-jobs`; the process-local provider is `LocalJobRegistry` in `@deepseek-ai/dsh-jobs-local` (the [task-registry contract Agent Note](../../archived/architecture/2026-07-26-job-registry-seam.md) records that split).
 
 ## Runtime contract
 
@@ -105,7 +105,7 @@ Separate bash and subagent output/stop tools duplicate ids, isolation, cleanup, 
 
 ### An immediate abstract task-runtime backend
 
-The current `JobStart.run()` contract passes in-process callbacks and exact `Agent` objects. A durable backend changes identity, restart, ownership, and observation semantics, so at introduction time the registry stayed one concrete service rather than freezing the wrong boundary. The [task-registry contract Agent Note](2026-07-26-job-registry-seam.md) later separated the contract from the process-local implementation without changing these in-process semantics.
+The current `JobStart.run()` contract passes in-process callbacks and exact `Agent` objects. A durable backend changes identity, restart, ownership, and observation semantics, so at introduction time the registry stayed one concrete service rather than freezing the wrong boundary. The [task-registry contract Agent Note](../../archived/architecture/2026-07-26-job-registry-seam.md) later separated the contract from the process-local implementation without changing these in-process semantics.
 
 ### Consumer-owned authorization or cleanup events
 

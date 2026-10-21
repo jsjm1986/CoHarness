@@ -326,7 +326,7 @@ Assistant streaming to final and Tool running to settled update only one Seat's 
 
 When business logic deliberately changes a materialized Node to hidden, it leaves visible order and remounts when visible again. This is explicit business withdrawal of presentation, distinct from the stable-Seat guarantee for running→settled.
 
-The concrete Tool renderer remains governed by the [`ui-tool ownership decision`](2026-08-08-client-tool-presentation-ownership.md). Tool Definition supplies recursive root/subcall data, and `ui-tool` dispatches concrete presentation by the Tool-name keyed slot.
+The concrete Tool renderer remains governed by the [`ui-tool ownership decision`](../../archived/architecture/2026-08-08-client-tool-presentation-ownership.md). Tool Definition supplies recursive root/subcall data, and `ui-tool` dispatches concrete presentation by the Tool-name keyed slot.
 
 Trajectory registers its own target and business Definitions against the same Assembler and Session event window as Chat. Its target builder preserves the stage-oriented read model without consuming the Chat Builder's legacy slice or running an independent history fold. The Chat Builder retains its legacy slice for StatsLine and the top-level public compatibility fields; target-specific Definitions do not change the shared Context, Reader, or Location contracts.
 

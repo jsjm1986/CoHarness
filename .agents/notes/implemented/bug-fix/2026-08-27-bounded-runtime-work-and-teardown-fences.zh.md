@@ -28,7 +28,7 @@ Workspace 归档枚举会先索引持久化 ID、谱系根和保留位置，再�
 
 可继续 subagent 物化会在创建或恢复 Agent 前，预留可配置的运行时全局及直接 parent Activation 配额。待处理物化与驻留 Activation 一起计数，回滚和最终 dispose 会释放确切配额；不活跃的持久化 child 会话不占用配额。[可继续 subagent 决策](../feature/2026-07-28-continuable-subagent-conversations.zh.md)规定驻留与容量语义。
 
-文件系统和文档生命周期路径在每个破坏性操作或发布步骤重新检查真实路径包含关系和符号链接所有权。用户文档拥有由提供方持有的回收站生命周期、带元数据上限的分页和按保留期限清理。浏览器可续传上传元数据随服务端会话过期（旧记录使用有界兜底期限），并在两种存储后端中同时受记录数和序列化字节数限制。本地请求图片派生文件按访问时间执行带数量和字节上限的 TTL/LRU 清理，DeepSeek 适配器按固定批次准备这些文件，因此较慢的首项不会让已完成投影无限积累。这些检查与[Gateway readiness](2026-08-26-document-scope-runtime-readiness.zh.md)、[会话写入批处理](../architecture/2026-08-08-bounded-session-persistence-write-batching.zh.md)和[子进程退出清理](2026-08-11-synchronous-subprocess-exit-cleanup.zh.md)等专门决策互相补充。
+文件系统和文档生命周期路径在每个破坏性操作或发布步骤重新检查真实路径包含关系和符号链接所有权。用户文档拥有由提供方持有的回收站生命周期、带元数据上限的分页和按保留期限清理。浏览器可续传上传元数据随服务端会话过期（旧记录使用有界兜底期限），并在两种存储后端中同时受记录数和序列化字节数限制。本地请求图片派生文件按访问时间执行带数量和字节上限的 TTL/LRU 清理，DeepSeek 适配器按固定批次准备这些文件，因此较慢的首项不会让已完成投影无限积累。这些检查与[Gateway readiness](2026-08-26-document-scope-runtime-readiness.zh.md)、[会话写入批处理](../architecture/2026-08-08-bounded-session-persistence-write-batching.zh.md)和[子进程退出清理](../../archived/bug-fix/2026-08-11-synchronous-subprocess-exit-cleanup.md)等专门决策互相补充。
 
 DeepSeek wire 转换器在修改状态前校验分片对象、usage 计数和有界工具调用元数据。Host 文档 Consumer 流式读取并限制 runtime JSON 响应，PostgreSQL overview 在 SQL 中筛选和分页，systemd 单元对 argv 字段进行显式转义。归档 runtime-read 替换结果在覆盖索引数据前，会按 SQL 回退路径的相同子会话、事件和字节上限校验。SDK 会释放完成的血缘和每会话锁映射；管理员永久清理文档必须确认，文档目录用户引用使用带企业范围的外键。仅用于显示的客户端会话血缘投影使用迭代遍历，并设置固定的深度和展开节点上限；超过任一上限的摘要仍会以根行显示。
 

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-04-task-surface.md
 document:
-  en: 8e68c60ad933a812b45efdfccd4a842c6b7700b1
-  zh: ab434c7913ebc408f8b99183e1f1268f84a2832d
+  en: 2d6bb2f664e782445e18b0fed2c842c95d007687
+  zh: 48a215554c57be39dbb194a4b1489707d1ed968d
 /agent-note-task-surface-for-structured-session-interaction:
   en: fd53b5c7554236fc
   zh: 6ff988716b5624cf
@@ -18,8 +18,8 @@ document:
   en: 9650ef8f65049b7d
   zh: c0925b701a6b681c
 /agent-note-task-surface-for-structured-session-interaction/tool-and-presentation-contract:
-  en: c4f7793ed5f33d45
-  zh: 4c759f80fb2add36
+  en: 9c548c62e8158dde
+  zh: 583d659a10fb485b
 /agent-note-task-surface-for-structured-session-interaction/submission-contract:
   en: 72c60bc7a05560be
   zh: 19dccd89c01534cf

@@ -48,6 +48,6 @@ The product-visible Windows roster flip is win32-only, so keyless snapshots that
 
 ## Related
 
-The [pwsh executor decision](2026-08-01-pwsh-tool-and-executor.md) owns the pwsh-sandbox/tool-pwsh dialect split this rung consumes.
+The [pwsh executor decision](../../archived/feature/2026-08-01-pwsh-tool-and-executor.md) owns the pwsh-sandbox/tool-pwsh dialect split this rung consumes.
 
 The [delete-confinement decision](2026-09-19-windows-acl-mandatory-integrity-confinement.md) extends this rung with the Low integrity layer and the ambient-delete deny; it supersedes only the delete route documented here.

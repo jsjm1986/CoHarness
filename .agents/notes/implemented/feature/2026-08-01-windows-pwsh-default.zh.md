@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-harness 交付的执行画像在每个平台都是 bash 优先。Windows 主机必须安装 bash 垫片（WSL 或 Git-Bash），或退回到仅 POSIX 的 `dsh-bash-local` 行为（硬编码 `bash -c` argv、进程组语义）；面向模型的 bash 工具教的是 bash 方言。Windows 原生基础已随 [pwsh 执行器与工具决策](2026-08-01-pwsh-tool-and-executor.zh.md) 交付——`ctx.shell` seam 的 PowerShell 实现与对等的 `pwsh` 工具——但交付组合在 Windows 上仍然挂载 bash 栈，没有垫片的 Windows 主机跑不了交付的 shell。
+harness 交付的执行画像在每个平台都是 bash 优先。Windows 主机必须安装 bash 垫片（WSL 或 Git-Bash），或退回到仅 POSIX 的 `dsh-bash-local` 行为（硬编码 `bash -c` argv、进程组语义）；面向模型的 bash 工具教的是 bash 方言。Windows 原生基础已随 [pwsh 执行器与工具决策](../../archived/feature/2026-08-01-pwsh-tool-and-executor.md) 交付——`ctx.shell` seam 的 PowerShell 实现与对等的 `pwsh` 工具——但交付组合在 Windows 上仍然挂载 bash 栈，没有垫片的 Windows 主机跑不了交付的 shell。
 
 ## 决策
 

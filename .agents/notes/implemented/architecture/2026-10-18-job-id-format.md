@@ -37,4 +37,4 @@ Tests and consumers can no longer predict ids: they thread the returned `JobId` 
 ## Related
 
 - [Generic long-running tool runtime](2026-06-20-generic-long-running-tool-runtime.md) — the producer/registry contract this mint serves.
-- [Job registry seam](2026-07-26-job-registry-seam.md) — the three-package layout the registry lives in.
+- [Job registry seam](../../archived/architecture/2026-07-26-job-registry-seam.md) — the three-package layout the registry lives in.
