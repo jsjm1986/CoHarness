@@ -322,7 +322,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'session',
     title: 'In-memory session store',
     mode: 'core',
-    consumers: ['agent-loop', 'agent', 'session-persistence', 'session-query', 'session-query-sqlite', 'subagent-inprocess', 'message-feedback'],
+    consumers: ['agent-loop', 'agent', 'session-persistence', 'session-query', 'session-query-sqlite', 'subagent-inprocess'],
     note: 'Owns append-only Session instances and emits the durable session event feed.',
   },
   {
@@ -346,7 +346,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Durable session persistence seam',
     mode: 'seam',
     implementations: ['session-persistence-jsonl', 'session-persistence-sqlite', 'session-persistence-gateway'],
-    consumers: ['agent-loop', 'tool-bash', 'hooks-claude-code', 'hooks-codex', 'session-query', 'session-query-sqlite', 'message-feedback'],
+    consumers: ['agent-loop', 'tool-bash', 'hooks-claude-code', 'hooks-codex', 'session-query', 'session-query-sqlite'],
     note: 'Backends persist the same SessionEvent vocabulary; apps choose a backend at composition time.',
   },
   {
@@ -417,7 +417,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'storage-domain',
     title: 'Domain data facility',
     mode: 'core',
-    consumers: ['workspace', 'message-feedback', 'memory'],
+    consumers: ['workspace', 'memory'],
     note: 'Waits for every configured backend, then publishes the domain form as one lifecycle-bound service for typed durable state.',
   },
   {
@@ -427,13 +427,6 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['memory-context', 'tool-memory'],
     note: 'Serializes scoped creates and revision-guarded writes through storageDomain, emits memory/changed at commit, and rechecks project writes through execution authority.',
-  },
-  {
-    key: 'messageFeedback',
-    pkg: 'message-feedback',
-    title: 'Lifecycle-bound message feedback',
-    mode: 'core',
-    note: 'Owns local per-assistant-message feedback, lifecycle and target validation, per-item compare-and-set, and the Host unary Remote contract without entering Session history or telemetry.',
   },
   {
     key: 'workspaceChanges',

@@ -4,6 +4,7 @@ import type {
   AssistantMessage,
   DeveloperMessage,
   AssistantStreamRecord,
+  MessageId,
   ToolCallId,
   LlmCallConfig,
   LlmCallConfigAdapterDefaults,
@@ -321,6 +322,52 @@ export interface RequestContext {
  */
 export type RequestHeaderReason = 'initial' | 'resume' | 'change' | 'series'
 
+/** One of the fixed feedback categories; the ids are durable log vocabulary. */
+export type FeedbackCategory =
+  | 'task-result'
+  | 'instruction-following'
+  | 'product-interaction'
+  | 'service-stability'
+  | 'resource-cost'
+  | 'security-privacy-permission'
+  | 'other'
+
+/**
+ * One recorded human remark about a Session. Both members are optional: a
+ * submission with neither still records that the human asked for the
+ * Session to be reviewed, which is what authorizes log delivery.
+ */
+export interface FeedbackRecord {
+  /** Free-text remark with surrounding whitespace removed; never empty when present. */
+  readonly text?: string
+  /** Category the human filed the remark under. */
+  readonly category?: FeedbackCategory
+}
+
+/** Opaque compare-and-set token for one exact feedback item revision. */
+export type MessageFeedbackVersion = Branded<'MessageFeedbackVersion'>
+
+/** The human's overall judgment of one assistant message. */
+export type MessageFeedbackRating = 'positive' | 'negative'
+
+/** One current feedback value and its opaque mutation token. */
+export interface MessageFeedbackItem {
+  /** Stable identity of the assistant message inside the owning Session. */
+  readonly messageId: MessageId
+  /** Overall positive or negative judgment. */
+  readonly rating: MessageFeedbackRating
+  /** Optional explanation, preserved verbatim after validation. */
+  readonly note?: string
+  /** Optional category chosen by the author of the feedback. */
+  readonly category?: FeedbackCategory
+  /** Equality-only token replaced by every material create or update. */
+  readonly version: MessageFeedbackVersion
+  /** Host-assigned creation time in Unix epoch milliseconds. */
+  readonly createdAt: number
+  /** Host-assigned time of the most recent material update. */
+  readonly updatedAt: number
+}
+
 /**
  * The merge-extensible, append-only source of truth for an agent interaction.
  * Message history is derived from this log. Every event is lossless JSON and
@@ -472,6 +519,15 @@ export interface SessionEventMap {
    * so tolerating concurrent writers needs a signal beyond the log.
    */
   'session/end-seed': { inherited?: true }
+  /**
+   * One recorded human remark about this session. Log-only and independent
+   * of its trigger; it never enters model context or derived history.
+   */
+  'feedback/record': FeedbackRecord
+  /** Explicit message feedback accepted by the sidecar CAS operation. */
+  'feedback/message-put': { sessionId: SessionId; item: MessageFeedbackItem }
+  /** Explicit message feedback removed by the sidecar CAS operation. */
+  'feedback/message-delete': { sessionId: SessionId; messageId: string; version: string }
 }
 
 /** The appendable event-type keys of {@link SessionEventMap}, plugin-merged extensions included. */

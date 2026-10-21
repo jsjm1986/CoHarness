@@ -14,9 +14,7 @@ import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote
 import pluginManagerRemote from '@deepseek-ai/dsh-plugin-manager/remote'
 import pluginMarketRemote from '@deepseek-ai/dsh-plugin-market/remote'
 import pluginRegistryProbeRemote from '@deepseek-ai/dsh-client-ui-plugin-manager/remote'
-import messageFeedbackRemote from '@deepseek-ai/dsh-message-feedback/remote'
 import permissionPresetsRemote from '@deepseek-ai/dsh-permission-presets/remote'
-import sessionFeedbackRemote from '@deepseek-ai/dsh-command-feedback/remote'
 import sessionReferencesRemote from '@deepseek-ai/dsh-session-reference/remote'
 import subagentsRemote from '@deepseek-ai/dsh-subagent/remote'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
@@ -43,9 +41,7 @@ export type {} from '@deepseek-ai/dsh-file-reference/remote'
 export type {} from '@deepseek-ai/dsh-goal/remote'
 export type {} from '@deepseek-ai/dsh-llm/remote'
 export type {} from '@deepseek-ai/dsh-host-plugin-inventory/remote'
-export type {} from '@deepseek-ai/dsh-message-feedback/remote'
 export type {} from '@deepseek-ai/dsh-permission-presets/remote'
-export type {} from '@deepseek-ai/dsh-command-feedback/remote'
 export type {} from '@deepseek-ai/dsh-session-reference/remote'
 export type {} from '@deepseek-ai/dsh-schedule/remote'
 export type {} from '@deepseek-ai/dsh-memory/remote'
@@ -62,7 +58,6 @@ export type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
 export type {} from '@deepseek-ai/dsh-credentials/types'
 export type {} from '@deepseek-ai/dsh-llm/types'
 export type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
-export type {} from '@deepseek-ai/dsh-command-feedback/types'
 export type {} from '@deepseek-ai/dsh-collaboration/types'
 export type {} from '@deepseek-ai/dsh-permission-presets/types'
 export type {} from '@deepseek-ai/dsh-goal/client'
@@ -168,8 +163,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     for (const contribution of [
       agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
       fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote,
-      memoryRemote, messageFeedbackRemote,
-      permissionPresetsRemote, sessionFeedbackRemote,
+      memoryRemote,
+      permissionPresetsRemote,
       sessionReferencesRemote, subagentsRemote, scheduleRemote, userQuestionsRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))

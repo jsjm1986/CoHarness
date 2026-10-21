@@ -22,7 +22,6 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [credentials.md](credentials.md) | the credential seam: `CredentialRef` references (never values) in configuration, per-operation resolution, UI-safe `CredentialInfo`, exclusive read-only layers |
 | [collaboration.md](collaboration.md) | Gateway-signed request principals, personal/project runtime identity, root-inherited conversation ACLs, request-captured authority, and shared interaction claims |
 | [session-query.md](session-query.md) | logical records, bounded exact-event reads, relationship traces, semantic filters/documents, and full-text result pages |
-| [feedback.md](feedback.md) | lifecycle-bound per-message feedback records, optimistic versions, sidecar persistence, and the Host Remote contract |
 | [session-title.md](session-title.md) | durable title snapshots, cited source-message seqs, and the asynchronous provider contract |
 | [session-reference.md](session-reference.md) | structured cross-session references: `SessionReferenceInput`/`Candidate`, prepared message contexts, the stable error taxonomy |
 | [system-prompt.md](system-prompt.md) | per-assembly context, tool-provider results, prompt sections, and cooperative assembly |

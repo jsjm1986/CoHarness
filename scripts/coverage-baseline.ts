@@ -302,7 +302,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/client/ui-commands/src/client/popup.ts',
   'packages/client/ui-deliverables/src/client/NativeOpenMenu.tsx',
   'packages/client/ui-deliverables/src/client/ReviewTab.tsx',
-  'packages/client/ui-message-feedback/src/client/SessionFeedbackAction.tsx',
   'packages/client/ui-primitives/src/SecretText.tsx',
   'packages/client/ui-primitives/src/credential-scanner.ts',
   'packages/client/ui-primitives/src/user-text.tsx',

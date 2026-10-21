@@ -94,7 +94,6 @@ flowchart LR
   pkg_session_query["session-query"]
   pkg_session_query_sqlite["session-query-sqlite"]
   pkg_subagent_inprocess["subagent-inprocess"]
-  pkg_message_feedback["message-feedback"]
   pkg_typert_registry["typert-registry"]
   svc_typert["ctx.typert<br/>Runtime type registry"]
   pkg_typert_loader["typert-loader"]
@@ -134,7 +133,6 @@ flowchart LR
   svc_memory["ctx.memory<br/>Durable space-scoped memory records"]
   pkg_memory_context["memory-context"]
   pkg_tool_memory["tool-memory"]
-  svc_messageFeedback["ctx.messageFeedback<br/>Lifecycle-bound message feedback"]
   pkg_workspace_changes["workspace-changes"]
   svc_workspaceChanges["ctx.workspaceChanges<br/>Host per-turn changed-file summaries"]
   svc_workspaceRegistry["ctx.workspaceRegistry<br/>Workspace entity registry"]
@@ -391,7 +389,6 @@ flowchart LR
   pkg_mcp_client --> svc_mcpResources
   pkg_mcp_resources --> svc_mcpResources
   pkg_memory --> svc_memory
-  pkg_message_feedback --> svc_messageFeedback
   pkg_model_access --> svc_modelAccess
   pkg_model_provider_config --> svc_modelProviderConfig
   pkg_modules --> svc_clientModules
@@ -559,7 +556,6 @@ flowchart LR
   svc_sessionPersistence --> pkg_agent_loop
   svc_sessionPersistence --> pkg_hooks_claude_code
   svc_sessionPersistence --> pkg_hooks_codex
-  svc_sessionPersistence --> pkg_message_feedback
   svc_sessionPersistence --> pkg_session_query
   svc_sessionPersistence --> pkg_session_query_sqlite
   svc_sessionPersistence --> pkg_tool_bash
@@ -571,7 +567,6 @@ flowchart LR
   svc_sessionQuery --> pkg_tool_session_query
   svc_sessions --> pkg_agent
   svc_sessions --> pkg_agent_loop
-  svc_sessions --> pkg_message_feedback
   svc_sessions --> pkg_session_persistence
   svc_sessions --> pkg_session_query
   svc_sessions --> pkg_session_query_sqlite
@@ -593,7 +588,6 @@ flowchart LR
   svc_ssh --> pkg_subprocess_ssh
   svc_storage --> pkg_storage_domain
   svc_storageDomain --> pkg_memory
-  svc_storageDomain --> pkg_message_feedback
   svc_storageDomain --> pkg_workspace
   svc_subagentModelSelection --> pkg_tool_subagent
   svc_subagents --> pkg_tool_ralph
@@ -698,10 +692,10 @@ flowchart LR
 | `ctx.modelProviderConfig` | `seam` | [`model-provider-config`](../packages/llm/model-provider-config) | - | [`llm-pi-ai`](../packages/llm/llm-pi-ai), `apiproxy` | - | 部署侧提供方发布不可变的组织路由；LLM 适配器将其作为不可编辑的提供方配置消费，而 API proxy 暴露经过授权的目录。 |
 | `ctx.tokenMeter` | `core` | [`token-meter`](../packages/llm/token-meter) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | 拥有按会话隔离的回放折叠区；压力消费方共享不可变且带修订版本的测量结果。 |
 | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | 在摘要压缩前，通过可回放的单节点表层替换来改写过大的当前工具结果。 |
-| `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess`, [`message-feedback`](../packages/feedback/message-feedback) | - | 拥有仅追加的 Session 实例，并发出持久的会话事件流。 |
+| `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess` | - | 拥有仅追加的 Session 实例，并发出持久的会话事件流。 |
 | `ctx.typert` | `core` | [`typert-registry`](../packages/typert/registry) | - | [`typert-loader`](../packages/typert/loader), [`api-gateway`](../packages/api/gateway) | - | 插件直接或通过 dsh-typert-loader 注册实时 zod 贡献；API 网关消费调用描述符和提供方，其他运行时消费方则在各自边界查询 schema 与反射元数据。 |
 | `ctx.typertGateway` | `core` | [`api-gateway`](../packages/api/gateway) | - | - | - | 将生成的 Remote 描述符与实时 Cordis 服务关联，解析已注册的身份，并通过共享的 Connection RPC 载体提供一元调用。 |
-| `ctx.sessionPersistence` | `seam` | [`session-persistence`](../packages/session/session-persistence) | [`session-persistence-jsonl`](../packages/session/session-persistence-jsonl), [`session-persistence-sqlite`](../packages/session/session-persistence-sqlite), [`session-persistence-gateway`](../packages/session/session-persistence-gateway) | [`agent-loop`](../packages/core/agent-loop), [`tool-bash`](../packages/shell/tool-bash), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), [`message-feedback`](../packages/feedback/message-feedback) | - | 各后端持久化同一套 SessionEvent 词汇；应用在组合时选择后端。 |
+| `ctx.sessionPersistence` | `seam` | [`session-persistence`](../packages/session/session-persistence) | [`session-persistence-jsonl`](../packages/session/session-persistence-jsonl), [`session-persistence-sqlite`](../packages/session/session-persistence-sqlite), [`session-persistence-gateway`](../packages/session/session-persistence-gateway) | [`agent-loop`](../packages/core/agent-loop), [`tool-bash`](../packages/shell/tool-bash), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite) | - | 各后端持久化同一套 SessionEvent 词汇；应用在组合时选择后端。 |
 | `ctx.collaboration` | `seam` | [`collaboration`](../packages/context/collaboration) | [`collaboration-gateway`](../packages/context/collaboration-gateway) | `apiproxy`, [`session-persistence-gateway`](../packages/session/session-persistence-gateway) | - | 消费方捕获一份请求绑定的 authority，用于执行根继承 ACL 检查和原子交互抢占；持久化提供方还会在创建期间读取仅对当前操作生效的根对话可见性。 |
 | `ctx.gatewayRuntime` | `core` | [`gateway-runtime`](../packages/context/gateway-runtime) | - | [`collaboration-gateway`](../packages/context/collaboration-gateway), [`session-persistence-gateway`](../packages/session/session-persistence-gateway) | - | 将 Gateway 签名的浏览器 principal 验证到请求局部状态中，并负责 Gateway 后端提供方使用的凭据认证 loopback 调用。 |
 | `ctx.settings` | `seam` | [`settings`](../packages/settings/settings) | [`settings-file`](../packages/settings/settings-file) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), `apiproxy` | - | 插件注册命名空间 schema 并解析分层值；提供方存储原始文档。LLM（大语言模型）适配器在用户分区下将其入口配置注册为组合基础；Web 网关提供经过脱敏的分层描述符，并写入用户层。 |
@@ -709,9 +703,8 @@ flowchart LR
 | `ctx.authorization` | `seam` | [`authorization`](../packages/credentials/authorization) | - | [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | flow 由了解如何取得某条凭据的插件注册，并以其写入的记录为键；seam 拥有交互和每键一次尝试的生命周期，但不拥有协议。 |
 | `ctx.sessionTelemetry` | `seam` | [`session-telemetry`](../packages/session/session-telemetry) | [`session-telemetry-otel`](../packages/session/session-telemetry-otel) | - | - | 该 seam 捕获会话记录、进行脱敏并交给一个后端；没有其他组件消费该服务，其输出会离开当前进程。 |
 | `ctx.storage` | `seam` | [`storage`](../packages/storage/storage) | [`storage-json`](../packages/storage/storage-json), [`storage-sqlite`](../packages/storage/storage-sqlite) | [`storage-domain`](../packages/storage/storage-domain) | - | 各后端以不同名称并列注册；数据形态（领域优先）挂载到枢纽上，并将类型化操作转换为不透明的 KV 单元原语。 |
-| `ctx.storageDomain` | `core` | [`storage-domain`](../packages/storage/storage-domain) | - | [`workspace`](../packages/workspace/workspace), [`message-feedback`](../packages/feedback/message-feedback), [`memory`](../packages/memory/memory) | - | 等待所有已配置后端就绪，然后将领域形态发布为一个受生命周期约束的服务，用于类型化持久状态。 |
+| `ctx.storageDomain` | `core` | [`storage-domain`](../packages/storage/storage-domain) | - | [`workspace`](../packages/workspace/workspace), [`memory`](../packages/memory/memory) | - | 等待所有已配置后端就绪，然后将领域形态发布为一个受生命周期约束的服务，用于类型化持久状态。 |
 | `ctx.memory` | `core` | [`memory`](../packages/memory/memory) | - | [`memory-context`](../packages/memory/memory-context), [`tool-memory`](../packages/memory/tool-memory) | - | 将按作用域的创建与修订校验写入经由 storageDomain 串行化，在提交点发出 memory/changed 事件，并通过执行授权能力复核项目写入。 |
-| `ctx.messageFeedback` | `core` | [`message-feedback`](../packages/feedback/message-feedback) | - | - | - | 拥有本地逐 assistant 消息反馈、生命周期与目标校验、逐条目 compare-and-set 及 Host 一元 Remote 契约，且不进入 Session 历史或遥测。 |
 | `ctx.workspaceChanges` | `core` | [`workspace-changes`](../packages/deliverables/workspace-changes) | - | - | - | 按 Session 与事件序号提供 workspace/changes 公告的摘要及各文件的轮次前后比较，直至该 Session 释放；日志仅携带轮次。 |
 | `ctx.workspaceRegistry` | `core` | [`workspace`](../packages/workspace/workspace) | - | `apiproxy` | - | 通过领域设施拥有带 WorkspaceId 品牌类型的记录；稳定的 sessionIds 账户驱动 Host RPC 与 GUI 投影。 |
 | `ctx.sessionQuery` | `seam` | [`session-query`](../packages/session-query/session-query) | [`session-query-sqlite`](../packages/session-query/session-query-sqlite) | [`session-reference`](../packages/context/session-reference), [`tool-session-query`](../packages/session-query/tool-session-query) | - | 该接口提供精确读取、过滤和追踪；具体后端还提供全文协调、排序、摘要片段和游标世代，而模型消费方负责工作区权限与不含游标的渲染。 |

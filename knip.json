@@ -141,18 +141,6 @@
         "zod"
       ]
     },
-    "packages/feedback/command-feedback": {
-      "entry": [
-        "tests/**/*.spec.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "zod"
-      ]
-    },
     "packages/host/directory-picker-native": {
       "entry": [
         "tests/**/*.spec.{ts,tsx}",

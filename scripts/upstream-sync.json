@@ -214,13 +214,6 @@
     "client/ui-memory": {
       "sovereignty": "owned"
     },
-    "client/ui-message-feedback": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
-      "removedUpstreamPaths": [
-        "packages/client/ui-message-feedback/src/client/surface.ts"
-      ]
-    },
     "client/ui-model-selection": {
       "sovereignty": "adapted",
       "removedUpstreamPaths": [
@@ -651,12 +644,6 @@
       "sovereignty": "adapted"
     },
     "extensions/ui-cordis": {
-      "sovereignty": "adapted"
-    },
-    "feedback/command-feedback": {
-      "sovereignty": "adapted"
-    },
-    "feedback/message-feedback": {
       "sovereignty": "adapted"
     },
     "fs/fs": {
@@ -1470,6 +1457,18 @@
       "package": "experimental/webhook-github",
       "reason": "upstream moved the package to experimental/ at rc.2; the fork retains its webhook/ layout",
       "replacedBy": "webhook/webhook-github"
+    },
+    {
+      "package": "client/ui-message-feedback",
+      "reason": "feedback UI removed at user request; no consumer for recorded feedback"
+    },
+    {
+      "package": "feedback/command-feedback",
+      "reason": "session /feedback command and sessionFeedback remote removed; no consumer"
+    },
+    {
+      "package": "feedback/message-feedback",
+      "reason": "per-message feedback sidecar and remote removed; no consumer"
     }
   ],
   "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json"

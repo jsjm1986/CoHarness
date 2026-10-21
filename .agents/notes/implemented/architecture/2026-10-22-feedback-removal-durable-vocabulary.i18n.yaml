@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-22-feedback-removal-durable-vocabulary.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-22-feedback-removal-durable-vocabulary.md
+document:
+  en: 28c89d750c280e526bb7dac465e45d057e3f8484
+  zh: ba6daaa5ebff887ab7263f2e1e3e4014faa27c6a
+/agent-note-feedback-producers-removed-feedback-events-remain-durable-log-vocabulary:
+  en: 38dccb748bde876f
+  zh: ada1749fe79ee279
+/agent-note-feedback-producers-removed-feedback-events-remain-durable-log-vocabulary/problem:
+  en: d9b229e70be1187a
+  zh: 36d1f0ffaa2e4d5f
+/agent-note-feedback-producers-removed-feedback-events-remain-durable-log-vocabulary/decision:
+  en: 5deae8d2c64cbb2e
+  zh: 0b46b51aa19ad495
+/agent-note-feedback-producers-removed-feedback-events-remain-durable-log-vocabulary/alternatives-considered:
+  en: 3e8f7c8c38307335
+  zh: a8ed1c9cb43ac256
+/agent-note-feedback-producers-removed-feedback-events-remain-durable-log-vocabulary/consequences:
+  en: 5df63b1cb8baac3a
+  zh: 44176fa09f145e0a
+/agent-note-feedback-producers-removed-feedback-events-remain-durable-log-vocabulary/verification:
+  en: caad5a605e478077
+  zh: a85dbd09b6a21a94

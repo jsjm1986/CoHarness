@@ -1715,31 +1715,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
-    key: 'messageFeedback',
-    summary: 'Storage-domain sidecar service.',
-    description: 'Storage-domain sidecar service. It inspects persisted Session history and never creates or resumes an Agent or Session.',
-    methods: [
-      {
-        signature: '@Remote(\'list\') async list(request: MessageFeedbackListRequest): Promise<MessageFeedbackListResult>',
-        description: 'Read feedback belonging to the current persisted Session lifecycle. A stale row from a reused Session id is invisible.',
-        parameters: [{ name: 'request', description: 'Session identity to inspect and list.' }],
-        returns: 'current immutable items or `session-not-found`.',
-      },
-      {
-        signature: '@Remote(\'put\') put(request: MessageFeedbackPutRequest): Promise<MessageFeedbackPutResult>',
-        description: 'Create or replace feedback for one derived append-origin assistant message. Every request must match the addressed item\'s current version; a matching no-op returns the stored item without changing its revision.',
-        parameters: [{ name: 'request', description: 'target, desired value, and observed item version.' }],
-        returns: 'the committed item or an explicit business failure.',
-      },
-      {
-        signature: '@Remote(\'delete\') delete(request: MessageFeedbackDeleteRequest): Promise<MessageFeedbackDeleteResult>',
-        description: 'Delete one feedback item. Absence is successful regardless of the supplied version; an existing item requires an exact version match.',
-        parameters: [{ name: 'request', description: 'Session, message, and observed item version.' }],
-        returns: 'the stable absent postcondition, or an explicit failure.',
-      },
-    ],
-  },
-  {
     key: 'modelAccess',
     summary: 'Runtime face published as `ctx.modelAccess`.',
     description: 'Runtime face published as `ctx.modelAccess`. Implementations may be plain objects.',
@@ -5912,10 +5887,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ExecutionState {\n    readonly revision: string;\n    readonly scopeId?: ExecutionScopeId;\n    readonly inputs: readonly ExecutionInputId[];\n    readonly actors: readonly {\n        readonly userId: number;\n    }[];\n    readonly primaryActorUserId?: number;\n    readonly unverifiedHistory: boolean;\n}',
   },
   {
-    name: 'FeedbackCategory',
-    declaration: 'export type FeedbackCategory = \'task-result\' | \'instruction-following\' | \'product-interaction\' | \'service-stability\' | \'resource-cost\' | \'security-privacy-permission\' | \'other\';',
-  },
-  {
     name: 'FiberState',
     declaration: 'export const enum FiberState {\n    PENDING,\n    LOADING,\n    ACTIVE,\n    FAILED,\n    DISPOSED,\n    UNLOADING\n}',
   },
@@ -6638,82 +6609,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'Message',
     declaration: 'export type Message = MessageRoleMap[keyof MessageRoleMap];',
-  },
-  {
-    name: 'MessageFeedbackDeleteRequest',
-    declaration: 'export interface MessageFeedbackDeleteRequest {\n    readonly sessionId: SessionId;\n    readonly messageId: MessageId;\n    readonly ifVersion: MessageFeedbackVersion;\n}',
-  },
-  {
-    name: 'MessageFeedbackDeleteResult',
-    declaration: 'export type MessageFeedbackDeleteResult = MessageFeedbackSuccess<MessageFeedbackDeleteValue> | MessageFeedbackRejected<MessageFeedbackSessionNotFound | MessageFeedbackVersionConflict>;',
-  },
-  {
-    name: 'MessageFeedbackDeleteValue',
-    declaration: 'export interface MessageFeedbackDeleteValue {\n    readonly absent: true;\n}',
-  },
-  {
-    name: 'MessageFeedbackFailure',
-    declaration: 'export type MessageFeedbackFailure = MessageFeedbackSessionNotFound | MessageFeedbackTargetNotFound | MessageFeedbackVersionConflict | MessageFeedbackNoteBlank | MessageFeedbackNoteTooLarge;',
-  },
-  {
-    name: 'MessageFeedbackItem',
-    declaration: 'export interface MessageFeedbackItem {\n    readonly messageId: MessageId;\n    readonly rating: MessageFeedbackRating;\n    readonly note?: string;\n    readonly category?: FeedbackCategory;\n    readonly version: MessageFeedbackVersion;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n}',
-  },
-  {
-    name: 'MessageFeedbackListRequest',
-    declaration: 'export interface MessageFeedbackListRequest {\n    readonly sessionId: SessionId;\n}',
-  },
-  {
-    name: 'MessageFeedbackListResult',
-    declaration: 'export type MessageFeedbackListResult = MessageFeedbackSuccess<MessageFeedbackListValue> | MessageFeedbackRejected<MessageFeedbackSessionNotFound>;',
-  },
-  {
-    name: 'MessageFeedbackListValue',
-    declaration: 'export interface MessageFeedbackListValue {\n    readonly items: readonly MessageFeedbackItem[];\n}',
-  },
-  {
-    name: 'MessageFeedbackNoteBlank',
-    declaration: 'export interface MessageFeedbackNoteBlank {\n    readonly code: \'note-blank\';\n}',
-  },
-  {
-    name: 'MessageFeedbackNoteTooLarge',
-    declaration: 'export interface MessageFeedbackNoteTooLarge {\n    readonly code: \'note-too-large\';\n    readonly maxBytes: number;\n    readonly actualBytes: number;\n}',
-  },
-  {
-    name: 'MessageFeedbackPutRequest',
-    declaration: 'export interface MessageFeedbackPutRequest {\n    readonly sessionId: SessionId;\n    readonly messageId: MessageId;\n    readonly rating: MessageFeedbackRating;\n    readonly note?: string;\n    readonly category?: FeedbackCategory;\n    readonly ifVersion: MessageFeedbackVersion | null;\n}',
-  },
-  {
-    name: 'MessageFeedbackPutResult',
-    declaration: 'export type MessageFeedbackPutResult = MessageFeedbackSuccess<MessageFeedbackItem> | MessageFeedbackRejected<MessageFeedbackSessionNotFound | MessageFeedbackTargetNotFound | MessageFeedbackVersionConflict | MessageFeedbackNoteBlank | MessageFeedbackNoteTooLarge>;',
-  },
-  {
-    name: 'MessageFeedbackRating',
-    declaration: 'export type MessageFeedbackRating = \'positive\' | \'negative\';',
-  },
-  {
-    name: 'MessageFeedbackRejected',
-    declaration: 'export interface MessageFeedbackRejected<E extends MessageFeedbackFailure> {\n    readonly ok: false;\n    readonly error: E;\n}',
-  },
-  {
-    name: 'MessageFeedbackSessionNotFound',
-    declaration: 'export interface MessageFeedbackSessionNotFound {\n    readonly code: \'session-not-found\';\n    readonly sessionId: SessionId;\n}',
-  },
-  {
-    name: 'MessageFeedbackSuccess',
-    declaration: 'export interface MessageFeedbackSuccess<T> {\n    readonly ok: true;\n    readonly value: T;\n}',
-  },
-  {
-    name: 'MessageFeedbackTargetNotFound',
-    declaration: 'export interface MessageFeedbackTargetNotFound {\n    readonly code: \'target-not-found\';\n    readonly sessionId: SessionId;\n    readonly messageId: MessageId;\n}',
-  },
-  {
-    name: 'MessageFeedbackVersion',
-    declaration: 'export type MessageFeedbackVersion = Branded<\'MessageFeedbackVersion\'>;',
-  },
-  {
-    name: 'MessageFeedbackVersionConflict',
-    declaration: 'export interface MessageFeedbackVersionConflict {\n    readonly code: \'version-conflict\';\n    readonly current: MessageFeedbackItem | null;\n}',
   },
   {
     name: 'MessageId',

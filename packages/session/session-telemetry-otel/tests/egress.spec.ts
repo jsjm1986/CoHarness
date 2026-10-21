@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
-import { recordFeedback } from '@deepseek-ai/dsh-command-feedback'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import OpenTelemetrySessionBackend, { SessionTelemetryMode } from '../src/index.ts'
@@ -109,7 +108,7 @@ describe('session-telemetry-otel egress', () => {
           session.append('request/header', { header: { config: { provider, model: 'm' } }, reason: 'initial' })
         }
         session.append('turn/start', { turn: 1 })
-        recordFeedback(session, { text: 'explicit egress feedback' })
+        session.append('feedback/record', { text: 'explicit egress feedback' })
         session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
         await fiber.dispose()
 

@@ -2,7 +2,7 @@
 import type { ComponentType } from 'react'
 import type { InputTriggerCandidate } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import {
-  IconCompactOutline16, IconDownloadOutline16, IconGoalOutline16, IconPlanOutline14, IconSendOutline16,
+  IconCompactOutline16, IconDownloadOutline16, IconGoalOutline16, IconPlanOutline14,
   IconShieldOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -17,7 +17,7 @@ export type MenuSection = 'add' | 'commands'
 
 /** Stable row order for the empty-query menu. Unlisted commands follow in catalog order. */
 const SECTION_ROWS: Readonly<Record<MenuSection, readonly string[]>> = {
-  add: ['file', 'goal', 'plan', 'feedback'],
+  add: ['file', 'goal', 'plan'],
   commands: ['compact', 'permission', 'model', 'export'],
 }
 
@@ -38,7 +38,6 @@ function hostFace(name: BuiltinCommandName, icon: ComponentType<IconProps>): rea
 const HOST_FACES: ReadonlyMap<BuiltinCommandName, HostFace> = new Map([
   hostFace('goal', IconGoalOutline16),
   hostFace('plan', IconPlanOutline14),
-  hostFace('feedback', IconSendOutline16),
   hostFace('compact', IconCompactOutline16),
   hostFace('permission', IconShieldOutline16),
   hostFace('export', IconDownloadOutline16),

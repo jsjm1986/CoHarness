@@ -38,9 +38,7 @@
     "@deepseek-ai/schemastery": "workspace:~"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-command-feedback": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
-    "@deepseek-ai/dsh-message-feedback": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-telemetry": "workspace:*",
     "@deepseek-ai/dsh-anonymous-user-id": "workspace:*",
@@ -50,11 +48,9 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
     "@deepseek-ai/dsh-anonymous-user-id": "workspace:*",
-    "@deepseek-ai/dsh-command-feedback": "workspace:*",
     "@deepseek-ai/dsh-http-proxy": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-loader-smoke": "workspace:*",
-    "@deepseek-ai/dsh-message-feedback": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:*",
     "@deepseek-ai/dsh-session-telemetry": "workspace:*",

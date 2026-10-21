@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/session.md
 document:
-  en: 1726406f03f58de3e9ac3c48e6e9f3cec9be302b
-  zh: a0e2835bf762716acbd00d926cf017e540062155
+  en: b55935577bee0aecf7e392cefab849f75499c3f2
+  zh: 366db52f2f33dd8d0ec45241a0a0e18e80134032
 /sessions:
   en: 28fb7eb8f758fdf0
   zh: a36d6f03e331ad86
@@ -12,8 +12,11 @@ document:
   en: 9cfcba05a52ba8d8
   zh: 1669f9791a60fc59
 /sessions/sessioneventmap-the-event-vocabulary/todoitem-one-todo-list-entry:
-  en: 7fafec5ba4292589
+  en: c18fb70c28c7d41e
   zh: 6a69dc7a22d6c833
+/sessions/sessioneventmap-the-event-vocabulary/feedback-event-payloads:
+  en: 21489db754aeb139
+  zh: 0e1702a60f6287ee
 /sessions/sessioneventmap-the-event-vocabulary/the-request-header-event-request-header:
   en: d372ffcc1724f8a1
   zh: 838eb25ce350a518

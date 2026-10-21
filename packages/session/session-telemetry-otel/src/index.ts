@@ -17,8 +17,6 @@
 import { createRequire } from 'node:module'
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-command-feedback'
-import type {} from '@deepseek-ai/dsh-message-feedback'
 import { Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   SessionTelemetryBackend,

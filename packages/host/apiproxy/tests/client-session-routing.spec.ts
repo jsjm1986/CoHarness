@@ -2,12 +2,6 @@
 import { expect, it } from 'vitest'
 import { remoteSessionId } from '../src/api/remote-session-routing.ts'
 
-it.each(['messageFeedback/list', 'messageFeedback/put', 'messageFeedback/delete', 'sessionFeedback/record'])(
-  'addresses %s through its request Session', (endpoint) => {
-    expect(remoteSessionId(endpoint, { request: { sessionId: 'project-session', text: 'unchanged' } })).toBe('project-session')
-  },
-)
-
 it('addresses child delivery through its parent without interpreting message content', () => {
   const args = { request: { parentSessionId: 'parent', childSessionId: 'child', content: [{ type: 'text', text: 'sessionId=other' }] } }
   const before = JSON.stringify(args)
@@ -39,7 +33,7 @@ it('rewrites Session addresses nested inside Schedule requests', async () => {
 it('does not infer a Session from undeclared, missing, inherited or invalid request fields', () => {
   expect(remoteSessionId('llm/discoverModels', { request: { sessionId: 'unrelated' } })).toBeUndefined()
   for (const request of [undefined, null, [], { sessionId: 1 }, { sessionId: '' }, Object.create({ sessionId: 'inherited' }) as object]) {
-    expect(remoteSessionId('sessionFeedback/record', { request })).toBeUndefined()
+    expect(remoteSessionId('schedule/list', { request })).toBeUndefined()
   }
 })
 
@@ -64,7 +58,7 @@ it('maps terminal and direct-child fields and keeps malformed JSON available to 
   expect(mapRemoteSessionIds('subagents/interruptByParent', { parentSessionId: 'a', childSessionId: 'b' }, map)).toEqual({ parentSessionId: 'wire:a', childSessionId: 'wire:b' })
   for (const request of [undefined, null, [], { sessionId: 3 }, {}, Object.create({ sessionId: 'inherited' }) as object]) {
     const args = { request }
-    expect(mapRemoteSessionIds('messageFeedback/list', args, map)).toBe(args)
+    expect(mapRemoteSessionIds('schedule/list', args, map)).toBe(args)
   }
 })
 

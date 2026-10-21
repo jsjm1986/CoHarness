@@ -654,21 +654,6 @@
   "packages/client/ui-layout/tests/apply.client.spec.ts": {
     "d0d7b677da65df97240f713995e20d0642ef32cf056864b11f2f4879a0d9e878": 1
   },
-  "packages/client/ui-message-feedback/tests/browser-plugin.client.spec.tsx": {
-    "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 1
-  },
-  "packages/client/ui-message-feedback/tests/controller.client.spec.ts": {
-    "49be998ed5ab4eaaf970fc42cc7f5ff0d4cbcc9ac3d45362edfb7b7e7712d404": 1
-  },
-  "packages/client/ui-message-feedback/tests/feedback-dialog.client.spec.tsx": {
-    "053070867bf145364028f75c811c449f84e6aaf1b34283f7060d3ac304d50b39": 1
-  },
-  "packages/client/ui-message-feedback/tests/message-feedback-actions.client.spec.tsx": {
-    "068518f0cc846fdaa425901d5c933e0d35adcf32d8ced11439c5a6ebb181e4a1": 2,
-    "0f3d5a4d18bca186b61c33a8bdf17cbaa2e2dc4179ec39f75423e0022dfe4304": 1,
-    "725ac0f0458045e54063dcb304a908de231ccbde23507f2a63efaf8946202a63": 7,
-    "8948f88708a564c84d9714a296938008eb1062de38e667065a148d7149a557bb": 1
-  },
   "packages/client/ui-open-in-app/tests/browser-plugin.client.spec.ts": {
     "eee35b4d8641824c6eaacfe03ed60d353d81d5257d1111132f34d46a7b13ef35": 2
   },
@@ -1383,24 +1368,6 @@
   "packages/extensions/ui-cordis/tests/status-icons.client.spec.tsx": {
     "f51693de73df01f6e9cbec189c052a03adef2cf2d83eec5237bfdb8dc81133a1": 1
   },
-  "packages/feedback/command-feedback/tests/loader-composition.spec.ts": {
-    "59c63f734e8bba862325f776e3fcbebd78a84cfb4161f8df41c216950d9bf351": 1
-  },
-  "packages/feedback/message-feedback/src/index.ts": {
-    "6370792878103b8fe2963dfeb036963572c1da2bb6dd7fcc10681be1c866b490": 1
-  },
-  "packages/feedback/message-feedback/src/spec.ts": {
-    "bc404a3ab9071230cf09995c1680ae3c91ce9c27aab41ad0f68efccfcf9cf57d": 1
-  },
-  "packages/feedback/message-feedback/tests/helpers.ts": {
-    "b40f3bbda2adba664b54271ea4b552ffb2c78a239d39d8b1e882cca164d21c4f": 1
-  },
-  "packages/feedback/message-feedback/tests/loader-composition.spec.ts": {
-    "59c63f734e8bba862325f776e3fcbebd78a84cfb4161f8df41c216950d9bf351": 1
-  },
-  "packages/feedback/message-feedback/tests/message-feedback.spec.ts": {
-    "e87443b2dcbfcd641eba56e2afb1b9daaa697f89df846c40cdea6bfb9b8a7ef3": 1
-  },
   "packages/fs/fs-local/tests/filesystem.spec.ts": {
     "002ddc98af9352c0e97f381118ea7815cd7721433ec527db75e09b42b37b3313": 1
   },
@@ -1980,9 +1947,6 @@
   },
   "packages/session/session-format/src/json.ts": {
     "539af7158f6057075289d3b1543bd5b692887755287d81f91d9b9c7cc14cf9cb": 1
-  },
-  "packages/session/session-log-deepseek/tests/feedback-composition.spec.ts": {
-    "59c63f734e8bba862325f776e3fcbebd78a84cfb4161f8df41c216950d9bf351": 1
   },
   "packages/session/session-persistence-gateway/tests/gateway.spec.ts": {
     "d102b9ab3e5bda166b04d53a2b92154808b1655bf40b6f07353a56ef2b3545eb": 1

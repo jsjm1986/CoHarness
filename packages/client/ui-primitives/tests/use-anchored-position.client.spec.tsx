@@ -4,7 +4,7 @@
  * keeps tracking it while open.
  *
  * The geometry itself needs real layout, which jsdom does not provide — the
- * browser layout scenario in `apps/web/tests/message-feedback-layout.e2e.ts`
+ * browser layout scenario it was extracted from
  * owns that. What is asserted here is the wiring the clamp depends on: the
  * listeners and the panel-size observer are attached while open and released on
  * close, a size change replays the placement, and the hook still works where

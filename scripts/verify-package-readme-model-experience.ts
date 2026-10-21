@@ -134,7 +134,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-sidebar': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-brand-official': { kind: 'none', reason: 'Browser-side presentation occupants; registers nothing model-facing.' },
   'packages/client/ui-conversation': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
-  'packages/client/ui-message-feedback': { kind: 'none', reason: 'Browser controls over message-feedback sidecars and log-only Session remarks; neither enters model context.' },
   'packages/client/ui-tool': { kind: 'none', reason: 'Browser-side Tool presentation layer; renders logged calls without changing model context.' },
   'packages/client/ui-jobs': { kind: 'none', reason: 'Browser-side read-only projection of ctx.jobs records; dsh-tool-jobs owns the model-facing behavior.' },
   'packages/client/ui-schedule': { kind: 'none', reason: 'Browser-side catalog, editing, and deletion of Host Schedule records; dsh-schedule owns the model-facing tools and delivery.' },

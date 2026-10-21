@@ -21,7 +21,6 @@
     "@deepseek-ai/dsh-bash-local": "workspace:*",
     "@deepseek-ai/dsh-bash-sandbox": "workspace:*",
     "@deepseek-ai/dsh-client-ui-schedule": "workspace:*",
-    "@deepseek-ai/dsh-command-feedback": "workspace:*",
     "@deepseek-ai/dsh-command-goal": "workspace:*",
     "@deepseek-ai/dsh-commands": "workspace:*",
     "@deepseek-ai/dsh-compaction": "workspace:*",

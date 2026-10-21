@@ -77,7 +77,6 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-jobs` | no | Session-header background-job list: live registry state mirrored from session/jobs frames |
 | `@deepseek-ai/dsh-client-ui-layout` | no | Shell plugin: three-column AppFrame with drag handles, ctx.layout viewing-state service (navigation + panels) |
 | `@deepseek-ai/dsh-client-ui-memory` | no | Durable memory browser and settings card: scoped entries the member can read, search, and edit |
-| `@deepseek-ai/dsh-client-ui-message-feedback` | no | Per-message feedback controls contributed to the assistant-message action strip, backed by the messageFeedback Host Remote |
 | `@deepseek-ai/dsh-client-ui-model-selection` | no | Model selection: the /model popupSelect over session.models / session.selectModel |
 | `@deepseek-ai/dsh-client-ui-open-in-app` | no | Web Session-header "Open In..." split button opening the session workspace directory in a locally installed application |
 | `@deepseek-ai/dsh-client-ui-permission-presets` | no | Permission surfaces: a new-session default in General settings and a current-session /permission popup over the permissions projection |
@@ -218,13 +217,6 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-cordis-client-runner` | no | Browser half of dynamic dual-half plugin packages: event subscription, closure evaluation, guard facade, and loader entries |
 | `@deepseek-ai/dsh-cordis-host-runner` | yes | Dynamic package registry, authorized Host execution, and read-only runtime inspection |
 | `@deepseek-ai/dsh-tool-cordis` | no | Read-only Host and Client runtime API and session-owned package inspection |
-
-## feedback
-
-| Package | Config | Description |
-|---|---|---|
-| `@deepseek-ai/dsh-command-feedback` | no | Log-only session feedback producer and human-facing slash command |
-| `@deepseek-ai/dsh-message-feedback` | yes | Lifecycle-bound per-message rating and note sidecar for the DeepSeek Harness |
 
 ## fs
 

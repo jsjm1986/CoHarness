@@ -105,7 +105,6 @@
     { "path": "./packages/client/ui-goal" },
     { "path": "./packages/client/ui-project-activity" },
     { "path": "./packages/client/ui-memory" },
-    { "path": "./packages/client/ui-message-feedback" },
     { "path": "./packages/client/ui-model-selection" },
     { "path": "./packages/client/ui-agent-preset" },
     { "path": "./packages/client/ui-permission-presets" },

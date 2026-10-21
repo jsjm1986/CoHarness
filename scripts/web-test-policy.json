@@ -47,7 +47,6 @@
     "diff-context.e2e.ts": "conversation",
     "document-manager.e2e.ts": "documents",
     "draft-initialization.e2e.ts": "lifecycle",
-    "feedback-command.e2e.ts": "conversation",
     "file-upload-round.e2e.ts": "conversation",
     "goal-bar.e2e.ts": "conversation",
     "goal-command-presentation.e2e.ts": "conversation",
@@ -66,9 +65,6 @@
     "math-rendering.e2e.ts": "conversation",
     "max-tokens-notice.snapshot.ts": "conversation",
     "message-actions.e2e.ts": "conversation",
-    "message-feedback-layout.e2e.ts": "conversation",
-    "message-feedback-protocol.snapshot.ts": "conversation",
-    "message-feedback.e2e.ts": "conversation",
     "minimal-preset.snapshot.ts": "shell",
     "mobile-density.e2e.ts": "mobile",
     "models-settings.e2e.ts": "settings",
@@ -101,7 +97,6 @@
     "search-card.snapshot.ts": "conversation",
     "seeded-history.e2e.ts": "lifecycle",
     "server-restart.e2e.ts": "lifecycle",
-    "session-feedback.e2e.ts": "conversation",
     "settings-chrome.e2e.ts": "settings",
     "settings-compact.e2e.ts": "settings",
     "shell-command-details.e2e.ts": "conversation",
@@ -265,7 +260,6 @@
       "settings",
       "workbench"
     ],
-    "client/ui-message-feedback": "conversation",
     "client/ui-model-selection": [
       "conversation",
       "settings",

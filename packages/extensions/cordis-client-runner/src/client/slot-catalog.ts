@@ -125,9 +125,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     hookContext: '',
     slotInject: '',
     declaredBy: 'an entry in \'conversation.chat.node\' (client-ui-conversation), so it exists while that entry is mounted',
-    occupants: [
-      'client-ui-message-feedback MessageFeedbackActions id \'feedback\'',
-    ],
+    occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.chat.assistant-actions\', () => ctx.slots.register(\n      { name: \'conversation.chat.assistant-actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-conversation/src/client/contract/slots.ts:232',
@@ -891,7 +889,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-commands PopupSelectView id \'command-popup\'',
       'client-ui-input-trigger MenuView id \'slash-menu\'',
-      'client-ui-message-feedback FeedbackDialog id \'feedback-dialog\'',
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.overlay\', () => ctx.slots.register(\n      { name: \'conversation.input.overlay\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
@@ -1347,7 +1344,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.session.header\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-message-feedback SessionFeedbackAction id \'session-feedback\'',
       'client-ui-open-in-app OpenInAppAction id \'open-in-app\'',
       'client-ui-permission-presets DesktopConfirmationAction id \'desktop-confirmation\'',
       'client-ui-schedule ScheduleCatalogAction id \'schedule-catalog\'',
@@ -2503,7 +2499,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'sidebar.settings\' (client-ui-settings-general), so it exists while that entry is mounted',
     occupants: [
       'client-ui-agent-preset AgentPresetSection id \'agent-presets\'',
-      'client-ui-remote-desktop-admin RemoteDesktopSection id \'remote-desktop\'',
       'client-ui-settings-general GeneralSection id \'general\'',
       'client-ui-settings-models ModelsSection id \'models\'',
       'client-ui-settings-plugins PluginsSettingsSection id \'plugins\'',

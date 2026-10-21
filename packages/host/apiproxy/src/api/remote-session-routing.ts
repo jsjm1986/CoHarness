@@ -22,9 +22,6 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'goals/resume': { action: 'write', path: ['agentId'], execution: 'request' },
   'goals/complete': { action: 'write', path: ['agentId'], execution: 'none' },
   'goals/clear': { action: 'write', path: ['agentId'], execution: 'none' },
-  'messageFeedback/list': { action: 'read', path: ['request', 'sessionId'] },
-  'messageFeedback/put': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
-  'messageFeedback/delete': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
   'dynamicCordisRunner/runHostHalf': { action: 'approve', path: ['agentId'], execution: 'operation' },
   'dynamicCordisRunner/getClientCode': { action: 'read', path: ['agentId'] },
   'dynamicCordisRunner/settleUserRun': { action: 'write', path: ['agentId'], execution: 'operation' },
@@ -47,7 +44,6 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'agentTeams/updateTask': { action: 'write', path: ['agentId'], execution: 'request' },
   'claudeCodeMods/watchBand': { action: 'read', path: ['agentId'] },
   'claudeCodeMods/pressBand': { action: 'write', path: ['agentId'], execution: 'operation' },
-  'sessionFeedback/record': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
   'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'request' },
   'userQuestions/attachWait': { action: 'read', path: ['agentId'] },
   // Uploads stage bytes under the receiving Session only; no execution origin.
