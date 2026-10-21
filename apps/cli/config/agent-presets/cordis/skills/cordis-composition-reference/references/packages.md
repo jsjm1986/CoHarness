@@ -15,6 +15,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-api-gateway` | no | Typert Remote Host dispatcher and Client API endpoint |
+| `@deepseek-ai/dsh-api-remote-desktop-controller` | no | Browser-facing BFF controller for ctx.remoteDesktop — remoteDesktop/* Remote namespace mapping authenticated human authority onto grant administration, attach, status, and audit |
 | `@deepseek-ai/dsh-api-remotes` | no | Remote BFF assembly and Host Agent/Session lookup policy |
 | `@deepseek-ai/dsh-api-terminal-controller` | yes | Session-owned interactive terminals with shell discovery, screen recovery and typed Remote control |
 
@@ -85,6 +86,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-plugin-market` | no | Discover tab of the dsh web Plugins page: browse configured plugin market indexes and install their bundles |
 | `@deepseek-ai/dsh-client-ui-project-activity` | no | Project member activity feed: attributed messages and question answers in the right Sidebar |
 | `@deepseek-ai/dsh-client-ui-reference` | no | Unified Web @file and @session reference source |
+| `@deepseek-ai/dsh-client-ui-remote-desktop` | no | Human remote-desktop tabs for the right sidebar: grant summary, explicit consent, attach, and the noVNC RFB screen |
 | `@deepseek-ai/dsh-client-ui-renderer` | no | Browser UI renderer: React slot bindings, ctx.uiRenderer, and the assembled application root |
 | `@deepseek-ai/dsh-client-ui-schedule` | no | Host task management page and Session reminder catalog |
 | `@deepseek-ai/dsh-client-ui-settings` | no | Settings domain base plugin: the settings-namespace scope service and the canonical settings slot-type contract |
@@ -344,6 +346,13 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-ptc-runtime-node` | yes | Node PTC execution with per-call sandboxed processes or in-memory REPL state |
+
+## remote-desktop
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-remote-desktop-stream` | yes | WebSocket mount for ctx.remoteDesktop — one upgrade route on ctx.webServer, the ?token= handshake, and the ws→Duplex adapter feeding serveStream |
+| `@deepseek-ai/dsh-remote-desktop-vnc` | yes | VNC/RFB provider for ctx.remoteDesktop — JSONL-backed grant store, enforced resolve → attach → serveStream attachment flow, and an RFB pump that drops input frames on view-only attachments |
 
 ## sandbox
 

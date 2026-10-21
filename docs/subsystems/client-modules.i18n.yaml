@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/client-modules.md
 document:
-  en: 2deceecd3c15a8d75eff4b8f18924bff54a0b7e0
-  zh: d7785a36faa8fa39e219c2a524eecb337f830c62
+  en: 0f294e70606c3f49d3736ed4d673776fd597b8f3
+  zh: 77185b9c082c63112956668732c11999949baedf
 /client-modules:
   en: e256a29cc5bc2726
   zh: e181d6b1a6e5c647
@@ -15,8 +15,8 @@ document:
   en: 91ce66fab388a8a2
   zh: 77428943582ae3f6
 /client-modules/the-bundle-route-and-index-injection:
-  en: fbde3cc316e85cf4
-  zh: 88ca826ef3556c52
+  en: 4f60012b1f948e90
+  zh: f0087fac164d4c13
 /client-modules/the-service:
   en: 000882ed7f09ad3f
   zh: c17c05f087d9574d

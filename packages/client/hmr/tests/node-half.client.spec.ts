@@ -48,7 +48,7 @@ function fakeClientModuleHost(rows: Map<string, string>, options: FakeHostOption
       options.beforeGraphRead?.()
       return {
         rev: 'r',
-        entries: [...rows.keys()].map(id => ({ id, url: `/plugins/??${id}/client.js&rev=r`, rev: 'r' })),
+        entries: [...rows.keys()].map(id => ({ id, url: `/plugins/combo.js??${id}/client.js&rev=r`, rev: 'r' })),
         batches: [],
       }
     },

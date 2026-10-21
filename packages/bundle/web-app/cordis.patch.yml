@@ -218,6 +218,21 @@
     - id: terminal-controller
       name: '@deepseek-ai/dsh-api-terminal-controller'
 
+    # Human remote desktop: the VNC provider enforces grants/consent inside the
+    # RFB stream, the stream row mounts its WebSocket endpoint on webServer,
+    # and the controller exposes the remoteDesktop/* Remote namespace.
+    # The gateway runtime patch points the provider at the deployment's
+    # remote-desktop directory: administrators own endpoints and grants in
+    # /admin and the files reload in place.
+    - id: remote-desktop-vnc
+      name: '@deepseek-ai/dsh-remote-desktop-vnc'
+
+    - id: remote-desktop-stream
+      name: '@deepseek-ai/dsh-remote-desktop-stream'
+
+    - id: remote-desktop-controller
+      name: '@deepseek-ai/dsh-api-remote-desktop-controller'
+
     - id: api-remotes
       name: '@deepseek-ai/dsh-api-remotes'
 
@@ -284,6 +299,12 @@
     # The right Sidebar's workspace file tree tab type.
     - id: ui-sidebar-files
       name: '@deepseek-ai/dsh-client-ui-sidebar-files'
+
+    # Human remote desktop: 'remoteDesktop' sidebar tabs render the consent
+    # card and RFB screen. Endpoint and grant administration lives in the
+    # gateway admin surface, not user settings.
+    - id: ui-remote-desktop
+      name: '@deepseek-ai/dsh-client-ui-remote-desktop'
 
 
     # Gateway project scope, shared-conversation visibility, read-only role UI,

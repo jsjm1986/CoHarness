@@ -325,7 +325,11 @@ describe('InstanceManager', () => {
       '- insert:\n    - id: gateway-runtime\n      name: \'@deepseek-ai/dsh-gateway-runtime\'\n'
       + '    - id: governance\n- insert: []\n'
       + '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
-      + '- id: api-gateway\n  inject: [executionAuthority]\n',
+      + '- id: api-gateway\n  inject: [executionAuthority]\n'
+      + `- id: remote-desktop-vnc\n  config:\n    endpointsFile: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'endpoints.json'))}\n`
+      + `    grantsFile: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'grants.jsonl'))}\n`
+      + `    auditFile: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'audit.jsonl'))}\n`
+      + `    recordingDir: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'recordings'))}\n`,
     )
     for (const plugin of ['dsh-directory-guard', 'dsh-model-governance']) {
       const installed = join(modules, plugin)

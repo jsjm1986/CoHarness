@@ -17,7 +17,7 @@ afterEach(async () => {
 })
 
 const row = (id: string, rev = 'r0', extra: Partial<WebBootEntry> = {}): WebBootEntry => ({
-  id, rev, url: `plugins/??${id}/client.js&rev=${rev}`, ...extra,
+  id, rev, url: `plugins/combo.js??${id}/client.js&rev=${rev}`, ...extra,
 })
 const graph = (...entries: WebBootEntry[]): WebBootGraph => ({
   rev: JSON.stringify(entries), entries,

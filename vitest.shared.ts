@@ -18,6 +18,10 @@ export const sourcePlaneAliases = [
     find: /^@deepseek-ai\/dsh-experimental-client-ui-cot-translation\/remote$/,
     replacement: fileURLToPath(new URL('./packages/experimental/client-ui-cot-translation/tests/remote-standin.ts', import.meta.url)),
   },
+  {
+    find: /^@deepseek-ai\/dsh-api-remote-desktop-controller\/remote$/,
+    replacement: fileURLToPath(new URL('./packages/api/remote-desktop-controller/tests/remote-standin.ts', import.meta.url)),
+  },
 ]
 
 /**

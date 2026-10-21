@@ -182,8 +182,8 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.keyboard.press('Escape')
 
     // Hold the combo batch carrying ui-theme so the shell-owned loading page
-    // remains observable. Dynamic rows arrive through /plugins/??<id>/client.js[,<id>/client.js…]&rev=<hash>.
-    const pluginPattern = /\/plugins\/\?\?[^ ]*dsh-client-ui-theme\/client\.js/
+    // remains observable. Dynamic rows arrive through /plugins/combo.js??<id>/client.js[,<id>/client.js…]&rev=<hash>.
+    const pluginPattern = /\/plugins\/(?:combo\.js)?\?\?[^ ]*dsh-client-ui-theme\/client\.js/
     let releaseBundles = (): void => {}
     const bundlesReleased = new Promise<void>((resolve) => { releaseBundles = resolve })
     await page.route(pluginPattern, async (route) => {

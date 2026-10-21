@@ -50,6 +50,7 @@ import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { PostgresSshTargetService } from './postgres/ssh-target-service.ts'
 import { PostgresMaintenanceService, type WriteGateVerdict } from './postgres/maintenance-service.ts'
 import { PostgresBackupService } from './postgres/backup-service.ts'
+import { RemoteDesktopService } from './remote-desktop-service.ts'
 import { createDeploymentCommands } from './deployment-commands.ts'
 import { PostgresDeploymentBackups } from './postgres/deployment-backups.ts'
 import { migrationPlan } from './postgres/database.ts'
@@ -436,6 +437,7 @@ const deps: GatewayDeps = {
   maintenance,
   nodeConfiguration,
   backups,
+  remoteDesktop: new RemoteDesktopService(cfg.remoteDesktopDir),
   backupWork: new PostgresDeploymentBackups(context, cfg, databaseUrl, deploymentCommands, effectiveEnvironment),
   migrationPlan: () => migrationPlan(pool, cfg.deployMigrationsDir),
   maintenanceGate,

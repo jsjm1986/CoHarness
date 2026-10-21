@@ -50,16 +50,19 @@ function chunkId(ownerId: string, fileName: string): string {
 /** Resolve a sibling chunk against the package's one-resource URL and current revision. */
 function chunkUrl(row: BootModuleRow, fileName: string, rev: string): string {
   const url = atRevision(row.url, rev)
-  const marker = '/??'
+  const marker = '??'
   const resourceStart = url.indexOf(marker)
   const revisionStart = url.indexOf('&rev=', resourceStart + marker.length)
   const resource = resourceStart < 0 || revisionStart < 0
     ? undefined
     : url.slice(resourceStart + marker.length, revisionStart)
-  if (resource !== `${row.id}/client.js`) {
+  // The combo route carries a synthetic `combo.js` filename for CDN caching;
+  // sibling chunks live in the route's real directory, not under that name.
+  const dirEnd = resourceStart < 0 ? -1 : url.lastIndexOf('/', resourceStart)
+  if (resource !== `${row.id}/client.js` || dirEnd < 0) {
     throw new Error(`client-modules: cannot resolve chunk ${JSON.stringify(fileName)} from bundle URL ${url}`)
   }
-  return `${url.slice(0, resourceStart)}/${row.id}/${fileName}?${url.slice(revisionStart + 1)}`
+  return `${url.slice(0, dirEnd)}/${row.id}/${fileName}?${url.slice(revisionStart + 1)}`
 }
 
 /** Untagged <style> elements present before a factory runs; the factory must not claim them. */

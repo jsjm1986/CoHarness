@@ -134,7 +134,11 @@
     "@deepseek-ai/dsh-api-terminal-controller": "workspace:*",
     "@deepseek-ai/dsh-client-ui-sidebar-terminal": "workspace:*",
     "@deepseek-ai/dsh-client-ui-sidebar-files": "workspace:*",
-    "@deepseek-ai/dsh-harness-dev-context": "workspace:*"
+    "@deepseek-ai/dsh-harness-dev-context": "workspace:*",
+    "@deepseek-ai/dsh-remote-desktop-vnc": "workspace:*",
+    "@deepseek-ai/dsh-remote-desktop-stream": "workspace:*",
+    "@deepseek-ai/dsh-api-remote-desktop-controller": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-remote-desktop": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",

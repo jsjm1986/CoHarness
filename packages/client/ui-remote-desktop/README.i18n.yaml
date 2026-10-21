@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-remote-desktop/README.md
+document:
+  en: f7a4e9f41e141863d9456d7024d3a9c965e65faf
+  zh: ea9d02065644124d8ffa62fce6134f9aba85f60e
+/:
+  en: 18dbf30998402780
+  zh: 8818dbecd1aa389e
+/deepseek-ai-dsh-client-ui-remote-desktop:
+  en: d71d5118075f9067
+  zh: c475d76b5563dc1d
+/deepseek-ai-dsh-client-ui-remote-desktop/summary:
+  en: 8a6a1f349707910f
+  zh: 414a1d2cbe023ac7
+/deepseek-ai-dsh-client-ui-remote-desktop/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 4a62efedf5461a53
+/deepseek-ai-dsh-client-ui-remote-desktop/use-this-package:
+  en: d30ece1d7c2f5283
+  zh: 2a9f16bde600ad65
+/deepseek-ai-dsh-client-ui-remote-desktop/understand-the-implementation:
+  en: 9db203c2f09dde4c
+  zh: 9b34fa05bd7c0f2d
+/deepseek-ai-dsh-client-ui-remote-desktop/further-exploration:
+  en: 90ef950a4eb751db
+  zh: a48997c02d3a6421
+/deepseek-ai-dsh-client-ui-remote-desktop/model-experience:
+  en: 5a93c9c8c45d5185
+  zh: 80b18c514a1866f7
+/deepseek-ai-dsh-client-ui-remote-desktop/model-experience/kv-cache-effect:
+  en: 0f558f194e1432ae
+  zh: 5f7f6610fd2f27bf
+/deepseek-ai-dsh-client-ui-remote-desktop/known-limitations-and-deferred-work:
+  en: 9c134af97b318c14
+  zh: 97e08a8a6f31ef86
+/deepseek-ai-dsh-client-ui-remote-desktop/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

@@ -54,6 +54,14 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'fileUploads/upload': { action: 'write', path: ['agentId'], execution: 'none' },
   // Translation is a session-bound provider call when the Client supplies one; it starts no execution.
   'cotTranslation/translate': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'remoteDesktop/status': { action: 'read', path: ['agentId'] },
+  'remoteDesktop/confirm': { action: 'write', path: ['agentId'], execution: 'request' },
+  'remoteDesktop/attach': { action: 'write', path: ['agentId'], execution: 'request' },
+  'remoteDesktop/listGrants': { action: 'read', path: ['agentId'] },
+  'remoteDesktop/grant': { action: 'write', path: ['agentId'], execution: 'none' },
+  'remoteDesktop/setLevel': { action: 'write', path: ['agentId'], execution: 'none' },
+  'remoteDesktop/revoke': { action: 'write', path: ['agentId'], execution: 'none' },
+  'remoteDesktop/audit': { action: 'read', path: ['agentId'] },
 })
 
 const REGISTERED_SESSION_POLICIES = new Map<string, RemoteSessionPolicy>()

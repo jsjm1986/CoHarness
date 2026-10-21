@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-19-remote-desktop-capability-seam.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-19-remote-desktop-capability-seam.md
+document:
+  en: 52de5d70a75cbbd7a8dc023bed920213ab254744
+  zh: 756a7d5dd22c47cb13f9294161c0a7c687de7aef
+/agent-note-remote-desktop-capability-seam:
+  en: cc4d3fec8e32632e
+  zh: ee8e04f24458af3d
+/agent-note-remote-desktop-capability-seam/problem:
+  en: 493e8af2fe11e2be
+  zh: a8ec6307dff53b33
+/agent-note-remote-desktop-capability-seam/decision:
+  en: 851d2d2436c04b13
+  zh: 4fa7a261b613c575
+/agent-note-remote-desktop-capability-seam/consequences:
+  en: 106a8051e481bd02
+  zh: 8cbe8b4396f5c054
+/agent-note-remote-desktop-capability-seam/alternatives-considered:
+  en: 8ea7d5a1b3a77aa7
+  zh: 269a08684c5950c0

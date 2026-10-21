@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-20-combo-route-static-extension.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-20-combo-route-static-extension.md
+document:
+  en: 3006e59ab58c3b0d1a93ff6198f2e71efda54ab4
+  zh: 88d595ea65e265a9826e7bd663fccff81d35e3c9
+/agent-note-combo-route-carries-a-static-extension-filename-for-cdn-edge-caching:
+  en: 73c9f0c9f2ba8e85
+  zh: 1f5cb13e9617fe0f
+/agent-note-combo-route-carries-a-static-extension-filename-for-cdn-edge-caching/problem:
+  en: 578eee66e60efcb9
+  zh: f1bde4b327f8e9da
+/agent-note-combo-route-carries-a-static-extension-filename-for-cdn-edge-caching/decision:
+  en: 45ed88ac5ecc91c5
+  zh: c6d99b920a4df466
+/agent-note-combo-route-carries-a-static-extension-filename-for-cdn-edge-caching/alternatives-considered:
+  en: 3fca500e8ffac4e5
+  zh: 8f0b6adbe564e287
+/agent-note-combo-route-carries-a-static-extension-filename-for-cdn-edge-caching/consequences:
+  en: 0e1bb41f2d23d856
+  zh: f7a896d31396fca7

@@ -2908,6 +2908,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-memory MemoryTab',
       'client-ui-plan PlanPreview',
       'client-ui-project-activity ActivityBody',
+      'client-ui-remote-desktop RemoteDesktopBody',
       'client-ui-schedule ScheduleTaskTab',
       'client-ui-sidebar-browser BrowserBody',
       'client-ui-sidebar-files FilesBody',
@@ -3083,6 +3084,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '{ hooks: { tabInfo: SlotHookFactory<\'sidebar.right.tab.guide.entry\', UseSidebarRightTabInfo> } }',
     declaredBy: 'an entry in \'sidebar.right.pane.tab\' (client-ui-sidebar-right), so it exists while that entry is mounted',
     occupants: [
+      'client-ui-remote-desktop RemoteDesktopGuide',
       'client-ui-sidebar-terminal TerminalGuide',
     ],
     replaceRisk: 'none',

@@ -38,6 +38,7 @@ import { TerminalManagementError } from './terminal-management.ts'
 import { WebhookReceiptError } from './postgres/webhook-delivery-service.ts'
 import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
 import { WebhookIntakeError } from './webhook-intake.ts'
+import { RemoteDesktopServiceError } from './remote-desktop-service.ts'
 import { SshTargetError } from './postgres/ssh-target-service.ts'
 import { NodeConfigurationError } from './node-config-store.ts'
 import { MaintenanceError } from './postgres/maintenance-service.ts'
@@ -110,6 +111,7 @@ function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof WebhookReceiptError) return { status: error.status, error: error.message }
   if (error instanceof WebhookEndpointError) return { status: error.status, error: error.message }
   if (error instanceof WebhookIntakeError) return { status: error.status, error: error.message }
+  if (error instanceof RemoteDesktopServiceError) return { status: error.status, error: error.message }
   if (error instanceof SshTargetError) return { status: error.status, error: error.message }
   if (error instanceof NodeConfigurationError) return { status: error.status, error: error.message }
   if (error instanceof MaintenanceError) return { status: error.status, error: error.message }
@@ -711,6 +713,58 @@ async function dispatch(
     return true
   }
 
+  if (pathname === '/admin/api/remote-desktop/endpoints' && method === 'GET') {
+    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    sendJson(res, 200, { endpoints: await deps.remoteDesktop.endpoints() })
+    return true
+  }
+  if (pathname === '/admin/api/remote-desktop/endpoints' && method === 'POST') {
+    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    const rows = await deps.remoteDesktop.saveEndpoints(parseObject(body).endpoints)
+    await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.endpoints.save',
+      detail: JSON.stringify({ endpoints: rows.length }), ip })
+    sendJson(res, 200, { endpoints: rows })
+    return true
+  }
+  if (pathname === '/admin/api/remote-desktop/grants' && method === 'GET') {
+    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    sendJson(res, 200, { grants: await deps.remoteDesktop.listGrants() })
+    return true
+  }
+  if (pathname === '/admin/api/remote-desktop/grants' && method === 'POST') {
+    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    const input = parseObject(body)
+    const row = await deps.remoteDesktop.createGrant(input, admin.username)
+    await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant',
+      detail: JSON.stringify({ principal: row.principal, target: row.target, level: row.level }), ip })
+    sendJson(res, 200, { grant: row })
+    return true
+  }
+  if (pathname === '/admin/api/remote-desktop/grants/level' && method === 'POST') {
+    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    const input = parseObject(body)
+    const row = await deps.remoteDesktop.setLevel(input.id, input.level)
+    await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant-level',
+      detail: JSON.stringify({ id: row.id, level: row.level }), ip })
+    sendJson(res, 200, { grant: row })
+    return true
+  }
+  if (pathname === '/admin/api/remote-desktop/grants/revoke' && method === 'POST') {
+    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    const input = parseObject(body)
+    const row = await deps.remoteDesktop.revoke(input.id)
+    await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant-revoke',
+      detail: JSON.stringify({ id: row.id }), ip })
+    sendJson(res, 200, { grant: row })
+    return true
+  }
+  if (pathname === '/admin/api/remote-desktop/audit' && method === 'GET') {
+    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    const query = new URL(req.url ?? pathname, 'http://admin').searchParams
+    const limit = Number.parseInt(query.get('limit') ?? '100', 10)
+    sendJson(res, 200, { events: await deps.remoteDesktop.audit(Number.isSafeInteger(limit) ? limit : 100) })
+    return true
+  }
   if (pathname === '/admin/api/desktops' && method === 'GET') {
     if (deps.desktops === undefined) { sendError(res, 503, 'desktop-coordination-unavailable'); return true }
     sendJson(res, 200, { resources: await deps.desktops.listResources() })

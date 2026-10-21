@@ -146,6 +146,8 @@ export const SERVICE_PAGE: Record<string, string> = {
   officeToPdf: 'office-to-pdf.md',
   webhookRuntime: 'webhook.md',
   workspaceRegistry: 'workspace.md',
+  remoteDesktop: 'remote-desktop.md',
+  remoteDesktopController: 'remote-desktop.md',
   worktrees: 'worktrees.md',
 }
 
@@ -213,6 +215,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   permissionCatalog: 'client-side per-runtime catalog directory — packages/client/runtime/README.md owns the API',
   sshAuthorization: 'interface-typed optional managed-deployment service (SshAuthorization) — packages/ssh/ssh/README.md owns the API',
   pluginNavigation: 'client-face Plugins-page navigation service — packages/client/ui-plugin-manager/README.md owns the API',
+  remoteDesktops: 'client-face remote-desktop accessor (ClientRemoteDesktops) — packages/api/remote-desktop-controller/README.md owns the API',
 }
 
 /**
@@ -259,6 +262,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'webserver': 'web-server.md',
   'workspace': 'workspace.md',
   'workspace-files': 'collaboration.md',
+  'remote-desktop': 'remote-desktop.md',
 }
 
 /**
@@ -303,6 +307,23 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   OfficeToPdfResult: 'office-to-pdf.md',
   OfficeToPdfGeneration: 'office-to-pdf.md',
   SshStreamEndpoint: 'ssh.md',
+  RemoteDesktopTarget: 'remote-desktop.md',
+  RemoteDesktopLevel: 'remote-desktop.md',
+  RemoteDesktopGrantScope: 'remote-desktop.md',
+  RemoteDesktopGrant: 'remote-desktop.md',
+  RemoteDesktopAttachRequest: 'remote-desktop.md',
+  RemoteDesktopSpec: 'remote-desktop.md',
+  RemoteDesktopStream: 'remote-desktop.md',
+  RemoteDesktopSession: 'remote-desktop.md',
+  RemoteDesktopActor: 'remote-desktop.md',
+  RemoteDesktopErrorCode: 'remote-desktop.md',
+  RemoteDesktopTargetStatus: 'remote-desktop.md',
+  RemoteDesktopGrantFilter: 'remote-desktop.md',
+  RemoteDesktopGrantInput: 'remote-desktop.md',
+  RemoteDesktopAuditEvent: 'remote-desktop.md',
+  RemoteDesktopGrantId: 'remote-desktop.md',
+  RemoteDesktopSessionId: 'remote-desktop.md',
+  RemoteDesktopToken: 'remote-desktop.md',
   WorkspaceFileDiff: 'deliverables.md',
   Agent: 'core.md',
   AgentCancelCause: 'core.md',
@@ -911,6 +932,16 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   McpResourceProvider: 'scoped resource provider is owned by packages/mcp/mcp-resources/README.md',
   'z.ZodType': 'Zod response validation API is owned by https://zod.dev/packages/zod',
   Socket: 'Node.js byte stream API is owned by https://nodejs.org/api/net.html#class-netsocket',
+  Duplex: 'Node.js duplex stream API is owned by https://nodejs.org/api/stream.html#class-streamduplex',
+  RemoteDesktopLevelView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
+  RemoteDesktopTargetView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
+  RemoteDesktopGrantScopeView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
+  RemoteDesktopGrantView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
+  RemoteDesktopAttachView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
+  RemoteDesktopSpecView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
+  RemoteDesktopStatusView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
+  RemoteDesktopGrantInputView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
+  RemoteDesktopAuditEventView: 'BFF wire view is owned by packages/api/remote-desktop-controller/src/types.ts',
   SessionHandle: 'persistence handle contract is owned by packages/session/session-persistence/README.md',
   SessionHandleMode: 'persistence handle mode is owned by packages/session/session-persistence/README.md',
   PersistenceSessionHandle: 'private persistence handle implementation is owned by packages/session/session-persistence/src/index.ts',

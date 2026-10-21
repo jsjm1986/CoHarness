@@ -59,6 +59,7 @@
 | [office-to-pdf.md](office-to-pdf.zh.md) | 已授权的延迟 Office 转换、有界 PDF 结果及预览适配 |
 | [ssh.md](ssh.zh.md) | POSIX 远端文件、进程与沙箱共享的 SSH 连接及生命周期 |
 | [webhook.md](webhook.zh.md) | 即发即弃的 Webhook 运行时：`WebhookSessionRequest`、受信任规则注册表与提供方自持的交付接收 |
+| [remote-desktop.md](remote-desktop.zh.md) | 面向人类的远程桌面缝：授权模型、强制的 `resolve → attach` 契约、流式会话与审计分类法 |
 | [workspace.md](workspace.zh.md) | 工作区注册表：`Workspace`/`WorkspaceId`、注册与解析、与会话 `cwd` 的关系 |
 | [client-modules.md](client-modules.zh.md) | Web 插件表：`dsh.client` 声明、`WebBootGraph` 线上组合、bundle 路由与 index 转换 |
 | [web-client.md](web-client.zh.md) | 浏览器端 Cordis 应用：四大基础（Client Modules、API Gateway、Slots、Conversation）以及 Client 模型与功能包的归属 |
