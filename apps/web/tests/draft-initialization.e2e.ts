@@ -24,6 +24,7 @@ const MODE = webSnapshotMode()
 
 interface DraftInitHandle {
   startSession(workspaceId: string | undefined, options: { prompt?: string; clearPreviousDraft?: boolean }): void
+  reusable(workspaceId: string | undefined, sessionId: string | undefined): boolean
 }
 
 describe('web e2e: Session draft initialization', () => {
@@ -176,11 +177,18 @@ describe('web e2e: Session draft initialization', () => {
     const snapshot = await captureStableAria(page, '[data-composer-card] textarea', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'reference.expected.md'), snapshot, MODE)
 
-    // The reuse scan reads freshly repulled summaries whose workspace/cwd join
-    // lands a frame after the session itself; the session's own sidebar row is
-    // the observable edge of that same join, so its presence means a reuse
-    // connect can already see this Session.
-    await page.locator(`[data-row-key^="session:"][data-row-key*="${sessionId!}"]`).waitFor({ timeout: 30_000 })
+    // The reuse scan needs the full predicate — blank summary, cwd joined to
+    // the Workspace path, Host membership, outside the archive set — and the
+    // post-reload repull lands those legs on separate frames. Wait on the
+    // fixture's verbatim predicate instead of a DOM proxy that mounts early.
+    await expect.poll(
+      () => page.evaluate(([wid, sid]) => {
+        const handle = (window as typeof window & { __draftInit?: DraftInitHandle }).__draftInit
+        if (handle === undefined) throw new Error('The shipped Workspace apply has not been observed')
+        return handle.reusable(wid, sid)
+      }, [wid, sessionId] as const),
+      { timeout: 90_000 },
+    ).toBe(true)
     await startSession(page, wid, { prompt: 'keep the existing reference' })
     await expect.poll(() => selected(page)).toBe(sessionId)
     await expect.poll(() => input.inputValue()).toBe('@reference target.md ')

@@ -61,13 +61,25 @@ async function waitForAgentToSettle(scaffold: WebScaffold, id: SessionId): Promi
 }
 
 /** Open the portaled subagent catalog through its trigger's keyboard path. */
-async function openSubagentCatalog(page: Page, name: string): Promise<void> {
+async function openSubagentCatalog(
+  page: Page, name: string, options: { settle?: boolean } = {},
+): Promise<void> {
   const trigger = page.getByRole('button', { name, exact: true })
   await trigger.waitFor({ timeout: 15_000 })
   // The hover path rides a 150ms open timer that a stray pointerleave cancels;
   // ArrowDown opens the same catalog synchronously with no pointer timing.
   await trigger.press('ArrowDown')
-  await page.getByRole('tree', { name: 'Subagent sessions' }).waitFor({ timeout: 15_000 })
+  const tree = page.getByRole('tree', { name: 'Subagent sessions' })
+  await tree.waitFor({ timeout: 15_000 })
+  // The tree mounts before its catalog rows repull; per-parent 'Loading
+  // subagents' placeholders occupy it meanwhile. Content is present only once
+  // no placeholder remains. Callers that stage the loading state itself opt
+  // out and observe it directly.
+  if (options.settle === false) return
+  await expect.poll(
+    () => tree.getByRole('treeitem', { name: 'Loading subagents' }).count(),
+    { timeout: 30_000 },
+  ).toBe(0)
 }
 
 describe('web e2e: persisted subagent conversation and human continuation', () => {
@@ -322,7 +334,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       await page.getByRole('button', { name: '3 subagents' }).waitFor({ timeout: 15_000 })
       acknowledgeReloadConnectionLoss(tripwire, warningStart)
 
-      await openSubagentCatalog(page, '3 subagents')
+      await openSubagentCatalog(page, '3 subagents', { settle: false })
       await expect.poll(() => trailingRequested, { timeout: 15_000 }).toBe(true)
       const tree = page.getByRole('tree', { name: 'Subagent sessions' })
       await tree.getByRole('treeitem', { name: 'Loading subagents' }).first().waitFor()
