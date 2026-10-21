@@ -14158,7 +14158,7 @@
         "packages/preset/agent-preset/skills/cordis-plugin-development/templates/mcp/package.json",
         "packages/preset/agent-preset/tests/skills.spec.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "localDisposition": "Upstream preset authoring skill pack (skills/templates/locales) carried in P5 alongside the registry split; the fork js-yaml line is 5.x. The fork file-model presets keep their embedded skills, so the packaged skills serve upstream-style declared presets.",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
