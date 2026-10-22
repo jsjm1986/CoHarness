@@ -69,17 +69,22 @@ export function apply(ctx: ClientContext): void {
   const subagent = new SubagentLimitsCardController(ctx.settingsScope.bind({ namespace: 'subagent' }))
   const subagentModels = new SubagentModelSelectionCardController(
     ctx.settingsScope.bind({ namespace: SUBAGENT_MODEL_SELECTION_NS }), api)
-  const webSearch = new WebSearchCardController({
-    web: ctx.settingsScope.bind({ namespace: WEB_NS }),
-    messages: ctx.settingsScope.bind({ namespace: WEB_SEARCH_NS }),
-    api: ctx.settingsScope.bind({ namespace: WEB_API_NS }),
-  }, api)
+  let webSearch: WebSearchCardController | undefined
+  const webSearchFace = () => {
+    webSearch ??= new WebSearchCardController({
+      web: ctx.settingsScope.bind({ namespace: WEB_NS }),
+      messages: ctx.settingsScope.bind({ namespace: WEB_SEARCH_NS }),
+      api: ctx.settingsScope.bind({ namespace: WEB_API_NS }),
+    }, api)
+    return webSearch.inject()
+  }
+  ctx.effect(() => () => webSearch?.dispose(), 'ui-settings-plugins: web search form')
 
   // The credential a card reports is not part of any settings section, so its
   // scope publishes nothing when one is written. This is the only signal that
   // a key written on another surface reached the Host.
   ctx.effect(
-    () => ctx.remote.$on('credentials/reference-updated', (ref) => { webSearch.refreshCredential(ref) }),
+    () => ctx.remote.$on('credentials/reference-updated', (ref) => { webSearch?.refreshCredential(ref) }),
     'ui-settings-plugins: credential invalidations',
   )
 
@@ -89,6 +94,8 @@ export function apply(ctx: ClientContext): void {
     'ui-settings-plugins: subagent model settings')
   ctx.effect(() => ctx.on('connection/reset', () => { subagentModels.resetConnection() }),
     'ui-settings-plugins: subagent model connection')
+  ctx.effect(() => ctx.on('connection/reset', () => { webSearch?.resetConnection() }),
+    'ui-settings-plugins: web search connection')
   ctx.effect(() => () => { subagentModels.dispose() }, 'ui-settings-plugins: subagent model form')
 
   let tabsVersion = -1
@@ -190,6 +197,6 @@ export function apply(ctx: ClientContext): void {
     order: 50,
     label: () => t('webSearchTitle'),
     locale: NS,
-    inject: () => webSearch.inject(),
+    inject: webSearchFace,
   }, WebSearchCard))
 }

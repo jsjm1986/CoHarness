@@ -20,6 +20,8 @@ Status: implemented
 
 协作上下文加载只合并非强制调用。变更后的强制刷新会取代并取消旧的上下文读取，陈旧请求的成功或失败都不会发布。上下文请求 slot 在延迟传输执行或通知订阅者之前赋值。对话详情的强制刷新仍保留合并后的尾随读取策略。
 
+[网页搜索设置卡](../../../../packages/client/ui-settings-plugins/src/client/web-search-card-controller.ts)只在详细页首次可见后负责凭据状态查询。摘要从设置派生，不描述凭据；重复激活共享当前读取。凭据引用未变的设置投影不会使凭据元数据失效。选中引用变更、凭据事件、写入完成或连接重置都会启动新读取，并拒绝旧请求的成功或失败，即使引用相同。重置会清除前一目标的状态提示：共享旧请求可能保留陈旧的凭据或写权限信息。未知或查询失败的状态与未配置密钥保持区别；重新打开页面会重试失败查询。销毁时取消读取，不再发布状态或发送后续请求，并等待已接纳的保存，不取消凭据写入回执。
+
 独立的 [Host 设置镜像](../architecture/2026-08-17-settings-describe-mirror.zh.md)决策负责读取派生与启动预算。[账户偏好冲突重试](2026-10-03-account-preferences-conflict-retry.zh.md)负责 revision 栅栏冲突后的串行重试，[项目设置管理](../feature/2026-08-28-project-scoped-settings-management.zh.md)负责项目管理与凭据权限。
 
 ## 考虑过的替代方案
@@ -32,6 +34,8 @@ Status: implemented
 
 **把变更回显作为新鲜权限依据。** 相等或更低的 revision 不能证明授权是新鲜的，也不能恢复已撤销的可写策略。
 
+**插件注册时读取凭据状态，或在重置后复用旧状态。** 摘要无需凭据元数据，重置则会改变目标或权限。延后首次读取可以移除未使用的工作，保留显式失效可以保障权限新鲜度。
+
 ## 后果
 
 清理可能需要等待忽略取消的传输载体。陈旧工作不能发布，已进入传输的写入保留其回执，直接调用兼容接口也不能在资源释放后发起新的传输。
@@ -39,3 +43,5 @@ Status: implemented
 ## 验证
 
 [账户规格](../../../../packages/client/ui-settings/tests/account-scope.client.spec.ts)、[项目规格](../../../../packages/client/ui-settings-models/tests/project-store.client.spec.ts)与[上下文规格](../../../../packages/client/ui-collaboration/tests/collaboration-client.client.spec.ts)约束请求责任、revision 与权限发布、资源释放时的请求准入，以及上下文与详情各自的刷新策略。
+
+[网页搜索生命周期规格](../../../../packages/client/ui-settings-plugins/tests/web-search-lifecycle.client.spec.ts)覆盖延后激活、三个引用未变的 scope 投影、旧读取尚未完成时的失效，以及带有未完成读写的销毁。未打开页面时零读取的断言在隔离负控中拒绝原版主动查询控制器。[组装后的插件设置场景](../../../../apps/web/tests/plugin-config.e2e.ts)通过真实浏览器组装与暂缓返回的 RPC 响应，记录查询中、状态不可用及恢复后的可见状态，不发起模型请求。

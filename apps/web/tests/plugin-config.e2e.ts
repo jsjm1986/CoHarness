@@ -20,22 +20,33 @@ import { ZH_BROWSER_LOCALE, saveFailureShot } from './support.ts'
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/plugin-config', import.meta.url))
 const SECTION_EXPECTED = join(SNAPSHOT_DIR, 'section.expected.md')
 const MODE = webSnapshotMode()
+const WEB_CREDENTIAL_REF = 'DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY'
+const CREDENTIAL_DESCRIBE = /\/api\/credentials\.describe(?:\?.*)?$/
+
+/** Whether a request is the web-search card's single-reference credential hint. */
+function webCredentialHint(request: { url(): string; postDataJSON(): unknown }): boolean {
+  if (!CREDENTIAL_DESCRIBE.test(request.url())) return false
+  const envelope = request.postDataJSON() as { payload?: { refs?: string[] } }
+  return envelope.payload?.refs?.length === 1 && envelope.payload.refs[0] === WEB_CREDENTIAL_REF
+}
 
 describe('web e2e: plugin configuration section', () => {
   let scaffold: WebScaffold
   let browser: Browser
   let page: Page
   let tripwire: ReturnType<typeof watchConsole>
+  let credentialHints = 0
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({
-      deepSeekSearch: { apiKeyEnv: 'DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY' },
-      deepSeekWebApi: { apiKeyEnv: 'DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY' },
+      deepSeekSearch: { apiKeyEnv: WEB_CREDENTIAL_REF },
+      deepSeekWebApi: { apiKeyEnv: WEB_CREDENTIAL_REF },
     })
     browser = await chromium.launch()
     // Chinese browser: the panel asserts the localized copy the client
     // derives from it, as the rest of the settings surface does.
     page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
+    page.on('request', (request) => { if (webCredentialHint(request)) ++credentialHints })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -90,6 +101,7 @@ describe('web e2e: plugin configuration section', () => {
     }
     // The form lives on the item's own page: the card shows the one-liner only.
     expect(await panel.getByLabel('命令超时（毫秒）').count()).toBe(0)
+    expect(credentialHints).toBe(0)
 
     const snapshot = await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SECTION_EXPECTED, snapshot, MODE)
@@ -210,10 +222,71 @@ describe('web e2e: plugin configuration section', () => {
     }
   })
 
+  it('reads a credential hint on detail demand and recovers from an unavailable response on reopening', async () => {
+    const arrived = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const drained = Promise.withResolvers<undefined>()
+    const before = credentialHints
+    expect(before).toBe(0)
+    let held = false
+    await page.route(CREDENTIAL_DESCRIBE, async (route) => {
+      if (!webCredentialHint(route.request()) || held) {
+        await route.fallback()
+        return
+      }
+      held = true
+      try {
+        arrived.resolve(undefined)
+        const response = await route.fetch()
+        const envelope = await response.json() as { type: string; rpcId: string }
+        await release.promise
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...envelope,
+            result: { ok: false, error: { code: 'credentials-unavailable', message: 'Fixture credential hint unavailable', details: {} } },
+          }),
+        })
+      } finally { drained.resolve(undefined) }
+    })
+    try {
+      const [, panel] = await Promise.all([
+        page.waitForRequest(webCredentialHint, { timeout: 10_000 }),
+        openItem('网页搜索'),
+      ])
+      await arrived.promise
+      await panel.getByText('正在查询密钥状态…', { exact: true }).waitFor()
+      expect(await panel.getByText('未配置密钥；仅使用 DeepSeek 账号模型的对话可以通过默认接口地址搜索。', { exact: true }).count()).toBe(0)
+      expect(credentialHints - before).toBe(1)
+      const pending = await captureStableAria(page, '[data-plugin-item-detail="web-search-deepseek"]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search-key-pending.expected.md'), pending, MODE)
+      release.resolve(undefined)
+      await drained.promise
+      await panel.getByText('暂时无法获取密钥状态，重新打开此页面可重试', { exact: true }).waitFor()
+      expect(await panel.getByLabel('API Key', { exact: true }).isEnabled()).toBe(true)
+      const unavailable = await captureStableAria(page, '[data-plugin-item-detail="web-search-deepseek"]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search-key-unavailable.expected.md'), unavailable, MODE)
+      await page.unroute(CREDENTIAL_DESCRIBE)
+      await openPlugins()
+      expect(credentialHints - before).toBe(1)
+      await openItem('网页搜索')
+      await panel.getByText('未配置密钥；仅使用 DeepSeek 账号模型的对话可以通过默认接口地址搜索。', { exact: true }).waitFor()
+      expect(credentialHints - before).toBe(2)
+      const recovered = await captureStableAria(page, '[data-plugin-item-detail="web-search-deepseek"]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search-key-recovered.expected.md'), recovered, MODE)
+      expect(tripwire.pageErrors).toEqual([])
+    } finally {
+      release.resolve(undefined)
+      if (held) await drained.promise
+      await page.unroute(CREDENTIAL_DESCRIBE)
+    }
+  }, 60_000)
+
   it('shows a refused credential replacement without erasing the draft or the stored key', async () => {
     // The card resolves the credential reference the mounted section names:
     // the scaffold configures DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY for both APIs.
-    const ref = credentialRef('DSH_PLUGIN_CONFIG_E2E_UNUSED_KEY')
+    const ref = credentialRef(WEB_CREDENTIAL_REF)
     await scaffold.ctx.credentials.set(ref, 'plugin-fixture-original')
     const panel = await openItem('网页搜索')
     const key = panel.getByLabel('API Key', { exact: true })
@@ -343,6 +416,9 @@ describe('web e2e: plugin configuration section', () => {
 
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md', 'refused-key.expected.md', 'subagent-limits.expected.md', 'subagent-models.expected.md', 'web-search.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, [
+      'section.expected.md', 'refused-key.expected.md', 'subagent-limits.expected.md', 'subagent-models.expected.md', 'web-search.expected.md',
+      'web-search-key-pending.expected.md', 'web-search-key-unavailable.expected.md', 'web-search-key-recovered.expected.md',
+    ])
   })
 })

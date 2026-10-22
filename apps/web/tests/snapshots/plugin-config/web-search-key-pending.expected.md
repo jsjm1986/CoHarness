@@ -1,0 +1,24 @@
+- button "返回插件": 插件
+- switch "启用组件 网页搜索" [checked]
+- heading "网页搜索" [level=3]
+- paragraph: DeepSeek 搜索提供方。
+- text: 启用新版 Web 搜索 API
+- switch "启用新版 Web 搜索 API"
+- paragraph:
+  - text: 默认关闭，搜索通过 DeepSeek Messages 完成。新版 Web 搜索 API 功能与计费详见
+  - link "网页搜索与抓取指南":
+    - /url: https://api-docs.deepseek.com/zh-cn/guides/search
+- text: API Key 正在查询密钥状态…
+- textbox "API Key"
+- paragraph: 不写入设置文件。留空表示保持当前密钥。
+- text: Messages API 基础地址
+- textbox "Messages API 基础地址":
+  - /placeholder: ""
+- paragraph: 填写含 API 前缀的地址，例如 https://api.deepseek.com/anthropic/v1；程序追加 /messages，留空恢复默认。
+- text: 单次请求最多搜索次数
+- textbox "单次请求最多搜索次数":
+  - /placeholder: ""
+  - text: "5"
+- paragraph: 辅助模型在一次 Messages 请求内最多可执行的搜索次数，仅适用于 Messages API。
+- button "放弃修改" [disabled]
+- button "保存" [disabled]

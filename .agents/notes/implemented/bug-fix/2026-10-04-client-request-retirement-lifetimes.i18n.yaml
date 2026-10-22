@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-client-request-retirement-lifetimes.md
 document:
-  en: 88b2db92b94b3f3a10c5d914c62d4ece1bc6163b
-  zh: ec232b6b50ecdd626a0842dbbdc15c302eb3af7a
+  en: fa33758a923ff60e0be229c6223f45e4169e6651
+  zh: 5125d4dd73bd15e2d2ed6dc888898ea0f93f4ac4
 /agent-note-separate-client-request-retirement-from-transport-completion:
   en: 405320bc872dcc6d
   zh: bc3f9e25d07e3c0e
@@ -12,14 +12,14 @@ document:
   en: b35c0e5cf34f7c4c
   zh: e764edc8fdabc8c4
 /agent-note-separate-client-request-retirement-from-transport-completion/decision:
-  en: 25a2e1796faf48ed
-  zh: 969f1f888114a498
+  en: cc89dbd217d863cc
+  zh: f76ffb2732db1604
 /agent-note-separate-client-request-retirement-from-transport-completion/alternatives-considered:
-  en: c8a06afb283fba36
-  zh: 27b5dcebbc2e7ded
+  en: 90fab2010f2cec21
+  zh: 4ab91482c1fd114e
 /agent-note-separate-client-request-retirement-from-transport-completion/consequences:
   en: 375d8af79fb544f8
   zh: 3aa6a9a3a9d3baf8
 /agent-note-separate-client-request-retirement-from-transport-completion/verification:
-  en: 2f54496d4f1080c8
-  zh: ee26444efe0f90b2
+  en: 0be4a631c6e9945b
+  zh: 47aba6a59dad1c46

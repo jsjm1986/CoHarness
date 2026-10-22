@@ -298,9 +298,10 @@ describe('WebSearchCard', () => {
       apiKey: field(''),
       apiKeyConfigured: false,
       apiKeyWritable: true,
+      apiKeyStatus: 'ready',
       ...state,
     })
-    const actions = { ...cardActions(), setSearchApi: vi.fn() }
+    const actions = { ...cardActions(), setSearchApi: vi.fn(), ensureCredential: vi.fn() }
     const props: WebSearchCardProps = { ...globalStandard, ...actions, t, view, useWebSearchCard: bindSnapshotSelector(store) }
     render(<WebSearchCard {...props} />)
     return actions
@@ -308,21 +309,32 @@ describe('WebSearchCard', () => {
 
   it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
     const { container } = render(<div />)
-    renderWebSearch({ available: false })
+    const unavailable = renderWebSearch({ available: false })
+    expect(unavailable.ensureCredential).not.toHaveBeenCalled()
     expect(container.textContent).toBe('')
     expect(screen.queryByLabelText(en.webSearchBaseUrl)).toBeNull()
 
     cleanup()
-    renderWebSearch({}, 'summary')
+    const summary = renderWebSearch({}, 'summary')
+    expect(summary.ensureCredential).not.toHaveBeenCalled()
     expect(screen.getByText(en.webSearchDescription)).toBeTruthy()
     expect(screen.queryByRole('button', { name: en.save })).toBeNull()
   })
 
   it('reports whether a key is configured without ever showing one', () => {
-    renderWebSearch({ apiKeyConfigured: true })
+    const actions = renderWebSearch({ apiKeyConfigured: true })
+    expect(actions.ensureCredential).toHaveBeenCalledOnce()
 
     expect(screen.getByText(en.webSearchApiKeySet)).toBeTruthy()
     expect(screen.getByLabelText(en.webSearchApiKey)).toHaveProperty('type', 'password')
+  })
+
+  it.each(['unknown', 'loading', 'unavailable'] as const)('does not report an unknown credential as missing (%s)', (apiKeyStatus) => {
+    renderWebSearch({ apiKeyStatus })
+
+    expect(screen.getByText(apiKeyStatus === 'unavailable' ? en.webSearchApiKeyUnknown : en.webSearchApiKeyChecking)).toBeTruthy()
+    expect(screen.queryByText(en.webSearchApiKeyUnset)).toBeNull()
+    expect(screen.getByLabelText(en.webSearchApiKey)).toHaveProperty('disabled', false)
   })
 
   it('keeps the key control usable while the settings document is read-only', () => {

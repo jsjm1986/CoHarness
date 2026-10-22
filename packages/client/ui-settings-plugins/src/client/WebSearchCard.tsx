@@ -5,6 +5,7 @@
  * the settings section, so the literal never rides a response.
  */
 
+import { useEffect } from 'react'
 import { Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: merges the Plugins page's `plugins.item` contract.
@@ -28,6 +29,10 @@ export type WebSearchCardProps =
 export function WebSearchCard(props: WebSearchCardProps) {
   const { t } = props
   const state = props.useWebSearchCard(snapshot => snapshot)
+  const { ensureCredential } = props
+  useEffect(() => {
+    if (props.view === 'page' && state.available) ensureCredential()
+  }, [props.view, state.available, ensureCredential])
   if (!state.available) return null
   if (props.view === 'summary') return t('webSearchDescription')
   const disabled = !state.writable || state.saving
@@ -58,7 +63,9 @@ export function WebSearchCard(props: WebSearchCardProps) {
         disabled={!state.apiKeyWritable}
         text={state.apiKey.text}
         configured={state.apiKeyConfigured}
-        stateLabel={state.apiKeyConfigured ? t('webSearchApiKeySet') : t('webSearchApiKeyUnset')}
+        stateLabel={state.apiKeyStatus === 'ready'
+          ? t(state.apiKeyConfigured ? 'webSearchApiKeySet' : 'webSearchApiKeyUnset')
+          : t(state.apiKeyStatus === 'unavailable' ? 'webSearchApiKeyUnknown' : 'webSearchApiKeyChecking')}
         onEdit={(text) => { props.edit('apiKey', text) }}
       />
       <ValueField
