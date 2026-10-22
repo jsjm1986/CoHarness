@@ -81,9 +81,15 @@ const CODE_KEYS = {
   'bundle-in-use': 'reasonBundleInUse',
   'stale-approval': 'reasonStaleApproval',
   'incompatible-version': 'reasonIncompatibleVersionUnnamed',
+  'install-source': 'reasonInstallSource',
   'invalid-config': 'reasonInvalidConfig',
   'operation-error': 'reasonOperationError',
 } satisfies Record<ManagementError['code'], PluginManagerLocaleKey>
+
+/** Transport refusal codes that bypass ManagementFailure; an unmapped code falls back to the generic sentence. */
+const REMOTE_KEYS: Record<string, PluginManagerLocaleKey> = {
+  'plugin-management/install-source': 'reasonInstallSource',
+}
 
 /** The sentence a failed action opens with, by what was being done. */
 const FAILED_KEYS = {
@@ -113,7 +119,10 @@ export function managementText(error: { readonly code: ManagementError['code']; 
       }))
     return [...sentences, t(error.installing ? 'reasonIncompatibleInstall' : 'reasonIncompatibleInstalled')].join(t('sentenceSeparator'))
   }
-  if (error.code !== 'operation-error') return t(CODE_KEYS[error.code])
+  if (error.code !== 'operation-error') {
+    const key = REMOTE_KEYS[error.code] ?? CODE_KEYS[error.code]
+    return key === undefined ? t('reasonOperationError') : t(key)
+  }
   return error.diagnostic === undefined || error.diagnostic === '' ? t('reasonOperationError') : error.diagnostic
 }
 

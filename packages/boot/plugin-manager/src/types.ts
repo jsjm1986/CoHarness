@@ -60,6 +60,16 @@ export interface PluginManagementAuthorization {
    */
   authorize(capability?: PluginManagementCapability): Promise<void>
   /**
+   * Gate one installable spec by its form before pnpm runs. Present only in
+   * deployments that restrict install sources; absent means any spec form is
+   * acceptable. The parsed spec, not the raw string, reaches the policy so a
+   * URL spelled several ways cannot slip past a host rule.
+   * @param spec - the parsed install spec.
+   * @returns After the deployment permits the source; rejects with
+   * 'plugin-management/install-source' otherwise.
+   */
+  authorizeInstall?(spec: ParsedInstallSpec): Promise<void>
+  /**
    * Read the profile's saved desired state. Present only in deployments with
    * a durable state store; standalone profiles manage files directly.
    * @returns the store's current snapshot.
@@ -78,6 +88,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** Profile management requires current deployment authorization. */
     'plugin-management/forbidden': Record<string, never>
+    /** The deployment's install-source policy refused the spec's form or host. */
+    'plugin-management/install-source': Record<string, never>
   }
 }
 
@@ -95,7 +107,7 @@ export interface IncompatiblePlugin {
 
 /** Localizable management failure and optional external diagnostic. */
 export interface ManagementError {
-  code: ReadOnlyReason | 'unknown-plugin' | 'invalid-spec' | 'invalid-config' | 'already-installed' | 'ambiguous-install' | 'not-bundle' | 'not-removable' | 'stop-profile' | 'bundle-in-use' | 'stale-approval' | 'incompatible-version' | 'operation-error'
+  code: ReadOnlyReason | 'unknown-plugin' | 'invalid-spec' | 'invalid-config' | 'already-installed' | 'ambiguous-install' | 'not-bundle' | 'not-removable' | 'stop-profile' | 'bundle-in-use' | 'stale-approval' | 'incompatible-version' | 'install-source' | 'operation-error'
   diagnostic?: string
   /** Present with `incompatible-version`: the packages the running DSH version rejects. */
   incompatible?: IncompatiblePlugin[]

@@ -646,6 +646,16 @@ export class PluginManager extends TypertRemoteService {
     const result = this.change(async (result) => {
       if (spec.trim() === '' || spec.startsWith('-')) throw new ManagementFailure('invalid-spec')
       if (stopped()) throw new InstallCancelledError()
+      const sourcePolicy = this.ownerContext.get('pluginManagementAuthorization')
+      if (sourcePolicy?.authorizeInstall !== undefined) {
+        let parsed: ParsedInstallSpec
+        try { parsed = parseInstallSpec(spec) } catch { throw new ManagementFailure('invalid-spec') }
+        try { await sourcePolicy.authorizeInstall(parsed) }
+        catch (error) {
+          if (remoteErrorOf(error)?.code === 'plugin-management/install-source') throw new ManagementFailure('install-source')
+          throw error
+        }
+      }
       const before = readProfileManifest('dsh', this.profile.dir).dependencies ?? {}
       // With HMR, an installed package is removed before another version is installed, so its plugins stop first.
       const known = specPackageName(spec, before, this.profile.dir)

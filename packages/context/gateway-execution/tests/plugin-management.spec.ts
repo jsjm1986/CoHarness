@@ -1,7 +1,7 @@
 /** Management authority is checked independently of profile and tool permissions. */
 import { expect, it, vi } from 'vitest'
 import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
-import { gatewayPluginManagementAuthorization } from '../src/plugin-management.ts'
+import { gatewayPluginManagementAuthorization, parseInstallSourcePolicy } from '../src/plugin-management.ts'
 
 function fixture() {
   const principal: GatewayRequestPrincipal = {
@@ -92,4 +92,35 @@ it('accepts the dedicated profile-management assertion and still rechecks the Ga
   principal.claims.purpose = 'terminal-admin'
   await expect(policy.authorize()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
   expect(request).toHaveBeenCalledTimes(1)
+})
+
+it('gates install specs by the deployment source policy', async () => {
+  const { current, request, lifetime } = fixture()
+  const sources = parseInstallSourcePolicy('git:github.com,tarball:cdn.example.com')
+  const policy = gatewayPluginManagementAuthorization({ current, request }, lifetime.signal, sources)
+  await policy.authorizeInstall!({ kind: 'registry', spec: 'dsh-plugin-x', name: 'dsh-plugin-x' })
+  await policy.authorizeInstall!({ kind: 'git', spec: 'github:a/b', host: 'github.com' })
+  await expect(policy.authorizeInstall!({ kind: 'git', spec: 'git@evil.example:a/b', host: 'evil.example' }))
+    .rejects.toMatchObject({ code: 'plugin-management/install-source' })
+  await expect(policy.authorizeInstall!({ kind: 'path', spec: '/opt/x', path: '/opt/x' }))
+    .rejects.toMatchObject({ code: 'plugin-management/install-source' })
+  await expect(policy.authorizeInstall!({ kind: 'tarball', spec: 'https://other.example/x.tgz', host: 'other.example' }))
+    .rejects.toMatchObject({ code: 'plugin-management/install-source' })
+  await expect(policy.authorizeInstall!({ kind: 'tarball', spec: 'https://cdn.example.com/x.tgz', host: 'cdn.example.com' }))
+    .resolves.toBeUndefined()
+  expect(request).not.toHaveBeenCalled()
+})
+
+it('defaults the source policy to registry specs only and opens every form without one', async () => {
+  const { current, request, lifetime } = fixture()
+  const restricted = gatewayPluginManagementAuthorization({ current, request }, lifetime.signal, parseInstallSourcePolicy(undefined))
+  await expect(restricted.authorizeInstall!({ kind: 'path', spec: '/opt/x', path: '/opt/x' }))
+    .rejects.toMatchObject({ code: 'plugin-management/install-source' })
+  const open = gatewayPluginManagementAuthorization({ current, request }, lifetime.signal)
+  await open.authorizeInstall!({ kind: 'path', spec: '/opt/x', path: '/opt/x' })
+})
+
+it('fails startup on a malformed source policy entry', () => {
+  expect(() => parseInstallSourcePolicy('registry,floppy')).toThrow('HGW_PLUGIN_INSTALL_SOURCES')
+  expect(() => parseInstallSourcePolicy('git:')).toThrow('HGW_PLUGIN_INSTALL_SOURCES')
 })

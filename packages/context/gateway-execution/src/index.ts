@@ -23,7 +23,7 @@ import { GatewayDesktopPolicy } from './desktop.ts'
 import { GatewaySshAuthorization } from './ssh.ts'
 import { GatewayUserTerminalAuthorization } from './user-terminal.ts'
 import { registerWebhookDispatch } from './webhook.ts'
-import { gatewayPluginManagementAuthorization } from './plugin-management.ts'
+import { gatewayPluginManagementAuthorization, parseInstallSourcePolicy } from './plugin-management.ts'
 import type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
 
 export type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
@@ -114,7 +114,7 @@ export class GatewayExecution extends ExecutionAuthority {
     const policy = gatewayPluginManagementAuthorization({
       current: () => ctx.gatewayRuntime.interactive(),
       request: (path, options) => ctx.gatewayRuntime.request(path, options),
-    }, this.lifetime.signal)
+    }, this.lifetime.signal, parseInstallSourcePolicy(process.env.HGW_PLUGIN_INSTALL_SOURCES))
     ctx.provide('pluginManagementAuthorization', {
       protectedModules: policy.protectedModules,
       // The deployment policy gates reads and writes alike: an unqualified
@@ -128,6 +128,8 @@ export class GatewayExecution extends ExecutionAuthority {
       // composition is shared, so publish and read ride the runtime credential.
       readDesiredState: policy.readDesiredState?.bind(policy),
       publishDesiredState: policy.publishDesiredState?.bind(policy),
+      // Install sources are deployment policy, uniform for every caller.
+      authorizeInstall: policy.authorizeInstall?.bind(policy),
     })
     ctx.provide('permissionPresetAuthorization', {
       canSelect: (preset: string) => {
