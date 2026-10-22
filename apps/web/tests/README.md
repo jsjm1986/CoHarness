@@ -43,3 +43,9 @@ That reachability is incidental, not a guarantee — if it ever leaves the graph
 mirror the helper like the rest.
 
 Nothing mechanically enforces this rule; keep it in review.
+
+## Runtime scope and timed-question regressions
+
+Run `pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/project-activity.e2e.ts apps/web/tests/timed-question-claim.e2e.ts` after building the affected Client bundles and Web frontend. `DSH_SNAPSHOT=refresh` rewrites their UI goldens; ordinary execution compares them without an API key.
+
+The activity scenario changes a shared scope cookie in a second browser tab and verifies that the original page still requests its pinned project before revealing a real seeded conversation. Only the external account Gateway endpoints are substituted. The timed-question scenario copies the shipped standard preset into an isolated directory, selects the supported timed ask-user configuration, and delays its real browser claim request until the actual Host wait expires. A replayed model tool call, the timed tool, Session projection, late-answer Remote call and subsequent model turn all run through the assembled application.

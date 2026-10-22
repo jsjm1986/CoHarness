@@ -273,6 +273,37 @@ describe('apply', () => {
     }
   })
 
+  it.each(['ended', 'failed'] as const)('answers a continued card through RPC after a delayed claim %s', async (outcome) => {
+    const b = await bench()
+    const opening = Promise.withResolvers<IteratorResult<{ remainingMs: number }>>()
+    let claimSignal: AbortSignal | undefined
+    b.attachWait.mockImplementation((_sessionId, _callId, signal) => {
+      claimSignal = signal
+      return { [Symbol.asyncIterator]: () => ({ next: () => opening.promise }) } as never
+    })
+    try {
+      const { wait, respond } = wireWait('question-delayed', {
+        questions: [...QUESTIONS], wait: { callId: CALL, timed: true },
+      })
+      b.setPending([wait])
+      b.projection.set({ active: [CONTINUED], settled: [] })
+      const card = b.session.publishInteraction.mock.calls[0]?.[0] as PendingQuestion
+      wait.markSettled()
+      b.setPending([])
+      expect(claimSignal?.aborted).toBe(true)
+      if (outcome === 'ended') opening.resolve({ done: true, value: undefined })
+      else opening.reject(new Error('claim connection closed'))
+      await b.flush()
+      expect(card.snapshot().channel).toBe('rpc')
+      await expect(card.answer(ANSWER)).resolves.toBeUndefined()
+      expect(b.answer).toHaveBeenCalledWith(SESSION_ID, CALL, ANSWER)
+      expect(respond).not.toHaveBeenCalled()
+    } finally {
+      await b.fiber.dispose()
+      await b.ctx.fiber.dispose()
+    }
+  })
+
   it('creates a continued card from the projection and answers it through the Remote path', async () => {
     const b = await bench()
     try {

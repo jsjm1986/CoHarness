@@ -15,6 +15,7 @@ Keep the mux transport and port the card model onto it.
 - `Session.publishInteraction` adds plugin-owned entries to the Session pending feed alongside wire `PendingWait`s; the feed is the single pending surface the composer seat and the session row read.
 - `PendingQuestion` keeps the upstream card lifecycle — waterfall channel, countdown deadline, hide/reveal, review — with the waterfall `resolve`/`reject`/`delegate` bridged to `wait.respond`, so the mux frame remains the answer carrier.
 - A wait carrying `wait.timed` opens the Remote `userQuestions.attachWait` claim stream once; the waterfall attaches only after the opening frame lands the deadline, so the countdown never flashes a wrong value.
+- The wait's abort signal owns that attachment. Once released, a delayed stream opening, completion or failure cannot restore its waterfall channel over the continued card's Remote answer path.
 - A live card retains its Session scope (`userQuestion` reference source). Scope teardown prunes the session-scoped draft store, so deselecting a session must not release it while a question remains answerable; the release happens when the card closes.
 - A re-bound Session starts with an empty published feed, so cards re-anchor onto the new Session object on every reconcile pass. Conversely, only the Session object that carried a wait may vouch for its departure — absence after a re-bind is not a settlement.
 - A closed turn owns a turn-process row even without assistant evidence, so a reply-only turn still folds what it leaves behind; folded members stay mounted under `hidden` instead of leaving the DOM, since a late reply mutates while hidden and must paint complete on reveal.
@@ -36,4 +37,4 @@ Keep the mux transport and port the card model onto it.
 
 ## Testing
 
-`browser-plugin.client.spec.ts` drives the port end to end against the mux `PendingWait` — adoption, timed claim anchoring, reconnect replay, feed departure, and the retain/release contract. `question-composer.e2e.ts` records the late-answer scenario: the reply row mounts folded inside its turn's process disclosure and expands to a read-only answer review.
+`browser-plugin.client.spec.ts` drives the port end to end against the mux `PendingWait` — adoption, timed claim anchoring, delayed claim completion and failure after release, reconnect replay, feed departure, and the retain/release contract. `question-composer.e2e.ts` records the late-answer scenario: the reply row mounts folded inside its turn's process disclosure and expands to a read-only answer review. `timed-question-claim.e2e.ts` delays the actual browser claim request while the real timed tool continues, then submits a durable late reply through the Remote path and pins the assembled UI states.
