@@ -218,6 +218,7 @@
     { "path": "./packages/context/userdoc-context" },
     { "path": "./packages/context/gateway-runtime" },
     { "path": "./packages/context/gateway-execution" },
+    { "path": "./packages/context/resource-budget" },
     { "path": "./packages/context/execution-authority" },
     { "path": "./packages/context/archive-gateway" },
     { "path": "./packages/context/collaboration" },

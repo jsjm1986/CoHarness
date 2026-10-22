@@ -1,3 +1,4 @@
+import { RuntimeCapacity, RuntimeCapacityError, type RuntimeCapacityLease, type RuntimeCapacitySnapshot } from './runtime-capacity.ts'
 import { createHash, randomBytes } from 'node:crypto'
 import {
   copyFileSync,
@@ -19,6 +20,7 @@ import type { UserRow } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
 import {
   LocalLauncher,
+  RuntimeLaunchCleanupError,
   type InstanceProc,
   type Launcher,
   type RuntimePolicyIdentity,
@@ -181,15 +183,27 @@ export type RuntimeStopReason = 'manual' | 'idle' | 'shutdown' | 'failed' | 'acc
 /** Explicit starts require an authenticated user action at the owning HTTP route. */
 export type RuntimeStartIntent = 'passive' | 'explicit' | 'webhook'
 
+/** One deduplicated start with separate bounded admission and readiness results. */
+export interface RuntimeStartRequest {
+  /** Resolves after bounded queue acceptance, immediate capacity reservation or warm reuse. */
+  readonly admission: Promise<void>
+  /** Resolves after authenticated readiness; queued requests can still time out or be cancelled. */
+  readonly completion: Promise<{ port: number; generation: number }>
+}
+
 /** Startup intent cannot override an unavailable owner or a durable stop decision. */
 export class RuntimeStartBlockedError extends Error {
   readonly code: 'INSTANCE_STOPPED' | 'INSTANCE_UNAVAILABLE'
-  constructor(readonly reason: RuntimeStopReason | 'maintenance' | 'stale-epoch' | 'unavailable' | null) {
-    super(reason === 'unavailable'
+  /**
+   * @param reason - durable stop, maintenance, or unavailable-assignment decision.
+   * @param message - actionable recovery instructions when availability requires process reconciliation.
+   */
+  constructor(readonly reason: RuntimeStopReason | 'maintenance' | 'stale-epoch' | 'unavailable' | null, message?: string) {
+    super(message ?? (reason === 'unavailable'
       ? 'Runtime start is unavailable. Check the owner status, membership and instance assignment.'
       : reason === 'maintenance' || reason === 'stale-epoch'
       ? 'Runtime start is unavailable during maintenance or after a database restore.'
-      : 'The runtime requires an explicit start by an authorized user.')
+      : 'The runtime requires an explicit start by an authorized user.'))
     this.name = 'RuntimeStartBlockedError'
     this.code = reason === 'maintenance' || reason === 'stale-epoch' || reason === 'unavailable' ? 'INSTANCE_UNAVAILABLE' : 'INSTANCE_STOPPED'
   }
@@ -212,6 +226,8 @@ function leaseKey(target: RuntimeTarget, generation: number | undefined): string
 /** Durable instance rows required by {@link InstanceManager}. */
 export interface InstanceRepository {
   initialize(instancesOutliveGateway: boolean): Promise<void>
+  /** @returns existing processes assigned to this node, including incomplete starts and stops. */
+  activeTargets(): Promise<RuntimeTarget[]>
   portOf(target: RuntimeTarget): Promise<number>
   stateOf(target: RuntimeTarget): Promise<string>
   stopReasonOf(target: RuntimeTarget): Promise<RuntimeStopReason | null>
@@ -239,6 +255,11 @@ class SqliteInstanceRepository implements InstanceRepository {
     if (!instancesOutliveGateway) this.db.prepare(`UPDATE instances SET
       stop_reason = CASE WHEN state IN ('ready','starting') THEN 'shutdown' ELSE stop_reason END,
       state = 'stopped', pid = NULL`).run()
+  }
+
+  async activeTargets(): Promise<RuntimeTarget[]> {
+    const rows = this.db.prepare("SELECT user_id FROM instances WHERE state IN ('ready','starting','stopping')").all() as Array<{ user_id: number }>
+    return rows.map(row => ({ kind: 'user', id: row.user_id }))
   }
 
   private userId(target: RuntimeTarget): number {
@@ -344,6 +365,10 @@ export class InstanceManager {
   private readonly launcher: Launcher
   private readonly repository: InstanceRepository
   private readonly initialized: Promise<void>
+  private readonly capacity: RuntimeCapacity
+  private readonly residentLeases = new Map<string, RuntimeCapacityLease>()
+  private readonly pendingStarts = new Map<string, RuntimeStartRequest>()
+  private readonly startControllers = new Map<string, Set<AbortController>>()
   private readonly procs = new Map<string, InstanceProc>()
   private readonly wsRefs = new Map<string, number>()
   /** Aggregate WebSocket leases by runtime, independent of generation. */
@@ -375,7 +400,25 @@ export class InstanceManager {
   ) {
     this.repository = 'prepare' in source ? new SqliteInstanceRepository(source) : source
     this.launcher = launcher ?? new LocalLauncher(cfg)
-    this.initialized = this.repository.initialize(this.launcher.instancesOutliveGateway)
+    this.capacity = new RuntimeCapacity(cfg.runtimeCapacity)
+    this.initialized = this.repository.initialize(this.launcher.instancesOutliveGateway).then(async () => {
+      for (const target of await this.repository.activeTargets()) {
+        const key = targetKey(target)
+        this.residentLeases.set(key, this.capacity.adopt(key))
+      }
+    })
+  }
+
+  /** @returns node-local process admission counts; excludes AI, tool and child-process resource usage. */
+  capacitySnapshot(): RuntimeCapacitySnapshot { return this.capacity.snapshot() }
+
+  private releaseResident(key: string): void {
+    this.residentLeases.get(key)?.release()
+    this.residentLeases.delete(key)
+  }
+
+  private cancelStarts(target: RuntimeTargetInput): void {
+    for (const controller of this.startControllers.get(targetKey(target)) ?? []) controller.abort()
   }
 
   async portOf(target: RuntimeTargetInput): Promise<number> {
@@ -572,11 +615,53 @@ export class InstanceManager {
     }
   }
 
-  async ensureRunning(subject: UserRow | ProjectRuntime, intent: RuntimeStartIntent = 'passive'): Promise<{ port: number; generation: number }> {
+  ensureRunning(subject: UserRow | ProjectRuntime, intent: RuntimeStartIntent = 'passive'): Promise<{ port: number; generation: number }> {
+    return this.startRequest(subject, intent).completion
+  }
+
+  /**
+   * Request a Runtime start while allowing HTTP callers to observe admission before readiness.
+   * @param subject - authorized user or project whose Runtime is required.
+   * @param intent - passive, explicit or webhook start policy.
+   * @returns one shared operation per target and intent while its start remains unsettled.
+   */
+  startRequest(subject: UserRow | ProjectRuntime, intent: RuntimeStartIntent = 'passive'): RuntimeStartRequest {
+    const key = targetKey({ kind: 'username' in subject ? 'user' : 'project', id: subject.id })
+    const requestKey = `${key}:${intent}`
+    const pending = this.pendingStarts.get(requestKey)
+    if (pending !== undefined) return pending
+    const controller = new AbortController()
+    let controllers = this.startControllers.get(key)
+    if (controllers === undefined) this.startControllers.set(key, controllers = new Set())
+    controllers.add(controller)
+    let accept!: () => void
+    let refuse!: (error: unknown) => void
+    const admission = new Promise<void>((resolve, reject) => { accept = resolve; refuse = reject })
+    // ensureRunning consumers observe readiness only; keep the optional admission result contained.
+    void admission.catch(() => {})
+    const run = this.ensureRunningNow(subject, intent, controller.signal, accept).then(result => {
+      accept()
+      return result
+    }, error => {
+      refuse(error)
+      throw error
+    })
+    const operation: RuntimeStartRequest = { admission, completion: run }
+    this.pendingStarts.set(requestKey, operation)
+    void run.finally(() => {
+      if (this.pendingStarts.get(requestKey) === operation) this.pendingStarts.delete(requestKey)
+      controllers.delete(controller)
+      if (controllers.size === 0) this.startControllers.delete(key)
+    }).catch(() => {})
+    return operation
+  }
+
+  private ensureRunningNow(subject: UserRow | ProjectRuntime, intent: RuntimeStartIntent, signal: AbortSignal, accept: () => void): Promise<{ port: number; generation: number }> {
     const target: RuntimeTarget = 'username' in subject
       ? { kind: 'user', id: subject.id }
       : { kind: 'project', id: subject.id }
     return this.serialize(target, async () => {
+      await this.initialized
       const port = await this.portOf(target)
       const proc = this.procs.get(targetKey(target))
       if (await this.stateOf(target) === 'ready') {
@@ -590,9 +675,7 @@ export class InstanceManager {
             live = this.launcher.attach(await this.launchContext(subject))
             this.procs.set(targetKey(target), live)
           } catch (error: unknown) {
-            // A stale systemd unit or a transient supervisor lookup failure
-            // must not strand a ready row. Treat the handle as unavailable and
-            // let the normal start path establish a fresh generation.
+            // Without a handle the existing process cannot be confirmed stopped.
             console.error(`[gateway] failed to re-attach ${targetKey(target)} survivor:`, error)
             live = undefined
           }
@@ -609,7 +692,16 @@ export class InstanceManager {
           await this.beforeUse?.(subject)
           return { port, generation: await this.repository.generationOf(target) }
         }
+        // A dead root can leave descendants running; release only after confirmed termination.
+        if (live === undefined && this.residentLeases.has(targetKey(target))) {
+          throw new RuntimeStartBlockedError('unavailable', 'The runtime has an unconfirmed existing process. Stop it successfully before starting it again.')
+        }
+        if (live !== undefined) await live.terminate(STOP_GRACE_MS)
         this.procs.delete(targetKey(target))
+        this.releaseResident(targetKey(target))
+      }
+      if (this.residentLeases.has(targetKey(target))) {
+        throw new RuntimeStartBlockedError('unavailable', 'The runtime has an incomplete start or stop. Stop it successfully before starting it again.')
       }
       const reason = await this.repository.stopReasonOf(target)
       if (intent !== 'explicit' && (reason === 'manual' || intent === 'webhook' && reason !== 'idle')) {
@@ -619,8 +711,21 @@ export class InstanceManager {
           throw new RuntimeStartBlockedError(eligible.stopReason)
         }
       }
-      const start = async () => this.start(await this.launchContext(subject), port, intent)
-      return this.startAdmission === undefined ? start() : this.startAdmission(start)
+      const request = this.capacity.request(targetKey(target), signal)
+      accept()
+      const lease = await request.lease
+      this.residentLeases.set(targetKey(target), lease)
+      try {
+        if (signal.aborted) throw new RuntimeCapacityError('cancelled')
+        const start = async () => this.start(await this.launchContext(subject), port, intent, signal)
+        const result = await (this.startAdmission === undefined ? start() : this.startAdmission(start))
+        lease.ready()
+        return result
+      } catch (error) {
+        // Failed termination retains the process handle and its reservation.
+        if (!this.procs.has(targetKey(target))) this.releaseResident(targetKey(target))
+        throw error
+      }
     })
   }
 
@@ -795,6 +900,7 @@ export class InstanceManager {
     descriptor: Omit<RuntimeLaunchContext, 'generation'>,
     port: number,
     intent: RuntimeStartIntent,
+    signal: AbortSignal,
   ): Promise<{ port: number; generation: number }> {
     // Mount policy bundles first: a missing mandatory policy must refuse the
     // start before any state transition, not strand the row in 'starting'.
@@ -813,6 +919,7 @@ export class InstanceManager {
     let proc: InstanceProc | undefined
     try {
       await this.beforeStart?.(runtime)
+      if (signal.aborted) throw new RuntimeCapacityError('cancelled')
       const gatewayCredential = JSON.stringify({
         version: 1,
         gatewayUrl: `http://127.0.0.1:${String(this.cfg.port)}`,
@@ -821,8 +928,20 @@ export class InstanceManager {
         token: runtimeToken,
         principalPublicKey: this.security.principalPublicKey,
       })
-      proc = await this.launcher.start({ ...runtime, gatewayCredential })
+      try { proc = await this.launcher.start({ ...runtime, gatewayCredential }) } catch (launchError: unknown) {
+        if (launchError instanceof RuntimeLaunchCleanupError) {
+          proc = launchError.process
+          this.procs.set(key, proc)
+        }
+        throw launchError
+      }
       this.procs.set(key, proc)
+      if (proc.exited !== undefined) {
+        const observed = proc
+        void proc.exited.then(() => this.serialize(runtime.target, async () => {
+          if (this.procs.get(key) === observed) await this.terminate(runtime.target, 'failed')
+        })).catch((error: unknown) => { console.error(`[gateway] Runtime exit cleanup failed for ${key}:`, error) })
+      }
 
       const deadline = Date.now() + this.cfg.readinessTimeoutMs
       const readinessNonce = randomBytes(32).toString('base64url')
@@ -834,6 +953,7 @@ export class InstanceManager {
       const readinessRequest = runtimeReadinessRequestProof(runtimeToken, readinessNonce, readinessIdentity)
       const readinessExpected = runtimeReadinessResponseProof(runtimeToken, readinessNonce, readinessIdentity)
       while (Date.now() < deadline) {
+        if (signal.aborted) throw new RuntimeCapacityError('cancelled')
         // A supervisor-backed unit can legitimately remain `activating` while
         // its HTTP endpoint is coming up; the authenticated probe below is the
         // readiness decision. Direct children still expose an exit edge here.
@@ -847,7 +967,7 @@ export class InstanceManager {
               [RUNTIME_READINESS_NONCE_HEADER]: readinessNonce,
               [RUNTIME_READINESS_REQUEST_HEADER]: readinessRequest,
             },
-            signal: AbortSignal.timeout(1000),
+            signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]),
           })
           if (response.ok) {
             const value: unknown = await readResponseJson(response, this.cfg.upstreamResponseLimitBytes)
@@ -874,11 +994,18 @@ export class InstanceManager {
     } catch (error) {
       // A failed post-beginStart path must never strand the durable row in
       // `starting`; terminate the child first, then publish the stopped state.
-      if (proc !== undefined) await proc.terminate(STOP_GRACE_MS).catch(() => {})
-      if (this.procs.get(key) === proc) this.procs.delete(key)
-      await this.repository.markStopped(runtime.target, 'failed').catch((cleanupError: unknown) => {
-        console.error(`[gateway] failed to roll back instance ${key}:`, cleanupError)
-      })
+      let terminated = proc === undefined
+      if (proc !== undefined) {
+        try { await proc.terminate(STOP_GRACE_MS); terminated = true } catch (cleanupError: unknown) {
+          console.error(`[gateway] failed to terminate instance ${key}:`, cleanupError)
+        }
+      }
+      if (terminated) {
+        if (this.procs.get(key) === proc) this.procs.delete(key)
+        await this.repository.markStopped(runtime.target, 'failed').catch((cleanupError: unknown) => {
+          console.error(`[gateway] failed to roll back instance ${key}:`, cleanupError)
+        })
+      }
       throw error
     }
   }
@@ -909,6 +1036,7 @@ export class InstanceManager {
   }
 
   async stop(target: RuntimeTargetInput, reason: RuntimeStopReason = 'manual'): Promise<void> {
+    this.cancelStarts(target)
     return this.serialize(target, () => this.terminate(targetOf(target), reason))
   }
 
@@ -919,6 +1047,7 @@ export class InstanceManager {
    * @returns the operation result
    */
   async withStopped<T>(target: RuntimeTargetInput, operation: () => Promise<T>): Promise<T> {
+    this.cancelStarts(target)
     return this.serialize(target, async () => {
       await this.terminate(targetOf(target), 'manual')
       return operation()
@@ -938,6 +1067,9 @@ export class InstanceManager {
     if (proc === undefined && this.launcher.attach !== undefined) {
       proc = await this.attachSurvivor(target)
     }
+    if (proc === undefined && this.residentLeases.has(key)) {
+      throw new Error(`Runtime ${key} termination cannot be confirmed`)
+    }
     if (proc !== undefined) await proc.terminate(STOP_GRACE_MS)
     this.procs.delete(key)
     const prefix = `${key}@`
@@ -948,6 +1080,7 @@ export class InstanceManager {
     this.wsTotals.delete(key)
     this.operationTotals.delete(key)
     await this.repository.markStopped(target)
+    this.releaseResident(key)
   }
 
   /**
@@ -995,6 +1128,10 @@ export class InstanceManager {
    * @returns completion after all workers settle; rejects with the first failed worker's original error
    */
   async stopAll(): Promise<void> {
+    this.capacity.close()
+    for (const controllers of this.startControllers.values()) for (const controller of controllers) controller.abort()
+    await this.initialized
+    await Promise.allSettled([...this.pendingStarts.values()].map(operation => operation.completion))
     // Local children must not outlive the gateway; systemd units stay up
     // across a gateway restart by design.
     if (this.launcher.instancesOutliveGateway) return

@@ -101,6 +101,17 @@ export class PostgresInstanceRepository implements InstanceRepository {
     })
   }
 
+  async activeTargets(): Promise<RuntimeTarget[]> {
+    const result = await this.context.pool.query<{ kind: 'user' | 'project'; id: string }>(`SELECT
+      CASE WHEN i.user_id IS NOT NULL THEN 'user' ELSE 'project' END kind,
+      COALESCE(u.public_id,p.public_id)::text id FROM harness.instances i
+      LEFT JOIN harness.users u ON u.id=i.user_id AND u.organization_id=i.organization_id
+      LEFT JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
+      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND i.observed_state IN ('ready','starting','stopping')`,
+    [this.context.organizationId, this.context.nodeId])
+    return result.rows.map(row => ({ kind: row.kind, id: publicNumber(row.id, 'Runtime target') }))
+  }
+
   async portOf(target: RuntimeTarget): Promise<number> {
     const owner = ownerJoin(target)
     const result = await this.context.pool.query<{ port: number }>(`SELECT i.port FROM harness.instances i

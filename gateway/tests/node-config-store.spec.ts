@@ -96,3 +96,16 @@ it('refuses a durable record whose applied generation exceeds its reviewed revis
   await writeNodeConfiguration(f.cfg.nodeConfigFile, { ...record, appliedRevision: record.revision + 1 })
   await expect(loadManagedNodeEnvironment(f.env)).rejects.toThrow('inconsistent-node-configuration-revisions')
 })
+
+it('persists node admission limits and upgrades missing additive settings from the bootstrap configuration', async () => {
+  const f = await fixture(), initial = await f.store.view()
+  expect(initial.effective).toMatchObject({ HGW_RUNTIME_MAX_STARTING: '2', HGW_RUNTIME_MAX_RESIDENT: '8', HGW_RUNTIME_MAX_QUEUED: '32', HGW_RUNTIME_QUEUE_WAIT_MS: '30000', HGW_PERFORMANCE_ENABLED: 'true', HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS: '20', HGW_DATABASE_MAX_CONNECTIONS: '10', HGW_DATABASE_MAX_CHECKOUT_QUEUE: '256', HGW_DATABASE_CONNECTION_TIMEOUT_MS: '5000' })
+  const next = { ...initial.desired, HGW_RUNTIME_MAX_STARTING: '3', HGW_RUNTIME_MAX_RESIDENT: '10', HGW_PERFORMANCE_ENABLED: 'false' }
+  await f.store.save(f.identity, 0, next)
+  expect((await readNodeConfiguration(f.cfg.nodeConfigFile, f.env))?.desired).toMatchObject(next)
+  const legacy: Record<string, unknown> = { ...initial.desired }
+  for (const key of ['HGW_RUNTIME_MAX_STARTING', 'HGW_RUNTIME_MAX_RESIDENT', 'HGW_RUNTIME_MAX_QUEUED', 'HGW_RUNTIME_QUEUE_WAIT_MS', 'HGW_PERFORMANCE_ENABLED', 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS', 'HGW_DATABASE_MAX_CONNECTIONS', 'HGW_DATABASE_MAX_CHECKOUT_QUEUE', 'HGW_DATABASE_CONNECTION_TIMEOUT_MS']) delete legacy[key]
+  expect(parseNodeSettingValues(legacy, { ...f.env, HGW_RUNTIME_MAX_RESIDENT: '12' })).toMatchObject({ HGW_RUNTIME_MAX_RESIDENT: '12', HGW_RUNTIME_MAX_STARTING: '2' })
+  expect(() => parseNodeSettingValues({ ...initial.desired, HGW_RUNTIME_MAX_RESIDENT: null }, f.env)).toThrow('HGW_RUNTIME_MAX_RESIDENT')
+  expect(() => parseNodeSettingValues({ ...initial.desired, HGW_RUNTIME_MAX_STARTING: '9' }, f.env)).toThrow('HGW_RUNTIME_MAX_STARTING')
+})

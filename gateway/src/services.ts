@@ -301,9 +301,11 @@ export interface GatewayModelGovernanceService {
 /** Instance lifecycle operations used by HTTP, proxy, and policy handlers. */
 export type GatewayInstanceService = Pick<
   InstanceManager,
-  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'stopReasonOf' | 'generationOf' | 'isLive' | 'touch' | 'wsRef' | 'ensureRunning' | 'reapIdle'
+  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'stopReasonOf' | 'generationOf' | 'isLive' | 'touch' | 'wsRef' | 'ensureRunning' | 'startRequest' | 'reapIdle'
   | 'stop' | 'stopAll' | 'withStopped'
 > & {
   /** Optional long-request lease supported by the production manager. */
   operationRef?: InstanceManager['operationRef']
+  /** Node-local managed Runtime admission observations, when supported by the provider. */
+  capacitySnapshot?: () => import('./runtime-capacity.ts').RuntimeCapacitySnapshot
 }

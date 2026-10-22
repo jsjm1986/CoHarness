@@ -1,3 +1,5 @@
+import type { NodeResourceBudgetConfig } from './node-resource-budget.ts'
+import type { RuntimeCapacityConfig } from './runtime-capacity.ts'
 import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
@@ -98,6 +100,20 @@ export interface GatewayConfig {
   dshCommand: string[]
   dshRepoRoot: string
   instancePortBase: number
+  /** Node-wide managed Runtime cold-start and residency admission. */
+  runtimeCapacity: RuntimeCapacityConfig
+  /** Durable node-wide model, process and execution-worker admission. */
+  resourceBudget: NodeResourceBudgetConfig
+  /** Enable bounded Gateway performance observations. */
+  performanceEnabled: boolean
+  /** Event-loop histogram sampling interval, in milliseconds. */
+  performanceEventLoopResolutionMs: number
+  /** Maximum PostgreSQL connections owned by this Gateway, including dedicated listeners. */
+  databaseMaxConnections: number
+  /** Maximum Gateway callers waiting for a PostgreSQL connection. */
+  databaseMaxCheckoutQueue: number
+  /** PostgreSQL connection checkout deadline, in milliseconds. */
+  databaseConnectionTimeoutMs: number
   idleTimeoutMs: number
   readinessTimeoutMs: number
   sessionTtlMs: number
@@ -575,6 +591,32 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     DEFAULT_RUNTIME_LOG_CAP_BYTES,
     'HGW_RUNTIME_LOG_CAP_BYTES',
   )
+  const performanceFlag = env.HGW_PERFORMANCE_ENABLED ?? 'true'
+  if (performanceFlag !== 'true' && performanceFlag !== 'false') throw new Error('HGW_PERFORMANCE_ENABLED must be true or false')
+  const performanceEnabled = performanceFlag === 'true'
+  const runtimeCapacity: RuntimeCapacityConfig = {
+    maxStarting: positiveSafeInteger(env.HGW_RUNTIME_MAX_STARTING, 2, 'HGW_RUNTIME_MAX_STARTING'),
+    maxResident: env.HGW_RUNTIME_MAX_RESIDENT === undefined || env.HGW_RUNTIME_MAX_RESIDENT === '0' ? 0 : positiveSafeInteger(env.HGW_RUNTIME_MAX_RESIDENT, 1, 'HGW_RUNTIME_MAX_RESIDENT'),
+    maxQueued: positiveSafeInteger(env.HGW_RUNTIME_MAX_QUEUED, 32, 'HGW_RUNTIME_MAX_QUEUED'),
+    maxQueueWaitMs: timerDelay(env.HGW_RUNTIME_QUEUE_WAIT_MS, 30_000, 'HGW_RUNTIME_QUEUE_WAIT_MS'),
+  }
+  if (runtimeCapacity.maxResident !== 0 && runtimeCapacity.maxStarting > runtimeCapacity.maxResident) throw new Error('HGW_RUNTIME_MAX_STARTING must not exceed HGW_RUNTIME_MAX_RESIDENT')
+  const resourceBudget: NodeResourceBudgetConfig = {
+    sampleMs: timerDelay(env.HGW_RESOURCE_SAMPLE_MS, 500, 'HGW_RESOURCE_SAMPLE_MS'),
+    staleMs: timerDelay(env.HGW_RESOURCE_STALE_MS, 2000, 'HGW_RESOURCE_STALE_MS'),
+    cpuTarget: positiveSafeInteger(env.HGW_RESOURCE_CPU_TARGET_PERCENT, 85, 'HGW_RESOURCE_CPU_TARGET_PERCENT') / 100,
+    eventLoopTargetMs: timerDelay(env.HGW_RESOURCE_EVENT_LOOP_TARGET_MS, 100, 'HGW_RESOURCE_EVENT_LOOP_TARGET_MS'),
+    linuxMemoryReserveRatio: positiveSafeInteger(env.HGW_RESOURCE_MEMORY_RESERVE_PERCENT, 10, 'HGW_RESOURCE_MEMORY_RESERVE_PERCENT') / 100,
+    maxQueued: positiveSafeInteger(env.HGW_RESOURCE_MAX_QUEUED, 256, 'HGW_RESOURCE_MAX_QUEUED'),
+    maxQueuedPerUser: positiveSafeInteger(env.HGW_RESOURCE_MAX_QUEUED_PER_USER, 32, 'HGW_RESOURCE_MAX_QUEUED_PER_USER'),
+    maxQueuedPerProject: positiveSafeInteger(env.HGW_RESOURCE_MAX_QUEUED_PER_PROJECT, 64, 'HGW_RESOURCE_MAX_QUEUED_PER_PROJECT'),
+    maxQueuedBytes: positiveSafeInteger(env.HGW_RESOURCE_MAX_QUEUED_BYTES, 1024 * 1024, 'HGW_RESOURCE_MAX_QUEUED_BYTES'),
+    maxWaitMs: timerDelay(env.HGW_RESOURCE_QUEUE_WAIT_MS, 30_000, 'HGW_RESOURCE_QUEUE_WAIT_MS'),
+  }
+  if (resourceBudget.cpuTarget > 1 || resourceBudget.linuxMemoryReserveRatio > 1 || resourceBudget.staleMs <= resourceBudget.sampleMs) throw new Error('resource pressure thresholds or freshness interval are invalid')
+  if (resourceBudget.maxQueuedPerUser > resourceBudget.maxQueued || resourceBudget.maxQueuedPerProject > resourceBudget.maxQueued) {
+    throw new Error('HGW_RESOURCE_MAX_QUEUED_PER_USER and HGW_RESOURCE_MAX_QUEUED_PER_PROJECT must not exceed HGW_RESOURCE_MAX_QUEUED')
+  }
   const idleTimeoutMs = positiveSafeInteger(env.HGW_IDLE_TIMEOUT_MS, 30 * 60 * 1000, 'HGW_IDLE_TIMEOUT_MS')
   const readinessTimeoutMs = timerDelay(env.HGW_READINESS_TIMEOUT_MS, 30 * 1000, 'HGW_READINESS_TIMEOUT_MS')
   const sessionTtlMs = positiveSafeInteger(env.HGW_SESSION_TTL_MS, 7 * 24 * 3600 * 1000, 'HGW_SESSION_TTL_MS')
@@ -704,6 +746,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     dshCommand,
     dshRepoRoot,
     instancePortBase,
+    runtimeCapacity,
+    resourceBudget,
+    performanceEnabled,
+    performanceEventLoopResolutionMs: timerDelay(env.HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS, 20, 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS'),
+    databaseMaxConnections: positiveSafeInteger(env.HGW_DATABASE_MAX_CONNECTIONS, 10, 'HGW_DATABASE_MAX_CONNECTIONS'),
+    databaseMaxCheckoutQueue: positiveSafeInteger(env.HGW_DATABASE_MAX_CHECKOUT_QUEUE, 256, 'HGW_DATABASE_MAX_CHECKOUT_QUEUE'),
+    databaseConnectionTimeoutMs: timerDelay(env.HGW_DATABASE_CONNECTION_TIMEOUT_MS, 5_000, 'HGW_DATABASE_CONNECTION_TIMEOUT_MS'),
     idleTimeoutMs,
     readinessTimeoutMs,
     sessionTtlMs,

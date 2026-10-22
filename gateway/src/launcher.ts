@@ -175,13 +175,26 @@ export interface InstanceProc {
    * prefer {@link isAlive} when the launcher supplies one.
    */
   hasExited(): boolean
+  /** Direct child exit notification; callers still await termination of any remaining descendants. */
+  exited?: Promise<void>
   /** Optional supervisor-backed liveness probe for processes not owned directly. */
   isAlive?(): Promise<boolean>
 }
 
+/** A failed launch whose process termination still needs confirmation by the lifecycle owner. */
+export class RuntimeLaunchCleanupError extends Error {
+  /**
+   * @param process - handle retained until its termination succeeds.
+   * @param cause - launch or cleanup failure.
+   */
+  constructor(readonly process: InstanceProc, cause: unknown) {
+    super('Runtime launch cleanup could not be confirmed', { cause })
+  }
+}
+
 /** One instance launch driver. */
 export interface Launcher {
-  /** Launch (or restart) one instance and return its handle. */
+  /** Launch one instance. Rejection confirms cleanup, or carries a RuntimeLaunchCleanupError retaining the handle. */
   start(runtime: LaunchRuntime): Promise<InstanceProc>
   /**
    * Re-attach to an instance this gateway process did not start (present
@@ -260,28 +273,34 @@ export class LocalLauncher implements Launcher {
         .catch(() => {})
         .finally(() => { localChildren.delete(child) })
     })
-    const credentialPipe = child.stdio[3] as Writable | null | undefined
-    if (credentialPipe === null || credentialPipe === undefined) {
-      child.kill('SIGKILL')
-      throw new Error(`runtime credential pipe unavailable for ${runtime.runtimeKey}`)
-    }
-    try {
-      await new Promise<void>((resolve, reject) => {
-        credentialPipe.once('error', reject)
-        credentialPipe.end(runtime.gatewayCredential, resolve)
-      })
-    } catch (error) {
-      await terminateLocalTree(child, 0).catch(() => {})
-      await logDrained
-      throw new Error(`runtime credential delivery failed for ${runtime.runtimeKey}: ${String(error)}`)
-    }
-    return {
+    const exited = new Promise<void>(resolve => {
+      if (processExited(child)) resolve()
+      else child.once('exit', () => resolve())
+    })
+    const handle: InstanceProc = {
+      exited,
       hasExited: () => child.exitCode !== null || child.signalCode !== null,
       terminate: async (graceMs: number) => {
         await terminateLocalTree(child, graceMs)
         await logDrained
       },
     }
+    try {
+      const credentialPipe = child.stdio[3] as Writable | null | undefined
+      if (credentialPipe === null || credentialPipe === undefined) {
+        throw new Error(`runtime credential pipe unavailable for ${runtime.runtimeKey}`)
+      }
+      await new Promise<void>((resolve, reject) => {
+        credentialPipe.once('error', reject)
+        credentialPipe.end(runtime.gatewayCredential, resolve)
+      })
+    } catch (error) {
+      try { await handle.terminate(0) } catch (cleanupError: unknown) {
+        throw new RuntimeLaunchCleanupError(handle, new AggregateError([error, cleanupError], 'Runtime credential delivery and cleanup failed'))
+      }
+      throw new Error(`runtime credential delivery failed for ${runtime.runtimeKey}: ${String(error)}`)
+    }
+    return handle
   }
 }
 
@@ -333,15 +352,23 @@ export class SystemdLauncher implements Launcher {
       `${user.runtimeKey}.${String(user.generation)}.${String(process.pid)}.credential`,
     )
     writeFileSync(credentialPath, gatewayCredential, { mode: 0o600, flag: 'wx' })
+    let restartAttempted = false
     try {
       writeFileSync(
         join(this.unitDir, unitName(user.runtimeKey)),
         renderUserUnit(user, grants, this.options.systemd, credentialPath),
       )
       await this.run(['daemon-reload'])
+      restartAttempted = true
       await this.run(['restart', unitName(user.runtimeKey)])
+    } catch (error: unknown) {
+      if (restartAttempted) throw new RuntimeLaunchCleanupError(this.attach(user), error)
+      throw error
     } finally {
-      rmSync(credentialPath, { force: true })
+      try { rmSync(credentialPath, { force: true }) } catch (error: unknown) {
+        if (restartAttempted) throw new RuntimeLaunchCleanupError(this.attach(user), error)
+        throw error
+      }
     }
     return this.attach(user)
   }

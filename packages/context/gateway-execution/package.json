@@ -45,7 +45,8 @@
     "@deepseek-ai/dsh-session-query": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
-    "@deepseek-ai/dsh-webhook": "workspace:*"
+    "@deepseek-ai/dsh-webhook": "workspace:*",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
@@ -90,7 +91,8 @@
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/dsh-typert-registry": "workspace:*",
     "@deepseek-ai/dsh-user-approval": "workspace:*",
-    "@deepseek-ai/dsh-webhook": "workspace:*"
+    "@deepseek-ai/dsh-webhook": "workspace:*",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*"
   },
   "dependencies": {
     "@deepseek-ai/dsh-util-values": "workspace:*",

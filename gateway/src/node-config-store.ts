@@ -64,7 +64,8 @@ export function parseNodeSettingValues(input: unknown, environment: NodeJS.Proce
   if (Object.keys(values).some(key => !NODE_CONFIG_FIELDS.some(field => field.key === key))) throw new NodeConfigurationError(400, 'unknown-node-configuration-field')
   const result = {} as NodeSettingValues
   for (const field of NODE_CONFIG_FIELDS) {
-    const value = values[field.key]
+    const value = Object.hasOwn(values, field.key) ? values[field.key]
+      : 'defaultValue' in field ? environment[field.key] ?? field.defaultValue : undefined
     if (typeof value !== 'string' || value.length > 8192 || /[\u0000-\u001f\u007f]/u.test(value)) throw new NodeConfigurationError(400, `invalid-node-setting:${field.key}`)
     if (field.kind === 'directory' || field.kind === 'file' || field.kind === 'optional-file' && value !== '') {
       if (!isAbsolute(value) || resolve(value) === '/') throw new NodeConfigurationError(400, `node-setting-needs-absolute-path:${field.key}`)
@@ -99,6 +100,23 @@ export function nodeSettingsFromConfig(cfg: GatewayConfig, environment: NodeJS.P
     HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE: cfg.organizationModelCredentialKeyFile,
     HGW_WEBHOOK_SECRET_KEY_FILE: cfg.webhookSecretKeyFile, HGW_DEFAULT_ENV_FILE: cfg.defaultEnvFile,
     HGW_INSTANCE_PORT_BASE: String(cfg.instancePortBase), HGW_IDLE_TIMEOUT_MS: String(cfg.idleTimeoutMs),
+    HGW_RESOURCE_SAMPLE_MS: String(cfg.resourceBudget.sampleMs),
+    HGW_RESOURCE_STALE_MS: String(cfg.resourceBudget.staleMs),
+    HGW_RESOURCE_CPU_TARGET_PERCENT: String(cfg.resourceBudget.cpuTarget * 100),
+    HGW_RESOURCE_EVENT_LOOP_TARGET_MS: String(cfg.resourceBudget.eventLoopTargetMs),
+    HGW_RESOURCE_MEMORY_RESERVE_PERCENT: String(cfg.resourceBudget.linuxMemoryReserveRatio * 100),
+    HGW_RESOURCE_MAX_QUEUED: String(cfg.resourceBudget.maxQueued),
+    HGW_RESOURCE_MAX_QUEUED_PER_USER: String(cfg.resourceBudget.maxQueuedPerUser),
+    HGW_RESOURCE_MAX_QUEUED_PER_PROJECT: String(cfg.resourceBudget.maxQueuedPerProject),
+    HGW_RESOURCE_MAX_QUEUED_BYTES: String(cfg.resourceBudget.maxQueuedBytes),
+    HGW_RESOURCE_QUEUE_WAIT_MS: String(cfg.resourceBudget.maxWaitMs),
+    HGW_PERFORMANCE_ENABLED: String(cfg.performanceEnabled),
+    HGW_DATABASE_MAX_CONNECTIONS: String(cfg.databaseMaxConnections),
+    HGW_DATABASE_MAX_CHECKOUT_QUEUE: String(cfg.databaseMaxCheckoutQueue),
+    HGW_DATABASE_CONNECTION_TIMEOUT_MS: String(cfg.databaseConnectionTimeoutMs),
+    HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS: String(cfg.performanceEventLoopResolutionMs),
+    HGW_RUNTIME_MAX_STARTING: String(cfg.runtimeCapacity.maxStarting), HGW_RUNTIME_MAX_RESIDENT: String(cfg.runtimeCapacity.maxResident),
+    HGW_RUNTIME_MAX_QUEUED: String(cfg.runtimeCapacity.maxQueued), HGW_RUNTIME_QUEUE_WAIT_MS: String(cfg.runtimeCapacity.maxQueueWaitMs),
     HGW_READINESS_TIMEOUT_MS: String(cfg.readinessTimeoutMs), HGW_MEMORY_MAX: cfg.memoryMax, HGW_CPU_QUOTA: cfg.cpuQuota,
   }
 }
