@@ -21,6 +21,10 @@ Status: implemented
 - **管理面把该通道做成一等列表。** `GET /admin/api/steward` 返回功能开关、已播种空间的名称/路径/运行时状态和每个成员的可授予/已授权/当前生效三元组与版本号；`/admin/steward` 页渲染准入规则、空间状态和逐成员的授予或清除失效授权控件，用户详情里的资格卡则拒绝向非管理员提供授权入口。
 - **SQL 访问是受审计通道，不是进数据库的 shell。** `POST /internal/runtime/steward/query` 要求 steward 绑定 generation 的运行时令牌，在服务端重新分类语句，执行语句/行数/结果/超时限额，并把包括拒绝在内的每次尝试写入 `steward_query_log`。关键字分类只选择通道：判为只读的语句在 `READ ONLY` 事务内执行，因此 `EXPLAIN ANALYZE` 与可写 CTE 失败关闭而不是夹带写入。写语句另外需要同一 steward 项目会话内、仍具资格的管理员应答者授予的近期 `allowed-once` 交互批准；审批 id 上的 advisory 锁串行化写入方，使一次批准恰好放行一次已提交的写入，写入在同时写入审计行的事务内执行。
 
+SQL 执行显式选择 PostgreSQL extended protocol，由服务端在执行前拒绝多条语句，防止语句退出只读事务。驱动的行监听器仅保留有序前缀，同时满足请求行数上限与完整 JSON 响应的 256 KiB UTF-8 字节上限，dry-run 计划也受限制。超出前缀的行和写语句的 `RETURNING` 行会继续读取，但不会保留驱动的完整结果数组；驱动仍会解码每个单独的行。审计保留完整命令计数。读取、预览、拒绝和失败日志仅在语句释放借用连接后再从连接池取连接，避免单连接池阻塞自身审计。写入成功日志仍保留在获批事务内。
+
+steward 工具为读取结果和 dry-run 计划标明截断；`row_limit` 同时覆盖两种行来源。无密钥的 [steward-query-truncation 组合](../../../../snapshots/session/steward-query-truncation/snapshot.yml) 使用外部 Gateway 响应夹具运行插件源码，并在模型可见记录中固定截断计划。
+
 ## 考虑过但未采用
 
 **`kind='maintenance'` 运行时目标。** 放弃：它要把目标判别联合扩展贯穿实例、插件状态、会话、审计、代理和会话键编码——用 schema 与 wire 扩张去重新推导项目空间已经提供的东西（独立 cwd、组装、会话、治理）。
@@ -28,6 +32,10 @@ Status: implemented
 **在 `admin-ui` 里做对话。** 放弃：管理端 SPA 没有会话与流式栈；steward 空间以零客户端运行时成本复用现有会话面。
 
 **成员资格叠加在资格之下。** 以项目成员表的形式放弃——成员表为空时 `member OR admin` 会拒绝每个有资格的普通用户。空间改而把授权叠加在组织管理员身份本身之上；见[管理员叠加准入 note](2026-10-10-steward-admin-layered-admission.zh.md)。
+
+**拆分 SQL 或依赖空参数数组。** 语句校验由 PostgreSQL 解析器负责；客户端拆分无法完整处理引号字符串、注释和过程体。当前驱动的空参数数组选择 simple protocol，不能阻止多条命令。
+
+**所有查询都使用 SQL 游标。** 游标无法统一覆盖 `SHOW`、`EXPLAIN` 和写语句的 `RETURNING`。驱动的行事件覆盖这些命令，并保留事务与审计顺序。
 
 ## 影响
 

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-10-steward-maintenance-space.md
 document:
-  en: a23c972edaf888cd45a4a3767f05f79ddfece475
-  zh: d1e514934f2f9c76f063ebdd5f069f139e653759
+  en: 66ac3887f4dd298b34232ef56caaccf99fba5bdc
+  zh: 0c6613fe2b1a8b6cab5090d328f8cf77dc02e448
 /agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime:
   en: c51822f8d73cf0a9
   zh: bf8ac150f127bb79
@@ -12,11 +12,11 @@ document:
   en: fc1f7c0d4487df2f
   zh: 5726a7517627791b
 /agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime/decision:
-  en: b8f35b9f76963f2d
-  zh: 345eaf19606934de
+  en: be4106fb0b767f2f
+  zh: 746ad9d71f308032
 /agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime/alternatives-considered:
-  en: f57b93758e0554d3
-  zh: 9994bcba729043ac
+  en: 0c5563d116b417f8
+  zh: 3d24d0190850b95e
 /agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime/consequences:
   en: a9b1f98c9f802a0d
   zh: acae48359be13426

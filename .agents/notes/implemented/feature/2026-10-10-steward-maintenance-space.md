@@ -21,6 +21,10 @@ A reserved steward space rides the existing project-space machinery instead of a
 - **The admin surface manages the lane as a first-class list.** `GET /admin/api/steward` returns feature state, the seeded space's name/path/runtime, and every member's grantable/qualified/effective triple with revisions; the `/admin/steward` page renders the admission rules, space state, and a per-member grant or stale-grant-clear control, while the per-user qualification card refuses to offer a grant to a non-administrator.
 - **SQL access is an audited channel, not a shell into the database.** `POST /internal/runtime/steward/query` requires the runtime token of a steward-bound generation, reclassifies the statement server-side, enforces statement/row/result/timeout limits, and writes a `steward_query_log` row for every attempt including denials. Keyword classification only selects a lane: read-classified statements run in a `READ ONLY` transaction so `EXPLAIN ANALYZE` and data-modifying CTEs fail closed instead of smuggling writes. Writes additionally require a recent `allowed-once` interaction approval from a still-qualified administrator responder inside a conversation rooted in the same steward project; an advisory lock on the approval id serializes writers so a verdict can green-light exactly one committed write, executed in the transaction that also writes the audit row.
 
+SQL execution explicitly selects PostgreSQL’s extended protocol so the server rejects multiple statements before any can escape the read-only transaction. A driver row listener retains only an ordered prefix under both the requested row limit and the complete JSON response’s 256 KiB UTF-8 limit, including dry-run plans. It drains surplus rows and write `RETURNING` rows without retaining the driver’s full result array; each individual row is still decoded by the driver. Full command counts remain available for auditing. Read, preview, denial and failure journals borrow a pool connection only after the statement releases its checkout, so a one-connection pool cannot stall its own audit. Write success journals stay inside the approved transaction.
+
+The steward tool marks truncation for both read results and dry-run plans; `row_limit` covers both row sources. The keyless [steward-query-truncation composition](../../../../snapshots/session/steward-query-truncation/snapshot.yml) runs the source plugin with an external Gateway response fixture and pins the truncated plan in the model-visible transcript.
+
 ## Alternatives considered
 
 **A `kind='maintenance'` runtime target.** Dropped: it would extend the target discriminated union through instances, plugin state, conversations, audit, proxying, and session-key encoding — a schema and wire expansion to re-derive what project space already provides (isolated cwd, composition, conversations, governance).
@@ -28,6 +32,10 @@ A reserved steward space rides the existing project-space machinery instead of a
 **Chat inside `admin-ui`.** Dropped: the admin SPA has no session or streaming stack; the steward space reuses the existing conversation surface at zero client-runtime cost.
 
 **Membership stacked under qualification.** Dropped in its project-member form — `member OR admin` with an empty member table would deny every qualified non-administrator. The space instead layers the grant on the organization-administrator membership itself; see [the admin-layered admission note](2026-10-10-steward-admin-layered-admission.md).
+
+**Split SQL or rely on an empty parameter array.** PostgreSQL’s parser owns statement validation; client-side splitting cannot correctly cover quoted strings, comments, or procedural bodies. An empty parameter array selects the simple protocol in the installed driver and does not prevent multiple commands.
+
+**Use SQL cursors for all queries.** Cursors do not cover `SHOW`, `EXPLAIN`, or write `RETURNING` uniformly. The driver’s row events cover all these commands while preserving transaction and audit ordering.
 
 ## Consequences
 
