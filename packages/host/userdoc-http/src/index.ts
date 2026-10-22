@@ -480,11 +480,26 @@ async function responseJson(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Yield request body chunks without handing the request to `for await`: an
+ * early exit from a `for await` loop returns the stream's iterator, which
+ * destroys the socket and emits `aborted` — the Gateway then suppresses the
+ * error response as a client disconnect and the request hangs.
+ */
+async function* bodyChunks(req: UserDocRequest): AsyncGenerator<unknown, void, undefined> {
+  const iterator: AsyncIterator<unknown> = req[Symbol.asyncIterator]()
+  for (;;) {
+    const step = await iterator.next()
+    if (step.done === true) return
+    yield step.value
+  }
+}
+
 async function readJsonBody(req: UserDocRequest): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
   let bytes = 0
   try {
-    for await (const chunk of req) {
+    for await (const chunk of bodyChunks(req)) {
       const value = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array)
       bytes += value.byteLength
       if (bytes > UPLOAD_METADATA_BODY_LIMIT) {
@@ -953,7 +968,7 @@ async function readTransferPayload(req: UserDocRequest): Promise<Record<string, 
   const chunks: Buffer[] = []
   let bytes = 0
   try {
-    for await (const chunk of req) {
+    for await (const chunk of bodyChunks(req)) {
       const value = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array)
       bytes += value.byteLength
       if (bytes > TRANSFER_BODY_LIMIT) {
@@ -1014,7 +1029,7 @@ async function readTransferPayloadForScope(req: UserDocRequest): Promise<Record<
   const chunks: Buffer[] = []
   let bytes = 0
   try {
-    for await (const chunk of req) {
+    for await (const chunk of bodyChunks(req)) {
       const value = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array)
       bytes += value.byteLength
       if (bytes > TRANSFER_BODY_LIMIT) {
@@ -1080,7 +1095,7 @@ async function readTransferDirectoryCreatePayload(req: UserDocRequest): Promise<
   const chunks: Buffer[] = []
   let bytes = 0
   try {
-    for await (const chunk of req) {
+    for await (const chunk of bodyChunks(req)) {
       const value = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array)
       bytes += value.byteLength
       if (bytes > TRANSFER_BODY_LIMIT) throw new DocumentTransferHttpError(413, 'DOCUMENT_TRANSFER_TOO_LARGE', 'Document transfer request is too large.')
@@ -1730,9 +1745,22 @@ function removedOneShotUpload(req: UserDocRequest, res: UserDocResponse): void {
   } satisfies ErrorBody)
 }
 
+/**
+ * Read a folder `name` query parameter with the same leaf semantics the
+ * document-name rule applies to uploads: a value containing a separator is a
+ * malformed name, not a path to be trimmed to its leaf.
+ */
+function folderNameQuery(url: URL): string {
+  const name = requiredQuery(url, 'name')
+  if (name.includes('/') || name.includes('\\')) {
+    throw new UserDocError('Document directory name is invalid.', INVALID_DOCUMENT_DIRECTORY_CODE)
+  }
+  return name
+}
+
 async function createFolder(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
   authorizeDocumentAction(host, 'write')
-  const created = await host.userDocs.createDirectory(directoryQuery(url), requiredQuery(url, 'name'))
+  const created = await host.userDocs.createDirectory(directoryQuery(url), folderNameQuery(url))
   json(res, 201, publicDirectoryRef(created))
 }
 
@@ -1740,7 +1768,7 @@ async function renameFolder(host: UserDocHttpHost, res: UserDocResponse, url: UR
   authorizeDocumentAction(host, 'write')
   const renamed = await host.userDocs.renameDirectory(
     requiredDirectoryQuery(url, 'id'),
-    requiredQuery(url, 'name'),
+    folderNameQuery(url),
   )
   await syncCatalog(host, await host.userDocs.list(), true, 'legacy')
   json(res, 200, publicDirectoryRef(renamed))

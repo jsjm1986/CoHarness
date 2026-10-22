@@ -225,6 +225,46 @@ describe('user-document HTTP consumer', () => {
     expect(await badRef.text()).not.toContain(root)
   })
 
+  it('answers oversized upload metadata instead of destroying the connection', async () => {
+    // The size guard fires while the body is still streaming; a structured
+    // response must reach the client rather than the socket being torn down.
+    const oversized = await fetch(`${origin}${USERDOC_UPLOADS_PATH}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        version: 1, name: 'big.json', directory: '', bytes: 1, fingerprint: 'x'.repeat(70 * 1024),
+      }),
+    })
+    expect(oversized.status).toBe(422)
+    expect(await oversized.json()).toMatchObject({ error: { code: 'DOCUMENT_UPLOAD_SIZE' } })
+
+    // The drained request keeps the keep-alive socket usable for a follow-up.
+    const healthy = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=`)
+    expect(healthy.status).toBe(200)
+  })
+
+  it('rejects folder names containing separators instead of trimming to a leaf', async () => {
+    for (const raw of ['../../etc', 'a/b', 'a\\b']) {
+      const created = await fetch(
+        `${origin}${USERDOC_HTTP_PATH}/folders?directory=&name=${encodeURIComponent(raw)}`,
+        { method: 'POST' },
+      )
+      expect(created.status).toBe(400)
+      expect(await created.json()).toMatchObject({ error: { code: 'INVALID_DOCUMENT_DIRECTORY' } })
+    }
+
+    const created = await fetch(`${origin}${USERDOC_HTTP_PATH}/folders?directory=&name=reports`, { method: 'POST' })
+    expect(created.status).toBe(201)
+    const renamed = await fetch(
+      `${origin}${USERDOC_HTTP_PATH}/folders?id=reports&name=${encodeURIComponent('../escape')}`,
+      { method: 'PATCH' },
+    )
+    expect(renamed.status).toBe(400)
+
+    const listing = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=`)
+    expect(await listing.json()).toMatchObject({ directories: [{ directoryId: 'reports', name: 'reports' }] })
+  })
+
   it('returns 404 for paths and methods outside the owned contract', async () => {
     expect((await fetch(`${origin}${USERDOC_HTTP_PATH}/other`)).status).toBe(404)
     expect((await fetch(`${origin}${USERDOC_HTTP_PATH}`, { method: 'PUT' })).status).toBe(404)
