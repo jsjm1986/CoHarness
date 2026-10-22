@@ -378,8 +378,8 @@ export function apply(ctx: Context): void {
       }
     },
     onConnected: (description) => {
-      sessions.handleConnected(description)
-      workspaces.handleConnected()
+      const workspaceBaseline = workspaces.handleConnected()
+      sessions.handleConnected(description, workspaceBaseline)
       ctx.emit('connection/reset')
     },
     onFailure: (failure) => { sessions.handleConnectionFailure(failure) },
@@ -389,11 +389,12 @@ export function apply(ctx: Context): void {
       // onConnected, so this is the safe moment to drop generation-scoped
       // interaction state.
       if (state === 'reconnecting') {
+        workspaces.handleDisconnected()
         sessions.handleDisconnected()
       }
     },
   })
-  ctx.effect(() => () => { loop.stop() }, 'runtime: connection stream loop')
+  ctx.effect(() => () => { workspaces.handleDisconnected(); loop.stop() }, 'runtime: connection stream loop')
 }
 
 /** Local Session owners; plugins extend this map for independent consumers. */

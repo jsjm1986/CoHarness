@@ -12,7 +12,7 @@ import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.ts'
 import type { IWorkspaces, StartSessionOptions } from '../contract/workspaces.ts'
 import { commitSessionNavigation } from '../navigation.ts'
-import { WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
+import { WorkspaceManager, type WorkspaceArchiveSnapshot, type WorkspaceListPhase } from './manager.ts'
 
 /** Generate one opaque browser draft reservation id. */
 function newDraftId(): SessionDraftId {
@@ -636,9 +636,17 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.manager.handleHostEnvelope(envelope)
   }
 
-  /** Rebuild the Workspace baseline after connection. */
-  handleConnected(): void {
-    this.manager.handleConnected()
+  /**
+   * Rebuild the Workspace baseline after connection.
+   * @returns installed archive facts shared with the base Session partition, or undefined on failure/cancellation.
+   */
+  handleConnected(): Promise<WorkspaceArchiveSnapshot | undefined> {
+    return this.manager.handleConnected()
+  }
+
+  /** Invalidate pending Workspace baseline work when its connection generation ends. */
+  handleDisconnected(): void {
+    this.manager.handleDisconnected()
   }
 
   private presentWorkspace(workspace: WorkspaceView): WorkspaceView {

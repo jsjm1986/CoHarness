@@ -66,6 +66,55 @@ it.each(['plain', 'encoded-looking'] as const)('keeps %s draft reservations in w
 })
 
 describe('WorkspaceManager', () => {
+  it('discards a disconnected baseline and lets the next generation refresh independently', async () => {
+    const api = new FakeApiClient()
+    const old = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const next = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const list = vi.spyOn(api.workspace, 'list')
+    api.onWorkspaceList = () => old.promise
+    const manager = new WorkspaceManager(api)
+    const oldResult = manager.handleConnected()
+    const oldSignal = list.mock.calls[0]?.[1]
+    manager.handleDisconnected()
+    expect(oldSignal?.aborted).toBe(true)
+    api.onWorkspaceList = () => next.promise
+    const nextResult = manager.handleConnected()
+    next.resolve(ok({ items: [workspace('next')], archivedSessionIds: [], archiveRevision: 2 }))
+    await expect(nextResult).resolves.toEqual({ archivedSessionIds: [], archiveRevision: 2 })
+    old.resolve(ok({ items: [workspace('old')], archivedSessionIds: [sid('old')], archiveRevision: 9 }))
+    await expect(oldResult).resolves.toBeUndefined()
+    expect(manager.getSnapshot()).toMatchObject({ items: [workspace('next')], archivedSessionIds: [], archiveRevision: 2 })
+    expect(api.callsOf('workspace.list')).toHaveLength(2)
+    manager.handleDisconnected()
+  })
+
+  it('shares the installed archive revision after frame replay and retries a refused baseline', async () => {
+    const api = new FakeApiClient()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    api.onWorkspaceList = () => gate.promise
+    const manager = new WorkspaceManager(api)
+    const connected = manager.handleConnected()
+    const concurrent = manager.refresh()
+    manager.handleHostEnvelope({ rpcId: 'archive-newer' as never, payload: {
+      type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2,
+    } })
+    manager.handleHostEnvelope({ rpcId: 'workspace-newer' as never, payload: {
+      type: 'host/workspace-changed', workspace: workspace('newer'),
+    } })
+    gate.resolve(ok({ items: [workspace('baseline')], archivedSessionIds: [sid('stale')], archiveRevision: 1 }))
+    await expect(connected).resolves.toEqual({ archivedSessionIds: [], archiveRevision: 2 })
+    await concurrent
+    expect(manager.getSnapshot().items.map(item => item.workspaceId)).toEqual(['newer', 'baseline'])
+    expect(api.callsOf('workspace.list')).toHaveLength(1)
+    api.onWorkspaceList = async () => err({ code: 'internal', message: 'refused', details: {} })
+    await expect(manager.handleConnected()).resolves.toBeUndefined()
+    expect(manager.getSnapshot().state).toBe('error')
+    api.onWorkspaceList = async () => ok({ items: [], archivedSessionIds: [sid('recovered')], archiveRevision: 3 })
+    await expect(manager.handleConnected()).resolves.toEqual({ archivedSessionIds: [sid('recovered')], archiveRevision: 3 })
+    expect(api.callsOf('workspace.list')).toHaveLength(3)
+    manager.handleDisconnected()
+  })
+
   it('replays changed frames over hydration and adopts the durable order on refresh', async () => {
     const api = new FakeApiClient()
     const gate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()

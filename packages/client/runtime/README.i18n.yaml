@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/runtime/README.md
 document:
-  en: 63505040af68484ab09516ec53b8a210a267eadc
-  zh: 9340f49d135c882e449265b77672985dfa290616
+  en: ddb2915fabee50f9ec4b507ce01b35fec75ebb7e
+  zh: 1147658ad26f57ff85c54d9645c78d43048f9900
 /:
   en: d263c68503f0be45
   zh: 61495d48365178df
@@ -30,8 +30,8 @@ document:
   en: 480f1b6ac309a94c
   zh: 36cefaf8f4ad981a
 /deepseek-ai-dsh-client-runtime/workspace-and-session-lists:
-  en: 78d7eeacb5369438
-  zh: 63bc1da9b1efabc6
+  en: 795d8efdb54f3aa5
+  zh: 24333297c0708ddc
 /deepseek-ai-dsh-client-runtime/new-session-and-the-blank-mirror:
   en: 0e1c55e0b0fd90f7
   zh: 8832ab88bc9a61c0
@@ -39,8 +39,8 @@ document:
   en: ef9c7d68388e82a7
   zh: 60a7ac0f7dc07f14
 /deepseek-ai-dsh-client-runtime/conversation-assembly:
-  en: 9b59a1db6e69ffdb
-  zh: ade782d27b8bc186
+  en: e392518e950dc2f7
+  zh: bdec456ff4a5cf44
 /deepseek-ai-dsh-client-runtime/trajectory-request-data:
   en: 1a4fe6e625fc5d45
   zh: f7764e9e60515564

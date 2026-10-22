@@ -16,7 +16,7 @@ import type { ConversationNodeDefinition } from '../src/client/contract/conversa
 import { Session } from '../src/client/sessions/session.ts'
 import type { SessionRuntime } from '../src/client/sessions/service.ts'
 import type { WorkspaceRuntime } from '../src/client/workspaces/service.ts'
-import { FakeApiClient, fakeRemote, ok } from './fake-api.client.ts'
+import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
 
 interface Bench {
   ctx: Context
@@ -99,6 +99,93 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe('runtime client apply', () => {
+  it('retries the shared Workspace baseline on a later connection after refusal', async () => {
+    const bench = await mount()
+    const id = 'recovered-archive' as never
+    const key = clientSessionKey({ kind: 'personal' }, id)
+    bench.api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    bench.api.onWorkspaceList = async () => err({ code: 'internal', message: 'refused', details: {} })
+    try {
+      const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
+      const connected = { version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }
+      bench.sinks?.onConnected?.(connected)
+      await workspaces.refresh()
+      expect(workspaces.list.getSnapshot().state).toBe('error')
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(1)
+      bench.sinks?.onStateChange?.('reconnecting')
+      bench.api.onWorkspaceList = async () => ok({ items: [], archivedSessionIds: [id], archiveRevision: 1 })
+      bench.sinks?.onConnected?.(connected)
+      await workspaces.refresh()
+      expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([key])
+      expect(bench.ctx.get('sessions')?.list.getSnapshot().archivedById[key]?.id).toBe(key)
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(2)
+    } finally { await bench.ctx.fiber.dispose() }
+  })
+
+  it('aborts pending Workspace baseline work on runtime disposal and ignores its late response', async () => {
+    const bench = await mount()
+    const baseline = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const list = vi.spyOn(bench.api.workspace, 'list')
+    bench.api.onWorkspaceList = () => baseline.promise
+    try {
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+      const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
+      const pending = workspaces.refresh()
+      const signal = list.mock.calls[0]?.[1]
+      await bench.ctx.fiber.dispose()
+      expect(signal?.aborted).toBe(true)
+      baseline.resolve(ok({ items: [], archivedSessionIds: ['late' as never], archiveRevision: 1 }))
+      await pending
+      expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([])
+      expect(bench.ctx.get('sessions')).toBeUndefined()
+    } finally { baseline.resolve(ok({ items: [] })); await bench.ctx.fiber.dispose() }
+  })
+
+  it('keeps both consumers on the same merged legacy Workspace archive baseline', async () => {
+    const bench = await mount()
+    const baseline = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const ids = ['legacy-a', 'legacy-b'].map(id => id as never)
+    bench.api.onWorkspaceList = () => baseline.promise
+    bench.api.onList = async () => ok({ items: ids.map(sessionId => ({ sessionId, updatedAt: 1, running: false, blank: false })) })
+    try {
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+      bench.sinks?.onHostEnvelope?.({ rpcId: 'legacy-archive' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [ids[1]!],
+      } })
+      baseline.resolve(ok({ items: [], archivedSessionIds: [ids[0]!] }))
+      const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
+      await workspaces.refresh()
+      const expected = new Set(ids.map(id => clientSessionKey({ kind: 'personal' }, id)))
+      expect(new Set(workspaces.list.getSnapshot().archivedSessionIds)).toEqual(expected)
+      expect(new Set(Object.keys(bench.ctx.get('sessions')!.list.getSnapshot().archivedById))).toEqual(expected)
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(1)
+    } finally { baseline.resolve(ok({ items: [] })); await bench.ctx.fiber.dispose() }
+  })
+
+  it('shares the connected Workspace baseline with the Session archive partition', async () => {
+    const bench = await mount()
+    const baseline = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const id = 'baseline-archived' as never
+    const key = clientSessionKey({ kind: 'personal' }, id)
+    bench.api.onWorkspaceList = () => baseline.promise
+    bench.api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    try {
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(1)
+      baseline.resolve(ok({ items: [], archivedSessionIds: [id], archiveRevision: 1 }))
+      const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
+      await workspaces.refresh()
+      await vi.waitFor(() => {
+        expect(bench.ctx.get('sessions')?.list.getSnapshot().archivedById[key]?.id).toBe(key)
+      })
+      expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([key])
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(1)
+    } finally {
+      baseline.resolve(ok({ items: [] }))
+      await bench.ctx.fiber.dispose()
+    }
+  })
+
   it('mounts slots, Sessions, and Workspaces and fans host frames into both managers', async () => {
     const bench = await mount()
     expect(bench.ctx.get('slots') !== undefined).toBe(true)

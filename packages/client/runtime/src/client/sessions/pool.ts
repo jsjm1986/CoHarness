@@ -31,6 +31,7 @@ import type { RpcResult } from '@deepseek-ai/dsh-api-remotes/client'
 import { remoteSessionId, mapRemoteSessionIds } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { WorkspaceResourceError, workspaceResourceProvider } from '../workspace-resources.ts'
 import type { WorkspaceResourceTarget } from '../workspace-resources.ts'
+import type { WorkspaceArchiveSnapshot } from '../workspaces/manager.ts'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotStore } from '../contract/store.ts'
 
 interface RuntimeEntry {
@@ -81,6 +82,8 @@ export class SessionRuntimePool implements ISessions {
   private readonly lifetime = new AbortController()
   private activeSession: SessionId | undefined
   private accountInvalidated = false
+  private baseGeneration = 0
+  private baseArchiveRevision = 0
   private readonly provideListeners = new Set<() => void>()
   private currentProvideSnapshot: SessionMaybeProvideInfo
 
@@ -580,32 +583,46 @@ export class SessionRuntimePool implements ISessions {
     this.base.handleHostEnvelope(envelope)
     if (envelope.payload.type === 'host/archived-sessions-changed') {
       const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
-      this.archivedByTarget.set(entry?.key ?? 'personal', new Set(envelope.payload.archivedSessionIds))
-      this.rebuild()
+      this.installBaseArchive(entry?.key ?? 'personal', envelope.payload)
     }
     if (envelope.payload.type === 'host/workspace-file-changed') this.rootCtx.get('workspaceResources')?.handleChange({ kind: 'base' }, { ...envelope.payload, sessionId: this.keyFor(envelope.payload.sessionId) })
   }
   /** Mark the base runtime connection as ready.
    * @param description - Host capabilities from the completed handshake.
+   * @param workspaceBaseline - this generation's installed Workspace archive facts;
+   *   absent callers rely on archive frames and do not issue a separate Workspace request.
    */
-  handleConnected(description?: HostDescription): void {
+  handleConnected(description?: HostDescription, workspaceBaseline?: Promise<WorkspaceArchiveSnapshot | undefined>): void {
     if (this.accountInvalidated) return
     if (description?.runtimeTarget !== undefined) this.setBaseRuntimeTarget(description.runtimeTarget)
     else if (description?.executionAuthorityRequired === true) throw new Error('Gateway runtime did not declare its Session identity')
     const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
     if (entry !== undefined && description !== undefined) this.connectResources(entry, description)
     this.base.handleConnected()
-    void this.baseConnection.api.workspace.list({}).then(({ result }) => {
-      if (result.ok) {
-        // The base entry's key tracks its current target (re-keyed by
-        // setBaseRuntimeTarget); a hardcoded 'personal' would orphan the set.
-        this.archivedByTarget.set(entry?.key ?? 'personal', new Set(result.value.archivedSessionIds))
-        this.rebuild()
-      }
-    }, (error: unknown) => { console.error('[web-runtime] base workspace.list refresh failed:', error) })
+    const generation = ++this.baseGeneration
+    const key = entry?.key ?? 'personal'
+    void workspaceBaseline?.then((snapshot) => {
+      if (snapshot === undefined || generation !== this.baseGeneration || this.lifetime.signal.aborted
+        || entry !== undefined && entry.key !== key) return
+      this.installBaseArchive(key, snapshot)
+    }, (error: unknown) => { console.error('[web-runtime] shared Workspace baseline failed:', error) })
+  }
+
+  /** Keep base archive frames and the shared baseline under the Workspace owner's revision rules. */
+  private installBaseArchive(key: string, snapshot: WorkspaceArchiveSnapshot): void {
+    const revision = snapshot.archiveRevision
+    if (revision === undefined && this.baseArchiveRevision > 0
+      || revision !== undefined && revision < this.baseArchiveRevision) return
+    const next = revision === undefined || revision === this.baseArchiveRevision
+      ? new Set([...(this.archivedByTarget.get(key) ?? []), ...snapshot.archivedSessionIds])
+      : new Set(snapshot.archivedSessionIds)
+    if (revision !== undefined) this.baseArchiveRevision = revision
+    this.archivedByTarget.set(key, next)
+    this.rebuild()
   }
   /** Mark the base runtime connection as unavailable. */
   handleDisconnected(): void {
+    this.baseGeneration++
     this.rootCtx.get('workspaceResources')?.disconnect({ kind: 'base' })
     this.base.handleDisconnected()
   }
@@ -691,6 +708,8 @@ export class SessionRuntimePool implements ISessions {
       return
     }
     this.beginNavigation()
+    this.baseGeneration++
+    this.baseArchiveRevision = 0
     const collision = this.entries.get(targetKey(target))
     if (collision !== undefined && collision !== baseEntry) throw new Error('Bootstrap target already has a live runtime')
     baseEntry.runtime.setPresentationKey(id => clientSessionKey(target, id), target)

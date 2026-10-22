@@ -6,11 +6,13 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { SessionRuntime } from '../src/client/sessions/service.ts'
 import { SessionRuntimePool } from '../src/client/sessions/pool.ts'
+import { WorkspaceRuntime } from '../src/client/workspaces/service.ts'
+import type { WorkspaceArchiveSnapshot } from '../src/client/workspaces/manager.ts'
 import { WorkspaceResourceRegistry, workspaceResourceAddress } from '../src/client/workspace-resources.ts'
 import { PermissionCatalogDirectory } from '../src/client/permission-catalog.ts'
 import { createSnapshotStore } from '../src/client/contract/store.ts'
 import type { WorkspaceResourceTarget } from '../src/client/workspace-resources.ts'
-import { FakeApiClient, fakeRemote, ok } from './fake-api.client.ts'
+import { FakeApiClient, deferred, fakeRemote, ok } from './fake-api.client.ts'
 
 function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionHandle['start']>[0]) => void): ConnectionHandle {
   return {
@@ -29,6 +31,92 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
 }
 
 describe('SessionRuntimePool', () => {
+  it('merges legacy shared archive facts with frames until a versioned snapshot replaces them', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const ids = ['baseline-a', 'frame-b', 'late-c'].map(id => id as SessionId)
+    api.onList = async () => ok({ items: ids.map(sessionId => ({ sessionId, updatedAt: 1, running: false, blank: false })) })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    const baseline = deferred<WorkspaceArchiveSnapshot | undefined>()
+    try {
+      pool.handleConnected(undefined, baseline.promise)
+      await base.refresh()
+      pool.handleHostEnvelope({ rpcId: 'legacy-b' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [ids[1]!],
+      } })
+      baseline.resolve({ archivedSessionIds: [ids[1]!, ids[0]!], archiveRevision: 0 })
+      pool.handleHostEnvelope({ rpcId: 'legacy-c' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [ids[2]!],
+      } })
+      await baseline.promise
+      expect(new Set(Object.keys(pool.list.getSnapshot().archivedById))).toEqual(
+        new Set(ids.map(id => clientSessionKey({ kind: 'personal' }, id))),
+      )
+      pool.handleHostEnvelope({ rpcId: 'versioned-clear' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 1,
+      } })
+      expect(pool.list.getSnapshot().archivedById).toEqual({})
+    } finally { baseline.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
+  it('keeps newer archive frames when a shared baseline settles after them', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const id = 'shared-archive' as SessionId
+    const key = clientSessionKey({ kind: 'personal' }, id)
+    api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    const baseline = deferred<WorkspaceArchiveSnapshot | undefined>()
+    try {
+      pool.handleConnected(undefined, baseline.promise)
+      await base.refresh()
+      pool.handleHostEnvelope({ rpcId: 'newer' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2,
+      } })
+      baseline.resolve({ archivedSessionIds: [id], archiveRevision: 1 })
+      await baseline.promise
+      expect(pool.list.getSnapshot().ids).toEqual([key])
+      pool.handleHostEnvelope({ rpcId: 'newest' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [id], archiveRevision: 3,
+      } })
+      pool.handleHostEnvelope({ rpcId: 'stale' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2,
+      } })
+      expect(pool.list.getSnapshot().archivedById[key]?.id).toBe(key)
+      expect(api.callsOf('workspace.list')).toHaveLength(0)
+    } finally { baseline.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
+  it('drops old-generation and old-target archive baselines without retaining their requests', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const id = 'colliding-archive' as SessionId
+    api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    const old = deferred<WorkspaceArchiveSnapshot | undefined>()
+    const next = deferred<WorkspaceArchiveSnapshot | undefined>()
+    try {
+      pool.handleConnected(undefined, old.promise)
+      pool.handleHostEnvelope({ rpcId: 'old-target-high-revision' as never, payload: {
+        type: 'host/archived-sessions-changed', archivedSessionIds: [id], archiveRevision: 8,
+      } })
+      pool.handleDisconnected()
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 7 })
+      pool.handleConnected(undefined, next.promise)
+      await base.refresh()
+      next.resolve({ archivedSessionIds: [], archiveRevision: 1 })
+      await next.promise
+      old.resolve({ archivedSessionIds: [id], archiveRevision: 9 })
+      await old.promise
+      expect(pool.list.getSnapshot().ids).toEqual([clientSessionKey({ kind: 'project', projectId: 7 }, id)])
+      expect(pool.list.getSnapshot().archivedById).toEqual({})
+      expect(api.callsOf('workspace.list')).toHaveLength(0)
+    } finally { old.resolve(undefined); next.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
   it('keeps unrelated pooled summaries stable and refreshes renamed runtime labels', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
@@ -391,7 +479,8 @@ describe('SessionRuntimePool', () => {
     baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [id] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
     const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
-    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true },
+      new WorkspaceRuntime(ctx, baseApi, pool).handleConnected())
     await vi.waitFor(() => { expect(pool.list.getSnapshot().archivedById[clientSessionKey({ kind: 'personal' }, id)]?.id).toBe(clientSessionKey({ kind: 'personal' }, id)) })
     expect(pool.list.getSnapshot().byId[id]).toBeUndefined()
     expect(pool.list.getSnapshot().ids).not.toContain(id)
@@ -411,7 +500,8 @@ describe('SessionRuntimePool', () => {
     const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
     base.open(id)
     expect(base.list.getSnapshot().current).toBe(id)
-    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true },
+      new WorkspaceRuntime(ctx, baseApi, pool).handleConnected())
     // The mask alone hides the row; the owner must also deselect or the
     // persisted selection remounts the archived session on the next reload.
     await vi.waitFor(() => { expect(base.list.getSnapshot().current).toBeUndefined() })
@@ -430,14 +520,15 @@ describe('SessionRuntimePool', () => {
     baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [] }))
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
     const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
-    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true },
+      new WorkspaceRuntime(ctx, baseApi, pool).handleConnected())
     await vi.waitFor(() => { expect(pool.list.getSnapshot().ids).toEqual([key]) })
 
-    pool.handleHostEnvelope({ rpcId: 'frame-1' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [id] } })
+    pool.handleHostEnvelope({ rpcId: 'frame-1' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [id], archiveRevision: 1 } })
     expect(pool.list.getSnapshot().ids).toEqual([])
     expect(pool.list.getSnapshot().archivedById[key]?.id).toBe(key)
 
-    pool.handleHostEnvelope({ rpcId: 'frame-2' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [] } })
+    pool.handleHostEnvelope({ rpcId: 'frame-2' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2 } })
     expect(pool.list.getSnapshot().ids).toEqual([key])
     expect(pool.list.getSnapshot().archivedById[key]).toBeUndefined()
   })
