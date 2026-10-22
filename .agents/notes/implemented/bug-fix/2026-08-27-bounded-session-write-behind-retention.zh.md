@@ -10,11 +10,11 @@ write-behind controller 会保留失败批次以及后端写入期间到达的�
 
 ## 决策
 
-`SessionWriteBehind` 在待处理队列与活跃批次的总和上同时执行 `maxPendingEvents` 和 `maxPendingBytes` 两项准入限制。字节限制按 controller 获取持久化所有权后的结构化副本计算其 UTF-8 JSON 编码大小。默认值为每个活动会话 100,000 个事件和 64 MiB。
+`SessionWriteBehind` 在待处理队列与活跃批次的总和上同时执行 `maxPendingEvents` 和 `maxPendingBytes` 两项准入限制。字节限制在 controller 取得持久化自有副本前，按事件的 UTF-8 JSON 编码大小计算。默认值为每个活动会话 100,000 个事件和 64 MiB。
 
-活跃批次会一直计入限制，直到其持久化写入结束。失败批次会恢复到较新待处理事件之前，并继续计入事件数与字节数，因此重试无法绕过任一上限。若某次准入会超过任一限制，系统会报告失败并在修改队列前抛出异常。
+活跃批次会一直计入限制，直到其持久化写入结束。失败批次会恢复到较新待处理事件之前，并继续计入事件数与字节数，因此重试无法绕过任一上限。若某次准入会超过任一限制，系统会报告失败并在修改队列前抛出异常。 controller 保留该失败，防止 Session observer 的异常包含掩盖缺失事件；其终结屏障行为由[接纳失败决策](2026-10-23-write-behind-admission-failure.zh.md)定义。
 
-共享的 [`PersistenceCoordinator`](../architecture/2026-06-18-shared-persistence-write-coordinator.zh.md) 负责解析两项限制，并将其传给每个活动会话 controller。JSONL、SQLite 和 Gateway 持久化提供方在配置 schema 中公开两项字段并原样转发。限制只作用于活动 write-behind 保留，不改变持久化事件日志、存储格式或后端行数。
+共享的 [`PersistenceCoordinator`](../architecture/2026-06-18-shared-persistence-write-coordinator.zh.md) 负责解析两项限制，并将其传给每个活动会话 controller。SQLite 和 Gateway 持久化提供方在配置 schema 中公开两项字段并原样转发。JSONL 使用独立的基于句柄的活动事件路由。限制只作用于活动 write-behind 保留，不改变持久化事件日志、存储格式或后端行数。
 
 ## 备选方案
 
@@ -28,10 +28,10 @@ write-behind controller 会保留失败批次以及后端写入期间到达的�
 
 ## 验证
 
-`packages/session/session-persistence/tests/write-behind.spec.ts` 覆盖字节限制拒绝、活跃批次计数、事件数限制拒绝和失败批次保留。提供方 schema 与生成的配置目录为 JSONL、SQLite 和 Gateway 暴露相同字段。
+`packages/session/session-persistence/tests/write-behind.spec.ts` 覆盖字节限制拒绝、活跃批次计数、事件数限制拒绝和失败批次保留。提供方 schema 与生成的配置目录为 SQLite 和 Gateway 暴露相同字段。
 
 ## 后果
 
-每个活动会话的 write-behind 队列都有确定的事件数和序列化负载字节上限，包括等待缓慢或失败后端的批次。超过任一上限时，生产者会收到明确错误；调用方必须等待 controller 排空后重试，或选择更大的部署限制。
+每个活动会话的 write-behind 队列都有确定的事件数和序列化负载字节上限，包括等待缓慢或失败后端的批次。直接 controller 调用与之后的每个持久化屏障都会明确暴露接纳失败。若活动 Session 的 observer 无法保留已接受事件，仅排空 controller 不能恢复该生命周期；部署必须在接受进一步工作前处理限制。
 
 controller 除了已有的持久化所有权副本外，还会为保留字节估算对每个已接纳事件执行一次序列化。该配额不限制后端 I/O 时长、已持久化历史总量或跨会话聚合内存；部署仍需要会话级与进程级容量控制。
