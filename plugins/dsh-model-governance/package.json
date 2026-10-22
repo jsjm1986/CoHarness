@@ -42,6 +42,7 @@
     "@deepseek-ai/dsh-execution-authority": "workspace:*"
   },
   "files": [
+    "locale/*.json",
     "lib",
     "cordis.patch.yml",
     "README.md",

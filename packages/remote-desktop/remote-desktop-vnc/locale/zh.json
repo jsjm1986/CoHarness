@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "远程桌面 VNC",
+    "description": "ctx.remoteDesktop 的 VNC/RFB 提供方。"
+  }
+}
