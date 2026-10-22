@@ -31,6 +31,8 @@ type QuotaMode = 'inherit' | 'unlimited' | 'custom'
 export function UsagePage() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: usagePageZh, en: usagePageEn }), [])
   const [month, setMonth] = useState('')
+  // Each selection can request the server's current month again after it resolves.
+  const [requestedMonth, setRequestedMonth] = useState({ month: '' })
   const [overview, setOverview] = useState<UsageOverview | null>(null)
   const [health, setHealth] = useState<UsageHealth | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -69,7 +71,10 @@ export function UsagePage() {
       if (!alive.current || requestGeneration.current !== generation) return
       setOverview(nextOverview)
       setHealth(nextHealth)
-      if (requestMonth === '') setMonth(current => current === '' ? nextOverview.month : current)
+      if (requestMonth === '') {
+        monthRef.current = nextOverview.month
+        setMonth(current => current === '' ? nextOverview.month : current)
+      }
       setUsers(nextUsers)
       setError('')
     } catch (cause) {
@@ -81,10 +86,10 @@ export function UsagePage() {
   }, [])
 
   useEffect(() => {
-    monthRef.current = month
+    monthRef.current = requestedMonth.month
     void reload(true)
     return () => { requestGeneration.current += 1 }
-  }, [month, reload])
+  }, [requestedMonth, reload])
 
   const subjectKey = `${subjectType}:${subjectId}`
 
@@ -221,7 +226,10 @@ export function UsagePage() {
         description={t('pageDescription')}
         actions={(
           <div className="pageToolbar">
-            <label className="monthPicker"><span>{t('monthLabel')}</span><input className="input" type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
+            <label className="monthPicker"><span>{t('monthLabel')}</span><input className="input" type="month" value={month} onChange={event => {
+              setMonth(event.target.value)
+              setRequestedMonth({ month: event.target.value })
+            }} /></label>
             <Button icon={Settings2} onClick={openQuotaDialog}>{t('configureQuota')}</Button>
           </div>
         )}

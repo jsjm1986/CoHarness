@@ -106,6 +106,8 @@ export function SshPage() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: sshZh, en: sshEn }), [])
   const [targets, setTargets] = useState<AdminSshTarget[] | null>(null)
   const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [projectsError, setProjectsError] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [editing, setEditing] = useState<{ target: AdminSshTarget | null; draft: TargetDraft } | null>(null)
@@ -117,10 +119,17 @@ export function SshPage() {
 
   useEffect(() => {
     let disposed = false
-    void Promise.all([listSshTargets(), listProjects()]).then(([ssh, projectRows]) => {
+    setLoadingProjects(true); setProjectsError('')
+    const projectRead = listProjects().then(rows => {
+      if (!disposed) setProjects(rows.map(project => ({ id: project.id, name: project.name })))
+      return rows
+    }).catch((cause: unknown) => {
+      if (!disposed) setProjectsError(messageOf(cause))
+      throw cause
+    }).finally(() => { if (!disposed) setLoadingProjects(false) })
+    void Promise.all([listSshTargets(), projectRead]).then(([ssh]) => {
       if (disposed) return
       setTargets(ssh.targets)
-      setProjects(projectRows.map(project => ({ id: project.id, name: project.name })))
       setError('')
     }).catch((cause: unknown) => { if (!disposed) setError(messageOf(cause)) })
     return () => { disposed = true; generation.current++ }
@@ -227,7 +236,7 @@ export function SshPage() {
           </div>
         )}
       </Section>
-      <SshPermissions />
+      <SshPermissions projects={{ items: projects, loading: loadingProjects, error: projectsError, reload: refresh }} />
       <Dialog
         open={editing !== null}
         title={editing === null || editing.target === null ? t('titleRegister') : t('titleEdit', { name: editing.target.name })}

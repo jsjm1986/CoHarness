@@ -1,9 +1,11 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORGANIZATION_MODEL_SETTINGS_SCHEMA } from '../../../src/organization-model-settings-schema.ts'
 import * as api from '../api.ts'
 import { ModelsPage } from './ModelsPage.tsx'
+import { OrganizationModelsEditor } from '../components/OrganizationModelsEditor.tsx'
 
 vi.mock('../api.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api.ts')>()
@@ -13,6 +15,7 @@ vi.mock('../api.ts', async (importOriginal) => {
     describeOrganizationModelSettings: vi.fn(),
     discoverOrganizationModels: vi.fn(),
     getModelAccess: vi.fn(),
+    getDigestModelSettings: vi.fn(),
     listModelProviders: vi.fn(),
     listModelRegistrations: vi.fn(),
     listModels: vi.fn(),
@@ -131,6 +134,7 @@ describe('ModelsPage', () => {
       effective: { version: 1, defaultAllowed: false, models: [] },
       overrides: [],
     })
+    vi.mocked(api.getDigestModelSettings).mockResolvedValue({ model: null, candidates: [] })
     vi.mocked(api.saveModel).mockResolvedValue(undefined)
     vi.mocked(api.setModelAccess).mockResolvedValue(undefined)
   })
@@ -156,6 +160,60 @@ describe('ModelsPage', () => {
     expect(screen.queryByRole('button', { name: '登记模型' })).toBeNull()
   })
 
+  it('owns one live read in StrictMode and keeps it across changed callback identities', async () => {
+    const user = userEvent.setup()
+    const firstChanged = vi.fn()
+    const secondChanged = vi.fn()
+    const view = render(<StrictMode><OrganizationModelsEditor onChanged={firstChanged} /></StrictMode>)
+    await screen.findByText('组织主连接')
+    expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(1)
+    const signal = vi.mocked(api.describeOrganizationModelSettings).mock.calls[0]![0]!
+    expect(signal.aborted).toBe(false)
+    view.rerender(<StrictMode><OrganizationModelsEditor onChanged={secondChanged} /></StrictMode>)
+    expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(1)
+    expect(signal.aborted).toBe(false)
+    await user.click(screen.getByRole('button', { name: '编辑 组织主连接 (org-primary)' }))
+    await user.click(screen.getByText('自定义设置'))
+    await user.clear(screen.getByLabelText('API 地址'))
+    await user.type(screen.getByLabelText('API 地址'), 'https://changed.example.com/v1')
+    await user.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(secondChanged).toHaveBeenCalledTimes(1))
+    expect(firstChanged).not.toHaveBeenCalled()
+    const readsBeforeRemount = vi.mocked(api.describeOrganizationModelSettings).mock.calls.length
+    view.unmount()
+    expect(signal.aborted).toBe(true)
+    render(<StrictMode><OrganizationModelsEditor onChanged={secondChanged} /></StrictMode>)
+    await screen.findByText('组织主连接')
+    expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(readsBeforeRemount + 1)
+    const nextSignal = vi.mocked(api.describeOrganizationModelSettings).mock.calls.at(-1)![0]!
+    expect(nextSignal).not.toBe(signal)
+    expect(nextSignal.aborted).toBe(false)
+  })
+
+  it('does not publish a departed owner read into a remounted editor', async () => {
+    let release!: (value: api.OrganizationModelSettingsView) => void
+    const pending = new Promise<api.OrganizationModelSettingsView>(resolve => { release = resolve })
+    vi.mocked(api.describeOrganizationModelSettings).mockReturnValueOnce(pending)
+    const view = render(<OrganizationModelsEditor onChanged={() => {}} />)
+    await waitFor(() => expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(1))
+    const signal = vi.mocked(api.describeOrganizationModelSettings).mock.calls[0]![0]!
+    view.unmount()
+    expect(signal.aborted).toBe(true)
+    render(<OrganizationModelsEditor onChanged={() => {}} />)
+    try {
+      await screen.findByText('组织主连接')
+      const stale = settingsView(2)
+      stale.namespaces[0]!.value = { providers: { 'org-departed': { ...profile, displayName: '已离开的组织连接' } } }
+      release(stale)
+      await pending
+      expect(screen.queryByText('已离开的组织连接')).toBeNull()
+      expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(2)
+    } finally {
+      release(settingsView())
+      await pending
+    }
+  })
+
   it('routes the discovery probe through the organization model endpoint', async () => {
     const user = userEvent.setup()
     vi.mocked(api.discoverOrganizationModels).mockResolvedValue({
@@ -171,7 +229,7 @@ describe('ModelsPage', () => {
       provider: 'org-primary',
       baseURL: profile.baseURL,
       api: profile.api,
-    })))
+    }), expect.any(AbortSignal)))
     expect(await screen.findByText('chat-probed')).toBeTruthy()
   })
 

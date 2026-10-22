@@ -171,6 +171,9 @@ function CompositionView({ composition, open, t }: { readonly composition: Plugi
 export function PluginsPage() {
   const t = useMemo(() => translatePlugin(adminLanguage()), [])
   const [targets, setTargets] = useState<Array<{ key: string; kind: 'user' | 'project'; id: number; label: string }>>([])
+  const [projects, setProjects] = useState<ReadonlyArray<{ id: number; name: string }>>([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [projectsError, setProjectsError] = useState('')
   const [selected, setSelected] = useState('')
   const [binding, setBinding] = useState<PluginManagementTarget | null>(null)
   const [error, setError] = useState('')
@@ -180,12 +183,22 @@ export function PluginsPage() {
   const invalidate = useCallback((message: string) => {
     generation.current++; setBinding(null); setLoading(false); setError(message)
   }, [])
+  const reloadOwners = () => { setBinding(null); setReload(value => value + 1) }
   useEffect(() => {
     let disposed = false
-    void Promise.all([listUsers(), listProjects()]).then(([users, projects]) => {
+    setLoadingProjects(true); setProjectsError('')
+    const projectRead = listProjects().then(rows => {
+      if (!disposed) setProjects(rows)
+      return rows
+    }).catch((cause: unknown) => {
+      if (!disposed) setProjectsError(String(cause))
+      throw cause
+    }).finally(() => { if (!disposed) setLoadingProjects(false) })
+    void Promise.all([listUsers(), projectRead]).then(([users, projects]) => {
       if (disposed) return
       setTargets([...users.map(user => ({ key: `user:${user.id}`, kind: 'user' as const, id: user.id, label: t('targetUser', { name: user.displayName }) })),
         ...projects.map(project => ({ key: `project:${project.id}`, kind: 'project' as const, id: project.id, label: t('targetProject', { name: project.name }) }))])
+      setError('')
     }).catch(cause => { if (!disposed) setError(String(cause)) })
     return () => { disposed = true }
   }, [reload, t])
@@ -211,7 +224,7 @@ export function PluginsPage() {
         <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
           generation.current++; setBinding(null); setSelected(event.target.value)
         }}><option value="">{t('targetPlaceholder')}</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
-        <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
+        <Button onClick={reloadOwners}>{t('pageReload')}</Button>
       </div>
       {loading ? <LoadingState label={t('targetLoading')} /> : null}
       {binding === null ? null : <p className="muted">
@@ -220,7 +233,7 @@ export function PluginsPage() {
       {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} t={t} />}
     </Section>
     {binding === null ? null : <BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} />}
-    <PluginPermissions />
+    <PluginPermissions projects={{ items: projects, loading: loadingProjects, error: projectsError, reload: reloadOwners }} />
   </div>
 }
 

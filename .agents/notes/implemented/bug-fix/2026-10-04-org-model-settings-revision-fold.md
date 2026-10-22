@@ -14,6 +14,8 @@ The admin organization models editor created a `SettingsDescribeMirror` over the
 
 ## Files
 
+The [administrator read ownership decision](../architecture/2026-10-23-admin-page-read-ownership.md) defines pending-read sharing and page lifetime while preserving these revision rules.
+
 - `gateway/admin-ui/src/model-settings-api.ts` — `createOrganizationModelsMirror` folds write answers and refreshes on credential writes and conflicts.
 - `gateway/admin-ui/src/components/OrganizationModelsEditor.tsx` — consumes the mirror/facade pair.
 - `packages/client/ui-settings-models/src/client/ProviderEditor.tsx` + `locales.ts` — owned empty `models` blocks submit in organization scope.

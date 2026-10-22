@@ -14,6 +14,8 @@
 
 ## 文件
 
+[管理员读取所有权决策](../architecture/2026-10-23-admin-page-read-ownership.zh.md) 规定待完成读取的共享与页面生命周期，并保留这里的修订号规则。
+
 - `gateway/admin-ui/src/model-settings-api.ts` — `createOrganizationModelsMirror` 折叠写答案并在凭据写入与冲突时刷新。
 - `gateway/admin-ui/src/components/OrganizationModelsEditor.tsx` — 消费该镜像/facade 对。
 - `packages/client/ui-settings-models/src/client/ProviderEditor.tsx` 与 `locales.ts` — 组织作用域下显式空 `models` 阻止提交。

@@ -133,6 +133,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
       docId: 'fixture-doc', directoryId: 'fixture-directory', name: 'Fixture document', bytes: 7, mediaType: 'text/plain',
       modifiedAt: 1, owner: { id: admin.id, username: 'admin', displayName: 'Admin fixture' }, ownerSource: 'upload',
       state: 'active', legacy: false, lineageRootId: null }
+    const adminReads = new Map<string, number>()
     const adminHandler = createAdminApiHandler(deps)
     const proxy = createProxyHandlers(deps)
     cleanup.push(() => { proxy.close() })
@@ -140,6 +141,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
       ...proxy,
       adminRoot: resolve('gateway/public/admin'),
       admin: async (req, res, user, path, body) => {
+        if (req.method === 'GET') adminReads.set(path, (adminReads.get(path) ?? 0) + 1)
         const documentValue = path === '/admin/api/documents' ? { documents: [personalDocument] }
           : path === `/admin/api/documents/${personalDocument.catalogId}` ? { document: personalDocument, history: [], copies: [] }
             : path === '/admin/api/documents/metrics' ? { total: 1, active: 1, deleted: 0, personal: 1, project: 0, bytes: 7, operations24h: 0, failures24h: 0 }
@@ -224,10 +226,13 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await quotaDialog.getByRole('button', { name: '保存额度', exact: true }).click()
     await expect.poll(() => quotaWrites).toEqual([{ kind: 'project', id: String(project.id), tokens: 12345, cost: 8500000 }])
 
+    for (const path of ['/admin/api/usage/overview', '/admin/api/users', '/admin/api/usage/health']) adminReads.set(path, 0)
     await page.goto(`${base}/admin/usage`)
+    await page.locator('.usageTable').waitFor({ state: 'visible' })
     await page.getByRole('button', { name: '配置额度', exact: true }).click()
     const usageQuota = page.getByRole('dialog', { name: '配置月度额度', exact: true })
     await expect.poll(async () => usageQuota.getByRole('button', { name: '保存额度', exact: true }).isEnabled()).toBe(true)
+    for (const path of ['/admin/api/usage/overview', '/admin/api/users', '/admin/api/usage/health']) expect(adminReads.get(path)).toBe(1)
     const roleTokens = usageQuota.locator('fieldset', { hasText: 'Token 额度' })
     const roleCost = usageQuota.locator('fieldset', { hasText: '公司成本额度' })
     await roleTokens.getByRole('combobox', { name: '额度模式' }).selectOption('custom')
@@ -303,7 +308,10 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await configurationDialog.waitFor({ state: 'hidden' })
     expect((await nodeConfiguration.view()).operation).toMatchObject({ status: 'pending', revision: 2, writeEpoch: '1' })
 
+    adminReads.set('/admin/api/projects', 0)
     await page.goto(`${base}/admin/ssh`)
+    await page.getByRole('option', { name: /Renamed fixture/u }).waitFor({ state: 'attached' })
+    expect(adminReads.get('/admin/api/projects')).toBe(1)
     await page.getByRole('button', { name: '编辑', exact: true }).click()
     const sshDialog = page.getByRole('dialog', { name: '编辑 SSH fixture', exact: true })
     const reference = sshDialog.getByLabel('密码凭据引用', { exact: false })
@@ -312,7 +320,10 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await sshDialog.getByRole('button', { name: '保存', exact: true }).click()
     await expect.poll(() => sshWrites).toMatchObject([{ targetId: 1, revision: '1', fields: { passwordRef: 'SSH_FIXTURE_PASSWORD' } }])
 
+    adminReads.set('/admin/api/model-settings', 0)
     await page.goto(`${base}/admin/models`)
+    await page.locator('.organizationModelsEditor').getByText('当前部署的设置文档为只读。', { exact: true }).waitFor()
+    expect(adminReads.get('/admin/api/model-settings')).toBe(1)
     await page.getByRole('button', { name: '权限与计价', exact: true }).click()
     await page.getByRole('button', { name: '配置模型治理', exact: true }).first().click()
     const priceDialog = page.getByRole('dialog', { name: '配置模型治理', exact: true })
@@ -341,7 +352,10 @@ it('preserves stored values through built forms and keeps every mobile destinati
     expect(await page.evaluate(() => document.cookie.includes('hgw_lang=en'))).toBe(true)
     await page.getByRole('button', { name: 'More administration features', exact: true }).click()
     const moreEn = page.getByRole('dialog', { name: 'More administration features', exact: true })
+    adminReads.set('/admin/api/projects', 0)
     await moreEn.getByRole('link', { name: 'Terminals', exact: true }).click()
+    await page.getByRole('option', { name: /Renamed fixture/u }).waitFor({ state: 'attached' })
+    expect(adminReads.get('/admin/api/projects')).toBe(1)
     await page.getByRole('heading', { name: 'Terminals', exact: true }).waitFor()
     await page.getByRole('button', { name: 'More administration features', exact: true }).click()
     await page.getByRole('dialog', { name: 'More administration features', exact: true })

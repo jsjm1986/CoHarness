@@ -53,6 +53,91 @@ describe('UsagePage', () => {
     })
   })
 
+  it('resolves the server month after all initial reads without requesting the overview again', async () => {
+    const overview = Promise.withResolvers<api.UsageOverview>()
+    const users = Promise.withResolvers<api.AdminUser[]>()
+    const health = Promise.withResolvers<api.UsageHealth>()
+    vi.mocked(api.listUsageOverview).mockReturnValueOnce(overview.promise)
+    vi.mocked(api.listUsers).mockReturnValueOnce(users.promise)
+    vi.mocked(api.getUsageHealth).mockReturnValueOnce(health.promise)
+    render(<UsagePage />)
+    const month = screen.getByLabelText('月份') as HTMLInputElement
+    expect(month.value).toBe('')
+    expect(api.listUsageOverview).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(api.listUsers).toHaveBeenCalledTimes(1)
+    expect(api.getUsageHealth).toHaveBeenCalledExactlyOnceWith(undefined)
+    await act(async () => {
+      overview.resolve({
+        month: '2001-01', timeZone: 'Pacific/Kiritimati',
+        personal: measure(1, 10), projects: measure(0, 0), unattributedProjects: measure(0, 0),
+        users: [{ userId: 1, username: 'server-month', archived: false, personal: personal(1, 10), projectContribution: measure(0, 0) }],
+      })
+    })
+    expect(month.value).toBe('')
+    expect(screen.getByText('正在加载用量')).toBeTruthy()
+    await act(async () => {
+      users.resolve([])
+      health.resolve({
+        month: '2001-01', timeZone: 'Pacific/Kiritimati', missingUsageCalls: 0,
+        unattributedProjectCalls: 0, unattributedProjectTokens: 0, unpricedCalls: 0,
+        historicalUnknownCalls: 0, maxIntakeLagMs: 0,
+      })
+    })
+    expect(month.value).toBe('2001-01')
+    expect({
+      overview: vi.mocked(api.listUsageOverview).mock.calls.length,
+      users: vi.mocked(api.listUsers).mock.calls.length,
+      health: vi.mocked(api.getUsageHealth).mock.calls.length,
+    }).toEqual({ overview: 1, users: 1, health: 1 })
+    expect(within(screen.getByRole('table')).getByText('server-month')).toBeTruthy()
+    expect(screen.getAllByText(/Pacific\/Kiritimati/)).not.toHaveLength(0)
+    expect(screen.queryByText('正在加载用量')).toBeNull()
+  })
+
+  it('refreshes the resolved server month after a save and permits repeated current-month selections', async () => {
+    const user = userEvent.setup()
+    const currentMonth = Promise.withResolvers<api.UsageOverview>()
+    const nextCurrentMonth = Promise.withResolvers<api.UsageOverview>()
+    render(<UsagePage />)
+    await screen.findByRole('table')
+    expect((screen.getByLabelText('月份') as HTMLInputElement).value).toBe('2026-08')
+    await user.click(screen.getByRole('button', { name: '配置额度' }))
+    const dialog = within(await screen.findByRole('dialog', { name: '配置月度额度' }))
+    await waitFor(() => expect((dialog.getByRole('button', { name: '保存额度' }) as HTMLButtonElement).disabled).toBe(false))
+    await user.click(dialog.getByRole('button', { name: '保存额度' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(api.listUsageOverview).toHaveBeenCalledTimes(2)
+    expect(api.listUsageOverview).toHaveBeenLastCalledWith('2026-08')
+    expect(api.getUsageHealth).toHaveBeenLastCalledWith('2026-08')
+    vi.mocked(api.listUsageOverview).mockReturnValueOnce(currentMonth.promise)
+    fireEvent.change(screen.getByLabelText('月份'), { target: { value: '' } })
+    expect(api.listUsageOverview).toHaveBeenCalledTimes(3)
+    expect(api.listUsageOverview).toHaveBeenLastCalledWith(undefined)
+    expect((screen.getByLabelText('月份') as HTMLInputElement).value).toBe('')
+    await act(async () => {
+      currentMonth.resolve({
+        month: '2026-09', timeZone: 'Asia/Shanghai',
+        personal: measure(0, 0), projects: measure(0, 0), unattributedProjects: measure(0, 0), users: [],
+      })
+    })
+    expect((screen.getByLabelText('月份') as HTMLInputElement).value).toBe('2026-09')
+    expect(api.listUsageOverview).toHaveBeenCalledTimes(3)
+    vi.mocked(api.listUsageOverview).mockReturnValueOnce(nextCurrentMonth.promise)
+    fireEvent.change(screen.getByLabelText('月份'), { target: { value: '' } })
+    expect(api.listUsageOverview).toHaveBeenCalledTimes(4)
+    expect(api.listUsageOverview).toHaveBeenLastCalledWith(undefined)
+    await act(async () => {
+      nextCurrentMonth.resolve({
+        month: '2026-09', timeZone: 'Asia/Shanghai',
+        personal: measure(0, 0), projects: measure(0, 0), unattributedProjects: measure(0, 0), users: [],
+      })
+    })
+    expect((screen.getByLabelText('月份') as HTMLInputElement).value).toBe('2026-09')
+    expect(api.listUsageOverview).toHaveBeenCalledTimes(4)
+    expect(api.listUsers).toHaveBeenCalledTimes(4)
+    expect(api.getUsageHealth).toHaveBeenCalledTimes(4)
+  })
+
   it('separates personal billing from shared-project contribution activity', async () => {
     render(<UsagePage />)
     expect(await screen.findByText('项目 Token')).toBeTruthy()
@@ -152,6 +237,27 @@ describe('UsagePage', () => {
     expect(api.listUsageOverview).toHaveBeenCalledTimes(2)
     expect(within(table).queryByText('stale')).toBeNull()
     expect(within(table).getAllByText('alice')).not.toHaveLength(0)
+  })
+
+  it.each(['month change', 'unmount'] as const)('ignores a late overview failure after %s', async retirement => {
+    const old = Promise.withResolvers<api.UsageOverview>()
+    vi.mocked(api.listUsageOverview).mockReturnValueOnce(old.promise)
+    const first = render(<UsagePage />)
+    if (retirement === 'month change') {
+      fireEvent.change(screen.getByLabelText('月份'), { target: { value: '2026-07' } })
+    } else {
+      first.unmount()
+      render(<UsagePage />)
+    }
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('alice')).toBeTruthy()
+    await act(async () => { old.reject(new Error('late overview failure')) })
+    expect(screen.queryByText('late overview failure')).toBeNull()
+    expect(screen.queryByText('正在加载用量')).toBeNull()
+    expect((screen.getByLabelText('月份') as HTMLInputElement).value).toBe(retirement === 'month change' ? '2026-07' : '2026-08')
+    expect(api.listUsageOverview).toHaveBeenCalledTimes(2)
+    expect(api.listUsers).toHaveBeenCalledTimes(2)
+    expect(api.getUsageHealth).toHaveBeenCalledTimes(2)
   })
 
   it('keeps an edited role draft through a background users refresh without a second quota read', async () => {
@@ -395,7 +501,7 @@ describe('UsagePage', () => {
         users: [{ userId: 9, username: 'stale', archived: false, personal: personal(9, 999), projectContribution: measure(0, 0) }],
       })
     })
-    expect(api.listUsageOverview).toHaveBeenCalledTimes(3)
+    expect(api.listUsageOverview).toHaveBeenCalledTimes(2)
     const table = await screen.findByRole('table')
     expect(within(table).queryByText('stale')).toBeNull()
     expect(within(table).getAllByText('alice')).not.toHaveLength(0)

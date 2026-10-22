@@ -934,8 +934,13 @@ export type OrganizationModelDiscovery = {
   apiKey?: string
 }
 
-export function describeOrganizationModelSettings(): Promise<OrganizationModelSettingsView> {
-  return request('/admin/api/model-settings')
+/**
+ * Read current organization settings.
+ * @param signal - optional owner lifetime; omission leaves the request uncancelled by that owner.
+ * @returns the current settings and revision, after the response body is read.
+ */
+export function describeOrganizationModelSettings(signal?: AbortSignal): Promise<OrganizationModelSettingsView> {
+  return request('/admin/api/model-settings', signal === undefined ? {} : { signal })
 }
 
 export function mutateOrganizationModelSettings(body: {
@@ -945,10 +950,16 @@ export function mutateOrganizationModelSettings(body: {
   return request('/admin/api/model-settings', { method: 'PUT', body: JSON.stringify(body) })
 }
 
-export function describeOrganizationCredentials(refs: string[]): Promise<{ credentials: Record<string, OrganizationCredentialView> }> {
+/**
+ * Describe organization credential state without retrieving values.
+ * @param refs - credential references to inspect.
+ * @param signal - optional owner cancellation; omission leaves this request uncancelled by that owner.
+ * @returns credential configuration state for the requested references.
+ */
+export function describeOrganizationCredentials(refs: string[], signal?: AbortSignal): Promise<{ credentials: Record<string, OrganizationCredentialView> }> {
   const query = new URLSearchParams()
   for (const ref of refs) query.append('refs', ref)
-  return request(`/admin/api/model-settings/credentials?${query.toString()}`)
+  return request(`/admin/api/model-settings/credentials?${query.toString()}`, signal === undefined ? {} : { signal })
 }
 
 export function setOrganizationCredential(ref: string, value: string): Promise<void> {
@@ -959,10 +970,16 @@ export function unsetOrganizationCredential(ref: string): Promise<void> {
   return request('/admin/api/model-settings/credentials', { method: 'DELETE', body: JSON.stringify({ ref }) })
 }
 
-export function discoverOrganizationModels(body: OrganizationModelDiscovery): Promise<{
+/**
+ * Discover models through the organization endpoint.
+ * @param body - provider endpoint and authentication for this discovery.
+ * @param signal - optional owner cancellation; omission leaves this request uncancelled by that owner.
+ * @returns discovered model metadata.
+ */
+export function discoverOrganizationModels(body: OrganizationModelDiscovery, signal?: AbortSignal): Promise<{
   models: Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>
 }> {
-  return request('/admin/api/model-settings/discover', { method: 'POST', body: JSON.stringify(body) })
+  return request('/admin/api/model-settings/discover', { method: 'POST', body: JSON.stringify(body), signal })
 }
 
 export type ModelAccessView = {
@@ -1098,8 +1115,13 @@ export function listModels(): Promise<ModelGovernanceRow[]> {
   return request('/admin/api/models')
 }
 
-export function listModelProviders(): Promise<ModelProviderRow[]> {
-  return request('/admin/api/model-providers')
+/**
+ * List the current organization Provider catalog.
+ * @param signal - optional owner cancellation; omission leaves this request uncancelled by that owner.
+ * @returns Provider metadata and current management status.
+ */
+export function listModelProviders(signal?: AbortSignal): Promise<ModelProviderRow[]> {
+  return request('/admin/api/model-providers', signal === undefined ? {} : { signal })
 }
 
 export function saveModelProvider(provider: ModelProviderInput): Promise<void> {

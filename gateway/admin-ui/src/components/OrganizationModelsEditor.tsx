@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Context } from '@deepseek-ai/cordis'
 import { ModelsSection } from '../../../../packages/client/ui-settings-models/src/client/ModelsSection.tsx'
 import type { ModelDiscoveryProbe } from '../../../../packages/client/ui-settings-models/src/client/ModelListEditor.tsx'
@@ -9,7 +9,7 @@ import {
 import { en, zh } from '../../../../packages/client/ui-settings-models/src/client/locales.ts'
 import { createSettingsSchemaOperations } from '../../../../packages/client/ui-settings-models/src/client/schema-operations.ts'
 import { SettingsSchemaService } from '../../../../packages/client/ui-settings/src/client/schema.ts'
-import { createOrganizationModelsMirror } from '../model-settings-api.ts'
+import { createOrganizationModelsMirror, OrganizationModelsStore } from '../model-settings-api.ts'
 import { adminLanguage } from '../language.ts'
 
 const ORGANIZATION_PROVIDER_PATTERN = /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
@@ -62,20 +62,34 @@ function bindSnapshot(controller: ModelsSettingsStore): SnapshotHook {
 
 /** Shared Models settings plugin mounted against the organization REST facade. */
 export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void }) {
-  const { schema, describeFace, api } = useMemo(() => {
+  const changed = useRef(onChanged)
+  const [owner, setOwner] = useState<OrganizationModelsOwner | null>(null)
+  useEffect(() => { changed.current = onChanged }, [onChanged])
+  useEffect(() => {
+    const lifetime = new AbortController()
     // The admin surface reuses the shared editor outside the Cordis client
     // plugin graph, so it must provide the same schema and settings mirror
     // faces that ui-settings-models receives from its host plugin.
     const schemaService = new SettingsSchemaService(new Context())
-    return {
-      schema: createSettingsSchemaOperations(schemaService),
-      ...createOrganizationModelsMirror({ onChanged }),
-    }
-  }, [onChanged])
-  const controller = useMemo(
-    () => new ModelsSettingsStore(api as never, schema, describeFace),
-    [api, describeFace, schema],
-  )
+    const schema = createSettingsSchemaOperations(schemaService)
+    const { describeFace, api } = createOrganizationModelsMirror({
+      signal: lifetime.signal,
+      onChanged: () => { if (!lifetime.signal.aborted) changed.current() },
+    })
+    const controller = new OrganizationModelsStore(api, schema, describeFace)
+    setOwner({ api, controller, schema })
+    return () => { lifetime.abort() }
+  }, [])
+  return owner === null ? null : <MountedOrganizationModelsEditor {...owner} />
+}
+
+interface OrganizationModelsOwner {
+  api: ReturnType<typeof createOrganizationModelsMirror>['api']
+  controller: ModelsSettingsStore
+  schema: ReturnType<typeof createSettingsSchemaOperations>
+}
+
+function MountedOrganizationModelsEditor({ api, controller, schema }: OrganizationModelsOwner) {
   const useSnapshot = useMemo(() => bindSnapshot(controller), [controller])
   const t = useMemo(() => {
     const copy = adminLanguage() === 'en' ? organizationCopyEn : organizationCopyZh
