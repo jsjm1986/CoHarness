@@ -285,6 +285,8 @@ export const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'pluginManager/waitForInstall',
   'pluginManager/inspect',
   'pluginManager/setPluginEnabled',
+  'pluginManager/describePluginConfig',
+  'pluginManager/setPluginConfig',
   'pluginManager/setBundleEnabled',
   'pluginManager/setVersionExemption',
   'pluginManager/installBundle',

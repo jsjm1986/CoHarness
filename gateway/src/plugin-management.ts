@@ -18,7 +18,7 @@ const stateWriteSchema = z.object({
 const invocationSchema = z.object({
   target: targetSchema, nodeId: z.string().min(1), generation: z.number().int().positive(), rpcId: z.uuid(),
   endpoint: z.enum(['settings.describe', 'settings.mutate', 'pluginInventory/list', 'pluginManager/listPlugins', 'pluginManager/listBundles', 'pluginManager/inspect',
-    'pluginManager/setPluginEnabled', 'pluginManager/setBundleEnabled', 'pluginManager/installBundleStream',
+    'pluginManager/setPluginEnabled', 'pluginManager/setPluginConfig', 'pluginManager/describePluginConfig', 'pluginManager/setBundleEnabled', 'pluginManager/installBundleStream',
     'pluginManager/cancelInstall', 'pluginManager/removeBundle', 'pluginManager/registries', 'pluginManager/waitForInstall',
     'pluginRegistryProbe/fastest']),
   args: z.record(z.string(), z.unknown()),
