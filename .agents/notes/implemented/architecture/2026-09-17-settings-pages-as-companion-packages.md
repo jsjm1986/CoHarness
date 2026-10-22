@@ -12,13 +12,13 @@ The four official settings pages — shell, agent loop, Subagent, web search —
 
 **A community plugin's settings page lives in its own package's browser half.** It registers into `plugins.bundle.config` or `plugins.row.config`, owns its copy and styles, and reads and writes through `ctx.settingsScope`. Its i18n is the client locale service, as the shipped community bundles already do.
 
-**A built-in namespace's page lives in a companion client package.** `ui-settings-shell`, `ui-settings-agent-loop`, `ui-settings-subagent`, and `ui-settings-web-search` are client-only packages with an empty Host `apply`, one bare-name row each in the web composition's roster, registering into `plugins.item` while the Host serves their namespace. Host packages stay free of browser code; the namespace they edit is spelled as a literal, never imported from the owner.
+**The shipped built-in cards live in `ui-settings-plugins`.** [The single-entry change](../simplification/2026-10-09-plugins-page-single-entry.md) folded the companion packages back into one, and [the patch-row binding](../feature/2026-10-23-plugins-item-patch-row-binding.md) keys each `plugins.item` entry on the row its feature runs as. Host packages stay free of browser code; the namespace a card edits is spelled as a literal, never imported from the owner.
 
 **The form machinery moves to `ui-primitives`.** `SettingsFormModel` with `settingsNumberField` and `settingsTextField`, `SettingsValueField` and `SettingsSecretField`, and the `SettingsForm` frame are the kit every page renders with; the frame takes its copy as `labels` and the model takes a structural scope, so the baseline package depends on neither a plugin nor its dictionary.
 
-**`settingsScope.whileServed(namespaces, register)` is the registration rule.** A page exists exactly while the Host serves one of its namespaces: the service watches the shared describe mirror, runs the registration when a namespace appears, and disposes it when none is served, so four packages share one rule instead of four copies.
+**`settingsScope.whileServed(namespaces, register)` remains the service rule for served-namespace gating.** The service watches the shared describe mirror, runs the registration when a namespace appears, and disposes it when none is served. The shipped cards no longer use it — they register unconditionally under the patch-row binding above.
 
-**`ui-settings-plugins` keeps the Built-in plugins section only:** the navigation entry and the tab row feature-owned tabs register into.
+**`ui-settings-plugins` owns the shipped built-in cards:** six `plugins.item` entries keyed on their patch rows, per the binding note above.
 
 ## Alternatives considered
 
@@ -30,11 +30,11 @@ The four official settings pages — shell, agent loop, Subagent, web search —
 
 ## Consequences
 
-- The Plugins page's Official group lists the same four pages in the same order, from four packages instead of one; their labels and forms are unchanged, so the page goldens hold.
+- The Plugins page lists the built-in feature cards in their declared order from one package; the bound cards' switches and the renamed groups moved the page goldens with them.
 - The cookbook [adding a settings page](../../../../docs/cookbook/adding-a-settings-card.md) shows the community path and names the companion template.
 - The client module system's rule stands: a browser half rides the Loader row whose specifier is the bare package name, so a bundle split into subpath rows keeps every page it registers on its root row.
-- The shell page's `plugins.item` id is `shell`, where the old package registered `bash`: `subject.id` on an official page is now a discriminator `plugins.detail.*` contributions key on, so the id names the capability the page edits rather than one executor family.
+- The shell feature's `plugins.item` ids are `bash-sandbox` and `pwsh-sandbox` — the patch rows, not a settings namespace: `subject.id` on an official page is the discriminator `plugins.detail.*` contributions key on, so the id names the row the card switches.
 
 ## Testing
 
-Each companion's `tests/apply.client.spec.ts` registers its page while the Host serves the namespace, withdraws it when the Host stops, and collapses on teardown; its card and controller specs carry the page's behavior from the former package. The settings-form specs in `ui-primitives` pin the kit, and the while-served spec in `ui-settings` pins the registration rule. `apps/web/tests/plugin-config.e2e.ts` exercises the shell and Subagent pages over the real wire.
+`ui-settings-plugins`' `tests/apply.client.spec.ts` pins the six unconditional patch-row registrations and collapses every contribution on teardown; the card and controller specs carry each page's behavior. The settings-form specs in `ui-primitives` pin the kit, and the while-served spec in `ui-settings` pins the service rule the shipped cards no longer use. `apps/web/tests/plugin-config.e2e.ts` exercises the shell and Subagent pages over the real wire.

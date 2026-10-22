@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import type { PluginEntryId, PluginInstallRequestId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { PluginEntryId, PluginInfo, PluginInstallRequestId } from '@deepseek-ai/dsh-api-remotes/client'
 import { bindSnapshotSelector, stubMutationScope } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsMirrorSnapshot, SettingsMutationScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
@@ -75,6 +75,7 @@ const READY: PluginManagerState = {
   status: 'ready',
   refreshStatus: 'idle',
   packages: [],
+  plugins: [],
   busy: [],
   notice: null,
   manage: true,
@@ -1103,6 +1104,79 @@ describe('PluginManagerPage', () => {
 
       expect(document.querySelector('[data-plugin-group="basic"]')).toBeNull()
       expect(screen.queryByRole('button', { name: en.openDetail.replace('{name}', 'Shell') })).toBeNull()
+    })
+
+    it('binds an item naming a patch row and switches the row from its card', () => {
+      const plugin: PluginInfo = { entryId: 'include:bash-sandbox' as PluginEntryId, moduleName: '@deepseek-ai/dsh-bash-sandbox', enabled: true, fiberPhase: 'active', patchId: 'bash' }
+      const b = renderTab({ plugins: [plugin] }, { items: [{ id: 'bash', label: 'Shell' }] }, bodies)
+      const card = document.querySelector('[data-plugin-item="bash"]') as HTMLElement
+      expect(card).not.toBeNull()
+      const toggle = within(card).getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') })
+      expect(toggle.getAttribute('aria-checked')).toBe('true')
+      fireEvent.click(toggle)
+      expect(b.actions.setRowEnabled).toHaveBeenCalledWith('include:bash-sandbox', false)
+      b.set({ plugins: [{ ...plugin, enabled: false }] })
+      expect(within(card).getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') }).getAttribute('aria-checked')).toBe('false')
+    })
+
+    it('keeps a switched-off feature listed and says so on its page', () => {
+      const plugin: PluginInfo = { entryId: 'include:bash-sandbox' as PluginEntryId, moduleName: '@deepseek-ai/dsh-bash-sandbox', enabled: false, fiberPhase: null, patchId: 'bash' }
+      const b = renderTab({ plugins: [plugin] }, { items: [{ id: 'bash', label: 'Shell' }] }, bodies)
+      const card = document.querySelector('[data-plugin-item="bash"]') as HTMLElement
+      const toggle = within(card).getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') })
+      expect(toggle.getAttribute('aria-checked')).toBe('false')
+      fireEvent.click(toggle)
+      expect(b.actions.setRowEnabled).toHaveBeenCalledWith('include:bash-sandbox', true)
+      fireEvent.click(screen.getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') }))
+      const detail = document.querySelector('[data-plugin-item-detail="bash"]') as HTMLElement
+      expect(within(detail).getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') })).toBeTruthy()
+      expect(within(detail).getByText(en.partOff)).toBeTruthy()
+      fireEvent.click(within(detail).getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') }))
+      expect(b.actions.setRowEnabled).toHaveBeenCalledWith('include:bash-sandbox', true)
+    })
+
+    it('merges same-label entries on the live member, or the first bound row while every member is off', () => {
+      const pwsh: PluginInfo = { entryId: 'include:pwsh-sandbox' as PluginEntryId, moduleName: '@deepseek-ai/dsh-pwsh-sandbox', enabled: false, fiberPhase: null, patchId: 'pwsh' }
+      const bash: PluginInfo = { entryId: 'include:bash-sandbox' as PluginEntryId, moduleName: '@deepseek-ai/dsh-bash-sandbox', enabled: true, fiberPhase: 'active', patchId: 'bash' }
+      const items = [{ id: 'pwsh', label: 'Shell' }, { id: 'bash', label: 'Shell' }]
+      const itemsCards = () => within(document.querySelector('[data-plugin-group="basic"]') as HTMLElement)
+        .getAllByRole('listitem').map(card => card.getAttribute('data-plugin-item'))
+      const first = renderTab({ plugins: [pwsh, bash] }, { items }, bodies)
+      expect(itemsCards()).toEqual(['bash'])
+      first.unmount()
+      renderTab({ plugins: [{ ...pwsh }, { ...bash, enabled: false }] }, { items }, bodies)
+      expect(itemsCards()).toEqual(['pwsh'])
+    })
+
+    it('disables a bound switch while the row is busy, read-only, or management is denied', () => {
+      const plugin: PluginInfo = { entryId: 'include:bash-sandbox' as PluginEntryId, moduleName: '@deepseek-ai/dsh-bash-sandbox', enabled: true, fiberPhase: 'active', patchId: 'bash' }
+      const b = renderTab(
+        { plugins: [plugin], busy: [rowKey('include:bash-sandbox')] },
+        { items: [{ id: 'bash', label: 'Shell' }] },
+        bodies,
+      )
+      const card = document.querySelector('[data-plugin-item="bash"]') as HTMLElement
+      expect(within(card).getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') })).toHaveProperty('disabled', true)
+      b.set({ busy: [] })
+      expect(within(card).getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') })).toHaveProperty('disabled', false)
+      b.set({ manage: false })
+      const denied = within(card).getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') })
+      expect(denied).toHaveProperty('disabled', true)
+      expect(denied.title).toBe(en.managementDenied)
+      b.unmount()
+      const readOnly: PluginInfo = { entryId: 'include:ro-bash' as PluginEntryId, moduleName: '@deepseek-ai/dsh-bash-sandbox', enabled: true, fiberPhase: 'active', readOnlyReason: 'unaddressable' }
+      renderTab(
+        { plugins: [readOnly], packages: [pkg({ rows: [row({ rowId: 'bash', entryId: 'include:ro-bash' as PluginEntryId })] })] },
+        { items: [{ id: 'bash', label: 'Shell' }] },
+        bodies,
+      )
+      const locked = within(document.querySelector('[data-plugin-item="bash"]') as HTMLElement)
+        .getByRole('switch', { name: en.partToggle.replace('{name}', 'Shell') })
+      expect(locked).toHaveProperty('disabled', true)
+      expect(locked.title).toBe(en.reasonUnaddressable)
+      fireEvent.click(screen.getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') }))
+      const detail = document.querySelector('[data-plugin-item-detail="bash"]') as HTMLElement
+      expect(within(detail).getByText(en.reasonUnaddressable)).toBeTruthy()
     })
 
     it('waits for the bundle list before showing cards or an item page', () => {

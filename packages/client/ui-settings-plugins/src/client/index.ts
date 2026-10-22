@@ -138,48 +138,58 @@ export function apply(ctx: ClientContext): void {
     children: { 'settings.plugins.tab': { kind: 'list', scope: 'root' } },
   }, PluginsSettingsSection))
 
-  // One card per host-plane namespace, listed on the Plugins page in `order`
-  // order; the card's own page shows its staged form. Each card registers
-  // only while the Host serves the namespace it edits, so a deployment that
-  // never composed the owner shows no trace of the page.
-  ctx.effect(() => ctx.settingsScope.whileServed([SHELL_NS], () => ctx.slots.inject('plugins.item', () => ctx.slots.register({
+  // One card per built-in feature, listed on the Plugins page in `order`
+  // order; the card's own page shows its staged form. Each card's id names
+  // the patch row its feature runs as, so the page carries the row's live
+  // state and switch and keeps the card listed while the feature is off. The
+  // shell feature's row changes with the platform, so its two ids share one
+  // label and the page keeps the live one.
+  ctx.slots.inject('plugins.item', () => ctx.slots.register({
     name: 'plugins.item',
-    id: SHELL_NS,
+    id: 'bash-sandbox',
     order: 10,
     label: () => t('bashTitle'),
     locale: NS,
     inject: () => bash.inject(),
-  }, BashCard))), 'ui-settings-plugins: shell card')
-  ctx.effect(() => ctx.settingsScope.whileServed([AGENT_LOOP_NS], () => ctx.slots.inject('plugins.item', () => ctx.slots.register({
+  }, BashCard))
+  ctx.slots.inject('plugins.item', () => ctx.slots.register({
     name: 'plugins.item',
-    id: AGENT_LOOP_NS,
+    id: 'pwsh-sandbox',
+    order: 10,
+    label: () => t('bashTitle'),
+    locale: NS,
+    inject: () => bash.inject(),
+  }, BashCard))
+  ctx.slots.inject('plugins.item', () => ctx.slots.register({
+    name: 'plugins.item',
+    id: 'agent-loop',
     order: 20,
     label: () => t('agentLoopTitle'),
     locale: NS,
     inject: () => agentLoop.inject(),
-  }, AgentLoopCard))), 'ui-settings-plugins: agent-loop card')
-  ctx.effect(() => ctx.settingsScope.whileServed(['subagent'], () => ctx.slots.inject('plugins.item', () => ctx.slots.register({
+  }, AgentLoopCard))
+  ctx.slots.inject('plugins.item', () => ctx.slots.register({
     name: 'plugins.item',
     id: 'subagent',
     order: 30,
     label: () => t('subagentTitle'),
     locale: NS,
     inject: () => subagent.inject(),
-  }, SubagentLimitsCard))), 'ui-settings-plugins: subagent card')
-  ctx.effect(() => ctx.settingsScope.whileServed(['subagent', SUBAGENT_MODEL_SELECTION_NS], () => ctx.slots.inject('plugins.item', () => ctx.slots.register({
+  }, SubagentLimitsCard))
+  ctx.slots.inject('plugins.item', () => ctx.slots.register({
     name: 'plugins.item',
-    id: SUBAGENT_MODEL_SELECTION_NS,
+    id: 'subagent-model-selection-settings',
     order: 40,
     label: () => t('subagentModelSelectionTitle'),
     locale: NS,
     inject: () => subagentModels.inject(),
-  }, SubagentModelSelectionCard))), 'ui-settings-plugins: subagent model selection card')
-  ctx.effect(() => ctx.settingsScope.whileServed([WEB_SEARCH_NS], () => ctx.slots.inject('plugins.item', () => ctx.slots.register({
+  }, SubagentModelSelectionCard))
+  ctx.slots.inject('plugins.item', () => ctx.slots.register({
     name: 'plugins.item',
-    id: WEB_SEARCH_NS,
+    id: 'web-search-deepseek',
     order: 50,
     label: () => t('webSearchTitle'),
     locale: NS,
     inject: () => webSearch.inject(),
-  }, WebSearchCard))), 'ui-settings-plugins: web search card')
+  }, WebSearchCard))
 }

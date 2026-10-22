@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-16-plugin-configuration-on-the-plugins-page.md
 document:
-  en: a2e395c82562921099b4ddf7ca1ec68a2eec4e92
-  zh: 91bd9157465a1e8597878ab04e5e58be9a5476b4
+  en: 99cc534accaf60132b7a7c9aa4fb4c5d9cda8797
+  zh: 3914caea9c41a05324588799c730e58922072386
 /agent-note-plugin-configuration-on-the-plugins-page:
   en: e3cb8f2cfd31ee99
   zh: 75c7c498bb5b29e4
@@ -12,14 +12,14 @@ document:
   en: 9ca845902f1df3a2
   zh: 41e3157a843a511e
 /agent-note-plugin-configuration-on-the-plugins-page/decision:
-  en: c42429872ce5ba71
-  zh: ac3e263da8b67525
+  en: 28a281ee465239b8
+  zh: 4e49bf0230251bfd
 /agent-note-plugin-configuration-on-the-plugins-page/consequences:
   en: 70847de189886792
-  zh: bc6f30013144eecf
+  zh: 5b5e6c2da2c917e9
 /agent-note-plugin-configuration-on-the-plugins-page/alternatives-considered:
   en: 14c6db09f23c2005
   zh: 979730121cd837c3
 /agent-note-plugin-configuration-on-the-plugins-page/testing:
-  en: b58fdf0d5922f52b
-  zh: a65eee771b22ee55
+  en: fa1889b7e03d2e3a
+  zh: 92d0895e0cb501de

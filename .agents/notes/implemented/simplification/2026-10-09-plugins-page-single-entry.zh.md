@@ -12,7 +12,7 @@ Status: implemented
 
 侧边栏「插件」页是唯一的用户侧插件面。删除 `ui-settings-plugin-inventory`，Settings 的 `plugins` 分区随之整体移除：`settings.plugins.tab` 与 `settings.plugin.item` slot、分区与标签页框架、以及 `PluginsSettingsSection`/`ConfigurablePluginsTab` 组件。
 
-`ui-settings-plugins` 把它的五张卡片各自注册为一个以 settings 命名空间为键的 `plugins.item` 条目（`shell`、`agent-loop`、`subagent`、`subagent-model-selection`、`web-search-deepseek`）。卡片去掉了折叠外壳（`PluginCard`），改用 `PluginForm`——只含主体的框架，保留同样的只读提示带与保存底栏；管理器页在卡片上渲染 `view: 'summary'`、在条目自己的页面上渲染 `view: 'page'`。「插件配置」分组原本就把条目过滤为 Host `settings.describe` 所服务的 id，因此未组装的插件不留空壳。
+`ui-settings-plugins` 把每张卡片注册为一个以其功能运行所在 patch 行为键的 `plugins.item` 条目——shell 标签下的 `bash-sandbox` 与 `pwsh-sandbox`、`agent-loop`、`subagent`、`subagent-model-selection-settings` 与 `web-search-deepseek`；[patch 行绑定](../feature/2026-10-23-plugins-item-patch-row-binding.zh.md)拥有该契约。卡片去掉了折叠外壳（`PluginCard`），改用 `PluginForm`——只含主体的框架，保留同样的只读提示带与保存底栏；管理器页在卡片上渲染 `view: 'summary'`、在条目自己的页面上渲染 `view: 'page'`。绑定卡片在行关闭时保持列出，没有任何行或已服务命名空间认领的 id 依然不留空壳。
 
 `ctx.pluginNavigation` 新增 `openItem(itemId)`，选中面板并落到 `{ kind: 'item', id }`，供插件深链到自己的页面——实验性语音输入即以 `speech-to-text` 这样注册，未组装管理器时回退到 `requestSettingsSection()`。
 

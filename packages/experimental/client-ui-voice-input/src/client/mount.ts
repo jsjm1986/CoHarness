@@ -52,9 +52,8 @@ function registerUi(ctx: Context): void {
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
     name: 'conversation.input.right', id: 'voice-input', order: 0, locale: NS, inject: () => actions,
   }, VoiceInput))
-  // The Plugins page's Configuration group keys an official item by its
-  // host-plane settings namespace, which the speech plugin registers on first
-  // use; the page then lists and opens this surface like every other card.
+  // The Plugins page binds this card to the bundle's `speech-to-text` patch
+  // row, so the card carries that row's live state and switch.
   ctx.slots.inject('plugins.item', () => ctx.slots.register({
     name: 'plugins.item', id: 'speech-to-text', order: 60,
     label: () => ctx.locale.bind(NS)('nav'), locale: NS, inject: () => actions,
