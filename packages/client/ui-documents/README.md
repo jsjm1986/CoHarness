@@ -64,6 +64,8 @@ Uploads use one resumable session protocol on desktop and mobile. Small files us
 <a id="scope-isolation"></a>
 ## Scope isolation
 
+Alternate-scope directory reads use the browser bundle's typed `browseScope` client. Compatibility with a Host that lacks the scope-browse route belongs to that HTTP client, which falls back to the transfer metadata route while preserving directory and paging arguments.
+
 Documents are stored per-runtime scope:
 
 - **Personal scope**: `$HOME/documents/`

@@ -19,7 +19,7 @@ vi.mock('../src/client/documents-client.ts', async (importOriginal) => {
 })
 import { UserDocHttpError, UserDocServiceUnavailableError } from '../src/client/documents-client.ts'
 import type {
-  UserDocDirectoryIdType, UserDocDirectoryRef, UserDocIdType, UserDocLimits, UserDocListQuery, UserDocTrashRef,
+  UserDocDirectoryIdType, UserDocDirectoryRef, UserDocIdType, UserDocLimits, UserDocListQuery, UserDocScope, UserDocTrashRef,
 } from '../src/client/documents-client.ts'
 
 function t(key: DocumentsKey, params?: Record<string, string>): string {
@@ -133,8 +133,15 @@ function makeClient() {
       current: { kind: 'personal' as const, label: 'Personal documents' },
       targets: [],
     })),
-    listScope: vi.fn(async () => ({
+    browseScope: vi.fn(async (
+      _scope: UserDocScope,
+      directoryId: UserDocDirectoryIdType,
+      _signal?: AbortSignal,
+      _query?: UserDocListQuery,
+    ) => ({
       version: 1,
+      directoryId,
+      directories: [] as UserDocDirectoryRef[],
       scope: { kind: 'project' as const, label: 'Compiler' },
       documents: [{
         docId: 'project/report.pdf', name: 'report.pdf', bytes: 2048,
@@ -245,7 +252,7 @@ describe('DocumentsModal', () => {
     const project = screen.getByRole('button', { name: /Compiler/ })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     fireEvent.click(project)
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(screen.getByRole('dialog', { name: t('modal.title') })).toBe(manager)
     expect(screen.getByText(t('scope.viewing', { name: 'Compiler' }))).toBeTruthy()
@@ -523,7 +530,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     const input = document.querySelector('input[type="file"]')
     if (!(input instanceof HTMLInputElement)) throw new Error('document upload input missing')
     fireEvent.change(input, { target: { files: [new File(['hello'], 'hello.txt', { type: 'text/plain' })] } })
@@ -566,7 +573,7 @@ describe('DocumentsModal', () => {
     expect(within(sheet).getByRole('option', { name: /Compiler/ })).toBeTruthy()
     expect(within(sheet).queryByRole('option', { name: /Payments/ })).toBeNull()
     fireEvent.click(within(sheet).getByRole('option', { name: /Compiler/ }))
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     expect(screen.queryByRole('dialog', { name: t('scope.switch.title') })).toBeNull()
   })
 
@@ -668,7 +675,7 @@ describe('DocumentsModal', () => {
     fireEvent.click(within(more).getByRole('button', { name: t('copy.source') }))
     const source = await screen.findByRole('dialog', { name: t('copy.source.title') })
     fireEvent.click(within(source).getByRole('option', { name: /Compiler/ }))
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
   })
 
@@ -1026,7 +1033,7 @@ describe('DocumentsModal', () => {
     expect(sourceDialog.querySelectorAll('select')).toHaveLength(0)
     expect(within(sourceDialog).getByRole('option', { name: /Compiler/ })).toBeTruthy()
     fireEvent.click(within(sourceDialog).getByRole('button', { name: t('copy.source.open') }))
-    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await waitFor(() => { expect(client.browseScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 })) })
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('checkbox', { name: 'report.pdf' }))
     fireEvent.click(screen.getByRole('button', { name: t('selection.copy') }))

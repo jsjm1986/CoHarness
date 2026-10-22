@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 /* oxlint-disable typescript/no-unsafe-assignment -- Vitest asymmetric matchers are typed as any. */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import {
   DOCUMENT_DIRECTORY_CONFLICT_CODE,
   DOCUMENT_DIRECTORY_NOT_EMPTY_CODE,
@@ -219,6 +219,36 @@ describe('saveDocFile', () => {
     await expect(saveDocFile(uploadRoot, target, body('x'), LIMITS, abort.signal)).rejects.toThrow(
       abort.signal.reason as Error,
     )
+  })
+
+  it('cancels a pending stream read and removes its partial file', async () => {
+    const uploadRoot = await root()
+    const target = await resolveDocTarget(uploadRoot, 'pending.txt', new Date())
+    const entered = Promise.withResolvers<undefined>()
+    const cancelled = Promise.withResolvers<unknown>()
+    const abort = new AbortController()
+    let producer: ReadableStreamDefaultController<Uint8Array> | undefined
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) { producer = controller },
+      pull() { entered.resolve(undefined) },
+      cancel(reason: unknown) { cancelled.resolve(reason) },
+    }, { highWaterMark: 0 })
+    const pending = saveDocFile(uploadRoot, target, stream, LIMITS, abort.signal)
+    const observed = pending.catch((error: unknown) => error)
+    onTestFinished(async () => {
+      producer?.error(new Error('test cleanup'))
+      await observed
+    })
+    try {
+      await entered.promise
+      abort.abort(new Error('upload withdrawn'))
+      await expect(cancelled.promise).resolves.toBe(abort.signal.reason)
+      await expect(observed).resolves.toBe(abort.signal.reason)
+      expect(await readdir(dirname(target.path))).toEqual([])
+    } finally {
+      producer?.error(new Error('test cleanup'))
+      await pending.catch(() => {})
+    }
   })
 
   it('removes the partial file when cancelled mid-stream', async () => {

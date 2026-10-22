@@ -624,7 +624,7 @@
   },
   "packages/client/ui-documents/src/client/DocumentsModal.tsx": {
     "46197efe57255c9d92d64476470c89d0602c7333bf98ad75509bf43c1b357a3b": 1,
-    "78bcc756d45e63d3c58a8d61437d485ec0e74ae8c27417548e39e8df6d40d346": 7
+    "78bcc756d45e63d3c58a8d61437d485ec0e74ae8c27417548e39e8df6d40d346": 6
   },
   "packages/client/ui-documents/src/client/userdoc-client.ts": {
     "46197efe57255c9d92d64476470c89d0602c7333bf98ad75509bf43c1b357a3b": 2,
