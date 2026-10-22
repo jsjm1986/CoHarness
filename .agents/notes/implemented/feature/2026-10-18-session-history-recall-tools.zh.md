@@ -14,7 +14,7 @@ Status: implemented
 
 [sanitizeFtsText](../../../../packages/session-query/session-query-sqlite/src/query.ts)——索引文档与 MATCH 查询共用的唯一规范化器——现在会在每对汉字相邻字符之间插入保留的零宽空格（`U+200B`）。`unicode61` 将其视为分隔符，于是每个 CJK 字符成为独立 token，普通短语匹配由此获得任意长度的子串语义：`记忆` 可匹配 `记忆系统` 内部，`试A版` 等混写区段也在两侧拆分。规范化高亮片段时该字符会被剥离，呈现文本保持原样。非汉字区段仍是 token/短语召回而非任意子串召回。
 
-`dsh-tool-session-query` 的授权在工作区相等之上叠加项目可读性。新增的 `readableSet` 助手仅在 `collaboration` 服务挂载时调用 `collaboration.capture().readableSessionIds()`，与 session-reference 惯例一致；服务缺位时（个人工作区）`cwd` 规则即完整规则，行为不变。`authorizeTarget` 拒绝不可读目标，`authorizeSessionIds` 将请求的父 id 与可读集合求交，会话搜索按页批量过滤命中项，跟踪投影为全部祖先与后代记录预取一次集合，使不可读节点沿用既有的无 id 边界/子树标记。读取后复核仍校验观测记录是否为已授权目标。
+`dsh-tool-session-query` 的授权结合工作区相等性与组合提供的参与方可读集合。搜索只批量取得一次工作区准入集合，每个操作都会在异步读取后复核披露的跨会话 id。[参与方可读 ACL 决策](../bug-fix/2026-10-17-session-query-participant-acl.zh.md)负责批处理、血缘遮蔽、撤权与自身访问语义。
 
 ## Consequences
 

@@ -253,7 +253,7 @@ function errorCode(result: ToolExecutionResult): string | undefined {
 }
 
 describe('registration and schemas', () => {
-  it('registers the five cursor-free tools, prompt, timeouts, and pure generic presenters, then disposes them', async () => {
+  it('registers cursor-free tools, prompt, timeouts, and pure generic presenters, then disposes them', async () => {
     const mounted = await mount({ maxSearchResults: 7, searchTimeoutMs: 1234 })
     const names = mounted.ctx.tools.schemas().map(schema => schema.name)
     expect(names).toEqual([
@@ -1279,7 +1279,7 @@ describe('workspace authority and lineage redaction', () => {
 })
 
 describe('collaboration participant readability', () => {
-  function installParticipantAcl(ctx: Context, readable: readonly SessionIdValue[]): void {
+  function installParticipantAcl(ctx: Context, readable: readonly SessionIdValue[]): Set<SessionIdValue> {
     const allowed = new Set(readable)
     ctx.provide('collaboration', {
       capture: () => ({
@@ -1288,6 +1288,7 @@ describe('collaboration participant readability', () => {
         ),
       }),
     } as never)
+    return allowed
   }
 
   it.each([
@@ -1349,9 +1350,10 @@ describe('collaboration participant readability', () => {
     expect(output).not.toContain('hidden-parent-secret')
   })
 
-  it('batches workspace readability into one authority request per search call', async () => {
+  it('batches search admission and final readability independently of hit count', async () => {
     const mounted = await mount()
     const hit = createSession(mounted.ctx, 'batched-hit', '/work')
+    const second = createSession(mounted.ctx, 'second-hit', '/work')
     const batches: SessionIdValue[][] = []
     mounted.ctx.provide('collaboration', {
       capture: () => ({
@@ -1361,7 +1363,7 @@ describe('collaboration participant readability', () => {
         },
       }),
     } as never)
-    FakeQuery.sessionSearch = () => Promise.resolve({ items: [sessionHit(hit.id, '/work')] })
+    FakeQuery.sessionSearch = () => Promise.resolve({ items: [sessionHit(hit.id, '/work'), sessionHit(second.id, '/work')] })
 
     const result = await mounted.call('session_search', {
       query: 'needle',
@@ -1369,8 +1371,9 @@ describe('collaboration participant readability', () => {
     })
 
     expect(result.isError).toBe(false)
-    expect(batches).toHaveLength(1)
-    expect(batches[0]).toEqual(expect.arrayContaining([hit.id, mounted.caller.id]))
+    expect(batches).toHaveLength(2)
+    expect(batches[0]).toEqual(expect.arrayContaining([hit.id, second.id, mounted.caller.id]))
+    expect(batches[1]).toEqual([hit.id, second.id])
     expect(FakeQuery.sessionRequests[0]?.sessionFilters).toContainEqual({
       kind: 'parent',
       values: [hit.id],
@@ -1439,6 +1442,167 @@ describe('collaboration participant readability', () => {
     expect(text(result)).toBe('Error: session query operation failed')
     expect(JSON.stringify(result)).not.toContain(secret)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(secret))
+  })
+
+  it.each([
+    ['session_search', { query: 'needle' }],
+    ['session_event_search', { query: 'needle' }],
+    ['session_trace', {}],
+    ['session_event_trace', { seq: 1 }],
+    ['session_handoff', {}],
+    ['session_event_read', { seq: 1 }],
+  ] as const)('withholds %s output when readability is revoked during a title read', async (toolName, args) => {
+    const mounted = await mount({ handoffExtraction: false })
+    const target = createSession(mounted.ctx, 'revoked-target-secret', '/work')
+    openStep(target, 'revoked content needle')
+    const readable = installParticipantAcl(mounted.ctx, [mounted.caller.id, target.id])
+    FakeQuery.sessionSearch = () => Promise.resolve({ items: [sessionHit(target.id, '/work', 'revoked content needle')] })
+    FakeQuery.eventSearch = () => Promise.resolve({
+      session: target.header,
+      items: [eventHit(target.id, SessionSeq(1), 'revoked content needle')],
+    })
+    const reached = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const readTitles = mounted.ctx.sessionQuery.readTitleSnapshots.bind(mounted.ctx.sessionQuery)
+    vi.spyOn(mounted.ctx.sessionQuery, 'readTitleSnapshots').mockImplementation(async (...input) => {
+      const observations = await readTitles(...input)
+      reached.resolve(undefined)
+      await release.promise
+      return observations
+    })
+
+    const operation = mounted.call(toolName, { ...args, session_id: target.id })
+    try {
+      await reached.promise
+      readable.delete(target.id)
+    } finally {
+      release.resolve(undefined)
+    }
+    const result = await operation
+
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+    expect(JSON.stringify(result)).not.toContain('revoked-target-secret')
+    expect(JSON.stringify(result)).not.toContain('revoked content needle')
+  })
+
+  it.each(['search parent', 'trace ancestor', 'trace descendant'] as const)(
+    'withholds a revoked %s even when the target remains readable', async (relationship) => {
+      const mounted = await mount()
+      const parent = createSession(mounted.ctx, 'private-parent-secret', '/work')
+      const target = createSession(mounted.ctx, 'readable-target', '/work', 20, parent.id)
+      const child = createSession(mounted.ctx, 'private-child-secret', '/work', 30, target.id)
+      const readable = installParticipantAcl(mounted.ctx, [mounted.caller.id, parent.id, target.id, child.id])
+      FakeQuery.sessionSearch = () => Promise.resolve({ items: [sessionHit(target.id, '/work', 'needle', parent.id)] })
+      const reached = Promise.withResolvers<undefined>()
+      const release = Promise.withResolvers<undefined>()
+      const readTitles = mounted.ctx.sessionQuery.readTitleSnapshots.bind(mounted.ctx.sessionQuery)
+      vi.spyOn(mounted.ctx.sessionQuery, 'readTitleSnapshots').mockImplementation(async (...input) => {
+        const observations = await readTitles(...input)
+        reached.resolve(undefined)
+        await release.promise
+        return observations
+      })
+      const operation = relationship === 'search parent'
+        ? mounted.call('session_search', { query: 'needle' })
+        : mounted.call('session_trace', { session_id: target.id })
+      try {
+        await reached.promise
+        readable.delete(relationship === 'trace descendant' ? child.id : parent.id)
+      } finally {
+        release.resolve(undefined)
+      }
+      const result = await operation
+
+      expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+      expect(JSON.stringify(result)).not.toContain('private-parent-secret')
+      expect(JSON.stringify(result)).not.toContain('private-child-secret')
+    },
+  )
+
+  it('withholds search results when readability is revoked while the provider page is pending', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'pending-page-secret', '/work')
+    const readable = installParticipantAcl(mounted.ctx, [mounted.caller.id, target.id])
+    const reached = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    FakeQuery.sessionSearch = async () => {
+      reached.resolve(undefined)
+      await release.promise
+      return { items: [sessionHit(target.id, '/work', 'private page needle')] }
+    }
+    const operation = mounted.call('session_search', { query: 'needle' })
+    try {
+      await reached.promise
+      readable.delete(target.id)
+    } finally {
+      release.resolve(undefined)
+    }
+    const result = await operation
+
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+    expect(JSON.stringify(result)).not.toContain('pending-page-secret')
+    expect(JSON.stringify(result)).not.toContain('private page needle')
+  })
+
+  it('sanitizes a failed final readability check without returning already-read data', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'final-check-secret', '/work')
+    openStep(target)
+    let reads = 0
+    mounted.ctx.provide('collaboration', {
+      capture: () => ({
+        readableSessionIds: (ids: readonly SessionIdValue[]) => ++reads === 1
+          ? Promise.resolve(new Set(ids))
+          : Promise.reject(new Error('private ACL diagnostic')),
+      }),
+    } as never)
+    const result = await mounted.call('session_event_read', { session_id: target.id, seq: 1 })
+
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_FAILED')
+    expect(JSON.stringify(result)).not.toContain('final-check-secret')
+    expect(JSON.stringify(result)).not.toContain('private ACL diagnostic')
+  })
+
+  it.each([
+    { initialAcl: true, self: false },
+    { initialAcl: true, self: true },
+    { initialAcl: false, self: false },
+  ])('preserves initial ACL requirements across provider unload: $initialAcl, self: $self', async ({ initialAcl, self }) => {
+    const mounted = await mount()
+    const target = self ? mounted.caller : createSession(mounted.ctx, 'unloaded-provider-secret', '/work')
+    if (!self) openStep(target, 'private source content')
+    const aclFiber = initialAcl ? await mounted.ctx.plugin((ctx: Context) => {
+      installParticipantAcl(ctx, [mounted.caller.id, target.id])
+    }) : undefined
+    const reached = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const readTitles = mounted.ctx.sessionQuery.readTitleSnapshots.bind(mounted.ctx.sessionQuery)
+    vi.spyOn(mounted.ctx.sessionQuery, 'readTitleSnapshots').mockImplementation(async (...input) => {
+      const observations = await readTitles(...input)
+      reached.resolve(undefined)
+      await release.promise
+      return observations
+    })
+    const controller = new AbortController()
+    const operation = mounted.call('session_event_read', { session_id: target.id, seq: 1 }, { signal: controller.signal })
+    try {
+      await reached.promise
+      await aclFiber?.dispose()
+      expect(mounted.ctx.get('collaboration')).toBeUndefined()
+      expect(controller.signal.aborted).toBe(false)
+    } finally {
+      release.resolve(undefined)
+    }
+    const result = await operation
+
+    if (initialAcl && !self) {
+      expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+      expect(JSON.stringify(result)).not.toContain('unloaded-provider-secret')
+      expect(JSON.stringify(result)).not.toContain('private source content')
+    } else {
+      expect(result.isError).toBe(false)
+      expect(text(result)).toContain(`Session ${target.id}`)
+    }
   })
 })
 
@@ -2382,6 +2546,62 @@ describe('session handoff', () => {
     expect(requests[0]?.provider).toBe('test-provider')
     expect(requests[0]?.sessionId).toBe(mounted.caller.id)
   })
+
+  it.each(['surface read', 'extraction'] as const)(
+    'withholds a handoff when readability is revoked during %s', async (stage) => {
+      const mounted = await mount()
+      const target = createSession(mounted.ctx, 'handoff-revoked-secret', '/work')
+      appendExchange(target, 'private handoff question', 'private handoff answer')
+      let readable = true
+      mounted.ctx.provide('collaboration', {
+        capture: () => ({
+          readableSessionIds: (ids: readonly SessionIdValue[]) => Promise.resolve(new Set(readable ? ids : [])),
+        }),
+      } as never)
+      const reached = Promise.withResolvers<undefined>()
+      const release = Promise.withResolvers<undefined>()
+      const requests: GenerateOptions[] = []
+      mounted.ctx.provide('llm', {
+        async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+          requests.push(options)
+          if (stage === 'extraction') {
+            reached.resolve(undefined)
+            await release.promise
+          }
+          yield { type: 'block-start', index: 0, blockType: 'text' }
+          yield { type: 'text-delta', index: 0, text: 'private model capsule' }
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: 'private model capsule' } }
+          yield { type: 'finish', reason: { kind: 'stop' } }
+        },
+      } as never)
+      if (stage === 'surface read') {
+        const readSurface = mounted.ctx.sessionQuery.readSurface.bind(mounted.ctx.sessionQuery)
+        vi.spyOn(mounted.ctx.sessionQuery, 'readSurface').mockImplementation(async (...input) => {
+          const snapshot = await readSurface(...input)
+          reached.resolve(undefined)
+          await release.promise
+          return snapshot
+        })
+      }
+      const agent: Agent = {
+        ...fakeAgent(mounted.caller),
+        options: { provider: 'test-provider', model: 'test-model' },
+      }
+      const operation = mounted.call('session_handoff', { session_id: target.id }, { agent })
+      try {
+        await reached.promise
+        readable = false
+      } finally {
+        release.resolve(undefined)
+      }
+      const result = await operation
+
+      expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+      expect(requests).toHaveLength(stage === 'surface read' ? 0 : 1)
+      expect(JSON.stringify(result)).not.toContain('private model capsule')
+      expect(JSON.stringify(result)).not.toContain('private handoff')
+    },
+  )
 
   it('falls back to the local tail when extraction fails', async () => {
     const mounted = await mount()

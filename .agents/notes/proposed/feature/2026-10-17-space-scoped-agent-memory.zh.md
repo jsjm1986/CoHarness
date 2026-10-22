@@ -89,7 +89,7 @@ kind 闭集为 `profile`（用户或团队是谁：角色、专长、偏好）�
 
 ## Earlier-session lookup
 
-ZCode 的 `ReadSessionContext` 对应已有的 `tool-session-query` 工具。它们按工作目录相等授权目标会话，这在项目 runtime 中会暴露其他成员的私有对话，因此要在项目空间启用，除目录检查外还必须让每个目标都经过 `CollaborationAuthority.readableSessionIds()` 过滤。
+ZCode 的 `ReadSessionContext` 对应现有 `tool-session-query` 工具。项目运行时中的工具结合工作目录相等性与参与方可读 ACL 检查，并包含最终撤权复核；[参与方可读 ACL 决策](../../implemented/bug-fix/2026-10-17-session-query-participant-acl.zh.md)负责这项行为。
 
 ## Browser surface
 

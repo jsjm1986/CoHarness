@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-10-17-space-scoped-agent-memory.md
 document:
-  en: e3da72ac0491b0f02e09f332ae3b4c5ac8e8de57
-  zh: ec626d82eace0124f93d7a396191f76a44f493c7
+  en: 6214594ef7e676bd42f5d6eb82e70dc1734b90e3
+  zh: 04ba2261db23aea0bc71ec685b7397c21e87f1ce
 /agent-note-space-scoped-agent-memory-for-personal-and-project-spaces:
   en: f173c018151b1e8b
   zh: ac6aef7e11e5ac32
@@ -39,8 +39,8 @@ document:
   en: e041342b4290b76e
   zh: 075d7d38a280f38d
 /agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/earlier-session-lookup:
-  en: e2d354c2b54f3408
-  zh: 7af442689ed56dcc
+  en: c1f7548bacc8fb28
+  zh: 6951c5ee1b919076
 /agent-note-space-scoped-agent-memory-for-personal-and-project-spaces/browser-surface:
   en: eea1a478fd3fe858
   zh: 299a0a826b49d5c6

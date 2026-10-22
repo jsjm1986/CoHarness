@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-17-session-query-participant-acl.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-17-session-query-participant-acl.md
+document:
+  en: a8e86a5dfbcb5b599ac661ce5030f8adc6215881
+  zh: 8e4d1210ed2932bcadc5cccb9b42b68c10084d73
+/agent-note-participant-readable-acl-for-session-query-tools:
+  en: a53325cf33bf4cdd
+  zh: ccdcf067ef10a1cf
+/agent-note-participant-readable-acl-for-session-query-tools/problem:
+  en: e2ef2ab2a08bacec
+  zh: 0ffaed850dc6151e
+/agent-note-participant-readable-acl-for-session-query-tools/decision:
+  en: 8639e9b891620924
+  zh: 4faa7ac7d066b26a
+/agent-note-participant-readable-acl-for-session-query-tools/alternatives-considered:
+  en: 7f135606f76ddfc8
+  zh: d5b61e4239d6b22a
+/agent-note-participant-readable-acl-for-session-query-tools/consequences:
+  en: 079c5d2d94412e85
+  zh: 62f5d32ffbecb29e
+/agent-note-participant-readable-acl-for-session-query-tools/verification:
+  en: 35383a7a78e41879
+  zh: f909fa648adb4379

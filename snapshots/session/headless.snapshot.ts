@@ -1246,6 +1246,15 @@ describe('headless recorded-session snapshots', () => {
             if (scenario.name === 'session-query-spill') {
               await verifySessionQuerySpill(actualLogs[0]!.content, spillRoot, locatorRoot)
             }
+            if (scenario.name === 'session-query-acl-revocation') {
+              const log = actualLogs[0]!.content
+              const result = parseSessionLog(log).find(event => event.type === 'tool/result')
+              expect(result?.data).toMatchObject({
+                message: { isError: true },
+                error: { code: 'SESSION_QUERY_TOOL_UNAUTHORIZED' },
+              })
+              expect(log).not.toContain('PRIVATE_SOURCE_BODY')
+            }
             if (scenario.name === 'mcp-resources' || scenario.name === 'mcp-resources-ptc') {
               verifyMcpResources(actualLogs[0]!.content, scenario.name === 'mcp-resources-ptc')
             }
