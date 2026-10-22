@@ -27,7 +27,7 @@ describe('TranscriptViewPolicy', () => {
     host.publish({
       status: 'ready', writable: true,
       value: {
-        busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+        busyEnter: 'queue', chatContentWidth: 700,
         performanceUsage: 'detailed', linkOpening: 'sidebar',
         transcriptView: 'normal',
       },
@@ -36,7 +36,7 @@ describe('TranscriptViewPolicy', () => {
     host.publish({
       status: 'ready', writable: true,
       value: {
-        busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+        busyEnter: 'queue', chatContentWidth: 700,
         performanceUsage: 'detailed', linkOpening: 'sidebar',
         transcriptView: 'expanded',
       },
@@ -116,7 +116,7 @@ describe('PerformanceUsagePolicy', () => {
     host.publish({
       status: 'ready', writable: true,
       value: {
-        busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+        busyEnter: 'queue', chatContentWidth: 700,
         performanceUsage: 'compact', linkOpening: 'sidebar',
       },
     })
@@ -146,7 +146,7 @@ describe('LinkOpeningPolicy', () => {
     host.publish({
       status: 'ready', writable: true,
       value: {
-        busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+        busyEnter: 'queue', chatContentWidth: 700,
         performanceUsage: 'detailed', linkOpening: 'new-tab',
       },
     })

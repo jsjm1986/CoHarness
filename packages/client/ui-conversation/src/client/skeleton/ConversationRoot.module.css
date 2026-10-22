@@ -24,7 +24,7 @@
      component resolves against the live column, or the fill-mode clearance
      calc); the width handles rewrite it during a gesture. */
   --dsh-chat-content-width: var(--dsh-chat-user-width, 748px);
-  --dsh-chat-font-size: 14px;
+  --dsh-chat-font-size: var(--dsh-content-font-size, 14px);
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;

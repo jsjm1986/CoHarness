@@ -282,7 +282,6 @@ export function apply(ctx: Context): void {
     hooks: { displaySettings },
     setWidth: (value) => { displaySettings.setWidth(value) },
     setFullWidth: (value) => { displaySettings.setFullWidth(value) },
-    setFontSize: (value) => { displaySettings.setFontSize(value) },
   })
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',

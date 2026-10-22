@@ -151,7 +151,6 @@ function mount(
   const chat = createChatStore().create()
   const displaySettings = createSnapshotStore<ConversationDisplaySettingsSnapshot>({
     chatContentWidth: 748,
-    chatFontSize: 14,
     chatFullWidth: false,
     settings: { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } },
   })

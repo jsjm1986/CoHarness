@@ -24,14 +24,13 @@ describe('ui-conversation host', () => {
       busyEnter: DEFAULT_BUSY_ENTER_BEHAVIOR,
       chatContentWidth: 748,
       chatFullWidth: false,
-      chatFontSize: 14,
       collapseTiming: 'completion',
       performanceUsage: 'detailed',
       linkOpening: 'sidebar',
     })
     await ctx.settings.update(ns, { busyEnter: 'steer' })
     expect(ctx.settings.get(ns)).toEqual({
-      busyEnter: 'steer', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14,
+      busyEnter: 'steer', chatContentWidth: 748, chatFullWidth: false,
       collapseTiming: 'completion', performanceUsage: 'detailed', linkOpening: 'sidebar',
     })
     await expect(ctx.settings.update(ns, { busyEnter: 'invalid' })).rejects.toThrow()

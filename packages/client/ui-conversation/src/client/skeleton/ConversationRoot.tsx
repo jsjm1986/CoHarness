@@ -1,7 +1,7 @@
 // Root conversation viewport and its resident Session pane. The pane keeps
 // Hero/composer identity while the root owns explicit per-pane bindings.
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { parseClientSessionKey, SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -418,10 +418,6 @@ export function ConversationContent({
     </div>
   )
 
-  const widthStyle = {
-    '--dsh-chat-font-size': `${displaySettings.chatFontSize}px`,
-  } as CSSProperties
-
   // The committed content width is published imperatively as
   // --dsh-chat-user-width (the CSS axis resolves it into
   // --dsh-chat-content-width): the ResizeObserver re-clamps a stored
@@ -508,7 +504,6 @@ export function ConversationContent({
       className={clsx(css.root, workbench && css.workbenchPane, variant === 'embedded' && css.embeddedBody)}
       data-phase={phase}
       data-chat-fill={displaySettings.chatFullWidth || undefined}
-      style={widthStyle}
     >
       {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
       <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">

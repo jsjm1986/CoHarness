@@ -321,7 +321,7 @@ describe('conversation slot inject API', () => {
     b.settingsScopeStub.publish({
       status: 'ready', writable: true,
       value: {
-        busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+        busyEnter: 'queue', chatContentWidth: 700,
         performanceUsage: 'detailed', linkOpening: 'new-tab',
       },
     })

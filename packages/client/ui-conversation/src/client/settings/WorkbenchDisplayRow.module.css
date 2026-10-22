@@ -1,5 +1,5 @@
-/* Workbench-sidebar display controls: a font stepper and named width segments
-   stacked to fit the sidebar's single-column width. */
+/* Workbench-sidebar display controls: named width segments stacked to fit
+   the sidebar's single-column width. */
 
 .controls {
   display: flex;
@@ -32,59 +32,6 @@
 
 .controlLabel {
   flex: none;
-}
-
-/* Font stepper: minus / value / plus inside one hairline capsule. */
-.stepper {
-  display: inline-flex;
-  flex: none;
-  align-items: stretch;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-md);
-  corner-shape: round;
-  overflow: hidden;
-}
-
-.stepButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  min-height: 24px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.stepButton:not(:disabled):hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
-}
-
-.stepButton:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.stepButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-border-l3);
-  outline-offset: -2px;
-}
-
-.stepValue {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  padding: 0 var(--dsw-space-1);
-  border-inline: 0.5px solid var(--dsw-alias-border-l1);
-  color: var(--dsw-alias-label-primary);
-  font-variant-numeric: tabular-nums;
 }
 
 /* Width presets: quiet text segments; the active one inverts to a filled chip. */

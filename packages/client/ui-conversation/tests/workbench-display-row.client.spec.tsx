@@ -26,7 +26,6 @@ function mount() {
     useDisplaySettings: bindSnapshotSelector(settings),
     setWidth: vi.fn((value: number) => { settings.setWidth(value) }),
     setFullWidth: vi.fn((value: boolean) => { settings.setFullWidth(value) }),
-    setFontSize: vi.fn((value: number) => { settings.setFontSize(value) }),
     t: makeTranslate(en),
   }
   render(<WorkbenchDisplayRow {...props} />)
@@ -38,7 +37,7 @@ function publishReady(scope: ReturnType<typeof stubSettingsScope<ConversationSet
     scope.publish({
       status: 'ready', writable: true,
       value: {
-        chatContentWidth: 720, chatFontSize: 15, chatFullWidth: false, busyEnter: 'queue',
+        chatContentWidth: 720, chatFullWidth: false, busyEnter: 'queue',
         performanceUsage: 'detailed', linkOpening: 'sidebar',
       },
     })
@@ -46,15 +45,9 @@ function publishReady(scope: ReturnType<typeof stubSettingsScope<ConversationSet
 }
 
 describe('WorkbenchDisplayRow', () => {
-  it('stacks width, font size, and fill controls bound to the shared settings face', () => {
+  it('stacks width and fill controls bound to the shared settings face', () => {
     const b = mount()
     publishReady(b.scope)
-    fireEvent.click(screen.getByRole('button', { name: 'Increase font size' }))
-    expect(b.props.setFontSize).toHaveBeenCalledWith(16)
-    expect(b.scope.set).toHaveBeenCalledWith('chatFontSize', 16)
-    // The write published back through the snapshot, so decrease steps from 16.
-    fireEvent.click(screen.getByRole('button', { name: 'Decrease font size' }))
-    expect(b.props.setFontSize).toHaveBeenCalledWith(15)
     // A stored custom width lights no preset; picking one writes the preset value.
     expect(screen.getByRole('group', { name: 'Content width' })).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: 'Relaxed' }))
@@ -72,7 +65,6 @@ describe('WorkbenchDisplayRow', () => {
   it('keeps controls disabled and surfaces the loading notice before settings are ready', () => {
     mount()
     expect(screen.getByText(/Loading display settings/)).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Increase font size' })).toHaveProperty('disabled', true)
     expect(screen.getByRole('button', { name: 'Fill' })).toHaveProperty('disabled', true)
   })
 
@@ -83,7 +75,6 @@ describe('WorkbenchDisplayRow', () => {
       b.scope.publish({ writable: false, writableReason: 'project' })
     })
     expect(screen.getByText(/Project settings are managed/)).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Increase font size' })).toHaveProperty('disabled', true)
     act(() => {
       b.scope.publish({ writable: true, writableReason: undefined, write: { status: 'error', code: 'x', message: 'x' } })
     })
