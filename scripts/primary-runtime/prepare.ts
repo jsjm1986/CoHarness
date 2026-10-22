@@ -2,13 +2,15 @@
 
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
+import { createWriteStream } from 'node:fs'
 import { cpSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { cp } from 'node:fs/promises'
+import { cp, lstat, mkdir, realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { pipeline } from 'node:stream/promises'
 import { parseArgs } from 'node:util'
-import extractZip from 'extract-zip'
+import * as yauzl from 'yauzl'
 import { x as extractTar } from 'tar'
 import { copyPrimaryRuntime, parsePrimaryRuntime, workspaceDependencyPaths, type PrimaryRuntimeManifest } from '../../packages/skill/tool-workspace-dependencies/src/index.ts'
 import { prunePrimaryRuntimePythonTests } from './prune-python-tests.ts'
@@ -92,14 +94,111 @@ export function primaryRuntimePayloadDigest(
  * @returns Resolves after extraction without command wrappers; rejects other wheel installation schemes.
  */
 export async function unpackPrimaryRuntimeWheel(archive: string, destination: string): Promise<void> {
-  await extractZip(archive, {
-    dir: destination,
-    onEntry: (entry) => {
-      const [directory, scheme] = entry.fileName.split('/')
-      if (directory?.endsWith('.data') && scheme !== '' && scheme !== 'scripts') {
-        throw new Error(`primary runtime: wheel requires unsupported installation paths: ${entry.fileName}`)
-      }
-    },
+  await extractZipSafely(archive, destination, (entry) => {
+    const [directory, scheme] = entry.fileName.split('/')
+    if (directory?.endsWith('.data') && scheme !== '' && scheme !== 'scripts') {
+      throw new Error(`primary runtime: wheel requires unsupported installation paths: ${entry.fileName}`)
+    }
+  })
+}
+
+/** Extract ordinary files and directories only; archive paths never choose links or filesystem roots. */
+async function extractZipSafely(
+  archive: string,
+  destination: string,
+  inspectEntry: (entry: yauzl.Entry) => void = () => {},
+): Promise<void> {
+  await mkdir(destination, { recursive: true })
+  const root = await realpath(destination)
+  const zip = await new Promise<yauzl.ZipFile>((resolveZip, reject) => {
+    yauzl.open(archive, { autoClose: false, lazyEntries: true, validateEntrySizes: true, strictFileNames: true },
+      (error, opened) => {
+        if (error !== null) {
+          reject(error)
+          return
+        }
+        resolveZip(opened)
+      })
+  })
+
+  await new Promise<void>((resolveEntries, rejectEntries) => {
+    const seen = new Set<string>()
+    let settled = false
+    const fail = (error: Error): void => {
+      if (settled) return
+      settled = true
+      zip.close()
+      rejectEntries(error)
+    }
+    zip.on('error', fail)
+    zip.on('end', () => {
+      if (settled) return
+      settled = true
+      zip.close()
+      resolveEntries()
+    })
+    zip.on('entry', (entry: yauzl.Entry) => {
+      void (async () => {
+        const nameError = yauzl.validateFileName(entry.fileName)
+        if (nameError !== null || entry.fileName === '' || entry.fileName.includes('\0')) {
+          throw new Error(`primary runtime: unsafe ZIP path ${entry.fileName}`)
+        }
+        const mode = entry.externalFileAttributes >>> 16 & 0xffff
+        const fileType = mode & 0o170000
+        const isDirectory = entry.fileName.endsWith('/') || fileType === 0o040000
+        if (fileType === 0o120000 || fileType !== 0 && fileType !== 0o100000 && fileType !== 0o040000) {
+          throw new Error(`primary runtime: unsupported ZIP entry type ${entry.fileName}`)
+        }
+        if (isDirectory && entry.uncompressedSize !== 0) {
+          throw new Error(`primary runtime: directory ZIP entry contains data ${entry.fileName}`)
+        }
+        inspectEntry(entry)
+        const segments = entry.fileName.split('/')
+        if (isDirectory) segments.pop()
+        if (segments.length === 0 || segments.some(segment => segment === '' || segment === '.' || segment === '..')) {
+          throw new Error(`primary runtime: unsafe ZIP path ${entry.fileName}`)
+        }
+        if (process.platform === 'win32' && segments.some(segment => /[:<>"|?*]/u.test(segment))) {
+          throw new Error(`primary runtime: unsafe Windows ZIP path ${entry.fileName}`)
+        }
+        const output = resolve(root, ...segments)
+        const outputRelative = relative(root, output)
+        if (outputRelative === '' || outputRelative === '..' || outputRelative.startsWith(`..${sep}`) || isAbsolute(outputRelative)) {
+          throw new Error(`primary runtime: ZIP path escapes destination ${entry.fileName}`)
+        }
+        if (seen.has(outputRelative)) throw new Error(`primary runtime: duplicate ZIP path ${entry.fileName}`)
+        seen.add(outputRelative)
+        const parents = isDirectory ? segments : segments.slice(0, -1)
+        let current = root
+        for (const segment of parents) {
+          current = join(current, segment)
+          try {
+            await mkdir(current, { mode: 0o755 })
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+          }
+          const info = await lstat(current)
+          if (!info.isDirectory() || info.isSymbolicLink()) {
+            throw new Error(`primary runtime: ZIP path crosses a non-directory ${entry.fileName}`)
+          }
+        }
+        if (isDirectory) return
+        const readStream = await new Promise<NodeJS.ReadableStream>((resolveStream, rejectStream) => {
+          zip.openReadStream(entry, (error, stream) => {
+            if (error !== null) {
+              rejectStream(error)
+              return
+            }
+            resolveStream(stream)
+          })
+        })
+        const fileMode = (mode & 0o111) === 0 ? 0o644 : 0o755
+        await pipeline(readStream, createWriteStream(output, { flags: 'wx', mode: fileMode }))
+      })().then(() => {
+        if (!settled) zip.readEntry()
+      }, fail)
+    })
+    zip.readEntry()
   })
 }
 
@@ -121,7 +220,7 @@ export async function installPrimaryNode(params: {
   const nodeArchive = await downloadPrimaryRuntimeAsset(`https://nodejs.org/dist/v${params.nodeVersion}/${nodeFilename}`, params.nodeSha256, params.downloads)
   const unpackedNode = join(params.staging, 'node')
   mkdirSync(unpackedNode)
-  if (params.target === 'win-x64') await extractZip(nodeArchive, { dir: unpackedNode })
+  if (params.target === 'win-x64') await extractZipSafely(nodeArchive, unpackedNode)
   else await extractTar({ file: nodeArchive, cwd: unpackedNode })
   const nodeSource = join(unpackedNode, nodeFilename.replace(/\.(?:zip|tar\.gz)$/u, ''))
   mkdirSync(join(params.dependencies, 'node', 'bin'), { recursive: true })

@@ -251,16 +251,16 @@
     "@types/node": "^22.20.0",
     "@types/papaparse": "5.3.16",
     "@types/spdx-expression-parse": "^4.0.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "@yao-pkg/pkg": "6.21.0",
     "@yarnpkg/cli-dist": "4.18.0",
     "eslint-plugin-sonarjs": "^4.2.0",
     "execa": "^10.0.0",
-    "extract-zip": "2.0.1",
+    "@types/yauzl": "^3.4.0",
     "fast-check": "^4.9.0",
     "fflate": "0.8.3",
     "istanbul-lib-report": "^3.0.1",
-    "js-yaml": "^5.2.3",
+    "js-yaml": "^5.4.1",
     "jscpd": "^5.0.16",
     "jsdom": "30.1.1",
     "knip": "^6.34.0",
@@ -281,9 +281,10 @@
     "tsdown": "^0.23.0",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
+    "yauzl": "^3.4.0",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^4.1.11",
+    "vitest": "^4.1.12",
     "zod": "^4.4.3",
-    "vite": "8.2.2"
+    "vite": "8.2.4"
   }
 }

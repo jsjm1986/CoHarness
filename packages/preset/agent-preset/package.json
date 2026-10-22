@@ -45,6 +45,6 @@
     "@deepseek-ai/dsh-compaction-tool-result-pruner": "workspace:*",
     "@deepseek-ai/dsh-skill": "workspace:*",
     "@deepseek-ai/dsh-skill-filesystem": "workspace:*",
-    "js-yaml": "^5.2.3"
+    "js-yaml": "^5.4.1"
   }
 }
