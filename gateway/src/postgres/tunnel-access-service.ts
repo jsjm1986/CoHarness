@@ -9,7 +9,7 @@ import type { PostgresRuntimeContext } from './runtime-context.ts'
 const NONCE_BYTES = 12
 const AUTH_TAG_BYTES = 16
 
-/** AES-256-GCM with tunnel-bound AAD; the deployment key file is shared with model credentials. */
+/** AES-256-GCM with organization-, node-, and field-bound AAD and a dedicated deployment key. */
 export class TunnelCredentialCipher {
   constructor(private readonly key: Buffer) {
     if (key.length !== 32) throw new Error('tunnel credential key must be 32 bytes')
@@ -25,7 +25,8 @@ export class TunnelCredentialCipher {
     const nonce = randomBytes(NONCE_BYTES)
     const cipher = createCipheriv('aes-256-gcm', this.key, nonce, { authTagLength: AUTH_TAG_BYTES })
     cipher.setAAD(this.aad(organizationId, nodeId, field))
-    return Buffer.concat([nonce, cipher.getAuthTag(), cipher.update(value, 'utf8'), cipher.final()])
+    const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()])
+    return Buffer.concat([nonce, cipher.getAuthTag(), ciphertext])
   }
 
   /** Decrypt one stored secret after authenticating the node's tunnel row. */

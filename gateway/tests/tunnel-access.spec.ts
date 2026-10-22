@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import { randomBytes } from 'node:crypto'
 import { GatewayTunnelAccess, type TunnelAccessDeps } from '../src/tunnel-access.ts'
-import type { TunnelAccessRow } from '../src/postgres/tunnel-access-service.ts'
+import { TunnelCredentialCipher, type TunnelAccessRow } from '../src/postgres/tunnel-access-service.ts'
 import type { TunnelProc } from '../src/tunnel-supervisor.ts'
 
 const BASE_ROW: TunnelAccessRow = {
@@ -58,7 +59,7 @@ function makeDeps(overrides: Partial<TunnelAccessDeps> & { initialRow?: Partial<
   const store = memoryStore(overrides.initialRow)
   const deps: TunnelAccessDeps = {
     store,
-    cipher,
+    cipher: overrides.cipher ?? cipher,
     organizationId: 'org-1',
     nodeId: 'node-1',
     target: 'http://127.0.0.1:8899',
@@ -152,7 +153,8 @@ describe('GatewayTunnelAccess', () => {
     })
     const proc = fakeProc()
     const spawnNamed = vi.fn(() => proc)
-    const { deps, store } = makeDeps({ fetchImpl, spawnNamed })
+    const actualCipher = new TunnelCredentialCipher(randomBytes(32))
+    const { deps, store } = makeDeps({ fetchImpl, spawnNamed, cipher: actualCipher })
     const view = await new GatewayTunnelAccess(deps).startNamed({
       hostname: 'team.example.com', domain: 'example.com', apiToken: 'CF-TOKEN',
     })
@@ -164,21 +166,23 @@ describe('GatewayTunnelAccess', () => {
     expect(methods.some(m => m.includes('PUT') && m.includes('configurations'))).toBe(true)
     expect(methods.some(m => m.includes('POST') && m.includes('dns_records'))).toBe(true)
     const row = store.snapshot()
-    expect(row.apiTokenCipher?.toString()).toBe('enc:CF-TOKEN')
-    expect(row.runTokenCipher?.toString()).toBe('enc:RUNTOKEN')
+    expect(actualCipher.decrypt('org-1', 'node-1', 'api-token', row.apiTokenCipher!)).toBe('CF-TOKEN')
+    expect(actualCipher.decrypt('org-1', 'node-1', 'run-token', row.runTokenCipher!)).toBe('RUNTOKEN')
     expect(row.tunnelId).toBe('tun-1')
   })
 
   it('reuses stored named credentials without Cloudflare calls', async () => {
+    const actualCipher = new TunnelCredentialCipher(randomBytes(32))
     const store = memoryStore({
       mode: 'named', hostname: 'team.example.com', zoneId: 'zone-1', accountId: 'acct-1', tunnelId: 'tun-1',
-      apiTokenCipher: Buffer.from('enc:CF-TOKEN'), runTokenCipher: Buffer.from('enc:RUNTOKEN'),
+      apiTokenCipher: actualCipher.encrypt('org-1', 'node-1', 'api-token', 'CF-TOKEN'),
+      runTokenCipher: actualCipher.encrypt('org-1', 'node-1', 'run-token', 'RUNTOKEN'),
     })
     const fetchImpl = vi.fn<typeof fetch>()
     const proc = fakeProc()
     const spawnNamed = vi.fn(() => proc)
     const access = new GatewayTunnelAccess({
-      store, cipher, organizationId: 'org-1', nodeId: 'node-1',
+      store, cipher: actualCipher, organizationId: 'org-1', nodeId: 'node-1',
       target: 'http://127.0.0.1:8899', stateDir: '/state/tunnel',
       resolveBinary: async () => binary, fetchImpl, spawnNamed,
     })

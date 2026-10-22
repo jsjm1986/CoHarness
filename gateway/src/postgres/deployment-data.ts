@@ -153,6 +153,7 @@ export async function collectDeploymentData(context: PostgresRuntimeContext, cfg
   const roots: ManagedDataPath[] = [
     { owner: 'gateway-principal', kind: 'directory', path: cfg.principalKeyDir },
     { owner: 'gateway-runtime-credentials', kind: 'directory', path: cfg.runtimeCredentialDir },
+    { owner: 'gateway-tunnel-credentials', kind: 'file', path: cfg.tunnelCredentialKeyFile },
     { owner: 'gateway-node-configuration', kind: 'file', path: cfg.nodeConfigFile },
     ...(cfg.databaseUrlFile === undefined ? [] : [{ owner: 'gateway-database-connection', kind: 'file' as const, path: cfg.databaseUrlFile }]),
     ...[cfg.organizationModelCredentialKeyFile, cfg.webhookSecretKeyFile, cfg.bootstrapAdminPasswordFile,
@@ -211,7 +212,7 @@ export async function planDeploymentDataRelocation(context: PostgresRuntimeConte
       throw new MaintenanceError(409, 'systemd-user-home-relocation-requires-coordinated-data-migration')
     }
   }
-  const keys = ['principalKeyDir', 'runtimeCredentialDir', 'organizationModelCredentialKeyFile', 'webhookSecretKeyFile'] as const
+  const keys = ['principalKeyDir', 'runtimeCredentialDir', 'organizationModelCredentialKeyFile', 'webhookSecretKeyFile', 'tunnelCredentialKeyFile'] as const
   const controlMoves = (await Promise.all(keys.filter(key => current[key] !== next[key]).map(async key => {
     const kind = key.endsWith('Dir') ? 'directory' : 'file'
     const from = (await normalizeManagedRoots([{ owner: 'gateway', kind, path: resolve(current[key]) }]))[0]!.path
