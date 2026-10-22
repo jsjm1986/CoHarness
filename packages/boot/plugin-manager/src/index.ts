@@ -279,22 +279,22 @@ export class PluginManager extends TypertRemoteService {
   }
 
   /** Check deployment authority independently of tool approval or sandbox mode.
-   * @param capability - 'read' permits every caller that reached the service;
-   * 'manage' enforces the deployment's authorization provider.
+   * @param capability - the deployment's authorization provider gates both
+   * 'read' and 'manage'; without a provider, reads stay open unless the
+   * profile requires authorization.
    * @returns After the current caller is permitted the operation.
    */
   async authorize(capability: PluginManagementCapability = 'manage'): Promise<void> {
     this.abort.signal.throwIfAborted()
-    if (capability === 'read') return
     const policy = this.ownerContext.get('pluginManagementAuthorization')
-    if (policy !== undefined) await policy.authorize('manage')
-    else if (this.authorizationRequired) {
+    if (policy !== undefined) await policy.authorize(capability)
+    else if (this.authorizationRequired && capability !== 'read') {
       throw new RemoteError('plugin-management/forbidden', 'Profile management authorization is unavailable.', {})
     }
   }
 
   /** Report whether the caller may change the profile, for interfaces gating controls on it.
-   * @returns `manage` after probing the deployment policy; read access is unconditional.
+   * @returns `manage` after probing the deployment policy.
    */
   @Remote
   async access(): Promise<PluginManagementAccess> {

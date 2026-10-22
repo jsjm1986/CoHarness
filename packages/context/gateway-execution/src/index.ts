@@ -117,8 +117,9 @@ export class GatewayExecution extends ExecutionAuthority {
     }, this.lifetime.signal)
     ctx.provide('pluginManagementAuthorization', {
       protectedModules: policy.protectedModules,
-      authorize: async (capability = 'manage') => {
-        if (capability === 'read') return
+      // The deployment policy gates reads and writes alike: an unqualified
+      // account must not even enumerate the managed profile.
+      authorize: async () => {
         const agent = ctx.agents.currentInitiator()
         if (agent === undefined) await policy.authorize()
         else await this.authorize('plugin-management', agent)
