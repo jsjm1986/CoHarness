@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Title from all messages",
+    "description": "Generates the session title from all user messages via the model."
+  }
+}

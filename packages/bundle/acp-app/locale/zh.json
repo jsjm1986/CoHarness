@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "ACP 应用包",
+    "description": "dsh ACP 配置包：仅自动化的 JSON-RPC stdio 与进程生命周期。"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "JSON-RPC server",
+    "description": "Stdio JSON-RPC server plugin for out-of-process SDK clients."
+  }
+}

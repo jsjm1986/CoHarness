@@ -1242,6 +1242,11 @@ export function pluginManagementInvoke(input: unknown, signal: AbortSignal): Pro
 export interface PluginDesiredEntry { id: string; name?: string; disabled: boolean }
 /** The deployment's saved plugin composition for one runtime owner. */
 export interface PluginDesiredState { entries: PluginDesiredEntry[]; bundles: string[] }
+/** Localized display text resolved for state rows whose instance cannot answer live. */
+export interface PluginStateMeta {
+  title?: { en: string } & Record<string, string>
+  description?: { en: string } & Record<string, string>
+}
 /** The store row, the instance's applied marker, and the files' observed composition. */
 export interface PluginManagementState {
   revision: string
@@ -1249,6 +1254,8 @@ export interface PluginManagementState {
   appliedRevision: string
   generation: number | null
   observed: PluginDesiredState | null
+  /** Display metadata keyed by state-row id and bundle name. */
+  meta?: { entries: Record<string, PluginStateMeta>; bundles: Record<string, PluginStateMeta> }
 }
 export function pluginManagementState(kind: 'user' | 'project', id: number, signal?: AbortSignal): Promise<PluginManagementState> {
   return request(`/admin/api/plugins/state?kind=${kind}&id=${String(id)}`, { signal })

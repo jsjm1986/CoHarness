@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SDK minimal",
+    "description": "The minimal standalone SDK bundle: JSON-RPC, one model adapter, persistent shell, JSONL sessions."
+  }
+}

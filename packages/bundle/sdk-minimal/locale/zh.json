@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SDK 最小包",
+    "description": "最小独立 SDK 包：JSON-RPC、单个模型适配器、持久终端、JSONL 会话。"
+  }
+}

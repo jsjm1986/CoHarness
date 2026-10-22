@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "工作区依赖工具",
+    "description": "load_workspace_dependencies 工具：提供内置 Python、Node.js 与 pnpm 的绝对路径。"
+  }
+}

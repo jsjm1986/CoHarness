@@ -142,10 +142,14 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
       })
     }
     for (const entry of view?.observed?.entries ?? []) {
-      put(entry.id, { moduleName: entry.name, observed: entryChoice(entry) })
+      const meta = view?.meta?.entries[entry.id]
+      put(entry.id, { moduleName: entry.name, observed: entryChoice(entry),
+        ...(meta?.title === undefined ? {} : { title: resolveLocalized(meta.title, language) }) })
     }
     for (const entry of draft?.entries ?? view?.state?.entries ?? []) {
-      put(entry.id, { moduleName: entry.name, desired: entryChoice(entry) })
+      const meta = view?.meta?.entries[entry.id]
+      put(entry.id, { moduleName: entry.name, desired: entryChoice(entry),
+        ...(meta?.title === undefined ? {} : { title: resolveLocalized(meta.title, language) }) })
     }
     // With nothing saved, the startup column mirrors the current composition so the administrator edits a visible baseline.
     if (draft === null && (view === null || view.state === null)) {
@@ -169,9 +173,15 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
         observed: bundle.enabled,
       })
     }
-    for (const name of view?.observed?.bundles ?? []) put(name, { observed: true })
+    for (const name of view?.observed?.bundles ?? []) {
+      const meta = view?.meta?.bundles[name]
+      put(name, { observed: true, ...(meta?.title === undefined ? {} : { title: resolveLocalized(meta.title, language) }) })
+    }
     const desiredSet = draft?.bundles ?? view?.state?.bundles ?? view?.observed?.bundles
-    for (const name of desiredSet ?? []) put(name, { desired: true })
+    for (const name of desiredSet ?? []) {
+      const meta = view?.meta?.bundles[name]
+      put(name, { desired: true, ...(meta?.title === undefined ? {} : { title: resolveLocalized(meta.title, language) }) })
+    }
     return [...names.values()].sort((a, b) => (a.title ?? a.name).localeCompare(b.title ?? b.name))
   }, [bundles, view, draft, language])
 

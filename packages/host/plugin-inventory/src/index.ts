@@ -86,7 +86,12 @@ export async function readPluginInventory(ctx: Context): Promise<PluginInventory
   for (const entry of ctx.loader.entries()) {
     if (entry.options.group) continue
     const base = entry.parent.tree.ctx.baseUrl
-    const meta = base === undefined ? undefined : packages?.metaOf(entry.options.name, base)
+    let meta = base === undefined ? undefined : packages?.metaOf(entry.options.name, base)
+    // The root `cordis:include` entry is the included composition itself, not a
+    // package, so package metadata cannot resolve; give the row its own title.
+    if (meta === undefined && entry.options.name === 'cordis:include') {
+      meta = { title: { en: 'Composition include', zh: '组合包含' } }
+    }
     entries.push({
       entryId: pluginEntryId(entry.id),
       moduleName: entry.options.name,

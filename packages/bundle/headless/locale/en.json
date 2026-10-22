@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Headless",
+    "description": "One-shot dsh runner over dsh-base with no Host, HTTP, or browser layer."
+  }
+}

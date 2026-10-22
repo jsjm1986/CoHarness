@@ -18,7 +18,7 @@ The Windows coverage run (run 34324325375, job 102377982193) reports an SDK subp
 
 ## Decision
 
-The `apps/web/tests/github-ready-review.e2e.ts` observes the model request caused by delivery before checking Session registration. The [feedback test](../../../../apps/web/tests/feedback-command.e2e.ts) waits for the empty composer and enabled attachment control before comparing ARIA output. Matching consecutive snapshots cannot prove that the command RPC has settled: its event stream can publish the acknowledgement first.
+The `apps/web/tests/github-ready-review.e2e.ts` observes the model request caused by delivery before checking Session registration. The feedback test waits for the empty composer and enabled attachment control before comparing ARIA output. Matching consecutive snapshots cannot prove that the command RPC has settled: its event stream can publish the acknowledgement first.
 
 The `apps/desktop/tests/project-manager.spec.ts` gives the worker readiness marker the active test's execution budget. Its independent `afterEach` releases and awaits workers before deleting private roots, including when the runner abandons a timed-out test body. The poll observes runner cancellation, and teardown reports transaction failures independently from assertion failures. The [PowerShell tests](../../../../packages/shell/pwsh-local/tests/executor.spec.ts) register each helper-created Context before plugin initialization and dispose those Contexts before deleting temporary directories. The background-input case awaits process completion before checking complete output, completed status, and exit code. Consuming reads remain covered by their separate streaming tests.
 

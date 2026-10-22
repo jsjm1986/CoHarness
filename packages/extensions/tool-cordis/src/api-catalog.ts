@@ -1865,7 +1865,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'authorize(capability?: PluginManagementCapability): Promise<void>',
         description: 'Recheck the current caller before profile reads or writes.',
-        parameters: [{ name: 'capability', description: '\'read\' permits any runtime principal; \'manage\' enforces the deployment\'s policy.' }],
+        parameters: [{ name: 'capability', description: 'the deployment\'s policy gates both \'read\' and \'manage\'; an unqualified account sees nothing.' }],
         returns: 'After the deployment permits the operation; rejects without permission.',
       },
       {
@@ -1890,14 +1890,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'async authorize(capability: PluginManagementCapability = \'manage\'): Promise<void>',
         description: 'Check deployment authority independently of tool approval or sandbox mode.',
-        parameters: [{ name: 'capability', description: '\'read\' permits every caller that reached the service; \'manage\' enforces the deployment\'s authorization provider.' }],
+        parameters: [{ name: 'capability', description: 'the deployment\'s authorization provider gates both \'read\' and \'manage\'; without a provider, reads stay open unless the profile requires authorization.' }],
         returns: 'After the current caller is permitted the operation.',
       },
       {
         signature: '@Remote async access(): Promise<PluginManagementAccess>',
         description: 'Report whether the caller may change the profile, for interfaces gating controls on it.',
         parameters: [],
-        returns: '`manage` after probing the deployment policy; read access is unconditional.',
+        returns: '`manage` after probing the deployment policy.',
       },
       {
         signature: '@Remote async listVersionExemptions(): Promise<{ exemptions: Record<string, string[]>; warnings: string[] }>',

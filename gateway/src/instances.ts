@@ -653,6 +653,11 @@ export class InstanceManager {
     try {
       copyFileSync(manifest, join(stagingDir, 'package.json'))
       cpSync(lib, join(stagingDir, 'lib'), { recursive: true, dereference: true })
+      // Display metadata resolves through the materialized copy, so the locale
+      // dictionaries ship beside lib; without them the plugin list falls back
+      // to the raw manifest name and description.
+      const localeDir = join(sourceDir, 'locale')
+      if (existsSync(localeDir)) cpSync(localeDir, join(stagingDir, 'locale'), { recursive: true, dereference: true })
       const bundlePatch = join(sourceDir, 'cordis.patch.yml')
       const copiedPatches = new Set(existsSync(bundlePatch) ? [bundlePatch, ...patchFiles] : patchFiles)
       const adminPatch = join(sourceDir, ADMIN_GUARD_PATCH_FILENAME)

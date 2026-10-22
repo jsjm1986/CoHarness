@@ -1,10 +1,12 @@
 /** Administrator-only forwarding to the exact current-node profile generation. */
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import type { UserRow } from './auth.ts'
 import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
-import { parseDesiredState, PluginStateError, type PluginDesiredState } from './plugin-state.ts'
+import { INSTANCE_PROFILE, parseDesiredState, PluginStateError, type PluginDesiredState } from './plugin-state.ts'
+import { PluginStateMetaResolver, type PluginStateMetaIndex } from './plugin-meta.ts'
 import type { GatewayDeps } from './server.ts'
 
 const targetSchema = z.object({ kind: z.enum(['user', 'project']), id: z.number().int().positive() }).strict()
@@ -30,6 +32,8 @@ export interface PluginManagementState {
   appliedRevision: string
   generation: number | null
   observed: PluginDesiredState | null
+  /** Display metadata keyed by state-row id and bundle name; absent rows have none. */
+  meta?: PluginStateMetaIndex
 }
 export class PluginManagementError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 502 | 503, message: string) { super(message) }
@@ -47,8 +51,19 @@ export class GatewayPluginManagement {
   private probePending: Promise<string | null> | undefined
   private probeCached: { registry: string | null; expiresAt: number } | undefined
 
+  private readonly meta: PluginStateMetaResolver
+
   constructor(private readonly deps: Pick<GatewayDeps, 'users' | 'projects' | 'instances' | 'cfg' | 'pluginState'>,
-    private readonly signer: GatewayPrincipalSigner, private readonly nodeId: string) {}
+    private readonly signer: GatewayPrincipalSigner, private readonly nodeId: string) {
+    // The release layout keeps workspace packages beside gateway/; a stubbed
+    // config still resolves them from this module's own location.
+    const anchor = this.deps.cfg.modelGovernancePackage
+    const releaseRoot = anchor === undefined
+      ? dirname(dirname(dirname(fileURLToPath(import.meta.url))))
+      : dirname(dirname(anchor))
+    this.meta = new PluginStateMetaResolver(
+      ['packages', 'plugins', 'vendor'].map(dir => join(releaseRoot, dir)))
+  }
 
   /**
    * Race the public registry pings; the manager dialog uses the winner to preselect a mirror
@@ -123,11 +138,27 @@ export class GatewayPluginManagement {
     await this.authorize(admin, parsed.data)
     const store = this.deps.pluginState
     if (store === undefined) throw new PluginManagementError(503, 'plugin state store unavailable')
+    const dshHome = await this.dshHomeFor(parsed.data)
     const [saved, appliedRevision, observed] = await Promise.all([
-      store.get(parsed.data), store.applied(parsed.data), store.observed(await this.dshHomeFor(parsed.data)),
+      store.get(parsed.data), store.applied(parsed.data), store.observed(dshHome),
     ])
     const generation = await this.deps.instances.isLive(parsed.data) ? await this.deps.instances.generationOf(parsed.data) : null
-    return { revision: saved.revision, state: saved.state, appliedRevision, generation, observed }
+    const profileDir = join(dshHome, 'profiles', INSTANCE_PROFILE)
+    const meta: PluginStateMetaIndex = { entries: {}, bundles: {} }
+    for (const entry of [...saved.state?.entries ?? [], ...observed?.entries ?? []]) {
+      if (meta.entries[entry.id] === undefined) {
+        const resolved = this.meta.metaOf(entry.name, profileDir)
+        if (resolved !== undefined) meta.entries[entry.id] = resolved
+      }
+    }
+    for (const name of [...saved.state?.bundles ?? [], ...observed?.bundles ?? []]) {
+      if (meta.bundles[name] === undefined) {
+        const resolved = this.meta.metaOf(name, profileDir)
+        if (resolved !== undefined) meta.bundles[name] = resolved
+      }
+    }
+    return { revision: saved.revision, state: saved.state, appliedRevision, generation, observed,
+      ...(Object.keys(meta.entries).length === 0 && Object.keys(meta.bundles).length === 0 ? {} : { meta }) }
   }
 
   /**

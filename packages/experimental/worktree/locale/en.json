@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Worktree",
+    "description": "Creates a named Git worktree and changes the calling Session working directory."
+  }
+}
