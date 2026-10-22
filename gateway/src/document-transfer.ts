@@ -1985,11 +1985,12 @@ export function createGatewayDocumentScopeHandler(
       if (operation === 'content' && response.ok) {
         const mediaType = (response.headers.get('content-type') ?? '').split(';', 1)[0] ?? ''
         const inline = incoming.searchParams.get('inline') === '1' && inlinePreviewMedia(mediaType)
+        const frameAncestors = inline && mediaType === 'application/pdf' ? "'self'" : "'none'"
         const contentDisposition = response.headers.get('content-disposition')
         const outputHeaders = new Headers(response.headers)
         outputHeaders.set('cache-control', 'private, no-store')
         outputHeaders.set('x-content-type-options', 'nosniff')
-        outputHeaders.set('content-security-policy', "default-src 'none'; img-src 'self' data:; frame-ancestors 'none'; sandbox")
+        outputHeaders.set('content-security-policy', `default-src 'none'; img-src 'self' data:; frame-ancestors ${frameAncestors}; sandbox`)
         if (inline) outputHeaders.set('content-disposition', 'inline')
         else if (contentDisposition === null) outputHeaders.set('content-disposition', 'attachment')
         handedOff = true

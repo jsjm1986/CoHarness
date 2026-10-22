@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/userdoc-http/README.md
 document:
-  en: 0093f9aa0a899e0bfc32264db957109593d41e82
-  zh: ad6034a660d59e808bd56059bc2661a47dc9d81b
+  en: 5a1987e81aad616765f432b6f8d7ad88c62e1a45
+  zh: cef1d2e4a016f3ed82d30a878b2c5c085656bd04
 /:
   en: 850dbb491603744d
   zh: 61495d48365178df
@@ -24,8 +24,8 @@ document:
   en: 47f982e326fe77fd
   zh: 10b529588772b11d
 /deepseek-ai-dsh-host-userdoc-http/known-limitations-and-deferred-work:
-  en: 04b887dca785f7cf
-  zh: 0eb9838d0eea44c6
+  en: 5f6f4e112d3cc391
+  zh: e5c970df828fd1f1
 /deepseek-ai-dsh-host-userdoc-http/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-native-document-pdf-framing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-native-document-pdf-framing.md
+document:
+  en: 3d02c9976932844bc6f33d2f117db464eed24dcc
+  zh: 24ba31df9b2faf9c5cc7483d11facdc9582da97f
+/agent-note-same-origin-native-document-pdf-framing:
+  en: 252d9e03505766aa
+  zh: 268cbb16f56e3004
+/agent-note-same-origin-native-document-pdf-framing/problem:
+  en: 420bdbac156ba854
+  zh: 41f05b16804bab0e
+/agent-note-same-origin-native-document-pdf-framing/decision:
+  en: ed90b6588910eff7
+  zh: 94be33f1faec9f56
+/agent-note-same-origin-native-document-pdf-framing/alternatives-considered:
+  en: f8657f2919e5365d
+  zh: 018d980712a8b5cb
+/agent-note-same-origin-native-document-pdf-framing/verification:
+  en: acb719815c057373
+  zh: 9d5602feb67f7a24
+/agent-note-same-origin-native-document-pdf-framing/consequences:
+  en: 8ca5a45619826b73
+  zh: c75049c1c7b39120

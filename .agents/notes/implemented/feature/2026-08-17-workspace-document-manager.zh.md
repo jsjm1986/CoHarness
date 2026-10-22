@@ -19,7 +19,7 @@ Status: implemented
 - **包结构**：`packages/client/ui-documents/` 仿照 `ui-collaboration`：`client/` 子入口承载纯浏览器插件代码，`tsdown.config.ts` 打包客户端 bundle，组件位于 `src/client/`。
 - **入口**：`sidebar.footer.action` 插槽，与 `ui-collaboration` 的工作区切换按钮并列。按钮使用 `IconBrowseOutline16` 和工具提示；展开侧边栏时显示「文档」文字。
 - **弹窗**：960px 的 `Modal`（小于 768px 时为全宽底部抽屉），限额放在 `description`，提供文件夹面包屑和目录行、当前文件夹上传，以及创建、重命名、移动和空文件夹删除流程。搜索、类型、排序、分页和批量删除见[文档管理器筛选、分页与批量删除](2026-08-19-document-manager-filter-pages-batch.zh.md)。紧凑布局把文档操作换到名称下方，并保持 44px 热区。
-- **预览**：按媒体类型路由 —— 图片用 `<img>`，PDF 用 `<iframe>`，文本类文件 fetch 后用 `<pre>` 渲染（上限 256 KiB），其他类型回退到下载提示；预览弹窗与管理器同宽。
+- **预览**：按媒体类型路由 —— 图片用 `<img>`，PDF 用 `<iframe>`，文本类文件 fetch 后用 `<pre>` 渲染（上限 256 KiB），其他类型回退到下载提示；预览弹窗与管理器同宽。 [原生 PDF 嵌入决策](../bug-fix/2026-10-23-native-document-pdf-framing.zh.md)拥有已认证 PDF 的响应策略。
 - **删除**：二次确认带会话历史引用警告；项目标题与全员影响说明来自 fail-open 的 `GET /account/api/context`。
 - **文案**：通过 `locales.ts` 提供中英双语。
 - **HTTP 客户端**：本包自带一份 `/api/documents` 客户端。客户端 bundle 纯度门禁禁止从 `ui-conversation` 做值导入，因此管理器不重导出对话包的客户端。

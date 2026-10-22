@@ -161,6 +161,67 @@ function responseForTargetChunk(): Response {
 }
 
 describe('Gateway document transfer broker', () => {
+  it.each([
+    ['application/pdf', true, "'self'", 'inline'],
+    ['application/pdf; charset=binary', true, "'self'", 'inline'],
+    ['application/pdf', false, "'none'", 'attachment'],
+    ['text/html', true, "'none'", 'inline'],
+    ['image/svg+xml', true, "'none'", 'inline'],
+    ['text/plain', true, "'none'", 'inline'],
+    ['application/pdfx', true, "'none'", 'attachment'],
+    ['application/octet-stream', true, "'none'", 'attachment'],
+  ] as const)('keeps type-specific scope framing for %s with inline=%s', async (mediaType, inline, ancestors, disposition) => {
+    const runtime = fixture()
+    const operationRef = vi.fn(async () => {})
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('bytes', { headers: {
+      'content-type': mediaType,
+      'content-length': '5',
+      'content-disposition': 'attachment',
+      'content-security-policy': "frame-ancestors 'none'",
+    } })))
+    const handler = createGatewayDocumentScopeHandler({
+      ...runtime.dependencies,
+      instances: { ensureRunning: runtime.ensureRunning, operationRef },
+    })
+    const request = Object.assign(Readable.from([]), {
+      method: 'GET', headers: {},
+      url: `/api/documents/scope/content?scope=project%3A41&id=preview.pdf${inline ? '&inline=1' : ''}`,
+    })
+    const response = await handler({
+      user: USER, request: request as never, pathname: '/api/documents/scope/content',
+      operation: 'content', scope: { kind: 'project', projectId: 41 }, signal: new AbortController().signal,
+    })
+    expect(response?.headers.get('content-security-policy')).toBe(
+      `default-src 'none'; img-src 'self' data:; frame-ancestors ${ancestors}; sandbox`,
+    )
+    expect(response?.headers.get('content-disposition')).toBe(disposition)
+    expect(response?.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(response?.headers.get('cache-control')).toBe('private, no-store')
+    expect(response?.headers.get('content-type')).toBe(mediaType)
+    expect(response?.headers.get('content-length')).toBe('5')
+    expect(await response?.text()).toBe('bytes')
+    expect(operationRef.mock.calls).toEqual([
+      [{ kind: 'project', id: 41 }, 1, 2], [{ kind: 'project', id: 41 }, -1, 2],
+    ])
+  })
+
+  it('refuses inline PDF content before forwarding for a non-member project', async () => {
+    const runtime = fixture()
+    runtime.projectForUser.mockResolvedValueOnce(null)
+    const send = vi.fn()
+    vi.stubGlobal('fetch', send)
+    const handler = createGatewayDocumentScopeHandler(runtime.dependencies)
+    const request = Object.assign(Readable.from([]), {
+      method: 'GET', headers: {}, url: '/api/documents/scope/content?id=preview.pdf&inline=1',
+    })
+    await expect(handler({
+      user: USER, request: request as never, pathname: '/api/documents/scope/content',
+      operation: 'content', scope: { kind: 'project', projectId: 41 }, signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: 'COLLABORATION_FORBIDDEN', status: 403 })
+    expect(send).not.toHaveBeenCalled()
+    expect(runtime.ensureRunning).not.toHaveBeenCalled()
+  })
+
   it('times out stalled scope metadata and releases its runtime lease', async () => {
     const runtime = fixture()
     const operationRef = vi.fn(async () => {})

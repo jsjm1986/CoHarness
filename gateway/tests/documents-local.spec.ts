@@ -119,9 +119,9 @@ async function uploadDocument(
 }
 
 describe('Gateway local document broker', () => {
-  const cleanups: Array<() => void> = []
-  afterEach(() => {
-    for (const cleanup of cleanups.splice(0)) cleanup()
+  const cleanups: Array<() => void | Promise<void>> = []
+  afterEach(async () => {
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
   })
 
   function fixture(options: { generationError?: Error; catalog?: boolean } = {}) {
@@ -174,7 +174,7 @@ describe('Gateway local document broker', () => {
     const user = { ...USER, homePath }
     const other = { ...OTHER, homePath: otherHome }
     const admin = { ...ADMIN, homePath: join(root, 'home', 'root') }
-    cleanups.push(() => { void broker.dispose() })
+    cleanups.push(() => broker.dispose())
     return { broker, catalog, generationOf, root, homePath, projectPath, readOnlyPath, user, other, admin }
   }
 
@@ -209,13 +209,17 @@ describe('Gateway local document broker', () => {
     expect(JSON.stringify(body)).not.toContain('/home/lin')
   })
 
-  it('streams document content into the live response with download headers', async () => {
-    const { broker, user } = fixture()
+  it.each([
+    ['data.bin', false], ['preview.pdf', false], ['preview.pdf', true],
+    ['preview.html', true], ['preview.svg', true], ['preview.txt', true],
+  ] as const)('streams %s with inline=%s under the authenticated local document owner', async (name, inline) => {
+    const { broker, user, other } = fixture()
+    let actor = user
     const bytes = Buffer.from('streamed bytes')
-    const uploaded = await uploadDocument(broker, user, { kind: 'personal' }, 'data.bin', bytes)
+    const uploaded = await uploadDocument(broker, user, { kind: 'personal' }, name, bytes)
     const server = createServer((req, res) => {
       void broker.serveScope({
-        user,
+        user: actor,
         request: req,
         response: res,
         operation: 'content',
@@ -230,15 +234,24 @@ describe('Gateway local document broker', () => {
         }
       })
     })
-    cleanups.push(() => { server.close() })
+    cleanups.push(() => new Promise<void>((done) => { server.close(() => { done() }) }))
     await new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve) })
     const port = (server.address() as { port: number }).port
-    const response = await fetch(`http://127.0.0.1:${String(port)}/api/documents/scope/content?id=${encodeURIComponent(uploaded.docId)}&scope=personal`)
+    const address = `http://127.0.0.1:${String(port)}/api/documents/scope/content?id=${encodeURIComponent(uploaded.docId)}&scope=personal${inline ? '&inline=1' : ''}`
+    const response = await fetch(address)
+    const received = Buffer.from(await response.arrayBuffer())
     expect(response.status).toBe(200)
-    expect(response.headers.get('content-disposition')).toContain('attachment')
+    expect(response.headers.get('content-disposition')).toContain(inline ? 'inline' : 'attachment')
+    expect(response.headers.get('content-security-policy')).toBe(!inline ? null
+      : name === 'preview.pdf' ? "default-src 'none'; img-src 'self' data:; frame-ancestors 'self'; sandbox"
+        : "default-src 'none'; img-src 'self' data:; frame-ancestors 'none'; sandbox")
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(response.headers.get('cache-control')).toContain('no-store')
-    expect(Buffer.from(await response.arrayBuffer())).toEqual(bytes)
+    expect(received).toEqual(bytes)
+    actor = other
+    const anotherAccount = await fetch(address)
+    expect(anotherAccount.status).toBe(404)
+    expect(await anotherAccount.text()).not.toContain('streamed bytes')
   })
 
   it('rejects a read-only project member from write operations before any filesystem work', async () => {
