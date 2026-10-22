@@ -1244,8 +1244,8 @@ export interface PluginDesiredEntry { id: string; name?: string; disabled: boole
 export interface PluginDesiredState { entries: PluginDesiredEntry[]; bundles: string[] }
 /** Localized display text resolved for state rows whose instance cannot answer live. */
 export interface PluginStateMeta {
-  title?: { en: string } & Record<string, string>
-  description?: { en: string } & Record<string, string>
+  title?: string | ({ en: string } & Record<string, string>)
+  description?: string | ({ en: string } & Record<string, string>)
 }
 /** The store row, the instance's applied marker, and the files' observed composition. */
 export interface PluginManagementState {

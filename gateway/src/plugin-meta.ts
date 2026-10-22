@@ -7,8 +7,8 @@ export type PluginStateText = { en: string } & Record<string, string>
 
 /** Localized plugin display text for one state row, keyed by language id. */
 export interface PluginStateMeta {
-  title?: PluginStateText
-  description?: PluginStateText
+  title?: PluginStateText | string
+  description?: PluginStateText | string
 }
 
 /** Per-row display metadata attached to the `plugins/state` response. */
@@ -22,6 +22,22 @@ function barePackageName(specifier: string): string | undefined {
   const parts = specifier.split('/')
   if (specifier.startsWith('@')) return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : undefined
   return parts[0] === '' ? undefined : parts[0]
+}
+
+/** Manifest name/description fallback, mirroring `readPluginMeta`'s unlocalized package form. */
+function manifestMeta(dir: string): PluginStateMeta | undefined {
+  try {
+    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
+      name?: unknown
+      description?: unknown
+    }
+    const title = typeof manifest.name === 'string' ? manifest.name : undefined
+    const description = typeof manifest.description === 'string' ? manifest.description : undefined
+    if (title === undefined && description === undefined) return undefined
+    return { title, description }
+  } catch {
+    return undefined
+  }
 }
 
 function localeMeta(dir: string): PluginStateMeta | undefined {
@@ -110,10 +126,12 @@ export class PluginStateMetaResolver {
     if (existsSync(installed)) {
       const meta = localeMeta(installed)
       if (meta !== undefined) return meta
+      const fallback = manifestMeta(installed)
+      if (fallback !== undefined) return fallback
     }
     this.workspaceIndex ??= this.buildIndex()
     const dir = this.workspaceIndex.get(name)
-    return dir === undefined ? undefined : localeMeta(dir)
+    return dir === undefined ? undefined : localeMeta(dir) ?? manifestMeta(dir)
   }
 
   private buildIndex(): Map<string, string> {
