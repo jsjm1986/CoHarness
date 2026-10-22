@@ -36,4 +36,15 @@ export function apply(ctx: Context): void {
     }),
   }, { surfaceOp: 'append' })
   ctx.effect(() => ctx.sessions.enter(source))
+
+  let readabilityChecks = 0
+  const revokeDuringPreparation = process.env.DSH_SNAPSHOT_REVOKE_SESSION_REFERENCE === '1'
+  ctx.provide('collaboration', {
+    capture: () => ({
+      readableSessionIds: (ids: readonly SessionId[]) => {
+        readabilityChecks += 1
+        return Promise.resolve(revokeDuringPreparation && readabilityChecks > 1 ? new Set() : new Set(ids))
+      },
+    }),
+  } as never)
 }

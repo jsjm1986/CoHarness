@@ -1,0 +1,8 @@
+{"type":"session","version":7,"id":"{{session:1}}","createdAt":1792689425642,"cwd":"{{cwd}}","isSeeded":false,"delegationDepth":0}
+{"type":"permission/preset","data":{"preset":"danger-full-access","origin":"default"}}
+{"type":"sandbox/mode","data":{"mode":"danger-full-access"}}
+{"type":"approval/policy","data":{"policy":"never"}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Use @[Research](dsh-session:InJlZmVyZW5jZS1zb3VyY2Ui) as background, then reply DONE."}],"source":{"kind":"user"},"role":"user","id":"{{message:1}}"}]}}
+{"type":"turn/start","data":{"turn":1}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
+{"type":"turn/end","data":{"turn":1,"reason":{"kind":"error","error":{"message":"one or more referenced sessions are not readable","code":"UNKNOWN"}}}}

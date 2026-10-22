@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-session-reference-acl-revocation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-session-reference-acl-revocation.md
+document:
+  en: 14de29b9253f12985bec8d3b5996bd2e718be6b5
+  zh: 5cd6c68bbdbe64bf32719e1e87cdab19dfdfe57b
+/agent-note-recheck-session-reference-access-before-publication:
+  en: 735835c5788b8bd4
+  zh: be12052534871425
+/agent-note-recheck-session-reference-access-before-publication/problem:
+  en: 68cfd305a8896c1f
+  zh: a178a540eadc0594
+/agent-note-recheck-session-reference-access-before-publication/decision:
+  en: 3538d2c730db34ea
+  zh: b0d031e2c08b4398
+/agent-note-recheck-session-reference-access-before-publication/alternatives-considered:
+  en: 277cfef49d9a9f08
+  zh: 5a73c6882f0ff4cb
+/agent-note-recheck-session-reference-access-before-publication/consequences:
+  en: 44f25e5fa7e72f08
+  zh: b181a6faddfb0a5f
+/agent-note-recheck-session-reference-access-before-publication/verification:
+  en: ef882d059e5fc3cd
+  zh: 8dd429c3360e5a8d
