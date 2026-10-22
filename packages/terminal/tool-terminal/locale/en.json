@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Terminal tools",
+    "description": "Six model-facing persistent PTY tools with owner isolation"
+  }
+}

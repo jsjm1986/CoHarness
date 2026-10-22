@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "开发环境上下文",
+    "description": "为开发会话向模型提示 DeepSeek Harness 检出目录与 Web GUI 地址。"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Archive sync",
+    "description": "Synchronizes runtime conversation archive state with the Gateway"
+  }
+}

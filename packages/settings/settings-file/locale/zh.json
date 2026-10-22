@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "文件设置存储",
+    "description": "基于 settings.yaml 文件的设置提供方。"
+  }
+}
