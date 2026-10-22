@@ -15,11 +15,14 @@ import { ProjectService } from '../src/projects.ts'
 import type { GatewayCollaborationService } from '../src/services.ts'
 import { createGatewayServer, type GatewayDeps, type GatewayHandlers } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
+import { GatewayPerformanceObserver } from '../src/performance-observer.ts'
+import { RuntimeCapacityError } from '../src/runtime-capacity.ts'
+import { PostgresCheckoutQueueFullError } from '../src/postgres/database.ts'
 
 let closer: (() => Promise<void>) | undefined
 afterEach(async () => { await closer?.() })
 
-async function setup(env: NodeJS.ProcessEnv = {}, handlers: GatewayHandlers = {}) {
+async function setup(env: NodeJS.ProcessEnv = {}, handlers: GatewayHandlers = {}, performance?: GatewayPerformanceObserver) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
   const cfg = testConfig(root, {
@@ -35,6 +38,7 @@ async function setup(env: NodeJS.ProcessEnv = {}, handlers: GatewayHandlers = {}
     projects: new ProjectService(db, cfg),
     audit: new AuditService(db),
     instances: new InstanceManager(db, cfg),
+    ...(performance === undefined ? {} : { performance }),
   }
   const admin = await deps.users.create({ username: 'root-admin', password: 'pw-12345678', role: 'admin' })
   await deps.users.changeOwnPassword(admin.id, 'pw-12345678')
@@ -108,6 +112,109 @@ const emptyUsageSummary: UsageSummary = {
 }
 
 describe('gateway server', () => {
+  it('restricts cumulative performance diagnostics to administrators without retaining request identifiers', async () => {
+    const { base, deps } = await setup()
+    deps.databasePerformance = () => ({ total: 4, idle: 2, waiting: 1, maximum: 10 })
+    expect((await fetch(base + '/admin/api/performance')).status).toBe(401)
+    await deps.users.create({ username: 'performance-reader', password: 'pw-12345678', role: 'user' })
+    const reader = await deps.users.getByUsername('performance-reader')
+    await deps.users.changeOwnPassword(reader!.id, 'pw-12345678')
+    const readerCookie = await login(base, 'performance-reader', 'pw-12345678')
+    expect((await fetch(base + '/admin/api/performance', { headers: { cookie: readerCookie } })).status).toBe(403)
+    const adminCookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(base + '/admin/api/performance?private-label=must-not-be-retained', { headers: { cookie: adminCookie } })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    const body = await response.text()
+    const snapshot = JSON.parse(body)
+    expect(snapshot).toMatchObject({
+      schemaVersion: 1, enabled: true, disposed: false,
+      measurement: { kind: 'cumulative' },
+      databasePool: { total: 4, idle: 2, waiting: 1, maximum: 10 },
+    })
+    expect(snapshot.requests.started).toBeGreaterThanOrEqual(5)
+    expect(snapshot.requests.inflight).toBe(1)
+    expect(snapshot.operationClasses.http.durationMs.percentileMethod).toBe('bucket-upper-bound')
+    expect(snapshot.memory.rss).toBeGreaterThan(0)
+    expect(body).not.toContain('must-not-be-retained')
+    expect(body).not.toContain('performance-reader')
+    const mutation = await fetch(base + '/admin/api/performance', { method: 'POST', headers: { cookie: adminCookie, origin: base } })
+    expect(mutation.status).toBe(405)
+    expect(mutation.headers.get('allow')).toBe('GET')
+  })
+
+  it('reports disabled observation explicitly', async () => {
+    const { base } = await setup({ HGW_PERFORMANCE_ENABLED: 'false' })
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(base + '/admin/api/performance', { headers: { cookie } })
+    expect(await response.json()).toMatchObject({ enabled: false, requests: { started: 0, completed: 0 } })
+  })
+
+  it('retains response occupancy after its handler returns and preserves caller ownership of a shared observer', async () => {
+    const observer = new GatewayPerformanceObserver({ enabled: true, eventLoopResolutionMs: 20 })
+    let publishResponse!: (response: import('node:http').ServerResponse) => void
+    const pending = new Promise<import('node:http').ServerResponse>(resolve => { publishResponse = resolve })
+    const { base } = await setup({}, {
+      proxy: async (_req, res) => {
+        res.writeHead(200)
+        res.flushHeaders()
+        publishResponse(res)
+      },
+    }, observer)
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const request = fetch(base + '/api/performance-stream', { headers: { cookie } })
+    const response = await pending
+    expect(observer.snapshot(null).requests.inflight).toBe(1)
+    response.end('complete')
+    expect(await (await request).text()).toBe('complete')
+    expect(observer.snapshot(null).requests.inflight).toBe(0)
+    await closer?.()
+    closer = undefined
+    expect(observer.snapshot(null).disposed).toBe(false)
+    observer.dispose()
+    expect(observer.snapshot(null).disposed).toBe(true)
+  })
+
+  it('returns an explicit retryable capacity response when a new Runtime cannot be admitted', async () => {
+    const { base } = await setup({}, { proxy: async () => { throw new RuntimeCapacityError('queue-full') } })
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(base + '/api/performance-capacity', { headers: { cookie } })
+    expect(response.status).toBe(503)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(Number(response.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect(await response.json()).toMatchObject({ error: { code: 'INSTANCE_CAPACITY' } })
+  })
+
+  it.each([
+    ['database', () => new PostgresCheckoutQueueFullError(1)],
+    ['runtime', () => new RuntimeCapacityError('queue-full')],
+  ] as const)('terminates a partial response when %s capacity fails after headers', async (_name, failure) => {
+    const { base } = await setup({}, {
+      proxy: async (_req, res) => {
+        res.writeHead(200, { 'content-type': 'text/plain' })
+        res.flushHeaders()
+        res.write('partial')
+        throw failure()
+      },
+    })
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    await expect((async () => {
+      const response = await fetch(base + '/api/partial-capacity', { headers: { cookie } })
+      await response.text()
+    })()).rejects.toThrow()
+    expect((await fetch(base + '/healthz/live')).status).toBe(200)
+  })
+
+  it('returns retryable database overload before routing an authenticated request', async () => {
+    const { base, deps } = await setup()
+    deps.auth.validate = () => { throw new PostgresCheckoutQueueFullError(1) }
+    const response = await fetch(base + '/admin/api/performance', { headers: { cookie: 'hgw_session=fixture-only' } })
+    expect(response.status).toBe(503)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(Number(response.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect(await response.json()).toMatchObject({ error: { code: 'DB_CHECKOUT_QUEUE_FULL' } })
+  })
+
   it('rejects a stale browser principal before HTTP or WebSocket routing while keeping untagged clients compatible', async () => {
     const routed: number[] = [], upgrades: number[] = []
     const { base, deps } = await setup({}, {

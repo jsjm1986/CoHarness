@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/session.md
 document:
-  en: b55935577bee0aecf7e392cefab849f75499c3f2
-  zh: 366db52f2f33dd8d0ec45241a0a0e18e80134032
+  en: dfdae1bed368a5675051759812a3cd2cc76c017d
+  zh: 01ec8e4de092116dadc0aa1039233ad0c123e068
 /sessions:
   en: 28fb7eb8f758fdf0
   zh: a36d6f03e331ad86
@@ -36,8 +36,11 @@ document:
   en: e7ead24911d9d6c8
   zh: d50edc487c596a67
 /sessions/surface-types/surfaceintent-the-parameter-to-session-append:
-  en: 9ec95db9133ffaec
-  zh: 41c08fef5fa9fdb6
+  en: 9e3286e64c844240
+  zh: e052c79fcd3483bc
+/sessions/surface-types/append-resource-admission:
+  en: 8c3cdf16786a7f77
+  zh: 2f4486789a15236e
 /sessions/surface-types/plugin-owned-message-projections:
   en: f1f73607d650620f
   zh: b3ef72f19fb5ee3d

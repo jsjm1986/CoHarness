@@ -1,5 +1,5 @@
 /** Real PostgreSQL backup admission and provider-owned data selection. */
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -22,6 +22,7 @@ import { PostgresMaintenanceService } from '../src/postgres/maintenance-service.
 import { nodeConfigurationAuthority } from '../src/postgres/node-configuration-authority.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
+import { TunnelCredentialCipher } from '../src/postgres/tunnel-access-service.ts'
 
 const databaseUrl = process.env.HGW_TEST_DATABASE_URL
 const describePg = databaseUrl === undefined ? describe.skip : describe
@@ -44,12 +45,12 @@ describePg('deployment backup completeness', () => {
   afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
   afterAll(async () => { await pool.end() })
 
-  async function fixture() {
+  async function fixture(overrides: NodeJS.ProcessEnv = {}) {
     const slug = randomUUID(), node = 'backup-node'
     const environment = testEnvironment(directory, { HGW_STATE_ROOT: join(directory, 'state'), HGW_USERS_ROOT: join(directory, 'users'),
       HGW_PROJECTS_ROOT: join(directory, 'projects'), HGW_PROJECT_RUNTIMES_ROOT: join(directory, 'project-runtimes'),
       HGW_DEFAULT_ENV_FILE: '', HGW_MANAGED_DATA_APPROVAL_FILE: join(directory, 'approved.jsonl'),
-      HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE_NAME: node, HGW_PUBLIC_ORIGINS: 'http://127.0.0.1:8899' })
+      HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE_NAME: node, HGW_PUBLIC_ORIGINS: 'http://127.0.0.1:8899', ...overrides })
     const cfg = testConfig(directory, environment)
     const organization = (await pool.query<{ id: string }>(
       "INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Backup fixture') RETURNING id", [slug])).rows[0]!.id
@@ -230,6 +231,28 @@ describePg('deployment backup completeness', () => {
     await writeFile(join(backupFilesDirectory(result.path), review.member), 'corrupt')
     await expect(f.backups.verify(result.id)).rejects.toThrow('digest mismatch')
     expect((await new PostgresBackupService(f.context).get(result.id)).status).toBe('failed')
+  })
+
+  it('backs up and restores the independent key that decrypts the stored tunnel tokens', async () => {
+    const f = await fixture({ HGW_TUNNEL_CREDENTIAL_KEY_FILE: join(directory, 'separate-secrets', 'tunnel.key') })
+    f.claim('@deepseek-ai/dsh-session-persistence-jsonl', 'directory', join(f.dsh, 'sessions'))
+    const key = randomBytes(32)
+    await mkdir(dirname(f.cfg.tunnelCredentialKeyFile), { recursive: true })
+    await writeFile(f.cfg.tunnelCredentialKeyFile, key, { mode: 0o600 })
+    const cipher = new TunnelCredentialCipher(key)
+    const ciphertext = cipher.encrypt(f.context.organizationId, f.context.nodeId, 'run-token', 'synthetic-token')
+    await pool.query(`INSERT INTO harness.tunnel_access(organization_id,node_id,mode,run_token_cipher)
+      VALUES($1,$2,'named',$3)`, [f.context.organizationId, f.context.nodeId, ciphertext])
+    await f.maintenance.enterMaintenance(null)
+    const backup = await f.backups.create(null)
+    const member = backup.managedSnapshot!.files.find(file => file.sourcePath === f.cfg.tunnelCredentialKeyFile)!
+    expect(member).toBeDefined()
+    expect(await readFile(join(backupFilesDirectory(backup.path), member.member))).toEqual(key)
+    await writeFile(f.cfg.tunnelCredentialKeyFile, randomBytes(32))
+    await f.commands.restoreManagedFiles(backupFilesDirectory(backup.path), backup.managedSnapshot!, backup.managedSnapshot!.roots)
+    const restored = new TunnelCredentialCipher(await readFile(f.cfg.tunnelCredentialKeyFile))
+    const row = (await pool.query<{ run_token_cipher: Buffer }>('SELECT run_token_cipher FROM harness.tunnel_access')).rows[0]!
+    expect(restored.decrypt(f.context.organizationId, f.context.nodeId, 'run-token', row.run_token_cipher)).toBe('synthetic-token')
   })
 
   it('requires explicit reviewed adoption for a historical runtime and retains custom retired roots', async () => {

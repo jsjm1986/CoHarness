@@ -29,7 +29,6 @@ function executable(path: string, source: string): void {
 function hostNativePaths(): string[] {
   const uname = (flag: string): string =>
     spawnSync('uname', [flag], { encoding: 'utf8' }).stdout.trim()
-  const darwin = `native/system/packages/darwin-${uname('-m')}/bin/system.node`
   const linux = (arch: string): string[] => [
     `native/system/packages/linux-${arch}/bin/landlock-run`,
     `native/system/packages/linux-${arch}/bin/glibc/system.node`,
@@ -37,11 +36,13 @@ function hostNativePaths(): string[] {
   ]
   switch (`${uname('-s')}-${uname('-m')}`) {
     case 'Darwin-arm64':
+      return ['native/system/packages/darwin-arm64/bin/system.node']
     case 'Darwin-x86_64':
-      return [darwin]
+      return ['native/system/packages/darwin-x64/bin/system.node']
     case 'Linux-x86_64':
       return linux('x64')
     case 'Linux-aarch64':
+    case 'Linux-arm64':
       return linux('arm64')
     default:
       return []
@@ -61,6 +62,11 @@ function release(root: string, name: string): string {
     'gateway/node_modules/pg/package.json',
     'gateway/node_modules/argon2/package.json',
     'gateway/node_modules/better-sqlite3/package.json',
+    ...['@deepseek-ai/cordis', '@deepseek-ai/schemastery', '@deepseek-ai/dsh-managed-data', '@deepseek-ai/dsh-atomic-write',
+      '@deepseek-ai/dsh-llm', '@deepseek-ai/dsh-session-format', '@deepseek-ai/dsh-session-format-catalog',
+      '@deepseek-ai/dsh-home-paths', '@deepseek-ai/dsh-userdoc', '@deepseek-ai/dsh-userdoc-local',
+      '@deepseek-ai/dsh-host-userdoc-http']
+      .map(packageName => `gateway/node_modules/${packageName}/package.json`),
     'packages/llm/llm/lib/types/discovery.js',
     'packages/session/session-format/lib/index.js',
     'packages/session/session-format/lib/types/surface.js',

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write apps/web/tests/README.md
 document:
-  en: 4d7236ef69189845dbc2847289d497fc54c94ae9
-  zh: 2e797314e9319527453139bc6b4632a135b3f56e
+  en: 39321b4169c9459c05b78794f9e4f744561bdf69
+  zh: ecd5ca6d86981c38504f15084bd59fa70acb2b0e
 /apps-web-browser-e2e:
   en: 11e73e82ea5d4855
   zh: 6673d11c91311641
@@ -14,3 +14,6 @@ document:
 /apps-web-browser-e2e/do-not-import-deepseek-ai-dsh-client-here:
   en: 32e2400d55dbb7ee
   zh: bd0a659387ccef76
+/apps-web-browser-e2e/runtime-scope-and-timed-question-regressions:
+  en: 70a5c9c7201a01b4
+  zh: 17458f48076e2570

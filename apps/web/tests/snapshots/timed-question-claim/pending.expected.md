@@ -1,0 +1,18 @@
+- region "Which rollout should we use?":
+  - heading "Which rollout should we use?" [level=2]
+  - text: Work continued — you can still answer
+  - button "Collapse the question card" [expanded]:
+    - img
+  - button "Close the panel — reopen it from the tool call":
+    - img
+  - radiogroup:
+    - radio "Staged": 1 Staged
+    - textbox "Type your answer"
+  - button "Previous question" [disabled]:
+    - img
+  - text: 1 / 1
+  - button "Next question" [disabled]:
+    - img
+  - status
+  - button "Skip"
+  - button "Submit" [disabled]

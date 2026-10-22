@@ -66,10 +66,14 @@ export class UsageOutbox {
             catch {
                 return;
             }
-            const post = (payload) => fetch(this.url, {
-                method: 'POST', headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
-                body: payload, signal: AbortSignal.timeout(5_000),
-            });
+            const post = async (payload) => {
+                const response = await fetch(this.url, {
+                    method: 'POST', headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
+                    body: payload, signal: AbortSignal.timeout(5_000),
+                });
+                await response.body?.cancel();
+                return response;
+            };
             let response;
             try {
                 response = await post(body);
@@ -88,8 +92,13 @@ export class UsageOutbox {
                     }
                 }
             }
-            if (!response.ok)
+            if (!response.ok) {
+                // A rejected record remains retryable without blocking independent bills.
+                // Authentication, throttling, and server failures stop this delivery pass.
+                if (response.status === 400)
+                    continue;
                 return;
+            }
             rmSync(path, { force: true });
         }
     }

@@ -213,3 +213,23 @@ it('keeps Request bodies and cancellation while fixing a personal runtime indepe
     expect(init?.signal?.aborted).toBe(true)
   } finally { fence.dispose() }
 })
+
+it('keeps activity pages on the document runtime when another tab changes its scope cookie', async () => {
+  let cookieTarget = 'project:9'
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    const url = requestedUrl(input)
+    return Response.json({ target: url.searchParams.get('dshTarget') ?? cookieTarget }, {
+      headers: { 'x-dsh-principal-id': '7' },
+    })
+  })
+  const fence = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn())
+  fence.confirm(7)
+  fence.setRuntimeTarget({ kind: 'project', projectId: 9 })
+  try {
+    expect(await (await fence.fetch(`${ORIGIN}/account/api/activity?limit=50`)).json()).toEqual({ target: 'project:9' })
+    cookieTarget = 'project:10'
+    const response = await fence.fetch(`${ORIGIN}/account/api/activity?limit=50&before=cursor`)
+    expect(await response.json()).toEqual({ target: 'project:9' })
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('before')).toBe('cursor')
+  } finally { fence.dispose() }
+})

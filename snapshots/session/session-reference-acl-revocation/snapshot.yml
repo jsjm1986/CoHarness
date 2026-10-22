@@ -1,0 +1,9 @@
+version: 1
+scenario: session-reference-acl-revocation
+profile: headless
+composition: session-reference-spill
+recording: live
+header:
+  class: session-reference-spill
+environment:
+  DSH_SNAPSHOT_REVOKE_SESSION_REFERENCE: '1'

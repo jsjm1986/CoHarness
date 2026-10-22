@@ -1,0 +1,11 @@
+- text: 2026-10-23 Release plan 2
+- button "09:00 Zhou Release plan Pinned the migration checklist to the top of the plan.":
+  - text: 09:00 Zhou
+  - button "Release plan"
+  - text: Pinned the migration checklist to the top of the plan.
+- button "08:59 Lin Release plan answered 「Roll out to production now or stage first?」 Proceed with the staged rollout":
+  - text: 08:59 Lin
+  - button "Release plan"
+  - text: answered 「Roll out to production now or stage first?」
+  - img
+  - text: Proceed with the staged rollout

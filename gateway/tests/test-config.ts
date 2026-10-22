@@ -29,6 +29,7 @@ export function testEnvironment(root: string, overrides: NodeJS.ProcessEnv = {})
     stateRoot: cfg.stateRoot, principalKeyDir: cfg.principalKeyDir,
     runtimeCredentialDir: cfg.runtimeCredentialDir, systemdUnitDir: cfg.systemdUnitDir,
     organizationModelCredentialKeyFile: cfg.organizationModelCredentialKeyFile,
+    tunnelCredentialKeyFile: cfg.tunnelCredentialKeyFile,
     webhookSecretKeyFile: cfg.webhookSecretKeyFile, bootstrapAdminPasswordFile: cfg.bootstrapAdminPasswordFile,
     backupDir: cfg.backupDir, nodeConfigFile: cfg.nodeConfigFile,
     databaseUrlFile: cfg.databaseUrlFile, managedDataApprovalFile: cfg.managedDataApprovalFile,

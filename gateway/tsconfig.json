@@ -60,6 +60,9 @@
       ],
       "@deepseek-ai/schemastery": [
         "../vendor/schemastery/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-resource-budget/types": [
+        "../packages/context/resource-budget/src/types.ts"
       ]
     },
     "noEmit": true,

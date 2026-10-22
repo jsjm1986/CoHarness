@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import inspect
 import os
+import queue
 import sys
 import threading
 import time
@@ -780,6 +781,56 @@ for line in sys.stdin:
             assert healthy.next().payload == {"source": "emit-second"}
 
 
+def test_full_subscription_filter_failure_keeps_rpc_and_other_subscriptions_live(tmp_path: Path) -> None:
+    script = tmp_path / "fake_runtime.py"
+    script.write_text(
+        """
+import json
+import sys
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg["method"] == "session/prompt":
+        for index in (1, 2):
+            print(json.dumps({"jsonrpc": "2.0", "method": "tick", "params": {"index": index}}), flush=True)
+        result = {"messageId": "message-1"}
+    else:
+        result = {}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+    if msg["method"] == "shutdown":
+        break
+""".strip()
+    )
+    calls = 0
+
+    def broken_filter(_notification: Notification) -> bool:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("filter failed with a full queue")
+        return True
+
+    with HarnessClient(
+        HarnessConfig(max_notification_queue=1, request_timeout_seconds=5),
+        _launch_args=(sys.executable, str(script)),
+    ) as client:
+        with (
+            client.subscribe_notifications(broken_filter) as broken,
+            client.subscribe_notifications(lambda notification: notification.payload.get("index") == 2) as healthy,
+        ):
+            try:
+                assert client.session_prompt("main", [{"type": "text", "text": "emit notifications"}]) == "message-1"
+                with pytest.raises(RuntimeError, match="filter failed with a full queue"):
+                    broken.next()
+                assert healthy.next().payload == {"index": 2}
+            finally:
+                # A blocking reader regression still needs queue space during teardown.
+                try:
+                    broken._notifications.get_nowait()
+                except queue.Empty:
+                    pass
+
+
 def test_client_rejects_unaccepted_session_prompt_response(tmp_path: Path) -> None:
     script = tmp_path / "fake_bridge.py"
     script.write_text(
@@ -916,6 +967,7 @@ time.sleep(60)
 
             initialize_timeout_seconds=0.1,
             request_timeout_seconds=0.1,
+            shutdown_timeout_seconds=0.1,
         )
     , _launch_args=(sys.executable, str(script))) as client:
         start = time.monotonic()
@@ -965,14 +1017,6 @@ for line in sys.stdin:
     assert client._proc is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "upstream dsh-v0.2.0-rc.1 close() waits shutdown_timeout_seconds for EOF "
-        "quiescence after a completed shutdown response; this SDK terminates the "
-        "runtime immediately, so the post-shutdown marker is never written"
-    ),
-)
 def test_client_close_allows_eof_quiescence_after_shutdown_response(tmp_path: Path) -> None:
     script = tmp_path / "fake_runtime.py"
     marker = tmp_path / "quiesced.txt"
@@ -1005,9 +1049,12 @@ Path(os.environ["QUIESCED_MARKER"]).write_text("quiesced")
     )
     client.start()
     client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
+    proc = client._proc
+    assert proc is not None
     client.close()
 
     assert marker.read_text() == "quiesced"
+    assert proc.returncode == 0
 
 
 def test_initialize_failure_reaps_started_runtime(tmp_path: Path) -> None:

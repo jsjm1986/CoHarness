@@ -45,7 +45,7 @@ A `plan-review` intent — set by `dsh-plan-mode` on the `exit_plan_mode` review
 
 An answer field autofocuses only when its answer channel is ready and no countdown exists. Manual focus and blur during the claim handshake are retained: the countdown starts paused only if the answer surface still has focus when the remaining duration arrives.
 
-Returning a local answer does not release its foreground claim: the Host closes that stream after accepting the waterfall outcome. The plugin owns the claim through this delivery interval. Explicit delegation releases it before calling the next answerer, and plugin disposal cancels any remaining claims.
+Returning a local answer does not release its foreground claim: the Host closes that stream after accepting the waterfall outcome. The plugin owns the claim through this delivery interval. Explicit delegation releases it before calling the next answerer, and plugin disposal cancels any remaining claims. A claim that opens, ends, or fails after its wait was released cannot attach an answer channel; a continued question keeps its Remote answer path.
 
 The card has two sources. A live Host request creates it and carries the answer back. For a timed request, the Client first opens the question-owned `attachWait` stream and derives a local deadline from its remaining-duration frame. The claim lasts until that request settles or the Client disconnects, including while the panel is hidden. The card owns the countdown; at zero it rejects with `ASK_TIMED_OUT` and stays available. Once the projection lists the call as continued, answers use the `answer` Remote method. Card removal follows the projection, and plugin teardown releases its requests and claims.
 

@@ -366,4 +366,108 @@ describePg('PostgreSQL steward space', () => {
       organization_id,project_id,enabled,revision) VALUES($1,$2,true,1)`,
       [organizationId, standardInternalId])).rejects.toThrow()
   })
+
+  it('rejects multiple statements before a read can end its read-only transaction', async () => {
+    const subject = { organizationId, projectInternalId: stewardInternalId, generation: 1 }
+    const original = (await projects.getById(standardPublicId))!.name
+    await expect(stewardQueries.query(subject, {
+      sql: `SELECT 1; COMMIT; UPDATE harness.projects SET name='escaped-read-only' WHERE id='${standardInternalId}'`,
+      dryRun: false, rowLimit: 500,
+    })).rejects.toThrow(/multiple commands.*prepared statement/)
+    expect((await projects.getById(standardPublicId))!.name).toBe(original)
+  })
+
+  it('caps the complete result in UTF-8 bytes while retaining an ordered prefix', async () => {
+    const sql = `SELECT i, repeat('维', 8000) AS value FROM generate_series(1, 20) i`
+    const result = await stewardQueries.query({ organizationId, projectInternalId: stewardInternalId, generation: 1 }, {
+      sql, dryRun: false, rowLimit: 20,
+    })
+    expect(result.rowCount).toBe(20)
+    expect(result.truncated).toBe(true)
+    expect(result.rows?.length).toBeGreaterThan(0)
+    expect(result.rows).toEqual(Array.from({ length: result.rows!.length }, (_, index) => ({ i: index + 1, value: '维'.repeat(8000) })))
+    expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(256 * 1024)
+    const journal = await pool.query<{ result_bytes: number }>(
+      'SELECT result_bytes FROM harness.steward_query_log WHERE organization_id=$1 AND statement=$2', [organizationId, sql])
+    expect(journal.rows[0]!.result_bytes).toBe(Buffer.byteLength(JSON.stringify(result), 'utf8'))
+  })
+
+  it('applies the row limit to dry-run plans', async () => {
+    const result = await stewardQueries.query({ organizationId, projectInternalId: stewardInternalId, generation: 1 }, {
+      sql: 'SELECT * FROM generate_series(1, 20) i ORDER BY i', dryRun: true, rowLimit: 1,
+    })
+    expect(result.plan).toHaveLength(1)
+    expect(result.rowCount).toBeGreaterThan(1)
+    expect(result.truncated).toBe(true)
+  })
+
+  it('drains a large read while retaining only the requested rows', async () => {
+    const result = await stewardQueries.query({ organizationId, projectInternalId: stewardInternalId, generation: 1 }, {
+      sql: 'SELECT i FROM generate_series(1, 10000) i', dryRun: false, rowLimit: 3,
+    })
+    expect(result).toMatchObject({ rowCount: 10000, rows: [{ i: 1 }, { i: 2 }, { i: 3 }], truncated: true })
+  })
+
+  it('omits a single row larger than the result budget', async () => {
+    const result = await stewardQueries.query({ organizationId, projectInternalId: stewardInternalId, generation: 1 }, {
+      sql: "SELECT repeat(chr(1), 100000) AS value", dryRun: false, rowLimit: 500,
+    })
+    expect(result).toMatchObject({ columns: ['value'], rowCount: 1, rows: [], truncated: true })
+    expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(256 * 1024)
+  })
+
+  it('rejects metadata that exceeds the result budget even without rows', async () => {
+    const columns = Array.from({ length: 750 }, (_, index) => `0 AS "${String(index).padStart(3, '0')}${'\u0001'.repeat(60)}"`)
+    const sql = `SELECT ${columns.join(', ')} WHERE false`
+    expect(Buffer.byteLength(sql, 'utf8')).toBeLessThan(64 * 1024)
+    await expect(stewardQueries.query({ organizationId, projectInternalId: stewardInternalId, generation: 1 }, {
+      sql, dryRun: false, rowLimit: 1,
+    })).rejects.toMatchObject({ status: 413, code: 'steward-result-too-large' })
+    const journal = await pool.query<{ status: string }>(
+      'SELECT status FROM harness.steward_query_log WHERE organization_id=$1 AND statement=$2', [organizationId, sql])
+    expect(journal.rows).toEqual([{ status: 'error' }])
+  })
+
+  it('keeps single-statement SHOW, empty reads and quoted semicolons valid', async () => {
+    const subject = { organizationId, projectInternalId: stewardInternalId, generation: 1 }
+    const show = await stewardQueries.query(subject, { sql: 'SHOW is_superuser', dryRun: false, rowLimit: 1 })
+    expect(show).toMatchObject({ columns: ['is_superuser'], rows: [{ is_superuser: 'on' }], rowCount: 1, truncated: false })
+    const empty = await stewardQueries.query(subject, { sql: 'SELECT 1 AS value WHERE false', dryRun: false, rowLimit: 1 })
+    expect(empty).toMatchObject({ columns: ['value'], rows: [], rowCount: 0, truncated: false })
+    const quoted = await stewardQueries.query(subject, { sql: "SELECT '; COMMIT;' AS value", dryRun: false, rowLimit: 1 })
+    expect(quoted.rows).toEqual([{ value: '; COMMIT;' }])
+  })
+
+  it('drains write RETURNING rows without returning them or losing the affected count', async () => {
+    await qualify(admin.publicId, true)
+    const stewardSession = await addConversation(stewardInternalId, admin.id, 'project')
+    const approvalId = await addApproval(stewardSession, admin.id)
+    const result = await stewardQueries.query({ organizationId, projectInternalId: stewardInternalId, generation: 1 }, {
+      sql: `UPDATE harness.projects SET name=name WHERE id='${standardInternalId}' RETURNING repeat('维', 100000) AS value`,
+      dryRun: false, rowLimit: 1, approvalId,
+    })
+    expect(result).toMatchObject({ columns: ['value'], rows: null, rowCount: 1, truncated: false })
+  })
+
+  it('journals reads, plans, errors and denials with a one-connection pool', async () => {
+    const single = createPostgresPool(DATABASE_URL!, { max: 1, connectionTimeoutMillis: 1000 })
+    try {
+      const service = new StewardQueryService({ ...context, pool: single }, true)
+      const sql = 'SELECT 1 AS single_connection_read'
+      const subject = { organizationId, projectInternalId: stewardInternalId, generation: 1 }
+      await service.query(subject, { sql, dryRun: false, rowLimit: 1 })
+      await service.query(subject, { sql, dryRun: true, rowLimit: 1 })
+      await expect(service.query(subject, { sql: 'SELECT * FROM harness.missing_single_connection_table', dryRun: false, rowLimit: 1 })).rejects.toThrow(/does not exist/)
+      const denied = 'UPDATE harness.projects SET name=name WHERE false RETURNING 1 AS single_connection_denial'
+      await expect(service.query(subject, { sql: denied, dryRun: false, rowLimit: 1, approvalId: randomUUID() }))
+        .rejects.toMatchObject({ code: 'steward-approval-invalid' })
+      const journal = await pool.query<{ count: number }>(
+        'SELECT COUNT(*)::int count FROM harness.steward_query_log WHERE organization_id=$1 AND statement=$2', [organizationId, sql])
+      expect(journal.rows[0]!.count).toBe(2)
+      const unsuccessful = await pool.query<{ status: string }>(
+        'SELECT status FROM harness.steward_query_log WHERE organization_id=$1 AND statement=ANY($2::text[]) ORDER BY status',
+        [organizationId, ['SELECT * FROM harness.missing_single_connection_table', denied]])
+      expect(unsuccessful.rows).toEqual([{ status: 'denied' }, { status: 'error' }])
+    } finally { await single.end() }
+  })
 })

@@ -219,11 +219,18 @@ export async function saveDocFile(
   try {
     handle = await open(partial, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | NOFOLLOW, 0o600)
     const reader = body.getReader()
+    let cancellation: Promise<void> | undefined
+    const onAbort = (): void => {
+      cancellation ??= reader.cancel(signal?.reason).catch(() => {})
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted === true) onAbort()
     try {
       try {
         while (true) {
           signal?.throwIfAborted()
           const { done, value } = await reader.read()
+          signal?.throwIfAborted()
           if (done) break
           bytes += value.byteLength
           if (limits.maxFileBytes !== null && bytes > limits.maxFileBytes) {
@@ -236,12 +243,16 @@ export async function saveDocFile(
         throw error
       }
     } finally {
+      signal?.removeEventListener('abort', onAbort)
+      await cancellation
       reader.releaseLock()
     }
+    signal?.throwIfAborted()
     await handle.sync()
     await handle.close()
     handle = undefined
     await assertRealParent(root, target.path)
+    signal?.throwIfAborted()
     try {
       await link(partial, target.path)
     } catch (error) {

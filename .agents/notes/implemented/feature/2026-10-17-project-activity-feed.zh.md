@@ -35,7 +35,7 @@ Gateway 新增 `GET /account/api/activity?before=<keyset>&limit=<n>`，与 `/acc
 ### 客户端
 
 - `packages/client/ui-project-activity` 注册 `sidebarRightTabs` 标签类型以及 `sidebar.right.pane.tab`、`sidebar.right.pane.tab.title` 插槽，与 `ui-sidebar-terminal` 同形。web-app 组合中的行保持启用；apply 体订阅 `projectUiPolicy`，在每次 scope 切换时挂载或释放标签定义——Guide 入口与已打开的标签只在项目空间出现，没有按空间划分的静态补丁。
-- 面板通过包内私有 `fetch` 客户端（`credentials: 'same-origin'`）拉取；路由从调用者的活动账户 scope 解析项目，projectId 不上线路。
+- 面板通过包内私有 `fetch` 客户端（`credentials: 'same-origin'`）拉取。Connection 身份核验在派发前添加页面已验证的 `dshTarget`，因此另一标签页的作用域 cookie 不能把刷新或分页重定向到其他项目。Gateway 仍检查所选项目的成员资格；选择器不授予访问权限。[带 runtime 的 Session 决策](../architecture/2026-09-27-runtime-qualified-client-sessions.zh.md)负责共用的账号与 runtime 核验。
 - 跳转分两级：点会话名聚焦或打开窗格（`conversationViewport.replaceActive`）；点条目调用新增的 `ConversationViewport.reveal(sessionId, seq)`——viewport 聚焦窗格并发布 reveal 请求；所属 `ChatView` 经 inject `hooks` 面订阅，定位包含该 `seq` 的 turn，经既有 `loadHistoryUntil` 加载历史并滚动到对应行。Feed 行携带线路 sessionId；插件先经 `sessions.keyFor` 翻译为 runtime 作用域的客户端标识，再调用这两个方法。这是本次唯一新增的跨插件能力。
 
 ### 呈现（已评审 HTML 稿）
@@ -58,5 +58,5 @@ Gateway 新增 `GET /account/api/activity?before=<keyset>&limit=<n>`，与 `/acc
 ## 测试
 
 - `packages/client/ui-project-activity/tests/apply.client.spec.ts` 覆盖 scope 门控的标签注册/释放、分组、成员筛选、分页，以及 reveal 的 `sessions.keyFor` 翻译。
-- `apps/web/tests/project-activity.e2e.ts` 在 mock Gateway 上启动真实 Web 组合，种子化一个会话，渲染 feed（消息、提问、选中回答），并点击行落到对应日志事件。
+- `apps/web/tests/project-activity.e2e.ts` 在 mock Gateway 上启动真实 Web 组合，种子化一个会话，从第二个标签页更改共用作用域 cookie，刷新原项目 feed，固定其 UI 快照，并点击行落到对应日志事件。
 - `listActivity` 的 SQL 语义（可见性条件、回答连接、keyset 顺序）由 CI 的 Gateway Postgres 通道运行。

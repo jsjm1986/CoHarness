@@ -44,6 +44,9 @@
       ],
       "@deepseek-ai/dsh-host-userdoc-http": [
         "../packages/host/userdoc-http/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-resource-budget/types": [
+        "../packages/context/resource-budget/lib/types/types.d.ts"
       ]
     }
   },

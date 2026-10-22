@@ -15,6 +15,7 @@ Status: implemented
 - `Session.publishInteraction` 把插件持有的条目并入 Session pending 源，与 wire `PendingWait` 并列；该源是 composer 槽位与会话行读取的唯一 pending 面。
 - `PendingQuestion` 保留上游卡片生命周期——waterfall 通道、倒计时截止点、hide/reveal、回看——其 waterfall 的 `resolve`/`reject`/`delegate` 桥接到 `wait.respond`，mux 帧仍是答案载体。
 - 携带 `wait.timed` 的 wait 只开启一次 Remote `userQuestions.attachWait` claim 流；waterfall 仅在首帧带回落下截止点后挂接，倒计时不会闪出错误值。
+- 该挂接由 wait 的中止信号持有。wait 释放后，延迟到达的 stream 打开、结束或失败都不能恢复 waterfall 通道，覆盖已继续卡片的 Remote 回答路径。
 - 存活卡片 retain 其 Session scope（`userQuestion` 引用来源）。scope 拆除会清掉会话级草稿存储，因此问题仍可答时取消选择会话不得释放它；卡片关闭时才释放。
 - 重绑的 Session 以空的 published 源起步，因此卡片在每次 reconcile 时重新锚定到新的 Session 对象。反向同理：只有承载过该 wait 的 Session 对象能证明它的离去——重绑后缺席不等于已结清。
 - closed turn 即使没有 assistant 证据也拥有 turn-process 行，只有回复的 turn 仍能折叠其遗留内容；被折叠的成员以 `hidden` 保持挂载而非脱离 DOM，因为迟到回复在隐藏期间仍会变化，展开时必须已绘制完整。
@@ -36,4 +37,4 @@ Status: implemented
 
 ## Testing
 
-`browser-plugin.client.spec.ts` 以 mux `PendingWait` 端到端驱动本次移植——收养、定时 claim 锚定、重连回放、源离开，以及 retain/release 契约。`question-composer.e2e.ts` 录制迟到回答场景：回复行折叠挂载在其 turn 的 process 展开件内，展开后为只读答案回看。
+`browser-plugin.client.spec.ts` 以 mux `PendingWait` 端到端驱动本次移植——收养、定时 claim 锚定、释放后的延迟 claim 结束与失败、重连回放、源离开，以及 retain/release 契约。`question-composer.e2e.ts` 录制迟到回答场景：回复行折叠挂载在其 turn 的 process 展开件内，展开后为只读答案回看。`timed-question-claim.e2e.ts` 延迟实际浏览器 claim 请求，让真实计时工具继续，再经 Remote 路径提交持久迟到回复，并固定完整装配的 UI 状态。

@@ -2778,6 +2778,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'In-memory session store (`ctx.sessions`).\n\nPersistence is intentionally not implemented here — persistence plugins subscribe to `session/event` and flush on `session/flush` / dispose.',
     methods: [
       {
+        signature: 'registerAppendAdmission(admission: SessionAppendAdmission): () => Promise<void>',
+        description: 'Register synchronous resource admission for every Session attached to this store. Refusal leaves the log and event feed unchanged. Reservations roll back in reverse order if any admission, surface validation, or dispatch validation fails; committed reservations pass to the `session/event` consumer.',
+        parameters: [{ name: 'admission', description: 'resource reservation over an immutable candidate; rollback must be synchronous.' }],
+        returns: 'the registering fiber\'s disposer, which removes future admission calls.',
+        throws: ['when the same callback already has a live registration.'],
+      },
+      {
         signature: 'registerMessageProjection(projection: SessionMessageProjection): () => Promise<void>',
         description: 'Register one event interpreter for live creation, restore, and fork. Disposing the contribution makes sessions that used it refuse further derivation.',
         parameters: [{ name: 'projection', description: 'pure definition owned by the event\'s plugin.' }],
@@ -7417,6 +7424,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionActivityRequest',
     declaration: 'export interface SessionActivityRequest {\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SessionAppendAdmission',
+    declaration: 'export type SessionAppendAdmission = (session: Session, candidate: SessionEvent) => (() => void) | undefined;',
   },
   {
     name: 'SessionAvailability',

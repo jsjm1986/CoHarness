@@ -118,6 +118,7 @@
     "swipe-check.e2e.ts": "mobile",
     "todo-row.snapshot.ts": "conversation",
     "tool-details.e2e.ts": "conversation",
+    "timed-question-claim.e2e.ts": "conversation",
     "trajectory-virtualization.e2e.ts": "conversation",
     "turn-tail-actions.e2e.ts": "conversation",
     "user-terminal.e2e.ts": "conversation",

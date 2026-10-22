@@ -47,6 +47,9 @@ import type { ProjectThemePolicy } from './projects.ts'
 import { applyModelGovernanceToProject, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
 import { ProjectModelSettingsConflictError, type ModelSettingsPathOp } from './model-governance.ts'
 import type { GatewayWorkbenchCatalogHandler } from './workbench.ts'
+import { GatewayPerformanceObserver } from './performance-observer.ts'
+import { RuntimeCapacityError } from './runtime-capacity.ts'
+import { PostgresCheckoutQueueFullError, type PostgresPoolAdmissionSnapshot } from './postgres/database.ts'
 
 export interface GatewayDeps {
   cfg: GatewayConfig
@@ -55,6 +58,16 @@ export interface GatewayDeps {
   projects: GatewayProjectService
   audit: GatewayAuditService
   instances: GatewayInstanceService
+  /** Shared process diagnostics; its supplying owner disposes it after all observed listeners close. */
+  performance?: GatewayPerformanceObserver
+  /** Native pool counters, without querying the database or retaining connection details. */
+  databasePerformance?: () => {
+    total: number
+    idle: number
+    waiting: number
+    maximum: number | null
+    admission?: PostgresPoolAdmissionSnapshot | null
+  }
   /** Durable revocations shared by Gateways using the same organization. */
   accessMonitor?: import('./access-invalidation.ts').GatewayAccessMonitor
   governance?: GatewayModelGovernanceService
@@ -589,6 +602,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   }
 
   const writerReleases = new WeakMap<ServerResponse, () => void>()
+  const performanceObserver = deps.performance ?? new GatewayPerformanceObserver({
+    enabled: cfg.performanceEnabled,
+    eventLoopResolutionMs: cfg.performanceEventLoopResolutionMs,
+  })
   const server = createServer((req, res) => {
     // Baseline response headers for every route. `writeHead` on relayed
     // responses can still override them when the upstream supplied its own.
@@ -599,10 +616,27 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     res.setHeader('referrer-policy', 'strict-origin-when-cross-origin')
     res.setHeader('content-security-policy-report-only',
       "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'")
+    performanceObserver.observeResponse(res, (req.url ?? '').startsWith('/internal/runtime/') ? 'internal' : 'http')
     void handle(req, res).catch((error: unknown) => {
-      if (!res.writableEnded) {
+      if (!res.writableEnded && res.headersSent) {
+        res.destroy()
+      } else if (!res.writableEnded && !res.destroyed) {
         if (error instanceof BodyTooLargeError) {
           send(res, 413, JSON.stringify({ error: 'request-too-large' }), 'application/json')
+        } else if (error instanceof PostgresCheckoutQueueFullError) {
+          res.setHeader('cache-control', 'no-store')
+          res.setHeader('retry-after', String(Math.max(1, Math.ceil(cfg.databaseConnectionTimeoutMs / 1000))))
+          send(res, 503, JSON.stringify({ error: {
+            code: error.code,
+            message: 'The server is at its database capacity. Try again later.',
+          } }), 'application/json')
+        } else if (error instanceof RuntimeCapacityError) {
+          res.setHeader('cache-control', 'no-store')
+          res.setHeader('retry-after', String(Math.max(1, Math.ceil(cfg.runtimeCapacity.maxQueueWaitMs / 1000))))
+          send(res, 503, JSON.stringify({ error: {
+            code: error.code,
+            message: 'The server is at its runtime capacity. Try again after another runtime is released.',
+          } }), 'application/json')
         } else if (error instanceof RuntimeStartBlockedError) {
           send(res, error.code === 'INSTANCE_STOPPED' ? 409 : 503, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
         } else if (error instanceof InvalidRuntimeTargetError) {
@@ -623,7 +657,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           send(res, 500, 'internal error', 'text/plain')
         }
       }
-      if (!(error instanceof BodyTooLargeError)) console.error('[gateway] request failed:', error)
+      if (!(error instanceof BodyTooLargeError) && !(error instanceof RuntimeCapacityError)
+        && !(error instanceof PostgresCheckoutQueueFullError)) console.error('[gateway] request failed:', error)
     }).finally(() => { writerReleases.get(res)?.(); writerReleases.delete(res) })
   })
   // Idle keep-alive connections must outlive the front proxy's origin pool
@@ -632,6 +667,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   // headersTimeout to exceed keepAliveTimeout.
   server.keepAliveTimeout = cfg.keepAliveTimeoutMs
   server.headersTimeout = cfg.keepAliveTimeoutMs + 5_000
+  if (deps.performance === undefined) server.once('close', () => { performanceObserver.dispose() })
 
   /**
    * Maintenance-mode write gate: mutating requests consult the shared
@@ -770,6 +806,21 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (user.mustChangePassword && pathname !== '/account/password') {
       if (wantsHtml(req)) { redirect(res, '/account/password'); return }
       send(res, 403, '{"error":"password-change-required"}', 'application/json')
+      return
+    }
+
+    if (pathname === '/admin/api/performance') {
+      if (user.role !== 'admin') { sendAdminGate(res, pathname, 'forbidden'); return }
+      res.setHeader('cache-control', 'no-store')
+      if (req.method !== 'GET') {
+        res.setHeader('allow', 'GET')
+        send(res, 405, '{"error":"method-not-allowed"}', 'application/json')
+        return
+      }
+      send(res, 200, JSON.stringify({
+        ...performanceObserver.snapshot(deps.instances.capacitySnapshot?.() ?? null),
+        databasePool: deps.databasePerformance?.() ?? null,
+      }), 'application/json')
       return
     }
 
@@ -1869,22 +1920,27 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   }
 
   server.on('upgrade', (req, socket, head) => {
+    const settlePerformance = performanceObserver.beginRequest('websocket')
+    let upgradeStatus = 400
+    socket.once('close', (hadError: boolean) => { settlePerformance(upgradeStatus, hadError) })
     const finish = async (): Promise<void> => {
       const pathname = new URL(req.url ?? '/', 'http://x').pathname
       const origin = req.headers.origin
-      if (origin !== undefined && !cfg.publicOrigins.includes(origin)) { socket.destroy(); return }
+      if (origin !== undefined && !cfg.publicOrigins.includes(origin)) { upgradeStatus = 403; socket.destroy(); return }
       const session = await currentUser(req)
-      if (session === null || session.user.mustChangePassword) { socket.destroy(); return }
+      if (session === null || session.user.mustChangePassword) { upgradeStatus = 401; socket.destroy(); return }
       if (!browserPrincipalMatches(req, session.user)) {
+        upgradeStatus = 409
         const body = JSON.stringify({ error: 'account-changed' })
         socket.end(`HTTP/1.1 409 Conflict\r\nConnection: close\r\nx-dsh-principal-id: ${session.user.id}\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`)
         return
       }
       if (handlers.upgrade === undefined || !pathname.startsWith('/api')) { socket.destroy(); return }
       const resolved = await requestContext(req, session.user)
+      upgradeStatus = 101
       await handlers.upgrade(req, socket, head, resolved.context)
     }
-    void finish().catch(() => socket.destroy())
+    void finish().catch(() => { upgradeStatus = 503; socket.destroy() })
   })
 
   return server

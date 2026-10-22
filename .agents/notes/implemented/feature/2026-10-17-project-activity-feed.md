@@ -35,7 +35,7 @@ The one durable gap is the `callId` on the claim row: `question/requested` carri
 ### Client surface
 
 - `packages/client/ui-project-activity` registers a `sidebarRightTabs` tab type plus `sidebar.right.pane.tab` and `sidebar.right.pane.tab.title` slots, mirroring `ui-sidebar-terminal`. The web-app composition keeps the row enabled; the apply body subscribes to `projectUiPolicy` and mounts or disposes the tab definition on each scope transition, so the guide entry and any open tab appear only in project scope — there is no static per-space patch.
-- The panel fetches via a package-private `fetch` client (`credentials: 'same-origin'`); the route resolves the project from the caller's active account scope, so no project id travels on the wire.
+- The panel fetches via a package-private `fetch` client (`credentials: 'same-origin'`). The Connection identity fence adds the document's verified `dshTarget` before dispatch, so another tab's scope cookie cannot redirect refresh or pagination to a different project. The Gateway still checks the selected project's membership; the selector grants no access. The [runtime-qualified Session decision](../architecture/2026-09-27-runtime-qualified-client-sessions.md) owns that shared account/runtime fence.
 - Jumping uses two behaviors: a conversation name focuses or opens the pane (`conversationViewport.replaceActive`); an entry calls the new `ConversationViewport.reveal(sessionId, seq)` — the viewport focuses the pane and publishes a reveal request; the owning `ChatView` subscribes through the inject `hooks` face, locates the turn containing `seq`, loads history through the existing `loadHistoryUntil`, and scrolls to the row. Feed rows carry wire session ids; the plugin translates them to the runtime-scoped client identity through `sessions.keyFor` before calling either method. This is the only new cross-plugin capability.
 
 ### Presentation (reviewed HTML mock)
@@ -58,5 +58,5 @@ Each grouping mode is a folded reading view: `time` folds rows into one collapsi
 ## Testing
 
 - `packages/client/ui-project-activity/tests/apply.client.spec.ts` covers scope-gated tab registration/disposal, grouping, member filtering, pagination, and reveal's `sessions.keyFor` translation.
-- `apps/web/tests/project-activity.e2e.ts` boots the real web composition over a mocked Gateway, seeds a conversation, renders the feed (message, question, chosen answer), and clicks a row to land on the logged event.
+- `apps/web/tests/project-activity.e2e.ts` boots the real web composition over a mocked Gateway, seeds a conversation, changes the shared scope cookie from a second tab, refreshes the original project's feed, pins its UI snapshot, and clicks a row to land on the logged event.
 - `listActivity` SQL semantics (visibility clause, answer join, keyset order) run in the Gateway Postgres lane on CI.

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-bounded-session-write-behind-retention.md
 document:
-  en: c86463dbae346a1449dfe47f70e7ad6c704227c5
-  zh: 6525001c82cf06a4e2d922189995a6cbc135b109
+  en: 4fa283724e58f85086134cc80403d62db79c36f6
+  zh: 782ae3fff071227dd58fe7bf4f32043cc3e6a9af
 /agent-note-bound-session-write-behind-retention-by-events-and-bytes:
   en: 0883d6390d7cc498
   zh: 32975415d6b6d131
@@ -12,14 +12,14 @@ document:
   en: 5a6352f127c3ab9f
   zh: 99eb3830f0fa771f
 /agent-note-bound-session-write-behind-retention-by-events-and-bytes/decision:
-  en: 7e5330864c43388d
-  zh: e4ec87341a5b7277
+  en: 23b2380e11cfd53e
+  zh: ee064a4e121e7c27
 /agent-note-bound-session-write-behind-retention-by-events-and-bytes/alternatives-considered:
   en: f5663cd3e062e2e9
   zh: 057146c6a34d9724
 /agent-note-bound-session-write-behind-retention-by-events-and-bytes/verification:
-  en: 178da177da90f478
-  zh: 9ac8ddeca6b6a047
+  en: 8ed1df04196bbda9
+  zh: d86b4ef607e0f010
 /agent-note-bound-session-write-behind-retention-by-events-and-bytes/consequences:
-  en: eec0ca9bafaf7104
-  zh: 7f3ee10fe40ba43c
+  en: 70c78cc37d8715ed
+  zh: 2be5d0a195c48b39

@@ -145,19 +145,24 @@ async function readLockRecord(lockPath: string): Promise<string | undefined> {
  * holder can no longer release it, and no other contender can remove it
  * without the claim, so a removal never deletes a lock another contender
  * acquired after the dead holder's, including one whose holder reused the PID.
+ * A claim left by an exited claimant is recovered through the same protocol;
+ * its record-specific claim serializes recovery before the original claim is
+ * retried. Live or incomplete claims remain owned.
  * @returns Whether this call removed the dead holder's lock.
  */
 async function takeOverExitedLock(lockPath: string): Promise<boolean> {
   const record = await readLockRecord(lockPath)
   if (record === undefined || !holderExited(record)) return false
   const claim = `${lockPath}.takeover-${createHash('sha256').update(record).digest('hex').slice(0, 16)}`
-  try {
-    await writeFile(claim, `${process.pid}\n`, { mode: 0o600, flag: 'wx' })
-  } catch (error) {
-    // Another contender owns the claim for this record, or Windows still deletes the claim it released.
-    const code = (error as NodeJS.ErrnoException).code
-    if (code === 'EEXIST' || code === 'EPERM') return false
-    throw error
+  for (;;) {
+    try {
+      await writeFile(claim, `${process.pid}\n`, { mode: 0o600, flag: 'wx' })
+      break
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code !== 'EEXIST' && code !== 'EPERM') throw error
+      if (!await takeOverExitedLock(claim)) return false
+    }
   }
   try {
     if (await readLockRecord(lockPath) !== record || !holderExited(record)) return false
@@ -171,7 +176,7 @@ async function takeOverExitedLock(lockPath: string): Promise<boolean> {
     return true
   } finally {
     await rm(claim, { force: true }).catch((error: unknown) => {
-      // A claim left behind names a record that is no longer the lock, so it blocks no later takeover.
+      // A later contender recovers the claim after this process exits if its lock still remains.
       void error
     })
   }

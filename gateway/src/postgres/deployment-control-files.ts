@@ -60,6 +60,12 @@ export async function previewBackupNodeConfiguration(id: string, snapshot: Manag
   const incompatibleFields: string[] = []
   const currentPath = (await normalizeManagedRoots([{ owner: 'gateway', kind: 'file', path: resolve(cfg.nodeConfigFile) }]))[0]!.path
   if (path !== undefined && path !== currentPath) incompatibleFields.push('HGW_NODE_CONFIG_FILE')
+  const tunnelKeys = snapshot.roots.filter(root => root.owner === 'gateway-tunnel-credentials')
+  if (tunnelKeys.length > 1 || tunnelKeys.some(root => root.kind !== 'file')) throw new MaintenanceError(409, 'backup-tunnel-credential-key-identity-ambiguous')
+  if (tunnelKeys.length === 1) {
+    const currentKey = (await normalizeManagedRoots([{ owner: 'gateway-tunnel-credentials', kind: 'file', path: resolve(cfg.tunnelCredentialKeyFile) }]))[0]!.path
+    if (tunnelKeys[0]!.path !== currentKey) incompatibleFields.push('HGW_TUNNEL_CREDENTIAL_KEY_FILE')
+  }
   if (record !== undefined && !sameIdentity(record, context, cfg)) incompatibleFields.push('node-identity')
   if (record !== undefined) {
     const current = nodeSettingsFromConfig(cfg, environment)

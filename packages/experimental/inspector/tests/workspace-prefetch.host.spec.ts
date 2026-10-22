@@ -22,7 +22,7 @@ it('pins the npm source and uses workspace Vite without a webpack dependency', (
   const dependencies = manifest('../package.json').devDependencies
   expect(dependencies?.['chrome-devtools-frontend']).toBe('1.0.1638082')
   expect(dependencies?.vite).toBeUndefined()
-  expect(manifest('../../../../package.json').devDependencies?.vite).toBe('8.2.2')
+  expect(manifest('../../../../package.json').devDependencies?.vite).toBe('8.2.4')
   expect(Object.keys(dependencies ?? {}).some(name => name.includes('webpack'))).toBe(false)
 })
 

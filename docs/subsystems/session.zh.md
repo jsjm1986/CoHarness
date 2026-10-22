@@ -454,6 +454,11 @@ type SurfaceIntent<T extends SurfaceEventType = SurfaceEventType> = {
 
 对 `SurfaceEventType` 事件必填：每个产生消息的事件都必须声明它如何加入 surface（派生模型历史的唯一来源）。面向人类的 transcript（文本记录）是另一个投影，读取的是日志中追加来源的事件，因为 surface 会有意遮蔽替换所概括的范围（见 [dsh-session](../../packages/core/session/README.zh.md) 的 `isAppendSurfaceEvent`）。非 surface 类型在编译期拒绝此参数。
 
+<a id="append-resource-admission"></a>
+### 追加资源准入
+
+`SessionAppendAdmission` 同步接收已挂接的 `Session` 及其冻结的 `SessionEvent` 候选事件，并返回回滚函数或 `undefined`。`ctx.sessions.registerAppendAdmission()` 通过调用方 fiber 拥有该注册。提交前，后续拒绝或校验失败会逆序调用成功预留的回滚函数；提交后，对应的 `session/event` 消费方负责结算。独立构造不调用这些回调。[Session 包](../../packages/core/session/README.zh.md#append-admission)记录注册与重入规则。
+
 <a id="plugin-owned-message-projections"></a>
 ### 插件拥有的消息投影
 
@@ -711,7 +716,9 @@ declare class Session {
      *   of truth, so a bad event fails at the append site rather than later during
      *   a backend flush. A synchronous internal dispatch validation failure or an
      *   append reentered while this acceptance/publication boundary is open also
-     *   rejects before the log changes.
+     *   rejects before the log changes. Attached-store resource admissions reserve
+     *   before surface and dispatch validation; refusal rolls back earlier
+     *   reservations without publishing the candidate.
      */
   append<T extends SessionEventType>(
       type: T,
@@ -941,6 +948,17 @@ In-memory session store (`ctx.sessions`).
 Persistence is intentionally not implemented here — persistence plugins subscribe to `session/event` and flush on `session/flush` / dispose.
 
 ```ts cordis-catalog
+/**
+ * Register synchronous resource admission for every Session attached to this store.
+ * Refusal leaves the log and event feed unchanged. Reservations roll back in
+ * reverse order if any admission, surface validation, or dispatch validation
+ * fails; committed reservations pass to the `session/event` consumer.
+ * @param admission - resource reservation over an immutable candidate; rollback must be synchronous.
+ * @returns the registering fiber's disposer, which removes future admission calls.
+ * @throws when the same callback already has a live registration.
+ */
+registerAppendAdmission(admission: SessionAppendAdmission): () => Promise<void>
+
 /**
  * Register one event interpreter for live creation, restore, and fork.
  * Disposing the contribution makes sessions that used it refuse further derivation.

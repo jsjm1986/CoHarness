@@ -21,6 +21,9 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_PORT` | 8899 | 网关监听端口 |
 | `HGW_DATABASE_URL` | （未设置文件时必需） | PostgreSQL 连接 URL；生产优先使用文件形式 |
 | `HGW_DATABASE_URL_FILE` | （未设置 URL 时必需） | 包含 PostgreSQL 连接 URL 的 `0600` 权限文件 |
+| `HGW_DATABASE_MAX_CONNECTIONS` | 10 | Gateway 连接池最大连接数，包含访问撤销监听连接 |
+| `HGW_DATABASE_MAX_CHECKOUT_QUEUE` | 256 | query、callback 与 promise 调用共享的未完成连接获取上限 |
+| `HGW_DATABASE_CONNECTION_TIMEOUT_MS` | 5 秒 | 最长连接池连接等待时间 |
 | `HGW_ORGANIZATION_SLUG` | `default` | 本进程选择的现有活跃 PostgreSQL 企业 |
 | `HGW_COMPUTE_NODE_NAME` | `local` | 拥有挂载、端口和实例状态的现有活跃计算节点 |
 | `HGW_INTAKE_PORT` | `HGW_PORT + 1` | 仅回环监听、Bearer 鉴权的用量 intake 端口 |
@@ -39,7 +42,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | 用于加密组织和项目 Provider API Key 的仅所有者可读 AES-GCM 密钥 |
 | `HGW_WEBHOOK_SECRET_KEY_FILE` | `~/.harness-gateway/webhook-secrets.key` | 用于加密 Webhook 端点签名密钥的仅所有者可读 AES-GCM 密钥 |
-| `HGW_TUNNEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/tunnel-credentials.key` | 加密管理端隧道 Cloudflare API 与运行令牌的仅所有者可读 AES-GCM 密钥 |
+| `HGW_TUNNEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/tunnel-credentials.key` | 加密管理端隧道 Cloudflare API 与运行令牌的仅所有者可读 AES-GCM 密钥；完整备份捕获此文件并随数据库恢复其字节；目标路径不同需要显式迁移 |
 | `HGW_TUNNEL_STATE_DIR` | `~/.harness-gateway/tunnel` | 隧道工作目录；承载受管 `cloudflared` 安装 |
 | `HGW_CLOUDFLARED` | (unset) | `cloudflared` 二进制绝对路径覆盖；未设置时先解析受管安装，再查 PATH 与常见路径 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
@@ -52,6 +55,12 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_INSTANCE_PORT_BASE` | 42000 | 节点本地实例端口分配的包含下界（总是选择第一个空闲端口） |
 | `HGW_IDLE_TIMEOUT_MS` | 30 分钟 | 实例闲置休眠阈值 |
 | `HGW_READINESS_TIMEOUT_MS` | 30 秒 | 实例就绪等待上限，最大 2,147,483,647 毫秒 |
+| `HGW_RUNTIME_MAX_STARTING` | 2 | 当前 Gateway 同时冷启动的 Runtime 数 |
+| `HGW_RUNTIME_MAX_RESIDENT` | 8 | 常驻与启动中 Runtime 的进程预约总数 |
+| `HGW_RUNTIME_MAX_QUEUED` | 32 | 等待冷启动准入的 Runtime 数 |
+| `HGW_RUNTIME_QUEUE_WAIT_MS` | 30 秒 | 冷启动准入最长等待时间 |
+| `HGW_PERFORMANCE_ENABLED` | `true` | 启用有界累计请求与进程诊断；仅接受 `true` 或 `false` |
+| `HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS` | 20 毫秒 | 原生事件循环延迟采样间隔 |
 | `HGW_UPSTREAM_TIMEOUT_MS` | 30 秒 | 单次 HTTP/WebSocket 代理操作或已转发的指定作用域文档元数据请求等待运行时上游的最长时间，最大 2,147,483,647 毫秒 |
 | `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` | 64 MiB | Gateway 保留或转发的运行时响应最大字节数 |
 | `HGW_LAUNCHER` | `local` | 实例启动驱动：`local`（macOS 开发子进程）/ `systemd`（Linux 生产每用户单元） |
@@ -77,11 +86,21 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 生产安装、切流与验收见 [deploy/README.md](deploy/README.zh.md)。
 
+## 性能与 Runtime 准入
+
+`GET /admin/api/performance` 要求已登录管理员身份，返回不缓存的累计快照：HTTP、内部 HTTP 和 WebSocket 生命周期、错误及在途计数；固定时长分桶及近似分位数上界；Gateway 事件循环延迟／利用率和进程内存；原生数据库连接池计数；以及 Runtime 准入计数。快照包含自身读取请求的在途占用，不保留请求路径、账户名或 Session 标识。采样区间可比较计数与分桶差值；累计分位数、最大值和内存快照不能通过相减得到区间统计。WebSocket 时长衡量连接生命周期，不是逐帧投递延迟；Gateway 内存不包括 Runtime 子进程和 PostgreSQL。
+
+冷 Runtime 准入在当前 Gateway 的个人与项目运行时之间共享 FIFO 启动和常驻预约。冷启动等待不阻止热运行时继续使用。容量保留至进程确认终止。重启后由 supervisor 保留的进程计入限额，不会仅因配置限额较低而被终止。默认值是保守保护设置，不代表实测支持 300 人或 100 个混合任务。这些限额覆盖受管 Runtime 进程，不覆盖 Agent／工具／PTY 并发、非受管进程或同机另一 Gateway。参见 [Runtime 准入决策](../.agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.zh.md)。
+
+`startRequest.admission` 确认有界队列已接纳请求、已立即预留槽位或可复用热运行时；`startRequest.completion` 才确认经鉴权的就绪状态。普通 HTTP 代理请求在准入后返回等待响应。队列满立即返回 HTTP 503、`INSTANCE_CAPACITY` 和 `Retry-After`。已获接纳的请求在后台继续启动，同时保留 HTML 200 等待页或 API 503 `INSTANCE_STARTING` 响应。之后的排队超时与取消会计入快照并拒绝 completion，不能改写已经返回的 HTTP 响应。
+
+PostgreSQL 连接池统一限制原生查询、直接取连接和事务辅助函数的待取连接数量。准入耗尽返回 HTTP 503 和 `DB_CHECKOUT_QUEUE_FULL`；用量接收端在认证及入库期间都保留这一可重试状态，避免把过载期间的有效账单当作无效输入丢弃。[连接池决策](../.agents/notes/implemented/architecture/2026-10-23-postgres-checkout-admission.zh.md)说明计数和恢复规则。
+
 ## 管理端与项目授权
 
 `/admin` 托管从 `gateway/admin-ui` 构建到 `gateway/public/admin` 的 Vite SPA；外壳 `index.html` 携带 `cache-control: no-store`，使版本切换不会让被钉住的外壳继续引用已删除的哈希分块，`assets/*` 按内容哈希命名并携带 `private, max-age=31536000, immutable`。`/admin/api/*` 是网关 JSON API（非 `admin` 角色 403）。管理员发起项目有两种创建模式：**默认目录**只提交名称，并以 `0770` 权限创建或复用 `<HGW_PROJECTS_ROOT>/<name>`；**现有目录**提交名称以及从 Gateway 宿主机选择的目录。用户发起项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下分配目录。两种来源使用同一套工作空间、共享运行时、成员和对话模型。用户创建的项目把创建者设为 `rw` 所有者，并提供邀请生命周期操作；管理员可以在同一列表中查看两种来源并按来源筛选。
 
-`GET /admin/api/project-directories` 为现有目录浏览器提供数据。本地启动器模式从 `/` 开始，因此 macOS 外接磁盘显示在 `/Volumes` 下；systemd 模式显示只包含 `HGW_PROJECT_PATH_ROOTS` 的虚拟根，且配置根本身只能导航。每次响应包含一层排序后的目录，最多 1,000 条；隐藏目录带标记，并在 UI 中默认隐藏，直到管理员启用显示。离开 systemd 根的规范符号链接会被省略。浏览器绝不会读取管理员客户端的文件系统。最终创建项目时会再次解析和校验所选路径，并用稳定诊断拒绝非绝对路径、不存在、不是目录、不可访问、配置根外、Gateway 自有/保留、用户 home 和既有项目重叠的路径。受管名称会被修剪且必须恰好构成一个目录段，因此 `.`/`..`、分隔符、控制字符和经符号链接解析的逃逸都会被拒绝。重命名项目只改变目录中的名称，删除项目会保留宿主机文件。
+`GET /admin/api/project-directories` 为现有目录浏览器提供数据。本地启动器模式从 `/` 开始，因此 macOS 外接磁盘显示在 `/Volumes` 下；systemd 模式显示只包含 `HGW_PROJECT_PATH_ROOTS` 的虚拟根，且配置根本身只能导航。每次响应包含一层排序后的目录，最多 1,000 条；隐藏目录带标记，并在 UI 中默认隐藏，直到管理员启用显示。离开 systemd 根的规范符号链接会被省略。浏览器绝不会读取管理员客户端的文件系统。最终创建项目时会再次解析和校验所选路径，并用稳定诊断拒绝非绝对路径、不存在、不是目录、不可访问、配置根外、Gateway 自有/保留、用户 home 和既有项目重叠的路径。受管名称会被修剪且必须恰好构成一个目录段，因此 `.`/`..`、分隔符、控制字符和经符号链接解析的逃逸都会被拒绝。重命名项目只改变目录中的名称，删除项目会保留宿主机文件。PostgreSQL 创建在节点事务锁内检查保留路径和重叠路径。用户项目创建失败时，只有不可能提交才会删除新分配目录；缺失提交确认和响应读取失败都会保留目录。项目成员变更复用事务连接；[项目创建事务说明](../.agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.zh.md) 记录清理取舍。
 
 成员为 `ro` 或 `rw`，普通用户的有效列表（私有 home 加成员身份，每条带 `label`）写入 `$DSH_HOME/directory-grants.json`。管理员在个人和项目 scope 都得到文件系统根目录的 `rw` 授权和 Full access 预设。该预设只改变 dsh 的应用内 sandbox 与审批旋钮；systemd 项目运行时仍受内核项目路径约束。角色变化会重写这份投影，并重启正在运行的个人实例。用户删除是逻辑删除：停止个人实例、释放其运行时端口分配、吊销会话、移除项目与模型访问、在登录和管理列表中隐藏账号，并保留审计、用量、对话和 home 历史；用户名保持占用。位于 `/admin/users/:id` 的用户详情页集中呈现单个账号的各项管理能力：资料、状态、运行时实例控制、SSH/终端/桌面/插件管理/记忆写入/维护空间资格、按模型的访问例外、显式项目成员身份，以及按用户的额度模式。
 
@@ -109,7 +128,9 @@ SSH 目标元数据在 `/admin/ssh` 管理。可选的 `passwordRef` 是连接�
 
 维护空间的准入把授权叠加在管理员身份之上：启用的 `steward_access_policies` 行让活跃组织管理员以 `rw` 进入，无授权的管理员和持有授权行的普通成员同样被拒——成员表保持为空，成员与邀请变更一律拒绝。对非管理员的启用写入在授权事务内失败，每条准入路径读时复核角色，降级立即终止准入，迁移 052 删除永不可能生效的授权行。管理员在 `/admin/steward` 页集中管理授权，也可在用户详情页以版本栅栏逐用户编辑。steward 运行时的目录授权覆盖其工作区（`rw`）加部署树（`HGW_RELEASE_ROOT` 布局下是 releases 集合目录，否则是仓库根）以及 `HGW_STEWARD_READ_ROOTS` 声明的根（`ro`）。维护运行时运行固定组装（`dsh-steward-tools` 经 profile 补丁挂载）；插件状态与插件管理写入拒绝 steward owner，因此常驻运行时永远不会因组装变更重启自己。
 
-Agent 的 `steward_query` 工具到达 `POST /internal/runtime/steward/query`：校验运行时令牌、确认目标项目是活跃的 steward 行、在服务端重新分类 SQL，并把每次尝试连同运行时 generation 写入 `steward_query_log`。判为只读的语句在 `READ ONLY` 事务内执行——关键字测试只选择通道，由 PostgreSQL 强制只读，因此 `EXPLAIN ANALYZE` 和可写 CTE 会失败并被审计，而不是被夹带放行——外加语句（64 KiB）、行数（至多 5000）、结果（256 KiB）与超时（15 秒）限额；`dry_run` 改为返回 `EXPLAIN` 计划。写语句需要同一 steward 项目会话内、仍具资格的应答者在 15 分钟内授予的 `allowed-once` 交互批准；审批上的 advisory 锁把并发写串行化，使一次批准恰好只能放行一次写入，写入随后在同时写入审计行的事务内执行。v1 刻意不提供通用运行时调用代理和发版激活自动化：代码改动仍走 worktree → PR → 发版流水线，审计 SQL 之外的管理操作仍在 `/admin` 完成。
+Agent 的 `steward_query` 工具到达 `POST /internal/runtime/steward/query`：校验运行时令牌、确认目标项目是活跃的 steward 行、在服务端重新分类 SQL，并把每次尝试连同运行时 generation 写入 `steward_query_log`。PostgreSQL extended protocol 强制每次只执行一条语句；判为只读的语句在 `READ ONLY` 事务内执行——关键字测试只选择通道，由 PostgreSQL 强制只读，因此 `EXPLAIN ANALYZE` 和可写 CTE 会失败并被审计，而不是被夹带放行——外加语句（64 KiB）、行数（至多 5000）、结果（256 KiB）与超时（15 秒）限额；`dry_run` 改为返回 `EXPLAIN` 计划。写语句需要同一 steward 项目会话内、仍具资格的应答者在 15 分钟内授予的 `allowed-once` 交互批准；审批上的 advisory 锁把并发写串行化，使一次批准恰好只能放行一次写入，写入随后在同时写入审计行的事务内执行。v1 刻意不提供通用运行时调用代理和发版激活自动化：代码改动仍走 worktree → PR → 发版流水线，审计 SQL 之外的管理操作仍在 `/admin` 完成。
+
+查询行和 dry-run 计划行按顺序保留前缀，同时满足请求行数上限与完整响应的 256 KiB UTF-8 字节预算。前缀之外的行会继续读取，但不会再积存第二份结果数组，写语句的 `RETURNING` 输出也遵循此规则；`rowCount` 报告完整命令计数，`truncated` 标明读取行或计划行是否有省略。驱动仍会先解码每个单独的行，再应用保留上限。
 
 ## 用户终端
 

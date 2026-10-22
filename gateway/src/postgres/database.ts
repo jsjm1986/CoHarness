@@ -50,9 +50,99 @@ export interface GatewayPoolConfig extends PoolConfig {
 interface CheckoutState {
   pending: number
   limit: number
+  rejected: number
 }
 
 const checkoutStates = new WeakMap<Pool, CheckoutState>()
+
+/** Node-local checkout admission; rejected is cumulative for this pool's lifetime. */
+export interface PostgresPoolAdmissionSnapshot {
+  /** Unsettled checkout operations, including connections still being established. */
+  readonly pending: number
+  readonly maxPending: number
+  readonly rejected: number
+}
+
+/**
+ * Read checkout admission without exposing SQL, connection strings or caller identities.
+ * @param pool - Gateway-created pool or an injected pool adopted by connectFromPool.
+ * @returns Current pending count, configured limit and cumulative refusals; null before an injected pool is adopted.
+ */
+export function poolAdmissionSnapshot(pool: Pool): PostgresPoolAdmissionSnapshot | null {
+  const state = checkoutStates.get(pool)
+  return state === undefined ? null : { pending: state.pending, maxPending: state.limit, rejected: state.rejected }
+}
+
+/** An unresolved checkout was refused before entering pg's pending queue. */
+export class PostgresCheckoutQueueFullError extends Error {
+  readonly code = 'DB_CHECKOUT_QUEUE_FULL'
+  /** @param limit - configured unresolved-checkout capacity. */
+  constructor(readonly limit: number) {
+    super('PostgreSQL checkout queue is full (' + String(limit) + ')')
+    this.name = 'PostgresCheckoutQueueFullError'
+  }
+}
+
+function checkoutQueueFull(state: CheckoutState): PostgresCheckoutQueueFullError {
+  state.rejected += 1
+  return new PostgresCheckoutQueueFullError(state.limit)
+}
+
+type CheckoutCallback = Parameters<Pool['connect']>[0]
+
+/** pg.query uses this.connect, so one override owns admission for every native checkout entry. */
+class GatewayPostgresPool extends Pool {
+  private readonly checkout: CheckoutState
+
+  constructor(options: PoolConfig, limit: number) {
+    super(options)
+    this.checkout = { pending: 0, limit, rejected: 0 }
+    checkoutStates.set(this, this.checkout)
+  }
+
+  override connect(): Promise<PoolClient>
+  override connect(callback: CheckoutCallback): void
+  override connect(callback?: CheckoutCallback): Promise<PoolClient> | void {
+    if (this.ending) return callback === undefined ? super.connect() : super.connect(callback)
+    if (this.checkout.pending >= this.checkout.limit) {
+      const error = checkoutQueueFull(this.checkout)
+      if (callback === undefined) return Promise.reject(error)
+      queueMicrotask(() => { callback(error, undefined, () => {}) })
+      return
+    }
+    this.checkout.pending += 1
+    let settled = false
+    const settle = (): void => {
+      if (settled) return
+      settled = true
+      this.checkout.pending -= 1
+    }
+    if (callback !== undefined) {
+      try {
+        super.connect((error, client, release) => {
+          settle()
+          callback(error, client === undefined ? undefined : guardCheckedOutClient(client), release)
+        })
+      } catch (error) {
+        settle()
+        throw error
+      }
+      return
+    }
+    let connecting: Promise<PoolClient>
+    try { connecting = super.connect() } catch (error) {
+      settle()
+      return Promise.reject(error)
+    }
+    return connecting.then(client => {
+      settle()
+      return guardCheckedOutClient(client)
+    }, error => {
+      settle()
+      throw error
+    })
+  }
+}
 
 function checkoutLimit(value: number | undefined): number {
   const resolved = value ?? DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE
@@ -82,7 +172,7 @@ export async function databaseUrlFromFile(env: NodeJS.ProcessEnv = process.env):
 export function createPostgresPool(connectionString: string, overrides: GatewayPoolConfig = {}): Pool {
   const { maxCheckoutQueue, ...poolOverrides } = overrides
   const checkoutQueueLimit = checkoutLimit(maxCheckoutQueue)
-  const pool = new Pool({
+  const pool = new GatewayPostgresPool({
     connectionString,
     max: 10,
     idleTimeoutMillis: 30_000,
@@ -92,8 +182,7 @@ export function createPostgresPool(connectionString: string, overrides: GatewayP
     lock_timeout: DEFAULT_DATABASE_LOCK_TIMEOUT_MS,
     idle_in_transaction_session_timeout: DEFAULT_DATABASE_IDLE_TRANSACTION_TIMEOUT_MS,
     ...poolOverrides,
-  })
-  checkoutStates.set(pool, { pending: 0, limit: checkoutQueueLimit })
+  }, checkoutQueueLimit)
   // `pg.Pool` emits an `error` event when an idle client is terminated by the
   // server or network.  Without a listener Node treats that event as
   // uncaught and takes the Gateway down, even though a later checkout could
@@ -130,20 +219,18 @@ function guardCheckedOutClient(client: PoolClient): PoolClient {
 
 /**
  * Acquire one pool client with the checkout `error` guard attached and the
- * bounded pg-pool wait list enforced. Callers that manage their own
- * BEGIN/COMMIT lifecycle (rather than {@link transaction}) must check out
- * through here so a server-side kill can never reach the process as an
- * unhandled `error` event.
+ * bounded unresolved-checkout count enforced. Gateway-created pools apply
+ * both protections to their native connect and query entries; this helper
+ * also adopts externally supplied pools for transaction callers.
  */
 export function connectFromPool(pool: Pool): Promise<PoolClient> {
+  if (pool instanceof GatewayPostgresPool) return pool.connect()
   const state = checkoutStates.get(pool)
   /* v8 ignore next -- every production pool is created by createPostgresPool; the
      fallback keeps transaction tests and injected pools compatible. */
-  const current = state ?? { pending: 0, limit: DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE }
+  const current = state ?? { pending: 0, limit: DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE, rejected: 0 }
   if (current.pending >= current.limit) {
-    const error = new Error(`PostgreSQL checkout queue is full (${String(current.limit)})`)
-    Object.assign(error, { code: 'DB_CHECKOUT_QUEUE_FULL' })
-    return Promise.reject(error)
+    return Promise.reject(checkoutQueueFull(current))
   }
   current.pending += 1
   if (state === undefined) checkoutStates.set(pool, current)
@@ -257,7 +344,6 @@ async function connectWithSignal(pool: Pool, signal?: AbortSignal): Promise<Pool
       settled = true
       cleanup()
       reject(signal.reason instanceof Error ? signal.reason : new Error('database checkout aborted'))
-      void connecting.then(client => { client.release() }, () => {})
     }
     signal.addEventListener('abort', onAbort, { once: true })
     if (signal.aborted) onAbort()

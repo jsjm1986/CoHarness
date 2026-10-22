@@ -7,7 +7,7 @@ import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from '../src/instances.ts'
 import type { InstanceRepository, RuntimeTarget, RuntimeStopReason } from '../src/instances.ts'
-import type { InstanceProc } from '../src/launcher.ts'
+import { RuntimeLaunchCleanupError, type InstanceProc } from '../src/launcher.ts'
 import { runtimeRelay } from './runtime-relay.ts'
 import { UserService } from '../src/users.ts'
 
@@ -108,6 +108,7 @@ class ProjectRepository implements InstanceRepository {
   constructor(private readonly projectPath: string, private readonly port: number) {}
 
   initialize(): Promise<void> { return Promise.resolve() }
+  activeTargets(): Promise<RuntimeTarget[]> { return Promise.resolve([]) }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.port) }
   stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve(this.state) }
   stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(this.reason) }
@@ -156,6 +157,7 @@ class SurvivorRepository implements InstanceRepository {
   constructor(private readonly projectPath: string, private readonly port: number) {}
 
   initialize(_instancesOutliveGateway: boolean): Promise<void> { return Promise.resolve() }
+  activeTargets(): Promise<RuntimeTarget[]> { return Promise.resolve([{ kind: 'project', id: 41 }]) }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.port) }
   stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve('ready') }
   stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(null) }
@@ -189,6 +191,7 @@ class FailingStopRepository implements InstanceRepository {
   constructor(private readonly failIds: ReadonlySet<number>) {}
 
   initialize(): Promise<void> { return Promise.resolve() }
+  activeTargets(): Promise<RuntimeTarget[]> { return Promise.resolve([]) }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(43100) }
   stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve('ready') }
   stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(null) }
@@ -209,6 +212,125 @@ class FailingStopRepository implements InstanceRepository {
 }
 
 describe('InstanceManager', () => {
+  it('keeps warm runtimes usable while cold starts wait, merges retries and cancels a queued target on stop', async () => {
+    const { alice, manager, users } = await setup({ HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '2', HGW_RUNTIME_MAX_QUEUED: '1' })
+    const bob = await users.create({ username: 'bob', password: 'pw-123456' })
+    const cara = await users.create({ username: 'cara', password: 'pw-123456' })
+    const dan = await users.create({ username: 'dan', password: 'pw-123456' })
+    await manager.ensureRunning(alice)
+    let release!: () => void
+    const barrier = new Promise<void>(resolve => { release = resolve })
+    manager.beforeStart = async runtime => { if (runtime.ownerId === bob.id) await barrier }
+    try {
+      const starting = manager.ensureRunning(bob)
+      expect(manager.ensureRunning(bob)).toBe(starting)
+      await vi.waitFor(() => { expect(manager.capacitySnapshot().starting).toBe(1) })
+      const queued = manager.ensureRunning(cara)
+      const cancelled = expect(queued).rejects.toMatchObject({ code: 'INSTANCE_CAPACITY', reason: 'cancelled' })
+      await vi.waitFor(() => { expect(manager.capacitySnapshot().queued).toBe(1) })
+      await expect(manager.ensureRunning(dan)).rejects.toMatchObject({ reason: 'queue-full' })
+      await expect(manager.ensureRunning(alice)).resolves.toHaveProperty('port')
+      await manager.stop(cara.id)
+      await cancelled
+      expect(manager.capacitySnapshot()).toMatchObject({ resident: 2, queued: 0, rejected: 1, cancelled: 1 })
+      release()
+      await starting
+      expect(await manager.isLive(cara.id)).toBe(false)
+      expect(await manager.isLive(bob.id)).toBe(true)
+      await manager.stop(bob.id)
+      expect(manager.capacitySnapshot()).toMatchObject({ resident: 1, starting: 0 })
+    } finally { release() }
+  })
+
+  it('retains a failed start reservation until process termination succeeds', async () => {
+    const { alice, cfg, db } = await setup({ HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '1' })
+    const terminate = vi.fn().mockRejectedValueOnce(new Error('process tree still running')).mockResolvedValue(undefined)
+    const proc: InstanceProc = { hasExited: () => true, terminate }
+    manager = new InstanceManager(db, cfg, { instancesOutliveGateway: false, start: async () => proc })
+    await expect(manager.ensureRunning(alice)).rejects.toThrow('failed to become ready')
+    expect(manager.capacitySnapshot()).toMatchObject({ resident: 1, starting: 1 })
+    await manager.stop(alice.id)
+    expect(terminate).toHaveBeenCalledTimes(2)
+    expect(manager.capacitySnapshot()).toMatchObject({ resident: 0, starting: 0 })
+  })
+
+  it('shutdown waits for a cancelled cold start to settle before returning', async () => {
+    const { alice, manager } = await setup()
+    let entered!: () => void, release!: () => void
+    const entry = new Promise<void>(resolve => { entered = resolve })
+    const barrier = new Promise<void>(resolve => { release = resolve })
+    manager.beforeStart = async () => { entered(); await barrier }
+    const starting = manager.ensureRunning(alice)
+    const cancelled = expect(starting).rejects.toMatchObject({ reason: 'cancelled' })
+    await entry
+    let stopped = false
+    const shutdown = manager.stopAll().then(() => { stopped = true })
+    try {
+      await Promise.resolve()
+      expect(stopped).toBe(false)
+    } finally { release() }
+    await cancelled
+    await shutdown
+    expect(manager.capacitySnapshot()).toMatchObject({ resident: 0, starting: 0, queued: 0 })
+    expect(await manager.isLive(alice.id)).toBe(false)
+  })
+
+  it('keeps a driver-owned launch failure counted when its process cannot be stopped', async () => {
+    const { alice, cfg, db } = await setup({ HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '1' })
+    const terminate = vi.fn().mockRejectedValueOnce(new Error('termination pending')).mockResolvedValue(undefined)
+    const proc: InstanceProc = { hasExited: () => false, terminate }
+    manager = new InstanceManager(db, cfg, {
+      instancesOutliveGateway: false,
+      start: async () => { throw new RuntimeLaunchCleanupError(proc, new Error('credential delivery failed')) },
+    })
+    await expect(manager.ensureRunning(alice)).rejects.toBeInstanceOf(RuntimeLaunchCleanupError)
+    expect(manager.capacitySnapshot()).toMatchObject({ resident: 1, starting: 1 })
+    await manager.stop(alice.id)
+    expect(manager.capacitySnapshot().resident).toBe(0)
+  })
+
+  it('keeps a supervisor survivor counted when attachment cannot confirm its process', async () => {
+    const { root, cfg } = await setup()
+    const projectPath = join(root, 'uncertain-project')
+    mkdirSync(projectPath)
+    const start = vi.fn()
+    const survivor = new InstanceManager(new SurvivorRepository(projectPath, 43100), cfg, {
+      instancesOutliveGateway: true, start,
+      attach: () => { throw new Error('supervisor unavailable') },
+    })
+    try {
+      await expect(survivor.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath }))
+        .rejects.toThrow('unconfirmed existing process')
+      expect(start).not.toHaveBeenCalled()
+      expect(survivor.capacitySnapshot()).toMatchObject({ resident: 1, starting: 0 })
+      await expect(survivor.stop({ kind: 'project', id: 41 })).rejects.toThrow('supervisor unavailable')
+      expect(survivor.capacitySnapshot().resident).toBe(1)
+    } finally { await survivor.stopAll() }
+  })
+
+  it.each(['starting', 'stopping'])('requires a confirmed stop before replacing a %s supervisor survivor', async state => {
+    const { root, cfg } = await setup({ HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '1' })
+    const projectPath = join(root, `incomplete-${state}`)
+    mkdirSync(projectPath)
+    const repository = new SurvivorRepository(projectPath, 43100)
+    repository.stateOf = async () => state
+    const terminate = vi.fn(async () => {})
+    const start = vi.fn()
+    const survivor = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: true, start,
+      attach: () => ({ hasExited: () => false, terminate }),
+    })
+    try {
+      await expect(survivor.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath }, 'explicit'))
+        .rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE', message: expect.stringContaining('incomplete start or stop') })
+      expect(start).not.toHaveBeenCalled()
+      expect(survivor.capacitySnapshot()).toMatchObject({ resident: 1, queued: 0, admitted: 0 })
+      await survivor.stop({ kind: 'project', id: 41 })
+      expect(terminate).toHaveBeenCalledOnce()
+      expect(survivor.capacitySnapshot().resident).toBe(0)
+    } finally { await survivor.stopAll() }
+  })
+
   it('spawns, reports ready, and dedupes concurrent starts', async () => {
     const { alice, manager } = await setup()
     const [a, b] = await Promise.all([manager.ensureRunning(alice), manager.ensureRunning(alice)])
@@ -264,8 +386,8 @@ describe('InstanceManager', () => {
     const { port } = await manager.ensureRunning(alice)
     expect(await manager.isLive(alice.id)).toBe(true)
     await fetch(`http://127.0.0.1:${port}/exit`)
-    await new Promise(r => setTimeout(r, 50))
-    expect(await manager.stateOf(alice.id)).toBe('ready')
+    await vi.waitFor(async () => { expect(await manager.stateOf(alice.id)).toBe('stopped') })
+    expect(manager.capacitySnapshot().resident).toBe(0)
     expect(await manager.isLive(alice.id)).toBe(false)
     await manager.ensureRunning(alice)
     expect(await manager.isLive(alice.id)).toBe(true)

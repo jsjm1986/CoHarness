@@ -16,6 +16,32 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ HGW_PSQL_COMMAND: '' })).toThrow('HGW_PSQL_COMMAND')
   })
 
+  it('validates node-wide Runtime admission and performance settings', () => {
+    expect(loadConfig({}).runtimeCapacity).toEqual({ maxStarting: 2, maxResident: 8, maxQueued: 32, maxQueueWaitMs: 30000 })
+    expect(loadConfig({}).performanceEnabled).toBe(true)
+    expect(loadConfig({}).performanceEventLoopResolutionMs).toBe(20)
+    expect(loadConfig({ HGW_PERFORMANCE_ENABLED: 'false' }).performanceEnabled).toBe(false)
+    for (const key of ['HGW_RUNTIME_MAX_STARTING', 'HGW_RUNTIME_MAX_RESIDENT', 'HGW_RUNTIME_MAX_QUEUED', 'HGW_RUNTIME_QUEUE_WAIT_MS', 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS']) {
+      for (const value of ['0', '-1', '1.5', 'wat', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_RUNTIME_MAX_STARTING: '3', HGW_RUNTIME_MAX_RESIDENT: '2' })).toThrow('HGW_RUNTIME_MAX_STARTING')
+    expect(() => loadConfig({ HGW_RUNTIME_QUEUE_WAIT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_RUNTIME_QUEUE_WAIT_MS')
+    expect(() => loadConfig({ HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS')
+    expect(() => loadConfig({ HGW_PERFORMANCE_ENABLED: 'on' })).toThrow('HGW_PERFORMANCE_ENABLED')
+    expect(loadConfig({ HGW_RUNTIME_MAX_STARTING: '4', HGW_RUNTIME_MAX_RESIDENT: '12', HGW_RUNTIME_MAX_QUEUED: '9', HGW_RUNTIME_QUEUE_WAIT_MS: '2000' }).runtimeCapacity)
+      .toEqual({ maxStarting: 4, maxResident: 12, maxQueued: 9, maxQueueWaitMs: 2000 })
+  })
+
+  it('validates production PostgreSQL pool capacity and checkout deadlines', () => {
+    expect(loadConfig({})).toMatchObject({ databaseMaxConnections: 10, databaseMaxCheckoutQueue: 256, databaseConnectionTimeoutMs: 5000 })
+    expect(loadConfig({ HGW_DATABASE_MAX_CONNECTIONS: '12', HGW_DATABASE_MAX_CHECKOUT_QUEUE: '20', HGW_DATABASE_CONNECTION_TIMEOUT_MS: '750' }))
+      .toMatchObject({ databaseMaxConnections: 12, databaseMaxCheckoutQueue: 20, databaseConnectionTimeoutMs: 750 })
+    for (const key of ['HGW_DATABASE_MAX_CONNECTIONS', 'HGW_DATABASE_MAX_CHECKOUT_QUEUE', 'HGW_DATABASE_CONNECTION_TIMEOUT_MS']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_DATABASE_CONNECTION_TIMEOUT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_DATABASE_CONNECTION_TIMEOUT_MS')
+  })
+
   it('provides workable defaults', () => {
     const cfg = loadConfig({})
     expect(cfg.port).toBe(8899)

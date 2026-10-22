@@ -1,0 +1,5 @@
+- insert:
+    - id: steward-query-snapshot-gateway
+      name: ../../../plugins/dsh-steward-tools/tests/fixtures/snapshot-gateway.mjs
+    - id: steward-tools
+      name: ../../../plugins/dsh-steward-tools/src/index.ts

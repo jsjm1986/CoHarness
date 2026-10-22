@@ -452,6 +452,11 @@ type SurfaceIntent<T extends SurfaceEventType = SurfaceEventType> = {
 
 Required for `SurfaceEventType` events — every message-producing event must declare how it joins the surface, the sole source of derived model history. A human-facing transcript is the other projection and reads the log's append-origin events instead, because the surface deliberately shadows the ranges a replacement summarizes (`isAppendSurfaceEvent` in [dsh-session](../../packages/core/session/README.md)). Non-surface types reject it at compile time.
 
+<a id="append-resource-admission"></a>
+### Append resource admission
+
+`SessionAppendAdmission` receives an attached `Session` and its frozen `SessionEvent` candidate synchronously and returns a rollback function or `undefined`. `ctx.sessions.registerAppendAdmission()` owns the registration through its calling fiber. Before commit, a later refusal or validation failure invokes successful reservations' rollbacks in reverse order; after commit, the corresponding `session/event` consumer owns settlement. Detached construction does not invoke these callbacks. The [Session package](../../packages/core/session/README.md#append-admission) documents registration and reentrance.
+
 <a id="plugin-owned-message-projections"></a>
 ### Plugin-owned message projections
 
@@ -709,7 +714,9 @@ declare class Session {
      *   of truth, so a bad event fails at the append site rather than later during
      *   a backend flush. A synchronous internal dispatch validation failure or an
      *   append reentered while this acceptance/publication boundary is open also
-     *   rejects before the log changes.
+     *   rejects before the log changes. Attached-store resource admissions reserve
+     *   before surface and dispatch validation; refusal rolls back earlier
+     *   reservations without publishing the candidate.
      */
   append<T extends SessionEventType>(
       type: T,
@@ -937,6 +944,17 @@ In-memory session store (`ctx.sessions`).
 Persistence is intentionally not implemented here — persistence plugins subscribe to `session/event` and flush on `session/flush` / dispose.
 
 ```ts cordis-catalog
+/**
+ * Register synchronous resource admission for every Session attached to this store.
+ * Refusal leaves the log and event feed unchanged. Reservations roll back in
+ * reverse order if any admission, surface validation, or dispatch validation
+ * fails; committed reservations pass to the `session/event` consumer.
+ * @param admission - resource reservation over an immutable candidate; rollback must be synchronous.
+ * @returns the registering fiber's disposer, which removes future admission calls.
+ * @throws when the same callback already has a live registration.
+ */
+registerAppendAdmission(admission: SessionAppendAdmission): () => Promise<void>
+
 /**
  * Register one event interpreter for live creation, restore, and fork.
  * Disposing the contribution makes sessions that used it refuse further derivation.

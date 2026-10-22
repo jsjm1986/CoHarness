@@ -20,9 +20,11 @@
  * whole-unit file `<root>/<name>.json` (the pre-per-record layout) seeds
  * per-record documents, provided its stored unit version is in the accepted
  * set — a legacy file stamped with any other version is left alone and reads
- * as the empty unit. Any new document path, including one whose contents are
- * unreadable or stale, suppresses the bootstrap for the whole unit. The
- * legacy file is never changed or deleted.
+ * as the empty unit. Without migration metadata, any new document path,
+ * including an unreadable or stale one, suppresses legacy import. The
+ * legacy file is never changed or deleted. A durable bootstrap marker retains
+ * the admitted source until every document is copied, then records completion;
+ * interrupted migration resumes before loadAll exposes its state.
  * @module @deepseek-ai/dsh-storage-json/src/per-record-unit
  */
 
@@ -37,6 +39,9 @@ import type { UnitState } from './format.ts'
 
 /** Keys become path segments in this layout; this set is path-safe on every OS. */
 const SAFE_KEY_RE = /^[a-zA-Z0-9_-]+$/
+const BOOTSTRAP_FILE = '.legacy-bootstrap.json'
+
+type BootstrapState = { version: 1; status: 'copying'; source: string } | { version: 1; status: 'complete' }
 
 /**
  * Open one `per-record`-layout unit under `root`: the unit directory is
@@ -67,6 +72,7 @@ export async function openPerRecordUnit(
  * @returns the authoritative state reconstructed from the tree.
  */
 async function loadPerRecordState(descriptor: KvUnitDescriptor, dir: string): Promise<UnitState> {
+  const bootstrap = await readBootstrap(dir)
   const versions = acceptedStamps(descriptor)
   const state: UnitState = {
     version: descriptor.version,
@@ -97,7 +103,9 @@ async function loadPerRecordState(descriptor: KvUnitDescriptor, dir: string): Pr
       }
       return false
     }))).some(Boolean)
-  if (!hasNewDocuments) await bootstrapLegacyUnit(descriptor, dir, state)
+  if (bootstrap?.status === 'copying' || (bootstrap === undefined && !hasNewDocuments)) {
+    await bootstrapLegacyUnit(descriptor, dir, state, bootstrap)
+  }
   return state
 }
 
@@ -118,42 +126,103 @@ function acceptedStamps(descriptor: KvUnitDescriptor): readonly number[] {
  * read failures propagate.
  * @param descriptor - Static identity and shape of the unit.
  * @param dir - The per-record unit directory (`<root>/<name>`).
- * @param state - The empty tree state; bootstrapped records are added.
+ * @param state - Reconstructed tree state; resumed records replace their partial copies.
+ * @param pending - Durable source admitted by an interrupted migration, when present.
  */
-async function bootstrapLegacyUnit(descriptor: KvUnitDescriptor, dir: string, state: UnitState): Promise<void> {
+async function bootstrapLegacyUnit(
+  descriptor: KvUnitDescriptor, dir: string, state: UnitState, pending?: BootstrapState,
+): Promise<void> {
   const legacyPath = join(dirname(dir), `${descriptor.name}.json`)
-  let text: string | undefined
+  let text = pending?.status === 'copying' ? pending.source : undefined
+  if (text === undefined) {
+    try {
+      text = await readFile(legacyPath, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      return
+    }
+  }
+  let document: unknown
   try {
-    text = await readFile(legacyPath, 'utf8')
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    document = JSON.parse(text)
+  } catch {
+    if (pending !== undefined) throw new StorageError('malformed-medium', `unit '${descriptor.name}': invalid bootstrap source`)
     return
   }
-  // The legacy document is runtime data: only `unit.name`, `unit.version`,
-  // and the tables map shape are checked here — the record values are
-  // migrated as-is and the domain layer's schemas judge them.
-  let document: { unit?: { name?: unknown; version?: unknown }; tables?: unknown }
-  try {
-    document = JSON.parse(text) as { unit?: { name?: unknown; version?: unknown }; tables?: unknown }
-  } catch {
-    return // Malformed legacy file: not ours to interpret or delete.
+  const decoded = decodeLegacy(descriptor, document)
+  if (decoded === undefined) {
+    if (pending !== undefined) throw new StorageError('malformed-medium', `unit '${descriptor.name}': invalid bootstrap source`)
+    return
   }
-  if (document.unit?.name !== descriptor.name) return
-  const stamped = document.unit.version
-  if (typeof stamped !== 'number' || !acceptedStamps(descriptor).includes(stamped)) return
-  const tables = document.tables
-  if (typeof tables !== 'object' || tables === null) return
-  const recordsByTable = tables as Record<string, Record<string, unknown>>
-  for (const [table, records] of Object.entries(recordsByTable)) {
-    const target = state.tables.get(table)
-    if (target === undefined) continue
-    for (const [key, value] of Object.entries(records)) {
+  const { recordsByTable, global } = decoded
+  // The durable source snapshot owns retries; a partial tree is never mistaken for a completed migration.
+  await mkdir(dir, { recursive: true, mode: 0o700 })
+  const marker = join(dir, BOOTSTRAP_FILE)
+  if (pending === undefined) {
+    await writeAtomic(marker, `${JSON.stringify({ version: 1, status: 'copying', source: text })}\n`)
+  }
+  for (const [table, records] of recordsByTable) {
+    for (const [key, value] of records) {
       const path = join(dir, table, `${key}.json`)
       await mkdir(dirname(path), { recursive: true, mode: 0o700 })
       await writeAtomic(path, serializeRecord(descriptor.version, value))
-      target.set(key, value)
+      state.tables.get(table)?.set(key, value)
     }
   }
+  if (descriptor.hasGlobal && global !== undefined && global !== null) {
+    await writeAtomic(join(dir, 'global.json'), serializeRecord(descriptor.version, global))
+    state.global = global
+  }
+  // Retain completion durably: deleting all migrated records must not resurrect the legacy snapshot.
+  await writeAtomic(marker, `${JSON.stringify({ version: 1, status: 'complete' })}\n`)
+}
+
+/** Validate the complete legacy tree before admitting its migration snapshot. */
+function decodeLegacy(
+  descriptor: KvUnitDescriptor, document: unknown,
+): { recordsByTable: Map<string, [string, unknown][]>; global: unknown } | undefined {
+  if (typeof document !== 'object' || document === null || Array.isArray(document)) return
+  const { unit, tables, global } = document as Record<string, unknown>
+  if (typeof unit !== 'object' || unit === null || Array.isArray(unit)) return
+  const header = unit as Record<string, unknown>
+  if (header.name !== descriptor.name || typeof header.version !== 'number'
+    || !acceptedStamps(descriptor).includes(header.version)) return
+  if (typeof tables !== 'object' || tables === null || Array.isArray(tables)) return
+  const recordsByTable = new Map<string, [string, unknown][]>()
+  for (const table of descriptor.tables) {
+    const records = (tables as Record<string, unknown>)[table]
+    if (records === undefined) continue
+    if (typeof records !== 'object' || records === null || Array.isArray(records)) return
+    const entries = Object.entries(records)
+    for (const [key] of entries) assertSafeKey(descriptor.name, key)
+    recordsByTable.set(table, entries)
+  }
+  return { recordsByTable, global }
+}
+
+/** Read migration ownership metadata; corrupt progress must not expose a partial tree. */
+async function readBootstrap(dir: string): Promise<BootstrapState | undefined> {
+  let text: string
+  try {
+    text = await readFile(join(dir, BOOTSTRAP_FILE), 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    return undefined
+  }
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch (error) {
+    throw new StorageError('malformed-medium', 'invalid per-record bootstrap metadata', { cause: error })
+  }
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const marker = value as Record<string, unknown>
+    if (marker.version === 1 && marker.status === 'complete') return { version: 1, status: 'complete' }
+    if (marker.version === 1 && marker.status === 'copying' && typeof marker.source === 'string') {
+      return { version: 1, status: 'copying', source: marker.source }
+    }
+  }
+  throw new StorageError('malformed-medium', 'invalid per-record bootstrap metadata')
 }
 
 /**

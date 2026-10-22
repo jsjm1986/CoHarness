@@ -33,6 +33,11 @@ kind: "package-reference"
 
 投影事件保留原始持久消息与序号身份。`surface.contentGeneration` 在位置替换或内容变化时使派生消息缓存失效；`replaceGeneration` 仅统计位置替换。此机制不增加事件格式版本，也不改写已提交代次。由 provider 持有的图片事件仍是独立消费者。
 
+<a id="append-admission"></a>
+### 追加准入
+
+`ctx.sessions.registerAppendAdmission(admission)` 为已挂接的 Session 注册由 fiber 拥有的同步资源预留。回调在提交前接收冻结的候选事件，并可返回回滚函数。准入拒绝、表层校验失败或分发校验失败会按逆序运行先前的回滚函数，日志与事件流保持不变；成功的预留交给其 `session/event` 消费方处理。准入和发布期间拒绝同一 Session 重入。独立 Session 不运行这些回调。
+
 ### 公共 API
 
 - `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` 校验持久种子／头部数据并生成脱离副本，补齐版本和 id，在未提供 `createdAt` 时使用当前时间，发布会话并将其绑定到调用方 fiber。带种子的 header（`meta.isSeeded: true`）必须同时提供 `seed` 与精确的 `inheritedEventCount`，因为构造种子可能在继承前缀之后还包含子级自有的初始化事件；无种子的 header 拒绝非零切点。持久化重建会提供原始的 `createdAt`、谱系与 `delegationDepth`。

@@ -42,7 +42,7 @@ Status: implemented
 
 ## 测试
 
-`packages/preset/agent-presets/tests/mount.spec.ts` 用真实 fixture 组装覆盖该加入：子 agent 看到父方的工具与提示段、不会挂载出第二个代际、加入在父方 dispose 后依然成立（活得比父方久的后台子 agent）、上报的 id 一致、没有 preset 的父方不产生加入、以及无 scope 的上下文被拒绝。
+[Preset 组合测试](../../../../packages/preset/agent-preset-registry/tests/mount.spec.ts) 用真实 fixture 组装覆盖该加入：子 agent 看到父方的工具与提示段、不会挂载出第二个代际、加入在父方 dispose 后依然成立（活得比父方久的后台子 agent）、上报的 id 一致、没有 preset 的父方不产生加入、以及无 scope 的上下文被拒绝。
 
 `packages/core/tools/tests/scoped.spec.ts` 直接覆盖该限制规则：子 agent 的过滤器能移除它从祖先作用域继承来的工具、子 agent 自身的注册在自己的过滤器下存活、祖先的限制仍作用于其内嵌套的每个作用域。
 

@@ -9,6 +9,7 @@
 - 注册 `steward_query`：经运行时自身的回环凭证调用 `POST /internal/runtime/steward/query` 执行一条 SQL（凭证材料不进入工具面）。
 - 读语句(`SELECT`/`WITH`/`VALUES`/`TABLE`/`SHOW`/`EXPLAIN`）直接执行；其余语句先经会话内审批通道询问操作员，获批后把审批 id 一并交给 Gateway，由 Gateway 对照 `conversation_interaction_responses` 复核后再执行。
 - `dry_run` 返回语句的 `EXPLAIN` 计划而不执行——写语句同样适用，因为不落任何改动，无需审批。
+- `row_limit` 限制返回的读取行与 dry-run 计划行。Gateway 的结果大小限制可能更早截断任一种响应；工具会明确标记被截断的计划和读取结果。
 - 每次尝试——读、拒绝、失败、应用——都由 Gateway 记入 `harness.steward_query_log`。
 - 注册 `steward:policy` 系统提示词节区，让模型知道自己运行在维护通道：受审计 SQL、只读事务、会话内写批准、留痕。
 
@@ -21,4 +22,6 @@
 
 ## 测试
 
-`tests/query.spec.ts` 覆盖语句分类与审批提示预览；`tests/composition.spec.ts` 覆盖注册的节区、工具及其注销。执行器契约由 `steward-query.ts` 旁的 Gateway 测试覆盖。
+`tests/query.spec.ts` 覆盖语句分类与审批提示预览；`tests/composition.spec.ts` 覆盖注册、注销，以及有截断和无截断情况下的真实 dry-run 工具执行。执行器契约由 `steward-query.ts` 旁的 Gateway 测试覆盖。
+
+无密钥的 [steward-query-truncation 快照](../../snapshots/session/steward-query-truncation/snapshot.yml)通过随产品提供的 headless profile 加载插件源码，并将截断计划记录为模型可见的工具结果。从仓库根目录运行 `DSH_EXAMPLE_MODE=src DSH_SNAPSHOT=replay pnpm exec vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts -t steward-query-truncation` 回放。

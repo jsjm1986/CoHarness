@@ -45,7 +45,9 @@ pnpm dsh plugin --profile web remove @deepseek-ai/dsh-experimental-auto-review
 
 ### 获得的能力
 
-Auto 在每个受支持调用的 body 执行前审查一次，包括每个已开始的 PTC `tools.*` inner call。它按实际效果分类：普通项目内操作和精确清理本 Session 创建的对象属于 low，直接允许；不可逆删除既有对象、生产操作、外部写入和安全控制变更属于 medium，需要当前 human 或直接父级明确授权动作、目标与范围。跨信任边界泄露敏感信息属于 high，始终拒绝。效果不明确、授权冲突未解决、响应不合法和技术失败都按拒绝处理。
+Auto 在每个受支持调用的 body 执行前审查一次，包括每个已开始的 PTC `tools.*` inner call。它按实际效果分类：普通项目内操作和精确清理本 Session 创建的对象属于 low，直接允许；不可逆删除既有对象、生产操作、外部写入和安全控制变更属于 medium，需要当前 human 或直接父级明确授权动作、目标与范围。跨信任边界泄露敏感信息属于 high，reviewer 始终返回拒绝。效果不明确或授权冲突未解决时，reviewer 也会返回拒绝；响应不合法或技术失败会直接拒绝调用，不询问用户。
+
+Session 审批策略为 `never` 时，reviewer 拒绝会立即拒绝调用。策略为 `ask` 时，只有其余工具策略允许调用后，reviewer 拒绝才会交由用户审批；调用必须获得用户授权才能执行。下游拒绝与取消仍然具有决定权，资格检查失败不会进入这条审批路径。
 
 被拒绝的调用使用普通工具卡片。折叠行标识 Auto review；展开输出说明 body 未执行，并显示可选理由。[Web 权限包](../../client/ui-permission-presets/README.zh.md)拥有选择器交互，[工具 UI](../../client/ui-tool/README.zh.md)拥有理由展示。
 
@@ -86,7 +88,7 @@ Reviewer 从当前 Session surface 与待执行调用重建五个分区：固定
 
 #### 模型看到什么
 
-Reviewer 使用最新 `request/header.config` 的 provider 与模型，并沿用 shipped adapter 默认 reasoning。固定 `REVIEW_POLICY` 替代恰好一个动作的人工审批：allow 后立即以 Full access 执行。其余四个分区只包含上文列出的保留事实。响应为一个严格 JSON text 对象，包含 `risk` 与 `decision`；deny 可附字符串 `reason`。Reasoning blocks 可以位于这唯一 text block 之前。只有 `low + allow`、`medium + allow/deny` 和 `high + deny` 合法。
+Reviewer 使用最新 `request/header.config` 的 provider 与模型，并沿用 shipped adapter 默认 reasoning。固定 `REVIEW_POLICY` 对一个待执行动作分类；allow 以 Full access 继续经过其余工具策略，deny 则按上文的 Session 审批策略处理。其余四个分区只包含上文列出的保留事实。响应为一个严格 JSON text 对象，包含 `risk` 与 `decision`；deny 可附字符串 `reason`。Reasoning blocks 可以位于这唯一 text block 之前。只有 `low + allow`、`medium + allow/deny` 和 `high + deny` 合法。
 
 #### Token 影响
 
@@ -100,7 +102,7 @@ Reviewer 使用最新 `request/header.config` 的 provider 与模型，并沿用
 
 #### 模型看到什么
 
-Reviewer 拒绝时使用 `Auto review rejected tool "<name>"; its body was not executed`。资格检查拒绝时则说明该次执行无权使用 Auto，并提示用户选择普通权限模式或联系管理员。普通原生错误渲染在前面加 `Error: `。PTC 使用既有 inner-call 异常与 catch 行为；被捕获的拒绝不强制外层 `run_code` 失败。可选原始理由是面向用户的持久结构化错误详情，绝不进入主模型内容。风险、reviewer prompt、reasoning 与原始响应都不持久化。
+策略为 `never` 时，reviewer 拒绝使用 `Auto review rejected tool "<name>"; its body was not executed`。策略为 `ask` 时，审批通道显示 reviewer 拒绝及可选理由，工具收到普通审批结果。资格检查拒绝时则说明该次执行无权使用 Auto，并提示用户选择普通权限模式或联系管理员。普通原生错误渲染在前面加 `Error: `。PTC 使用既有 inner-call 异常与 catch 行为；被捕获的拒绝不强制外层 `run_code` 失败。可选原始理由是面向用户的持久结构化错误详情，绝不进入主模型内容。风险、reviewer prompt、reasoning 与原始响应都不持久化。
 
 #### Token 影响
 
@@ -117,7 +119,7 @@ Reviewer 拒绝时使用 `Auto review rejected tool "<name>"; its body was not e
 
 - Auto 需要开启此 Web 层；默认 Web、Headless、通用设置与新会话默认值都不包含它。
 - Auto 不提供文件沙箱。外层 `run_code` transport 及PTC 程序内直接 Node 效果不经过 inner-tool review。
-- 模型分类可能出错。不提供确定性工具豁免、持久 grant、人工 fallback、可配置策略或重试层。
+- 模型分类可能出错。不提供确定性工具豁免、持久 grant、可配置策略或重试层。
 - 进程内 Auto child 独立审查自身调用。进程外 child 在父委派调用获准后保留原生权限系统。
 - reviewer 在带行级豁免的情况下，通过已废弃的同步 `snapshotEvents()` 读取 Session 动作历史。此前的调用、PTC start 与直接父级的初始 prompt 目前都没有投影或分页读取方，因此迁移按[同步读取决策](../../../.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.zh.md)继续延期。
 

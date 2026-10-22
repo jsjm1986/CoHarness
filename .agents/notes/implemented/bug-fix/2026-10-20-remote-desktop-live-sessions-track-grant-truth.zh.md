@@ -12,6 +12,8 @@ VNC Provider 的 `live` 会话表曾以三条互不相关的路径偏离授权�
 
 会话记账现在共用一条提交路径。`attach` 为每个 token 装上定时器；未消费的 token 过期进入 `finishDetach`，移除 `live` 条目、记录 `detach` 并发出 `remote-desktop/attached`。token 消费后的每个 `serveStream` 失败——端点缺失、拨号失败、录制器打开失败、条目过期——都销毁两侧 socket 并完成同一条 detach，`live` 中不再存在没有流的会话。`revoke` 与 `setLevel` 调用 `enforceLiveSessions`：按已提交的存储对每个存活会话重跑 `matchingGrants`，已解析级别不再被授权的会话被拆除；仍有授权支撑的流保持打开。`listGrants` 新增 `attachable` 与调用者绑定的 `sessionId`，经 `resolve` 所用的同一个 `matchingGrants` 谓词过滤并要求目标已配置端点；浏览器控制器把 `sessionId` 绑定到被寻址的 agent，引导入口传 `attachable: true`，列出的目标恰好是 attach 会授权的目标。标签页主体启用了此前闲置的 `disconnect`/`reconnect` 文案：断开即关闭 RFB socket（服务端随之拆除），重连按已记录的确认重走 status → attach 换取新 token。
 
+授权存储仅在候选文件原子替换成功后才把候选状态发布到实时授权。变更与重新加载共用实例内的顺序队列，因此失败的候选不会进入后续成功写入，并发插入的两条已提交记录都会保留。写入失败期间，队列保留最后一次已提交的映射。
+
 ## Alternatives considered
 
 **让存活会话保持到客户端自行断开，即使授权被撤销。** 否决：撤销是管理员动作，必须生效；control 级流在自己的授权被撤后继续存活，等于越过授权边界静默放宽访问。
@@ -19,6 +21,8 @@ VNC Provider 的 `live` 会话表曾以三条互不相关的路径偏离授权�
 **在 `attach` 内惰性清扫过期 pending 条目。** 原 `sweepPending` 只在下一次 attach 时运行，没有新 attach 的部署会无限期持有幽灵会话。按 token 的定时器让过期自我驱动；清扫被移除而非保留为第二个时钟。
 
 **在控制器或引导入口里过滤可挂接行。** 否决：会话作用域匹配必须与 `resolve` 一致，在 `matchingGrants` 之外复制该逻辑会让列表与强制谓词漂移。
+
+**先修改实时授权集，再在写入失败后回滚。** 并发变更与重新加载可能观察到未提交的授权，或覆盖回滚。候选状态按顺序处理，并仅在提交时发布，无需回滚即可保持授权一致。
 
 **暴露 `detach` Remote 方法而非关闭 socket。** 延后：流关闭已能到达 `finishDetach`，显式的管理员强制 detach 方法仍是后续工作，不作为面向用户的调用。
 

@@ -6,11 +6,26 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { RemoteDesktopError, RemoteDesktopGrantId } from '@deepseek-ai/dsh-remote-desktop'
 import type { RemoteDesktopGrant } from '@deepseek-ai/dsh-remote-desktop'
 import { matchingGrants, VncGrantStore } from '../src/grants.ts'
+
+const io = vi.hoisted(() => ({ failedDestination: undefined as string | undefined }))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    rename: async (...args: Parameters<typeof actual.rename>) => {
+      if (args[1] === io.failedDestination) {
+        throw Object.assign(new Error('EIO: injected grant publication failure'), { code: 'EIO' })
+      }
+      return actual.rename(...args)
+    },
+  }
+})
 
 const NOW = 1_000_000
 
@@ -70,6 +85,7 @@ describe('VncGrantStore', () => {
     dir = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-'))
   })
   afterEach(async () => {
+    io.failedDestination = undefined
     await rm(dir, { recursive: true, force: true })
   })
 
@@ -88,6 +104,45 @@ describe('VncGrantStore', () => {
     await store.update(RemoteDesktopGrantId('g1'), { revokedAt: NOW })
     const reopened = await VncGrantStore.open(file)
     expect(reopened.all()[0]!.revokedAt).toBe(NOW)
+  })
+
+  it('keeps failed inserts out of authorization and later durable writes', async () => {
+    const file = join(dir, 'grants.jsonl')
+    const store = await VncGrantStore.open(file)
+    await store.insert(grant())
+    await store.refresh()
+    io.failedDestination = file
+    const rejected = grant({ id: RemoteDesktopGrantId('rejected'), principal: 'bob', level: 'control' })
+
+    await expect(store.insert(rejected)).rejects.toMatchObject({ code: 'EIO' })
+    await store.refresh()
+    expect(matchingGrants(store.all(), 'bob', rejected.target, undefined, NOW)).toEqual([])
+    expect((await VncGrantStore.open(file)).all()).toEqual([grant()])
+
+    io.failedDestination = undefined
+    await store.update(RemoteDesktopGrantId('g1'), { recording: true })
+    expect((await VncGrantStore.open(file)).all()).toEqual([grant({ recording: true })])
+  })
+
+  it('keeps a failed level update out of the live grant set', async () => {
+    const file = join(dir, 'grants.jsonl')
+    const store = await VncGrantStore.open(file)
+    await store.insert(grant())
+    io.failedDestination = file
+
+    await expect(store.update(RemoteDesktopGrantId('g1'), { level: 'control' })).rejects.toMatchObject({ code: 'EIO' })
+    expect(store.all()).toEqual([grant()])
+    expect((await VncGrantStore.open(file)).all()).toEqual([grant()])
+  })
+
+  it('commits concurrent inserts in order without losing a row', async () => {
+    const file = join(dir, 'grants.jsonl')
+    const store = await VncGrantStore.open(file)
+    const second = grant({ id: RemoteDesktopGrantId('g2') })
+    await Promise.all([store.insert(grant()), store.insert(second)])
+
+    expect(store.all()).toEqual([grant(), second])
+    expect((await VncGrantStore.open(file)).all()).toEqual([grant(), second])
   })
 
   it('opens an absent file as empty and rejects unknown updates', async () => {

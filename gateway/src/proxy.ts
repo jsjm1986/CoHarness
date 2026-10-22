@@ -241,8 +241,10 @@ export function createProxyHandlers(
         if (res !== null) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: gate })) }
         return null
       }
-      const pending = instances.ensureRunning(context.runtime)
+      const request = instances.startRequest(context.runtime)
+      const pending = request.completion
       if (res !== null) {
+        await request.admission
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })

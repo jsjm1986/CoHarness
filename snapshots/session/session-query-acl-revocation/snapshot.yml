@@ -1,0 +1,10 @@
+version: 1
+scenario: session-query-acl-revocation
+profile: headless
+composition: session-query-acl-revocation
+recording: authored
+header:
+  class: session-query-acl-revocation
+  pin: true
+replay:
+  override: true

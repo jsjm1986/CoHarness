@@ -199,26 +199,18 @@ export class SessionReferenceResolver extends TypertRemoteService {
     if (!Number.isSafeInteger(limit) || limit <= 0) {
       throw new SessionReferenceError('candidate limit must be a positive safe integer', 'SESSION_REFERENCE_INVALID_REFERENCE')
     }
+    const requiresAcl = this.ctx.get('collaboration') !== undefined
     const needle = query.toLocaleLowerCase()
     const targetCwd = agent.session.header.cwd
     assertNotCancelled(signal)
     const listed = (await settleWithCancellation(this.ctx.sessionQuery.listSessions(signal), signal))
       .filter(record => record.header.id !== agent.id)
       .map((record, index) => ({ record, index }))
-    // The ACL gate only yields when the collaboration capture is composed;
-    // compositions without it must not add a microtask hop before title reads.
-    const collaboration = this.ctx.get('collaboration')
-    let records = listed
-    if (collaboration !== undefined) {
-      const readable = await settleWithCancellation(
-        collaboration.capture().readableSessionIds(listed.map(({ record }) => record.header.id)),
-        signal,
-      )
-      assertNotCancelled(signal)
-      records = listed.filter(({ record }) => readable.has(record.header.id))
-    }
+    const authorization = this.readableSources(listed.map(({ record }) => record.header.id), signal, requiresAcl)
+    const readable = authorization === undefined ? undefined : await authorization
+    const records = readable === undefined ? listed : listed.filter(({ record }) => readable.has(record.header.id))
     const labelled = records.map(({ record, index }) => ({ record, index, ...this.projectedLabels(record) }))
-    return labelled.filter(({ record, label, displayTitle }) => {
+    const candidates = labelled.filter(({ record, label, displayTitle }) => {
       if (needle === '') return true
       return record.header.id.toLocaleLowerCase().includes(needle)
         || record.header.cwd?.toLocaleLowerCase().includes(needle) === true
@@ -235,6 +227,9 @@ export class SessionReferenceResolver extends TypertRemoteService {
         sameWorkspace: record.header.cwd !== undefined && record.header.cwd === targetCwd,
         createdAt: record.header.createdAt,
       }))
+    const recheck = this.readableSources(candidates.map(candidate => candidate.sessionId), signal, requiresAcl)
+    const current = recheck === undefined ? undefined : await recheck
+    return current === undefined ? candidates : candidates.filter(candidate => current.has(candidate.sessionId))
   }
 
   /**
@@ -323,6 +318,7 @@ export class SessionReferenceResolver extends TypertRemoteService {
     references: SessionReferenceInput[],
     signal?: AbortSignal,
   ): Promise<PreparedReferencedMessage> {
+    const requiresAcl = this.ctx.get('collaboration') !== undefined
     const acceptedContent = structuredClone(content)
     const inputs = normalizeReferences(agent.id, references, this.config.maxReferences)
     if (inputs.length === 0) return { content: acceptedContent }
@@ -331,19 +327,8 @@ export class SessionReferenceResolver extends TypertRemoteService {
     assertNotCancelled(signal)
     let prepared: PreparedSource[]
     try {
-      const collaboration = this.ctx.get('collaboration')
-      if (collaboration !== undefined) {
-        const readable = await settleWithCancellation(
-          collaboration.capture().readableSessionIds(inputs.map(input => input.sessionId)),
-          signal,
-        )
-        if (!inputs.every(input => readable.has(input.sessionId))) {
-          throw new SessionReferenceError(
-            'one or more referenced sessions are not readable',
-            'SESSION_REFERENCE_READ_FAILED',
-          )
-        }
-      }
+      const admission = this.assertReadableSources(inputs, signal, requiresAcl)
+      if (admission !== undefined) await admission
       prepared = await settleWithCancellation(
         Promise.all(inputs.map(async input => ({
           input,
@@ -362,11 +347,15 @@ export class SessionReferenceResolver extends TypertRemoteService {
     }
     assertNotCancelled(signal)
 
+    const beforeSpill = this.assertReadableSources(inputs, signal, requiresAcl)
+    if (beforeSpill !== undefined) await beforeSpill
     const rendered = this.renderSources(prepared, maxReferenceBytes)
     const omissions = await settleWithCancellation(Promise.all(rendered.map((source, index) =>
       prepareReferenceOmission(this.ctx.get('spillStore'), agent.session.id, source, index),
     )), signal)
     assertNotCancelled(signal)
+    const publication = this.assertReadableSources(inputs, signal, requiresAcl)
+    if (publication !== undefined) await publication
     const notices = omissions.filter(notice => notice !== undefined)
     const prompt = renderPrompt(rendered.map(source => source.data))
       + (notices.length === 0 ? '' : '\n\n## Reference omissions\n\n'
@@ -390,6 +379,36 @@ export class SessionReferenceResolver extends TypertRemoteService {
       content: [{ type: 'text', text: prompt }],
     })
     return { content: acceptedContent, additionalContext }
+  }
+
+  /** Read current participant permissions without downgrading an operation when its provider disappears. */
+  private readableSources(
+    ids: readonly SessionId[], signal: AbortSignal | undefined, required: boolean,
+  ): Promise<ReadonlySet<SessionId>> | undefined {
+    const collaboration = this.ctx.get('collaboration')
+    if (collaboration === undefined && !required) return undefined
+    return (async () => {
+      try {
+        if (collaboration === undefined) throw new Error('collaboration provider is unavailable')
+        const readable = await settleWithCancellation(collaboration.capture().readableSessionIds(ids), signal)
+        assertNotCancelled(signal)
+        return readable
+      } catch {
+        if (signal?.aborted === true) throw cancelled(signal)
+        throw new SessionReferenceError('referenced session authorization is unavailable', 'SESSION_REFERENCE_READ_FAILED')
+      }
+    })()
+  }
+
+  private assertReadableSources(
+    inputs: readonly SessionReferenceInput[], signal: AbortSignal | undefined, required: boolean,
+  ): Promise<void> | undefined {
+    const authorization = this.readableSources(inputs.map(input => input.sessionId), signal, required)
+    return authorization?.then((readable) => {
+      if (inputs.some(input => !readable.has(input.sessionId))) {
+        throw new SessionReferenceError('one or more referenced sessions are not readable', 'SESSION_REFERENCE_READ_FAILED')
+      }
+    })
   }
 
   private async referenceBudget(agent: Agent, signal: AbortSignal | undefined): Promise<number> {

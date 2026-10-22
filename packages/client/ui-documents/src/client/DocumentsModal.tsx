@@ -140,26 +140,6 @@ interface SourceOption {
   mode: 'ro' | 'rw'
 }
 
-/** Compatibility view for a client record that may expose alternate-scope browsing. */
-type BrowseScopeFunction = (
-  scope: UserDocScope,
-  directoryId: UserDocDirectoryIdType,
-  signal?: AbortSignal,
-  query?: UserDocListQuery,
-) => Promise<{
-  readonly documents: readonly UserDocRef[]
-  readonly directories: readonly UserDocDirectoryRef[]
-  readonly directoryId: UserDocDirectoryIdType
-  readonly limits?: UserDocLimits
-  readonly parentDirectoryId?: UserDocDirectoryIdType
-  readonly totalDocuments?: number
-  readonly nextCursor?: string
-}>
-
-function browseScopeOf(value: unknown): BrowseScopeFunction | undefined {
-  return typeof value === 'function' ? value as BrowseScopeFunction : undefined
-}
-
 /** Metadata-only view selected from the workbench scope rail. */
 interface ScopeView {
   value: string
@@ -789,30 +769,13 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     ...(cursor === undefined ? {} : { cursor }),
   })
 
-  /**
-   * Request one directory from an explicitly selected scope.
-   *
-   * `browseScope` is the full browser contract. Older clients only expose the
-   * metadata transfer listing, whose extra arguments are intentionally ignored;
-   * keeping that fallback here means folder navigation does not become a
-   * dead-end when a runtime is upgraded before the browser bundle.
-   */
   const fetchScopeListing = async (
     target: UserDocScope,
     directoryId: UserDocDirectoryIdType,
     listingQuery: UserDocListQuery,
     signal?: AbortSignal,
   ): Promise<unknown> => {
-    const clientRecord = userDocs.current as unknown as Record<string, unknown>
-    const browseScope = browseScopeOf(clientRecord.browseScope)
-    if (browseScope !== undefined) return browseScope(target, directoryId, signal, listingQuery)
-    const client = userDocs.current
-    const listScope = client.listScope.bind(client)
-    // Older metadata-only clients expose a one-argument function. Preserve its
-    // exact call shape; newer clients advertise the directory/query form.
-    return listScope.length >= 2
-      ? listScope(target, signal, directoryId, listingQuery)
-      : listScope(target)
+    return userDocs.current.browseScope(target, directoryId, signal, listingQuery)
   }
 
   const isServerPage = (value: unknown): value is {

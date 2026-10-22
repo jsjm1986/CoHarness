@@ -7,7 +7,7 @@ import { finished } from 'node:stream/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RuntimeLog } from '../src/runtime-log.ts'
 import { loadConfig } from '../src/config.ts'
-import { LocalLauncher, SystemdLauncher, selectLauncher, type SystemdLauncherOptions } from '../src/launcher.ts'
+import { LocalLauncher, RuntimeLaunchCleanupError, SystemdLauncher, selectLauncher, type SystemdLauncherOptions } from '../src/launcher.ts'
 
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -54,6 +54,28 @@ function systemdOptions(unitDir: string, calls: string[][]): SystemdLauncherOpti
 }
 
 describe('SystemdLauncher', () => {
+  it('returns a cleanup handle when restart fails after the supervisor may have started a process', async () => {
+    const unitDir = temporary('units-')
+    const calls: string[][] = []
+    const options = systemdOptions(unitDir, calls)
+    options.run = async args => {
+      calls.push(args)
+      if (args[0] === 'restart') throw new Error('supervisor response lost')
+    }
+    const launcher = new SystemdLauncher(options)
+    const failure = await launcher.start({
+      kind: 'user', ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome: '/srv/harness/users/alice/dsh',
+      generation: 2, gatewayCredential: '{"token":"test"}',
+    }).catch(error => {
+      if (error instanceof RuntimeLaunchCleanupError) return error
+      throw error
+    })
+    expect(failure).toBeInstanceOf(RuntimeLaunchCleanupError)
+    await (failure as RuntimeLaunchCleanupError).process.terminate(0)
+    expect(calls.at(-1)).toEqual(['stop', 'harness-alice.service'])
+  })
+
   it('writes a per-user confinement unit and restarts any process holding the prior credential', async () => {
     const unitDir = temporary('units-')
     const calls: string[][] = []

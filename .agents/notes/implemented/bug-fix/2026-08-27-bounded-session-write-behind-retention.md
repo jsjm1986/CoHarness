@@ -10,11 +10,11 @@ The write-behind controller retained failed batches and events arriving while a 
 
 ## Decision
 
-`SessionWriteBehind` enforces two admission limits across the pending queue and the active batch: `maxPendingEvents` and `maxPendingBytes`. The byte limit measures each retained event's UTF-8 JSON encoding, after the controller takes its persistence-owned structured clone. The defaults are 100,000 events and 64 MiB per live session.
+`SessionWriteBehind` enforces two admission limits across the pending queue and the active batch: `maxPendingEvents` and `maxPendingBytes`. The byte limit measures each retained event's UTF-8 JSON encoding, before the controller takes its persistence-owned structured clone. The defaults are 100,000 events and 64 MiB per live session.
 
-The active batch remains counted until its durable write settles. A failed batch is restored before newer pending events and its event and byte totals remain counted, so retries cannot bypass either limit. An admission that would exceed either limit reports the failure and throws before changing the queue.
+The active batch remains counted until its durable write settles. A failed batch is restored before newer pending events and its event and byte totals remain counted, so retries cannot bypass either limit. An admission that would exceed either limit reports the failure and throws before changing the queue. The controller retains that failure so Session observer containment cannot hide a missing event; the [admission-failure decision](2026-10-23-write-behind-admission-failure.md) owns its terminal barrier behavior.
 
-The shared [`PersistenceCoordinator`](../architecture/2026-06-18-shared-persistence-write-coordinator.md) owns the resolved limits and passes them to every live-session controller. JSONL, SQLite, and Gateway persistence providers expose both fields in their configuration schemas and forward them unchanged. The limits apply to live write-behind retention only; they do not change the durable event log, storage format, or backend row count.
+The shared [`PersistenceCoordinator`](../architecture/2026-06-18-shared-persistence-write-coordinator.md) owns the resolved limits and passes them to every live-session controller. SQLite and Gateway persistence providers expose both fields in their configuration schemas and forward them unchanged. JSONL uses its independent handle-based live routing. The limits apply to live write-behind retention only; they do not change the durable event log, storage format, or backend row count.
 
 ## Alternatives considered
 
@@ -28,10 +28,10 @@ The shared [`PersistenceCoordinator`](../architecture/2026-06-18-shared-persiste
 
 ## Verification
 
-`packages/session/session-persistence/tests/write-behind.spec.ts` verifies byte-limit rejection, active-batch accounting, count-limit rejection, and failed-batch retention. The provider schemas and generated configuration catalog expose the same fields for JSONL, SQLite, and Gateway.
+`packages/session/session-persistence/tests/write-behind.spec.ts` verifies byte-limit rejection, active-batch accounting, count-limit rejection, and failed-batch retention. The provider schemas and generated configuration catalog expose the same fields for SQLite and Gateway.
 
 ## Consequences
 
-Each live session has a deterministic upper bound on queued write-behind event count and serialized payload bytes, including a batch waiting on a slow or failed backend. Producers receive an explicit error when admission would exceed either bound; callers must retry after the controller drains or choose a larger deployment limit.
+Each live session has a deterministic upper bound on queued write-behind event count and serialized payload bytes, including a batch waiting on a slow or failed backend. Admission errors remain explicit at direct controller calls and at every later durability barrier. A live Session whose observer could not retain an accepted event cannot recover that lifecycle by merely draining its controller; deployments must address the limit before accepting further work.
 
 The controller serializes each admitted event once for its retained byte estimate in addition to the existing persistence-owned clone. The quota does not bound backend I/O duration, total durable history, or aggregate memory across sessions; deployments still need session and process-level capacity controls.

@@ -1,4 +1,5 @@
 import { once } from 'node:events'
+import { createServer } from 'node:http'
 import { generateKeyPairSync } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -12,6 +13,8 @@ import { AuthService } from '../src/auth.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
+import type { Launcher, LaunchRuntime } from '../src/launcher.ts'
+import { RUNTIME_READINESS_NONCE_HEADER, RUNTIME_READINESS_PATH, runtimeReadinessResponseProof } from '../src/runtime-readiness.ts'
 import { ProjectService } from '../src/projects.ts'
 import { createProxyHandlers, projectRuntimeGrants } from '../src/proxy.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
@@ -73,7 +76,7 @@ afterEach(async () => {
 })
 
 
-async function setup(withPrincipal = false, env: Record<string, string> = {}) {
+async function setup(withPrincipal = false, env: Record<string, string> = {}, launcher?: Launcher) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   cleanup.push(() => rmSync(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'g.sqlite'))
@@ -88,7 +91,7 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}) {
     users: new UserService(db, cfg),
     projects: new ProjectService(db, cfg),
     audit: new AuditService(db),
-    instances: new InstanceManager(db, cfg),
+    instances: new InstanceManager(db, cfg, launcher),
   }
   cleanup.push(() => deps.instances.stopAll())
   const alice = await deps.users.create({ username: 'alice', password: 'pw-12345678' })
@@ -120,10 +123,129 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}) {
     body: new URLSearchParams({ username: 'alice', password: 'pw-12345678' }),
   })
   const cookie = (loginRes.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
-  return { deps, base, cookie, root, signer, handlers, alice }
+  return { deps, base, cookie, root, signer, handlers, alice, db }
 }
 
 describe('proxy handlers', () => {
+  it('reports a full cold-start queue through real HTTP admission and recovers without waiting for readiness', async () => {
+    const starts: number[] = []
+    const states = new Map<number, {
+      entered: ReturnType<typeof barrier>
+      proceed: ReturnType<typeof barrier>
+      runtime?: LaunchRuntime
+      alive: boolean
+    }>()
+    const launcher: Launcher = {
+      instancesOutliveGateway: false,
+      async start(runtime) {
+        const state = states.get(runtime.ownerId)!
+        starts.push(runtime.ownerId)
+        state.runtime = runtime
+        state.entered.resolve()
+        await state.proceed.promise
+        state.alive = true
+        return { hasExited: () => !state.alive, terminate: async () => { state.alive = false } }
+      },
+    }
+    const { deps, base, cookie, alice, db } = await setup(false, {
+      HGW_RUNTIME_MAX_STARTING: '1', HGW_RUNTIME_MAX_RESIDENT: '1', HGW_RUNTIME_MAX_QUEUED: '1',
+    }, launcher)
+    const bob = await deps.users.create({ username: 'queued-bob', password: 'pw-12345678' })
+    const cara = await deps.users.create({ username: 'refused-cara', password: 'pw-12345678' })
+    const cookies = new Map([[alice.id, cookie]])
+    for (const user of [alice, bob, cara]) {
+      const state = { entered: barrier(), proceed: barrier(), alive: false, runtime: undefined as LaunchRuntime | undefined }
+      states.set(user.id, state)
+      const runtime = createServer((req, res) => {
+        if (!state.alive || state.runtime === undefined) { res.writeHead(503).end(); return }
+        if (req.url === RUNTIME_READINESS_PATH) {
+          const credential = JSON.parse(state.runtime.gatewayCredential) as { token: string; runtime: { kind: 'user'; id: number; generation: number } }
+          const nonce = req.headers[RUNTIME_READINESS_NONCE_HEADER]
+          if (typeof nonce !== 'string') { res.writeHead(403).end(); return }
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ version: 1, runtime: credential.runtime, proof: runtimeReadinessResponseProof(credential.token, nonce, credential.runtime) }))
+          return
+        }
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ runtimeUser: user.id }))
+      })
+      cleanup.push(async () => {
+        if (!runtime.listening) return
+        const closed = new Promise<void>((resolve, reject) => runtime.close(error => error ? reject(error) : resolve()))
+        runtime.closeAllConnections()
+        await closed
+      })
+      await new Promise<void>(resolve => runtime.listen(0, '127.0.0.1', resolve))
+      db.prepare('UPDATE instances SET port=? WHERE user_id=?').run((runtime.address() as AddressInfo).port, user.id)
+      if (user.id !== alice.id) {
+        await deps.users.changeOwnPassword(user.id, 'pw-12345678')
+        const login = await fetch(base + '/login', {
+          method: 'POST', redirect: 'manual', headers: { origin: base, 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username: user.username, password: 'pw-12345678' }),
+        })
+        await login.body?.cancel()
+        cookies.set(user.id, (login.headers.get('set-cookie') ?? '').split(';')[0]!)
+      }
+    }
+    cleanup.push(async () => {
+      for (const state of states.values()) state.proceed.resolve()
+      await deps.instances.stopAll()
+    })
+    const unhandled: unknown[] = []
+    const onUnhandled = (error: unknown): void => { unhandled.push(error) }
+    process.on('unhandledRejection', onUnhandled)
+    cleanup.push(() => { process.off('unhandledRejection', onUnhandled) })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    cleanup.push(() => log.mockRestore())
+    const firstWaiting = await fetch(base + '/', { headers: { cookie, accept: 'text/html' } })
+    expect(firstWaiting.status).toBe(200)
+    expect(await firstWaiting.text()).toContain('aria-busy="true"')
+    await states.get(alice.id)!.entered.promise
+    expect(states.get(alice.id)!.alive).toBe(false)
+    const first = deps.instances.startRequest(alice)
+    expect(deps.instances.ensureRunning(alice)).toBe(first.completion)
+
+    const queuedWaiting = await fetch(base + '/api/echo', { headers: { cookie: cookies.get(bob.id)! } })
+    expect(queuedWaiting.status).toBe(503)
+    expect(await queuedWaiting.json()).toMatchObject({ error: { code: 'INSTANCE_STARTING' } })
+    const queued = deps.instances.startRequest(bob)
+    expect(deps.instances.startRequest(bob)).toBe(queued)
+    await expect(queued.admission).resolves.toBeUndefined()
+    expect(starts).toEqual([alice.id])
+    expect(deps.instances.capacitySnapshot?.().queued).toBe(1)
+    const refusedHeaders: Record<string, string>[] = [{ cookie: cookies.get(cara.id)! }, { cookie: cookies.get(cara.id)!, accept: 'text/html' }]
+    for (const headers of refusedHeaders) {
+      const refused = await fetch(base + '/api/echo', { headers })
+      expect(refused.status).toBe(503)
+      expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0)
+      expect(await refused.json()).toMatchObject({ error: { code: 'INSTANCE_CAPACITY' } })
+    }
+    expect(starts).toEqual([alice.id])
+    const cancelled = expect(first.completion).rejects.toMatchObject({ code: 'INSTANCE_CAPACITY', reason: 'cancelled' })
+    const stopping = deps.instances.stop(alice.id)
+    states.get(alice.id)!.proceed.resolve()
+    await stopping
+    await cancelled
+    await states.get(bob.id)!.entered.promise
+    states.get(bob.id)!.proceed.resolve()
+    await queued.completion
+    const warmBob = await fetch(base + '/api/echo', { headers: { cookie: cookies.get(bob.id)! } })
+    expect(await warmBob.json()).toEqual({ runtimeUser: bob.id })
+
+    const recovering = await fetch(base + '/api/echo', { headers: { cookie: cookies.get(cara.id)! } })
+    expect(await recovering.json()).toMatchObject({ error: { code: 'INSTANCE_STARTING' } })
+    const recovered = deps.instances.startRequest(cara)
+    await deps.instances.stop(bob.id)
+    await states.get(cara.id)!.entered.promise
+    states.get(cara.id)!.proceed.resolve()
+    await recovered.completion
+    const warmCara = await fetch(base + '/api/echo', { headers: { cookie: cookies.get(cara.id)! } })
+    expect(await warmCara.json()).toEqual({ runtimeUser: cara.id })
+    await new Promise<void>(resolve => setImmediate(resolve))
+    expect(unhandled).toEqual([])
+    expect(deps.instances.capacitySnapshot?.()).toMatchObject({ resident: 1, starting: 0, queued: 0, rejected: 2 })
+  })
+
   it('rewrites host and origin to the instance loopback authority and writes grants', async () => {
     const { deps, base, cookie, root } = await setup()
     // Deterministic startup (the manager's beforeStart writes the grants file).

@@ -1,6 +1,8 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { ModelRegistrationEvent, UsageEvent } from './model-governance.ts'
 import type { GatewayAuditService, GatewayModelGovernanceService } from './services.ts'
+import type { GatewayPerformanceObserver } from './performance-observer.ts'
+import { PostgresCheckoutQueueFullError } from './postgres/database.ts'
 
 async function body(req: IncomingMessage, limit = 256 * 1024): Promise<string> {
   const chunks: Buffer[] = []; let size = 0
@@ -16,13 +18,23 @@ export interface UsageIntakeWrites {
   track<T>(operation: () => Promise<T>): Promise<T>
 }
 
-/** Create the private loopback-only, bearer-authenticated usage intake. */
+/**
+ * Create the private loopback-only, bearer-authenticated usage intake.
+ * @param governance - Authenticates and persists usage records.
+ * @param audit - Optional metadata-only audit sink.
+ * @param writes - Optional maintenance and writer ownership.
+ * @param performanceObserver - Shared observer disposed by its supplying owner after server closure.
+ * @returns An unbound server whose caller owns listening and closure.
+ */
 export function createUsageIntakeServer(
   governance: GatewayModelGovernanceService,
   audit?: GatewayAuditService,
   writes?: UsageIntakeWrites,
+  performanceObserver?: GatewayPerformanceObserver,
 ): Server {
-  return createServer((req, res) => { void (async () => {
+  return createServer((req, res) => {
+    performanceObserver?.observeResponse(res, 'internal')
+    void (async () => {
     if (req.method !== 'POST' || req.url !== '/usage') { res.writeHead(404).end(); return }
     const auth = req.headers.authorization
     const token = auth?.startsWith('Bearer ') ? auth.slice(7) : ''
@@ -60,7 +72,18 @@ export function createUsageIntakeServer(
     try {
       await (writes === undefined ? ingest() : writes.track(ingest))
     } catch (error) {
+      if (error instanceof PostgresCheckoutQueueFullError) {
+        res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error.code }))
+        return
+      }
       res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: String(error) }))
     }
-  })().catch(() => { if (!res.writableEnded) res.writeHead(500).end() }) })
+  })().catch((error: unknown) => {
+    if (res.writableEnded) return
+    if (error instanceof PostgresCheckoutQueueFullError) {
+      res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error.code }))
+      return
+    }
+    res.writeHead(500).end()
+  }) })
 }

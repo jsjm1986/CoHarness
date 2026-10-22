@@ -391,7 +391,7 @@ function adoptWait(
       } catch {
         // A dropped claim stream leaves the card answerable without a countdown.
       } finally {
-        card.pending.attachWaterfall(channel)
+        if (!claimLifetime.signal.aborted) card.pending.attachWaterfall(channel)
       }
     })()
   } else {

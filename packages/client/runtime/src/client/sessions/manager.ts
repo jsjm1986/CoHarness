@@ -1404,6 +1404,7 @@ export class SessionManager {
         && prev.visibleContentSeq === entry.visibleContentSeq
         && prev.parentSessionId === entry.parentSessionId && prev.cwd === entry.cwd
         && prev.workspaceId === entry.workspaceId && prev.sshTarget === entry.sshTarget
+        && prev.visibility === entry.visibility && prev.projectId === entry.projectId
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.pendingInteraction === entry.pendingInteraction
         && prev.projectionValues === entry.projectionValues

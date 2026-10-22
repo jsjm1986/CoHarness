@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-23-project-creation-transactions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.md
+document:
+  en: 50b3774d0d77a6337464f4c220cb24bcc8ec0e1b
+  zh: 9db248abe1f6aba50c271f25a4c1ffc6b75fec45
+/agent-note-project-creation-owns-its-transaction-and-directory-cleanup:
+  en: 35e242dba6007dd7
+  zh: f894b01b63a2d9e6
+/agent-note-project-creation-owns-its-transaction-and-directory-cleanup/problem:
+  en: 1beb70b509a69671
+  zh: c89475ed19f52df0
+/agent-note-project-creation-owns-its-transaction-and-directory-cleanup/decision:
+  en: 6ff61c353d08a3be
+  zh: cb94e04cf60e9377
+/agent-note-project-creation-owns-its-transaction-and-directory-cleanup/alternatives-considered:
+  en: ff2f3254907a3e91
+  zh: 02fecec826aff9b4
+/agent-note-project-creation-owns-its-transaction-and-directory-cleanup/consequences:
+  en: 5a2b160ed4858007
+  zh: c690931691c9eaef

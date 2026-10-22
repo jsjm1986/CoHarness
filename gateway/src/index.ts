@@ -31,6 +31,7 @@ import {
   createPostgresPool,
   databaseUrlFromFile,
   errorCodeForDiagnostics,
+  poolAdmissionSnapshot,
   runMigrations,
   withDatabaseStartupRetry,
 } from './postgres/database.ts'
@@ -84,6 +85,7 @@ import { LocalDocumentBroker } from './documents-local.ts'
 import { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, type GatewayDeps } from './server.ts'
+import { GatewayPerformanceObserver } from './performance-observer.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
 import { removeBootstrapAdminPassword, writeBootstrapAdminPassword } from './bootstrap-admin.ts'
 import type { GatewayModelGovernanceService } from './services.ts'
@@ -127,7 +129,11 @@ const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
 const cfg = loadConfig(effectiveEnvironment)
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
 const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
-const pool = createPostgresPool(databaseUrl)
+const pool = createPostgresPool(databaseUrl, {
+  max: cfg.databaseMaxConnections,
+  maxCheckoutQueue: cfg.databaseMaxCheckoutQueue,
+  connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
+})
 const startupAbort = new AbortController()
 const onStartupSignal = (): void => { startupAbort.abort() }
 process.once('SIGINT', onStartupSignal)
@@ -406,7 +412,12 @@ const tunnelAccess = new GatewayTunnelAccess({
 })
 const pluginState = new PostgresPluginState(context)
 const stewardQuery = new StewardQueryService(context, cfg.steward.enabled)
+const performanceObserver = new GatewayPerformanceObserver({
+  enabled: cfg.performanceEnabled,
+  eventLoopResolutionMs: cfg.performanceEventLoopResolutionMs,
+})
 const deps: GatewayDeps = {
+  performance: performanceObserver,
   cfg,
   auth,
   users,
@@ -445,6 +456,13 @@ const deps: GatewayDeps = {
   migrationPlan: () => migrationPlan(pool, cfg.deployMigrationsDir),
   maintenanceGate,
   writerSpan,
+  databasePerformance: () => ({
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+    maximum: pool.options.max ?? null,
+    admission: poolAdmissionSnapshot(pool),
+  }),
   readiness: async (signal) => {
     await checkPostgresReadiness(context, signal)
     await accessMonitor.synchronize()
@@ -663,7 +681,7 @@ server.listen(cfg.port, '127.0.0.1', () => {
 const intake = createUsageIntakeServer(governance, audit, {
   open: async () => (await maintenanceGate()) === 'open',
   track: trackWriter,
-})
+}, performanceObserver)
 intake.listen(cfg.intakePort, '127.0.0.1', () => {
   console.log(`[gateway] usage intake listening on http://127.0.0.1:${cfg.intakePort}`)
 })
@@ -809,6 +827,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
     await tunnelAccess.shutdown()
     await deps.instances.stopAll()
     await pool.end()
+    performanceObserver.dispose()
     clearTimeout(forced)
     process.exit(0)
   } catch (error) {

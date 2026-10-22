@@ -61,7 +61,7 @@ interface Config {
   maxParallelToolCalls?: number // default 10; 1 is serial
   inbox?: {
     maxMessages?: number // default 10,000; pending messages per agent
-    maxBytes?: number // default 8 MiB; pending UTF-8 bytes per agent
+    maxBytes?: number // default 16 MiB; pending UTF-8 bytes per agent
   }
   agents: Array<{
     id: string                 // required

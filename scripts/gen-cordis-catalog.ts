@@ -619,6 +619,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   Scoped: 'scope.md',
   EpochHeader: 'session.md',
   Session: 'session.md',
+  SessionAppendAdmission: 'session.md',
   SessionEventMap: 'session.md',
   SessionMessageProjection: 'session.md',
   TurnEndReason: 'session.md',

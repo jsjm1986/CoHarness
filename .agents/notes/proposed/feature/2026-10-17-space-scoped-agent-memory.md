@@ -89,7 +89,7 @@ When the `recall` switch is on, `dsh-memory-context` starts an auxiliary selecto
 
 ## Earlier-session lookup
 
-ZCode's `ReadSessionContext` corresponds to the existing `tool-session-query` tools. They authorize a target session by working-directory equality, which in a project runtime would expose other members' private conversations, so enabling them in project space requires filtering every target through `CollaborationAuthority.readableSessionIds()` in addition to the directory check.
+ZCode's `ReadSessionContext` corresponds to the existing `tool-session-query` tools. They combine working-directory equality with participant-readable ACL checks in project runtimes, including final revocation checks; the [participant-readable ACL decision](../../implemented/bug-fix/2026-10-17-session-query-participant-acl.md) owns that behavior.
 
 ## Browser surface
 

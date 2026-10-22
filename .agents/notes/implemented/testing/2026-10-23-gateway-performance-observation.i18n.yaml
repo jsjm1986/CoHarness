@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-gateway-performance-observation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-23-gateway-performance-observation.md
+document:
+  en: e3ae5c8db50699978fdbcfa368231501879e007e
+  zh: 9cac0e6b840cf765a62a9684d81f4cb5508f4e1e
+/agent-note-bounded-gateway-observation-and-offline-baselines:
+  en: f0b5319bd46589ec
+  zh: 43f87a94ac10f3c8
+/agent-note-bounded-gateway-observation-and-offline-baselines/problem:
+  en: da83dc5957d14233
+  zh: 119f09482ada1ed5
+/agent-note-bounded-gateway-observation-and-offline-baselines/decision:
+  en: 82a336909c31787d
+  zh: 57e0fc1a376f0277
+/agent-note-bounded-gateway-observation-and-offline-baselines/alternatives-considered:
+  en: 2bda38b8cce20529
+  zh: 877f72188372e33d
+/agent-note-bounded-gateway-observation-and-offline-baselines/consequences:
+  en: 4c6f4ee1fe029772
+  zh: 0c910e37cebdf1bc
+/agent-note-bounded-gateway-observation-and-offline-baselines/verification:
+  en: b8070788e28839d2
+  zh: 8f729ca61fbde04d

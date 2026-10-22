@@ -12,12 +12,28 @@ import { Config, JsonStorageBackend, apply } from '../src/index.ts'
 
 const state = vi.hoisted(() => ({
   failDirectorySync: '',
+  failPublication: '',
+  failTreeRead: '',
 }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
+    readdir: (async (path: string, ...args: never[]) => {
+      if (path === state.failTreeRead) {
+        state.failTreeRead = ''
+        throw Object.assign(new Error('EIO: injected tree read failure'), { code: 'EIO' })
+      }
+      return (actual.readdir as (path: string, ...args: never[]) => Promise<unknown>)(path, ...args)
+    }) as typeof actual.readdir,
+    rename: (async (source: string, target: string) => {
+      if (target === state.failPublication) {
+        state.failPublication = ''
+        throw Object.assign(new Error('ENOSPC: injected publication failure'), { code: 'ENOSPC' })
+      }
+      return actual.rename(source, target)
+    }) as typeof actual.rename,
     open: (async (path: unknown, ...rest: never[]) => {
       // `writeAtomic` opens the temp file with 'wx' and the parent directory
       // with 'r'; failing only the exact directory path injects the
@@ -416,6 +432,103 @@ describe('per-record layout', () => {
     const unit2 = await backend.kv.open(descriptor)
     expect(await unit2.loadAll()).toEqual({ tables: { t: { old1: { v: 1 }, old2: { v: 2 } } }, global: null })
     await backend.close()
+  })
+
+  it('resumes an interrupted bootstrap before exposing any partial migrated state', async () => {
+    const root = await freshRoot()
+    const legacy = JSON.stringify({
+      unit: { name: 'recs', version: descriptor.version },
+      global: 'retained global',
+      tables: { t: { first: { v: 1 }, second: { v: 2 } } },
+    })
+    await writeFile(join(root, 'recs.json'), legacy)
+    const backend = new JsonStorageBackend(root)
+    try {
+      const unit = await backend.kv.open(descriptor)
+      state.failPublication = recordPath(root, 'second')
+      await expect(unit.loadAll()).rejects.toMatchObject({ code: 'ENOSPC' })
+      await unit.close()
+      const reopened = await backend.kv.open(descriptor)
+      expect(await reopened.loadAll()).toEqual({
+        tables: { t: { first: { v: 1 }, second: { v: 2 } } }, global: 'retained global',
+      })
+      await reopened.deleteRecord('t', 'first')
+      await reopened.deleteRecord('t', 'second')
+      await reopened.close()
+      const empty = await backend.kv.open(descriptor)
+      expect((await empty.loadAll()).tables.t).toEqual({})
+      expect(await readFile(join(root, 'recs.json'), 'utf8')).toBe(legacy)
+    } finally {
+      state.failPublication = ''
+      await backend.close()
+    }
+  })
+
+  it.each(['{invalid', 'null', '{}', JSON.stringify({ version: 1, status: 'copying', source: '{invalid' }), JSON.stringify({ version: 1, status: 'copying', source: '{}' })])(
+    'refuses invalid bootstrap progress instead of exposing a partial tree: %s', async (marker) => {
+      const root = await freshRoot()
+      await mkdir(join(root, 'recs', 't'), { recursive: true })
+      await writeFile(recordPath(root, 'partial'), JSON.stringify({ version: 2, record: { v: 1 } }))
+      await writeFile(join(root, 'recs', '.legacy-bootstrap.json'), marker)
+      const backend = new JsonStorageBackend(root)
+      try {
+        const unit = await backend.kv.open(descriptor)
+        await expect(unit.loadAll()).rejects.toMatchObject({ code: 'malformed-medium' })
+      } finally { await backend.close() }
+    },
+  )
+
+  it.each([
+    null, [], { unit: { name: 'recs', version: 2 }, tables: { t: [] } },
+    { unit: { name: 'recs', version: 2 }, tables: { t: null } },
+    { unit: { name: 'recs', version: 2 }, tables: {} },
+  ])('leaves malformed legacy data absent without losing its source: %j', async (document) => {
+    const root = await freshRoot()
+    const text = JSON.stringify(document)
+    await writeFile(join(root, 'recs.json'), text)
+    const backend = new JsonStorageBackend(root)
+    try {
+      const unit = await backend.kv.open(descriptor)
+      expect(await unit.loadAll()).toEqual({ tables: { t: {} }, global: null })
+      expect(await readFile(join(root, 'recs.json'), 'utf8')).toBe(text)
+    } finally { await backend.close() }
+  })
+
+  it('propagates a tree read failure after migration metadata was inspected', async () => {
+    const root = await freshRoot()
+    const backend = new JsonStorageBackend(root)
+    try {
+      const unit = await backend.kv.open(descriptor)
+      state.failTreeRead = join(root, 'recs')
+      await expect(unit.loadAll()).rejects.toMatchObject({ code: 'EIO' })
+    } finally { state.failTreeRead = ''; await backend.close() }
+  })
+
+  it('releases a failed per-record write without changing sibling records', async () => {
+    const root = await freshRoot()
+    const backend = new JsonStorageBackend(root)
+    try {
+      const unit = await backend.kv.open(descriptor)
+      await unit.putRecord('t', 'retained', 1)
+      state.failPublication = recordPath(root, 'failed')
+      await expect(unit.putRecord('t', 'failed', 2)).rejects.toMatchObject({ code: 'ENOSPC' })
+      await unit.close()
+      const reopened = await backend.kv.open(descriptor)
+      expect(await reopened.loadAll()).toEqual({ tables: { t: { retained: 1 } }, global: null })
+    } finally { state.failPublication = ''; await backend.close() }
+  })
+
+  it('rejects unsafe legacy record paths before creating migration metadata', async () => {
+    const root = await freshRoot()
+    await writeFile(join(root, 'recs.json'), JSON.stringify({
+      unit: { name: 'recs', version: 2 }, tables: { t: { '../outside': 'untrusted' } },
+    }))
+    const backend = new JsonStorageBackend(root)
+    try {
+      const unit = await backend.kv.open(descriptor)
+      await expect(unit.loadAll()).rejects.toThrow(/not path-safe/)
+      await expect(readFile(join(root, 'recs', '.legacy-bootstrap.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally { await backend.close() }
   })
 
   it('bootstraps from a legacy file only when its stored version is accepted', async () => {

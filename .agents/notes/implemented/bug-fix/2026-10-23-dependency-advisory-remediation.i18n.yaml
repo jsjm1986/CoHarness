@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-dependency-advisory-remediation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-dependency-advisory-remediation.md
+document:
+  en: adf3bd5a60ff4583538ab39802f57d32da1c5065
+  zh: 4cfda78f8d237708c972165cf44c969034d5b85e
+/agent-note-remediate-dependency-advisories-across-runtime-and-build-tools:
+  en: ef0dd9492d10aada
+  zh: 9949529e43c31717
+/agent-note-remediate-dependency-advisories-across-runtime-and-build-tools/problem:
+  en: 012f0eb81676639d
+  zh: fab3700c37e5e7e6
+/agent-note-remediate-dependency-advisories-across-runtime-and-build-tools/decision:
+  en: bd629b97708168be
+  zh: 42bf62cf66022724
+/agent-note-remediate-dependency-advisories-across-runtime-and-build-tools/alternatives-considered:
+  en: 5325dbfea0b7a744
+  zh: ddf073034c59a7df
+/agent-note-remediate-dependency-advisories-across-runtime-and-build-tools/consequences:
+  en: 9bde5ccd467f684c
+  zh: a1e8180ccb81f219
+/agent-note-remediate-dependency-advisories-across-runtime-and-build-tools/verification:
+  en: 14fcc6497fb8e7b8
+  zh: ba20e6bbc7c0f503

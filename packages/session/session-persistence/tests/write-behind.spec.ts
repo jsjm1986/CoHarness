@@ -298,6 +298,7 @@ describe('SessionWriteBehind', () => {
     controller.enqueue(event(SessionSeq(1)))
     expect(() => { controller.enqueue(event(SessionSeq(2))) }).toThrow(/pending-event limit exceeded/)
     expect(report).toHaveBeenCalledOnce()
+    expect(controller.hasWork).toBe(true)
   })
 
   it('fails loudly when serialized pending bytes reach their configured bound', () => {
@@ -331,7 +332,7 @@ describe('SessionWriteBehind', () => {
     expect(() => { controller.enqueue(event(SessionSeq(1))) }).toThrow(/pending-byte limit exceeded/)
     gate.resolve(undefined)
     await vi.advanceTimersByTimeAsync(0)
-    await controller.flush()
+    await expect(controller.flush()).rejects.toThrow(/pending-(event|byte) limit exceeded/)
   })
 
   it('counts an active batch against the retained-event bound', async () => {
@@ -357,7 +358,7 @@ describe('SessionWriteBehind', () => {
     expect(() => { controller.enqueue(event(SessionSeq(2))) }).toThrow(/pending-event limit exceeded/)
     gate.resolve(undefined)
     await vi.advanceTimersByTimeAsync(0)
-    await controller.flush()
+    await expect(controller.flush()).rejects.toThrow(/pending-(event|byte) limit exceeded/)
     expect(batches).toEqual([[0], [0, 1]])
   })
 })

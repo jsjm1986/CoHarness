@@ -2,20 +2,28 @@
 
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import type { Browser, Page } from 'playwright'
+import { join } from 'node:path'
+import type { Browser, BrowserContext, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { launchWebScaffold, seedSession, watchConsole, type WebScaffold } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import {
+  captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession,
+  watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import { saveFailureShot } from './support.ts'
 
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const SESSION_ID = 'project-activity-web-e2e'
 const MESSAGE_TEXT = 'Pinned the migration checklist to the top of the plan.'
 const ANSWER_TEXT = 'Proceed with the staged rollout'
 const QUESTION_TEXT = 'Roll out to production now or stage first?'
+const OTHER_PROJECT_TEXT = 'Unrelated project activity'
+const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/project-activity', import.meta.url))
+const MODE = webSnapshotMode()
 
 let scaffold: WebScaffold
 let browser: Browser
+let context: BrowserContext | undefined
 let page: Page | undefined
 let tripwire: ReturnType<typeof watchConsole> | undefined
 
@@ -42,17 +50,24 @@ async function mockActivityGateway(target: Page): Promise<void> {
     await route.fulfill({ status: 204, body: '' })
   })
   await target.route(/\/account\/api\/activity(?:\?.*)?$/, async (route) => {
+    const selector = new URL(route.request().url()).searchParams.get('dshTarget')
+      ?? (await route.request().allHeaders()).cookie?.match(/(?:^|;\s*)dsh-scope=([^;]+)/u)?.[1]
+      ?? 'project:9'
     await route.fulfill({
       json: {
-        items: [
+        items: selector === 'project:10' ? [{
+          kind: 'message', sessionId: 'another-project', conversationTitle: 'Other project',
+          actorUserId: 8, actorLabel: 'Zhou', occurredAt: '2026-10-23T09:00:00.000Z',
+          seq: 1, text: OTHER_PROJECT_TEXT,
+        }] : [
           {
             kind: 'message', sessionId: SESSION_ID, conversationTitle: 'Release plan',
-            actorUserId: 8, actorLabel: 'Zhou', occurredAt: new Date().toISOString(),
+            actorUserId: 8, actorLabel: 'Zhou', occurredAt: '2026-10-23T09:00:00.000Z',
             seq: 1, text: MESSAGE_TEXT,
           },
           {
             kind: 'answer', sessionId: SESSION_ID, conversationTitle: 'Release plan',
-            actorUserId: 7, actorLabel: 'Lin', occurredAt: new Date(Date.now() - 60_000).toISOString(),
+            actorUserId: 7, actorLabel: 'Lin', occurredAt: '2026-10-23T08:59:00.000Z',
             seq: 2, text: ANSWER_TEXT, questionText: QUESTION_TEXT,
           },
         ],
@@ -100,7 +115,8 @@ describe('project activity tab', () => {
       expect(tripwire?.warnings ?? []).toEqual([])
       expect(tripwire?.pageErrors ?? []).toEqual([])
     } finally {
-      await page?.close()
+      await context?.close()
+      context = undefined
       page = undefined
       tripwire = undefined
     }
@@ -114,8 +130,9 @@ describe('project activity tab', () => {
     if (failures.length > 1) throw new AggregateError(failures, 'project activity e2e cleanup failed')
   })
 
-  it('renders member messages and chosen answers, then reveals the conversation row', async () => {
-    page = await newEnglishPage(browser)
+  it('keeps project activity pinned after another tab changes scope, then reveals the conversation row', async () => {
+    context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'UTC' })
+    page = await context.newPage()
     tripwire = watchConsole(page)
     await mockActivityGateway(page)
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-activity'))
@@ -136,6 +153,25 @@ describe('project activity tab', () => {
     // The folded line expands to the detail card; the question shows there.
     await feed.getByText(ANSWER_TEXT, { exact: true }).click()
     await feed.getByText(QUESTION_TEXT, { exact: false }).waitFor()
+
+    const scopeTab = await page.context().newPage()
+    try {
+      await scopeTab.route('**/test-select-project', route => route.fulfill({
+        headers: { 'set-cookie': 'dsh-scope=project:10; Path=/; SameSite=Lax' },
+        body: 'Project 10 selected',
+      }))
+      await scopeTab.goto(new URL('/test-select-project', scaffold.authenticatedUrl).href)
+    } finally {
+      await scopeTab.close()
+    }
+    const refreshed = page.waitForResponse(response => new URL(response.url()).pathname === '/account/api/activity')
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+    const response = await refreshed
+    expect(new URL(response.url()).searchParams.get('dshTarget')).toBe('project:9')
+    await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor()
+    expect(await feed.getByText(OTHER_PROJECT_TEXT, { exact: true }).count()).toBe(0)
+    const snapshot = await captureStableAria(page, '[class*="feed"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'ui.expected.md'), snapshot, MODE)
 
     const seeded = page.getByText('DONE', { exact: true })
     await feed.getByText('Jump to conversation', { exact: true }).click()

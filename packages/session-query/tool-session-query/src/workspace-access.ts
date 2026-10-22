@@ -29,6 +29,8 @@ interface Caller {
   readonly id: SessionIdValue
   readonly agent: Agent
   readonly header: SessionHeader
+  /** Whether this operation started with a participant ACL provider. */
+  readonly requiresParticipantAcl: boolean
   /** The caller's own-session boundary fold (the `turnBoundary` projection). */
   readonly boundary: TurnBoundaryProjection | undefined
 }
@@ -71,6 +73,7 @@ function callerOf(exec: ToolRunContext, ctx: Context): Caller {
     id: agent.session.id,
     agent,
     header: agent.session.header,
+    requiresParticipantAcl: ctx.get('collaboration') !== undefined,
     boundary: ctx.sessionProjections.stateOf(agent.session, 'turnBoundary'),
   }
 }
@@ -117,6 +120,21 @@ async function readableSessions(
   return captureReadableSet(ctx, collaboration, ids, signal)
 }
 
+/** Recheck every cross-session id disclosed by a result after its asynchronous reads. */
+async function assertReadableSessions(
+  ctx: Context,
+  caller: Caller,
+  ids: readonly SessionIdValue[],
+  signal: AbortSignal,
+): Promise<void> {
+  const other = [...new Set(ids)].filter(id => id !== caller.id)
+  if (other.length === 0) return
+  const readable = await readableSessions(ctx, other, signal)
+  if (readable === undefined ? caller.requiresParticipantAcl : other.some(id => !readable.has(id))) {
+    throw serviceBoundary.unauthorizedTarget()
+  }
+}
+
 /**
  * Authorize one direct target against the caller workspace and the composed
  * participant ACL.
@@ -151,9 +169,9 @@ async function authorizeTarget(
  * Every authorized session id in the caller workspace, or `undefined` when no
  * collaboration service is composed. The caller stays authorized even when the
  * bound principal is absent, matching {@link authorizeSessionIds}. Search
- * resolves this once per call — one corpus enumeration plus one batched
- * readability request — so streamed hits, hit parents, and title revalidation
- * share a single authorization decision.
+ * resolves this once before reading provider pages. Streamed hits, hit parents,
+ * and title observations share this admission set; final result publication
+ * separately rechecks the disclosed ids against current readability.
  */
 async function authorizedWorkspaceIds(
   ctx: Context,
@@ -366,6 +384,7 @@ export const workspaceAccess = {
   authorizeTarget,
   authorizedWorkspaceIds,
   readableSessions,
+  assertReadableSessions,
   recordAuthorized,
   assertObservedTargetAuthorized,
   authorizeSessionIds,

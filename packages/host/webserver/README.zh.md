@@ -53,9 +53,6 @@ Web HTTP 与 upgrade route 注册插件（默认导出 `WebServer`，配置为 `
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 
-两条工作备注，均非权威结论：
-
-- TLS 测试材料在测试时生成（`tests/tls-fixture.ts`），绝不入库：GitHub push protection 会拦截测试中的 PEM 私钥，况且该证书本就是一次性的。该助手每个进程签发一张自签名的 localhost 证书，覆盖 127.0.0.1、`::1` 与 `localhost`，并以仅属主可读的权限写入私钥。
-- `selfsigned` 固定在 4.x：在 pnpm 下 5.x 会装入两份 `@peculiar/asn1-schema`，其 extension 构造器随后会让每次 `generate()` 抛错。
+- TLS 测试材料在测试时异步生成（`tests/tls-fixture.ts`），绝不入库：GitHub push protection 会拦截测试中的 PEM 私钥，况且该证书本就是一次性的。该助手在每个进程内共用一个待完成的 `selfsigned` 生成操作，签发有效期 30 天、覆盖 127.0.0.1、`::1` 与 `localhost` 的自签名证书，并以仅属主可读的权限写入私钥。
 
 </details>

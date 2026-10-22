@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session-query/tool-session-query/README.md
 document:
-  en: 3210ff8bbdef28775cd2b448c435446722e79d4a
-  zh: 6c012934007587152d1224c891fe1a43c0a63d33
+  en: 66af66b76c8528529f0c863a1e742e9516a637d7
+  zh: a291a95e1d4d64a264901e580224e479c2ea1fd3
 /:
   en: fa5100de1316e6e4
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: f655f2e399ab5001
   zh: 34ac0e01b970b5d8
 /deepseek-ai-dsh-tool-session-query/configuration:
-  en: 762ba278737e5e94
-  zh: b10d7f437a48023e
+  en: acbec77d32134800
+  zh: b2bcaa8b7ee78548
 /deepseek-ai-dsh-tool-session-query/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -42,11 +42,11 @@ document:
   en: 3039bc5e7a796b21
   zh: 6b7a9eaf69c9ea53
 /deepseek-ai-dsh-tool-session-query/model-experience/tool-schemas/what-the-model-sees:
-  en: 9399fc8822bcee2e
-  zh: ce83ad6a03d32992
+  en: 7ab350ed0457f675
+  zh: 5aa9a88654c6a352
 /deepseek-ai-dsh-tool-session-query/model-experience/tool-schemas/token-effect:
-  en: 3c001ca824c5bc52
-  zh: 314a8fdf37a470c1
+  en: 66aef9e930425123
+  zh: d072a1c79a1bbf4c
 /deepseek-ai-dsh-tool-session-query/model-experience/tool-schemas/kv-cache-effect:
   en: c8cbbef533bdb90f
   zh: 9477247f981b9e7d

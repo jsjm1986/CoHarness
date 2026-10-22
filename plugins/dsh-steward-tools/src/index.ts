@@ -59,11 +59,11 @@ function approvalKey(callId: unknown): string {
 }
 
 function renderResult(result: StewardQueryWire): string {
+  const suffix = result.truncated ? '\n(result truncated — raise row_limit or narrow the statement)' : ''
   if (result.dryRun) {
     const plan = (result.plan ?? []).map(row => JSON.stringify(row)).join('\n')
-    return `Dry run plan:\n${plan}`
+    return `Dry run plan:\n${plan}${suffix}`
   }
-  const suffix = result.truncated ? '\n(result truncated — raise row_limit or narrow the statement)' : ''
   if (result.rows === null) {
     return `Statement applied; ${String(result.rowCount ?? 0)} row(s) affected.${suffix}`
   }
@@ -130,7 +130,7 @@ export function apply(ctx: Context): void {
       },
       row_limit: {
         type: 'integer',
-        description: `Maximum rows to return for read statements (default 500, at most ${String(MAX_ROW_LIMIT)}).`,
+        description: `Maximum rows to return for read statements or dry_run plans (default 500, at most ${String(MAX_ROW_LIMIT)}).`,
       },
     },
     output: {

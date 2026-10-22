@@ -19,6 +19,8 @@ with DeepSeekHarness(dsh_home="./.harness") as harness:
 
 `DeepSeekHarness` keeps its lazily started runtime subprocess for reuse across calls. Use it as a context manager, as above, or call `close()` explicitly when finished.
 
+Closing requests JSON-RPC shutdown, closes stdin, and allows the runtime to finish EOF cleanup before sending a termination signal. `shutdown_timeout_seconds` bounds each of the shutdown acknowledgement, EOF exit, and termination waits; a process still alive after termination is killed and reaped.
+
 The SDK launches the bundled `dsh` executable with the `sdk` runtime profile. Set `dsh_home` or a nonempty `DSH_HOME` explicitly; the SDK does not choose a personal home implicitly. Use `profile` and ordered `patches` to configure the shipped application. The selected profile must provide stdio JSON-RPC and its required services. An independent home removes an inherited `DSH_MANAGED_DATA_MANIFEST`; a same-home launch retains it. To register the child's data for backup, pass its own inventory explicitly through `HarnessConfig.env`, which overlays the inherited environment.
 
 ```py
@@ -81,6 +83,8 @@ The shipped `sdk-minimal` profile is a standalone explicit tree rather than an o
 `Session.run()` owns an activity interval from its prompt's durable inbox receipt through the next whole-agent idle and returns `RunResult(session_id, final_response, finish_reason, events, notifications)`. `final_response` is the last committed root-session assistant text in the interval. `finish_reason` is the `kind` of the last root-session `turn/end`, such as `completed`, `max-tokens`, or `error`, and is `None` when no turn ended. A `turn/end` without a string `data.reason.kind` violates the protocol and raises `SdkProtocolError`.
 
 `HarnessClient` retains discovered subagent ancestry while each child is active, releases an edge after `subagent.finished`, and bounds the lineage map by the notification queue limit. During `Session.run()`, `RunResult.notifications` and `on_notification` receive the root session and known descendants in wire order. `RunResult.events` contains root-session events only, so descendant output cannot replace the root response. The low-level `session_prompt()` returns the queued message id immediately; callers that bypass `Session.run()` own the later activity boundary.
+
+A low-level notification subscription has its own bounded queue. A filter exception removes that subscription and reaches its next reader as the original exception, even when the queue is full; delivering the terminal error may discard one queued notification. Other subscriptions and RPC responses keep progressing.
 
 The selected home stores profiles, plugins, and every profile-owned durable resource. The full `sdk` profile uses its credentials, settings, and session stores; `sdk-minimal` uses only its JSONL session store. Use a fresh home when those resources must be isolated, and a fresh session id for independent work. Reusing both a harness and session id continues the durable conversation and session-owned resources.
 

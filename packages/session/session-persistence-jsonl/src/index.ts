@@ -36,6 +36,7 @@ import {
 } from '@deepseek-ai/dsh-session-persistence'
 import { JsonlBackendTracker, JsonlSessionHandle, type StorageHandleState } from './storage.ts'
 import { SessionWriteLease } from './lease.ts'
+import { DEFAULT_MAX_PENDING_BYTES, DEFAULT_MAX_PENDING_EVENTS, type JsonlRetentionLimits } from './retention.ts'
 import { SESSION_FORMAT_VERSION, Session, SessionId as makeSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionId, SessionHeader, SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 import {
@@ -91,7 +92,7 @@ export const JsonlCompressionSchema: z<JsonlCompression> = z.union([
 ]).default(DEFAULT_COMPRESSION)
 
 /** Plugin config for the JSONL backend's root and physical encoding. */
-export interface Config {
+export interface Config extends JsonlRetentionLimits {
   /**
    * Root directory for all session files. Required (no default): a default of
    * `process.cwd()` would scatter session files as the process's cwd changes
@@ -367,7 +368,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     // before its first log bytes publish (ensureLease); an unmaterialized
     // session leaves no filesystem footprint at all.
     this.tracker.registerCreated(snapshot, inheritedEventCount)
-    return this.tracker.adopt(new JsonlSessionHandle(this, snapshot.id, snapshot, 'write', { cursor: 0, materialized: false, inheritedEventCount }))
+    return this.tracker.adopt(new JsonlSessionHandle(this, snapshot.id, snapshot, 'write', { cursor: 0, materialized: false, inheritedEventCount }, undefined, this.tracker.retention))
   }
 
   /**
@@ -447,7 +448,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         recoveredTail: stored.recoveredTail,
         inheritedEventCount: stored.inheritedEventCount,
         primed: stored,
-      }, lease))
+      }, lease, this.tracker.retention))
     } catch (error) {
       // Free the in-process claim no matter how the kernel-lock release
       // fares, and keep the original diagnostic: a release failure joins it
@@ -1921,6 +1922,8 @@ export const Config: z<Config> = z.object({
   root: z.string().required(),
   compression: JsonlCompressionSchema,
   listConcurrency: z.natural().min(1).default(DEFAULT_LIST_CONCURRENCY),
+  maxPendingEvents: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_PENDING_EVENTS),
+  maxPendingBytes: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_PENDING_BYTES),
 })
 
 /**
@@ -1935,7 +1938,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   let service!: Fiber
   // A synchronous generator registers thenable disposers without awaiting them.
   ctx.effect(function* () {
-    const tracker = new JsonlBackendTracker(name)
+    const tracker = new JsonlBackendTracker(name, config)
     yield tracker.install(ctx)
     service = ctx.plugin({
       name: 'session-persistence-jsonl-service',
