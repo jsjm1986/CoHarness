@@ -409,6 +409,7 @@ function orderedUngrouped(
  */
 function groupByWorkspace(
   list: SessionListState,
+  summaries: SessionListState['byId'],
   workspaces: readonly WorkspaceView[],
   archived: ReadonlySet<SessionId>,
   archivedFilter: ArchivedFilter,
@@ -425,7 +426,6 @@ function groupByWorkspace(
   const workspaceMembers = currentHint === undefined
     ? undefined
     : new Set(workspaces.flatMap(workspace => workspace.sessionIds))
-  const summaries = sessionSummaries(list)
   for (const workspace of workspaces) {
     const members: SessionSummary[] = []
     for (const id of workspace.sessionIds) {
@@ -529,7 +529,7 @@ export function deriveGroups(
         ?? currentSummary?.workspaceId
         ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, rowState.archivedFilter, view.ungroupedOrder)) {
+  for (const g of groupByWorkspace(list, summaries, workspaces, archived, rowState.archivedFilter, view.ungroupedOrder)) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,
@@ -557,9 +557,8 @@ export function deriveGroups(
  * @returns known ordinary Session ids, including archives and only the current blank.
  */
 export function sessionMemberIds(list: SessionListState): SessionId[] {
-  const summaries = sessionSummaries(list)
   return sessionKnownIds(list).filter((id) => {
-    const s = summaries[id]
+    const s = sessionSummaryOf(list, id)
     return s !== undefined
       && s.origin !== 'subagent'
       && (!s.blank || s.id === list.current)

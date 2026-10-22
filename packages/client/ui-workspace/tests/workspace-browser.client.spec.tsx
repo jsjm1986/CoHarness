@@ -130,6 +130,110 @@ function rerender(b: ReturnType<typeof mount>, overrides: Partial<WorkspaceBrows
 }
 
 describe('WorkspaceBrowser', () => {
+  it('reconciles a multi-workspace update with one persisted order snapshot', () => {
+    const count = 40
+    const items = Array.from({ length: count }, (_, i) => summary(`session-${i}`, i))
+    const workspaces = items.map((item, i) => workspace(`workspace-${i}`, [item.id]))
+    const b = mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState(workspaces)),
+    })
+    let summaryEnumerations = 0
+    const updated = items.map(item => ({ ...item, updatedAt: item.updatedAt + count }))
+    const next = sessionState(updated)
+    const byId = new Proxy(next.byId, {
+      ownKeys(target) {
+        summaryEnumerations++
+        return Reflect.ownKeys(target)
+      },
+    })
+    const writes = vi.spyOn(Storage.prototype, 'setItem')
+    try {
+      rerender(b, { useSessions: hook({ ...next, byId }) })
+      const orderWrites = writes.mock.calls.filter(([key]) => key === 'dsh.workspace.view.v5')
+      expect(orderWrites).toHaveLength(1)
+      expect(summaryEnumerations).toBeLessThanOrEqual(3)
+      expect(b.store.getSnapshot().sessionUpdatedAtByAccount).toEqual(Object.fromEntries([
+        ...workspaces.map((item, i) => [item.workspaceId, { [`session-${i}`]: i + count }]),
+        [UNGROUPED_KEY, {}],
+      ]))
+      const persisted = JSON.parse(orderWrites[0]![1]) as Record<string, unknown>
+      expect(persisted.sessionUpdatedAtByAccount)
+        .toEqual(b.store.getSnapshot().sessionUpdatedAtByAccount)
+    } finally {
+      writes.mockRestore()
+    }
+  })
+
+  it('refreshes archived titles and order baselines while the live summary map stays unchanged', () => {
+    const archivedId = sid('archived')
+    const initial = sessionState([summary('live', 2)], {
+      archivedById: { [archivedId]: summary('archived', 1, { title: 'Before' }) },
+    })
+    const b = mount({
+      useSessions: hook(initial),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live', 'archived'])])),
+    })
+    act(() => { b.store.actions.setArchivedFilter('show'); b.store.actions.setGroupExpanded('alpha', true) })
+    expect(screen.getByText('Before')).toBeTruthy()
+    rerender(b, {
+      useSessions: hook({
+        ...initial,
+        archivedById: { [archivedId]: summary('archived', 3, { title: 'After' }) },
+      }),
+    })
+    expect(screen.queryByText('Before')).toBeNull()
+    expect(screen.getByText('After')).toBeTruthy()
+    expect(b.store.getSnapshot().sessionUpdatedAtByAccount.alpha).toEqual({ live: 2, archived: 3 })
+  })
+
+  it('pauses the hidden workbench browser and restores its revealed rows from fresh metadata', () => {
+    const items = Array.from({ length: 8 }, (_, i) => summary(`session-${i}`, i))
+    let snapshot = sessionState(items)
+    const listeners = new Set<() => void>()
+    const useSessions = bindSnapshotSelector({
+      getSnapshot: () => snapshot,
+      subscribe: (listener) => {
+        listeners.add(listener)
+        return () => { listeners.delete(listener) }
+      },
+    })
+    const b = mount({
+      useSessions,
+      useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    fireEvent.click(screen.getByRole('button', { name: '展开其余 3 个会话' }))
+    expect(screen.getByText('session-7')).toBeTruthy()
+    const tree = screen.getByRole('tree')
+    tree.scrollTop = 37
+    const visibleSubscriptions = listeners.size
+    rerender(b, { useViewport: hook({ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }) })
+    expect(listeners.size).toBeLessThan(visibleSubscriptions)
+    expect(screen.queryByRole('tree')).toBeNull()
+    const writes = vi.spyOn(Storage.prototype, 'setItem')
+    try {
+      act(() => {
+        snapshot = sessionState(items.map(item => item.id === sid('session-7')
+          ? { ...item, title: 'Latest title', updatedAt: 99 }
+          : item))
+        for (const listener of listeners) listener()
+      })
+      expect(writes.mock.calls.filter(([key]) => key === 'dsh.workspace.view.v5')).toHaveLength(0)
+      rerender(b, { useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }) })
+      expect(screen.getByRole('tree')).toBe(tree)
+      expect(tree.scrollTop).toBe(37)
+      expect(screen.getByText('Latest title')).toBeTruthy()
+      expect(screen.getByRole('button', { name: '收起' })).toBeTruthy()
+      expect(b.store.getSnapshot().sessionUpdatedAtByAccount.alpha?.['session-7']).toBe(99)
+      expect(listeners.size).toBe(visibleSubscriptions)
+    } finally {
+      writes.mockRestore()
+      b.view.unmount()
+    }
+    expect(listeners.size).toBe(0)
+  })
+
   it('shows localized fork failures and dismisses them', () => {
     vi.useFakeTimers()
     try {
@@ -207,7 +311,7 @@ describe('WorkspaceBrowser', () => {
     const b = mount({ useWorkspaces: hook(pending) })
     act(() => {
       b.store.actions.setGroupExpanded('deleted', true)
-      b.store.actions.syncSessionOrderAccount('deleted', ['session'], { session: 1 })
+      b.store.actions.syncSessionOrderAccounts([{ accountKey: 'deleted', order: ['session'], updatedAt: { session: 1 } }])
     })
     expect(b.store.getSnapshot().groupExpansion).toEqual({ deleted: true })
 
@@ -967,6 +1071,36 @@ describe('WorkspaceBrowser', () => {
       fireEvent.click(input.parentElement as HTMLElement)
       expect(document.activeElement).toBe(input)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels workbench-hidden content search and resumes the retained query when the browser returns', async () => {
+    vi.useFakeTimers()
+    const pending: (() => void)[] = []
+    const searchSessions = vi.fn<WorkspaceBrowserProps['searchSessions']>((_query, _signal) =>
+      new Promise((resolve) => { pending.push(() => { resolve({ items: [], hasMore: false }) }) }))
+    let b: ReturnType<typeof mount> | undefined
+    try {
+      b = mount({ searchSessions })
+      const input = screen.getByPlaceholderText<HTMLInputElement>('搜索会话…')
+      fireEvent.change(input, { target: { value: 'retained query' } })
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledOnce()
+      const firstSignal = searchSessions.mock.calls[0]![1]
+      rerender(b, { useViewport: hook({ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }) })
+      expect(firstSignal.aborted).toBe(true)
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledOnce()
+      rerender(b, { useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }) })
+      expect(input.value).toBe('retained query')
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      expect(searchSessions).toHaveBeenCalledTimes(2)
+      expect(searchSessions.mock.calls[1]![0]).toBe('retained query')
+      expect(searchSessions.mock.calls[1]![1].aborted).toBe(false)
+    } finally {
+      b?.view.unmount()
+      await act(async () => { for (const resolve of pending) resolve() })
       vi.useRealTimers()
     }
   })

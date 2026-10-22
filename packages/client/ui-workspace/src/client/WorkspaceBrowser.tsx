@@ -9,7 +9,7 @@
  * menu in between; the flow and its error dialog live in WorkspacePicker
  * (same package — direct composition, no slot between them).
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Activity, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
@@ -175,17 +175,16 @@ function compareSessionRecency(a: SessionId, b: SessionId, byId: SessionListStat
 
 /** Reconcile one editable order account and apply its activity-promotion policy. */
 function nextSessionOrderAccount({
-  sessionIds, previousOrder, previousUpdatedAt, list, orderBy, sortByRecency, rowState,
+  sessionIds, previousOrder, previousUpdatedAt, summaries, orderBy, sortByRecency, rowState,
 }: {
   sessionIds: readonly SessionId[]
   previousOrder: readonly string[] | undefined
   previousUpdatedAt: Readonly<Record<string, number>>
-  list: SessionListState
+  summaries: SessionListState['byId']
   orderBy: SessionOrderBy
   sortByRecency: boolean
   rowState: SessionRowState
 }): { order: SessionId[]; updatedAt: Record<string, number>; changed: boolean } {
-  const summaries = sessionSummaries(list)
   let order = reconcileManualOrder(sessionIds, previousOrder, summaries, rowState)
   if (sortByRecency) {
     order.sort((a, b) => compareSessionRecency(a, b, summaries))
@@ -320,8 +319,8 @@ type SessionTreeProps = Pick<
   sessionOrderByAccount: Readonly<Record<string, readonly string[]>>
   /** Last update timestamps observed for one-time recent-update promotions. */
   sessionUpdatedAtByAccount: Readonly<Record<string, Readonly<Record<string, number>>>>
-  /** Replace one shared order and its observed timestamps. */
-  syncSessionOrderAccount: (accountKey: string, order: string[], updatedAt: Record<string, number>) => void
+  /** Commit reconciled account orders and observed timestamps in one persisted snapshot. */
+  syncSessionOrderAccounts: WorkspaceBrowserProps['actions']['syncSessionOrderAccounts']
   /** Apply a drag to one shared order. */
   setSessionOrder: (accountKey: string, order: string[]) => void
   /** Registry-global pin and archive sets plus the archived-visibility choice the rows derive and drag against. */
@@ -368,9 +367,10 @@ function SessionTree({
   onRenameRequest, onDeleteRequest, onSessionRenameRequest, revealSessionId, onSessionRevealed,
   insertWorkspaceBefore, insertSessionBefore, orderBy, workspaceReady, newShortcut,
   groupExpansion, setGroupExpanded,
-  sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, home, renderSlot, t,
+  sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccounts, setSessionOrder, home, renderSlot, t,
 }: SessionTreeProps) {
   const list = useSessions(s => s)
+  const summaries = useMemo(() => sessionSummaries(list), [list.byId, list.archivedById])
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const current = panelActive ? undefined : list.current
   const currentBlank = current !== undefined && list.byId[current]?.blank === true ? current : undefined
@@ -424,7 +424,6 @@ function SessionTree({
   const ungroupedSessionIds = useMemo(() => {
     const accounted = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
     const hintedWorkspaces = new Set(workspaces.map(workspace => workspace.workspaceId))
-    const summaries = sessionSummaries(list)
     return sessionKnownIds(list).filter((id) => {
       const summary = summaries[id]
       const hintedWorkspace = summary?.workspaceId
@@ -432,7 +431,7 @@ function SessionTree({
         && (hintedWorkspace === undefined || !hintedWorkspaces.has(hintedWorkspace))
         && !accounted.has(id)
     })
-  }, [list, workspaces])
+  }, [list, summaries, workspaces])
   useEffect(() => {
     if (list.phase !== 'ready') return
     const switchedToUpdated = previousOrderBy.current !== 'updated' && orderBy === 'updated'
@@ -444,6 +443,7 @@ function SessionTree({
       })),
       { key: UNGROUPED_KEY, sessionIds: ungroupedSessionIds },
     ]
+    const updates: Parameters<SessionTreeProps['syncSessionOrderAccounts']>[0][number][] = []
     for (const { key, sessionIds } of accounts) {
       const previousOrder = sessionOrderByAccount[key]
       const previousUpdatedAt = sessionUpdatedAtByAccount[key] ?? {}
@@ -451,18 +451,21 @@ function SessionTree({
         sessionIds,
         previousOrder,
         previousUpdatedAt,
-        list,
+        summaries,
         orderBy,
         sortByRecency: orderBy === 'updated' && (previousOrder === undefined || switchedToUpdated),
         rowState,
       })
       if (next.changed) {
-        syncSessionOrderAccount(key, next.order.map(id => id as string), next.updatedAt)
+        updates.push({ accountKey: key, order: next.order.map(id => id as string), updatedAt: next.updatedAt })
       }
     }
-  }, [list, orderBy, rowState, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, ungroupedSessionIds, workspaces])
+    if (updates.length > 0) syncSessionOrderAccounts(updates)
+  }, [
+    list, orderBy, rowState, sessionOrderByAccount, sessionUpdatedAtByAccount,
+    summaries, syncSessionOrderAccounts, ungroupedSessionIds, workspaces,
+  ])
   const orderedWorkspaces = useMemo(() => {
-    const summaries = sessionSummaries(list)
     return workspaces.map((workspace) => {
       const stored = sessionOrderByAccount[workspace.workspaceId as string]
       const sessionIds = pinCurrentBlank(
@@ -471,13 +474,13 @@ function SessionTree({
       )
       return { ...workspace, sessionIds }
     })
-  }, [currentBlank, list, rowState, sessionOrderByAccount, workspaces])
+  }, [currentBlank, rowState, sessionOrderByAccount, summaries, workspaces])
   const orderedUngroupedSessionIds = useMemo(
     () => pinCurrentBlank(
-      reconcileManualOrder(ungroupedSessionIds, sessionOrderByAccount[UNGROUPED_KEY], sessionSummaries(list), rowState),
+      reconcileManualOrder(ungroupedSessionIds, sessionOrderByAccount[UNGROUPED_KEY], summaries, rowState),
       currentBlank !== undefined && ungroupedSessionIds.includes(currentBlank) ? currentBlank : undefined,
     ),
-    [currentBlank, list, rowState, sessionOrderByAccount, ungroupedSessionIds],
+    [currentBlank, rowState, sessionOrderByAccount, summaries, ungroupedSessionIds],
   )
   const groups = useMemo(
     () => deriveGroups(list, orderedWorkspaces, rowState, {
@@ -818,7 +821,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   useSessions, usePanelInfo, open, onSessionRenameRequest, revealSessionId, onSessionRevealed, rowState,
-  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, renderSlot, t,
+  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccounts, setSessionOrder, renderSlot, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessions'
@@ -832,18 +835,19 @@ function FlatList({
   | 'workspaceReady'
   | 'sessionOrderByAccount'
   | 'sessionUpdatedAtByAccount'
-  | 'syncSessionOrderAccount'
+  | 'syncSessionOrderAccounts'
   | 'setSessionOrder'
   | 'renderSlot'
   | 't'
 >) {
   const list = useSessions(s => s)
+  const summaries = useMemo(() => sessionSummaries(list), [list.byId, list.archivedById])
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const current = panelActive ? undefined : list.current
   // Complete account membership in recency order — the flat list's natural
   // baseline. Archives stay members so an unarchive restores position;
   // deriveFlat sections the pinned block ahead of the supplied order.
-  const sessionIds = useMemo(() => orderByRecency(sessionMemberIds(list), sessionSummaries(list)), [list])
+  const sessionIds = useMemo(() => orderByRecency(sessionMemberIds(list), summaries), [list, summaries])
   const previousOrderBy = useRef(orderBy)
   useEffect(() => {
     if (list.phase !== 'ready') return
@@ -855,22 +859,24 @@ function FlatList({
       sessionIds,
       previousOrder,
       previousUpdatedAt,
-      list,
+      summaries,
       orderBy,
       sortByRecency: orderBy === 'updated' && (previousOrder === undefined || switchedToUpdated),
       rowState,
     })
     if (next.changed) {
-      syncSessionOrderAccount(FLAT_SESSION_ORDER_KEY, next.order.map(id => id as string), next.updatedAt)
+      syncSessionOrderAccounts([{
+        accountKey: FLAT_SESSION_ORDER_KEY, order: next.order.map(id => id as string), updatedAt: next.updatedAt,
+      }])
     }
-  }, [list, orderBy, rowState, sessionOrderByAccount, sessionUpdatedAtByAccount, sessionIds, syncSessionOrderAccount])
+  }, [list, orderBy, rowState, sessionOrderByAccount, sessionUpdatedAtByAccount, sessionIds, summaries, syncSessionOrderAccounts])
   const currentBlank = current !== undefined && list.byId[current]?.blank === true ? current : undefined
   const orderedSessionIds = useMemo(
     () => pinCurrentBlank(
-      reconcileManualOrder(sessionIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY], sessionSummaries(list), rowState),
+      reconcileManualOrder(sessionIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY], summaries, rowState),
       currentBlank !== undefined && sessionIds.includes(currentBlank) ? currentBlank : undefined,
     ),
-    [currentBlank, list, rowState, sessionIds, sessionOrderByAccount],
+    [currentBlank, rowState, sessionIds, sessionOrderByAccount, summaries],
   )
   const rows = useMemo(
     () => deriveFlat(list, orderedSessionIds, rowState),
@@ -1255,6 +1261,7 @@ export function WorkspaceBrowser({
   }, [normalizedQuery])
 
   useEffect(() => {
+    if (workbenchMode) return
     if (normalizedQuery === '') {
       setRemoteSearch({ query: '', status: 'idle', items: [], hasMore: false })
       return
@@ -1289,7 +1296,7 @@ export function WorkspaceBrowser({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [normalizedQuery, searchSessions])
+  }, [normalizedQuery, searchSessions, workbenchMode])
 
   // Rename dialog (browser-owned so it outlives row unmounts during collapse).
   const [renameTarget, setRenameTarget] = useState<{ workspaceId: WorkspaceId; currentTitle: string } | null>(null)
@@ -1499,78 +1506,80 @@ export function WorkspaceBrowser({
           itself is wide-only. */}
       {navigationError !== null && <div className={css.renameError} role="alert">{navigationError}</div>}
       <div className={clsx(css.listArea, workbenchMode && css.workbenchListHidden)}>
-        {wide && (normalizedQuery !== ''
-          ? (
-            <SearchResults
-              useSessions={useCurrentSessions}
-              usePanelInfo={usePanelInfo}
-              open={openSearchResult}
-              onUnarchive={onSessionUnarchive}
-              workspaces={workspaces}
-              archivedSessionIds={archivedSessionIds}
-              archivedFilter={archivedFilter}
-              query={normalizedQuery}
-              remote={remoteSearch}
-              resultLimit={searchResultLimit}
-              t={t}
-            />
-          )
-          : groupBy === 'flat'
+        <Activity mode={workbenchMode ? 'hidden' : 'visible'}>
+          {wide && (normalizedQuery !== ''
             ? (
-              <FlatList
-                useSessions={useCurrentSessions} usePanelInfo={usePanelInfo} open={guardedOpen}
-                onSessionRenameRequest={requestSessionRename}
-                revealSessionId={revealSessionId}
-                onSessionRevealed={acknowledgeSessionReveal}
-                rowState={rowState}
-                orderBy={orderBy}
-                workspaceReady={workspacePhase === 'ready'}
-                sessionOrderByAccount={sessionOrderByAccount}
-                sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
-                syncSessionOrderAccount={actions.syncSessionOrderAccount}
-                setSessionOrder={actions.setSessionOrder}
-                renderSlot={renderSlot}
+              <SearchResults
+                useSessions={useCurrentSessions}
+                usePanelInfo={usePanelInfo}
+                open={openSearchResult}
+                onUnarchive={onSessionUnarchive}
+                workspaces={workspaces}
+                archivedSessionIds={archivedSessionIds}
+                archivedFilter={archivedFilter}
+                query={normalizedQuery}
+                remote={remoteSearch}
+                resultLimit={searchResultLimit}
                 t={t}
               />
             )
-            : (
-              <SessionTree
-                useSessions={useCurrentSessions}
-                usePanelInfo={usePanelInfo}
-                onSessionRenameRequest={requestSessionRename}
-                revealSessionId={revealSessionId}
-                onSessionRevealed={acknowledgeSessionReveal}
-                newShortcut={newShortcut}
-                workspaces={workspaces}
-                nestWorkspaces={groupBy === 'workspace-tree'}
-                groupExpansion={groupExpansion}
-                setGroupExpanded={actions.setGroupExpanded}
-                sessionOrderByAccount={sessionOrderByAccount}
-                sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
-                syncSessionOrderAccount={actions.syncSessionOrderAccount}
-                setSessionOrder={actions.setSessionOrder}
-                rowState={rowState}
-                onLeaveArchivedOnly={() => { actions.setArchivedFilter('default') }}
-                startSession={startSession}
-                open={guardedOpen}
-                workspaceReady={workspacePhase === 'ready'}
-                insertWorkspaceBefore={insertWorkspaceBefore}
-                insertSessionBefore={insertSessionBefore}
-                orderBy={orderBy}
-                home={home}
-                renderSlot={renderSlot}
-                t={t}
-                onRenameRequest={(workspaceId, currentTitle) => {
-                  setRenameTarget({ workspaceId, currentTitle })
-                  setRenameDraft(currentTitle)
-                  setRenameError(null)
-                }}
-                onDeleteRequest={(workspaceId, title) => {
-                  setDeleteTarget({ workspaceId, title })
-                  setDeleteError(null)
-                }}
-              />
-            ))}
+            : groupBy === 'flat'
+              ? (
+                <FlatList
+                  useSessions={useCurrentSessions} usePanelInfo={usePanelInfo} open={guardedOpen}
+                  onSessionRenameRequest={requestSessionRename}
+                  revealSessionId={revealSessionId}
+                  onSessionRevealed={acknowledgeSessionReveal}
+                  rowState={rowState}
+                  orderBy={orderBy}
+                  workspaceReady={workspacePhase === 'ready'}
+                  sessionOrderByAccount={sessionOrderByAccount}
+                  sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
+                  syncSessionOrderAccounts={actions.syncSessionOrderAccounts}
+                  setSessionOrder={actions.setSessionOrder}
+                  renderSlot={renderSlot}
+                  t={t}
+                />
+              )
+              : (
+                <SessionTree
+                  useSessions={useCurrentSessions}
+                  usePanelInfo={usePanelInfo}
+                  onSessionRenameRequest={requestSessionRename}
+                  revealSessionId={revealSessionId}
+                  onSessionRevealed={acknowledgeSessionReveal}
+                  newShortcut={newShortcut}
+                  workspaces={workspaces}
+                  nestWorkspaces={groupBy === 'workspace-tree'}
+                  groupExpansion={groupExpansion}
+                  setGroupExpanded={actions.setGroupExpanded}
+                  sessionOrderByAccount={sessionOrderByAccount}
+                  sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
+                  syncSessionOrderAccounts={actions.syncSessionOrderAccounts}
+                  setSessionOrder={actions.setSessionOrder}
+                  rowState={rowState}
+                  onLeaveArchivedOnly={() => { actions.setArchivedFilter('default') }}
+                  startSession={startSession}
+                  open={guardedOpen}
+                  workspaceReady={workspacePhase === 'ready'}
+                  insertWorkspaceBefore={insertWorkspaceBefore}
+                  insertSessionBefore={insertSessionBefore}
+                  orderBy={orderBy}
+                  home={home}
+                  renderSlot={renderSlot}
+                  t={t}
+                  onRenameRequest={(workspaceId, currentTitle) => {
+                    setRenameTarget({ workspaceId, currentTitle })
+                    setRenameDraft(currentTitle)
+                    setRenameError(null)
+                  }}
+                  onDeleteRequest={(workspaceId, title) => {
+                    setDeleteTarget({ workspaceId, title })
+                    setDeleteError(null)
+                  }}
+                />
+              ))}
+        </Activity>
       </div>
 
       <Modal
