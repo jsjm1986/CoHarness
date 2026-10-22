@@ -589,6 +589,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
   const writerReleases = new WeakMap<ServerResponse, () => void>()
   const server = createServer((req, res) => {
+    // Baseline response headers for every route. `writeHead` on relayed
+    // responses can still override them when the upstream supplied its own.
+    // CSP ships as Report-Only: the SPA, admin pages with inline scripts,
+    // iframe previews, and noVNC need observed data before an enforcing policy.
+    res.setHeader('x-content-type-options', 'nosniff')
+    res.setHeader('x-frame-options', 'SAMEORIGIN')
+    res.setHeader('referrer-policy', 'strict-origin-when-cross-origin')
+    res.setHeader('content-security-policy-report-only',
+      "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'")
     void handle(req, res).catch((error: unknown) => {
       if (!res.writableEnded) {
         if (error instanceof BodyTooLargeError) {
@@ -781,7 +790,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (req.method === 'POST') {
         const password = new URLSearchParams(await readBody(req)).get('password') ?? ''
         if (password.length < MIN_PASSWORD_LENGTH) { send(res, 400, passwordPage(gateCopy(gateLang)('passwordTooShort', { min: String(MIN_PASSWORD_LENGTH) }), gateLang)); return }
-        await users.changeOwnPassword(user.id, password)
+        await users.changeOwnPassword(user.id, password, token)
         handlers.invalidateAccess?.({ userId: user.id })
         await removeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile).catch((error: unknown) => {
           // Password change remains successful; operators can remove a stale
@@ -1805,6 +1814,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           }
           await deps.collaboration.setVisibility(user.id, sessionId, body.visibility)
           handlers.invalidateAccess?.({ projectId: access.projectId })
+          await audit.write({ userId: user.id, action: 'conversation.visibility',
+            detail: JSON.stringify({ sessionId, visibility: body.visibility, projectId: access.projectId }),
+            ip: clientIp(req) })
           res.writeHead(204)
           res.end()
           return
