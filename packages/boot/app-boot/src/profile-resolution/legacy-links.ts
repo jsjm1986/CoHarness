@@ -53,6 +53,18 @@ export function symlinkPointsTo(link: string, target: string): boolean {
   return canonicalActual !== undefined && canonicalActual === canonicalTarget
 }
 
+/** Canonicalize a module resource, preserving physical file aliases.
+ * SEA archive files are symlink-free and support stat and reads, while their containing directories support realpath.
+ * @param path Existing module resource path.
+ * @returns Canonical resource path under the active carrier's filesystem.
+ * @throws When the resource or its directory cannot be inspected or resolved.
+ */
+export function realModuleFile(path: string): string {
+  return !isPackagedExecutable() || lstatSync(path).isSymbolicLink()
+    ? realpathSync(path)
+    : join(realModuleDirectory(dirname(path)), basename(path))
+}
+
 /**
  * Return whether an observed profile package must not claim local precedence.
  * @param profileDir - profile directory containing the package projection.

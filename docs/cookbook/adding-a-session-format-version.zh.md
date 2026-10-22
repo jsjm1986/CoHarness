@@ -55,6 +55,8 @@ pnpm run gen-session-format-catalog
 
 显式定义新迁移边的事件准入与变换规则。[V2 到 V3 源审计](../../packages/session/session-format-v2-to-v3/README.zh.md#source-audit)和 [Alpha V0→V1 规则](../../.agents/notes/implemented/architecture/2026-08-31-alpha-historical-unknown-event-refusal.zh.md)分别负责对应已发布迁移边的策略，而非新迁移边的策略。不要将任一策略推广到所有迁移边。结构或事件位置变化时，必须分类源事件、载荷成员与引用，并显式判断不透明数据能否保持有效。[同版本保留](../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.zh.md)本身不能证明结构变换安全。校验目标语义，并为每个新增可接受案例提供一个被拒绝的反例；绝不放宽旧迁移边来掩盖不受支持的转换。
 
+`appendPluginRecord()` 写入的插件记录是 `plugin:` 命名空间中的 ignorable 事件，实验性包按类型把它们读回。目标格式能够表示它们时，以原名称继续携带；否则在迁移边 README 中说明它丢弃哪些记录。[ignorable 事件决策](../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.zh.md)以尽力而为的方式保留这些记录。即使已存记录在[实验性持久化目录](../experimental-persistence-catalog.zh.md)中没有声明，也适用这一策略。
+
 通过 `sessionFormatCatalog.createRestore(header, { recovery: 'strict', validation: 'current' })` 验证严格恢复，按顺序传入各行并调用 `finish()`。这会执行物理解码、完整迁移链与已安装当前 Session 校验。生产环境的 recoverable/transformed 策略不能替代 fixture（测试前置数据）和发布验证所需的严格校验。保留已记录的历史校验例外，不要宣称源校验比迁移边实际执行的更严格。
 
 <a id="current-version-consumers"></a>

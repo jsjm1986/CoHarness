@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-17-space-scoped-agent-memory.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-17-space-scoped-agent-memory.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-10-17-space-scoped-agent-memory.md
+document:
+  en: e3da72ac0491b0f02e09f332ae3b4c5ac8e8de57
+  zh: ec626d82eace0124f93d7a396191f76a44f493c7
 /agent-note-space-scoped-agent-memory-for-personal-and-project-spaces:
   en: f173c018151b1e8b
   zh: ac6aef7e11e5ac32

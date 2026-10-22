@@ -86,6 +86,7 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`execa`](https://github.com/sindresorhus/execa) | MIT |
 | [`fast-xml-parser`](https://github.com/NaturalIntelligence/fast-xml-parser) | MIT |
 | [`fflate`](https://github.com/101arrowz/fflate) | MIT |
+| [`hosted-git-info`](https://github.com/npm/hosted-git-info) | ISC |
 | [`immer`](https://github.com/immerjs/immer) | MIT |
 | [`ipaddr.js`](https://github.com/whitequark/ipaddr.js) | MIT |
 | [`js-yaml`](https://github.com/nodeca/js-yaml) | MIT |
@@ -105,10 +106,12 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`micromark-util-symbol`](https://github.com/micromark/micromark/tree/main/packages/micromark-util-symbol) | MIT |
 | [`micromark-util-types`](https://github.com/micromark/micromark/tree/main/packages/micromark-util-types) | MIT |
 | [`mime-types`](https://github.com/jshttp/mime-types) | MIT |
+| [`minisearch`](https://github.com/lucaong/minisearch) | MIT |
 | [`negotiator`](https://github.com/jshttp/negotiator) | MIT |
 | [`node-addon-require-builtin`](https://www.npmjs.com/package/node-addon-require-builtin) | MIT |
 | [`node-pty`](https://github.com/microsoft/node-pty) | MIT |
 | [`open`](https://github.com/sindresorhus/open) | MIT |
+| [`p-limit`](https://github.com/sindresorhus/p-limit) | MIT |
 | [`papaparse`](https://github.com/mholt/PapaParse) | MIT |
 | [`pdfjs-dist`](https://github.com/mozilla/pdf.js) | Apache-2.0 |
 | [`picomatch`](https://github.com/micromatch/picomatch) | MIT |
@@ -116,10 +119,12 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`react-dom`](https://github.com/react/react) | MIT |
 | [`resolve.exports`](https://github.com/lukeed/resolve.exports) | MIT |
 | [`semver`](https://github.com/npm/node-semver) | ISC |
+| [`serve-static`](https://github.com/expressjs/serve-static) | MIT |
 | [`sharp`](https://github.com/lovell/sharp) | Apache-2.0 |
 | [`sherpa-onnx-node`](https://github.com/csukuangfj/sherpa-onnx) | Apache-2.0 |
 | [`shiki`](https://github.com/shikijs/shiki) | MIT |
 | [`supports-color`](https://github.com/chalk/supports-color) | MIT |
+| [`tar`](https://github.com/isaacs/node-tar) | BlueOak-1.0.0 |
 | [`tsx`](https://github.com/privatenumber/tsx) | MIT |
 | [`turndown`](https://github.com/mixmark-io/turndown) | MIT |
 | [`typescript`](https://github.com/microsoft/TypeScript) | Apache-2.0 |
@@ -133,7 +138,7 @@ External packages installed for runtime use or distributed inside the prebuilt b
 
 pnpm applies local patches to the following packages at install time, so shipped artifacts carry modified copies; each patch file is the complete record of the modification:
 
-- `@earendil-works/pi-ai@0.87.1` — [`patches/@earendil-works__pi-ai@0.87.1.patch`](patches/@earendil-works__pi-ai@0.87.1.patch)
+- `@earendil-works/pi-ai@1.1.0` — [`patches/@earendil-works__pi-ai@1.1.0.patch`](patches/@earendil-works__pi-ai@1.1.0.patch)
 - `@fortune-sheet/core@1.0.4` — [`patches/@fortune-sheet__core@1.0.4.patch`](patches/@fortune-sheet__core@1.0.4.patch)
 - `@fortune-sheet/react@1.0.4` — [`patches/@fortune-sheet__react@1.0.4.patch`](patches/@fortune-sheet__react@1.0.4.patch)
 - `@yao-pkg/pkg@6.21.0` — [`patches/@yao-pkg__pkg@6.21.0.patch`](patches/@yao-pkg__pkg@6.21.0.patch)
@@ -190,6 +195,7 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`@testing-library/react`](https://github.com/testing-library/react-testing-library) | MIT |
 | [`@types/babel__code-frame`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/compression`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
+| [`@types/hosted-git-info`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/jsdom`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/mdast`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/mime-types`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
@@ -200,6 +206,7 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`@types/react`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/react-dom`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/semver`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
+| [`@types/serve-static`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/spdx-expression-parse`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/turndown`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/ws`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
@@ -208,6 +215,7 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`@vitest/spy`](https://github.com/vitest-dev/vitest) | MIT |
 | [`@yao-pkg/pkg`](https://github.com/yao-pkg/pkg) | MIT |
 | [`@yarnpkg/cli-dist`](https://github.com/yarnpkg/berry) | BSD-2-Clause |
+| [`chrome-devtools-frontend`](https://github.com/ChromeDevTools/devtools-frontend) | BSD-3-Clause |
 | [`cytoscape`](https://github.com/cytoscape/cytoscape.js) | MIT |
 | [`cytoscape-cose-bilkent`](https://github.com/cytoscape/cytoscape.js-cose-bilkent) | MIT |
 | [`dayjs`](https://github.com/iamkun/dayjs) | MIT |
@@ -228,9 +236,9 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`playwright`](https://github.com/microsoft/playwright) | Apache-2.0 |
 | [`pnpm`](https://github.com/pnpm/pnpm) | MIT |
 | [`publint`](https://github.com/publint/publint) | MIT |
+| [`selfsigned`](https://github.com/jfromaniello/selfsigned) | MIT |
 | [`smol-toml`](https://github.com/squirrelchat/smol-toml) | BSD-3-Clause |
 | [`spdx-expression-parse`](https://github.com/jslicense/spdx-expression-parse.js) | MIT |
-| [`tar`](https://github.com/isaacs/node-tar) | BlueOak-1.0.0 |
 | [`tsdown`](https://github.com/rolldown/tsdown) | MIT |
 | [`typescript-language-server`](https://github.com/typescript-language-server/typescript-language-server) | Apache-2.0 |
 | [`vite`](https://github.com/vitejs/vite) | MIT |
@@ -249,6 +257,7 @@ Direct dependencies of the `pyproject.toml` manifests, plus `uv` as the developm
 | Package | License | Role |
 | --- | --- | --- |
 | [`hatchling`](https://github.com/pypa/hatch) | MIT | build backend |
+| [`pillow`](https://github.com/python-pillow/Pillow) | MIT-CMU | Python project dependency |
 | [`pydantic`](https://github.com/pydantic/pydantic) | MIT | runtime dependency of `deepseek-harness-sdk` |
 | [`pytest`](https://github.com/pytest-dev/pytest) | MIT | test-only |
 | [`ruff`](https://github.com/astral-sh/ruff) | MIT | static-analysis tool |

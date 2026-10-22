@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-11-preset-card-description-clamp.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-11-preset-card-description-clamp.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-11-preset-card-description-clamp.md
+document:
+  en: 16ebf371d5af7c9e54fcc37819696b380856d5cb
+  zh: 5b7a18f41e4b3e8acd681a001f6826b19ca7026d
 /agent-note-preset-cards-clamp-their-description-instead-of-sizing-the-roster:
   en: 827a6e2b323a0c39
   zh: 79639549895a61b5

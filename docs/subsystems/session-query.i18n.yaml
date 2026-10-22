@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for session-query.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for session-query.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/session-query.md
+document:
+  en: b42d1d51c7466e7657c8cf5233263d87f6462c0e
+  zh: bdd33a6ae9a7c53ef3550c11a360a001e4004cd4
 /session-query:
   en: 041684440d88fbbc
   zh: 376e7f0b173b238d

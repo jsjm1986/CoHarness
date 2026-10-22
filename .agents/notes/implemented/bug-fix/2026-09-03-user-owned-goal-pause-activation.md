@@ -14,7 +14,7 @@ A later human turn could use `update_goal resume` to lift a durable `paused` goa
 
 The `update_goal resume` action rejects a durable paused goal with `GOAL_TOOL_RESUME_PAUSED` before calling the goal service. It still resumes an active-but-disarmed goal after session restore or fork and a blocked goal after human continuation. Pause authority remains in the goal domain and the human `/goal resume` command, which can still resume every resumable phase.
 
-Web rendering of activation state — the upstream GoalBar activation source that distinguishes armed, disarmed, and paused goals — is scheduled separately; this change ships the runtime event and its forwarding without the display consumer.
+The Web GoalBar reads live activation through a Session-scoped source that combines `goals.get` with `goal/activation-changed`. It accepts an activation only for the current goal id and revision, maps events through the owning runtime connection, and discards replies from an earlier subscription or request generation. Reconnection and observer restart invalidate cached activation before refreshing. An active goal with unknown activation retains Pause; Resume requires confirmed disarm or a durable paused phase.
 
 ## Alternatives considered
 
@@ -28,8 +28,10 @@ Web rendering of activation state — the upstream GoalBar activation source tha
 
 ## Consequences
 
-Clients can distinguish armed from disarmed goals without persisting activation. A durable paused goal is resumable only through `/goal resume` or another direct goal-service caller; model `update_goal resume` is limited to disarmed-active and blocked goals. The API surface gains one read and one forwarded live event; durable goal change payloads and projection state versions are unchanged. Until a display consumer ships, the emitted edges serve remote consumers and tests.
+Clients can distinguish armed from disarmed goals without persisting activation. A durable paused goal is resumable only through `/goal resume` or another direct goal-service caller; model `update_goal resume` is limited to disarmed-active and blocked goals. The API surface gains one read and one forwarded live event; durable goal change payloads and projection state versions are unchanged.
 
 ## Testing
 
 Goal unit tests pin the activation event id and revision across create, session start, and resume, and the replay-failure path keeps `agent/created` disarm from throwing while the retained failure still surfaces on read. Tool tests pin rejection of a durable paused goal in a later human turn while restored disarmed-active goals still resume. The api-proxy test pins `host/remote-event` JSON forwarding.
+
+The activation-source tests cover equal Session ids on different runtimes, stale goal refs, late reads, connection resets, observer restart, and disposal. The GoalBar tests keep Pause available when activation cannot be read. The [browser scenario](../../../../apps/web/tests/goal-bar.e2e.ts) resumes a disarmed active goal and then clears it through the composed application.

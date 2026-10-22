@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-24-web-session-model-selector.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-24-web-session-model-selector.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-24-web-session-model-selector.md
+document:
+  en: d10e139e48ec2448bc7e7f0fda583d7980d23c96
+  zh: c4f1f569360de3244afeb3aa084895172c6b9eda
 /agent-note-session-model-selection-in-the-web-composer:
   en: 9edf52da1a6f4053
   zh: 90dcb2299cdc7efe

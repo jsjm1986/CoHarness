@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/examples/acp-demo/README.md
+document:
+  en: d86f6d6c18fae7c5ef86079c81cbc7777306909d
+  zh: 170a25320420b4a9694b2c02c31891a6b9a95c92
 /:
   en: 9e66094448aecde2
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: 1ccbe175cb226e4b
   zh: 3f10e2f1b026a779
 /deepseek-ai-dsh-acp-demo/table-of-contents:
-  en: 3b1e0577d102b9ea
-  zh: c8506a409e7f3f35
+  en: afcfdae687e409a0
+  zh: 1963b3a163975d21
 /deepseek-ai-dsh-acp-demo/composition:
   en: 61bd301650dcbdf5
   zh: 3478de98dd1c9267
@@ -21,11 +24,8 @@
   en: 88aaa057fc347992
   zh: 9faecea47feab7d7
 /deepseek-ai-dsh-acp-demo/bin:
-  en: 03ae476c4d7cfc29
-  zh: 5f1cd38e2b9727d1
-/deepseek-ai-dsh-acp-demo/invariants:
-  en: 655a91dd2eae0f5f
-  zh: f6024eeef595d212
+  en: a94d675eac34a414
+  zh: 3f0a5f56e4de2946
 /deepseek-ai-dsh-acp-demo/model-experience:
   en: 73e68991f435416d
   zh: 33bc248aa1e2fc8c

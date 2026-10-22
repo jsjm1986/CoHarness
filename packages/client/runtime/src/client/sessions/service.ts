@@ -61,10 +61,10 @@ export interface SessionSummary {
   /** Finished while not selected and not yet opened — the sidebar's green "done" reminder. Absent = false. */
   completed?: boolean
   /**
-   * No-visible-content bit (host summary derivation mirror). New Session reuses a blank
-   * one targeting the same workspace. Filtering stays with the consumer: the
-   * store carries every row, while the Workspace browser shows only the
-   * selected blank entry.
+   * No-visible-content bit (host summary derivation mirror). Workspace
+   * reconnection reuses a blank member; a bare New Session always mints a
+   * fresh one. Filtering stays with the consumer: the store carries every
+   * row, while the Workspace browser shows only the selected blank entry.
    */
   blank: boolean
   updatedAt: number
@@ -155,6 +155,8 @@ export interface SessionBinding {
   readonly sessionId: SessionId
   /** The outward session face only — feature code never sees the concrete class. */
   readonly session: SessionFace
+  /** Raw event-window feed backing the session snapshot (inspection consumers). */
+  readonly eventSource: import('../contract/events.ts').SessionEventSource
   readonly ctx: AgentContext
   /** Description of the exact connection that owns this Session. */
   readonly hostDescription?: HostDescriptionSource
@@ -532,6 +534,16 @@ export class SessionRuntime implements ISessions {
     }
   }
 
+  /**
+   * Retain a validated Gateway identity synchronously, without history or catalog I/O.
+   * @param id - Host-projected Session identity, possibly not yet catalogued.
+   * @returns a Gateway-source reference owned by the invocation.
+   */
+  retainAgentScope(id: SessionId): SessionReference {
+    if (this.closed) throw new Error('Session Controller is disposed')
+    return this.retainScope(id, 'gateway')
+  }
+
   async using<T>(
     target: SessionTarget,
     options: SessionRetainOptions,
@@ -765,20 +777,30 @@ export class SessionRuntime implements ISessions {
 
   private async createPrepared(prepared: SessionCreateOptions, reuseSessionId?: SessionId): Promise<SessionId> {
     const sessionId = reuseSessionId ?? prepared.sessionId
-    const { runtimeTarget: _runtimeTarget, ...wireOptions } = prepared
+    const { runtimeTarget: _runtimeTarget, reuseWorkspaceBlank: reuseRequested, ...wireOptions } = prepared
+    const reusing = reuseSessionId !== undefined || reuseRequested === true
     // A reservation belongs only to a newly minted draft. Reusing an existing
     // blank session must not attach or consume another tab's reservation key.
-    const request = reuseSessionId === undefined
+    const request = !reusing
       ? wireOptions
       : (() => {
         const { draftId: _draftId, ...rest } = wireOptions
-        return { ...rest, sessionId: reuseSessionId }
+        return sessionId === undefined ? rest : { ...rest, sessionId }
       })()
-    const result = await this.manager.create(
-      request,
-      reuseSessionId !== undefined,
-    )
+    let result = await this.manager.create(request, reusing)
+    // A preset the flow named but the roster no longer declares degrades to
+    // the deployment default rather than blocking the new conversation.
+    if (!result.ok && prepared.agentPreset !== undefined
+      && (result.error.code === 'agent-preset-not-found' || result.error.code === 'agent-preset-invalid')) {
+      const { agentPreset: _agentPreset, ...fallback } = request
+      result = await this.manager.create(fallback, reusing)
+    }
     if (!result.ok) throw new SessionCreateError(result.error, sessionId)
+    // A declined candidate can still read blank from cached list metadata,
+    // hiding it from the tree; an authoritative pull reconciles its row.
+    if (reusing && sessionId !== undefined && result.value.sessionId !== sessionId) {
+      void this.manager.refreshList().catch(() => undefined)
+    }
     this.projectList()
     return result.value.sessionId
   }
@@ -991,6 +1013,7 @@ export class SessionRuntime implements ISessions {
     const binding: SessionBinding = {
       sessionId: presentationId,
       session: presentationId === id ? session : sessionPresentation(session, presentationId, this.presentationKey), ctx,
+      eventSource: session.eventSource,
       ...this.hostDescription === undefined ? {} : { hostDescription: this.hostDescription },
     }
     const record: ScopeRecord = {
@@ -1055,8 +1078,11 @@ export class SessionRuntime implements ISessions {
         const child = subagentsByParent[address.parentSessionId]?.entries
           .find(entry => entry.kind === 'child' && entry.id === childId)
         if (child?.kind !== 'child') break
-        const displayTitle = child.label ?? childId
         const summary = byId[childId]
+        const projectionValues = summary?.projectionValues ?? this.manager.projectionValues(childId)
+        const projectedTitle = projectionValues?.title
+        const title = typeof projectedTitle === 'string' && projectedTitle !== '' ? projectedTitle : undefined
+        const displayTitle = title ?? child.label ?? childId
         if (summary === undefined) {
           byId[childId] = {
             id: childId,
@@ -1066,9 +1092,15 @@ export class SessionRuntime implements ISessions {
             running: child.activity === 'running',
             blank: false,
             updatedAt: 0,
+            ...(projectionValues === undefined ? {} : { projectionValues }),
+            ...(title === undefined ? {} : { title }),
           }
-        } else if (summary.displayTitle !== displayTitle) {
-          byId[childId] = { ...summary, displayTitle }
+        } else if (summary.displayTitle !== displayTitle || summary.projectionValues !== projectionValues) {
+          byId[childId] = {
+            ...summary,
+            displayTitle,
+            ...(projectionValues === undefined ? {} : { projectionValues }),
+          }
         }
         const parent = byId[address.parentSessionId]
         if (parent !== undefined && parent.origin !== 'subagent') break

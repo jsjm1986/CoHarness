@@ -45,9 +45,15 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'agentTeams/view': { action: 'read', path: ['agentId'] },
   'agentTeams/createTask': { action: 'write', path: ['agentId'], execution: 'request' },
   'agentTeams/updateTask': { action: 'write', path: ['agentId'], execution: 'request' },
+  'claudeCodeMods/watchBand': { action: 'read', path: ['agentId'] },
+  'claudeCodeMods/pressBand': { action: 'write', path: ['agentId'], execution: 'operation' },
   'sessionFeedback/record': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
   'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'request' },
   'userQuestions/attachWait': { action: 'read', path: ['agentId'] },
+  // Uploads stage bytes under the receiving Session only; no execution origin.
+  'fileUploads/upload': { action: 'write', path: ['agentId'], execution: 'none' },
+  // Translation is a session-bound provider call when the Client supplies one; it starts no execution.
+  'cotTranslation/translate': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
   'remoteDesktop/status': { action: 'read', path: ['agentId'] },
   'remoteDesktop/confirm': { action: 'write', path: ['agentId'], execution: 'request' },
   'remoteDesktop/attach': { action: 'write', path: ['agentId'], execution: 'request' },
@@ -58,6 +64,32 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'remoteDesktop/audit': { action: 'read', path: ['agentId'] },
 })
 
+const REGISTERED_SESSION_POLICIES = new Map<string, RemoteSessionPolicy>()
+
+/**
+ * Declare a Session-scoped ACL for one Remote endpoint owned by a Host
+ * extension. Built-in names and already-registered endpoints reject a second
+ * declaration: an endpoint's access class has exactly one owner.
+ * @param endpoint - exact `namespace/method` Remote endpoint.
+ * @param policy - Session address path, access class, and execution attribution.
+ * @returns nothing; declarations are composition-time facts.
+ */
+export function registerRemoteSessionPolicy(endpoint: string, policy: RemoteSessionPolicy): void {
+  if (Object.hasOwn(REMOTE_SESSION_POLICIES, endpoint) || REGISTERED_SESSION_POLICIES.has(endpoint)) {
+    throw new Error(`remote-session-routing: ${endpoint} already has a Session policy`)
+  }
+  REGISTERED_SESSION_POLICIES.set(endpoint, policy)
+}
+
+/**
+ * Resolve one endpoint's Session policy across built-in and registered owners.
+ * @param endpoint - exact Remote namespace and method.
+ * @returns the owning policy, or undefined when the endpoint is not Session-scoped.
+ */
+export function lookupRemoteSessionPolicy(endpoint: string): RemoteSessionPolicy | undefined {
+  return REMOTE_SESSION_POLICIES[endpoint] ?? REGISTERED_SESSION_POLICIES.get(endpoint)
+}
+
 /**
  * Read one declared Session address without interpreting arbitrary request content.
  * @param endpoint - exact Remote namespace and method.
@@ -65,7 +97,7 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
  * @returns the primary Session identity, or absence for unscoped/invalid requests.
  */
 export function remoteSessionId(endpoint: string, args: Readonly<Record<string, unknown>>): SessionId | undefined {
-  const policy = REMOTE_SESSION_POLICIES[endpoint]
+  const policy = lookupRemoteSessionPolicy(endpoint)
   if (policy === undefined) return undefined
   let value: unknown = args
   for (const field of policy.path) {
@@ -88,7 +120,7 @@ export function mapRemoteSessionIds(
   map: (id: SessionId) => SessionId,
   scopeWire?: string,
 ): Readonly<Record<string, unknown>> {
-  const policy = REMOTE_SESSION_POLICIES[endpoint]
+  const policy = lookupRemoteSessionPolicy(endpoint)
   const paths: readonly (readonly string[])[] = [
     ...(policy === undefined ? [] : [policy.path]),
     ...(scopeWire === undefined ? [] : [[scopeWire]]),

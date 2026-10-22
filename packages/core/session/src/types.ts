@@ -1,4 +1,5 @@
 import type { Branded, BrandedNumber } from '@deepseek-ai/dsh-brand'
+import type { TypertResource } from '@deepseek-ai/dsh-typert-protocol'
 import type {
   AssistantMessage,
   DeveloperMessage,
@@ -458,11 +459,10 @@ export interface SessionEventMap {
    * `Session` constructor supplies it when given only the inherited prefix.
    * The last tagged marker is the current Session's cut; untagged markers
    * keep ordinary restore and replay lifecycle boundaries.
-
    *
    * Only the `Session` constructor and `buildForkSeed` may create this marker.
-   * The invariant companion deliberately constrains nothing here, so a plugin
-   * appending one would silently classify every live bracket before it as seed history.
+   * Session append does not reject other writers, so a plugin appending one
+   * would silently classify every live bracket before it as seed history.
    *
    * An owner of a standalone open/close bracket (`compaction/start` …
    * `compaction/end`) reads it because seed history and live work are otherwise
@@ -573,3 +573,47 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
     sourceEventSeqs?: never
   })
 }[T]
+
+/**
+ * Event type of an experimental plugin record: `plugin:` followed by
+ * slash-separated segments of lowercase letters, digits, `.`, `_`, and `-`,
+ * each starting with a letter or digit. A record type is never a
+ * {@link SessionEventMap} member.
+ */
+export type PluginRecordType = `plugin:${string}`
+
+/**
+ * Payloads written by experimental packages, keyed by their `plugin:` record
+ * names. Packages augment this map to type writes and enter the current plugin
+ * record catalog; these declarations do not enter {@link SessionEventMap} or
+ * released persistence schemas. Stored records still require owner validation.
+ */
+export interface PluginRecordMap {}
+
+/**
+ * One committed experimental plugin record, read from the log by
+ * `pluginRecordOf`. The record's owner validates `data` before use, because a
+ * restored record carries whatever JSON an earlier build of its owner wrote.
+ */
+export interface PluginRecord {
+  /** The record type, chosen by the owning plugin. */
+  readonly type: PluginRecordType
+  /** The record's position in the Session log. */
+  readonly seq: SessionSeq
+  /** Unix epoch milliseconds at append. */
+  readonly time: number
+  /** The JSON payload as committed. */
+  readonly data: unknown
+}
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface TypertResourceMap {
+    /** One Session; the Session Controller registers its default `sessionId` wire field. */
+    session: TypertResource<SessionId>
+  }
+
+  interface RemoteErrorDetailsMap {
+    /** The named Session does not exist; produced by every layer that resolves a SessionId. */
+    'session/not-found': { readonly sessionId: SessionId }
+  }
+}

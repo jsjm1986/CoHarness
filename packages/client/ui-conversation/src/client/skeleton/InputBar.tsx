@@ -30,6 +30,7 @@ import { resolveSubmitMode } from '../contract/composer-submission.ts'
 import { deriveDecorations } from '../contract/decorations.ts'
 import type { DraftDecorations } from '../contract/decorations.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
+import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
 import { SessionSettingsSheet, type SessionSettingsSection, type SessionSettingsSectionId } from './SessionSettingsSheet.tsx'
@@ -560,7 +561,11 @@ export const InputBar = memo(function InputBar({
       return
     }
     if (e.key === 'Tab') {
-      if (keyboard.arbitrate('tab', composing) !== 'pass') e.preventDefault()
+      // Tab settles the highlighted completion and passes without one, keeping
+      // native focus traversal; Shift+Tab leaves the menu like Escape whenever
+      // it is open, highlight or not, so the two Tab gestures never disagree
+      // about consuming the draft.
+      if (keyboard.arbitrate(e.shiftKey ? 'tabBack' : 'tab', composing) !== 'pass') e.preventDefault()
       return
     }
     if (e.key === 'Escape') {
@@ -721,11 +726,18 @@ export const InputBar = memo(function InputBar({
   }, [addDocuments, showToast])
 
   const intakeFiles = useCallback((files: readonly File[]): void => {
+    if (locked || machineBusy || (subagent !== null && !continuable) || files.length === 0) return
+    // Child prompts support images, but not generic file receipts or the
+    // document-browser fallback. Refuse mixed batches before intake.
+    if (continuable && files.some(file => !isImageMediaType(file.type))) {
+      showToast(t('image.unsupportedType'))
+      return
+    }
     const images = files.filter(file => file.type.startsWith('image/'))
     const documents = files.filter(file => !file.type.startsWith('image/'))
     intakeImages(images)
     intakeDocuments(documents)
-  }, [intakeDocuments, intakeImages])
+  }, [continuable, intakeDocuments, intakeImages, locked, machineBusy, subagent, showToast, t])
 
   const onFileInputChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const files = [...(event.currentTarget.files ?? [])]
@@ -734,7 +746,8 @@ export const InputBar = memo(function InputBar({
     intakeFiles(files)
   }
 
-  const canAcceptDrop = active && !locked && !machineBusy && (addImages !== undefined || addDocuments !== undefined)
+  const canAcceptDrop = active && (subagent === null || continuable) && !locked && !machineBusy
+    && (addImages !== undefined || addDocuments !== undefined)
 
   const onSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>): void => {
     // Any caret/selection gesture ends a live paste attempt (the machine
@@ -754,7 +767,13 @@ export const InputBar = memo(function InputBar({
 
   const onToggleCommandMenu = (): void => {
     const el = inputRef.current
-    if (el !== null) toggleCommandMenu?.(selectionOf(el))
+    if (el === null) return
+    // The menu is a combobox over the composer, so the keyboard has to be in
+    // the textarea before the launcher opens it: activating the button from
+    // the keyboard leaves focus on the button, and restoring it afterwards
+    // would re-track an empty draft and close the menu again.
+    el.focus({ preventScroll: true })
+    toggleCommandMenu?.(selectionOf(el))
   }
 
   // An empty or owner-blocked ordinary composer keeps Stop. A sendable draft
@@ -1032,7 +1051,7 @@ export const InputBar = memo(function InputBar({
                 type="button"
                 className={css.add}
                 aria-label={t('document.attach')}
-                disabled={locked || machineBusy || addDocuments === undefined}
+                disabled={locked || machineBusy || addDocuments === undefined || subagent !== null}
                 onMouseDown={keepFocus}
                 onClick={() => { fileInputRef.current?.click() }}
               >
@@ -1044,7 +1063,7 @@ export const InputBar = memo(function InputBar({
                 type="button"
                 className={css.add}
                 aria-label={t('document.browse')}
-                disabled={locked || machineBusy}
+                disabled={locked || machineBusy || subagent !== null}
                 onMouseDown={keepFocus}
                 onClick={() => {
                   if (typeof window !== 'undefined') {
@@ -1060,6 +1079,7 @@ export const InputBar = memo(function InputBar({
               className={css.fileInput}
               type="file"
               multiple
+              disabled={subagent !== null}
               tabIndex={-1}
               aria-hidden="true"
               onChange={onFileInputChange}

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for glossary.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for glossary.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/glossary.md
+document:
+  en: 1a9ac39a73526833be3cdc191d67f519bdf8fc90
+  zh: cd41876d41148082ddc18a08c49cf2abba882c79
 /glossary:
   en: 9b364904616b2266
   zh: 934b9d189a4f34a2

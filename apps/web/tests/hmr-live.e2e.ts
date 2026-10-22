@@ -24,7 +24,7 @@ function spawnSpec(argv: readonly string[], cwd: string, env?: Record<string, st
   }
 }
 
-function waitForOutput(child: SubprocessHandle, pattern: RegExp, label: string): Promise<string> {
+function waitForOutput(child: SubprocessHandle, pattern: RegExp, label: string, timeoutMs = 60_000): Promise<string> {
   return new Promise((resolveReady, reject) => {
     let output = ''
     let settled = false
@@ -51,7 +51,7 @@ function waitForOutput(child: SubprocessHandle, pattern: RegExp, label: string):
       if (match === null) return
       resolveOnce(match[1] ?? match[0])
     }
-    const timer = setTimeout(() => { rejectOnce(new Error(`${label} not ready:\n${output}`)) }, 60_000)
+    const timer = setTimeout(() => { rejectOnce(new Error(`${label} not ready:\n${output}`)) }, timeoutMs)
     child.stdout?.on('data', onData)
     child.stderr?.on('data', onData)
     void child.done.then((outcome) => {
@@ -117,7 +117,10 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
       REPO_ROOT,
       { ...clientBuildEnvironment, NODE_ENV: 'production' },
     ))
-    await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web')
+    // The first watch-mode compile of the full client graph can exceed the
+    // generic bound several times over on loaded runners, so the bound must
+    // cover the worst observed cold compile plus margin.
+    await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web', 420_000)
     host = subprocessCtx.subprocess.spawn(spawnSpec(
       [process.execPath, binPath, 'web', '--patch', storagePatch, '--no-open', '--port', '0'],
       world,
@@ -171,4 +174,4 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     await rm(world, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
   }
   if (failures.length > 0) throw new AggregateError(failures, 'HMR browser test or cleanup failed')
-}, 120_000)
+}, 480_000)

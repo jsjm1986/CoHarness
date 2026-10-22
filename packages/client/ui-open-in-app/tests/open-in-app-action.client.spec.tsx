@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { useSyncExternalStore } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { OpenInAppAction, type OpenInAppActionProps } from '../src/client/OpenInAppAction.tsx'
@@ -21,6 +22,7 @@ interface Bench {
   props: OpenInAppActionProps
   launch: ReturnType<typeof vi.fn>
   choose: ReturnType<typeof vi.fn>
+  choice: SnapshotStore<string>
 }
 
 function bench(over: {
@@ -45,12 +47,17 @@ function bench(over: {
   const apps = createSnapshotStore<readonly string[] | null>(over.apps ?? null)
   const choice = createSnapshotStore<string>(over.choice ?? '')
   const launch = vi.fn(over.launch ?? (async () => {}))
-  const choose = vi.fn()
+  const choose = vi.fn((appId: string) => { choice.set(appId) })
   function useSessions<T>(select: (snapshot: SessionListState) => T): T {
     return select(state)
   }
-  function useSelector<T, R>(source: { getSnapshot(): T }): (select: (value: T) => R) => R {
-    return select => select(source.getSnapshot())
+  // The production inject binds these sources through uSES; the bench does
+  // the same so a published choice re-renders without a phase change.
+  function useSelector<T, R>(source: { getSnapshot(): T; subscribe(fn: () => void): () => void }): (select: (value: T) => R) => R {
+    return select => useSyncExternalStore(
+      onChange => source.subscribe(onChange),
+      () => select(source.getSnapshot()),
+    )
   }
   const props: OpenInAppActionProps = {
     sessionId: SESSION,
@@ -71,7 +78,7 @@ function bench(over: {
     localTarget: over.localTarget ?? (() => true),
     t,
   }
-  return { props, launch, choose }
+  return { props, launch, choose, choice }
 }
 
 describe('OpenInAppAction visibility', () => {
@@ -172,15 +179,15 @@ describe('OpenInAppAction launching', () => {
     }, { timeout: 4_000 })
   })
 
-  it('shows the product tooltip on hover instead of a native title', async () => {
+  it('names the application in the product tooltip on hover instead of a native title', async () => {
     render(<OpenInAppAction {...bench({ apps: ['finder'], cwd: '/w/dir' }).props} />)
     const main = screen.getByRole('button', { name: zh['open.title'].replace('{app}', zh['app.finder']) })
     expect(main.getAttribute('title')).toBeNull()
     fireEvent.mouseEnter(main)
-    expect(await screen.findByText(zh['open.tooltip'])).toBeDefined()
+    expect(await screen.findByText(zh['open.title'].replace('{app}', zh['app.finder']))).toBeDefined()
     fireEvent.mouseLeave(main)
     await waitFor(() => {
-      expect(screen.queryByText(zh['open.tooltip'])).toBeNull()
+      expect(screen.queryByText(zh['open.title'].replace('{app}', zh['app.finder']))).toBeNull()
     })
   })
 
@@ -190,8 +197,58 @@ describe('OpenInAppAction launching', () => {
     fireEvent.click(screen.getByRole('button', { name: zh['menu.toggle'] }))
     const cursorItem = await screen.findByText('Cursor')
     fireEvent.click(cursorItem)
-    expect(b.choose).toHaveBeenCalledWith('cursor')
     expect(b.launch).toHaveBeenCalledWith('cursor', '/w/dir')
+    // The pick persists once its launch has succeeded.
+    await waitFor(() => {
+      expect(b.choose).toHaveBeenCalledWith('cursor')
+    })
+  })
+
+  it('keeps the remembered application when a picked application fails to launch', async () => {
+    const b = bench({
+      apps: ['finder', 'cursor'],
+      choice: 'finder',
+      cwd: '/w/dir',
+      launch: appId => (appId === 'cursor' ? Promise.reject(new Error('launch failed')) : Promise.resolve()),
+    })
+    render(<OpenInAppAction {...b.props} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['menu.toggle'] }))
+    fireEvent.click(await screen.findByText('Cursor'))
+    expect(b.launch).toHaveBeenCalledWith('cursor', '/w/dir')
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: zh['open.error'] })).toBeDefined()
+    })
+    // A failed pick never reaches the persisted choice…
+    expect(b.choice.getSnapshot()).toBe('finder')
+    // …so after the error dress decays the primary action still names and opens it.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: zh['open.title'].replace('{app}', zh['app.finder']) })).toBeDefined()
+    }, { timeout: 4_000 })
+    fireEvent.click(screen.getByRole('button', { name: zh['open.title'].replace('{app}', zh['app.finder']) }))
+    expect(b.launch).toHaveBeenLastCalledWith('finder', '/w/dir')
+  })
+
+  it('remembers a picked application after its launch succeeds and the primary action follows it', async () => {
+    const b = bench({ apps: ['finder', 'cursor'], choice: 'finder', cwd: '/w/dir' })
+    render(<OpenInAppAction {...b.props} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['menu.toggle'] }))
+    fireEvent.click(await screen.findByText('Cursor'))
+    expect(b.launch).toHaveBeenCalledWith('cursor', '/w/dir')
+    await waitFor(() => {
+      expect(b.choice.getSnapshot()).toBe('cursor')
+    })
+    fireEvent.click(screen.getByRole('button', { name: zh['open.title'].replace('{app}', 'Cursor') }))
+    expect(b.launch).toHaveBeenLastCalledWith('cursor', '/w/dir')
+  })
+
+  it('names the picked application in the hover tooltip', async () => {
+    const b = bench({ apps: ['finder', 'cursor'], cwd: '/w/dir' })
+    render(<OpenInAppAction {...b.props} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['menu.toggle'] }))
+    fireEvent.click(await screen.findByText('Cursor'))
+    const main = await screen.findByRole('button', { name: zh['open.title'].replace('{app}', 'Cursor') })
+    fireEvent.mouseEnter(main)
+    expect(await screen.findByText(zh['open.title'].replace('{app}', 'Cursor'))).toBeDefined()
   })
 
   it('ignores a menu pick while a launch is in flight', async () => {

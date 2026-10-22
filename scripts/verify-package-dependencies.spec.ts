@@ -477,11 +477,11 @@ describe('face-aware source classification', () => {
   it('does not treat static browser library entries as Host modules', () => {
     const subject = sourceFacts({
       'src/index.tsx': "import 'static-input'; export const view = <div />",
-      'src/invariant.ts': "import 'browser-companion'",
+      'src/companion.ts': "import 'browser-companion'",
     }, {
       exports: {
         '.': { types: './lib/types/index.d.ts', default: './lib/index.js' },
-        './invariant': { types: './lib/types/invariant.d.ts', default: './lib/invariant.js' },
+        './companion': { types: './lib/types/companion.d.ts', default: './lib/companion.js' },
       },
     }, 'client-only')
 
@@ -494,7 +494,7 @@ describe('face-aware source classification', () => {
   it('scans published Node companions, conditional entries, and emitted-tree subpaths from source', () => {
     const subject = sourceFacts({
       'src/index.ts': 'export function apply() {}',
-      'src/invariant.ts': "import 'invariant-runtime'; import type { Kind } from 'invariant-types'",
+      'src/companion.ts': "import 'companion-runtime'; import type { Kind } from 'companion-types'",
       'src/node/helper.ts': "export { helper } from 'node-helper'",
       'src/node.mts': "import 'node-import'",
       'src/node.cts': "require('node-require')",
@@ -506,7 +506,7 @@ describe('face-aware source classification', () => {
     }, {
       exports: {
         '.': { types: './lib/types/index.d.ts', default: './lib/index.js' },
-        './invariant': { types: './lib/types/invariant.d.ts', default: './lib/invariant.js' },
+        './companion': { types: './lib/types/companion.d.ts', default: './lib/companion.js' },
         './renamed': { types: './lib/types/node/helper.d.ts', default: './lib/node-bundle.js' },
         './conditional': { browser: './lib/browser.js', node: { import: './lib/node.mjs', require: './lib/node.cjs' } },
         './emitted': { types: './lib/types/emitted.d.ts', default: './lib/types/emitted.js' },
@@ -521,11 +521,11 @@ describe('face-aware source classification', () => {
     })
 
     expect([...subject.hostRuntimeSourceUses.keys()].sort()).toEqual([
-      'invariant-runtime', 'node-helper', 'node-import', 'node-require', 'react', 'worker-one', 'worker-two',
+      'companion-runtime', 'node-helper', 'node-import', 'node-require', 'react', 'worker-one', 'worker-two',
     ])
     const expected = expectedPackageDependencies(subject)
     for (const name of subject.hostRuntimeSourceUses.keys()) expect(expected.get(name)?.section).toBe('dependencies')
-    for (const name of ['browser-only', 'invariant-types', 'type-export-only']) {
+    for (const name of ['browser-only', 'companion-types', 'type-export-only']) {
       expect(expected.get(name)?.section).toBe('devDependencies')
     }
   })

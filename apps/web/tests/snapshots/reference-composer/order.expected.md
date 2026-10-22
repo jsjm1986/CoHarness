@@ -4,19 +4,27 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "Process details":
-  - text: Process details
-  - img
 - button "System prompt":
   - img
   - img
   - text: System prompt
-- text: Research notes what changed? Referenced session · Research notes
+- text: Research notes what changed?
+- button "preview.txt":
+  - img
+  - text: preview.txt
+- text: Referenced session · Research notes
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - textbox "Message COHARNESS"
 - button "Add images or documents":
   - img

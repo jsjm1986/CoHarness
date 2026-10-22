@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-19-document-manager-filter-pages-batch.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-19-document-manager-filter-pages-batch.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-document-manager-filter-pages-batch.md
+document:
+  en: 6b1740b75cd119ef097bbaaf697b8d744a219db0
+  zh: 3fdd33fc6f798499e586e4849e72b9dbaeed4823
 /agent-note-document-manager-filter-pages-and-batch-delete:
   en: 1daf9a2ee968c55a
   zh: d7443c40ee8096af

@@ -109,7 +109,6 @@ The library is built on one separation: it owns the mechanical question of what 
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | `ItemRetainer`, `TextRetainer`, `describeOmitted`, `formatRetentionNotice`, and `truncateWithoutSplittingSurrogatePair` |
-| — | No runtime invariant companion is published; this pure utility owns no event stream or mutable runtime data; its value algebra is enforced by unit tests. |
 
 ### Two retainers, two resource models
 
@@ -150,7 +149,6 @@ No direct invalidation; the retention consumers own any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define what the retainers deliberately do not cover. They are current package constraints, not a task backlog.
 

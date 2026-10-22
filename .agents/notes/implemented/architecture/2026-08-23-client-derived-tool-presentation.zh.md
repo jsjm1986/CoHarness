@@ -56,9 +56,9 @@ Host 的 `ToolDefinition.presentCall`、`ToolDefinition.presentResult`、`ToolCa
 
 ## 术语
 
-**原始 Session event**指持久日志中的 `SessionEvent` 事实，包括 `tool/call` 的 `name` 与原始 `arguments` 字符串，以及 `tool/result` 的 `content`、`isError`、结构化错误和可选 `meta`。
+**原始 Session event**指持久日志中的 `SessionEvent` 事实，包括 `tool/call` 的 `name` 与原始 `arguments` 字符串，以及 `tool/result` 与 `tool/ptc-dispatch` 的 `content`、`isError`、结构化错误和可选 `meta`。
 
-**持久 metadata**指 `ToolOutputDefinition.presentationMeta` 在工具成功执行时生成并写入 `tool/result.data.meta` 的 JSON 值。它是结果事实的一部分，不是预先排版的 React 或 card DTO。
+**持久 metadata**指 `ToolOutputDefinition.presentationMeta` 在工具成功执行时生成并写入 `tool/result.data.meta` 或 `tool/ptc-dispatch.data.meta` 的 JSON 值。它记录执行时刻的事实——文件工具即当时的绝对路径——不是预先排版的 React 或 card DTO；文件行从它解析打开目标，而不是从 Session 之后的 cwd。
 
 **Host tool view**指 `ToolDefinition.presentCall`／`presentResult` 返回的 `ToolCallView`／`ToolResultView`；Session Remote 不运输它。
 
@@ -78,8 +78,8 @@ Host 的 `ToolDefinition.presentCall`、`ToolDefinition.presentResult`、`ToolCa
 2. 成功执行产生 canonical JSON value。
 3. Tools runtime 对 value 做快照、schema 校验和冻结。
 4. `output.render(args, value)` 生成模型可见 `ContentBlock[]`。
-5. 顶层调用若声明 `output.presentationMeta`，runtime 同时生成 JSON-safe metadata。
-6. Agent loop 把模型可见结果与 metadata 写入 `tool/result` Session event。
+5. 调用若声明 `output.presentationMeta`，runtime 对直接调用与嵌套 PTC 调用同样生成 JSON-safe metadata。
+6. Agent loop 把模型可见结果与 metadata 写入 `tool/result` Session event；嵌套调用则写入所属程序的 `tool/ptc-dispatch` event。
 7. Session log 不保存 `ToolCallView` 或 `ToolResultView`。
 
 ### Host journal 读取

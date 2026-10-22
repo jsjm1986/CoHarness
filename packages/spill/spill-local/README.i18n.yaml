@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/spill/spill-local/README.md
+document:
+  en: ecb87a9832bce444cccd9e93adef22d96347c195
+  zh: 3aa3ee68061b8e520fe66f4da63cf3c8be012fa2
 /:
   en: 220445363ce07d52
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: 1d8b50741c23fe72
   zh: 9e3eb775ee92d964
 /deepseek-ai-dsh-spill-local/table-of-contents:
-  en: 000249e91d7c9a06
-  zh: ab0c161b403ac5fd
+  en: f76f26cbca72f4b9
+  zh: 76d9f3e218ee0c7d
 /deepseek-ai-dsh-spill-local/storage-layout:
   en: 48a4d5a60555fa88
   zh: 3b2dfd0bbc7f4f82
@@ -21,11 +24,8 @@
   en: 066b88e2780fd369
   zh: 44de9d3256b5424f
 /deepseek-ai-dsh-spill-local/startup-cleanup:
-  en: c597799ed64e6cad
-  zh: ea83d0189c6c91b9
-/deepseek-ai-dsh-spill-local/invariants:
-  en: a87507e8326e1d0c
-  zh: a576617d002c8946
+  en: 1c63f28dfd0504f9
+  zh: aa566a88f3099fa2
 /deepseek-ai-dsh-spill-local/model-experience:
   en: ae2966f8fc63dc5b
   zh: 141aa4ebbc52574f

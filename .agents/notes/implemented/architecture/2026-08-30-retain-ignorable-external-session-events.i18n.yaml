@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-30-retain-ignorable-external-session-events.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-30-retain-ignorable-external-session-events.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md
+document:
+  en: 97327ce81fdcdb0b463b4fb8d947f357d1257af1
+  zh: e9369442085659f6997ebb25f39b949b7768725f
 /agent-note-retain-ignorable-session-events-for-external-plugins:
   en: 09f4f7ee764601c3
   zh: af6ead8e96015e51
@@ -9,11 +12,11 @@
   en: d2df1eb3602af45d
   zh: fd162b1c214f1494
 /agent-note-retain-ignorable-session-events-for-external-plugins/decision:
-  en: a4162e65cf6768f3
-  zh: bb700d9630642e7e
+  en: cf9aaeccb35663f3
+  zh: a5e72bd192aa6ef1
 /agent-note-retain-ignorable-session-events-for-external-plugins/alternatives-considered:
-  en: 30ec097e3ba4e951
-  zh: 3e90fc035d04b09b
+  en: c91cdee1dda42176
+  zh: 870dfbda591abb76
 /agent-note-retain-ignorable-session-events-for-external-plugins/consequences:
-  en: 5f65bfb81f172d49
-  zh: 069d41d6bda9f8af
+  en: b14df3e7f7489748
+  zh: ac227743cf5c11f7

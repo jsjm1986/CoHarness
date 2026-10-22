@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-17-unified-document-zoom-controls.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-unified-document-zoom-controls.md
+document:
+  en: 702c6c84886f1c22215d7b50e0075e919154b001
+  zh: 3ee1f59807fe811f1fc4473fd2ced39b68cdcff3
+/agent-note-unified-document-zoom-controls:
+  en: dbdbd65322cc3800
+  zh: d44ff091b2ff731d
+/agent-note-unified-document-zoom-controls/problem:
+  en: 874c92832ad61bb3
+  zh: 4d8a15abd9b0dcb1
+/agent-note-unified-document-zoom-controls/decision:
+  en: ec3af3c2a8812db0
+  zh: cebe8be6ff08be11
+/agent-note-unified-document-zoom-controls/alternatives-considered:
+  en: 67e18987abfb06f4
+  zh: ab79d6573f095314
+/agent-note-unified-document-zoom-controls/consequences:
+  en: 30ea4c5f5be576bd
+  zh: 4ae3e6bf04b3d91e
+/agent-note-unified-document-zoom-controls/verification:
+  en: 37c1716ce30b6f56
+  zh: 472f71681ec346b3

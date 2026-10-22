@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { logPath } from '../src/format.ts'
 import { runPersistenceContract } from '../../session-persistence/tests/contract.ts'
 

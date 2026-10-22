@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-13-safari-textarea-soft-wrap-reflow.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-13-safari-textarea-soft-wrap-reflow.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-13-safari-textarea-soft-wrap-reflow.md
+document:
+  en: fb264a8e6fbe24369584f2427bbb0c462b450ecf
+  zh: f4cdf9b38ca8ca093cf388973d40e652d76a2f27
 /agent-note-safari-textarea-soft-wrap-shrink-recovery:
   en: 39eedc6bbf874e7f
   zh: 55147635dac47401

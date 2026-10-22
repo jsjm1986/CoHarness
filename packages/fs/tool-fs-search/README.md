@@ -30,7 +30,6 @@ Use `dsh-tool-fs-search` to give models `glob` file discovery and `grep` content
 - [Tools](#tools)
 - [Two budgets, two artifacts](#two-budgets-two-artifacts)
 - [Errors](#errors)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -77,11 +76,6 @@ Raw `rg` stdout and stderr are internal transport details. Each search requests 
 ## Errors
 
 Search failures carry the package-owned `SearchError` (a `HarnessError` subclass), surfaced as `{ name, code }` on `isError` results: `SEARCH_INVALID_PATTERN` (ripgrep rejected the regex/glob), `SEARCH_FAILED` (a failed `rg` launch, inaccessible target, signal kill, malformed `--json` output), `SEARCH_RAW_OUTPUT_OVERFLOW` (raw output over `rawOutputMaxBytes`, or still lossy after the requested stdout capture budget), and `SEARCH_ABORTED` (cooperative tool timeout or caller cancellation). ripgrep exit semantics are tool-owned: exit 0 is success with results, exit 1 is a successful empty search (`No files found` / `No matches found`), and only other exits are failures. Model argument mistakes (blank pattern, a list-valued `include`) stay ordinary tool argument errors.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each call spawns one ripgrep process through `ctx.subprocess` and returns its output; no index or process state survives the call.
 
 <a id="model-experience"></a>
 ## Model Experience

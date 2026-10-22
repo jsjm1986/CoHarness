@@ -51,7 +51,7 @@ export interface PrPreflightReport {
 /** Only these deterministic writers can run through --fix-generated. Neither records translations or golden output. */
 const GENERATORS = [
   { id: 'tsconfig-paths', script: 'scripts/gen-tsconfig-paths.ts', outputs: ['tsconfig.base.json'],
-    matches: (path: string): boolean => /^packages\/[^/]+\/[^/]+\/(?:package\.json|src\/invariant\.ts)$/.test(path)
+    matches: (path: string): boolean => /^packages\/[^/]+\/[^/]+\/package\.json$/.test(path)
       || ['tsconfig.base.json', 'scripts/gen-tsconfig-paths.ts'].includes(path) },
   { id: 'third-party-notices', script: 'scripts/gen-third-party-notices.ts', outputs: ['THIRD_PARTY_NOTICES.md'],
     matches: (path: string): boolean => /(?:^|\/)package\.json$/.test(path) || /^python\/[^/]+\/pyproject\.toml$/.test(path)

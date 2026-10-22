@@ -169,7 +169,6 @@ Append-only; new results follow the reusable request prefix.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define the model-facing surface that is absent. They are current package constraints, not a task backlog.
 
 - **No TUI or key-sequence surface** — named key sequences, full-screen TUI interaction, BEL, resize, and auto-start are not exposed in any schema.
@@ -184,5 +183,3 @@ These limits define the model-facing surface that is absent. They are current pa
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. This stateless adapter contributes tools and prompt guidance, while PTY lifecycle and background-job relationships remain owned by the services it composes.

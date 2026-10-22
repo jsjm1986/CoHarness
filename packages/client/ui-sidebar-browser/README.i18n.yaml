@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-sidebar-browser/README.md
+document:
+  en: 636ebd4c0deabdca122db2ead1c6ef10a30db000
+  zh: e003c0b1d949390a5528bb956a4cdf134be2f3a1
 /:
   en: aceaa4f1e64f54b1
   zh: 0f43a543e01f0778
@@ -21,8 +24,8 @@
   en: 6e5b5be3084fcd80
   zh: 42ab0469e3d3eb94
 /deepseek-ai-dsh-client-ui-sidebar-browser/use-this-package/minimal-configuration:
-  en: c14e260b65ad1cfb
-  zh: a596dc99470699e4
+  en: 8d9520a2a433b2c1
+  zh: 519a109bced983ef
 /deepseek-ai-dsh-client-ui-sidebar-browser/understand-the-implementation:
   en: 42b15ac6321706aa
   zh: e15901d8462ec7c7
@@ -30,14 +33,14 @@
   en: 6ff86a3a08d62a9b
   zh: bbe95e84cfac2a39
 /deepseek-ai-dsh-client-ui-sidebar-browser/understand-the-implementation/iframe-carrier:
-  en: 9790c94e82154d9d
-  zh: 00a49098e8737348
+  en: 1d5f79efdf558dd0
+  zh: 7cc0fdc51f948b50
 /deepseek-ai-dsh-client-ui-sidebar-browser/understand-the-implementation/controller:
   en: eaef9fc9999348c6
   zh: 325d26183996cf3e
 /deepseek-ai-dsh-client-ui-sidebar-browser/further-exploration:
   en: 66326378347e9a43
-  zh: cdf2ed10a33fe9df
+  zh: cbd9edd745a4db16
 /deepseek-ai-dsh-client-ui-sidebar-browser/model-experience:
   en: 69e711858e7d9ebc
   zh: d84610491e69a35b
@@ -45,8 +48,8 @@
   en: e17a5fd3d5405745
   zh: 9de97a1394a0fd6d
 /deepseek-ai-dsh-client-ui-sidebar-browser/known-limitations-and-deferred-work:
-  en: e9daa4de0aec1146
-  zh: acbdd193fe2c0df3
+  en: 2b0e698e3b2b34c1
+  zh: 1754674aeaa8c5e7
 /deepseek-ai-dsh-client-ui-sidebar-browser/known-limitations-and-deferred-work/dev-note:
-  en: 289c45472a4f8ed4
+  en: e67f633dc6fe7773
   zh: e88aeb617ffb74ea

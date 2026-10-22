@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for experimental-persistence-catalog.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/experimental-persistence-catalog.md
+document:
+  en: 0868849c519f2dde892ba51c0dc9322e8c713596
+  zh: 32cb1d053308c9e1e2328694e1b86264df635751
+/:
+  en: a11f106978c9dce7
+  zh: a11f106978c9dce7
+/experimental-plugin-record-catalog:
+  en: 84dbc9c06ab92877
+  zh: b82ef2a46292ab0e

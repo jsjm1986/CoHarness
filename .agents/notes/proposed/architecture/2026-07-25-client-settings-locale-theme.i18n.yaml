@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-25-client-settings-locale-theme.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-25-client-settings-locale-theme.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-07-25-client-settings-locale-theme.md
+document:
+  en: eb96a86b6d242d8450b6a6c58c385646c95ad69c
+  zh: fd033baa3e249b99b4d7188268d9c3548a37dfcb
 /agent-note-client-settings-locale-and-theme-layering:
   en: c6527715489521bc
   zh: 55eea3a9ec4631ad
@@ -15,8 +18,8 @@
   en: 7a4890dffd207a66
   zh: 4353be1cf48bf68d
 /agent-note-client-settings-locale-and-theme-layering/proposal/slot-topology:
-  en: 401726839632066a
-  zh: cc207b78263dc382
+  en: bc2aba013c52fca5
+  zh: 734e5ef05792bdf9
 /agent-note-client-settings-locale-and-theme-layering/proposal/slot-declarations-are-first-class-injectable-waits:
   en: 7ea35a59904afe26
   zh: bce49559d326237a

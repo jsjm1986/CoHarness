@@ -104,14 +104,14 @@ class FakeFs extends FileSystem {
   }
 }
 
-async function setup() {
+async function setup(config: ToolFs.Config = {}) {
   const ctx = new Context()
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(FakeFs)
   await ctx.plugin(FsPolicy)
-  await ctx.plugin(ToolFs)
+  await ctx.plugin(ToolFs, config)
   const fs = ctx.fs as FakeFs
   return { ctx, fs }
 }
@@ -147,9 +147,47 @@ describe('current directory resolution', () => {
 })
 
 describe('registration', () => {
+  it.each([
+    { config: { read: false }, tools: ['edit', 'write'], sections: ['tool:edit', 'tool:write'] },
+    { config: { write: false }, tools: ['edit', 'read'], sections: ['tool:edit', 'tool:read'] },
+    { config: { edit: false }, tools: ['read', 'write'], sections: ['tool:read', 'tool:write'] },
+    { config: { read: false, readImage: false, write: false, edit: false }, tools: [], sections: [] },
+  ])('omits disabled tools and their guidance: $config', async ({ config, tools, sections }) => {
+    const { ctx } = await setup(config)
+    try {
+      expect(ctx.tools.schemas().map(tool => tool.name).sort()).toEqual(tools)
+      expect((await ctx.systemPrompt.assemble()).sections.map(section => section.name)
+        .filter(name => name.startsWith('tool:')).sort()).toEqual(sections)
+      const excluded = ['read', 'write', 'edit'].find(name => !tools.some(tool => tool === name))!
+      expect((await call(ctx, excluded, { file_path: 'a.txt' })).isError).toBe(true)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each([{ read: 'false' }, { readImage: 1 }, { write: [] }, { edit: {} }])('rejects non-boolean switches at configuration parsing: %j', async (config) => {
+    expect((await ToolFs.Config['~standard'].validate(config)).issues).toBeDefined()
+  })
+
   it('registers read, write, and edit', async () => {
     const { ctx } = await setup()
     expect(ctx.tools.schemas().map(s => s.name).sort()).toEqual(['edit', 'read', 'write'])
+  })
+
+  it.each([
+    { name: 'write', fields: ['content'], hint: 'Provide `file_path` before `content` in the arguments.' },
+    { name: 'edit', fields: ['old_string', 'new_string'], hint: 'Provide `file_path` before `old_string` and `new_string` in the arguments.' },
+  ])('requests file_path before content fields for $name', async ({ name, fields, hint }) => {
+    const { ctx } = await setup()
+    try {
+      const schema = ctx.tools.schemas().find(tool => tool.name === name)!
+      expect(Object.keys(schema.parameters.properties as Record<string, unknown>).slice(0, fields.length + 1))
+        .toEqual(['file_path', ...fields])
+      expect(schema.parameters).toHaveProperty('required', ['file_path', ...fields])
+      expect(schema.parameters).toHaveProperty('properties.file_path.description', expect.stringContaining(hint))
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('declares read parallel-safe while write/edit remain exclusive', async () => {
@@ -1083,7 +1121,8 @@ class GuidancePtcRuntime extends PtcRuntime {
 }
 
 describe('scope-aware PTC guidance', () => {
-  it.each(['ptc', 'both'] as const)('uses capability visibility in %s mode', async (mode) => {
+  it('uses capability visibility in PTC mode', async () => {
+    const mode = 'ptc'
     const ctx = new Context()
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)

@@ -13,11 +13,9 @@ kind: "package-reference"
 
 使用 `dsh-gateway-runtime` 获得 Gateway 启动的 Harness 运行时的已认证请求上下文与私有 loopback 传输。启动凭据把进程绑定到一个组织与一个个人或项目运行时身份，并为其他协作包验证短生命周期浏览器主体。
 
-
 ## 目录
 
 - [运行时约定](#runtime-contract)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -41,12 +39,6 @@ kind: "package-reference"
 ### 执行授权
 
 本插件为所属应用标记 `executionAuthorityRequired`。该要求一直保留到应用销毁，授权提供者卸载也不会移除。[Gateway Execution](../gateway-execution/README.zh.md) 拥有执行、权限预设和 profile 管理策略。它使用本包已验证的交互调用者与私有传输；对于委派和恢复工作，则使用真正 Agent 的持久参与者引用。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。启动凭据绑定固定进程身份，并在请求准入时检查；本包没有可与该身份比较的独立投影。
-
 
 <a id="model-experience"></a>
 ## 模型体验

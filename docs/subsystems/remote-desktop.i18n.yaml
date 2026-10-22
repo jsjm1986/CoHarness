@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for remote-desktop.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for remote-desktop.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/remote-desktop.md
+document:
+  en: 99802f36b7bc9fd7795f1da8bccdfe45d9079b89
+  zh: 8e4607b3a1435b03e629e3f07a8a85383e9aa8c5
 /remote-desktop:
   en: 1e6eeda1dd19116a
   zh: 259ec6266289c5f3

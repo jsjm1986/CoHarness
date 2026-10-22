@@ -15,14 +15,16 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type {
-  ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
+  ChatConversationViewNode, ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { Button, CoHarnessMascot, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ToolCallId } from '../contract/views.ts'
 import type { ChatViewSlotProps, RenderMessageImages } from '../contract/slots.ts'
 import type { ChatNode, TurnProcessChatData } from '../contract/chat-nodes.ts'
+import { isAtOrOutside } from '../contract/group-tree.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
+import { ChatGroupSeat } from './ChatGroupSeat.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { formatRunDuration } from './message-chrome.ts'
@@ -52,17 +54,33 @@ interface PagingAnchor {
   top: number
 }
 
-/** Find an already-rendered settled row without interpolating a selector. */
+/**
+ * Find an already-rendered settled row without interpolating a selector.
+ * Saved and armed positions name exact rendered parts, while rail jumps name
+ * the original Node — a split Node's rows carry part keys, so the Node key is
+ * the fallback identity. Hidden rows have no box to align to and never match.
+ */
 function anchorElement(list: HTMLElement, key: string): HTMLElement | null {
-  for (const row of list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')) {
+  let nodePart: HTMLElement | null = null
+  for (const row of list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]:not([hidden]):not([hidden] *)')) {
     if (row.dataset.chatAnchorKey === key) return row
+    if (nodePart === null && row.dataset.chatNodeKey === key) nodePart = row
   }
-  return null
+  return nodePart
 }
 
 /** Row position in scrollport coordinates (viewport-independent). */
 function flowTop(row: HTMLElement, scrollport: HTMLElement): number {
   return row.getBoundingClientRect().top - scrollport.getBoundingClientRect().top
+}
+
+/** Visible rows eligible to carry a reader/paging position. Turn controls and
+ * hidden rows are excluded: controls relocate when history expands their Turn,
+ * and hidden rows have no box to align to. */
+function anchorCandidates(list: HTMLElement): NodeListOf<HTMLElement> {
+  return list.querySelectorAll<HTMLElement>(
+    '[data-chat-anchor-key]:not([data-chat-group-key]):not([data-chat-flow-kind="turn-process"]):not(:empty):not([hidden]):not([hidden] *)',
+  )
 }
 
 /** Select a visible stable node/call identity, falling back only when layout
@@ -72,8 +90,8 @@ function pagingAnchor(list: HTMLElement, scrollport: HTMLElement): HTMLElement |
   const composer = scrollport.querySelector<HTMLElement>('[data-composer-seat]')
   const visibleBottom = composer?.getBoundingClientRect().top ?? viewport.bottom
   // Scroll events are hot: hit-test a few points through the stretched flow
-  // rows before considering the full mounted set. The fallback keeps jsdom
-  // and pre-layout states deterministic; a virtualizer naturally bounds it.
+  // rows before considering the mounted set. The fallback keeps jsdom and
+  // pre-layout states deterministic at O(log n) box reads.
   if (typeof document.elementsFromPoint === 'function' && visibleBottom > viewport.top) {
     const content = list.getBoundingClientRect()
     const left = Math.max(viewport.left, content.left)
@@ -86,16 +104,27 @@ function pagingAnchor(list: HTMLElement, scrollport: HTMLElement): HTMLElement |
         const row = element instanceof HTMLElement
           ? element.closest<HTMLElement>('[data-chat-anchor-key]')
           : null
-        if (row !== null && list.contains(row)) return row
+        if (row === null || !list.contains(row) || row.dataset.chatFlowKind === 'turn-process') continue
+        // An open group's header stays put while older members enter above
+        // its body content: anchor inside the visible content instead.
+        return row.dataset.chatGroupKey === undefined
+          ? row
+          : row.querySelector<HTMLElement>('[data-step-process-content] > [data-chat-anchor-key]:not(:empty):not([hidden]):not([hidden] *)') ?? row
       }
     }
   }
-  const rows = [...list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')]
-  const visibleRows = rows.filter((row) => {
-    const rect = row.getBoundingClientRect()
-    return rect.bottom > viewport.top && rect.top < visibleBottom
-  })
-  return visibleRows[0] ?? rows[0] ?? null
+  const rows = anchorCandidates(list)
+  // The reader's row is the first whose box crosses the scrollport top; flow
+  // order matches box order, so a binary search finds it in O(log n) reads.
+  let low = 0
+  let high = rows.length
+  while (low < high) {
+    const middle = (low + high) >>> 1
+    if (rows.item(middle).getBoundingClientRect().bottom > viewport.top) high = middle
+    else low = middle + 1
+  }
+  const row = rows[low]
+  return row !== undefined && row.getBoundingClientRect().top < visibleBottom ? row : rows[0] ?? null
 }
 
 type ChatScrollPosition = NonNullable<ReturnType<ChatViewSlotProps['chatScroll']['read']>>
@@ -131,10 +160,6 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
   return latest
 }
 
-function runningTurnOf(timeline: ConversationTimelineSnapshot): number | undefined {
-  return [...timeline.turns.values()].findLast(value => value.status === 'open')?.turn
-}
-
 function nodeTurn(node: { readonly location: { readonly kind: string; readonly turn?: { readonly turn: number } } }): number | undefined {
   return node.location.kind === 'turn' || node.location.kind === 'step'
     ? node.location.turn?.turn
@@ -143,20 +168,67 @@ function nodeTurn(node: { readonly location: { readonly kind: string; readonly t
 
 /** Chat node kinds that never fold into a turn's collapsed process window. */
 const TURN_PROCESS_INDEPENDENT: ReadonlySet<string> = new Set([
-  'system-prompt', 'user', 'steering', 'turn-process', 'turn-error', 'turn-max-tokens', 'turn-tail',
+  'system-prompt', 'user', 'steering', 'turn-trigger', 'turn-process', 'turn-error', 'turn-max-tokens', 'turn-tail',
 ])
 
 /**
- * A turn still running — or one that ended aborted or errored — keeps its
- * process window open: its evidence is the failure surface, not decoration.
- * @param node - the node whose turn location decides openness.
- * @returns whether the owning turn's process window defaults to open.
+ * Turns whose process window cannot collapse. Live, stopped, and failed Turns
+ * keep their evidence open; a Turn holding an interleaved human input (one
+ * anchored after its opening input, or any input when no opening input exists)
+ * keeps it too — the transcript itself is part of the answer there.
+ * Node locations carry the current lifecycle, so outcome reads stay correct
+ * even when the timeline reference is stale.
+ * @param order - visible Chat Node keys in presentation order.
+ * @param nodes - resident Node reader.
+ * @returns the always-open Turns plus those marked open by interleaved input.
  */
-function turnProcessAlwaysOpen(node: ChatNode | undefined): boolean {
-  const location = node?.location
-  if (location === undefined || (location.kind !== 'turn' && location.kind !== 'step')) return false
-  const reason = location.turn.end?.data.reason.kind
-  return location.turn.status === 'open' || reason === 'aborted' || reason === 'error'
+function alwaysOpenTurns(
+  order: readonly string[],
+  nodes: { get(key: string): ChatConversationViewNode | undefined },
+): { readonly always: ReadonlySet<number>; readonly interleaved: ReadonlySet<number> } {
+  const always = new Set<number>()
+  const interleaved = new Set<number>()
+  const controls = new Map<number, { readonly anchor: number; readonly startSeq: number | undefined }>()
+  const inputs: { readonly turn: number; readonly anchor: number }[] = []
+  for (const key of order) {
+    const node = nodes.get(key) as ChatNode | undefined
+    if (node === undefined) continue
+    const location = node.location
+    if (location.kind === 'turn' || location.kind === 'step') {
+      const turn = location.turn
+      const reason = (turn.end?.data as { readonly reason?: { readonly kind?: string } } | undefined)
+        ?.reason?.kind
+      if (turn.status === 'open' || reason === 'aborted' || reason === 'interrupted' || reason === 'error') {
+        always.add(turn.turn)
+      }
+    }
+    if (node.kind === 'turn-process') {
+      const location = node.location
+      controls.set(node.data.turn, {
+        anchor: node.data.controlAnchorSeq,
+        startSeq: location.kind === 'turn' || location.kind === 'step' ? location.turn.start?.seq : undefined,
+      })
+      continue
+    }
+    if (!isAtOrOutside(node, 'input')) continue
+    const turn = nodeTurn(node)
+    if (turn !== undefined) inputs.push({ turn, anchor: node.anchorSeq })
+  }
+  const openingAnchors = new Map<number, number>()
+  for (const input of inputs) {
+    const control = controls.get(input.turn)
+    if (control !== undefined && (control.anchor === control.startSeq || input.anchor < control.anchor)) {
+      openingAnchors.set(input.turn, Math.max(openingAnchors.get(input.turn) ?? input.anchor, input.anchor))
+    }
+  }
+  for (const input of inputs) {
+    const opening = openingAnchors.get(input.turn)
+    if (controls.has(input.turn) && (opening === undefined || input.anchor > opening)) {
+      interleaved.add(input.turn)
+      always.add(input.turn)
+    }
+  }
+  return { always, interleaved }
 }
 
 /** Return submission ids already represented by durable nodes, plus the last input's Turn. */
@@ -235,6 +307,7 @@ export function ChatView({
   fileMentions, presentation, useRevealTarget, ackReveal, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
+  const entries = useSession(s => s.chat.entries)
   const nodeStore = useSession(s => s.chat.nodes)
   const timeline = useSession(s => s.chat.timeline)
   const navigation = useSession(s => s.chat.navigation)
@@ -263,6 +336,10 @@ export function ChatView({
   )
   const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string; options?: { line?: number } } | null>(null)
   const [fileOpenBusy, setFileOpenBusy] = useState(false)
+  const [selectedSkill, setSelectedSkill] = useState<{ sessionId: typeof sessionId; name: string } | null>(null)
+  const activeSkill = selectedSkill?.sessionId === sessionId ? selectedSkill.name : undefined
+  const openSkill = useCallback((name: string) => { setSelectedSkill({ sessionId, name }) }, [sessionId])
+  const closeSkill = useCallback(() => { setSelectedSkill(null) }, [])
   const [activeTurn, setActiveTurn] = useState<number | null>(null)
   const [busyTurn, setBusyTurn] = useState<number | null>(null)
   const [processOpen, setProcessOpen] = useState<ReadonlyMap<number, boolean>>(new Map())
@@ -334,7 +411,6 @@ export function ChatView({
     [loadImage, renderSlot],
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
-  const runningTurn = useMemo(() => runningTurnOf(timeline), [timeline])
   // An empty opening control follows the first local transcript echo, never steering.
   const tailKey = order.at(-1)
   const tailNode = tailKey === undefined ? undefined : nodeStore.get(tailKey)
@@ -398,6 +474,18 @@ export function ChatView({
     }
     return result
   }, [nodeStore, order])
+  /** Newest turn owning a process node; the next-input timing defers only it. */
+  const latestTurn = useMemo(() => {
+    let latest: number | undefined
+    for (const turn of processByTurn.keys()) latest = latest === undefined ? turn : Math.max(latest, turn)
+    return latest
+  }, [processByTurn])
+  // 'next-input' keeps the newest completed Turn's process open until another
+  // input lands below it — a transcript-placed pending submission already is
+  // that input's echo.
+  const deferCollapse = presentationPolicy.collapseTiming === 'next-input'
+    && !visibleSubmissions.some(item => item.placement === 'transcript')
+  const openTurns = useMemo(() => alwaysOpenTurns(order, nodeStore), [nodeStore, order])
   /**
    * Keys of nodes folded behind a closed turn's process toggle. Folded nodes
    * stay mounted — a late-arriving reply or in-flight stream mutates while
@@ -413,18 +501,65 @@ export function ChatView({
       const process = processByTurn.get(turn)
       if (process === undefined || node.kind === 'turn-process') continue
       const open = processOpen.get(turn)
-        ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn || turnProcessAlwaysOpen(node))
+        ?? (!presentationPolicy.foldCompletedTurns
+          || (deferCollapse && turn === latestTurn) || openTurns.always.has(turn))
       if (open) continue
       if (TURN_PROCESS_INDEPENDENT.has(node.kind)) continue
       if (process.answerAnchorSeq !== null
         && node.kind === 'assistant-step' && node.data.finalNode?.seq === process.answerAnchorSeq) continue
       // A turn without an assistant answer folds everything after its first
       // evidence — that is where a late question reply lands.
-      if (node.anchorSeq >= process.controlAnchorSeq
+      if (node.anchorSeq >= process.processStartSeq
         && (process.answerAnchorSeq === null || node.anchorSeq < process.answerAnchorSeq)) folded.add(key)
     }
     return folded
-  }, [nodeStore, order, processByTurn, processOpen, runningTurn, presentationPolicy])
+  }, [nodeStore, order, processByTurn, processOpen, openTurns, presentationPolicy, deferCollapse, latestTurn])
+
+  /** Turns whose process window is currently folded — group containers hide with their members. */
+  const foldedTurns = useMemo(() => {
+    const turns = new Set<number>()
+    for (const key of foldedKeys) {
+      const node = nodeStore.get(key) as ChatNode | undefined
+      const turn = node === undefined ? undefined : nodeTurn(node)
+      if (turn !== undefined) turns.add(turn)
+    }
+    return turns
+  }, [foldedKeys, nodeStore])
+
+  /** Turns holding any foldable process evidence — a control over nothing stays a plain label. */
+  const contentfulTurns = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const key of order) {
+      const node = nodeStore.get(key) as ChatNode | undefined
+      if (node === undefined) continue
+      const turn = nodeTurn(node)
+      if (turn === undefined) continue
+      const process = processByTurn.get(turn)
+      if (process === undefined || TURN_PROCESS_INDEPENDENT.has(node.kind)) continue
+      if (node.anchorSeq < process.processStartSeq
+        || (process.answerAnchorSeq !== null && node.anchorSeq >= process.answerAnchorSeq)) continue
+      // The answering Step's own reasoning part joins the group without making
+      // the process external; hasContent still counts spec.inlineReasoning.
+      if (node.kind === 'assistant-step'
+        && process.answerStep !== null && node.data.step === process.answerStep) continue
+      counts.set(turn, (counts.get(turn) ?? 0) + 1)
+    }
+    return counts
+  }, [nodeStore, order, processByTurn])
+
+  const groupStore = useSession(s => s.chat.groups)
+  /** Group key -> owning turn, read once per entries revision (a group's turn never changes). */
+  const groupTurnOf = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const entry of entries) {
+      if (entry.kind !== 'group') continue
+      const data = groupStore.get(entry.key)?.data
+      if (typeof data === 'object' && data !== null && 'turn' in data && typeof data.turn === 'number') {
+        map.set(entry.key, data.turn)
+      }
+    }
+    return (key: string): number | undefined => map.get(key)
+  }, [entries, groupStore])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -800,39 +935,81 @@ export function ChatView({
                 </button>
               </div>
             )}
-            {order.map((nodeKey) => {
+            {entries.map((entry) => {
+              if (entry.kind === 'group') {
+                return (
+                  <ChatGroupSeat
+                    key={entry.key}
+                    groupKey={entry.key}
+                    turnFolded={foldedTurns.has(groupTurnOf(entry.key) ?? -1)}
+                    foldedKeys={foldedKeys}
+                    presentation={presentationPolicy}
+                    deferCollapse={deferCollapse}
+                    latestTurn={latestTurn}
+                    useSession={useSession}
+                    selectedCallId={selectedCallId}
+                    cwd={cwd}
+                    openFile={requestOpenFile}
+                    openSkill={openSkill}
+                    openCallDetails={openCallDetails}
+                    inspectCall={inspectCall}
+                    forkAt={forkAt}
+                    renderMessageImages={renderMessageImages}
+                    fileMentions={fileMentions}
+                    renderSlot={renderSlot}
+                    t={t}
+                  />
+                )
+              }
+              const nodeKey = entry.key
               const node = nodeStore.get(nodeKey) as ChatNode | undefined
               const turn = node === undefined ? undefined : nodeTurn(node)
               const process = turn === undefined ? undefined : processByTurn.get(turn)
               const open = turn === undefined || process === undefined
                 ? true
                 : processOpen.get(turn)
-                  ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn || turnProcessAlwaysOpen(node))
+                  ?? (!presentationPolicy.foldCompletedTurns
+                    || (deferCollapse && turn === latestTurn) || openTurns.always.has(turn))
               const folded = foldedKeys.has(nodeKey)
+              const turnLocation = node !== undefined
+                && (node.location.kind === 'turn' || node.location.kind === 'step')
+                ? node.location.turn
+                : undefined
               const turnProcess = node?.kind === 'turn-process' && turn !== undefined
-                ? { open, setOpen: (value: boolean) => {
-                  setProcessOpen((previous) => {
-                    const next = new Map(previous)
-                    next.set(turn, value)
-                    return next
-                  })
-                } }
+                ? {
+                  open,
+                  setOpen: (value: boolean) => {
+                    setProcessOpen((previous) => {
+                      const next = new Map(previous)
+                      next.set(turn, value)
+                      return next
+                    })
+                  },
+                  // The window exists once the Turn boundary is loaded; the
+                  // toggle's outcome gate lives on `turnProcessAlwaysOpen`.
+                  foldable: presentationPolicy.foldCompletedTurns
+                    && (turnLocation?.start !== undefined || turnLocation?.status === 'closed'),
+                  hasContent: !openTurns.interleaved.has(turn)
+                    && ((contentfulTurns.get(turn) ?? 0) > 0 || process?.inlineReasoning === true),
+                }
                 : undefined
               return (
                 <ChatNodeSeat
-                  key={nodeKey}
+                  key={entry.groupPart === undefined ? nodeKey : `${nodeKey}:${entry.groupPart}`}
                   nodeKey={nodeKey}
                   folded={folded}
                   useSession={useSession}
                   selectedCallId={selectedCallId}
                   cwd={cwd}
                   openFile={requestOpenFile}
+                  openSkill={openSkill}
                   openCallDetails={openCallDetails}
                   inspectCall={inspectCall}
                   forkAt={forkAt}
                   renderMessageImages={renderMessageImages}
                   fileMentions={fileMentions}
                   presentation={presentationPolicy}
+                  {...entry.groupPart === undefined ? {} : { groupPart: entry.groupPart }}
                   {...turnProcess === undefined ? {} : { turnProcess }}
                   renderSlot={renderSlot}
                   t={t}
@@ -895,6 +1072,17 @@ export function ChatView({
             </div>
           )}
         </div>
+        {activeSkill !== undefined && renderSlot('conversation.chat.skill-preview', {
+          skillName: activeSkill, onClose: closeSkill,
+        }, {
+          fallback: <Modal
+            open
+            title={`/${activeSkill}`}
+            description={t('skillPreview.unavailable')}
+            closeLabel={t('close')}
+            onClose={closeSkill}
+          />,
+        })}
         {fileOpenError !== null && (
           <FileOpenErrorDialog
             path={fileOpenError.path}

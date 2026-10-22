@@ -42,7 +42,6 @@ The two switches are independent: flip only the one whose platform is degraded.
 
 Six always-on instances absorb normal PR traffic. When standby drills are enabled, their steady-state load is one serial job per master push; when disabled, the pool has no workflow-generated standby load. If queues still build, register additional instances with an org registration token (org Settings → Actions → Runners → New runner). Clone an existing runner directory **excluding its identity files** — `rsync -a --exclude '.runner*' --exclude '.credentials*' --exclude '_diag' --exclude '_work' <src>/ <dst>/` (the globs also catch `.runner_migrated`/`.credentials_migrated`, which GitHub writes on migrated runners and which equally trigger the already-configured refusal) — then run `config.sh` (copying `.runner`/`.credentials` verbatim makes it refuse with "already configured"), and **start the listener**: `sudo ./svc.sh install ubuntu && sudo ./svc.sh start`. Registration alone leaves the runner offline; only a started service adds capacity. About a minute per instance.
 
-
 ### Switch back
 
 Delete the `DSH_CI_FAILOVER_LINUX` or `DSH_CI_FAILOVER_WINDOWS` variable (or set it to anything other than `selfhosted`). New runs resolve to the portable standard hosted labels unless `DSH_CI_ENTERPRISE_RUNNERS_ENABLED=true`, in which case they resolve to the named enterprise pools. Remove any extra instances that were registered during the incident.

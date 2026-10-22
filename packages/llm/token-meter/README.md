@@ -19,7 +19,6 @@ Use `ctx.tokenMeter` to estimate a session's current request and context pressur
 - [Measurement contract](#measurement-contract)
 - [Session projections](#session-projections)
 - [Composition](#composition)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -82,10 +81,6 @@ The [Agent Note](../../../.agents/notes/implemented/architecture/2026-07-29-proj
 
 Both plugins have usable defaults. The meter remains independent of model routing and optional compaction. A deployment configures capacity on its LLM adapter and compaction policy on `dsh-compaction-basic`.
 
-<a id="invariants"></a>
-## Invariants
-
-No runtime invariant companion is published: the meter derives estimates from durable events and current request context without an independent authority for comparison.
 
 <a id="model-experience"></a>
 ## Model Experience

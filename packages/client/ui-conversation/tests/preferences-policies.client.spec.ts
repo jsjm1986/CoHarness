@@ -5,6 +5,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { CollapseTimingPolicy } from '../src/client/collapse-timing.ts'
 import { TranscriptViewPolicy } from '../src/client/transcript-view.ts'
 import { PerformanceUsagePolicy } from '../src/client/performance-usage.ts'
 import { LinkOpeningPolicy } from '../src/client/link-opening.ts'
@@ -81,14 +82,20 @@ describe('derivePresentationPolicy', () => {
   it('keeps one stable policy object per mode and follows the mode observable', () => {
     const host = stubSettingsScope<ConversationSettings>()
     const policy = new TranscriptViewPolicy(host.scope)
-    const presentation = derivePresentationPolicy(policy.mode)
+    const collapseTiming = new CollapseTimingPolicy(host.scope)
+    const presentation = derivePresentationPolicy(policy.mode, collapseTiming.timing)
     expect(presentation.getSnapshot()).toBe(presentationPolicyFor('detailed'))
     const changed = vi.fn()
     presentation.subscribe(changed)
     policy.setMode('verbose')
     expect(changed).toHaveBeenCalledOnce()
     expect(presentation.getSnapshot().foldCompletedTurns).toBe(false)
+    collapseTiming.setTiming('next-input')
+    expect(changed).toHaveBeenCalledTimes(2)
+    expect(presentation.getSnapshot().collapseTiming).toBe('next-input')
+    expect(presentation.getSnapshot()).toBe(presentationPolicyFor('verbose', 'next-input'))
     policy.dispose()
+    collapseTiming.dispose()
   })
 
   it('assigns the contracted fields per mode', () => {

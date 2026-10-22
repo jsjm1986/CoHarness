@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-await-agent-publication-rollback.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-await-agent-publication-rollback.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-17-await-agent-publication-rollback.md
+document:
+  en: 4c053f351f977ac88a2c7a626733fcf79766444b
+  zh: 00d8d05de4bfa057e2ef5c8b2a9c70a443ef3093
 /agent-note-await-publication-inside-agent-creation-rollback:
   en: 866c2c4d0fbf28df
   zh: ac5d7753e6e6c730

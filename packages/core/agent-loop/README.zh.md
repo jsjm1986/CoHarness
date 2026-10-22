@@ -35,7 +35,6 @@ agent（智能体）的唯一具体实现插件和循环驱动器。其包内部
 
 内部发布操作返回 Promise，并在 setup 事务的回滚处理范围内等待完成。Setup 与发布在维护任务中执行：唤醒输入排队到发布成功，发布失败则先抑制排队唤醒，再清理并拒绝创建。取消会清除已有唤醒请求，即使使用 `keepInbox`；普通取消后，新的唤醒输入仍可恢复保留的任务。以 `disposed` 取消的维护任务不会重放待处理唤醒。创建监听器不得等待 `agent.whenIdle()` 或自身所有者的卸载。`agent/created` 监听器按顺序执行并等待完成，拒绝会回滚发布。
 
-
 调用方 fiber 与 AgentLoop 提供方共同拥有 agent。`AgentFactory.createAgent(ownerCtx, options)` 与 `resume(ownerCtx, options)` 显式接收调用方所有权，而工厂为 `sessions`/`llm`/`tools`/`systemPrompt` 保留自身的依赖上下文；这样，调用方可以只注入 `agents`，而不会缩减新 agent 的服务接口。调用方卸载、handle dispose（资源释放）或提供方卸载都会汇合到同一个记忆化的完全停稳边界。提供方关闭会同时等待资源 teardown，以及已经观测到停用的公开 create/resume 包装层，因此依赖消失后，任何 continuation 都无法继续发布。工厂卸载时在整个作用域清理期间保留 inbox 投影与轮次边界投影，包括作用域内 abort 监听器发起取消的时刻，直到所有 Agent teardown 和启动任务结束；清理失败不会使这些投影提前释放。
 
 挂载 `ctx.sessionPersistence` 后，每条创建入口（包括 `ctx.agentLoop.create()`）都会在发布前取得一个写入 `SessionHandle`。新建流程通过句柄登记 header，恢复流程打开已有 id。句柄由已发布的生命周期持有，并在 Agent 与 Session 完成排空后关闭，因此第二个写入者会在发布前被拒绝，销毁后 id 可以再次使用。
@@ -54,10 +53,6 @@ agent（智能体）的唯一具体实现插件和循环驱动器。其包内部
 ### 注入的服务
 
 `agents`、`sessions`、`llm`、`tools`、`systemPrompt`：全部 5 个接口服务。
-
-### 不变量配套入口
-
-可选的 `@deepseek-ai/dsh-agent-loop/invariant` 配套入口会向 `ctx.invariants` 注册请求重建。循环会把每个确切的冻结请求记录在 `dsh-llm` 拥有的进程本地身份集合中；随后，配套入口要求存在实时会话，并根据日志独立重建消息边界和折叠后的请求 header。即使调用方冻结直接的一次性调用，或为其附加会话 id，这类调用仍不属于该约定。
 
 ### 配置（Schemastery）
 
@@ -116,7 +111,6 @@ AgentLoop 要求挂载 session-projection 注册表（`sessionProjections` 在�
 - subagent：在循环外部实现为 `ctx.subagents` 提供方；进程内提供方使用 `ctx.agents.create()` 创建 agent，并通过其拥有的 `AgentHandle` 执行 teardown，而通用的 [`ctx.jobs`](../../jobs/jobs/) 与 [`dsh-tool-subagent`](../../subagent/tool-subagent/) 负责后台收集。
 - 持久化：`session/event` 发生后立即安排延后写入；`session/flush` 是显式观测屏障
 - UI：`session/event`（assistant token 流、边界、工具活动）+ `agent/*` 控制事件（`agent/status`、`agent/created`/`agent/disposed`）
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -7,6 +7,9 @@
     - button "Models":
       - img
       - text: Models
+    - button "Built-in plugins":
+      - img
+      - text: Built-in plugins
     - button "Agent presets":
       - img
       - text: Agent presets
@@ -39,9 +42,21 @@
   - button "System" [pressed]:
     - img
     - text: System
+  - text: Font size Only affects conversation content 14
+  - button "Increase font size":
+    - img
+  - button "Decrease font size":
+    - img
+  - text: px
+  - button "More font settings":
+    - img
   - text: Work details Choose how much detail to show for tool calls
   - button "Detailed":
     - text: Detailed
+    - img
+  - text: When to Collapse Work Details Choose when to automatically collapse work details
+  - button "On completion":
+    - text: On completion
     - img
   - text: Show coding view Shows trajectory and this turn’s code diff, and enables switching among the full Agent presets
   - switch "Show coding view" [checked]
@@ -67,3 +82,4 @@
   - button "Detailed":
     - text: Detailed
     - img
+  - text: "Current version: {{version}}"

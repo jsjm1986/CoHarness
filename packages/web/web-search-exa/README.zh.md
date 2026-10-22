@@ -19,7 +19,6 @@ kind: "package-reference"
 
 - [配置](#config)
 - [映射](#mapping)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -49,12 +48,6 @@ kind: "package-reference"
 ## 映射
 
 Exa 返回扁平 `results[]`，不返回生成答案，因此省略 `content`。每项结果映射为 `WebSearchSource`：`url` ← `url`、`title` ← `title`、`snippet` ← 第一个非空的 `highlights[]` 条目（没有高亮摘要的结果缺少可移植的 snippet，会被丢弃）、`publishedAt` ← `publishedDate`。请求的 `maxResults` 优先于已配置的默认 `numResults`，并作为 Exa `numResults` 发送，以优化成本和延迟；最终上限由 seam 强制执行。提供方失败（HTTP 错误、网络失败、响应体无法解析或结构不符）以 `WebError` `WEB_PROVIDER_ERROR` 呈现；中止请求以 `WEB_ABORTED` 呈现。HTTP 重定向会在访问 `Location` 指向的目标之前被拒绝，并以 `WEB_PROVIDER_ERROR` 呈现。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次查询是一次映射为规范化结果的无状态提供方请求；调用之间不保留搜索状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -1,9 +1,5 @@
-// Web e2e scenario: a user invokes a disable-model-invocation skill through
-// the composer (issue #1470). The entered `/name args` line claims into
-// skill.invoke: the real host forwards the gesture as an ordinary user
-// prompt, injects the rendered body as instructions context named after the
-// skill, and starts a turn answered by the replay adapter. The transcript shows
-// the gesture bubble, the collapsed context-injection row, and the reply.
+// The real Host accepts a user-only skill through ordinary prompt text,
+// records its injected instructions, and serves a read-only source preview.
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -27,6 +23,7 @@ import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './suppor
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/skill-user-invoke', import.meta.url))
 const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
+const PREVIEW_EXPECTED = join(SNAPSHOT_DIR, 'preview.expected.md')
 const MODE = webSnapshotMode()
 
 const SKILL_NAME = 'user-invoke-demo'
@@ -146,11 +143,20 @@ describe.skipIf(MODE === 'record')('web e2e: user-explicit skill invocation thro
 
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await bubble.click()
+    const preview = page.getByRole('dialog', { name: `/${SKILL_NAME}`, exact: true })
+    await preview.locator('code').waitFor({ timeout: 10_000 })
+    expect(await preview.locator('code').textContent()).toBe('Reply with the fixture acknowledgement line.')
+    expect(await preview.textContent()).not.toContain('<skill_content')
+    const previewSnapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(PREVIEW_EXPECTED, previewSnapshot, MODE)
+    await preview.getByRole('button', { name: 'Close', exact: true }).click()
+    await preview.waitFor({ state: 'detached', timeout: 10_000 })
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 60_000)
 
   it('keeps its snapshot inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md', 'preview.expected.md'])
   })
 })

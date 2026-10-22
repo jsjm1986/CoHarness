@@ -1,3 +1,4 @@
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
@@ -13,7 +14,6 @@ import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { WorkflowRunId, WorkflowEngine } from '@deepseek-ai/dsh-workflow'
 import type { WorkflowResult, WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import * as toolRalph from '../src/index.ts'
-import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const testToolSignal = new AbortController().signal
 
@@ -59,10 +59,9 @@ class StubProvider implements SubagentProvider {
   constructor(options?: { outputSchema?: boolean; inheritsParentContext?: boolean }) {
     this.capabilities = {
       agentOptions: true,
+      agentPreset: false,
       outputSchema: options?.outputSchema ?? true,
       depthLimit: true,
-      toolFilter: true,
-      persona: true,
     }
     this.inheritsParentContext = options?.inheritsParentContext ?? false
   }

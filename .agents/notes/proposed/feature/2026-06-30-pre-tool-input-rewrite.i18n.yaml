@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-30-pre-tool-input-rewrite.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-30-pre-tool-input-rewrite.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md
+document:
+  en: 63027079a996f2f7b9d2ef87afcd4e64a2691fb1
+  zh: 7697f285506a2df029be3811429dfe621f65951d
 /agent-note-pre-tool-input-rewrite-a-consistent-design:
   en: 28be5a60d0f8f70d
   zh: 2ade899f45347755

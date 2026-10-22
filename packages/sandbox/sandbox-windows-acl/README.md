@@ -176,7 +176,6 @@ One extra catalog entry on Windows: the skill's description enters context with 
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define when the backend is a poor fit or needs special operational care. They are current package constraints, not a general Windows comparison or a task backlog.
 
 - **One write allowlist per workspace** — the write SID is the unit of the allowlist and IS the workspace identity; reusing one sandbox instance across two workspaces widens both grants to both roots. Create one instance per workspace root — the seam does exactly this, keyed by the workspace path.
@@ -204,5 +203,3 @@ This Dev Note is working context for maintainers: undecided directions and open 
 The warn-only posture for unusually wide directories and FAT-class volumes is documented in the limitations above but not implemented, and a cleanup command that reaps standing workspace ACEs from renamed workspaces is undecided. Both are open directions, not shipped behavior.
 
 </details>
-
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond the fail-closed contracts it enforces at each Win32 call boundary.

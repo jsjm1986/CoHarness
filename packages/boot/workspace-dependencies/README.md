@@ -45,8 +45,6 @@ Locked targets are `mac-arm64`, `mac-x64`, `win-x64`, `linux-x64`, and `linux-ar
 
 The [CLI patch](../../../apps/cli/config/workspace-dependencies.cordis.patch.yml) enables the tool in a selected profile. Set `DSH_WORKSPACE_RUNTIME_SOURCE` to the absolute deployment-owned payload directory, and pass this patch to `dsh --profile sdk`, `web`, or `headless`. Its private destination is `workspace-runtime` under the selected Harness home. Inspect the resolved composition with `--dump-config`. Deployment packaging must carry the payload alongside the application; the npm plugin alone contains no interpreters.
 
-The installer checks manifest versions and platform identity, stages a complete copy, and replaces the installed tree under the shared cross-process writer lock. An interrupted replacement can recover its previous tree. Reusing the same manifest preserves user-added packages; the returned distribution versions describe the bundled payload only. No runtime invariant companion is published: installation checks execute at publication, and the tool registry owns registration disposal.
-
 ## Dev Note
 
 The installer derives from the fixed alpha.2 `desktop-host` implementation. CoHarness uses a plugin usable by its CLI and Gateway runtimes, adds cross-process installation serialization, and rejects paths that the current execution target cannot use. [Office skills](../../skill/skill-office/README.md) supply document workflows; [computer-use](../../computer-use/computer-use/README.md) owns desktop access.

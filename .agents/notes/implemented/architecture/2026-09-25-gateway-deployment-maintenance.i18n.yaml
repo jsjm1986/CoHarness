@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-gateway-deployment-maintenance.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-gateway-deployment-maintenance.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md
+document:
+  en: 13ea153174f27a6e3747385b4d95978f7449f2fb
+  zh: 8c28489dfbd471ffb52c94a86b6f162738e7e028
 /agent-note-gateway-deployment-maintenance-control-plane:
   en: f3b830c302725ee4
   zh: c2626494cf61ef9a

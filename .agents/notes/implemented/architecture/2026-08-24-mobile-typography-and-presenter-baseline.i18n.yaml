@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-24-mobile-typography-and-presenter-baseline.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-24-mobile-typography-and-presenter-baseline.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-24-mobile-typography-and-presenter-baseline.md
+document:
+  en: 7a6fa96c2c3ed39270996918b8931dfeed39d6e5
+  zh: 3c210f6f2c30ba126d91254fb0ed5f97ffe09816
 /agent-note-mobile-typography-and-presenter-baseline:
   en: 85cb5ee708b263a4
   zh: f8ba0d0f0fef592c

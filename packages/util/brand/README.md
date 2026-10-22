@@ -64,7 +64,6 @@ A package brands the values it owns — `CallId` in `dsh-llm`, the shared agent/
 
 This package owns only the primitive. Keeping it dependency-free lets `dsh-jobs`, for example, brand `JobId` without importing an unrelated capability package merely to reach `Branded`.
 
-**Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its value algebra is enforced by unit tests.
 
 <a id="dev-note"></a>
 ## Dev Note

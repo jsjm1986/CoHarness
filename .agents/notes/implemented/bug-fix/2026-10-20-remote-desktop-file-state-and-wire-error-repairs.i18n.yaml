@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-20-remote-desktop-file-state-and-wire-error-repairs.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-20-remote-desktop-file-state-and-wire-error-repairs.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-file-state-and-wire-error-repairs.md
+document:
+  en: d696175722585771db3f2f81f506bae5592ca15b
+  zh: aa8d05e8a6e7dc84dcc493acfed94eb68284816c
 /agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes:
   en: f627979b0d4ac1ec
   zh: e6b6ce55ef71794a

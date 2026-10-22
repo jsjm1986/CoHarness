@@ -20,7 +20,6 @@ kind: "package-reference"
 - [信任立场](#trust-stance)
 - [配置](#config)
 - [导出形状](#export-shape)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -83,12 +82,6 @@ Client 查询在 `clientInspectTimeoutMs` 内接受首个有效页面响应。�
 
 服务包：默认导出 `DynamicCordisRunnerService`（服务键 `dynamicCordisRunner`），`./types` 则承载 `dynamicCordisRunner` remote namespace 与其消费方共享的载荷形状。`define`／`undefine` 的形状留在包内部，因为它们从不跨 wire。
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。定义及其沙箱化 fiber 是私有注册表状态，其挂载/调用/撤回生命周期由 runner 的规格断言；不发布可独立观测的投影。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -107,8 +100,6 @@ Client 查询在 `clientInspectTimeoutMs` 内接受首个有效页面响应。�
 本包自身没有。注册工具的 host 半会改变下一次请求的工具视图，从第一个变化的 schema token 起使前缀复用失效；运行或停止一个不注册任何工具的包对前缀不产生影响。
 
 <a id="known-limitations-and-deferred-work"></a>
-
-**运行时不变式：** 不发布伴生入口。definition registry 位于进程内存中且没有可观察的事件流；它唯一负责的关系是运行中的 definition 拥有已结算的 host-half fiber 及其 handler table，该关系在单个等待完成的操作中建立和解除，因此由包测试直接断言。
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项

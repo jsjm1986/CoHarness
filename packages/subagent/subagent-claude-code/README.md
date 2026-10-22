@@ -21,7 +21,6 @@ Install this Profile Bundle when a delegated task should run as a fresh, unatten
 - [Configuration](#configuration)
 - [Persistent members](#persistent-members)
 - [Product compatibility and evidence](#product-compatibility-and-evidence)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -151,11 +150,6 @@ Loader composition proves that the Bundle default, two additional named Claude i
 
 The project owner's identity-scoped distribution authorization covers the official SDK and the official CLI/platform payloads declared by each SDK version. [`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) discloses the current optional payload closure without classifying its declared terms as permissive; unrelated non-permissive runtime dependencies continue to fail the notices gate.
 
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run submits one task through the vendor SDK in the delegating workspace and returns its result; no session state is retained between runs.
-
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -196,7 +190,7 @@ Append-only: foreground adds one result after the reusable parent prefix, while 
 - **The SDK platform payload is required at delegation time** — installs that omit optional dependencies, unsupported platforms, and missing or damaged payloads fail at the first query; there is no host-CLI fallback.
 - **No human interaction path** — `AskUserQuestion` is disabled, permission prompts are denied, MCP elicitation is declined, and blocking dialogs fail closed instead of suspending.
 - **Assistant payload is final text only** — a failed run may additionally expose the separate safe diagnostic; reasoning, intermediate messages, tool traffic, usage, stderr, and workspace diffs remain product-local, while generic Job ids, notices, and status come from the shared job runtime.
-- **No optional shared capabilities** — output schemas, child personas, tool filtering, and harness depth enforcement are rejected by the shared service for this provider.
+- **No optional shared capabilities** — `agentPreset`, `agentOptions`, output schemas, and harness depth enforcement are rejected by the shared service for this provider.
 - **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
 
 <a id="dev-note"></a>

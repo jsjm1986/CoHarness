@@ -2,7 +2,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { SlotRegistry, NavigationController, clientSessionKey, createSnapshotStore, workspaceResourceAddress, WorkspaceResourceRegistry } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationViewport, ConversationViewportSnapshot, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewport, ConversationViewportSnapshot, SessionId, SessionRuntimeTarget, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { ConversationViewportController, createConversationViewportStore } from '@deepseek-ai/dsh-client-ui-conversation/src/client/viewport.ts'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
@@ -17,7 +17,27 @@ const A = 'a' as SessionId
 const item: WorkbenchConversation = { sessionId: A, runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }
 const catalog: WorkbenchCatalog = { personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [item] }
 
-async function harness(services: { connection?: unknown; workspaceResources?: unknown; viewport?: ConversationViewport } = {}) {
+/** The native-open members of the workbench tab inject face these tests exercise. */
+interface NativeOpenInjected {
+  nativeOpenAvailable(): boolean
+  openNativePath(request: WorkspaceResourceOpenRequest): Promise<void>
+}
+
+/** Runtime check that the registered workbench tab inject face exposes the native-open verbs. */
+function isNativeOpenInjected(value: unknown): value is NativeOpenInjected {
+  return typeof value === 'object' && value !== null
+    && 'nativeOpenAvailable' in value && typeof value.nativeOpenAvailable === 'function'
+    && 'openNativePath' in value && typeof value.openNativePath === 'function'
+}
+
+interface HarnessServices {
+  connection?: unknown
+  workspaceResources?: unknown
+  viewport?: ConversationViewport
+  workspaces?: unknown
+}
+
+async function harness(services: HarnessServices = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry)
   const slots = ctx.get('slots') as SlotRegistry
@@ -58,7 +78,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
   ctx.provide('layout', layout as never)
   ctx.provide('conversationViewport', (services.viewport ?? viewport) as never)
   ctx.provide('sessions', sessions as never)
-  ctx.provide('workspaces', {} as never)
+  ctx.provide('workspaces', (services.workspaces ?? {}) as never)
   if (services.connection !== undefined) ctx.provide('connection', services.connection as never)
   ctx.provide('workspaceResources', (services.workspaceResources ?? new WorkspaceResourceRegistry()) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
@@ -576,6 +596,51 @@ describe('workspace file serving', () => {
       )
       expect(read).toHaveBeenCalledOnce()
       expect(html).toContain('<!doctype html>')
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('gates the file-preview native-open action on the local desktop capability and resolves the workspace path', async () => {
+    const openPath = vi.fn(async () => {})
+    let description: { executionAuthorityRequired: boolean; canOpenPath: boolean } | undefined =
+      { executionAuthorityRequired: false, canOpenPath: true }
+    const conn = connection()
+    conn.isLoopback = true
+    Object.assign(conn, { hostDescription: { getSnapshot: () => description } })
+    const h = await harness({ connection: conn, workspaces: { openPath } })
+    try {
+      const entry = h.slots.entries('sidebar.right.pane.tab')[0]!
+      if (entry.inject === undefined) throw new Error('workbench tab entry missing inject')
+      // StoredEntry.inject is type-erased; check the registered face at the seam.
+      const injected: unknown = Reflect.apply(entry.inject, undefined, [A])
+      if (!isNativeOpenInjected(injected)) throw new Error('workbench tab inject is incomplete')
+      const face = injected
+      h.sessions.list = { getSnapshot: () => ({ byId: { [A]: { cwd: '/proj' } } }) } as never
+      expect(face.nativeOpenAvailable()).toBe(true)
+      await face.openNativePath(openRequest)
+      expect(openPath).toHaveBeenCalledWith('/proj/a.txt')
+      // A remote/Gateway runtime, a missing or incapable description, and a
+      // non-loopback transport each hide and refuse the action.
+      h.sessions.runtimeTargetFor.mockReturnValue({ kind: 'project', projectId: 7 })
+      expect(face.nativeOpenAvailable()).toBe(false)
+      await expect(face.openNativePath({ ...openRequest, runtimeTarget: { kind: 'project', projectId: 7 } }))
+        .rejects.toThrow('unavailable')
+      h.sessions.runtimeTargetFor.mockReturnValue(undefined)
+      description = { executionAuthorityRequired: false, canOpenPath: false }
+      expect(face.nativeOpenAvailable()).toBe(false)
+      description = { executionAuthorityRequired: true, canOpenPath: true }
+      expect(face.nativeOpenAvailable()).toBe(false)
+      description = undefined
+      expect(face.nativeOpenAvailable()).toBe(false)
+      description = { executionAuthorityRequired: false, canOpenPath: true }
+      conn.isLoopback = false
+      expect(face.nativeOpenAvailable()).toBe(false)
+      await expect(face.openNativePath(openRequest)).rejects.toThrow('unavailable')
+      expect(openPath).toHaveBeenCalledOnce()
+      // A moved session runtime keeps the ownership fence before the RPC.
+      conn.isLoopback = true
+      h.sessions.runtimeTargetFor.mockReturnValue({ kind: 'project', projectId: 9 })
+      await expect(face.openNativePath(openRequest)).rejects.toThrow('no longer owns this Session')
+      expect(openPath).toHaveBeenCalledOnce()
     } finally { await h.ctx.fiber.dispose() }
   })
 

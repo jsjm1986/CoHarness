@@ -14,7 +14,6 @@ The Web turn tail shows recorded workspace changes and explicit file deliveries.
 ## Table of Contents
 
 - [Historical review and current files](#historical-review-and-current-files)
-- [Invariants](#invariants)
 - [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -27,17 +26,11 @@ The Web turn tail shows recorded workspace changes and explicit file deliveries.
 
 The [workspace recorder](../../deliverables/workspace-changes/README.md) announces summaries with `workspace/changes`; the [present tool](../../deliverables/tool-present/README.md) records `deliverables/presented`. `deliverablesDefinition` folds these events into turn data without scanning conversation history. Mutation-location fallback retains support for tools that declare diff or edit render intent.
 
-Review shows one file at a time with unified or side-by-side hunks, line wrapping, creation/deletion facts, and explicit binary or oversized states. Comparisons read the recorded turn snapshots, not current file contents. The renderer limits visible comparison lines and reports truncation. A separate preview action reads the current file. Completed comparisons survive recorder release and Host restart. Missing older history displays an unavailable status with an explicit retry; a failed recording displays an incomplete status without implying zero changes.
+Review shows one file at a time with unified or side-by-side hunks, line wrapping, creation/deletion facts, and explicit binary or oversized states. The selected-file title uses the shared `ui-primitives` `PathLabel`: complete and left-aligned when it fits, otherwise clipped at the left with a fade that preserves trailing characters and the extension, directories subdued and the filename primary, with the complete displayed path on hover; resizing the pane updates the fade. Without wrapping, the two side-by-side columns synchronize both axes, each hunk row — including empty alignment rows — paints across its column's full scrollable width, and both columns suppress elastic edge feedback and scroll chaining while retaining native in-range scrolling. Comparisons read the recorded turn snapshots, not current file contents. The renderer limits visible comparison lines and reports truncation. A separate preview action reads the current file, and a split control beside it opens the file natively through the same chooser the delivery cards use: the OS default application, a registered handler re-read on each open, or the Host's file manager. Completed comparisons survive recorder release and Host restart. Missing older history displays an unavailable status with an explicit retry; a failed recording displays an incomplete status without implying zero changes.
 
 Reads use the Session's runtime connection and ApiProxy authorization. The Host checks Session access and recorded paths before and after asynchronous reads. Client readers belong to the retained Session, discard cached results on connection replacement, and abort on disposal. A review resource must declare the same Session as its sidebar. Hidden tabs do not initiate comparisons.
 
 Delivery cards preserve file descriptions and provide preview, default-application, registered-application, and file-manager actions. The menu re-queries `host.fileApplications` on each open so a handler installed after delivery still appears; the Host revalidates a chosen id against current handlers, so a stale row fails instead of silently opening the default. Native actions require an explicitly independent local Host, base runtime, loopback access, and an available desktop opener. Gateway users receive authorized previews without access to the server desktop. The manager action reveals the file on macOS/Windows and opens its containing folder on Linux, where no selection API exists.
-
-<a id="invariants"></a>
-## Invariants
-
-No companion is published: the UI projects durable events and authorized read results; the recorder and resource services own the file relationships.
-
 
 <a id="further-exploration"></a>
 ## Further Exploration
@@ -52,7 +45,7 @@ No companion is published: the UI projects durable events and authorized read re
 
 #### What the model sees
 
-A static system-prompt section asks the model to name primary outputs, show supporting images inline with `![alt](<path>)` and offer hover-previewable image links with `[label](<path>)`, keep Markdown file destinations in angle brackets, and link every mention of an existing file to its working-directory-relative or absolute path. Link labels use filenames or concise aliases, with optional line locations. Legacy inline-code references still resolve exact paths and unique basenames. The `present` tool independently owns the delivery schema and result text.
+A static system-prompt section asks the model to prefer showing primary results in the final response, reserve `present` for separate file deliverables — especially Office documents, spreadsheets, and slide decks — with at most four files per call, show supporting images inline with `![alt](<path>)` and offer hover-previewable image links with `[label](<path>)` plus a companion file link for clients that cannot render images inline, keep Markdown file destinations in angle brackets, and link every mention of an existing file to its working-directory-relative or absolute path. Link labels use filenames or concise aliases, with optional line locations. Legacy inline-code references still resolve exact paths and unique basenames.
 
 #### Token effect
 

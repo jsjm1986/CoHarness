@@ -116,4 +116,66 @@ describe('WorkspaceMarkdownPreview', () => {
     expect(isWorkspaceMarkdown('notes.mdx')).toBe(false)
     expect(isWorkspaceMarkdown('notes.txt')).toBe(false)
   })
+
+  it('renders leading YAML frontmatter as fields instead of a heading', async () => {
+    const text = [
+      '---', 'name: pdf', 'description: >-', '  Extract text', '  from PDF files.',
+      'metadata:', '  tags: [docs, pdf]', 'anchor: &list [a]', 'copy: *list', 'license:', 'version: 1.0', 'beta: true', '1: one', '? orphan',
+      '---', '', '# Body',
+    ].join('\n')
+    const view = harness(vi.fn<ReadWorkspacePreview>(async () => page(1, text, true)))
+    const fields = await vi.waitUntil(() => view.container.querySelector('[data-workspace-frontmatter] dl'))
+    expect([...fields.querySelectorAll('dt')].map(node => node.textContent))
+      .toEqual(['name', 'description', 'metadata', 'anchor', 'copy', 'license', 'version', 'beta', '1', 'orphan'])
+    expect([...fields.querySelectorAll('dd')].map(node => node.textContent)).toEqual([
+      'pdf', 'Extract text from PDF files.', 'tags: [docs, pdf]', '[a]', '*list', '', '1.0', 'true', 'one', '',
+    ])
+    expect(view.getAllByRole('heading').map(node => node.textContent)).toEqual(['Body'])
+  })
+
+  it.each([
+    ['invalid YAML', 'name: [unclosed'],
+    ['a scalar document', '~'],
+    ['a sequence document', '- first\n- second'],
+  ])('shows the verbatim frontmatter source for %s', async (_, source) => {
+    const view = harness(vi.fn<ReadWorkspacePreview>(async () => page(1, `---\r\n${source}\r\n...\r\nBody.`, true)))
+    await act(async () => { await import('../src/client/markdown/frontmatter-fields.tsx') })
+    const block = view.container.querySelector('[data-workspace-frontmatter]')
+    expect(block?.querySelector('dl')).toBeNull()
+    expect(block?.querySelector('pre')?.textContent).toBe(source)
+    expect(view.getByText('Body.')).toBeDefined()
+  })
+
+  it('collapses frontmatter without content and keeps an unterminated opening rule as Markdown', async () => {
+    const read = vi.fn<ReadWorkspacePreview>(async () => page(1, '---\nname: pdf\n---\nBody.', true))
+    const view = harness(read)
+    const block = await vi.waitUntil(() => view.container.querySelector('[data-workspace-frontmatter]:has(dl)'))
+    expect(block.childElementCount).toBeGreaterThan(0)
+    read.mockImplementation(async () => page(1, '---\n# comment\n---\nBody.', true))
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => {
+      const box = view.container.querySelector('[data-workspace-frontmatter]')
+      expect(box).not.toBeNull()
+      expect(box?.childElementCount).toBe(0)
+    })
+    read.mockImplementation(async () => page(1, '---\n---\n# Next\n\n---\nTail', true))
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(view.getByRole('heading', { name: 'Next' })).toBeTruthy() })
+    expect(view.container.querySelector('[data-workspace-frontmatter]')?.childElementCount).toBe(0)
+    expect(view.getByText('Tail')).toBeDefined()
+    read.mockImplementation(async () => page(1, '---\nname: pdf', true))
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(view.container.querySelector('hr')).not.toBeNull() })
+    expect(view.container.querySelector('[data-workspace-frontmatter]')).toBeNull()
+  })
+
+  it.each([
+    ['a leading blank line', '\n---\nname: pdf\n---\nBody.'],
+    ['leading text', 'Intro.\n\n---\nname: pdf\n---\nBody.'],
+    ['an indented opening rule', ' ---\nname: pdf\n---\nBody.'],
+  ])('treats a delimiter pair after %s as Markdown', async (_, text) => {
+    const view = harness(vi.fn<ReadWorkspacePreview>(async () => page(1, text, true)))
+    await waitFor(() => { expect(view.getByText('Body.')).toBeTruthy() })
+    expect(view.container.querySelector('[data-workspace-frontmatter]')).toBeNull()
+  })
 })

@@ -164,7 +164,6 @@ A standing-policy change appends a superseding runtime-context snapshot after re
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define where the backend is a poor fit or needs special operational care. They are current package constraints, not a general shell comparison or a task backlog.
 
 - **Line-oriented output only** — a headless xterm maintains control-sequence state only for terminal-protocol replies. Returned output remains normalized to lines, and full-screen alternate-buffer interaction is unsupported.
@@ -182,5 +181,3 @@ These limits define where the backend is a poor fit or needs special operational
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. Readiness, terminal buffers, and process-tree state are private per-session implementation state, and the backend publishes no independent lifecycle stream or snapshot.

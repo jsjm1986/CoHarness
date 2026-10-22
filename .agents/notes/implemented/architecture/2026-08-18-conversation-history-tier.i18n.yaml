@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-18-conversation-history-tier.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-18-conversation-history-tier.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md
+document:
+  en: 0520340a95235434cea94ceff9f6b9089540343b
+  zh: 25dc4b0b1c2a3627a504b8593e24f31451659504
 /agent-note-two-tier-conversation-history-transport:
   en: bd1ece4e5aeed5a4
   zh: 8b0a08ab1971cd35

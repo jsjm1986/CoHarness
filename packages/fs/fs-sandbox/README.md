@@ -21,7 +21,6 @@ Loading it INSTEAD OF `dsh-fs-local`, together with a [`ctx.sandboxPolicy`](../.
 
 - [The fence](#the-fence)
 - [Threat model: a policy fence, not a kernel boundary](#threat-model-a-policy-fence-not-a-kernel-boundary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -43,11 +42,6 @@ The per-call policy carries the effective mode (session override or escalation g
 The fence is a check in TRUSTED code over a MODEL-CONTROLLED path — the operations are the seam's own (open, rename), only the target path is untrusted, so canonicalize-then-contain is the complete answer to this surface. This mirrors the `ptc-runtime` stance: containment, not a security boundary. Kernel-grade isolation of untrusted CODE stays `ctx.shell`'s job ([`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md)). The residual TOCTOU (an ancestor symlink swapped between the containment re-check and the syscall) is narrowed by re-canonicalizing immediately before the write and is accepted for this threat model; a kernel-tight boundary needs `openat2`-class primitives not worth their portability cost here.
 
 A denial is a structured `FsError` (`FS_SANDBOX_DENIED`, carrying the effective mode) — no stderr text inference (unlike bash's kernel denials), because an in-process fence knows exactly what it refused. The model-facing `[sandbox: file access denied under <mode> mode]` marker and the one-approved-wider retry live in the tool layer (`dsh-tool-fs`), exactly as bash's do. See [the cross-family fs sandbox Agent Note](../../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.md).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The fence is a per-call mode check against the injected policy; storage mechanics are inherited and the filesystem stays authoritative.
 
 <a id="model-experience"></a>
 ## Model Experience

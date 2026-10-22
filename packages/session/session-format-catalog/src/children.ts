@@ -1,20 +1,19 @@
-/** Per-fixture catalog factory for replay restores that must not share restore state. */
+/** Bind parent-specific child evidence into the static first-party migration inventory. */
 
 import { createSessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
 import type { SessionFormatCatalog, SessionFormatJsonValue } from '@deepseek-ai/dsh-session-format'
+import { createSessionFormatV6ToV7, sessionFormatV6ToV7 } from '@deepseek-ai/dsh-session-format-v6-to-v7'
 import { sessionFormatCatalogOptions } from './generated.ts'
 
 /**
- * Assemble an independent catalog for one restore. The `children` parameter is
- * accepted for call-site parity with upstream: CoHarness session logs never
- * embed child session artifacts inside a parent log, so no local migration
- * edge consumes it yet.
- * @param children - child session evidence retained for the catalog's lifetime; currently must be empty.
+ * Assemble a catalog whose V6→V7 edge knows one parent's historical children.
+ * @param children - complete child evidence retained unchanged for the catalog's lifetime; an empty array declares no children.
  * @returns a catalog with independent restore state per artifact and unchanged current-format readers.
  */
 export function createSessionFormatCatalogWithChildren(children: readonly SessionFormatJsonValue[]): SessionFormatCatalog {
-  if (children.length !== 0) {
-    throw new Error('embedded child session evidence is not supported by the installed session-format chain')
-  }
-  return createSessionFormatCatalog(sessionFormatCatalogOptions)
+  const migration = createSessionFormatV6ToV7(children)
+  return createSessionFormatCatalog({
+    ...sessionFormatCatalogOptions,
+    migrations: sessionFormatCatalogOptions.migrations.map(edge => edge === sessionFormatV6ToV7 ? migration : edge),
+  })
 }

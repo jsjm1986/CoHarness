@@ -244,7 +244,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
       // No preset composition: the ACP bundle keeps the model-facing rows in
       // the host plane, so this agent reads them from the global layer. A
       // deployment that configures a roster has to join one here first
-      // (@deepseek-ai/dsh-agent-presets README, "Composing a child agent").
+      // (@deepseek-ai/dsh-agent-preset-registry README, "Composing a child agent").
       let record: AcpSession
       try {
         record = await AcpSession.create(ctx, {

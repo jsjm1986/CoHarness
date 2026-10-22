@@ -19,17 +19,11 @@ Every base-backed `dsh --profile` surface runs on `dsh-base`, so those surfaces 
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The bundle is a static `cordis.patch.yml` layer; every plugin row it inserts owns its own runtime relationships and invariant wiring.
 
 <a id="model-experience"></a>
 ## Model Experience

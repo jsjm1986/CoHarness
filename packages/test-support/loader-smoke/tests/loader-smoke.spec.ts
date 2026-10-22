@@ -29,7 +29,10 @@ describe('runLoaderSmoke', () => {
           extendEnv: false,
           env: marker === undefined ? {} : { LOADER_SMOKE_MARKER: marker },
         })
-        expect((JSON.parse(result.stdout) as { marker?: string }).marker).toBe(marker)
+        const output = JSON.parse(result.stdout) as { marker?: string; execArgv: string[] }
+        expect(output.marker).toBe(marker)
+        // lib mode launches plain `node <libBin>`, so the child reports no loader flags.
+        expect(output.execArgv).toEqual([])
       }
     } finally {
       if (previous === undefined) delete process.env.LOADER_SMOKE_MARKER
@@ -51,6 +54,7 @@ describe('runLoaderSmoke', () => {
     const output = JSON.parse(result.stdout) as {
       configPath: string
       args: string[]
+      execArgv: string[]
       cwd: string
       dshHome: string
       agentsHome: string
@@ -60,6 +64,7 @@ describe('runLoaderSmoke', () => {
     expect(output).toMatchObject({
       configPath,
       args: [configPath],
+      execArgv: ['--import', import.meta.resolve('tsx/esm')],
       marker: 'present',
       input: '',
     })

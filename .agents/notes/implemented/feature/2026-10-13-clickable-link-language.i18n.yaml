@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-clickable-link-language.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-clickable-link-language.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-clickable-link-language.md
+document:
+  en: 97abde8f3989d6ffb684271fb8baf3849a6375ac
+  zh: 7b4a74678833f956731754eda983aa6a6ae06d7b
 /agent-note-unify-clickable-link-language-and-ship-the-gallery-e2e:
   en: 9cb137800d5485e6
   zh: bb2a6f1db9f08457

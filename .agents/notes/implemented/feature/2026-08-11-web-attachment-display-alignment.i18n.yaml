@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-11-web-attachment-display-alignment.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-11-web-attachment-display-alignment.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-11-web-attachment-display-alignment.md
+document:
+  en: e34e6ae8432d9bd9ea610eff9d6047fa2732ebb3
+  zh: 522527a4463684667a06c14623fb5620d3bf84b4
 /agent-note-web-attachment-display-aligns-with-deepseek-chat-via-attachment-atoms:
   en: 2aca610b3a2aaf68
   zh: e5d7ab1eef7d3796
@@ -15,5 +18,5 @@
   en: 3072a127e41ba444
   zh: 587ab69b731b2ad7
 /agent-note-web-attachment-display-aligns-with-deepseek-chat-via-attachment-atoms/consequences:
-  en: 5a9621d3f549d31e
+  en: 89452c3c3f042e75
   zh: bc6e52601fb5cce5

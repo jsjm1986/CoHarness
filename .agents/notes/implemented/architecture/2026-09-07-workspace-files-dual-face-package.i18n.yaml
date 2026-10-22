@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-07-workspace-files-dual-face-package.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-07-workspace-files-dual-face-package.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-07-workspace-files-dual-face-package.md
+document:
+  en: adc900865cb8d5f19518828a9cb230a835d025f5
+  zh: ccfa60417284129a280efd7ddad2ea275c242f1e
 /agent-note-workspace-files-as-one-dual-face-api-package:
   en: fee20bed1c4f69d2
   zh: 8897bf7430250d46

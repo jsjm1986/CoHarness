@@ -19,17 +19,11 @@ Users who cannot reach an OS chooser still pick a workspace directory through `d
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Listing and creation are stateless stdlib operations answered per call; the backend keeps no session state.
 
 <a id="model-experience"></a>
 ## Model Experience

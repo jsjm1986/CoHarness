@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-18-localized-package-metadata.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-18-localized-package-metadata.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-18-localized-package-metadata.md
+document:
+  en: b703d6b27ed9c37838d9d04c97009d05831ca08c
+  zh: d3486908fe44c458d632002bdae8dacd546014e0
 /agent-note-plugin-owned-localized-display-metadata:
   en: b78ee8e580f068ea
   zh: 17dd59c9b6273897

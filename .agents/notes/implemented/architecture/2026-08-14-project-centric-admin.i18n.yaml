@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-14-project-centric-admin.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-14-project-centric-admin.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-project-centric-admin.md
+document:
+  en: 4d7518574e062d9b206065a58a395f3589d4369a
+  zh: 915f82df7be6c524cde74a7f0b5def2110712da7
 /agent-note-project-centric-admin-browse-roots-and-unauthorized-workspace-open:
   en: 2750854feca3e313
   zh: a455b993f32a05ea

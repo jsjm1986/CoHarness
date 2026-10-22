@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-19-direct-deepseek-vision-input.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-19-direct-deepseek-vision-input.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-direct-deepseek-vision-input.md
+document:
+  en: e40a4947ffebcd3abf1bff1fa9762cb478a68595
+  zh: d9182ff1e064dc17b5d8227768d7f7b4922d88e5
 /agent-note-direct-deepseek-vision-input:
   en: 1a5a1fcdc2aec2a4
   zh: 3211787facb11617

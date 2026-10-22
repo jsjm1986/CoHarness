@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-11-22-web-scaffold-managed-profile.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-11-22-web-scaffold-managed-profile.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-22-web-scaffold-managed-profile.md
+document:
+  en: afff2840f3a6960dd8f69276bccd3c5880807d01
+  zh: f1e74ad92a4817f773b9918c1f546add7645763c
 /agent-note-web-e2e-scaffold-boots-through-a-real-managed-profile:
   en: f5f46395cf6d858d
   zh: 02144fcf098f3ed0

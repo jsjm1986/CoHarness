@@ -1,6 +1,6 @@
 /**
- * SDK-facing JSON-RPC plugin over stdio. An external `cordis.yml` decides
- * whether to load it; see the single-executable Agent Note and package README.
+ * SDK-facing JSON-RPC plugin over stdio, mounted by the SDK app profile or
+ * an explicit plugin composition; see the package README.
  * Stdout is reserved for protocol frames, so the tree must not load a stdout logger.
  * This plugin answers `shutdown`, disposes the complete root runtime, and exits 0; the app bin
  * owns EOF and signal exits. Keep named plugin exports with no default export so

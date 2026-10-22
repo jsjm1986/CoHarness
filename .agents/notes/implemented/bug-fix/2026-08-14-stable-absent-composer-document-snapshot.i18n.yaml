@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-14-stable-absent-composer-document-snapshot.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-14-stable-absent-composer-document-snapshot.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-14-stable-absent-composer-document-snapshot.md
+document:
+  en: 8c2eb771c23043f18e86ee6baaa066352d52691a
+  zh: 88d8a064ecb81231dc0c573f24bb6f76e6720af9
 /agent-note-keep-the-absent-composer-document-snapshot-stable:
   en: bb30532a19bae3c2
   zh: 90712faa3b1803b4

@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/dsh-commands/types'
 import type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
 import type {} from '@deepseek-ai/dsh-credentials/types'
 import type {} from '@deepseek-ai/dsh-llm/types'
-import type {} from '@deepseek-ai/dsh-agent-presets/types'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import type {} from '@deepseek-ai/dsh-permission-presets/types'
 import type {} from '@deepseek-ai/dsh-settings/types'
 

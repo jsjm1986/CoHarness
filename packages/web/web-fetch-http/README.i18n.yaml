@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/web/web-fetch-http/README.md
+document:
+  en: 9d55d5c7058107b84aa77475eb56fad069160e85
+  zh: 2b325a280ca43b4f65e4a067af2d35d9f8fb44e1
 /:
   en: c0727a21226aef6a
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: 88157c32f36635d5
   zh: a149d576df0349bc
 /deepseek-ai-dsh-web-fetch-http/table-of-contents:
-  en: 229ba996009b9bd9
-  zh: a2c9aff0a9493e30
+  en: 5c991629aea94a97
+  zh: 8e3a6e65b52b63bd
 /deepseek-ai-dsh-web-fetch-http/responsibility-split:
   en: 6afcc75af147586a
   zh: 561d355bce906d00
@@ -21,11 +24,8 @@
   en: ac7a92647a9b41c8
   zh: 0308c0988c53cd05
 /deepseek-ai-dsh-web-fetch-http/config:
-  en: d5392f05227558fa
-  zh: 9eb439b55c6be1e4
-/deepseek-ai-dsh-web-fetch-http/invariants:
-  en: 4b870a88705e2e1b
-  zh: fb81b28caaf3306d
+  en: 48fe3f624af70a95
+  zh: 0effe6dd20b6d9ec
 /deepseek-ai-dsh-web-fetch-http/model-experience:
   en: 5c488f8d23ce3e90
   zh: 3cc8f8dc3ab60b65

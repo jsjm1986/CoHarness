@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-16-chat-full-width-preference.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-16-chat-full-width-preference.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-16-chat-full-width-preference.md
+document:
+  en: fcd5892c7977c226aa36c0e9cd85bc390446cfbe
+  zh: 35dec1ba07fa9d4d5d75e18c50308f18711a972c
 /agent-note-chat-content-width-carries-a-separate-persisted-fill-flag:
   en: 5dc14da01f1d4fba
   zh: 500b6934a867b8cb

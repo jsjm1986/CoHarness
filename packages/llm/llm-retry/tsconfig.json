@@ -18,9 +18,6 @@
       "path": "../llm"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../util/brand"
     },
     {

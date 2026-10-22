@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-27-continuable-subagent-human-inbox-control.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-27-continuable-subagent-human-inbox-control.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-27-continuable-subagent-human-inbox-control.md
+document:
+  en: 6bf8ceb2b8eab7138a1e617bb97e475d5cfa8172
+  zh: 081fb84f75afcc94339ae3bf627480081bc56d89
 /agent-note-human-inbox-controls-for-continuable-subagents:
   en: 42b7ed7255c6c527
   zh: c3faf95870ba0e0c

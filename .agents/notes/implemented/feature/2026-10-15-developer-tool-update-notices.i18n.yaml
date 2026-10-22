@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-developer-tool-update-notices.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-developer-tool-update-notices.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-developer-tool-update-notices.md
+document:
+  en: 20f2c433c365664a61d9301a4d7a83e909b91c47
+  zh: 666d13bc67086272967ab1734b169e7c1fa5a3a0
 /agent-note-developer-tool-updates-present-as-compact-context-notices:
   en: 36fe52fd4d60abbf
   zh: 5e3ea8419db86540

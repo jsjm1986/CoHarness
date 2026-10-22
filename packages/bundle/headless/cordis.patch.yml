@@ -22,7 +22,7 @@
     mode: !!js process.env.DSH_TOOLS_MODE
 
 # Headless uses the structured read/write/edit file tools. The legacy editor
-# remains available to the minimal Web preset and the base/TUI composition.
+# remains available to the base/TUI composition and presets that opt into it.
 - id: tool-str-replace-editor
   disabled: true
 

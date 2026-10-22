@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-model-menu-keyboard-navigation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-model-menu-keyboard-navigation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-model-menu-keyboard-navigation.md
+document:
+  en: d60e82ee4d8d5655db71bf0ae5204375ab262502
+  zh: a7cf9ce67c49698b375deb3e567b48f07d7438c9
 /agent-note-keep-keyboard-focus-inside-model-menu-navigation:
   en: eb5f0986829e0594
   zh: 35184a228237776c

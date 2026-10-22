@@ -19,18 +19,19 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
 import type { ViewTab } from './contract/views.ts'
 import type {
-  ApprovalInjected, ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
+  ApprovalInjected, ApprovalWait, ChatNodeInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
   ComposerChainProps, ConversationInjected,
   ConversationViewportInjected, ConversationSessionHeaderInjected, ConversationSessionInjected, MessageImageLoader,
   DetailsInjected, WorkspaceSelectionOptions,
 } from './contract/slots.ts'
-import type { InputNotice } from './input/contract.ts'
+import type { DraftDocumentId, InputNotice } from './input/contract.ts'
 import { createChatStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './input/blocks.ts'
 import { InputHub } from './input/hub.ts'
+import { readPersistedDraft } from './input/persisted-draft.ts'
 import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
 import { InputBar } from './skeleton/InputBar.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
@@ -43,7 +44,7 @@ import { StatsPills, type StatsPillsInjected } from './chat/StatsPills.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
-import { ConversationPane, ConversationRoot } from './skeleton/ConversationRoot.tsx'
+import { ConversationContent, ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationViewportController, createConversationViewportStore, WORKBENCH_PANE_LIMIT } from './viewport.ts'
 import type { ShortcutCommandId, ShortcutFixedCommand } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { installStopShortcut } from './stop-shortcut.ts'
@@ -52,12 +53,15 @@ import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
+import { bindDisclosure, bindDisclosureReset } from './chat/use-disclosure.ts'
 import { CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_TRANSCRIPT_VIEW_MODE, type ConversationSettings } from '../submission-settings.ts'
 import { ConversationDisplaySettings } from './display-settings.ts'
 import { TranscriptViewPolicy } from './transcript-view.ts'
 import { PerformanceUsagePolicy } from './performance-usage.ts'
 import { LinkOpeningPolicy } from './link-opening.ts'
+import { CollapseTimingPolicy } from './collapse-timing.ts'
 import { derivePresentationPolicy } from './presentation-policy.ts'
+import { CollapseTimingRow, type CollapseTimingRowInjected } from './settings/CollapseTimingRow.tsx'
 import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
 import { PerformanceUsageRow, type PerformanceUsageRowInjected } from './settings/PerformanceUsageRow.tsx'
 import { LinkOpeningRow, type LinkOpeningRowInjected } from './settings/LinkOpeningRow.tsx'
@@ -125,9 +129,9 @@ const ABSENT_POLICY = {
   subscribe: () => () => {},
 }
 
-const CHAT_NODE_INJECT: ChatNodeTurnDataInjected = {
+const CHAT_NODE_INJECT: ChatNodeInjected = {
   hooks: {
-    turnData: ({ useSession }, nodeKey) => function useTurnData(key) {
+    turnData: ({ useSession }, { nodeKey }) => function useTurnData(key) {
       return useSession((snapshot) => {
         const location = snapshot.chat.nodes.get(nodeKey)?.location
         return location?.kind === 'turn' || location?.kind === 'step'
@@ -135,6 +139,8 @@ const CHAT_NODE_INJECT: ChatNodeTurnDataInjected = {
           : undefined
       })
     },
+    disclosure: (_standard, { disclosureReset }) => bindDisclosure(disclosureReset),
+    disclosureReset: (_standard, { disclosureReset }) => bindDisclosureReset(disclosureReset),
   },
 }
 
@@ -204,13 +210,15 @@ export function apply(ctx: Context): void {
   const displaySettings = new ConversationDisplaySettings(conversationSettings)
   const transcriptView = new TranscriptViewPolicy(
     conversationSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
-  const presentation = derivePresentationPolicy(transcriptView.mode)
+  const collapseTiming = new CollapseTimingPolicy(conversationSettings)
+  const presentation = derivePresentationPolicy(transcriptView.mode, collapseTiming.timing)
   const performancePolicy = new PerformanceUsagePolicy(conversationSettings)
   const linkOpening = new LinkOpeningPolicy(conversationSettings)
   ctx.effect(() => () => {
     submissionPolicy.dispose()
     displaySettings.dispose()
     transcriptView.dispose()
+    collapseTiming.dispose()
     performancePolicy.dispose()
     linkOpening.dispose()
   }, 'ui-conversation: settings observers')
@@ -226,6 +234,17 @@ export function apply(ctx: Context): void {
       setTranscriptView: (mode) => { transcriptView.setMode(mode) },
     }),
   }, TranscriptViewRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'collapse-timing',
+    order: 13,
+    locale: NS,
+    inject: (): CollapseTimingRowInjected => ({
+      hooks: { collapseTiming: collapseTiming.timing, settings: collapseTiming.settings },
+      setCollapseTiming: (timing) => { collapseTiming.setTiming(timing) },
+    }),
+  }, CollapseTimingRow))
 
   // The destination choice only exists once ui-sidebar-right provides its
   // tab-type registry; assemblies without one keep the external default and no
@@ -429,6 +448,33 @@ export function apply(ctx: Context): void {
     },
   }), 'ui-conversation: input standard-kit provider')
 
+  // Draft initialization lands through the root event so New Session flows
+  // need no reach into this package; the hub answers for the exact Session.
+  // The per-session chat store is the durable draft owner: writes go through
+  // it as well so an unmounted Session keeps the initialized text across
+  // remount and reload, and a cleared draft cannot re-seed later.
+  ctx.effect(() => ctx.on('conversation/draft-initialize',
+    (payload: { sessionId: SessionId; prompt?: string; clearPreviousDraft?: boolean }) => {
+      const { sessionId, ...options } = payload
+      const chat = ctx.slots.bindStore(chatStore, sessionId)
+      const shell = inputHub.peek(sessionId)
+      // A live submission owns the draft and refuses the change.
+      if (shell !== undefined
+        && (shell.snapshot.phase === 'adjudicating' || shell.snapshot.phase === 'submitting')) return
+      // The existing draft is the live shell text when present, else the
+      // persisted owner — an empty shell not yet seeded from the store does
+      // not make a preserved draft adoptable.
+      const stored = readPersistedDraft(chat.store.getSnapshot().draft)
+      const current = shell === undefined || shell.snapshot.draft === ''
+        ? typeof stored === 'string' ? stored : stored.text
+        : shell.snapshot.draft
+      const next = options.clearPreviousDraft === true ? options.prompt ?? ''
+        : options.prompt !== undefined && current === '' ? options.prompt : undefined
+      if (next === undefined) return
+      chat.actions.setDraft(next)
+      inputHub.requestDraftInitialization(sessionId, { prompt: next, clearPreviousDraft: true })
+    }), 'ui-conversation: draft-initialize listener')
+
   // Resident current-session-optional shell. It owns the stable Hero/composer
   // frame while strict session slots fill only their session-bound regions.
   // The reserved `conversation` key keeps the layout's main selection on this
@@ -439,7 +485,6 @@ export function apply(ctx: Context): void {
     locale: NS,
     store: viewportStore,
     children: {
-      'conversation.pane': { kind: 'single', scope: 'session-maybe' },
       'conversation.workbench.toolbar': { kind: 'single', scope: 'root' },
       'conversation.workbench.empty': { kind: 'single', scope: 'root' },
       'conversation.workbench.pane.header': { kind: 'list', scope: 'session' },
@@ -477,8 +522,9 @@ export function apply(ctx: Context): void {
     }
   }, 'ui-conversation: conversation viewport capability')
 
-  slots.register({
-    name: 'conversation.pane',
+  slots.registerFactory({
+    name: 'conversation.content',
+    scope: 'session-maybe',
     locale: NS,
     children: {
       'conversation.session': { kind: 'single', scope: 'session' },
@@ -493,6 +539,9 @@ export function apply(ctx: Context): void {
       'conversation.hero.brand.mark': { kind: 'single', scope: 'root' },
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
       'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
+    },
+    slots: {
+      views: { scope: 'session' },
     },
     inject: (sessionId: SessionId | undefined): ConversationInjected => ({
       hooks: {
@@ -510,14 +559,41 @@ export function apply(ctx: Context): void {
         await commitSessionNavigation(sessions, nextId, navigation, () => {
           if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
           sessions.open(nextId)
-          if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
-            inputHub.discardDraft(sessionId)
+          if (sessionId !== undefined && nextId !== sessionId) {
+            if (options.discardDraft === true) {
+              inputHub.discardDraft(sessionId)
+            } else {
+              // Carry the draft with its structured references and settled
+              // attachments into the opened session; an in-flight document
+              // upload cannot move without aborting it, so those stay behind.
+              const from = inputHub.shell(sessionId)
+              const to = inputHub.shell(nextId)
+              const draft = from.draftSnapshot()
+              const { imageIds, documentIds } = from.snapshot
+              if (imageIds.length === 0 || to.addImages(imageIds)) {
+                if (draft.text !== '' || draft.references.length > 0) {
+                  to.setDraft(draft)
+                  from.setDraft('')
+                }
+                for (const id of imageIds) from.removeImage(id)
+                const conversation = concreteConversation(ctx)
+                const moved: DraftDocumentId[] = []
+                for (const doc of conversation.documentStore(sessionId).getSnapshot()) {
+                  if (!documentIds.includes(doc.id) || doc.status !== 'ready' || doc.docId === undefined) continue
+                  const ref = { docId: doc.docId, name: doc.name, bytes: doc.bytes, mediaType: doc.mediaType }
+                  if (!conversation.attachDocument(nextId, ref)) continue
+                  from.removeDocument(doc.id)
+                  moved.push(doc.id)
+                }
+                conversation.releaseDraftDocuments(sessionId, moved)
+              }
+            }
           }
         })
       },
       setDisplayWidth: (value) => { displaySettings.setWidth(value) },
     }),
-  }, ConversationPane)
+  }, ConversationContent)
 
   // The strict session body fills the resident scrollport without owning it;
   // the Hero/composer path therefore stays fixed while the first blank
@@ -533,7 +609,7 @@ export function apply(ctx: Context): void {
       return {
         views,
         releaseSessionImages: (id) => { conversation.releaseSessionImages(id) },
-        bindDraftMirror: write => inputHub.shell(sessionId).bindMirror(write),
+        bindDraftMirror: (write, initialDraft) => inputHub.shell(sessionId).bindMirror(write, initialDraft),
       }
     },
   }, ConversationSession)
@@ -711,6 +787,7 @@ export function apply(ctx: Context): void {
     children: {
       'conversation.chat.node': { kind: 'keyed', scope: 'session', inject: CHAT_NODE_INJECT },
       'conversation.message.images': { kind: 'single', scope: 'session' },
+      'conversation.chat.skill-preview': { kind: 'single', scope: 'session' },
     },
     store: chatStore,
     inject: (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ChatViewInjected => {

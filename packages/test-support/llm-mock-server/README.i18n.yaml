@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/test-support/llm-mock-server/README.md
+document:
+  en: 22e376b478d887a0fef5d4d077e6f18826879958
+  zh: 2b80a12341a404771c3d1e3549f40839dded1596
 /:
   en: 7a361871c93c1d91
   zh: dd8097d1293fa845
@@ -39,8 +42,8 @@
   en: 393a6ca8f1eb021e
   zh: d71bc369d550b527
 /deepseek-ai-dsh-llm-mock-server/understand-the-implementation/source-map:
-  en: ac683a0f364b53e4
-  zh: 3b4c782b56e024db
+  en: 893c33eff2af34d1
+  zh: 44eed7b3810023a9
 /deepseek-ai-dsh-llm-mock-server/understand-the-implementation/wire-flow:
   en: 34abeb79b2e0cdcd
   zh: d175185e4f1cc190

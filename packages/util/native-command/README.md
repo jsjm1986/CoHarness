@@ -68,7 +68,6 @@ The command runner is a thin wrapper over Node's `execFile`. The path opener sel
 | [`src/index.ts`](src/index.ts) | Public command-runner and path-opener exports |
 | [`src/runner.ts`](src/runner.ts) | Shell-free `execFile` adapter |
 | [`src/path-opener.ts`](src/path-opener.ts) | Desktop detection, open intents, browser preference, and WSL translation |
-| — | No runtime invariant companion is published; each run is one stateless child-process round trip with no owned event stream or mutable runtime data; behavior is enforced by unit tests. |
 
 ### What execFile gives the runner
 
@@ -104,7 +103,6 @@ Nothing here enters a request prefix; this package neither assembles nor sends a
 <a id="known-limitations-and-deferred-work"></a>
 
 Linux association discovery and explicit launching require GIO. Missing native commands reject the query, and missing artwork returns null; callers can retain file-manager reveal as their fallback.
-
 
 These limits define when this runner is not the right tool. They are current package constraints, not a task backlog.
 

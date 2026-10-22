@@ -113,7 +113,7 @@ function scriptedApi(overrides: {
       readBytes: r => ok(r, { path: r.payload.path, offset: r.payload.offset ?? 0, bytes: '', eof: true, version: 'v' }),
       ...overrides.workspaceFiles,
     },
-    skills: { list: r => ok(r, { skills: [] }), ...overrides.skills },
+    skills: { list: r => ok(r, { skills: [] }), get: r => ok(r, {}), ...overrides.skills },
     agentPresets: {
       openDocument: r => ok(r, { opened: true as const }),
       ...overrides.agentPresets,

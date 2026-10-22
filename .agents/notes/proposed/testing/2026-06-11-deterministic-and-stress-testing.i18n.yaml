@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-11-deterministic-and-stress-testing.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-11-deterministic-and-stress-testing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/testing/2026-06-11-deterministic-and-stress-testing.md
+document:
+  en: d9977be835af05f9ee303b63ec6015bc9e153170
+  zh: 263e69f85a1cd8ee47da07210e513cab272d1a44
 /agent-note-deterministic-tests-the-replay-invariant-fixture-and-race-stress:
   en: 58d89a2102972f26
   zh: 10390903f7621673

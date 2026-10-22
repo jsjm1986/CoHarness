@@ -10,7 +10,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import SessionProjectionCache from '@deepseek-ai/dsh-session-projection-cache'
@@ -716,10 +716,13 @@ describe('SubagentRuntime.listChildren', () => {
     // The compacted twin: a compaction checkpoint replaces the whole surface,
     // while the append-only log retains the model-hidden descriptor event.
     const compactedEvents = childEvents(descriptorPayload('twin child'))
+    compactedEvents.push(
+      { type: 'compaction/start', seq: SessionSeq(4), time: 5, data: { compactionId: 'compaction-1', turn: null } } as SessionEvent,
+    )
     compactedEvents.push({
       type: 'user/message',
-      seq: SessionSeq(4),
-      time: 5,
+      seq: SessionSeq(5),
+      time: 6,
       data: createUserMessage({
         content: [{ type: 'text', text: 'summary of everything' }],
         source: { kind: 'compact-checkpoint', compactionId: 'compaction-1' } as never,

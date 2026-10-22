@@ -43,12 +43,6 @@ kind: "package-reference"
 
 <a id="model-experience"></a>
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。`dsh_plugin_packages` 字段按请求从实时 Loader 清单计算；不保留清单副本。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 

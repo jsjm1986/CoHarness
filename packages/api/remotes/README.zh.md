@@ -25,7 +25,6 @@ Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile�
 
 - [转发的 Host 事件](#forwarded-host-events)
 - [构建边界](#build-boundary)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -37,7 +36,7 @@ Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile�
 
 `src/remote-events.ts` 持有 `API_REMOTE_FORWARDED_EVENTS`——本应用原样转发给消费端的 Host cordis 事件名单（无投影、无脱敏、wire 名称不改写），它同时就是 `ctx.remote.$on` 的合法键集；只含类型的 `src/types.ts` 派生其选择面。六组动态 Cordis 事件同时包含官方 `cordis/*` 名称和 fork 的 `@deepseek-ai/cordis/*` 名称。Host 仍转发其实际收到的精确名称；Gateway Client 将每对名称视为同一投递组。其余事件仍只需在数组中增加一个条目：类型投影、消费端键面与 Host 转发循环全部由它派生。
 
-监听器签名不在此处重写。名单内每条事件的 cordis `Events` 声明都住在其 owner 包 client-safe 的 `./types` 出口（`dsh-agent-presets`、`dsh-commands`、`dsh-cordis-host-runner`、`dsh-credentials`、`dsh-llm`、`dsh-settings`），本包两个 face 都把那些声明纳入编译面，因此「原样转发」是构造性成立的，不需要另立证明。Host face 还额外把名单断言给 `TypertForwardableEvent`：未声明的事件名、绑定 AgentScope 的事件、以及形状不是单向的事件都会在此被拒绝。
+监听器签名不在此处重写。名单内每条事件的 cordis `Events` 声明都住在其 owner 包 client-safe 的 `./types` 出口（`dsh-agent-preset-registry`、`dsh-commands`、`dsh-cordis-host-runner`、`dsh-credentials`、`dsh-llm`、`dsh-settings`），本包两个 face 都把那些声明纳入编译面，因此「原样转发」是构造性成立的，不需要另立证明。Host face 还额外把名单断言给 `TypertForwardableEvent`：未声明的事件名、绑定 AgentScope 的事件、以及形状不是单向的事件都会在此被拒绝。
 
 <a id="build-boundary"></a>
 ## 构建边界
@@ -48,16 +47,9 @@ Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile�
 
 这条例外不止是一行 `files`。根 `tsconfig.base.json` 把 `@deepseek-ai/dsh-api-remotes/types` 映射到 `src/types.ts`——**源平面**，与其余所有 workspace 子路径一致，也与生成的 `/remote` 产物相反（后者没有 `paths` 条目，靠 `exports` 命中构建产物）。于是两个 face 都把同一份名单与类型投影收进各自的 program，并向 `lib/types` 发射逐字相同的 `remote-events` 与 `types` 输出；`.tsbuildinfo` 仍各自独立。没有任何门禁强制两个 face 的源文件互不重叠——`scripts/project-reference-faces.ts` 只校验「引用一个 split project 必须指到对应 face」——因此本段记录这次双列为何是有意的。
 
-
 包内 `clientBundle(..., { hostPhase: true })` 让 Host tsdown 打包 Host 入口，让后续 Client tsdown 只打包 browser 入口。普通 Client 插件仍使用单一 Client project，并在 Client tsdown 阶段一起生成 Node loader 入口和 browser bundle；不得因一个包同时存在 `src/index.ts` 与 `src/client/index.ts` 就复制本包的拆分。
 
 Agent 查找会在异步读取和恢复期间保留会话标识。Host 通过 `onResumed` 持有每个恢复后的工厂句柄；并发查找共用一次创建与所有权交接。永久清理拒绝仍在进行的查找，清理保留期间也拒绝新的查找。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每个贡献都通过 `ctx.remote.$mount()` 挂载为随组装 fiber 撤回的 effect，身份解析是针对实时 Agent 注册表的逐次调用策略。
-
 
 <a id="model-experience"></a>
 ## 模型体验

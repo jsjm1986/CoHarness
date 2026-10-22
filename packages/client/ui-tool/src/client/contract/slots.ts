@@ -49,13 +49,20 @@ export type UseDisclosure = () => {
   readonly toggle: () => void
 }
 
+/** Hook reading the owning Chat seat's disclosure fold generation. */
+export type UseDisclosureReset = () => number
+
 /** Call-local sources supplied by the Tool tree to the slot's Hook binding. */
 export interface ToolCallHookContext {
   readonly callId: string
   /** This call's Step source, present only while preparing. */
   readonly assistant: HostObservable<Readonly<AssistantChatData> | undefined> | undefined
-  /** Per-call expanded-state cell shared by every row form this call takes. */
-  readonly disclosure: SnapshotStore<boolean>
+  /**
+   * Per-call expansion record shared by every row form this call takes: the
+   * seat fold generation the call was expanded under, or `null` while
+   * collapsed. A generation bump collapses the record without unmounting it.
+   */
+  readonly disclosure: SnapshotStore<number | null>
 }
 
 /** Framework-bound subscriptions available to atomic Tool views on demand. */
@@ -83,9 +90,9 @@ export interface ToolCallCommonProps {
   /** Open an argument path at its optional requested line through the Host. */
   openFile: (path: string, options?: { line?: number }) => void
   /**
-   * Whether this call is a run_code sub-dispatch: nested calls persist no
-   * presentationMeta and no wire views, so the owner carries the fact (the
-   * node has no parent link).
+   * Whether this call is a run_code sub-dispatch: historical nested records
+   * persist no presentationMeta and nested calls carry no wire views, so the
+   * owner carries the fact (the node has no parent link).
    */
   nested?: boolean | undefined
   /**

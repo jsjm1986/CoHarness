@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-27-session-projection-and-command-log.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-27-session-projection-and-command-log.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md
+document:
+  en: d468b398765996c18819265283413a84fb1d1fc1
+  zh: 8528d0f675d8e96e23e0a8473f13b2a7b4708e61
 /agent-note-session-projections-and-command-lifecycle-logging:
   en: c4b22a24c549feb8
   zh: 4e4921326e0cd13a
@@ -15,8 +18,8 @@
   en: e6c93d89a25f0d03
   zh: 65e1f5842bc74008
 /agent-note-session-projections-and-command-lifecycle-logging/proposal/host-projection-registry-dsh-session-projection-new-package:
-  en: d6470d68280688f8
-  zh: ee9825a6abb1641e
+  en: b831a25f62e48d4e
+  zh: 2cae6f6a763997b0
 /agent-note-session-projections-and-command-lifecycle-logging/proposal/shipped-consumer-the-subagent-identity-unit:
   en: 8230bf93dae63208
   zh: 1fcf882db3ad181e
@@ -33,8 +36,8 @@
   en: 7b536bd8a51cc5dc
   zh: 1ead63f6358b3799
 /agent-note-session-projections-and-command-lifecycle-logging/proposal/command-lifecycle-in-the-log:
-  en: b3b39932abaa58de
-  zh: 5bdc1961af6152f4
+  en: 6e4a9bfa341b7c46
+  zh: ecd722ded67867b2
 /agent-note-session-projections-and-command-lifecycle-logging/delivery-plan:
   en: 64ad8d08a8ab44e0
   zh: fb0a0f7369d0bd23
@@ -45,5 +48,5 @@
   en: 9dfcca30fffda225
   zh: 0beddb81d32e0ca7
 /agent-note-session-projections-and-command-lifecycle-logging/risks:
-  en: f0eb219b4119ca7d
-  zh: de870016c1623895
+  en: c3740b6e12eb7295
+  zh: b0b427b83c73dbba

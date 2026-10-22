@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-18-rail-search-outside-click-self-dismissal.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-18-rail-search-outside-click-self-dismissal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-rail-search-outside-click-self-dismissal.md
+document:
+  en: 9893b3a2456b9a592e1feb107d21404e043dee78
+  zh: 91e343b8843dc02ca9c1be2b145e79beb84e17b7
 /agent-note-rail-search-keeps-its-expansion-when-the-opening-click-reaches-document:
   en: 4c04de3618942d2b
   zh: 9f9152c80308b0be

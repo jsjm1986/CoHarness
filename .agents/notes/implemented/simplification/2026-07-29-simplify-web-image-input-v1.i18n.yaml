@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-29-simplify-web-image-input-v1.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-29-simplify-web-image-input-v1.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-29-simplify-web-image-input-v1.md
+document:
+  en: e7847dc2ae18f48146cb2b686dcda64beebf2350
+  zh: 47f6bb5face5b896b5184f7198eef7d99ee25afe
 /agent-note-simplify-web-image-input-version-one:
   en: 1d74876fbcd25723
   zh: f51fb473221af13f

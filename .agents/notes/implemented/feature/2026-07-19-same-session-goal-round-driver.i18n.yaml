@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-same-session-goal-round-driver.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-same-session-goal-round-driver.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-same-session-goal-round-driver.md
+document:
+  en: 9a2bbf40e86dd7ed5a35ca90e736bb321455488f
+  zh: a094b1289cd38e5f2c4e58270b653ffe984b9cbb
 /agent-note-same-session-goal-round-driver:
   en: bb5ac988d2dbd7f7
   zh: f809ac6b1422c10a

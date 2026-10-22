@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-20-generic-long-running-tool-runtime.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-20-generic-long-running-tool-runtime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-20-generic-long-running-tool-runtime.md
+document:
+  en: 88494e0a07ed73c11e7eee8594df9405c9680ecb
+  zh: 347098ceb3a315382b674c349f7502edca10485b
 /agent-note-the-background-job-runtime-ctx-jobs-and-generic-task-control-tools:
   en: 56e269b2a2839796
   zh: 8fc971036985ac0d
@@ -9,11 +12,11 @@
   en: 70e26df62568c337
   zh: a9e6f5f8a5482d0a
 /agent-note-the-background-job-runtime-ctx-jobs-and-generic-task-control-tools/decision:
-  en: 2cb20805842fc34c
-  zh: 8602bd434deb849d
+  en: 277869395ad6f792
+  zh: 93f13a97d52f10a5
 /agent-note-the-background-job-runtime-ctx-jobs-and-generic-task-control-tools/runtime-contract:
-  en: 38ed88a87d92476b
-  zh: 2c3987aa12179ac3
+  en: 8d467dc62e6f2fe5
+  zh: 480bcee405108c4c
 /agent-note-the-background-job-runtime-ctx-jobs-and-generic-task-control-tools/authorization-and-owner-lifecycle:
   en: 3819a73ca70ecdfd
   zh: c1a4f461a4e45978
@@ -21,8 +24,8 @@
   en: be26156a0146a590
   zh: 2319f927d0e08a67
 /agent-note-the-background-job-runtime-ctx-jobs-and-generic-task-control-tools/model-facing-control-api:
-  en: 8f6b0b4454fbfc1b
-  zh: 07f6fd21b13ae838
+  en: b0e5b3af2b70e26f
+  zh: 208b9a00f2865b3e
 /agent-note-the-background-job-runtime-ctx-jobs-and-generic-task-control-tools/producer-opt-in:
   en: a39343bf6f655051
   zh: d9894d39e7f4d6e1
@@ -36,8 +39,8 @@
   en: 9781c302dc72fd8e
   zh: a78e1dd8da4d8ca8
 /agent-note-the-background-job-runtime-ctx-jobs-and-generic-task-control-tools/alternatives-considered/an-immediate-abstract-task-runtime-backend:
-  en: e3f83b4dc8ba99a8
-  zh: b67ee192c8c6e33a
+  en: 260db414dbacaad2
+  zh: 6a9152a6a1a16917
 /agent-note-the-background-job-runtime-ctx-jobs-and-generic-task-control-tools/alternatives-considered/consumer-owned-authorization-or-cleanup-events:
   en: d99de803718d9ca6
   zh: e03a97314851ed0f

@@ -36,7 +36,7 @@ export default defineConfig({
   plugins: [tsconfigPaths({ projects: ['./tsconfig.base.json'] }), standardDecoratorPlugin()],
   test: {
     execArgv: vitestExecArgv,
-    setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts'],
+    setupFiles: ['./scripts/test-proxy-environment.ts'],
     include: [
       'scripts/**/*.snapshot.ts',
       'scripts/session-snapshot-corpus.corpus.ts',

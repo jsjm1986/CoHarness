@@ -16,7 +16,7 @@ Status: implemented
 
 自身子进程能够保留有效归因的长时间协调门禁可以选择 `streamOutput`。其 stdout 与 stderr 会立即到达父进程，不会被缓冲，也不会在结束时重复打印。分区覆盖率与并行 Web 快照使用该模式，使运行中途的失败无需等待兄弟工作结束就能显示。
 
-Node 24 消费方任务采用单个包含 10 道门禁的模式，而非由 shell 管理的进程池。其默认 worker 数等于门禁数，拉取请求 CI 则把活动门禁限制为 8 道，并由依赖关系控制就绪状态。构建与源码兼容性立即启动；构建完成后，`publint` 与已构建包不变式验证并行运行。lint、两套快照、文档类型检查、NodeNext 类型检查和 built-bin 冒烟测试等待不变式验证器清除临时包视图。
+Node 24 消费方任务采用单个包含 10 道门禁的模式，而非由 shell 管理的进程池。其默认 worker 数等于门禁数，拉取请求 CI 则把活动门禁限制为 8 道，并由依赖关系控制就绪状态。构建与源码兼容性立即启动；构建完成后，`publint`、lint、两套快照、文档类型检查、NodeNext 类型检查和 built-bin 冒烟测试同时就绪。
 
 [scripts/publint-all.ts](../../../../scripts/publint-all.ts) 从 `packages/<group>/<pkg>` 发现包，并以根据 `availableParallelism()` 确定大小的 worker 池运行 `publint`。`DSH_PUBLINT_CONCURRENCY` 可以针对资源配置不同的本地机器和 CI runner 限制或提高 worker 数量。结果按包缓冲，并按确定性的包顺序打印，因此并行执行不会打乱各包的日志块。
 

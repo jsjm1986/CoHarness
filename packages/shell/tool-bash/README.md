@@ -26,7 +26,6 @@ The plugin also contributes the `tool:bash` prompt section (order 105): check th
 - [The tool builds its request from named args only](#the-tool-builds-its-request-from-named-args-only)
 - [Permissions and escalation](#permissions-and-escalation)
 - [Per-session mode switching](#per-session-mode-switching)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -40,13 +39,13 @@ The plugin also contributes the `tool:bash` prompt section (order 105): check th
 
 | Arg | Type | Notes |
 |---|---|---|
+| `description` | string (required) | One-line, active-voice summary of the command (5-10 words), for UI/log display only — no effect on execution. The schema lists it before `command` and asks the model to emit it first; this guides streaming presentation without enforcing JSON member order. |
 | `command` | string (required) | Run via `bash -c`. No state persists between calls — use `workdir`, not `cd`. |
-| `description` | string (required) | One-line, active-voice summary of the command (5-10 words), for UI/log display only — no effect on execution. |
 | `timeoutMs` | number | Timeout override in milliseconds. The executor applies its configured default and cap. |
 | `workdir` | string | Working directory for this call. Defaults to the Session's current working directory (`ctx.workingDirectory`) so each session runs in its own workspace; a relative `workdir` is resolved against that same directory. |
 | `run_in_background` | boolean | Return a job id immediately; no timeout applies. |
 | `sandbox_permissions` | string enum | ADVERTISED ONLY when the mounted executor sandboxes (`ctx.shell.sandboxMode` reports a confining default): the wider mode a denied command needs, from the closed target vocabulary `workspace-write`/`danger-full-access` (never cut down to the executor's default — the effective mode is per-session; a wider mode is checked and approved at execution, a repeated mode runs without approval, and a narrower request fails without prompting anyone). |
-| `justification` | string | Required together with `sandbox_permissions` (each without the other is a validation error): one sentence for the user explaining why this exact command needs the wider access. |
+| `justification` | string | Required together with `sandbox_permissions` (each without the other is a validation error), except that a `sandbox_permissions` repeating the call's effective mode may omit it: one sentence for the user explaining why this exact command needs the wider access. An explicitly-passed blank or whitespace-only `justification` is always a validation error — including on a repeated-mode request; ordinary calls may omit it. |
 
 `command`, `workdir`, and `timeoutMs` are resolved against the executor's config defaults via `ctx.shell.resolve()` before execution, so the Service Definition (`ShellExecSpec`) receives explicit `workdir`/`timeoutMs` values. The workdir default is applied in the tool layer BEFORE `resolve()` from the Session's current directory (`ctx.workingDirectory.ensure(exec.agent)`) — the per-session cwd must come from `exec.agent`, since N sessions share one executor; only when no agent is bound does the executor fall back to its own config / `process.cwd()`. The effective directory is independent of the sandbox permission root, which stays anchored on the Session's original project directory.
 
@@ -75,17 +74,12 @@ The tool owns its `presentCall`/`presentResult` render intent. A foreground call
 
 Commands run with the executor's full authority unless a sandboxing executor ([`dsh-bash-sandbox`](../bash-sandbox/)) confines them — the deny-only sandbox reports denials as result facts, rendered here as the denial marker; per-call allow/deny/ask policy is the `tools/pre-execute` waterfall (see docs/architecture.md).
 
-Escalating bash calls resolve `ctx.approval` before execution. `allowed-once` applies the requested mode only to that call; rejection, cancellation, unavailability, or missing approval context executes nothing and returns a distinct error. On a real denial, the model may retry the same command once in the same turn with the narrowest sufficient mode and justification; the approval prompt itself is the consent step. Escalation is never speculative, and a disabled or rejected approval is final. Repeating the call's effective mode needs no approval, while a narrower target fails before execution. The [sandbox Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.md) owns the rationale.
+Escalating bash calls resolve `ctx.approval` before execution. `allowed-once` applies the requested mode only to that call; rejection, cancellation, unavailability, or missing approval context executes nothing and returns a distinct error. On a real denial, the model may retry the same command once in the same turn with the narrowest sufficient mode and justification; the approval prompt itself is the consent step. Escalation is never speculative, and a disabled or rejected approval is final. Repeating the call's effective mode needs no approval and may omit `justification` — an explicit blank is still rejected — while a narrower target fails before execution. The [sandbox Agent Note](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) owns the rationale.
 
 <a id="per-session-mode-switching"></a>
 ## Per-session mode switching
 
-For sandboxing executors, each call resolves mode as one-shot escalation, then session override, then executor default. Non-sandboxing and agent-less calls carry no session override. The policy owner contributes the current capability-neutral standing mode; denial results still own the operation-specific effective mode and retry guidance. See the [`dsh-shell` fold](../shell/README.md) and [sandbox switching contract](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.md).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The tool adapts model calls onto the `ctx.shell` executor and `ctx.jobs` runtime; process and job state are owned by those services.
+For sandboxing executors, each call resolves mode as one-shot escalation, then session override, then executor default. Non-sandboxing and agent-less calls carry no session override. The policy owner contributes the current capability-neutral standing mode; denial results still own the operation-specific effective mode and retry guidance. See the [`dsh-shell` fold](../shell/README.md) and [sandbox switching contract](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md).
 
 <a id="model-experience"></a>
 ## Model Experience

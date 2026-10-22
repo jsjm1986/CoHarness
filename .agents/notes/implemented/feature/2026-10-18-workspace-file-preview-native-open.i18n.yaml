@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-18-workspace-file-preview-native-open.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-workspace-file-preview-native-open.md
+document:
+  en: bcd22702a847be16fac5967e6c71fe02777bc886
+  zh: 72587b4996346895138ee9c921501b40a0349035
+/agent-note-workspace-file-preview-native-open-fallback:
+  en: b68fb6e2fe19fe7b
+  zh: bbf88731f4611834
+/agent-note-workspace-file-preview-native-open-fallback/problem:
+  en: 6ed8e91980c95585
+  zh: da52308d70f75d5e
+/agent-note-workspace-file-preview-native-open-fallback/decision:
+  en: 9c594161d1635afb
+  zh: e8b74526b1453a9c
+/agent-note-workspace-file-preview-native-open-fallback/alternatives-considered:
+  en: 98541e9048444b8d
+  zh: 524abb8923e4d810
+/agent-note-workspace-file-preview-native-open-fallback/testing:
+  en: b21c0fdd13babc5e
+  zh: 8b10846a8c15831b
+/agent-note-workspace-file-preview-native-open-fallback/consequences:
+  en: c24cc72285cd4e49
+  zh: 3f447d0116caf0bf

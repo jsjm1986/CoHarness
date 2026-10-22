@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-session-end-seed-log-boundary.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-session-end-seed-log-boundary.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-session-end-seed-log-boundary.md
+document:
+  en: c6ed3911a797480804d064273922d85412664c79
+  zh: 1e9517f9a5aed819fdaff6194ab952c322c85b82
 /agent-note-the-end-seed-log-boundary:
   en: 0f53ca9c0166d7ad
   zh: e16b2376c2afb1bc

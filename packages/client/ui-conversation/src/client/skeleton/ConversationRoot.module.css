@@ -103,6 +103,17 @@
    column's chrome; keep only a small rhythm around the strip. */
 .workbenchPane .header { padding: var(--dsw-space-2) var(--dsw-space-3); }
 
+/* Embedded occurrences (sidebar chat): the host's column is narrower than a
+   main pane, so the chat content and composer budgets tighten and there are
+   no width handles to leave edge room for. */
+.embeddedBody {
+  overflow: hidden;
+  --dsh-chat-content-width: min(calc(100% - 32px), 920px);
+  --dsh-composer-card-max-width: min(calc(100% - 16px), 952px);
+  --dsh-composer-side-clearance: 8px;
+  --dsh-composer-dock-inset: 8px;
+}
+
 /* The header's one centered group: status dot, breadcrumb strip, and the
    titleMeta suffix. `leading` (workbench toolbar) anchors the left edge, the
    view tabs and action groups the right, so identity centers between the
@@ -416,20 +427,22 @@
   overscroll-behavior: contain;
 }
 
-/* Two 40px hit strips flank the content column, each inner edge 24px
+/* Two 10px hit strips flank the content column, each inner edge 24px
    outside the content column — the same offset the glow line paints at — and
-   the strip extends 40px outward from there; the outer edge is clamped to
+   the strip extends 10px outward from there; the outer edge is clamped to
    keep a 24px safe zone against the column edges (sidebar side and scrollbar
    side stay drag-free). When the margin cannot fit inset + strip + safe zone
    the computed width goes negative and the strip resolves to zero — no
-   mispositioned hit area on narrow columns. */
+   mispositioned hit area on narrow columns. Concrete overflow content
+   establishes z-index 1 above this resting layer, while the sticky composer
+   remains above both. */
 .widthHandle {
   position: absolute;
   top: 0;
   bottom: 0;
-  z-index: 9;
+  z-index: 0;
   width: min(
-    40px,
+    10px,
     calc((100% - var(--dsh-chat-content-width)) / 2 - 24px - 24px)
   );
   cursor: col-resize;
@@ -444,39 +457,45 @@
   left: calc(50% + var(--dsh-chat-content-width) / 2 + 24px);
 }
 
-/* The glow: a short 3px bar riding the pointer's Y, inset 16px outward from
-   the strip's inner edge (40px from the content column), not a full-height
-   rule — a 24px solid core centered on the pointer (published by pointermove
-   as --dsh-width-handle-pointer-y), fading to transparent over 40px each
-   side (~104px total). A solid CORE, not a single solid stop: a lone peak
-   washes out over the fade. The scrollbar hover tint, not a border token:
-   this is a draggable bar and the border alphas (4-16%) disappear against
-   the base fill. Before the first move the fallback centers the glow at 50%
-   height. */
+/* The glow: a short 2px bar riding the pointer's Y, centered in the strip
+   (29px from the content column), not a full-height rule — a 16px solid core
+   centered on the pointer (published by pointermove as
+   --dsh-width-handle-pointer-y), fading to transparent over 28px each side
+   (72px total). A solid CORE, not a single solid stop: a lone peak washes
+   out over the fade. The resting scrollbar tint keeps this secondary
+   affordance quiet in both themes. Before the first move the fallback
+   centers the glow at 50% height. */
 .widthHandle::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 3px;
-  border-radius: 3px;
+  width: 2px;
+  border-radius: 2px;
   background: linear-gradient(
     to bottom,
-    transparent calc(var(--dsh-width-handle-pointer-y, 50%) - 52px),
-    var(--dsw-alias-scrollbar-hover-l1) calc(var(--dsh-width-handle-pointer-y, 50%) - 12px),
-    var(--dsw-alias-scrollbar-hover-l1) calc(var(--dsh-width-handle-pointer-y, 50%) + 12px),
-    transparent calc(var(--dsh-width-handle-pointer-y, 50%) + 52px)
+    transparent calc(var(--dsh-width-handle-pointer-y, 50%) - 36px),
+    var(--dsw-alias-scrollbar-bg-l1) calc(var(--dsh-width-handle-pointer-y, 50%) - 8px),
+    var(--dsw-alias-scrollbar-bg-l1) calc(var(--dsh-width-handle-pointer-y, 50%) + 8px),
+    transparent calc(var(--dsh-width-handle-pointer-y, 50%) + 36px)
   );
   opacity: 0;
   pointer-events: none;
 }
 
 .widthHandle[data-side='left']::after {
-  right: 16px;
+  right: 4px;
 }
 
 .widthHandle[data-side='right']::after {
-  left: 16px;
+  left: 4px;
+}
+
+/* A drag starts above the composer band. Pointer capture keeps it active
+   when crossing the footer; lift only the active handle so its indicator
+   remains visible without making the resting footer gutter draggable. */
+.widthHandle[data-dragging] {
+  z-index: 8;
 }
 
 .widthHandle:hover::after,

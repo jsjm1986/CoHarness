@@ -1,7 +1,7 @@
 /** Platform-neutral assembly of generated Host Remote contributions. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import agentPresetsRemote from '@deepseek-ai/dsh-agent-presets/remote'
+import agentPresetsRemote from '@deepseek-ai/dsh-agent-preset-registry/remote'
 import userQuestionsRemote from '@deepseek-ai/dsh-user-questions/remote'
 import commandsRemote from '@deepseek-ai/dsh-commands/remote'
 import goalsRemote from '@deepseek-ai/dsh-goal/remote'
@@ -12,6 +12,7 @@ import memoryRemote from '@deepseek-ai/dsh-memory/remote'
 import fileReferencesRemote from '@deepseek-ai/dsh-file-reference/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import pluginManagerRemote from '@deepseek-ai/dsh-plugin-manager/remote'
+import pluginMarketRemote from '@deepseek-ai/dsh-plugin-market/remote'
 import pluginRegistryProbeRemote from '@deepseek-ai/dsh-client-ui-plugin-manager/remote'
 import messageFeedbackRemote from '@deepseek-ai/dsh-message-feedback/remote'
 import permissionPresetsRemote from '@deepseek-ai/dsh-permission-presets/remote'
@@ -28,9 +29,14 @@ export type {
   ReadOnlyReason, Registry, RestartReason,
 } from '@deepseek-ai/dsh-plugin-manager/types'
 export type {} from '@deepseek-ai/dsh-plugin-manager/remote'
+export type {} from '@deepseek-ai/dsh-plugin-market/remote'
+export type {
+  MarketCompatibility, MarketIndexSummary, MarketInstallation, MarketInstallationStatus, MarketListingEntry, MarketListingVersion,
+  MarketQuery, MarketSearchResult, MarketSort,
+} from '@deepseek-ai/dsh-plugin-market/types'
 export type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/remote'
 export type { PluginInventorySnapshot } from '@deepseek-ai/dsh-host-plugin-inventory/types'
-export type {} from '@deepseek-ai/dsh-agent-presets/remote'
+export type {} from '@deepseek-ai/dsh-agent-preset-registry/remote'
 export type {} from '@deepseek-ai/dsh-user-questions/remote'
 export type {} from '@deepseek-ai/dsh-commands/remote'
 export type {} from '@deepseek-ai/dsh-file-reference/remote'
@@ -55,10 +61,11 @@ export type {} from '@deepseek-ai/dsh-commands/types'
 export type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
 export type {} from '@deepseek-ai/dsh-credentials/types'
 export type {} from '@deepseek-ai/dsh-llm/types'
-export type {} from '@deepseek-ai/dsh-agent-presets/types'
+export type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 export type {} from '@deepseek-ai/dsh-command-feedback/types'
 export type {} from '@deepseek-ai/dsh-collaboration/types'
 export type {} from '@deepseek-ai/dsh-permission-presets/types'
+export type {} from '@deepseek-ai/dsh-goal/client'
 export type {} from '@deepseek-ai/dsh-schedule/client'
 export type {} from '@deepseek-ai/dsh-memory/client'
 export type {} from '@deepseek-ai/dsh-settings/types'
@@ -77,7 +84,7 @@ export type {
   MuxFrame, PromptContentPart, QuestionResponsePayload, QueueAction, RpcError, RpcId, RpcReceipt,
   RpcRequest, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionDraftId, SessionId, SessionModels, SessionSearchItem,
-  SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, StreamChunk,
+  SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, SkillPreview, StreamChunk,
   SubagentAddress, SubagentCatalog, SubagentPromptContentPart,
   JobView, JobsApi, JobChannel, JobKillValue, JobOutputChunk, JobOutputCoords, JobOutputValue,
   ToolCallView, ToolEventView, ToolResultView,
@@ -160,7 +167,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
-      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, pluginRegistryProbeRemote, memoryRemote, messageFeedbackRemote,
+      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote,
+      memoryRemote, messageFeedbackRemote,
       permissionPresetsRemote, sessionFeedbackRemote,
       sessionReferencesRemote, subagentsRemote, scheduleRemote, userQuestionsRemote,
     ]) {

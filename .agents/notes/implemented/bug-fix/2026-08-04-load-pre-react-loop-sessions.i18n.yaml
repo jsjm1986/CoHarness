@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-load-pre-react-loop-sessions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-load-pre-react-loop-sessions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-04-load-pre-react-loop-sessions.md
+document:
+  en: 277a481f366f1182fd3948caf858607efd550e5e
+  zh: 67f6b361811a0de024b8e6130f31a33f1deaf9ef
 /agent-note-load-sessions-from-the-pre-react-loop-format:
   en: 3780a493097edcd3
   zh: b2bc67b8d836aa57

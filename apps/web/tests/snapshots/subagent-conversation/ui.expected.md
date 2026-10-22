@@ -13,14 +13,13 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - button "System prompt":
   - img
   - img
@@ -29,10 +28,11 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Thinking The user is asking for a one-sentence description of event sourcing. This is a straightforward knowledge question that doesn't require any skill loading or tool calls.":
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
   - img
-  - img
-  - text: Thinking The user is asking for a one-sentence description of event sourcing. This is a straightforward knowledge question that doesn't require any skill loading or tool calls.
+- button "Analysis completed"
 - paragraph: Event sourcing is a pattern where all changes to an application's state are stored as an immutable, append-only sequence of events, rather than persisting only the current state, enabling full auditability, temporal queries, and event-driven architectures.
 - button "Copy":
   - img
@@ -47,13 +47,15 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - text: Now give the same explanation to a human reader.
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
 - button "Thinking The user is asking for a one-sentence description of event sourcing. This is a straightforward knowledge question that doesn't require any skill loading or tool calls.":
   - img
   - img
@@ -73,9 +75,9 @@
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
 - textbox "Message COHARNESS"
-- button "Add images or documents":
+- button "Add images or documents" [disabled]:
   - img
-- button "Choose from Documents":
+- button "Choose from Documents" [disabled]:
   - img
 - button "Commands":
   - img

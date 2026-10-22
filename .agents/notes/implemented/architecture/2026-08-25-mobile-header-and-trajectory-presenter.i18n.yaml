@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-25-mobile-header-and-trajectory-presenter.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-25-mobile-header-and-trajectory-presenter.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-25-mobile-header-and-trajectory-presenter.md
+document:
+  en: 9835295c5dfc578aa9abe51cf8c652cbd4af3017
+  zh: b2d46df811a0e47eb01f29369b6a518745e2853b
 /agent-note-share-mobile-chrome-contracts-while-projecting-trajectory-events-for-phones:
   en: e2b1db8a53697f7c
   zh: 30c917c4a42efad6

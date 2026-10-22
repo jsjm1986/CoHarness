@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-14-preset-stage-outlives-tools-toggle.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-14-preset-stage-outlives-tools-toggle.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-14-preset-stage-outlives-tools-toggle.md
+document:
+  en: 62378044b1295b6778f0a31298baded14be3b0dd
+  zh: 3c4b09b6fd6fea557096265a25741d949f7489d0
 /agent-note-the-tools-preference-clears-preset-stages-on-its-off-transition-only:
   en: dfab6134bdb3e23e
   zh: 3db6738140022a6a

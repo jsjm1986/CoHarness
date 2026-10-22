@@ -26,15 +26,31 @@ kind: "package-reference"
 
 生成的第一方 Session 格式目录通过 `dsh.sessionFormatMigration` 元数据引入这条边。持久化提供者经已有的 V6 编解码器读取 V6，并在读取时于内存中重建 V7；显式以写方式打开则发布一个独立的 V7 代际。既有 V6 代际的字节、inode 与修改时间保持不变；其存在绝不允许从损坏的 V7 代际回退。
 
-V6 的 `kind: 'plugin'` 消息来源会按生产者的插件身份重写为带命名空间的 `plugin:<name>` 形式；已携带限定 kind 的来源保持原值。嵌在 assistant 消息内的工具结果块移动到独立的 `tool` 角色消息；任何 V6 写入器都不可能产出的不透明生产者事件，会以 `plugin:` 命名空间准入，而不是准入失败。
+仅头部迁移只校验并推进元数据，不读取正文也不收集子 Session：
+
+```text
+const targetHeader = sessionFormatV6ToV7.migrateHeader(sourceHeader)
+```
+
+历史正文恢复要求显式的子 Session 证据。缺少该绑定时 `sessionFormatV6ToV7.createStage()` 拒绝执行；空数组显式声明没有子 Session。持久化必须收集完整的可用直属子 Session 集合，而独立转录回放可以有意提供空集合。在 catalog 的生命周期内保持证据不变。
+
+```text
+const catalog = createSessionFormatCatalogWithChildren(childFacts)
+const restore = catalog.createRestore(physicalHeader, {
+  recovery: 'strict', validation: 'current',
+})
+for (const row of physicalRows) restore.decodeRow(row)
+const artifact = restore.finish()
+```
+
+V6 的 `kind: 'plugin'` 消息来源会按生产者的插件身份重写为带命名空间的 `plugin:<name>` 形式；已携带限定 kind 的来源保持原值。结果以 user 角色消息中唯一 `tool-result` 块携带且与其 tool 来源匹配的 `tool/result` 事件，会提升为独立的 `tool` 角色消息；结果内容再嵌套 `tool-result` 块的输入按不支持拒绝。未知事件类型仅在标记 `ignorable` 时以 `plugin:` 命名空间保留载荷与坐标准入；其余未知类型一律准入失败。
 
 <a id="implementation"></a>
 ## 实现
 
 迁移把每个 V6 事件依次经过来源重写、工具结果提升与内容迁移，然后按 V7 交付规则校验结果：头部字段、消息来源、developer 数据、system 消息字段、生命周期关系、fork 结果与已退役语法拒绝。仅头部迁移只改 `version`；整工件校验在转换之后应用 V7 事件规则。
 
-本包不发布运行时不变量伴随包：这个纯库没有可比较的注册项或独立可变状态。其编解码器与迁移行为由直接转换测试和 JSONL 提供者的不可变代际测试覆盖。
-
+其编解码器与迁移行为由直接转换测试和 JSONL 提供者的不可变代际测试覆盖。
 
 <a id="model-experience"></a>
 ## 模型体验

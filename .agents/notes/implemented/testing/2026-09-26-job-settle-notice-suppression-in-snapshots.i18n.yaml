@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-26-job-settle-notice-suppression-in-snapshots.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-26-job-settle-notice-suppression-in-snapshots.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-26-job-settle-notice-suppression-in-snapshots.md
+document:
+  en: bf431576412dc5653fd07b5699861da88dd92f25
+  zh: 1b033d3d1d8e2561813ef9d50f1931c36667e105
 /agent-note-suppress-racing-job-completion-notices-in-replay-fixtures:
   en: 4478b35efa110013
   zh: 2b6a1ef3cbe25b96

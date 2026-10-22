@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-coverage-exempt-heavy-suites.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-coverage-exempt-heavy-suites.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-31-coverage-exempt-heavy-suites.md
+document:
+  en: 1f468a69321b451593a9279cfebc1b457fb08a47
+  zh: 7e519f44c8321b6b99c04c6af56c4cfa5b641663
 /agent-note-coverage-exempt-heavy-suites:
   en: c101ff50f57c3c67
   zh: 2d7d6cfb8661584c

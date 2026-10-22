@@ -16,7 +16,7 @@ Retry policy had the same indirect ownership. It was discovered through the stre
 
 `LlmRuntime` is the normalization boundary for one adapter attempt. It catches only final-adapter selection, synchronous dispatch, iterator construction, and `next()` failures, converts the thrown value to immutable `LlmFailure`, and emits one terminal `finish`. Caller cancellation or an `ABORTED` failure selects the aborted reason; every other adapter failure selects error. An adapter may also emit either terminal reason directly.
 
-The adapter-owned catch ends before each yielded chunk. Errors from `llm/stream` middleware, nested calls, adapter cleanup, chunk consumers, logging, signal checks, and assembly remain thrown as defects or lifecycle failures; they never enter model-request recovery. A transport failure after partial deltas may leave blocks open, so the stream invariant permits open blocks only for terminal error or aborted finishes. No assistant message or tool call is assembled from that incomplete output.
+The adapter-owned catch ends before each yielded chunk. Errors from `llm/stream` middleware, nested calls, adapter cleanup, chunk consumers, logging, signal checks, and assembly remain thrown as defects or lifecycle failures; they never enter model-request recovery. A transport failure after partial deltas may leave blocks open before a terminal error or aborted finish. No assistant message or tool call is assembled from that incomplete output.
 
 `PreparedLlmCall` exposes the immutable retry policy captured with its config and registration. One-shot reuse and config mismatch remain synchronous `INVALID_PREPARED_CALL` misuse errors. A route served entirely by `llm/stream` middleware has no prepared registration and therefore no serving policy.
 

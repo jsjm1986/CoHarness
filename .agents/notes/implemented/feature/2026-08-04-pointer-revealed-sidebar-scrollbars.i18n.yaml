@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-pointer-revealed-sidebar-scrollbars.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-pointer-revealed-sidebar-scrollbars.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-04-pointer-revealed-sidebar-scrollbars.md
+document:
+  en: 5c6fff378932d3e63bc92ed27e9b0341effaf6b8
+  zh: dd9528fec4bd24a53b17ecf888a9af03d457ce0e
 /agent-note-the-sidebar-s-scrollbars-follow-the-pointer:
   en: cc958e2f2407ce4e
   zh: 3935aad2da370bf5

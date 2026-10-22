@@ -54,7 +54,7 @@ interface ResolvedGrant {
   userId: number
 }
 
-/** Minimal AgentPresets surface ssh-execution consumes. */
+/** Minimal AgentPresetRegistry surface ssh-execution consumes. */
 function roster() {
   const hooks = new Map<string, (scopeCtx: Context) => Promise<void>>()
   const invalidated: string[] = []

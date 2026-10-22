@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-05-web-preview-product-badge.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-05-web-preview-product-badge.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-web-preview-product-badge.md
+document:
+  en: c20dedf8caa497d17a577cf46261c6a24c09a1ce
+  zh: 415a7cb3eb02030ef5481f4eba9110b56547ce64
 /agent-note-web-preview-product-badge:
   en: bdabfdf00d16f32a
   zh: e6448e8ab99aa933

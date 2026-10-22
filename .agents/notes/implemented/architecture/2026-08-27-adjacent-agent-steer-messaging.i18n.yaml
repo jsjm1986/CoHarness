@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-27-adjacent-agent-steer-messaging.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-27-adjacent-agent-steer-messaging.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-adjacent-agent-steer-messaging.md
+document:
+  en: 6cc77c2d43554efdfe4233174b9b8d1670015a8c
+  zh: cb03400db4c92eb0d8e8eeadaa15def6fdfd8e5b
 /agent-note-adjacent-agents-share-one-steer-send-message-operation:
   en: 758d31ae04ce0d4f
   zh: 112475efbd52b9f6
@@ -12,8 +15,8 @@
   en: 1188c699ce6e6ca2
   zh: 4d5b974cd1216f06
 /agent-note-adjacent-agents-share-one-steer-send-message-operation/decision/one-model-tool-and-one-return-instruction:
-  en: 8a4be155a4984ca8
-  zh: 00c2a61da2443530
+  en: 4b0a25389324fa91
+  zh: c2cdd9f7e40ef43b
 /agent-note-adjacent-agents-share-one-steer-send-message-operation/decision/complete-removal-and-reintroduction-condition:
   en: 5a9ec6478cf7430c
   zh: f4c2f067cc72040e

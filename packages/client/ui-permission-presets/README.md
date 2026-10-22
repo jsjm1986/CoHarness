@@ -21,7 +21,6 @@ Choose permission presets for the current Web session or future sessions. Genera
 
 - [Account qualifications](#account-qualifications)
 - [Desktop confirmation](#desktop-confirmation)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -41,11 +40,6 @@ Auto is a per-session opt-in and is absent from the new-session default schema. 
 ## Desktop confirmation
 
 The managed Session header utility opens a personal desktop confirmation dialog through its own runtime connection. It displays the live root Session, node, desktop and account before saving. Confirmation covers that root's live descendants, not another root or historical forks; every participant confirms separately. The server owns current qualification and rejects stale targets. Disconnects and Session changes discard pending responses, and a failed save requires a fresh status read. Confirming or withdrawing does not start a model turn. Full access, Auto and tool approval cannot provide this confirmation.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The row binds one Host-owned Settings descriptor and preset data stays in the host permission domain; nothing package-owned persists to compare.
 
 <a id="model-experience"></a>
 ## Model Experience

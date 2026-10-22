@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-11-microkernel-event-taxonomy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-11-microkernel-event-taxonomy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-11-microkernel-event-taxonomy.md
+document:
+  en: 6cacbc30f29c863de0f8ddfa4df7251a64bc80ca
+  zh: 1c7919392b835c491b9dc606d46f638a708d2948
 /agent-note-microkernel-extension-via-cordis-event-taxonomy-one-concrete-loop:
   en: e5775d7ec6f1cdc3
   zh: a364697f860a545a

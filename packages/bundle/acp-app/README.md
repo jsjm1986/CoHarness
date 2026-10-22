@@ -62,7 +62,6 @@ Stable for a fixed profile, provider, model, and tool roster. Profile changes ta
 - **User plugins can violate stdout purity** — profile and per-launch patches are trusted application composition. The shipped bundle writes no non-protocol stdout, but it cannot contain an arbitrary inserted plugin.
 - **Configuration changes require restart** — the `acp-app` bundle disables HMR in YAML so one stdio connection never observes a replacement bridge or Agent dependency.
 
-
 <a id="dev-note"></a>
 ### Dev Note
 
@@ -72,5 +71,3 @@ Stable for a fixed profile, provider, model, and tool roster. Profile changes ta
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. The bundle adds a process transport and startup latch; source/built stdio tests own frame purity, help exclusion, and shutdown.

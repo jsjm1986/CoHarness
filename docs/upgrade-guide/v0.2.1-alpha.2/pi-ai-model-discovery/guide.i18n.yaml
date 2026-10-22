@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.2/pi-ai-model-discovery/guide.md
+document:
+  en: 562d77c423f5c73650fe4ea148b27c77401dc695
+  zh: 30f16a0b2b104a47bdf1ca82e16426abcd70be95
+/:
+  en: 40afcce4dbdcb337
+  zh: 33c5647441bd1dcb
+/pi-ai-model-visibility-without-a-credential:
+  en: 1bc74c0ce4085c3c
+  zh: 0a2be91b04c069c8
+/pi-ai-model-visibility-without-a-credential/change:
+  en: 29bd4b4b6a4c815c
+  zh: 9d8e493b1ad2c38a
+/pi-ai-model-visibility-without-a-credential/migration:
+  en: 26d72c82e5c60031
+  zh: 4b582d3e4d022dd8

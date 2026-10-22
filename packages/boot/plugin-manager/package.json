@@ -105,6 +105,6 @@
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/dsh-user-approval": "workspace:*",
     "chokidar": "^5.0.0",
-    "pnpm": "11.28.4"
+    "pnpm": "11.28.5"
   }
 }

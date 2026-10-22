@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-upstream-alignment-coverage-gaps.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-upstream-alignment-coverage-gaps.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-15-upstream-alignment-coverage-gaps.md
+document:
+  en: 3b36e405ec7cd930ad4de651599a4846d9478e97
+  zh: 3b69eb7c54c84b9af3822e63ef232df6deebb857
 /agent-note-upstream-alignment-audits-must-cover-feature-graphs-scope-boundaries-and-diverged-seam-contracts:
   en: be9aa23687e34690
   zh: 7d654cef5db907b3

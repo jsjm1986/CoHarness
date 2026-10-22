@@ -216,8 +216,8 @@ export function ConversationSessionHeader({
  * @returns the active view area, or null while the Session remains blank.
  */
 export function ConversationSession({
-  sessionId, useSession, useInput, inputActions, useStore, actions,
-  renderSlot, views, bindDraftMirror, releaseSessionImages, compact = false,
+  sessionId, useSession, inputActions, useStore, actions,
+  renderSlot, views, bindDraftMirror, releaseSessionImages, compact = false, view,
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
@@ -225,14 +225,12 @@ export function ConversationSession({
   const active = resolveActiveView(tabs, selectedId)
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
-  const inputState = useInput(s => s)
   const storedDraft = useStore(s => s.draft)
   // `?? null`: persisted snapshots from before the inspect field rehydrate without it.
   const inspect = useStore(s => s.inspect ?? null)
 
   useEffect(() => {
-    if (inputState.draft === '' && storedDraft !== '') inputActions.setDraft(storedDraft)
-    const unmirror = bindDraftMirror(actions.setDraft)
+    const unmirror = bindDraftMirror(actions.setDraft, storedDraft)
     return () => { unmirror() }
     // Mount-only (deps pinned to inputActions): later store writes come from
     // the machine mirror, not this seed effect.
@@ -243,13 +241,14 @@ export function ConversationSession({
   }, [releaseSessionImages, sessionId])
 
   if (blank && composerPhase === 'blank') return null
+  const viewId = view ?? active?.id
   return (
     <div className={css.viewArea}>
-      {active !== undefined && renderSlot('conversation.view', {
+      {viewId !== undefined && renderSlot('conversation.view', {
         compact,
         inspect,
         onInspectDone: () => { actions.setInspect(null) },
-      }, { only: active.id })}
+      }, { only: viewId })}
     </div>
   )
 }

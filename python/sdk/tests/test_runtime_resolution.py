@@ -50,7 +50,7 @@ def _resource_sidecars(executable: Path, native_targets: tuple[str, ...] = ("dar
     node.chmod(0o755)
     packages = python.parent if tag.startswith("win-") else python.parent.parent
     (packages / ("Lib/site-packages" if tag.startswith("win-") else "lib/python3.12/site-packages")).mkdir(parents=True)
-    for file in ["scripts/check_office.py", *(f"office-{kind}/SKILL.md" for kind in ("docx", "pptx", "xlsx"))]:
+    for file in (f"office-{kind}/SKILL.md" for kind in ("docx", "pptx", "xlsx")):
         path = resources / "office-skills" / file
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch()

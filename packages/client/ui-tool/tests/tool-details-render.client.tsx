@@ -34,6 +34,8 @@ export function toolChatSnapshot(
       get: key => byKey.get(key),
       values: () => nodes,
     },
+    entries: nodes.map(node => ({ kind: 'node', key: node.key })),
+    groups: { get: () => undefined },
     locations: {
       getTurn: () => empty,
       getStep: () => empty,

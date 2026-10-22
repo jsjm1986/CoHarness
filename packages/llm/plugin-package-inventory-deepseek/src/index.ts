@@ -15,7 +15,7 @@ import type { Entry, EntryTree } from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-agent-presets'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type { DeepSeekPluginPackageIdentity, DeepSeekPluginPackageInventoryExtension } from './types.ts'
 import type {} from './types.ts'
 
@@ -156,8 +156,8 @@ async function collectActivePluginPackages(
     const agent = ctx.agents.get(SessionId(sessionId))
     if (agent !== undefined) {
       // The optional peer is loaded only when its service is present. Its existing
-      // mount query keeps Loader internals off the public AgentPresets service.
-      const { standingMountFor } = await import('@deepseek-ai/dsh-agent-presets')
+      // mount query keeps Loader internals off the public AgentPresetRegistry service.
+      const { standingMountFor } = await import('@deepseek-ai/dsh-agent-preset-registry')
       const presetTree = standingMountFor(agent.ctx)?.tree
       // PresetTree deliberately resolves its root bare rows from the harness;
       // nested ordinary includes retain their own tree base.

@@ -31,6 +31,8 @@ const BASE_FIXTURE = fileURLToPath(new URL('./snapshots/live-interactions/sessio
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/subagent-interrupt', import.meta.url))
 const OFFLINE_COMPOSER_EXPECTED = join(SNAPSHOT_DIR, 'offline-composer.expected.md')
+const IMAGE_QUEUE_EXPECTED = join(SNAPSHOT_DIR, 'image-queue.expected.md')
+const PNG = fileURLToPath(new URL('../../../snapshots/session/read-image/workspace/red.png', import.meta.url))
 const MODE = webSnapshotMode()
 const LABEL = 'event-sourcing researcher'
 const INITIAL = 'Explain event sourcing in one sentence.'
@@ -40,6 +42,7 @@ const FOLLOWUP = 'Now give the same explanation to a human reader.'
 const WAKING = 'And add one concrete example.'
 const REARMED_ANSWER = 're-armed setup answer'
 const PARKED_ANSWER = 'parked follow-up answer'
+const IMAGE_ANSWER = 'image follow-up answer'
 const WAKING_ANSWER = 'waking answer'
 
 /** Poll a synchronous condition (hook-safe; expect.poll is test-body only). */
@@ -104,6 +107,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       { kind: 'hang', readyFile: rearmedReadyFile },
       textCompletion(REARMED_ANSWER),
       textCompletion(PARKED_ANSWER),
+      textCompletion(IMAGE_ANSWER),
       textCompletion(WAKING_ANSWER),
     ]))
     await writeFile(
@@ -282,6 +286,32 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     expect(((await (await promptResponse).json()) as { result: { ok: boolean } }).result)
       .toMatchObject({ ok: true })
 
+    // A separate image-only follow-up proves attachment admission without
+    // changing the existing text queue's coverage.
+    const imageBytes = [...await readFile(PNG)]
+    await input.evaluate((surface, data) => {
+      const transfer = new DataTransfer()
+      transfer.items.add(new File([new Uint8Array(data)], 'child-followup.png', { type: 'image/png' }))
+      surface.dispatchEvent(new ClipboardEvent('paste', {
+        clipboardData: transfer, bubbles: true, cancelable: true,
+      }))
+    }, imageBytes)
+    await page.getByRole('img', { name: 'child-followup.png', exact: true }).waitFor()
+    const imageResponse = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/subagents/prompt')
+    await page.getByRole('button', { name: 'Queue message' }).click()
+    expect(((await (await imageResponse).json()) as { result: { ok: boolean } }).result).toMatchObject({ ok: true })
+    // The multi-row dock renders collapsed; open it to reach the queued thumb.
+    await page.locator('[data-queue-dock]').getByRole('button', { name: /queued messages/ }).click()
+    const thumbnail = page.locator('[data-queue-dock]').getByRole('img', { name: 'Queued message image' })
+    await thumbnail.waitFor()
+    await expect.poll(() => thumbnail.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
+    await compareOrRefreshGolden(
+      IMAGE_QUEUE_EXPECTED,
+      await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd),
+      MODE,
+    )
+
     const aborted = waitForAbortedTurn(scaffold, childId)
     const stop = page.getByRole('button', { name: 'Stop generating' })
     expect(await stop.count()).toBe(1)
@@ -300,7 +330,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     await expect.poll(() => scaffold.ctx.agents.get(childId)?.status, { timeout: 15_000 }).toBe('idle')
     const child = scaffold.ctx.agents.get(childId)
     expect(child).toBeDefined()
-    expect(child!.inbox.nextTurn).toHaveLength(2)
+    expect(child!.inbox.nextTurn).toHaveLength(3)
     expect(child!.session.snapshotEvents().filter(event => event.type === 'turn/start')).toHaveLength(2)
     await page.getByRole('button', { name: 'Send message' }).waitFor({ timeout: 15_000 })
 
@@ -309,6 +339,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     await input.press('Enter')
     await expect.poll(() => page.getByText(REARMED_ANSWER, { exact: true }).count(), { timeout: 30_000 }).toBe(1)
     await expect.poll(() => page.getByText(PARKED_ANSWER, { exact: true }).count(), { timeout: 30_000 }).toBe(1)
+    await expect.poll(() => page.getByText(IMAGE_ANSWER, { exact: true }).count(), { timeout: 30_000 }).toBe(1)
     await expect.poll(() => page.getByText(WAKING_ANSWER, { exact: true }).count(), { timeout: 30_000 }).toBe(1)
     await expect.poll(() => scaffold.ctx.agents.get(childId), { timeout: 60_000 }).toBeUndefined()
 
@@ -320,14 +351,23 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     expect(userTexts[0]).toBe(INITIAL)
     expect(userTexts[1]).toMatch(/^Your parent agent id is .+send_message\(\{ agent_id: /)
     expect(userTexts.slice(2)).toEqual([REARM, REARM_WAKE, FOLLOWUP, WAKING])
+    const imageMessage = loaded.events.find(event => event.type === 'user/message'
+      && event.data.content.some(block => block.type === 'image'))
+    expect(imageMessage?.type === 'user/message' && imageMessage.data.content.map(block => block.type)).toEqual(['image'])
+    const image = imageMessage?.type === 'user/message'
+      ? imageMessage.data.content.find(block => block.type === 'image')
+      : undefined
+    expect(image?.type === 'image' && image.attachment.name).toBe('child-followup.png')
+    expect(JSON.stringify(loaded.events)).not.toContain('base64')
+    await page.locator('[class*="userRow"] img').first().waitFor()
     const turnEndKinds = loaded.events
       .filter(event => event.type === 'turn/end')
       .map(event => event.data.reason.kind)
-    expect(turnEndKinds).toEqual(['aborted', 'aborted', 'completed', 'completed', 'completed'])
+    expect(turnEndKinds).toEqual(['aborted', 'aborted', 'completed', 'completed', 'completed', 'completed'])
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
 
   it('keeps its snapshot inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['offline-composer.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['offline-composer.expected.md', 'image-queue.expected.md'])
   })
 })

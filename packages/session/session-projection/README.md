@@ -18,7 +18,6 @@ Use `dsh-session-projection` when clients need current per-session state—such 
 - [Service: `SessionProjectionRegistry` (ctx key: `sessionProjections`)](#service-sessionprojectionregistry-ctx-key-sessionprojections)
 - [Contract](#contract)
 - [Role](#role)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -58,11 +57,6 @@ Use `dsh-session-projection` when clients need current per-session state—such 
 
 This package owns the Service Definition and drive roles of the capability seam: domain host plugins (e.g. `dsh-tool-todo`) contribute units, carriers (`dsh-host-apiproxy`) consume the snapshot and change feed, and neither knows the other.
 
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Registered units are pure folds driven over committed events; drive state is itself derived from the same log.
-
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -78,7 +72,6 @@ None; projections never assemble or send provider requests.
 - **The unit table is process-wide, so key presence is not a per-session capability signal** — a key registered by ANY agent preset appears in every session's snapshot, including sessions whose own composition mounts nothing that produces it. A client must read the VALUE (`plan.active`, an empty todo list) rather than treat an absent key as absence of the feature; a unit whose empty value is indistinguishable from a real one belongs on the host plane instead, which is why `dsh-token-meter` sits there.
 - **Eager drive touches every unit per event** — cheap by construction (whole-value rule, same-reference gate), but a hot path would justify per-unit event-type prefilters, addable without contract change.
 - **Registry cells live in memory only** — a restart rebuilds by folding the log on first touch; compositions that mount `dsh-session-projection-cache` seed that fold from persisted rows instead.
-- **Synchronous unit discipline is only partially mechanical** — `wire.viewSchema.parse` rejects a Promise-returning view, but an `apply` that blocks or reads torn non-session state is a review concern; the invariant companion documents why no runtime check exists.
 
 <a id="dev-note"></a>
 ### Dev Note

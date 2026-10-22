@@ -12,7 +12,7 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { join } from 'node:path'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import {
@@ -51,6 +51,11 @@ describe('web e2e: settings modal and General preferences', () => {
 
   it('opens the settings dialog, switches sections, and closes by every path', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-shell'))
+    onTestFinished(async () => {
+      const dialog = page.getByRole('dialog', { name: '设置' })
+      if (await dialog.isVisible()) await page.keyboard.press('Escape')
+      await dialog.waitFor({ state: 'hidden' })
+    })
     const trigger = page.getByRole('button', { name: '设置', exact: true })
     expect(await trigger.getAttribute('aria-haspopup')).toBe('dialog')
     expect(await trigger.getAttribute('aria-expanded')).toBe('false')
@@ -198,14 +203,14 @@ describe('web e2e: settings modal and General preferences', () => {
         return {
           attr: document.body.hasAttribute('data-ds-dark-theme'),
           background: getComputedStyle(boot).backgroundColor,
-          colorScheme: document.documentElement.style.colorScheme,
+          colorScheme: getComputedStyle(document.documentElement).colorScheme,
         }
       })
       expect(state).toEqual({
         attr: true,
         // The alias-token sheet lives in the held plugin bundle, so the boot
-        // page resolves its own fallback chain to the dark-scheme Canvas.
-        background: 'rgb(18, 18, 18)',
+        // page resolves its own fallback chain to the dark-scheme canvas.
+        background: 'rgb(21, 21, 23)',
         colorScheme: 'dark',
       })
     } finally {
@@ -329,6 +334,101 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '浅色' }).click()
     await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(false)
     expectThemeColorSynchronized(await readState())
+    await page.keyboard.press('Escape')
+    expect(tripwire.pageErrors).toEqual([])
+  }, 90_000)
+
+  it('sets text and code fonts and the code size independently, applies them, and persists across reload', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-font-family'))
+    onTestFinished(async () => {
+      await page.keyboard.press('Escape')
+      await page.getByRole('dialog', { name: '设置', exact: true }).waitFor({ state: 'hidden' })
+    })
+    // Computed font-family lists: body text, code, and the two built-in stacks.
+    const readFonts = async (): Promise<Record<'text' | 'code' | 'textStack' | 'codeStack', string>> => await page.evaluate(() => {
+      const probe = (family: string): string => {
+        const element = document.createElement('code')
+        element.style.fontFamily = family
+        document.body.appendChild(element)
+        const value = getComputedStyle(element).fontFamily
+        element.remove()
+        return value
+      }
+      return {
+        text: getComputedStyle(document.body).fontFamily,
+        code: probe('var(--ds-font-family-code)'),
+        textStack: probe('var(--dsh-font-family-text-default)'),
+        codeStack: probe('var(--dsh-font-family-code-default)'),
+      }
+    })
+    const settingsFile = join(scaffold.harnessHome, 'settings.yaml')
+    const commit = async (name: string, value: string): Promise<void> => {
+      const field = page.getByRole('dialog', { name: '设置' }).getByRole('textbox', { name, exact: true })
+      await field.fill(value)
+      await field.press('Enter')
+    }
+    const defaults = await readFonts()
+    const { textStack, codeStack } = defaults
+    expect(defaults.text.startsWith(textStack)).toBe(true)
+    // The font rows expand from the font-size row and start collapsed on every settings open.
+    const expandFonts = async (): Promise<void> => {
+      const dialog = page.getByRole('dialog', { name: '设置' })
+      await dialog.waitFor({ timeout: 10_000 })
+      const toggle = dialog.getByRole('button', { name: '更多字体设置', exact: true })
+      expect(await toggle.getAttribute('aria-expanded')).toBe('false')
+      expect(await dialog.getByRole('textbox', { name: '代码字体', exact: true }).count()).toBe(0)
+      await toggle.click()
+      await dialog.getByRole('textbox', { name: '代码字体', exact: true }).waitFor()
+    }
+    const openSettings = async (): Promise<void> => {
+      await page.getByRole('button', { name: '设置', exact: true }).click()
+    }
+    await openSettings()
+    await expandFonts()
+    await commit('代码字体', 'Courier New, monospace')
+    await expect.poll(async () => readFile(settingsFile, 'utf8'), { timeout: 5_000 }).toContain('codeFontFamily')
+    await expect.poll(readFonts, { timeout: 5_000 }).toEqual({ ...defaults, code: `"Courier New", monospace, ${codeStack}` })
+    // The code size moves the code-block token independently of the content size.
+    const readCodeSize = async (): Promise<string> => await page.evaluate(() => {
+      const element = document.createElement('code')
+      element.style.font = 'var(--dsw-font-markdown-code-block)'
+      document.body.appendChild(element)
+      const size = getComputedStyle(element).fontSize
+      element.remove()
+      return size
+    })
+    // The local markdown ladder anchors the code block 2px above the code
+    // size setting (13px at the default 11); each step tracks the setting.
+    expect(await readCodeSize()).toBe('13px')
+    const codeSize = page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '增大代码字号', exact: true })
+    await codeSize.click()
+    await expect.poll(readCodeSize, { timeout: 5_000 }).toBe('14px')
+    await expect.poll(async () => readFile(settingsFile, 'utf8'), { timeout: 5_000 }).toContain('codeFontSize: 12')
+    await commit('正文字体', 'Georgia')
+    await expect.poll(readFonts, { timeout: 5_000 }).toEqual({ ...defaults, text: `Georgia, ${textStack}`, code: `"Courier New", monospace, ${codeStack}` })
+    // The snapshot updates optimistically; reload only after the Host has persisted both lists.
+    await expect.poll(async () => readFile(settingsFile, 'utf8'), { timeout: 5_000 }).toContain('Georgia')
+    await page.keyboard.press('Escape')
+
+    const warningStart = tripwire.warnings.length
+    await page.reload({ waitUntil: 'load' })
+    acknowledgeReloadConnectionLoss(tripwire, warningStart)
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    expect(await readFonts()).toEqual({ ...defaults, text: `Georgia, ${textStack}`, code: `"Courier New", monospace, ${codeStack}` })
+    expect(await readCodeSize()).toBe('14px')
+
+    // Clearing each field restores the built-in stacks for the specs that follow.
+    await openSettings()
+    const reloaded = page.getByRole('dialog', { name: '设置' })
+    await expandFonts()
+    expect(await reloaded.getByRole('textbox', { name: '代码字体', exact: true }).inputValue()).toBe('"Courier New", monospace')
+    await commit('正文字体', '')
+    await commit('代码字体', '')
+    await reloaded.getByRole('button', { name: '减小代码字号', exact: true }).click()
+    await expect.poll(readFonts, { timeout: 5_000 }).toEqual(defaults)
+    await expect.poll(readCodeSize, { timeout: 5_000 }).toBe('13px')
+    await expect.poll(async () => readFile(settingsFile, 'utf8'), { timeout: 5_000 }).toContain('codeFontSize: 11')
+    await expect.poll(async () => readFile(settingsFile, 'utf8'), { timeout: 5_000 }).not.toContain('Courier New')
     await page.keyboard.press('Escape')
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)

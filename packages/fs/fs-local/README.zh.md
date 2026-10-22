@@ -24,7 +24,6 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 ## 目录
 
 - [行为](#behavior)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -44,12 +43,6 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 - **`editText`**：在同一原语之上依次执行原子的字面量读取、修改和写入，并通过变更锁按目标串行化。`expected` 防护是可选的：提供时，会在字面量匹配之前校验版本（陈旧编辑报告 `FS_STALE_VERSION`，绝不会针对较新内容报告 `FS_EDIT_NOT_FOUND`/`FS_AMBIGUOUS_EDIT`）；省略时，无条件编辑当前内容。无论哪种情况，目标缺失都报告 `FS_STALE_VERSION`。匹配时规范化为 LF，随后恢复文件主要的 CRLF/LF 风格；空 `oldString` / 零匹配报告 `FS_EDIT_NOT_FOUND`，未设置 `replace_all` 的多个匹配则报告 `FS_AMBIGUOUS_EDIT`。
 
 包根 SDK 接口包含默认/具名 `LocalFileSystem` 类和 `Config`。原始 I/O 位于 `src/fsio.ts`（不依赖 Cordis，单独进行单元测试）；`src/index.ts` 是轻量服务接线。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每个原语委托给作为唯一权威的宿主文件系统；提供方不保留影子状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

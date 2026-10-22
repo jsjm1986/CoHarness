@@ -19,7 +19,7 @@ import { recordFeedback } from '@deepseek-ai/dsh-command-feedback'
 import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SESSION_FORMAT_VERSION, Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import MessageFeedbackService from '@deepseek-ai/dsh-message-feedback'
-import JsonlPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
@@ -676,9 +676,13 @@ describe('OpenTelemetrySessionBackend route and feedback', () => {
       const session = ctx.sessions.create(SessionId('live-ratings'))
       const handle = await ctx.sessionPersistence.create(session.header)
       try {
+        session.append('turn/start', { turn: 1 })
+        session.append('step/start', { turn: 1, step: 1 })
         if (provider !== undefined) session.append('request/header', { header: { config: { provider, model: 'm' } }, reason: 'initial' })
         const message = createAssistantMessage({ content: [{ type: 'text', text: 'answer' }], source: { provider: provider ?? 'mock', model: 'm' } })
         session.append('assistant/message', { message, stream: [], turn: 1, step: 1 }, { surfaceOp: 'append' })
+        session.append('step/end', { turn: 1, step: 1 })
+        session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
         const request = { sessionId: session.id, messageId: message.id, rating: 'positive' as const, ifVersion: null }
         const before = session.seq
         expect((await ctx.messageFeedback.put({ ...request, note: ' ' })).ok).toBe(false)

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-13-published-document-fragments.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-13-published-document-fragments.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-13-published-document-fragments.md
+document:
+  en: 4146a592a97b5d8b4e1d3fbabd0f035074cc8001
+  zh: 6cf76dfa349bbd61d1dd51cb683b696e4c405435
 /agent-note-validate-published-document-fragments:
   en: 5b2dde8717ba58a3
   zh: ecb3cd7de57d716a

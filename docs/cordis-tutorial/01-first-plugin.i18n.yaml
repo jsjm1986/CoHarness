@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 01-first-plugin.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 01-first-plugin.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cordis-tutorial/01-first-plugin.md
+document:
+  en: 79df2f42df1f34a7ef32cc81607e1b926a1854ae
+  zh: b7cfce290e86cebb12d99bcc438a281d4a988b4b
 /1-your-first-plugin:
   en: 2b4f2febdeebdc74
   zh: 98bc166d6cfd188a

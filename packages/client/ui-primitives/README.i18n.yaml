@@ -1,19 +1,22 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-primitives/README.md
+document:
+  en: 21842bc75d536ad1c0e0bf54f7f4868b503b6230
+  zh: d408e6fbaa587e85b665f2cb0b8a9b07c0a48269
 /:
   en: a11297238044f97c
   zh: 0a51af1cad6486b4
 /deepseek-ai-dsh-client-ui-primitives:
-  en: f62dbda156a91055
-  zh: a9be4b1baabeaf93
+  en: 9eae915cd470ddf9
+  zh: a4a2fb95434c033b
 /deepseek-ai-dsh-client-ui-primitives/summary:
   en: a05472dce901d64f
   zh: 6747ad81824a5c0d
 /deepseek-ai-dsh-client-ui-primitives/table-of-contents:
-  en: 6d3ec095763f3f3d
-  zh: 2e970f677ab876b8
+  en: 7ac1405f06dba60e
+  zh: 32cb6f8e1b00696d
 /deepseek-ai-dsh-client-ui-primitives/hover-cards:
   en: be507a97311f4d7f
   zh: 4de7fb87dc1d0739
@@ -24,8 +27,8 @@
   en: 55eb35ceca6c995a
   zh: 115b8057dda23f3d
 /deepseek-ai-dsh-client-ui-primitives/terminal-output:
-  en: e074426ab757911f
-  zh: 06f4e0f6244a3daa
+  en: 42273837fa7a1a97
+  zh: ae049597ac6fde54
 /deepseek-ai-dsh-client-ui-primitives/read-rendering:
   en: 2d8e7a8566c956f7
   zh: afba2aebce979c48
@@ -39,11 +42,8 @@
   en: ba70baa3f991ac5d
   zh: 06e04fc1e46ab214
 /deepseek-ai-dsh-client-ui-primitives/compatibility:
-  en: 8de86ff6f6841c16
-  zh: 5374fa0e4d1d01b7
-/deepseek-ai-dsh-client-ui-primitives/invariants:
-  en: 1b21db3bfc1ec63f
-  zh: b6993988a199993f
+  en: c787ebd987fb941d
+  zh: c2152239660bfe70
 /deepseek-ai-dsh-client-ui-primitives/model-experience:
   en: 3120df665299c634
   zh: 1d9f365d091d0d2a
@@ -51,8 +51,8 @@
   en: ca75c51c89c2c9b0
   zh: 2026c1566df4f78c
 /deepseek-ai-dsh-client-ui-primitives/known-limitations-and-deferred-work:
-  en: c559f820acb2ba87
-  zh: 17f8b5435b9bdded
+  en: e924d376951ca398
+  zh: 88acfd30ed325195
 /deepseek-ai-dsh-client-ui-primitives/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

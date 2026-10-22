@@ -13,11 +13,9 @@ kind: "package-reference"
 
 使用 `dsh-collaboration` 作为已认证项目协作的服务定义：消费方获取一份请求级权限——参与者身份与 ACL 决策——而非从进程全局服务读取可变账户状态。
 
-
 ## 目录
 
 - [运行时约定](#runtime-contract)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -29,14 +27,9 @@ kind: "package-reference"
 
 - `capture()` 返回当前请求的认证参与者、断言过期时间、提供方生命周期信号、会话授权、批量可读性过滤，以及审批/问答原子抢占能力。
 - `authorize()` 将每个后代会话解析到根对话，并返回从根继承的项目、可见性、创建者和 `ro`/`rw` 访问事实。
+- `capabilities()` 是每个主体的访问快照：`collaborationCapabilities(participant)` 不访问授权后端、直接从 scope 推导允许的 action 类别——`personal` 给出全部动词，`ro` 只有 `read`，`rw` 有 `read`/`write`/`approve`，`manage` 取决于 scope 自身的授权。会话级规则（如创建者身份）仍由 `authorize()` 判定。
 - `withSessionCreation()` 在异步创建操作中携带项目根对话的 `project` 或 `private` 可见性；`currentCreation()` 只在该操作内部暴露它。
 - `CollaborationError` 为 RPC 和 HTTP 消费者保留稳定拒绝码。提供方无法确认成员身份、可见性或授权后端时会失败关闭。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。本包只声明请求绑定的授权契约；存在的账户状态由提供方携带。
-
 
 <a id="model-experience"></a>
 ## 模型体验

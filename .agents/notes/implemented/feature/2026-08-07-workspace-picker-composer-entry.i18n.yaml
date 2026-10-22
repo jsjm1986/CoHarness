@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-07-workspace-picker-composer-entry.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-07-workspace-picker-composer-entry.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-07-workspace-picker-composer-entry.md
+document:
+  en: dc9c26c291de6e7614ace3c787030c0032a9740d
+  zh: 9121750ae1cbef2a94630d9ac43a765c03a397a7
 /agent-note-the-no-workspace-composer-opens-the-existing-picker:
   en: 09ba891b08bbaa66
   zh: a62aeb0bc089148c

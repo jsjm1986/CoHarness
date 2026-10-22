@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-session-archive-global-set.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-session-archive-global-set.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-session-archive-global-set.md
+document:
+  en: 4fd1df62989bc0d68b731193c52d16e5ea4f31c4
+  zh: aa623ef63dde69161ed12bbcc0641938ed1db861
 /agent-note-session-archive-registry-global-set:
   en: 764d9e132b019a80
   zh: 5dfed34db0b6e0c4

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-07-mcp-client-plugin.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-07-mcp-client-plugin.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-07-mcp-client-plugin.md
+document:
+  en: 7a41ba32f38679e9e020e4d6d9f11330bd182ae1
+  zh: 3eddf406d23becaf32439bd24e689abb3cb00e33
 /agent-note-mcp-client-plugin-connect-to-external-mcp-servers-and-bridge-their-tools:
   en: 7d41e632fd40efe0
   zh: 4c7f6410b74a5bd3

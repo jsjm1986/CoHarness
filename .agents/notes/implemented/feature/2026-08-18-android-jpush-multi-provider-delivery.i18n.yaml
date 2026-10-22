@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-18-android-jpush-multi-provider-delivery.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-18-android-jpush-multi-provider-delivery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-android-jpush-multi-provider-delivery.md
+document:
+  en: f5057f902ceaa26863e6ed575f8765e9fd16446a
+  zh: 2a77200995d1c7fa382fcfdb49583048a03ae31d
 /agent-note-android-jpush-multi-provider-delivery:
   en: ce4628ee245fadfa
   zh: 8bc4398fe2d73f98

@@ -11,6 +11,7 @@
 import { isAbsolute, join } from 'node:path'
 import {
   SESSION_FORMAT_VERSION,
+  KNOWN_SESSION_EVENT_TYPES,
   SessionLogOffset,
 } from '@deepseek-ai/dsh-session'
 import type {
@@ -24,7 +25,7 @@ import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
 import type { SessionFormatRecovery, SessionFormatRestore } from '@deepseek-ai/dsh-session-format'
 import { coharnessJsonlFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import { assertV3RowAdmission } from '@deepseek-ai/dsh-session-format-v2-to-v3'
-import { assertV7RowAdmission } from '@deepseek-ai/dsh-session-format-v6-to-v7'
+import { assertV7RowAdmission, assertReleasedV7Relationships } from '@deepseek-ai/dsh-session-format-v6-to-v7'
 import {
   SessionFormatUnsupportedError,
   sessionFormatVersionRefusal,
@@ -488,6 +489,7 @@ export class SessionLogScanner {
   finish(): SessionLogScan {
     this.finished = true
     const artifact = this.restore.finish()
+    assertReleasedV7Relationships(artifact, KNOWN_SESSION_EVENT_TYPES)
     return {
       meta: this.meta,
       inheritedEventCount: SessionLogOffset(artifact.inheritedEventCount),

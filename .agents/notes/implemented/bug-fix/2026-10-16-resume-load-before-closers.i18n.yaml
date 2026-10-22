@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-16-resume-load-before-closers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-16-resume-load-before-closers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-16-resume-load-before-closers.md
+document:
+  en: 76d8b981bacad24410d18a2e50c91305df8c13ce
+  zh: 8d2ac7ba3829f648bef6f34e51062880d23bf3e6
 /agent-note-resume-commits-cold-recovery-through-load-before-reading-the-log:
   en: 9ef0166f9211d870
   zh: 9e2e6e5942e4ea06

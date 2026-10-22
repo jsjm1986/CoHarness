@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-08-pnpm-hoisted-installer-fix.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-08-pnpm-hoisted-installer-fix.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-08-pnpm-hoisted-installer-fix.md
+document:
+  en: aabd3b5e9d065a9ffbe6ea29c2dedcce160a7f22
+  zh: 4333d28b0e19d82c4e5f61643754aedd3c142caf
 /agent-note-pnpm-hoisted-installer-fix-through-a-compatible-11-x-distribution:
   en: eb56fba902fd7996
   zh: 7f24671457279e6b

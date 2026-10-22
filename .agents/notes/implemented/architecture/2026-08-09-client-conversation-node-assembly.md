@@ -326,7 +326,7 @@ Assistant streaming to final and Tool running to settled update only one Seat's 
 
 When business logic deliberately changes a materialized Node to hidden, it leaves visible order and remounts when visible again. This is explicit business withdrawal of presentation, distinct from the stable-Seat guarantee for running→settled.
 
-The concrete Tool renderer remains governed by the [`ui-tool ownership decision`](2026-08-08-client-tool-presentation-ownership.md). Tool Definition supplies recursive root/subcall data, and `ui-tool` dispatches concrete presentation by the Tool-name keyed slot.
+The concrete Tool renderer remains governed by the [`ui-tool ownership decision`](../../archived/architecture/2026-08-08-client-tool-presentation-ownership.md). Tool Definition supplies recursive root/subcall data, and `ui-tool` dispatches concrete presentation by the Tool-name keyed slot.
 
 Trajectory registers its own target and business Definitions against the same Assembler and Session event window as Chat. Its target builder preserves the stage-oriented read model without consuming the Chat Builder's legacy slice or running an independent history fold. The Chat Builder retains its legacy slice for StatsLine and the top-level public compatibility fields; target-specific Definitions do not change the shared Context, Reader, or Location contracts.
 
@@ -406,3 +406,5 @@ Steps and Turns become stable homes for cross-business aggregates. Turn Tail and
 The cost is new Runtime contracts for Registry, Assembler, Location data, dependency replay, and per-target Builders, plus parent-owned common inject and per-occurrence `hookContext` in UI Slots. Definition authors must understand stable IDs, unique starts, forward replay, Step→Turn publication order, read-only Reader access, and the prohibition on Node withdrawal.
 
 `useTurnData()` does not revoke the standard `useSession` capability from session-scoped renderers, so this boundary relies on API guidance and tests rather than capability isolation. Registry changes remain low-frequency full rebuilds; the Chat Builder still maintains a legacy slice for StatsLine and the top-level public fields, while Trajectory owns target-specific Definitions and a Builder over the shared Session window. Built-in Definitions remain in their respective UI packages, and these compatibility boundaries do not return business interpretation to Session.
+
+Two later notes refine this surface without changing its contract: the [grouped-process-rendering decision](../feature/2026-10-18-grouped-process-rendering.md) wraps the ordered Nodes in `ChatSnapshot.entries`/`groups`, and the [turn-trigger decision](../bug-fix/2026-10-18-turn-trigger-and-turn-end-anchored-tail.md) splits the single Inbox claim Definition into `inbox-next-step` and `inbox-next-turn`.

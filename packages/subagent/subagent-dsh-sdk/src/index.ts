@@ -104,9 +104,9 @@ function resolveConfiguredFile(field: string, value: string): string {
 }
 
 /**
- * The SDK provider. Advertises NO start-time capabilities: an out-of-process
- * child cannot honor `outputSchema`/`maxDepth`/`toolFilter`/`persona` (the
- * service rejects a request needing any of them before `start` runs).
+ * The SDK provider. It resolves Agent route options into the child runtime's
+ * process-wide handshake; output schema, depth, and independent preset selection stay
+ * unsupported because their ownership does not cross this process boundary.
  */
 class SdkSubagentProvider implements SubagentProvider {
   readonly capabilities: SubagentCapabilities = { ...NO_START_CAPABILITIES, agentOptions: true }

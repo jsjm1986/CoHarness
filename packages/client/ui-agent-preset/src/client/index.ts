@@ -53,8 +53,8 @@ export {
 } from './section-store.ts'
 export type { AgentPresetOption, AgentPresetSettingsState } from './settings-store.ts'
 export { AGENT_PRESET_SETTINGS_NS, writeDefaultPreset } from './settings-store.ts'
-export { presetDisplayText } from '@deepseek-ai/dsh-agent-presets/display'
-export type { PresetDisplaySource, PresetDisplayText } from '@deepseek-ai/dsh-agent-presets/display'
+export { presetDisplayText } from '@deepseek-ai/dsh-agent-preset-registry/display'
+export type { PresetDisplaySource, PresetDisplayText } from '@deepseek-ai/dsh-agent-preset-registry/display'
 
 /** Required services (cordis fiber inject). */
 export const inject = [
@@ -224,9 +224,9 @@ export function apply(ctx: ClientContext): void {
           void value.seat.apply()
         }
       })
-      // Connecting a workspace either creates a blank session or reuses one,
-      // and either way the chip's pick predates it — so the stage is applied
-      // when the session arrives, not when it was made.
+      // A session start creates a session or reuses a blank, and either way
+      // the chip's pick predates it — so the stage is applied when the
+      // session arrives, not when it was made.
       const stop = scope.sessions.list.subscribe(() => { void seat.apply() })
       // The chip opens on the deployment default, so a default changed from
       // the settings surface moves it too — otherwise the screen that starts
@@ -251,8 +251,8 @@ export function apply(ctx: ClientContext): void {
       rosterReaders.add(readRoster)
       // Stage WITHOUT applying — the still-current running session would
       // refuse the swap and drop the stage — then start the session it lands
-      // on: the chip's list-change applier composes the blank session the
-      // workspace connect produces or reuses.
+      // on: the chip's list-change applier composes the fresh Session the
+      // bare start creates.
       creatorDraft = () => {
         // Each entry renders only after its own roster load proved the
         // deployment offers preset selection; re-check both stores so a

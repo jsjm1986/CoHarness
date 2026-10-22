@@ -1,25 +1,28 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-agent-preset/README.md
+document:
+  en: b8b0d50d79a030d4348ae2043178864334dc104b
+  zh: 292207aeb4e1a3284de29d2cc52bf69b477ebcb4
 /:
   en: bc21e85265ce2411
   zh: 61495d48365178df
 /dsh-client-ui-agent-preset:
-  en: d8a0142921b68df8
-  zh: d5b7a8c3036de05e
+  en: 542b1c9a23d7590e
+  zh: 156b77d9fd066c44
 /dsh-client-ui-agent-preset/summary:
   en: 9d57e549d79e291c
   zh: 216a3dcaec644cf8
 /dsh-client-ui-agent-preset/table-of-contents:
-  en: c55ea9475c062c6a
-  zh: 59f2f9a042f26605
+  en: 5e25a1ea15ca4e0b
+  zh: 6cac34038571a702
 /dsh-client-ui-agent-preset/why-it-is-a-new-session-preference:
   en: 2f0a1ce8f49a4b96
   zh: 5ba31fc76f241214
 /dsh-client-ui-agent-preset/the-new-session-chip:
-  en: 79f649062af9feed
-  zh: 9eddfafe48695807
+  en: fd9a45a6df649277
+  zh: 71b2dd4fa3017454
 /dsh-client-ui-agent-preset/the-session-header-label:
   en: b6a7b16d11b5d2dc
   zh: a5776612e3b0c0a7
@@ -30,11 +33,8 @@
   en: b36429223cf4f017
   zh: af03af890e3914b8
 /dsh-client-ui-agent-preset/when-the-surfaces-are-absent:
-  en: 8ea38e047fe0d4d1
-  zh: c8f13512e5c95bc6
-/dsh-client-ui-agent-preset/invariants:
-  en: 64af959addfec89c
-  zh: 4bfe8854b6f90069
+  en: 438c3744bd2ce942
+  zh: 45dc38db54e0080a
 /dsh-client-ui-agent-preset/model-experience:
   en: 5174dc16b8930a37
   zh: 46a31904e17bd5ad

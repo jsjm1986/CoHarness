@@ -6,7 +6,7 @@ English | [中文](2026-07-06-approval-seam.zh.md)
 
 ## Problem
 
-Two callers need one closed decision — "may this specific action proceed?": `tools/pre-execute`'s `ask` decision (including the Claude-Code hook bridge's `permissionDecision: ask`) and the [sandbox Agent Note](2026-07-06-sandbox.md)'s post-denial one-shot escalation retry. A shared seam keeps them from inventing separate outcome vocabularies, channel routing, cancellation, and audit trails, while guaranteeing that a deployment with no answerer can never grant an unanswerable request. The answerer may be an interactive host or an automated controller.
+Two callers need one closed decision — "may this specific action proceed?": `tools/pre-execute`'s `ask` decision (including the Claude-Code hook bridge's `permissionDecision: ask`) and the [sandbox Agent Note](../../archived/feature/2026-07-06-sandbox.md)'s post-denial one-shot escalation retry. A shared seam keeps them from inventing separate outcome vocabularies, channel routing, cancellation, and audit trails, while guaranteeing that a deployment with no answerer can never grant an unanswerable request. The answerer may be an interactive host or an automated controller.
 
 The routing problem is ownership: a permission request must reach the channel that owns the asking agent, fail closed for agents nobody owns, and stay out of deployments that compose no answerer.
 
@@ -63,7 +63,7 @@ Answerers are `approval/request` waterfall listeners. Zero listeners fall throug
 
 #### The per-session policy tier
 
-The seam also owns the session-scoped `'ask' | 'never'` policy described by [the sandbox Agent Note](2026-07-06-sandbox.md). Effective policy is folded from logged switches over the deployment default. `'never'` resolves to `rejected` inside `request()` before any answerer can run; `'ask'` dispatches and otherwise falls through to `unavailable`. Both current values join the atomic runtime-context snapshot before each model request, so a policy switch needs no separate narration; every approval request still records the audit pair.
+The seam also owns the session-scoped `'ask' | 'never'` policy described by [the sandbox Agent Note](../../archived/feature/2026-07-06-sandbox.md). Effective policy is folded from logged switches over the deployment default. `'never'` resolves to `rejected` inside `request()` before any answerer can run; `'ask'` dispatches and otherwise falls through to `unavailable`. Both current values join the atomic runtime-context snapshot before each model request, so a policy switch needs no separate narration; every approval request still records the audit pair.
 
 #### The ACP answerer
 
@@ -87,7 +87,7 @@ Snapshots record allowed and rejected sandbox escalation through `session/reques
 
 ## Deferred
 
-- **`allow_always` grant storage** — honoring a persistent grant means designing storage, scope identity (call? path? prefix? session? time window?), and revocation; until designed, only the one-shot options are advertised ([the sandbox Agent Note](2026-07-06-sandbox.md) § Escalation records the open scope question).
+- **`allow_always` grant storage** — honoring a persistent grant means designing storage, scope identity (call? path? prefix? session? time window?), and revocation; until designed, only the one-shot options are advertised ([the sandbox Agent Note](../../archived/feature/2026-07-06-sandbox.md) § Escalation records the open scope question).
 - **A recorded hook-driven `ask` through a composed answerer** — the permission wire is recorded through the sandbox example's escalation branches. The hook matrix's `hook-cc-pretool-ask` pins the no-ApprovalService fallback denial, while the hook-producer-plus-answerer composition remains on the unit tier.
 - **Routing a child agent's approvals to the parent session** — `subagent-acp`'s child auto-answers its own permission requests; delegating them to the parent controller is its own design.
 

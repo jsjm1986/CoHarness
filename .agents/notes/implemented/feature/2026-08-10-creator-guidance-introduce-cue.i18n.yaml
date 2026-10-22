@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-creator-guidance-introduce-cue.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-creator-guidance-introduce-cue.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-creator-guidance-introduce-cue.md
+document:
+  en: 888fee7b3def585ed3098fedcb7bc6169ee26a22
+  zh: d80260abd1995df1f95e3f24fefcb265bda64c11
 /agent-note-creator-guidance-lands-as-an-introduce-cue-on-the-preset-chip:
   en: f3c41fb17c7d8a0e
   zh: 009f06a3f46a943b

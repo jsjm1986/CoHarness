@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-02-projcache-cross-version-read-compat.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-02-projcache-cross-version-read-compat.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-02-projcache-cross-version-read-compat.md
+document:
+  en: 106c06ec0d1a47defaeb14fcdf3e4f638d4ee16a
+  zh: 7910851bdc9f2b8e5320409408265e945bf26fd1
 /agent-note-projection-cache-predecessor-recovery-and-session-format-binding-session-projcache-v3-v6-v7:
   en: 5744de86025f278d
   zh: 5ba2198c13ac54f9
@@ -14,6 +17,9 @@
 /agent-note-projection-cache-predecessor-recovery-and-session-format-binding-session-projcache-v3-v6-v7/decision:
   en: b0286edaf6e29197
   zh: cae2b0099ad795db
+/agent-note-projection-cache-predecessor-recovery-and-session-format-binding-session-projcache-v3-v6-v7/decision/opaque-checkpoint-values:
+  en: 8d433cc3431f594e
+  zh: 386ce074ef0903c1
 /agent-note-projection-cache-predecessor-recovery-and-session-format-binding-session-projcache-v3-v6-v7/decision/v3-v6-v7-disposition:
   en: fe188d164c08a7f5
   zh: 30aa9e9201621f35

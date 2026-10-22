@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/directory-picker/README.md
+document:
+  en: ab97d77a112c498bb6a3584fe11543f898d4408b
+  zh: 4aa1bb32e74f940464779d3b898688218f5064d0
 /:
   en: d2a61a3fc7f996a0
   zh: 61495d48365178df
@@ -12,11 +15,8 @@
   en: eccb4c3b89bf1072
   zh: 97f245651d77ec7c
 /deepseek-ai-dsh-host-directory-picker/table-of-contents:
-  en: b59e55619aaa595f
-  zh: a35cee05e12c8f29
-/deepseek-ai-dsh-host-directory-picker/invariants:
-  en: 2ea814b53b13d9df
-  zh: 76b22c38b1850fb8
+  en: b4683d2a53256fda
+  zh: 4e65ff63dc8c48fe
 /deepseek-ai-dsh-host-directory-picker/model-experience:
   en: 90a8149ae911c396
   zh: 887d434607099162

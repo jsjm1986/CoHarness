@@ -32,6 +32,17 @@ export interface CollaborationParticipant {
     }
 }
 
+/**
+ * Action classes a participant's scope permits before any per-session rule.
+ * `manage` reflects the scope's project-management grant only; a concrete
+ * Session ACL may still refuse it (for example a non-creator member), so
+ * `authorize()` remains the per-operation authority.
+ */
+export interface CollaborationCapabilities {
+  /** Scope-permitted verbs in declaration order. */
+  readonly actions: readonly CollaborationAction[]
+}
+
 /** Root-inherited access facts returned after authorization succeeds. */
 export interface CollaborationAccess {
   readonly sessionId: SessionId
@@ -65,6 +76,15 @@ export interface CollaborationAuthority {
    * @returns root-inherited access facts.
    */
   authorize(sessionId: SessionId, action: CollaborationAction): Promise<CollaborationAccess>
+
+  /**
+   * The participant's scope-level capabilities without contacting the
+   * authorization backend — the per-principal access snapshot Consumers may
+   * render or gate on. Session-level rules (creator status, visibility locks)
+   * still apply through {@link authorize}.
+   * @returns the action classes this scope permits.
+   */
+  capabilities(): CollaborationCapabilities
 
   /**
    * Filter a batch to sessions this participant may read.

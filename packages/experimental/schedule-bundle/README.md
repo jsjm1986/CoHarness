@@ -35,8 +35,6 @@ Open Plugins in the Web sidebar and enable Automation tasks, marked by an alarm 
 <details>
 <summary>Maintainer details — click to expand</summary>
 
-`cordis.patch.yml` inserts the two host rows and enables `ui-schedule`, and `package.json` depends on their packages so each row resolves from this bundle. `OPTIONAL_BUNDLES` in `packages/boot/app-boot/src/profile.ts` names this package and `apps/cli` depends on it, so every installation ships it switched off and the plugin manager offers it in the Official group. Selecting it appends the bundle to the profile's `dsh.profile.bundles` list. No runtime invariant companion is published because this configuration-only package owns no mutable runtime state.
-
 | File | Role |
 |---|---|
 | [`cordis.patch.yml`](cordis.patch.yml) | Inserts the `time-context` and `schedule` rows; enables `ui-schedule` |

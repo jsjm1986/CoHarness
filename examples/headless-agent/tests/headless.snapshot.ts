@@ -902,7 +902,7 @@ describe('headless stream-json snapshots', () => {
     const expectedSessions = await Promise.all(fixtureFiles.map(file => readFile(file, 'utf8')))
     const patchRoot = '.snapshot-patches'
     const baseCompositionDir = join(advancedCorpusDir, '../text-turn')
-    const compositionDir = join(advancedCorpusDir, '../cordis-inspect-jsdoc')
+    const compositionDir = advancedCorpusDir
     let runCwd = ''
     const result = await runLoaderSmoke({
       label: 'advanced headless stream-json snapshot',
@@ -915,7 +915,7 @@ describe('headless stream-json snapshots', () => {
         '--profile', 'headless',
         '--patch', join(baseCompositionDir, 'cordis.yml'),
         '--patch', join(patchRoot, '1-cordis.snapshot.yml'),
-        '--patch', join(baseCompositionDir, 'model.cordis.yml'),
+        '--patch', join(advancedCorpusDir, '../text-turn/model.cordis.yml'),
         '--json', prompt,
       ],
       tsconfigPath,

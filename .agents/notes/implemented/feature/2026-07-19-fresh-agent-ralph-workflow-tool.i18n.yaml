@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-fresh-agent-ralph-workflow-tool.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-fresh-agent-ralph-workflow-tool.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-fresh-agent-ralph-workflow-tool.md
+document:
+  en: af21d1013471c9d1f71b949bc78fa0ce5474fdd8
+  zh: 665b77f521b684394bb7a6ef0dd724f309df1f30
 /agent-note-fresh-agent-ralph-workflow-tool:
   en: fa01a47773703ae3
   zh: 3277d56a08e2603d
@@ -21,8 +24,8 @@
   en: e61bc86cc48f3085
   zh: 0268ff3f702a7fdc
 /agent-note-fresh-agent-ralph-workflow-tool/decision/model-and-ui:
-  en: 753bcc44d6d75c53
-  zh: 6c412dd1b37e6403
+  en: e0ba23e6fff265af
+  zh: ec6437e05b47fd34
 /agent-note-fresh-agent-ralph-workflow-tool/testing:
   en: d542eb85464a822f
   zh: 4547c1dafaf79f73

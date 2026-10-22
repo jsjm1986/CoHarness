@@ -6,7 +6,9 @@ import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type {
   CollaborationAction,
   CollaborationAuthority,
+  CollaborationCapabilities,
   CollaborationErrorCode,
+  CollaborationParticipant,
   CollaborationRefusal,
   CollaborationSessionCreation,
 } from './types.ts'
@@ -72,6 +74,21 @@ export class CollaborationError extends Error {
     super(message)
     this.name = 'CollaborationError'
   }
+}
+
+/**
+ * Derive a participant's scope-level action classes — the per-principal
+ * access snapshot shared by every provider implementation.
+ * @param participant - authenticated participant captured for the request.
+ * @returns the verbs the scope permits; `manage` requires the scope's own grant.
+ */
+export function collaborationCapabilities(
+  participant: CollaborationParticipant,
+): CollaborationCapabilities {
+  const scope = participant.scope
+  if (scope.kind === 'personal') return { actions: ['read', 'write', 'approve', 'manage'] }
+  if (scope.mode === 'ro') return { actions: ['read'] }
+  return { actions: scope.canManage === true ? ['read', 'write', 'approve', 'manage'] : ['read', 'write', 'approve'] }
 }
 
 declare module '@deepseek-ai/cordis' {

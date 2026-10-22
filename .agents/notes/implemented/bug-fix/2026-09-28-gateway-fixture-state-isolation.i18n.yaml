@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-28-gateway-fixture-state-isolation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-28-gateway-fixture-state-isolation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md
+document:
+  en: 6f326a5d351307712f27c5463b8494968b75c1c0
+  zh: cdd4e20cdd9efdf44c74788889906399ca7fb8e8
 /agent-note-gateway-fixture-state-isolation:
   en: 3f1939804f3a8039
   zh: 6a074e22b4b7b9b1

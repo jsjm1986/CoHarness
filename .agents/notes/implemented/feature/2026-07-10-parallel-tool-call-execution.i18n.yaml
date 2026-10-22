@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-10-parallel-tool-call-execution.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-10-parallel-tool-call-execution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.md
+document:
+  en: 0a426c85c388e8b500622718972d63c9c553d8d1
+  zh: 03171866e1712a65712b12324b61e74ee1e0cd05
 /agent-note-parallel-tool-call-execution-by-per-call-safety:
   en: bbc8567dc50716d1
   zh: 4ddef348cc74b39c
@@ -12,8 +15,8 @@
   en: 532bb7268d9b93ce
   zh: ad47162233222ab0
 /agent-note-parallel-tool-call-execution-by-per-call-safety/scheduling-and-ordering:
-  en: f0906d03fef98e7b
-  zh: f9e43c4c832c9a05
+  en: 4c5ce902bef1a586
+  zh: ecfe7e57c86b4a41
 /agent-note-parallel-tool-call-execution-by-per-call-safety/safety-contract:
   en: 16c4ee08b65ead23
   zh: df80d6e49982615b

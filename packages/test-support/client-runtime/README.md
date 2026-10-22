@@ -21,17 +21,11 @@ Not part of the product plugin graph (no `dsh.client`); feature packages depend 
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A test-only assembly of typed doubles around the production slot registry; it owns no product runtime state.
 
 <a id="model-experience"></a>
 ## Model Experience

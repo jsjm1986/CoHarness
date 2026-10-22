@@ -1,0 +1,65 @@
+- banner:
+  - navigation "Session hierarchy":
+    - "button \"Uploaded document \\\"poem.txt\\\" at \\\"{{documents}}\" [disabled]"
+  - text: Standard mode
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "Feedback":
+    - img
+  - button "Open right sidebar":
+    - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
+- button "reference-1.png, click to view original":
+  - img "reference-1.png"
+- text: "Uploaded document \"poem.txt\" at \"{{documents}}/poem.txt\"; contents inlined verbatim: UPLOAD_ROUND_OK Read the attached file with the read tool, reply with exactly the single word it contains, and stop."
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Read files"
+- paragraph: UPLOAD_ROUND_OK
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- button "Usage 17.3K tok · Cache hit 50.7%":
+  - img
+  - text: Usage 17.3K tok · Cache hit 50.7%
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- textbox "Message COHARNESS"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash-Vision-Exp, reasoning effort high":
+  - text: DeepSeek-V4-Flash-Vision-Exp high
+  - img
+- button "1% of context used": 1%
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "17.3K tok · Cache hit 51%":
+    - img
+    - text: 17.3K tokCache hit 51%
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

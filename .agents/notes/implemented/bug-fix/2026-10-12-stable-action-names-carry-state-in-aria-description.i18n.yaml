@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-stable-action-names-carry-state-in-aria-description.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-stable-action-names-carry-state-in-aria-description.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-stable-action-names-carry-state-in-aria-description.md
+document:
+  en: 409e07c0a0ae583a45d541d9da7315a8facc78e9
+  zh: 357d091046b4a75a7485efee5c9537d8ada88906
 /agent-note-action-controls-keep-one-accessible-name-live-state-rides-in-aria-description:
   en: db7aa1b0aeef3084
   zh: 355466f72dae7668

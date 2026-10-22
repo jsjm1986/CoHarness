@@ -10,11 +10,11 @@
 
 `PluginInfo` 包含模块标识、实际启停状态和 fiber 阶段，以及唯一的 `patchId` 或 `readOnlyReason`。
 
-`BundleInfo` 包含包名、可选的安装版本、组合层选择状态、删除可用性及可选的解析错误。
+`BundleInfo` 包含包名、可选的安装版本、组合层选择状态、删除可用性、可选的解析错误，以及——对 profile 自身依赖提供而安装未提供的组合包——`source`：该依赖作为 `pnpm add` 接受的 spec。
 
 `InstallBundleOptions.enabled` 默认为 true，false 表示安装但不选择组合包层。`approvedBuilds` 在安装前向指定的待审批包名授予持久脚本权限。
 
-`ChangeResult.changed` 报告磁盘修改，独立于 `application`：`applied`、`restart-required`、`overridden`、`cancelled` 或 `failed`。可选的 `error` 包含可本地化的错误码和外部诊断。`packageResult` 记录 pnpm 退出码、有界输出、截断标志及完整诊断日志路径。`pendingBuilds` 列出整个 profile 尚未决定的包；`approvedBuilds` 记录本次操作授予权限的包名。
+`ChangeResult.changed` 报告磁盘修改，独立于 `application`：`applied`、`restart-required`、`overridden`、`cancelled` 或 `failed`。可选的 `error` 包含可本地化的错误码和外部诊断。`packageResult` 记录 pnpm 退出码、有界输出、截断标志及完整诊断日志路径。`pendingBuilds` 列出整个 profile 尚未决定的包；`approvedBuilds` 记录本次操作授予权限的包名；`bundle` 与 `version` 给出完成的安装新增的包及其清单版本。
 
 `PluginInstallFrame` 是一帧私有的进度、日志或最终结果。`installBundleStream` 要求唯一请求 id，仅携带本次安装的诊断，并在传输关闭时取消所属安装。消费者必须同时确认最终结果及流正常结束；不得重连并重放安装。
 
@@ -177,8 +177,8 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 
 /** Read the profile's installed bundles, the bundles this dsh installation supplies, and the selected names that are not bundles.
  * A dependency without a bundle patch is listed, as a `not-bundle` problem, only while it is selected.
- * @returns Package versions, manifest descriptions, rows, optional display metadata, activation selections,
- * whether the installation offers the bundle, and removal availability.
+ * @returns Package versions, manifest descriptions, the installable spec of profile dependencies, rows, optional
+ * display metadata, activation selections, whether the installation offers the bundle, and removal availability.
  */
 @Remote async listBundles(): Promise<BundleInfo[]>
 
@@ -254,6 +254,56 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 ```
 
 Source: [`packages/boot/plugin-manager/src/index.ts`](../../packages/boot/plugin-manager/src/index.ts)
+
+<a id="ctxpluginmarket--pluginmarket"></a>
+
+### `ctx.pluginMarket` — `PluginMarket`
+
+Fetches, validates, and caches configured market indexes; annotates entries with the profile's installation facts.
+
+```ts cordis-catalog
+/**
+ * List the configured index sources without fetching them.
+ * @returns every source in order, with the title of its last successful read and, when the last read failed, its error.
+ */
+@Remote listIndexes(): MarketIndexSummary[]
+
+/**
+ * Replace the configured index sources through Settings, without remounting this service.
+ * `plugin-market/changed` announces the committed list. A URL already configured is kept as written, so a client can
+ * add or remove sources beside one that `listIndexes` reports as unusable.
+ * @param urls - index URLs in display order.
+ * @throws {RemoteError} `plugin-market/invalid-index-url` for an invalid new URL or a repeated URL;
+ * `plugin-market/settings-unavailable` without Settings.
+ */
+@Remote async setIndexes(urls: string[]): Promise<void>
+
+/**
+ * Return one page of the plugins of a configured index that match a query. Concurrent reads of a URL share one
+ * fetch; a successful document is reused for `cacheTtlMs` unless `refresh` is set. Matching and ordering read only
+ * the document; installation status and compatibility are computed for the returned page on every call.
+ * @param url - a configured index URL.
+ * @param query - text, filters, order, page, and whether to bypass the cached document.
+ * @returns the index header, the page's plugins with each plugin's default version and installation status and each
+ *   version's compatibility and install arguments, the number of matches, and the next page's offset.
+ * @throws {RemoteError} `plugin-market/invalid-query`, `plugin-market/unknown-index`, `plugin-market/invalid-index-url`,
+ *   `plugin-market/fetch-failed`, or `plugin-market/invalid-index`.
+ */
+@Remote async search(url: string, query: MarketQuery): Promise<MarketSearchResult>
+
+/**
+ * Read one plugin of a configured index, using the cached document as `search` does.
+ * @param url - a configured index URL.
+ * @param name - the plugin's package name.
+ * @returns the plugin with its default version, installation status, and annotated versions; undefined when the
+ *   index does not list it.
+ * @throws {RemoteError} `plugin-market/unknown-index`, `plugin-market/invalid-index-url`, `plugin-market/fetch-failed`,
+ *   or `plugin-market/invalid-index`.
+ */
+async entry(url: string, name: string): Promise<MarketListingEntry | undefined>
+```
+
+Source: [`packages/boot/plugin-market/src/index.ts`](../../packages/boot/plugin-market/src/index.ts)
 
 <a id="ctxpluginregistryprobe--pluginregistryprobe"></a>
 
@@ -396,4 +446,24 @@ An installation moved between its Host phases. `installing` is announced once wh
 ```
 
 Source: [`packages/boot/plugin-manager/src/types.ts`](../../packages/boot/plugin-manager/src/types.ts)
+
+<a id="plugin-market-events"></a>
+
+### `plugin-market/*` events
+
+<a id="plugin-marketchanged--emit"></a>
+
+#### `plugin-market/changed` — emit
+
+The configured index sources changed.
+
+```ts cordis-catalog
+/**
+ * The configured index sources changed.
+ * @mode emit
+ */
+'plugin-market/changed'(): void
+```
+
+Source: [`packages/boot/plugin-market/src/types.ts`](../../packages/boot/plugin-market/src/types.ts)
 <!-- END GENERATED cordis-surface -->

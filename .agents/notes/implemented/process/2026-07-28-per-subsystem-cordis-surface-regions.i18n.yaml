@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-28-per-subsystem-cordis-surface-regions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-28-per-subsystem-cordis-surface-regions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-28-per-subsystem-cordis-surface-regions.md
+document:
+  en: 66973223ec443fdd2a150fdd32d722ae3cad261b
+  zh: de000402bd20018c423a391dfefca4a3a9d65bdf
 /agent-note-per-subsystem-generated-cordis-surface-regions:
   en: 6c98c2008acb70d8
   zh: 7db5d39ee2ce4359

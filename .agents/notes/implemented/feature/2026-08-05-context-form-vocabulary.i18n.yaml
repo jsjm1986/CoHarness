@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-05-context-form-vocabulary.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-05-context-form-vocabulary.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-context-form-vocabulary.md
+document:
+  en: 52053725ca94f826380a1af8ad6565edcc52c290
+  zh: 97ecb037a3ff6eb0a578cbdcf7ae67aca004c585
 /agent-note-producer-declared-context-forms:
   en: a88151ac41197659
   zh: 4aaffb71b4ae04ea

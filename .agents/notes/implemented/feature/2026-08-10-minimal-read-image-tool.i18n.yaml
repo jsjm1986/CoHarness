@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-minimal-read-image-tool.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-minimal-read-image-tool.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-minimal-read-image-tool.md
+document:
+  en: 12085c276130fc885498157cf18b3bec5517938f
+  zh: 58a76cacd05c63635da5ef2ad0e3682515e61a7f
 /agent-note-a-minimal-read-image-tool-over-existing-seams:
   en: d091373923838282
   zh: fafee78fec914416

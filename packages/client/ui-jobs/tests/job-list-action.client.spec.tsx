@@ -468,6 +468,52 @@ describe('JobListAction human kill', () => {
     expect(stop.getAttribute('data-kill-state')).toBe('idle')
   })
 
+  it('makes a transport failure retryable through another confirmed stop', async () => {
+    vi.useFakeTimers()
+    const killJob = vi.fn(async () => true).mockRejectedValueOnce(new Error('transport closed'))
+    render(<JobListAction {...props([job()], undefined, {}, killJob)} />)
+    openList()
+    const stop = screen.getByTitle(stopTitle('pnpm run build'))
+    fireEvent.click(stop)
+    await act(async () => { fireEvent.click(stop) })
+    expect(stop.getAttribute('data-kill-state')).toBe('failed')
+    expect(screen.getByTitle(zh['kill.failed'])).toBe(stop)
+    expect(stop.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(stop)
+    expect(stop.getAttribute('data-kill-state')).toBe('armed')
+    await act(async () => { fireEvent.click(stop) })
+    expect(killJob).toHaveBeenCalledTimes(2)
+    expect(stop.getAttribute('data-kill-state')).toBe('pending')
+    expect(stop.hasAttribute('disabled')).toBe(true)
+  })
+
+  it.each(['refusal', 'transport failure'] as const)(
+    'keeps a new confirmation on the same row when an older request ends in %s',
+    async (outcome) => {
+      vi.useFakeTimers()
+      const pending = Promise.withResolvers<boolean>()
+      const killJob = vi.fn(() => pending.promise)
+      render(<JobListAction {...props([
+        job(),
+        job({ id: 'bash-2' as JobView['id'], label: 'pnpm run watch' }),
+      ], undefined, {}, killJob)} />)
+      openList()
+      const first = screen.getByTitle(stopTitle('pnpm run build'))
+      fireEvent.click(first)
+      fireEvent.click(first)
+      expect(first.getAttribute('data-kill-state')).toBe('pending')
+      fireEvent.click(screen.getByTitle(stopTitle('pnpm run watch')))
+      fireEvent.click(first)
+      expect(first.getAttribute('data-kill-state')).toBe('armed')
+      await act(async () => {
+        if (outcome === 'refusal') pending.resolve(false)
+        else pending.reject(new Error('transport closed'))
+      })
+      expect(first.getAttribute('data-kill-state')).toBe('armed')
+      expect(killJob).toHaveBeenCalledTimes(1)
+    },
+  )
+
   it('arming a second row disarms the first', () => {
     render(<JobListAction {...props([
       job(),

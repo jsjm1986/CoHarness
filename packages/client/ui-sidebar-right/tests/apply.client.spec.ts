@@ -48,6 +48,7 @@ interface Recorded {
 
 async function boot(sessionId = SESSION, runtime: SessionRuntimeTarget = { kind: 'personal' }) {
   const ctx = new Context()
+  onTestFinished(async () => { await ctx.fiber.dispose() })
   const registered: Recorded[] = []
   const slots = {
     inject: vi.fn((_name: string, register: Parameters<SlotRegistry['inject']>[1]) => ctx.effect(register)),
@@ -106,6 +107,17 @@ async function boot(sessionId = SESSION, runtime: SessionRuntimeTarget = { kind:
     return entry.inject(sessionId)
   }
   return { ctx, registered, dictionaries, layout, resources, fiber, seat, injectedOf, policy, description, sessions }
+}
+
+function layoutStorage(): Map<string, string> {
+  const values = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+  })
+  onTestFinished(() => { vi.unstubAllGlobals() })
+  return values
 }
 
 describe('ui-sidebar-right apply', () => {
@@ -487,5 +499,83 @@ describe('ui-sidebar-right apply', () => {
     ;(injectedOf(seat('conversation.session.header.corner')) as { focus(): void }).focus()
     expect(layout.focusRightbar).toHaveBeenCalledWith(SESSION)
     await fiber.dispose()
+  })
+
+  it('retires persistence and identity listeners when a Session store is recreated', async () => {
+    const values = layoutStorage()
+    const { ctx, seat, policy, description } = await boot()
+    description.set({ executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(1)
+    const key = sessionPersistenceKey(ctx.sessions, SESSION, true, 1)
+    if (key === undefined) throw new Error('expected a verified persistence key')
+    const storage = `dsh.sidebar-right.v1.${key}`
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const previous = handle.create(SESSION)
+    previous.actions.setExpanded(SESSION, true)
+    const before = values.get(storage)
+    expect(before).toBeDefined()
+    const current = handle.create(SESSION)
+    current.actions.setExpanded(SESSION, false)
+    expect(values.get(storage)).not.toBe(before)
+    current.actions.setExpanded(SESSION, true)
+    const saved = values.get(storage)
+    expect(saved).toBeDefined()
+    previous.actions.setExpanded(SESSION, false)
+    expect(values.get(storage)).toBe(saved)
+    expect(current.getSnapshot().bySession[SESSION]?.layout.expanded).toBe(true)
+    const retired = previous.getSnapshot()
+    policy.setVerifiedAccountId(2)
+    expect(previous.getSnapshot()).toBe(retired)
+    expect(current.getSnapshot().bySession).toEqual({})
+    expect(values.get(storage)).toBe(saved)
+  })
+
+  it('pruning a Session store releases its adoption, resource holds, and reconciliation', async () => {
+    const values = layoutStorage()
+    const { ctx, seat, policy, description } = await boot()
+    description.set({ executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(1)
+    const key = sessionPersistenceKey(ctx.sessions, SESSION, true, 1)
+    if (key === undefined) throw new Error('expected a verified persistence key')
+    const storage = `dsh.sidebar-right.v1.${key}`
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    instance.actions.setExpanded(SESSION, true)
+    const tab = Object.values(instance.getSnapshot().bySession[SESSION]?.layout.tabs ?? {})[0]
+    if (tab === undefined) throw new Error('expected a retained guide')
+    const { signal } = ctx.sidebarRight.tabDomain.occurrence(SESSION, tab)
+    expect(signal.aborted).toBe(false)
+    expect(values.has(storage)).toBe(true)
+    instance.clearPersisted()
+    expect(values.has(storage)).toBe(false)
+    expect(signal.aborted).toBe(true)
+    expect(() => { ctx.sidebarRight.openSessionTab(SESSION, 'guide') }).toThrow('Session is not adopted')
+    const retired = instance.getSnapshot()
+    policy.setVerifiedAccountId(2)
+    expect(instance.getSnapshot()).toBe(retired)
+    instance.actions.setExpanded(SESSION, false)
+    instance.actions.setExpanded(SESSION, true)
+    expect(values.size).toBe(0)
+  })
+
+  it('a retired Session store cannot clear its replacement layout', async () => {
+    const values = layoutStorage()
+    const { ctx, seat } = await boot()
+    const key = sessionPersistenceKey(ctx.sessions, SESSION, false, undefined)
+    if (key === undefined) throw new Error('expected a local persistence key')
+    const storage = `dsh.sidebar-right.v1.${key}`
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const previous = handle.create(SESSION)
+    previous.actions.setExpanded(SESSION, true)
+    const current = handle.create(SESSION)
+    current.actions.setExpanded(SESSION, true)
+    const saved = values.get(storage)
+    expect(saved).toBeDefined()
+    previous.clearPersisted()
+    expect(values.get(storage)).toBe(saved)
+    expect(() => { ctx.sidebarRight.openSessionTab(SESSION, 'guide') }).not.toThrow()
+    current.clearPersisted()
+    expect(values.has(storage)).toBe(false)
+    expect(() => { ctx.sidebarRight.openSessionTab(SESSION, 'guide') }).toThrow('Session is not adopted')
   })
 })

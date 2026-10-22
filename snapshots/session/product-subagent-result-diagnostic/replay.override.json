@@ -23,8 +23,8 @@
     "kind": "chunks",
     "chunks": [
       { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_claude_output", "name": "job_output", "argumentsDelta": "{\"job_id\":\"subagent-1\",\"wait\":true}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_claude_output", "name": "job_output", "arguments": "{\"job_id\":\"subagent-1\",\"wait\":true}" } },
+      { "type": "tool-call-delta", "index": 0, "id": "call_claude_output", "name": "job_output", "argumentsDelta": "{\"job_id\":\"{{fromRequest:(subagent-[0-9a-f]{16})}}\",\"wait\":true}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_claude_output", "name": "job_output", "arguments": "{\"job_id\":\"{{fromRequest:(subagent-[0-9a-f]{16})}}\",\"wait\":true}" } },
       { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 5 } },
       { "type": "finish", "reason": { "kind": "tool-calls" } }
     ]
@@ -53,8 +53,8 @@
     "kind": "chunks",
     "chunks": [
       { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_codex_output", "name": "job_output", "argumentsDelta": "{\"job_id\":\"subagent-2\",\"wait\":true}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_codex_output", "name": "job_output", "arguments": "{\"job_id\":\"subagent-2\",\"wait\":true}" } },
+      { "type": "tool-call-delta", "index": 0, "id": "call_codex_output", "name": "job_output", "argumentsDelta": "{\"job_id\":\"{{fromRequest:(subagent-[0-9a-f]{16})}}\",\"wait\":true}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_codex_output", "name": "job_output", "arguments": "{\"job_id\":\"{{fromRequest:(subagent-[0-9a-f]{16})}}\",\"wait\":true}" } },
       { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 5 } },
       { "type": "finish", "reason": { "kind": "tool-calls" } }
     ]

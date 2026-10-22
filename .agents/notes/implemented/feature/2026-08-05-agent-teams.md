@@ -64,6 +64,8 @@ Worktree isolation is not a harness runtime behavior. A deployment or prompt may
 
 Package tests cover identity, name and authority checks, provider selection, reserved-id persistence collisions, child-before-Lead flush ordering, durable provisioning failure and pending-inbox JSONL/SQLite reconciliation, concurrent target-local ordering, pending/history de-duplication, mailbox limits, post-flush notification, bounded disposal with in-flight creation and dispatch cancellation, failed-member cleanup, task CAS and DAG validation, write-scope warnings, wait cancellation/timeout, inbox-preserving interruption, ordinary-fork isolation, legacy-control shadowing, compact declared-schema result rendering, and scoped registration HMR at per-file 100% coverage. A keyless headless Loader snapshot assembles the real Team plugins and records teammate creation, peer mail, dependent tasks, waiting, and Lead aggregation.
 
+Model-facing member identities and availability follow the [tool projection decision](../simplification/2026-09-15-model-agent-availability-and-team-targets.md); service residency and durable identity remain distinct.
+
 ## Consequences
 
 The Lead Session grows with whole task/member snapshots and mailbox acknowledgements. This favors independently inspectable recovery over compact deltas; configured task and pending-mail bounds cap active state, while deleted and delivered history remains append-only until broader Session retention applies.

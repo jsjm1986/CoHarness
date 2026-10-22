@@ -64,7 +64,7 @@ enter 分支的 `PreStepDecision.messages` 是拟议步骤的完整批次。wate
 - idle 状态下的 `inject()` 会立即追加一条持久 inbox 插入记录，但不会追加模型可见的 `user/message`；后续可唤醒投递可能开始 pre-step 处理。
 - 活跃轮次中的注入会在最近的后续 pre-step 边界领取，并位于完整工具结果批次之后、消费它的请求之前。
 - pre-step reject 或失败会丢弃其已领取批次；领取后插入的输入继续保持待处理。
-- 单元测试、持久化与 resume 测试、不变量测试和 TUI 覆盖会固定事件顺序、领取归属和持久回放。
+- 单元测试、持久化与 resume 测试和 TUI 覆盖会固定事件顺序、领取归属和持久回放。
 
 ## 后果
 

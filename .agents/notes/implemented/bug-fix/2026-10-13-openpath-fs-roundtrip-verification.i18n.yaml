@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-openpath-fs-roundtrip-verification.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-openpath-fs-roundtrip-verification.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-openpath-fs-roundtrip-verification.md
+document:
+  en: b947f0ff32c6d8d721e14b5f2d01d3970117e827
+  zh: 45f846eb99cc60069d60341015427d15cefea071
 /agent-note-host-openpath-verifies-client-paths-through-the-filesystem:
   en: 795614216d9fbd04
   zh: 9e5ad7aefd7088cf

@@ -7,19 +7,17 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-Bin-only app that boots an external `cordis.yml`; its [`jsonrpc`](../../sdk/server/README.md) entry serves SDK clients over newline-delimited stdio. The config composes the spine, backends, and serving plugin. The published `dsh-jsonrpc-agent` bin resolves bare plugins from the configuration project. The Python SDK's `dsh-jsonrpc-agent-pkg` [single-executable runtime](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md) uses `lib/packaged-bin.js` instead: packaged bare plugins resolve from its closed runtime tree, while relative plugins remain configuration-relative.
+Bin-only app that boots an external `cordis.yml`; its [`jsonrpc`](../../sdk/server/README.md) entry serves SDK clients over newline-delimited stdio. The config composes the spine, backends, and serving plugin. The published `dsh-jsonrpc-agent` bin resolves bare plugins from the configuration project. `dsh-jsonrpc-agent-pkg` uses `lib/packaged-bin.js`: bare plugins resolve from its installed runtime tree, while relative plugins remain configuration-relative. The Python SDK uses the separate [profile-based CLI runtime](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md).
 
 ## Summary
 
 Use `dsh-sdk-jsonrpc-demo` as the bin-only app that boots an external `cordis.yml` and serves SDK clients over newline-delimited stdio through its `jsonrpc` entry. The config composes the spine, backends, and serving plugin; the published `dsh-jsonrpc-agent` bin resolves bare plugins from the configuration project.
-
 
 ## Table of Contents
 
 - [Config discovery](#config-discovery)
 - [Exit lifecycle](#exit-lifecycle)
 - [stdout is the protocol](#stdout-is-the-protocol)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -42,11 +40,6 @@ stdin EOF and `SIGTERM` dispose the root to quiescence and exit 0; `SIGINT` exit
 ## stdout is the protocol
 
 stdout carries only JSON-RPC frames. The bin and boot guards diagnose on stderr, and the config must omit stdout loggers.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The package supplies an entry point and a `cordis.yml`; all runtime relationships belong to the composed plugins.
 
 <a id="model-experience"></a>
 ## Model Experience

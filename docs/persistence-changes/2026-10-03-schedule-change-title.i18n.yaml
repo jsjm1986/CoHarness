@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-03-schedule-change-title.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-03-schedule-change-title.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-03-schedule-change-title.md
+document:
+  en: 5b7ed345f9694f20b36293ed1a8f6bfc9f2396e6
+  zh: ece10e133dd49ccbcf427ecfb684e85df283c35a
 /:
   en: 3d5a424ae7d7e46b
   zh: c22a8e4a62d8cc1a

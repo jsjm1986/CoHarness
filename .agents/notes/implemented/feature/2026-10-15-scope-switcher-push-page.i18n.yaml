@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-scope-switcher-push-page.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-scope-switcher-push-page.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-scope-switcher-push-page.md
+document:
+  en: 0df5e82a34e859152b28e0069bb9233f23c93239
+  zh: 50807bd800a21ed268b958576d49ff8a6a7d4c96
 /agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column:
   en: 50be87b614162869
   zh: f2d8a6ffe0fbb0a5

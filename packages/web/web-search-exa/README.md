@@ -19,7 +19,6 @@ With `dsh-web-search-exa`, the harness searches the web through Exa and gets ven
 
 - [Config](#config)
 - [Mapping](#mapping)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -49,11 +48,6 @@ With `dsh-web-search-exa`, the harness searches the web through Exa and gets ven
 ## Mapping
 
 Exa returns a flat `results[]` and no generated answer, so `content` is omitted. Each result maps to a `WebSearchSource`: `url` ← `url`, `title` ← `title`, `snippet` ← the first non-empty `highlights[]` entry (a result with no highlight has no portable snippet and is dropped), `publishedAt` ← `publishedDate`. A request's `maxResults` wins over the configured `numResults` default and is sent as Exa's `numResults` for a cost/latency optimization; the final bound is enforced by the seam. Provider failures (HTTP errors, network failure, unparseable or wrong-shape bodies) surface as `WebError` `WEB_PROVIDER_ERROR`; an aborted request surfaces as `WEB_ABORTED`. HTTP redirects are rejected before the `Location` target is contacted and surface as `WEB_PROVIDER_ERROR`.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each query is one stateless provider request mapped into normalized results; no search state is retained between calls.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -61,7 +61,6 @@ Fiber states map onto the public phase vocabulary, with `disposed` folding into 
 |---|---|
 | [`src/index.ts`](src/index.ts) | `PluginInventoryGateway`: the `pluginInventory` Remote service and the Loader projection |
 | [`src/types.ts`](src/types.ts) | Public payload types: `PluginInventoryEntry`, `PluginInventorySnapshot`, `PluginFiberPhase` |
-| — | No runtime invariant companion is published; every snapshot is projected directly from Loader-owned state. |
 
 Typert generates the Host and Client Remote artifacts exposed by `./typert` and `./remote`.
 
@@ -93,12 +92,11 @@ None; this package neither assembles nor sends a provider request.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define what a point-in-time inventory cannot tell a client. They are current package constraints, not a task backlog.
 
 - **Point-in-time state only** — the result contains no durable failure history or subscription; a missing root Fiber is reported as `null`, regardless of why no live root exists.
 - **No introduction source or mutation** — the service does not identify which bundle, profile, or override introduced an entry, and it cannot enable, disable, add, or remove plugins in either plane.
-- **Presets appear only with a roster** — a deployment without `dsh-agent-presets` serves Loader entries alone; the `agentPresets` field is absent rather than empty.
+- **Presets appear only with a roster** — a deployment without `dsh-agent-preset-registry` serves Loader entries alone; the `agentPresets` field is absent rather than empty.
 
 <a id="dev-note"></a>
 ### Dev Note

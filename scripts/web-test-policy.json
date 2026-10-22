@@ -20,6 +20,7 @@
     "auto-review-denial.e2e.ts": "conversation",
     "background-job-list.e2e.ts": "workbench",
     "bash-abort-row.e2e.ts": "conversation",
+    "blank-preset-reuse.e2e.ts": "lifecycle",
     "built-boot.snapshot.ts": "shell",
     "chat-continuous-conversation.e2e.ts": "conversation",
     "chat-long-interactions.e2e.ts": "conversation",
@@ -45,7 +46,9 @@
     "details-session-lifecycle.e2e.ts": "lifecycle",
     "diff-context.e2e.ts": "conversation",
     "document-manager.e2e.ts": "documents",
+    "draft-initialization.e2e.ts": "lifecycle",
     "feedback-command.e2e.ts": "conversation",
+    "file-upload-round.e2e.ts": "conversation",
     "goal-bar.e2e.ts": "conversation",
     "goal-command-presentation.e2e.ts": "conversation",
     "goal-multi-turn-actions.e2e.ts": "conversation",
@@ -59,6 +62,7 @@
     "markdown-cjk-strong.e2e.ts": "conversation",
     "markdown-images.e2e.ts": "conversation",
     "markdown-inline-code-links.e2e.ts": "conversation",
+    "markdown-wide-table.e2e.ts": "conversation",
     "math-rendering.e2e.ts": "conversation",
     "max-tokens-notice.snapshot.ts": "conversation",
     "message-actions.e2e.ts": "conversation",
@@ -100,6 +104,7 @@
     "session-feedback.e2e.ts": "conversation",
     "settings-chrome.e2e.ts": "settings",
     "settings-compact.e2e.ts": "settings",
+    "shell-command-details.e2e.ts": "conversation",
     "shipped-composition.e2e.ts": "shell",
     "sidebar-browser.e2e.ts": "documents",
     "sidebar-scrollbar.e2e.ts": "workbench",
@@ -122,6 +127,7 @@
     "turn-tail-actions.e2e.ts": "conversation",
     "user-terminal.e2e.ts": "conversation",
     "vite-entry.e2e.ts": "shell",
+    "voice-input.e2e.ts": "conversation",
     "web-search-round.e2e.ts": "conversation",
     "webhook.e2e.ts": "conversation",
     "workbench.e2e.ts": "workbench",
@@ -211,9 +217,15 @@
     ],
     "apps/web/tests/webhook.overlay.yml": [
       "webhook.e2e.ts"
+    ],
+    "snapshots/web/fresh-round-trip/session.v3.jsonl": [
+      "voice-input.e2e.ts"
     ]
   },
   "packages": {
+    "api/terminal-controller": "conversation",
+    "boot/plugin-manager": "settings",
+    "client/file-upload": "conversation",
     "client/hmr": "shell",
     "client/locale": "all",
     "client/shortcuts": [
@@ -266,6 +278,7 @@
     "client/ui-permission-presets": "settings",
     "client/ui-plan": "conversation",
     "client/ui-plugin-manager": "settings",
+    "client/ui-plugin-market": "settings",
     "client/ui-primitives": "all",
     "client/ui-project-activity": "workbench",
     "client/ui-reference": "conversation",
@@ -275,6 +288,7 @@
     "client/ui-settings": "settings",
     "client/ui-settings-general": "settings",
     "client/ui-settings-models": "settings",
+    "client/ui-settings-plugin-inventory": "settings",
     "client/ui-settings-plugins": "settings",
     "client/ui-settings-unarchive-sessions": "settings",
     "client/ui-shortcuts": [
@@ -287,7 +301,9 @@
       "workbench"
     ],
     "client/ui-sidebar-browser": "documents",
+    "client/ui-sidebar-files": "workbench",
     "client/ui-sidebar-right": "all",
+    "client/ui-sidebar-terminal": "conversation",
     "client/ui-skill": "conversation",
     "client/ui-slots": "all",
     "client/ui-subagent": "subagent",
@@ -314,8 +330,13 @@
     "client/userdoc-upload": "documents",
     "experimental/agent-team": "subagent",
     "experimental/client-ui-agent-team": "subagent",
+    "experimental/client-ui-claude-code-mods": "conversation",
+    "experimental/client-ui-cot-translation": "conversation",
     "experimental/client-ui-voice-input": "conversation",
+    "experimental/inspector": "workbench",
+    "experimental/session-inspector": "workbench",
     "goal/goal": "conversation",
+    "host/plugin-inventory": "settings",
     "interaction/permission-presets": "settings",
     "llm/token-meter": "conversation",
     "memory/memory": [
@@ -330,10 +351,6 @@
     "session/session-turn-outline": "workbench",
     "subagent/subagent": "subagent",
     "todo/tool-todo": "conversation",
-    "client/ui-sidebar-terminal": "conversation",
-    "api/terminal-controller": "conversation",
-    "boot/plugin-manager": "settings",
-    "host/plugin-inventory": "settings",
     "webhook/webhook": "all",
     "webhook/webhook-github": "conversation"
   },

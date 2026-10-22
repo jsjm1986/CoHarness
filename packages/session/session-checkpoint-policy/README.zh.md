@@ -16,7 +16,6 @@ kind: "package-reference"
 ## 目录
 
 - [插件（命名空间：`session-checkpoint-policy`）](#plugin-namespace-session-checkpoint-policy)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -41,12 +40,6 @@ kind: "package-reference"
 策略延迟包装 `llm/stream`，因此下游流只会在活动会话中缓冲的请求事件已持久化后构造。它在预执行策略和防护机制之后包装 `tools/execute`；只有在已记录调用已持久化后，顶层工具正文才会运行。如果取消在 flush 等待期间到达，包装层会返回规范的 `ABORTED_BEFORE_DISPATCH` 结果，不进入工具正文。嵌套工具分派重用外层模型可见调用的检查点。`agent/pre-step` 在派生请求前持久化前一响应/结果批次。
 
 在模型和工具边界，检查点被拒绝时会按失败即阻止原则处理：适配器和顶层工具正文都不运行。步骤边界处的检查点被拒绝会在另一个请求开始前使轮次失败。并发工具检查点共享会话存储的串行持久化排空流程，不会产生重复的序列号。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。策略在已定义边界上触发所属会话的检查点；它自身不存储检查点数据。
-
 
 <a id="model-experience"></a>
 ## 模型体验

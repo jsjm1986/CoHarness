@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/ptc-runtime-python/README.md
+document:
+  en: 32cb7c2e7cea0a21ff24144bf3e0ba5c0a994006
+  zh: 3fca6303e951896ea46f478c6c5691141cfb7214
 /:
   en: d9caf4b17c0e6fe4
   zh: 7233b09cfb890559
@@ -45,11 +48,11 @@
   en: 4f322d79bbf578f6
   zh: 7f7f9187f49af439
 /deepseek-ai-dsh-experimental-ptc-runtime-python/further-exploration:
-  en: c06d5d6dc0a06bb6
-  zh: 05018fa846aac6e5
+  en: 160ce2d224f9a953
+  zh: e698b35ccf3ce665
 /deepseek-ai-dsh-experimental-ptc-runtime-python/model-experience:
-  en: 42064c81cda8f059
-  zh: fa68d1acac16e263
+  en: 79863a171221fa59
+  zh: 961125d015b1e800
 /deepseek-ai-dsh-experimental-ptc-runtime-python/model-experience/kv-cache-effect:
   en: 40294c1c31b74824
   zh: d805c6bd7270505e
@@ -57,5 +60,5 @@
   en: 5d62ed07fefbefc4
   zh: 2a03d9bc9265a200
 /deepseek-ai-dsh-experimental-ptc-runtime-python/known-limitations-and-deferred-work/dev-note:
-  en: 9ead50d7c3b0ec97
-  zh: 839965ec9f169895
+  en: f57d5fcd5b2e8a44
+  zh: b210a0dce56f2e8a

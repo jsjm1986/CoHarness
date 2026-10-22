@@ -16,7 +16,7 @@ from typing import BinaryIO, Callable, TypeAlias, TypeVar
 
 from pydantic import BaseModel
 
-from .errors import JsonRpcError, TransportClosedError
+from .errors import JsonRpcError, SdkProtocolError, TransportClosedError
 from .models import IncomingRequest, InitializeResponse, JsonObject, JsonValue, Notification
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -186,7 +186,7 @@ class HarnessClient:
             return
         try:
             if not self._runtime_dead:
-                self.request("shutdown", None, response_model=_ShutdownResponse, timeout_seconds=self.config.shutdown_timeout_seconds)
+                self.request("shutdown", None, response_model=_EmptyResponse, timeout_seconds=self.config.shutdown_timeout_seconds)
         except Exception as exc:
             self._stderr_lines.append(f"shutdown request failed: {exc}")
         if proc.stdin:
@@ -256,6 +256,14 @@ class HarnessClient:
             notification_subscription=notification_subscription,
         )
         return response.messageId
+
+    def resume_session(self, session_id: str) -> None:
+        """Restore a persisted session without sending a prompt; propagate restoration failures."""
+        self.request(
+            "session/resume",
+            {"sessionId": session_id},
+            response_model=_EmptyResponse,
+        )
 
     def get_working_directory(self, session_id: str) -> str:
         """Read the effective directory, recovering a missing directory to the Session origin."""
@@ -796,7 +804,7 @@ class _WorkingDirectoryResponse(BaseModel):
     cwd: str
 
 
-class _ShutdownResponse(BaseModel):
+class _EmptyResponse(BaseModel):
     pass
 
 

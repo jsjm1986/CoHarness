@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-05-pwsh-ui-bash-parity.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-05-pwsh-ui-bash-parity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-pwsh-ui-bash-parity.md
+document:
+  en: ee7a6146fca4123f8cbeeb337b4c23b0788e5e3e
+  zh: cc6e7fb8c350dcabad57d5e434eb12776b68666d
 /agent-note-pwsh-ui-presentation-matches-bash:
   en: 099d8ed00b601168
   zh: 78677239841beb31

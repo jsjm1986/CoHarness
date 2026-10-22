@@ -27,7 +27,7 @@ interface TeamMemberSnapshot {
 }
 ```
 
-每个 member 都从 `provisioning` 开始，并且只到达一个终态 roster phase：`active` 或 `failed`。运行时 `running`／`idle`／`inactive` 状态单独派生，绝不会重写该记录。
+每个 member 都从 `provisioning` 开始，并且只到达一个终态 roster phase：`active` 或 `failed`。Roster `running`／`inactive` 状态单独派生，绝不会重写该记录。
 
 ## 持久 mailbox
 
@@ -177,7 +177,7 @@ async waitForChange(caller: Agent, timeoutMs: number, signal: AbortSignal): Prom
  * @param targetName - durable teammate name.
  * @returns the target status sampled before cancellation.
  */
-interrupt(caller: Agent, targetName: string): { previousStatus: 'running' | 'idle' | 'inactive' }
+interrupt(caller: Agent, targetName: string): { previousStatus: 'running' | 'inactive' }
 
 /**
  * Read the current roster and non-deleted task board through the generated Remote API.

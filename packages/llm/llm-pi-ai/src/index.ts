@@ -70,7 +70,8 @@ import type {
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { PiAiAdapter } from './adapter.ts'
-import { catalogProviderIds, SUPPORTED_THINKING_FORMATS } from './catalog.ts'
+import { catalogProvider, catalogProviderIds, SUPPORTED_THINKING_FORMATS } from './catalog.ts'
+import { providerDefaultsOf } from './provider-data.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
 import type {
   PiAiCompatProfile,
@@ -241,6 +242,10 @@ function directoryEntries(
       // narrowing a shipped provider's models stores a profile too, and that
       // route is still one pi-ai knows.
       declared: !catalog.has(provider),
+      ...(() => {
+        const installed = catalogProvider(provider)
+        return installed === undefined ? {} : providerDefaultsOf(installed)
+      })(),
       ...metadata === undefined ? {} : {
         management: metadata.management,
         ...metadata.projectId === undefined ? {} : { projectId: metadata.projectId },

@@ -63,6 +63,7 @@ async function mount(overrides: Partial<ConnectionHandle> = {}): Promise<Bench> 
   const handle: ConnectionHandle = {
     api,
     isLoopback: true,
+    interactions: 'none',
     hostDescription: {
       getSnapshot: () => description,
       subscribe: (listener) => {

@@ -16,6 +16,8 @@ The collapsed row uses a 14-pixel document-and-sparkle glyph and the Bash row's 
 
 The row derives every visible value from a paired call/result slice in the current runtime window. It reads the skill name from the recorded `name` argument and the instructions from durable result content, and never joins the current skill catalog for descriptions or provider metadata. If pagination leaves the call outside the window, the result has no tool identity and remains on the generic fallback rather than extending the history wire contract. The existing ACP `skill-load` recording is seeded through the real Web persistence and composition path for a keyless interaction and accessibility snapshot.
 
+The historical card remains independent of the installed registry. The separate [current-source preview](../architecture/2026-10-18-session-skill-source-preview.md) follows the current Session's visibility and does not replace the recorded instructions.
+
 ## Alternatives considered
 
 - Keep the generic tool row and add only a `skill` color selector in `ui-conversation`. This leaves the redundant input envelope and generic expanded body in place, and makes the conversation package own a domain-specific visual rule.

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-19-experimental-package-name-prefix.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-19-experimental-package-name-prefix.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-experimental-package-name-prefix.md
+document:
+  en: 3420fa20a0dd9519af5684142fc8f3e70f2ed779
+  zh: b7e7d073157eab272baed4ffb75f987a685f53d7
 /agent-note-mark-experimental-packages-in-npm-names:
   en: 723e4f3f029d420e
   zh: d0aeb4facf612547

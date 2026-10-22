@@ -193,9 +193,7 @@ Loop-retained response blocks append to the next request and preserve its earlie
 
 ## Known Limitations and Deferred Work
 
-
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define where the adapter stops and future work begins. They are current package constraints, not a general DeepSeek comparison or a task backlog.
 
@@ -211,7 +209,5 @@ These limits define where the adapter stops and future work begins. They are cur
 ### Dev Note
 
 None.
-
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
 
 `deepseek-official` uses only its configured API-key reference. Chat and Files requests reject redirects so credentials remain on the configured origin.

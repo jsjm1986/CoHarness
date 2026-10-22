@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import type { ContextMessageNode } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatViewSlotProps } from '../contract/slots.ts'
+import type { ChatViewSlotProps, UseDisclosure } from '../contract/slots.ts'
 import { DisclosureRow, IconBrowseOutline16, ReferenceIcon } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useDisclosure as useStandaloneDisclosure } from './use-disclosure.ts'
 import { contextBody } from './ContextBody.tsx'
 import css from './ContextInjectionRow.module.css'
 
@@ -13,6 +13,8 @@ export interface ContextInjectionRowProps {
   producer: ContextMessageNode['producer']
   /** Producer-declared information form; null renders the opaque body. */
   form: ContextMessageNode['form']
+  /** Seat-bound disclosure Hook; standalone rows fall back to unmanaged state. */
+  useDisclosure?: UseDisclosure | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -28,8 +30,8 @@ export interface ContextInjectionRowProps {
  * @param props - Durable content, its projected producer role/name and form, and the locale seat.
  * @returns A collapsed context row with a bounded, form-specific body.
  */
-export function ContextInjectionRow({ content, source, producer, form, t }: ContextInjectionRowProps) {
-  const [open, setOpen] = useState(false)
+export function ContextInjectionRow({ content, source, producer, form, useDisclosure, t }: ContextInjectionRowProps) {
+  const { expanded: open, toggle } = (useDisclosure ?? useStandaloneDisclosure)()
   // Resolved rather than declared: a form whose fields are unreadable renders
   // the opaque body, and the marker must say what the row actually shows.
   const { rendered, summary, body } = contextBody(form, { content, source, t })
@@ -81,7 +83,7 @@ export function ContextInjectionRow({ content, source, producer, form, t }: Cont
       open={open && single === undefined}
       expandable={single === undefined}
       expandOnRowClick
-      onToggle={() => { setOpen(value => !value) }}
+      onToggle={toggle}
     >
       <div className={css.body} data-context-injection-body data-context-form={rendered ?? undefined}>
         {toolBlocks === undefined ? body : (

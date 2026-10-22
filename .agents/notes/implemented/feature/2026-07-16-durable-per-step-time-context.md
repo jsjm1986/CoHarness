@@ -22,8 +22,6 @@ This message-bound zone record is not copied to `SessionHeader`, a connection de
 
 The resolved browser zone also formats the reading's timestamp. Mixed or unavailable requests use the configured `timeZone` fallback, or the Node process zone resolved once at plugin load when config is omitted, while retaining the clarify policy. Every fallback is validated through `Intl.DateTimeFormat`.
 
-Each reading uses the exact snapshot source `{ kind: 'plugin', plugin: 'time-context', form: 'snapshot', sections: [{ name: 'time-context', text: <same text> }] }`. The invariant companion checks the snapshot shape, re-derives current-turn browser-zone records from the original user-rpc messages, and validates the rendered timestamp zone and elapsed baseline.
-
 The optional `refreshIntervalMs` config is a non-negative safe integer. Omission or `0` injects on every eligible entered step. A positive value scans raw Session events for the latest plugin reading and injects when none exists, wall time moved backward, or the event is old enough. The event timestamp governs after compaction and resume without a process-local cache. The Schedule Web overlay omits the interval so every request step gets current browser guidance.
 
 ### Text and elapsed baselines

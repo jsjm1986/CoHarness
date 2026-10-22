@@ -9,7 +9,7 @@ import Include from '@deepseek-ai/cordis-plugin-include'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { createScope } from '@deepseek-ai/dsh-scope'
-import AgentPresets, { mountPreset } from '@deepseek-ai/dsh-agent-presets'
+import AgentPresetRegistry, { mountPreset } from '@deepseek-ai/dsh-agent-preset-registry'
 import DeepSeekLlmApiExtensionRegistry from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import * as PluginInventory from '../src/index.ts'
 
@@ -44,7 +44,7 @@ async function harness(enabled?: boolean): Promise<{ ctx: Context; root: string;
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   await ctx.plugin(AgentRegistry)
-  await ctx.plugin(AgentPresets, { default: 'fixture', roots: [], includeUserRoot: false })
+  await ctx.plugin(AgentPresetRegistry, { default: 'fixture', roots: [], includeUserRoot: false })
   await ctx.plugin(DeepSeekLlmApiExtensionRegistry)
   const inventory = enabled === undefined
     ? ctx.plugin(PluginInventory)

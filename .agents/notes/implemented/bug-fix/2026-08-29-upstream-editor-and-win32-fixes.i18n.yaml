@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-29-upstream-editor-and-win32-fixes.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-29-upstream-editor-and-win32-fixes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-29-upstream-editor-and-win32-fixes.md
+document:
+  en: e0a3f2b47db701ebf0c0407c694c40d09591e35a
+  zh: 555528b48242ec8b9d938c865071c1e3ced6d761
 /agent-note-preserve-utf-16-paths-and-tolerate-editor-placeholders:
   en: bcb3831b11e6ef71
   zh: a0dcb2792a7e8c26

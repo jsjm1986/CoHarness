@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-06-v3-canonical-session-envelopes.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-06-v3-canonical-session-envelopes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-v3-canonical-session-envelopes.md
+document:
+  en: 667b4a2ecbc231429959205cdf0d545fd122eacb
+  zh: a37d2f4338661e532943ecc9804d10dbba5ea508
 /agent-note-canonical-v3-session-event-envelopes:
   en: 17b0c507058d0bba
   zh: cc281197005d02c8

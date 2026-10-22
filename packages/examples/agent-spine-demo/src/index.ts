@@ -23,11 +23,6 @@ import GoalService, { type Config as GoalDomainConfig } from '@deepseek-ai/dsh-g
 import * as goalSession from '@deepseek-ai/dsh-goal-round-driver'
 import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
 import LocalJobRegistry, { type Config as JobsConfig } from '@deepseek-ai/dsh-jobs-local'
-import InvariantRegistry, { type Config as InvariantConfig } from '@deepseek-ai/dsh-invariants'
-import * as sessionInvariant from '@deepseek-ai/dsh-session/invariant'
-import * as agentInvariant from '@deepseek-ai/dsh-agent/invariant'
-import * as scopeInvariant from '@deepseek-ai/dsh-scope/invariant'
-import * as agentLoopInvariant from '@deepseek-ai/dsh-agent-loop/invariant'
 import * as toolBash from '@deepseek-ai/dsh-tool-bash'
 import * as bashEnv from '@deepseek-ai/dsh-shell-env'
 import * as workspaceContext from '@deepseek-ai/dsh-agent-instructions'
@@ -82,8 +77,7 @@ export interface GoalConfig {
  * Provider adapters own their `retryPolicy`; this bundle always mounts its
  * executor.
  * `goals` opts into and configures the persisted goal domain plus its model tool
- * and same-session driver; `invariants` configures global and package-filtered
- * relational checks. Owner schemas supply defaults for optional input;
+ * and same-session driver. Owner schemas supply defaults for optional input;
  * workspace context instead requires an explicit byte budget or `false` because
  * it changes model-visible input. Producer opt-in stays producer-local:
  * `toolBash` configures bash only; independently composed producers keep their
@@ -129,8 +123,6 @@ export interface Config {
   jobs?: JobsConfig
   /** Generic background-job controls; set false to keep the job service without model-facing job tools. */
   toolJobs?: toolJobs.Config | false
-  /** Global enablement and package-name filters for invariant companions. */
-  invariants?: InvariantConfig
   /** Opt-in persisted same-session goal stack; set false or omit to leave it unmounted. */
   goals?: GoalConfig | false
 }
@@ -176,10 +168,9 @@ export const Config = z.intersect([
     toolBash: ToolBashConfigSchema,
     jobs: JobsConfigSchema,
     toolJobs: z.union([z.const(false), ToolJobsConfigSchema]),
-    invariants: InvariantRegistry.Config,
     goals: z.union([z.const(false), GoalConfigSchema]),
     persona: z.string(),
-  }) as unknown as z<Pick<Config, 'tools' | 'dshHome' | 'sessionTitle' | 'skills' | 'workspaceContext' | 'toolBash' | 'jobs' | 'toolJobs' | 'invariants' | 'goals' | 'persona'>>,
+  }) as unknown as z<Pick<Config, 'tools' | 'dshHome' | 'sessionTitle' | 'skills' | 'workspaceContext' | 'toolBash' | 'jobs' | 'toolJobs' | 'goals' | 'persona'>>,
 ]) as unknown as z<Config>
 
 /**
@@ -205,7 +196,6 @@ export function pickSpineConfig(config: Omit<Config, 'agents'>): Omit<Config, 'a
     ...config.toolBash !== undefined ? { toolBash: config.toolBash } : {},
     ...config.jobs !== undefined ? { jobs: config.jobs } : {},
     ...config.toolJobs !== undefined ? { toolJobs: config.toolJobs } : {},
-    ...config.invariants !== undefined ? { invariants: config.invariants } : {},
     ...config.goals !== undefined ? { goals: config.goals } : {},
   }
 }
@@ -254,11 +244,6 @@ export function apply(ctx: Context, config: Config): void {
     ctx.plugin(goalSession)
   }
   ctx.plugin(LocalJobRegistry, config.jobs ?? {})
-  ctx.plugin(InvariantRegistry, config.invariants ?? {})
-  ctx.plugin(sessionInvariant)
-  ctx.plugin(agentInvariant)
-  ctx.plugin(scopeInvariant)
-  ctx.plugin(agentLoopInvariant)
   if (config.toolBash !== false) {
     ctx.plugin(bashEnv, { dshHome })
     ctx.plugin(toolBash, config.toolBash ?? {})

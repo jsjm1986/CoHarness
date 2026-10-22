@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-16-pnpm-over-yarn.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-16-pnpm-over-yarn.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-06-16-pnpm-over-yarn.md
+document:
+  en: c42616f8d1dcacd925719bc8662683f04022573b
+  zh: df2adbb3873415e2c732f4eb5f876f17e3c86003
 /agent-note-pnpm-as-the-package-manager-instead-of-yarn-4:
   en: 2c8be5b7d3dae8c7
   zh: e6d4d5dc41455f52

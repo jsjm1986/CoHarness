@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-auto-review-execution-attribution.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-auto-review-execution-attribution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.md
+document:
+  en: ed9f1f0421233805be11df98f74e442b77f7eef6
+  zh: 7b5548b1295102b18f78b778ce70dfb6731d966a
 /agent-note-auto-review-execution-authority-and-billing-attribution:
   en: 37cf33ffacb64c12
   zh: 6d9a70f76547f21a

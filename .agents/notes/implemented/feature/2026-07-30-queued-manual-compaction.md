@@ -12,7 +12,7 @@ The human command arrives between turns and must summarize asynchronously. A pro
 
 Compaction also needs one mutual-exclusion fact shared by manual, pressure, overflow, and explicit-range entry points. A process-local flag alone cannot explain a crash-recovered log, while a summarize-first transaction leaves no durable evidence during the expensive interval. Conversely, treating marker pairs as exclusive containers would forbid valid idle injection even though injection is explicitly non-waking and immediate between turns.
 
-This note extends the [compaction capability seam](2026-06-18-compaction-capability-seam.md), the [session end-seed boundary](../architecture/2026-07-30-session-end-seed-log-boundary.md), and the [removal of synthetic log-only turns](../simplification/2026-07-28-remove-synthetic-log-only-turns.md). Each remains active and owns its broader decision; the overlap is partial only.
+This note extends the [compaction capability seam](../../archived/feature/2026-06-18-compaction-capability-seam.md), the [session end-seed boundary](../architecture/2026-07-30-session-end-seed-log-boundary.md), and the [removal of synthetic log-only turns](../simplification/2026-07-28-remove-synthetic-log-only-turns.md). Each remains active and owns its broader decision; the overlap is partial only.
 
 ## Decision
 
@@ -67,8 +67,6 @@ Failed `changed` or `summary` attempts leave the conversation surface unchanged,
 
 Tail scanning finds the current turn, unmatched compaction start, and newest `session/end-seed` independently. An unmatched start after the newest end-seed is live and blocks every compaction entry point. An unmatched start before a later end-seed belongs to an earlier session lifecycle and is stale, so it does not wedge the resumed or forked session.
 
-The compaction invariant uses the same transition logic during seed replay: `session/end-seed` clears an open historical trace. The boundary need not publish live from the constructor for this case; replay is the load-bearing path.
-
 The client request projection closes an unmatched compaction request as interrupted at the `session/end-seed` time and clears its active index. A later `compaction/start` therefore creates an independent request instead of leaving or overwriting a permanently running orphan.
 
 Once a transaction has appended its start, every later failure makes one closing attempt. A failed close leaves the unmatched start deliberately visible and blocking, and no flush is attempted. A closed manual attempt is flushed even when it reports an expected failure. Cancellation retains exact-reason precedence after required close and flush cleanup.
@@ -97,7 +95,7 @@ That reference also carried client-side replacement-anchor machinery to preserve
 
 ## Verification
 
-Agent-loop tests cover same-tick right of way, preserved IDs and FIFO lifecycle, waking and quiet queued work, idempotent release, `whenIdle()`, cancellation, and teardown. Compact tests cover standalone and numbered invariant ownership, end-seed replay, live versus stale orphans, re-entrant listeners, selected-span drift, commit and close failures, flush ordering, exact cancellation causes, raw output and usage preservation, and automatic/manual mutual exclusion.
+Agent-loop tests cover same-tick right of way, preserved IDs and FIFO lifecycle, waking and quiet queued work, idempotent release, `whenIdle()`, cancellation, and teardown. Compact tests cover end-seed replay, live versus stale orphans, re-entrant listeners, selected-span drift, commit and close failures, flush ordering, exact cancellation causes, raw output and usage preservation, and automatic/manual mutual exclusion.
 
 The command package pins registration, Loader composition, argument rejection, exact success/failure text, cancellation, absence from model history, and disposal waiting across separate close and flush boundaries after an abort stops the executor from awaiting the handler. The client runtime projection test pins end-seed interruption followed by an independent completed attempt. The `queued-manual-compact` terminal snapshot drives real keystrokes through the assembled TUI: `/help` discovers the command, a held summary admits a queued prompt and immediate injection, `turn: null` markers and the flush precede the queued prompt turn, command lifecycle stays log-only, and the derived order is checkpoint → injection → queued prompt.
 

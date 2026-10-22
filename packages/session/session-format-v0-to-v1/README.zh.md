@@ -27,7 +27,7 @@ kind: "package-library"
 
 ### 何时使用
 
-持久化通过 `dsh-session-format-catalog` 获取该迁移边；功能组合不会挂载它。只有在装配或测试静态已发布格式目录时，才直接导入本包。它不发布运行时不变式伴生入口，因为本包没有状态可能彼此分歧的、可独立观测的运行时注册项；decoder 与 migration stage 的状态只属于一次还原。
+持久化通过 `dsh-session-format-catalog` 获取该迁移边；功能组合不会挂载它。只有在装配或测试静态已发布格式目录时，才直接导入本包。
 
 ### 入口
 
@@ -77,7 +77,6 @@ Alpha 迁移边会拒绝冻结清单之外的所有事件类型，包括带有 `
 - [会话子系统](../../../docs/subsystems/session.zh.md)——当前逻辑会话语义。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验

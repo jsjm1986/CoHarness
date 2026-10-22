@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-14-session-log-upload-default.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-14-session-log-upload-default.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-session-log-upload-default.md
+document:
+  en: c1e7c9e050d1b1809ff3abba03fe4e17a3779daa
+  zh: d7b6e64098eca3fe07c43272fcba18a3790182e2
 /agent-note-default-deepseek-session-log-upload:
   en: fcb31f3679ced0e2
   zh: 0e07b8a08f7e004f

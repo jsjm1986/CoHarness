@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-workbench-pane-grid-redesign.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-workbench-pane-grid-redesign.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-workbench-pane-grid-redesign.md
+document:
+  en: f1a011ad137a0f064bebc0aae81634a3cba38a98
+  zh: 671ccb81fa2bc132f120cbae3ee9d4f1ea27613c
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder:
   en: f483764b328d5518
   zh: 16f3488618c01649

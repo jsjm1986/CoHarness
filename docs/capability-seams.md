@@ -7,6 +7,10 @@ A service can be a core spine service, a swappable capability seam, a bundle/com
 
 ```mermaid
 flowchart LR
+  pkg_experimental_client_ui_cot_translation["experimental-client-ui-cot-translation"]
+  svc_cotTranslation["ctx.cotTranslation<br/>Reasoning translation Remote"]
+  pkg_experimental_translator["experimental-translator"]
+  svc_translator["ctx.translator<br/>Anonymous text translation"]
   pkg_host_apiproxy["host-apiproxy"]
   svc_hostSessionLifecycle["ctx.hostSessionLifecycle<br/>Host ownership and idle release of Session handles"]
   pkg_archive_gateway["archive-gateway"]
@@ -24,11 +28,19 @@ flowchart LR
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
   svc_pluginManager["ctx.pluginManager<br/>Current-profile plugin and bundle management"]
+  pkg_plugin_market["plugin-market"]
+  svc_pluginMarket["ctx.pluginMarket<br/>Plugin market index reader"]
+  pkg_client_ui_plugin_market["client-ui-plugin-market"]
   pkg_ui_plugin_manager["ui-plugin-manager"]
   svc_pluginRegistryProbe["ctx.pluginRegistryProbe<br/>Registry reachability probing for the install dialog"]
   svc_profileContext["ctx.profileContext<br/>Launcher-owned profile data"]
   pkg_office_to_pdf["office-to-pdf"]
   svc_officeToPdf["ctx.officeToPdf<br/>Office to PDF conversion"]
+  pkg_experimental_inspector["experimental-inspector"]
+  svc_inspector["ctx.inspector<br/>Cross-realm runtime inspection"]
+  pkg_experimental_worktree["experimental-worktree"]
+  svc_worktrees["ctx.worktrees<br/>Git worktree creation"]
+  pkg_experimental_tool_worktree["experimental-tool-worktree"]
   pkg_mcp_resources["mcp-resources"]
   svc_mcpResources["ctx.mcpResources<br/>Scoped MCP resource access"]
   pkg_mcp_client["mcp-client"]
@@ -51,6 +63,9 @@ flowchart LR
   svc_userDocs["ctx.userDocs<br/>User-uploaded document storage"]
   pkg_userdoc_local["userdoc-local"]
   pkg_tool_userdoc["tool-userdoc"]
+  pkg_client_file_upload["client-file-upload"]
+  svc_fileUploads["ctx.fileUploads<br/>Session-scoped staged upload receipts"]
+  pkg_commands["commands"]
   pkg_llm["llm"]
   svc_llm["ctx.llm<br/>LLM adapter registry"]
   pkg_llm_deepseek["llm-deepseek"]
@@ -77,10 +92,7 @@ flowchart LR
   pkg_session_query["session-query"]
   pkg_session_query_sqlite["session-query-sqlite"]
   pkg_subagent_inprocess["subagent-inprocess"]
-  pkg_invariants["invariants"]
   pkg_message_feedback["message-feedback"]
-  svc_invariants["ctx.invariants<br/>Package-owned invariant registry"]
-  pkg_scope["scope"]
   pkg_typert_registry["typert-registry"]
   svc_typert["ctx.typert<br/>Runtime type registry"]
   pkg_typert_loader["typert-loader"]
@@ -153,7 +165,6 @@ flowchart LR
   svc_planMode["ctx.planMode<br/>Plan collaboration state"]
   pkg_agent_preset_registry["agent-preset-registry"]
   svc_agentPresets["ctx.agentPresets<br/>Per-session agent composition"]
-  pkg_commands["commands"]
   svc_commands["ctx.commands<br/>Human command registry"]
   pkg_session_projection["session-projection"]
   svc_sessionProjections["ctx.sessionProjections<br/>Session projection units"]
@@ -244,6 +255,8 @@ flowchart LR
   pkg_agent_team["agent-team"]
   svc_agentTeams["ctx.agentTeams<br/>Agent Teams coordination domain"]
   pkg_tool_agent_team["tool-agent-team"]
+  pkg_experimental_claude_code_mods["experimental-claude-code-mods"]
+  svc_claudeCodeMods["ctx.claudeCodeMods<br/>Claude Code mods bridge"]
   pkg_jobs["jobs"]
   svc_jobs["ctx.jobs<br/>Background job registry"]
   pkg_jobs_local["jobs-local"]
@@ -254,6 +267,7 @@ flowchart LR
   pkg_web_search_exa["web-search-exa"]
   pkg_web_search_perplexity["web-search-perplexity"]
   pkg_web_search_deepseek["web-search-deepseek"]
+  pkg_web_deepseek_api["web-deepseek-api"]
   pkg_web_fetch_http["web-fetch-http"]
   pkg_spill["spill"]
   svc_spillStore["ctx.spillStore<br/>Spill storage seam"]
@@ -267,6 +281,9 @@ flowchart LR
   svc_webServer["ctx.webServer<br/>HTTP route registration"]
   pkg_connection["connection"]
   pkg_modules["modules"]
+  pkg_web_app["web-app"]
+  svc_webApp["ctx.webApp<br/>Served Web GUI"]
+  pkg_harness_dev_context["harness-dev-context"]
   pkg_webhook["webhook"]
   svc_webhookRuntime["ctx.webhookRuntime<br/>Webhook rule runtime"]
   pkg_webhook_github["webhook-github"]
@@ -315,6 +332,7 @@ flowchart LR
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
   pkg_browser_use --> svc_browserUse
+  pkg_client_file_upload --> svc_fileUploads
   pkg_collaboration --> svc_collaboration
   pkg_collaboration_gateway --> svc_collaboration
   pkg_commands --> svc_commands
@@ -336,11 +354,16 @@ flowchart LR
   pkg_experimental_browser_use_chrome_devtools_mcp --> svc_browserUse
   pkg_experimental_browser_use_playwright_mcp --> svc_browserUse
   pkg_experimental_browser_use_stagehand_native --> svc_browserUse
+  pkg_experimental_claude_code_mods --> svc_claudeCodeMods
+  pkg_experimental_client_ui_cot_translation --> svc_cotTranslation
   pkg_experimental_computer_use_cua_driver_mcp --> svc_computerUse
   pkg_experimental_computer_use_cua_driver_native --> svc_computerUse
+  pkg_experimental_inspector --> svc_inspector
   pkg_experimental_ptc_runtime_python --> svc_ptcRuntime
   pkg_experimental_speech_to_text --> svc_speechToText
   pkg_experimental_speech_to_text_sensevoice --> svc_speechToText
+  pkg_experimental_translator --> svc_translator
+  pkg_experimental_worktree --> svc_worktrees
   pkg_file_reference --> svc_fileReferences
   pkg_file_reference_local --> svc_fileReferences
   pkg_fs --> svc_fs
@@ -355,7 +378,6 @@ flowchart LR
   pkg_goal --> svc_goals
   pkg_hmr --> svc_hmr
   pkg_host_apiproxy --> svc_hostSessionLifecycle
-  pkg_invariants --> svc_invariants
   pkg_jobs --> svc_jobs
   pkg_jobs_local --> svc_jobs
   pkg_llm --> svc_llm
@@ -377,6 +399,7 @@ flowchart LR
   pkg_plan_mode --> svc_planMode
   pkg_plugin_manager --> svc_pluginManagementAuthorization
   pkg_plugin_manager --> svc_pluginManager
+  pkg_plugin_market --> svc_pluginMarket
   pkg_ptc_runtime --> svc_ptcRuntime
   pkg_ptc_runtime_node --> svc_ptcRuntime
   pkg_pwsh_local --> svc_shell
@@ -441,6 +464,8 @@ flowchart LR
   pkg_userdoc --> svc_userDocs
   pkg_userdoc_local --> svc_userDocs
   pkg_web --> svc_web
+  pkg_web_app --> svc_webApp
+  pkg_web_deepseek_api --> svc_web
   pkg_web_fetch_http --> svc_web
   pkg_web_search_deepseek --> svc_web
   pkg_web_search_exa --> svc_web
@@ -489,16 +514,13 @@ flowchart LR
   svc_executionAuthority --> pkg_host_apiproxy
   svc_executionAuthority --> pkg_subagent
   svc_executionAuthority --> pkg_subagent_in_process_driver
+  svc_fileUploads --> pkg_commands
   svc_fs --> pkg_tool_fs
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
   svc_hmr --> pkg_app_boot
   svc_hostSessionLifecycle --> pkg_archive_gateway
   svc_hostSessionLifecycle --> pkg_host_apiproxy
-  svc_invariants --> pkg_agent
-  svc_invariants --> pkg_agent_loop
-  svc_invariants --> pkg_scope
-  svc_invariants --> pkg_session
   svc_jobs --> pkg_api_job_controller
   svc_jobs --> pkg_tool_bash
   svc_jobs --> pkg_tool_jobs
@@ -519,6 +541,8 @@ flowchart LR
   svc_pluginManagementAuthorization --> pkg_cordis_host_runner
   svc_pluginManagementAuthorization --> pkg_plugin_manager
   svc_pluginManager --> pkg_plugin_manager
+  svc_pluginMarket --> pkg_client_ui_plugin_market
+  svc_pluginMarket --> pkg_plugin_market
   svc_pluginRegistryProbe --> pkg_ui_plugin_manager
   svc_profileContext --> pkg_plugin_manager
   svc_ptcRuntime --> pkg_tools
@@ -545,7 +569,6 @@ flowchart LR
   svc_sessionQuery --> pkg_tool_session_query
   svc_sessions --> pkg_agent
   svc_sessions --> pkg_agent_loop
-  svc_sessions --> pkg_invariants
   svc_sessions --> pkg_message_feedback
   svc_sessions --> pkg_session_persistence
   svc_sessions --> pkg_session_query
@@ -601,6 +624,7 @@ flowchart LR
   svc_tools --> pkg_tool_terminal
   svc_tools --> pkg_tool_todo
   svc_tools --> pkg_tool_web
+  svc_translator --> pkg_experimental_client_ui_cot_translation
   svc_typert --> pkg_api_gateway
   svc_typert --> pkg_typert_loader
   svc_userDocs --> pkg_tool_userdoc
@@ -608,6 +632,7 @@ flowchart LR
   svc_userTerminalAdministration --> pkg_api_terminal_controller
   svc_userTerminalAuthorization --> pkg_api_terminal_controller
   svc_web --> pkg_tool_web
+  svc_webApp --> pkg_harness_dev_context
   svc_webServer --> pkg_connection
   svc_webServer --> pkg_hmr
   svc_webServer --> pkg_modules
@@ -639,33 +664,39 @@ flowchart LR
   svc_workingDirectory --> pkg_tools
   svc_workingDirectory --> pkg_workflow_ptc
   svc_workspaceRegistry --> pkg_apiproxy
+  svc_worktrees --> pkg_experimental_tool_worktree
   svc_fs -. event gate .-> pkg_fs_observation_policy
 ```
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.cotTranslation` | `service` | [`experimental-client-ui-cot-translation`](../packages/experimental/client-ui-cot-translation) | - | - | - | Serves reasoning translations, reuses saved results, and joins ordinary Session activation for uncached inactive Sessions. |
+| `ctx.translator` | `service` | [`experimental-translator`](../packages/experimental/translator) | - | [`experimental-client-ui-cot-translation`](../packages/experimental/client-ui-cot-translation) | - | Resolves Google or Bing requests and retains shared experimental records through the active Session writer. |
 | `ctx.hostSessionLifecycle` | `core` | [`host-apiproxy`](../packages/host/apiproxy) | - | [`host-apiproxy`](../packages/host/apiproxy), [`archive-gateway`](../packages/context/archive-gateway) | - | The Host retains its factory handles, reserves Session identities during removal, and releases only idle resources before durable archive deletion. |
 | `ctx.executionAuthority` | `seam` | [`execution-authority`](../packages/context/execution-authority) | [`gateway-execution`](../packages/context/gateway-execution) | [`host-apiproxy`](../packages/host/apiproxy), [`subagent`](../packages/subagent/subagent), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`experimental-agent-team`](../packages/experimental/agent-team), [`experimental-auto-review`](../packages/experimental/auto-review) | - | Input transports stamp authenticated participants; delegated work retains their restrictions and privileged operations recheck current grants. |
 | `ctx.pluginManagementAuthorization` | `seam` | [`plugin-manager`](../packages/boot/plugin-manager) | [`gateway-execution`](../packages/context/gateway-execution) | [`plugin-manager`](../packages/boot/plugin-manager), [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | Managed runtimes require current administrator authority before profile and dynamic-plugin operations, including queued changes. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | Owns module and exact configuration watchers; application mutations share its queue and automatic reloads await the application file lock. |
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |
+| `ctx.pluginMarket` | `core` | [`plugin-market`](../packages/boot/plugin-market) | - | [`client-ui-plugin-market`](../packages/client/ui-plugin-market), [`plugin-market`](../packages/boot/plugin-market) | - | Fetches and validates the index sources the user configures; installation goes through the plugin manager. |
 | `ctx.pluginRegistryProbe` | `core` | `ui-plugin-manager` | - | `ui-plugin-manager` | - | Races the configured public registries through the Host fetch proxy and caches the first answer the Plugins-page install dialog can preselect. |
 | `ctx.profileContext` | `core` | [`app-boot`](../packages/boot/app-boot) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | The dsh launcher supplies data-only profile locations and composition inputs; reload scheduling belongs to dsh-hmr. |
 | `ctx.officeToPdf` | `core` | [`office-to-pdf`](../packages/document/office-to-pdf) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | Authorized deferred source reads feed a bounded Host converter using the declared native engine or Node WASM. |
+| `ctx.inspector` | `core` | [`experimental-inspector`](../packages/experimental/inspector) | - | - | - | Owns the Worker-hosted CDP target and the transport-independent Host and Client observation and Cordis-tree query API. |
+| `ctx.worktrees` | `seam` | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-tool-worktree`](../packages/experimental/tool-worktree) | - | Explicit experimental creation from a pinned local commit. Existing write permissions govern checkout and shared Git metadata; the working-directory service owns the resulting Session directory. |
 | `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | Connection-owned providers serve shared resource tools in the calling agent scope. |
 | `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | - | One provider-owned name per service instance. Providers own their tools and browser resources per live Session; the shared service has no browser operation API. |
 | `ctx.computerUseAuthorization` | `core` | [`computer-use`](../packages/computer-use/computer-use) | - | [`computer-use`](../packages/computer-use/computer-use) | - | Deployment policy surrounds actual native and MCP effects with authorization and cancellation; managed runtimes deny operations when the policy is absent. |
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | One provider-owned name per service instance. Each provider also owns its model tools; the service has no common action API, runtime selection, or Session workflow lock. |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content. |
 | `ctx.userDocs` | `seam` | [`userdoc`](../packages/attachment/userdoc) | [`userdoc-local`](../packages/attachment/userdoc-local) | [`tool-userdoc`](../packages/attachment/tool-userdoc) | - | Uploads land as real named files inside a directory the tool authorization policy already grants. The personal-document Consumer adds bounded discovery and text reads without exposing host paths; ordinary filesystem tools remain available for attached documents. |
+| `ctx.fileUploads` | `core` | [`client-file-upload`](../packages/client/file-upload) | - | [`commands`](../packages/interaction/commands) | - | Accepts streamed browser bytes and encoded Remote uploads, stages per-Session receipts, binds them to prompt requests, and retires them on delivery observation. |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | Adapters register provider implementations; the loop and compaction call the provider-neutral stream service. |
 | `ctx.deepseekLlmApiExtensions` | `seam` | [`deepseek-llm-api-extensions`](../packages/llm/deepseek-llm-api-extensions) | - | [`llm-deepseek`](../packages/llm/llm-deepseek), [`session-log-deepseek`](../packages/session/session-log-deepseek), [`plugin-package-inventory-deepseek`](../packages/llm/plugin-package-inventory-deepseek) | - | The registry owns additive provider-specific request fields and their post-acceptance callbacks; the official adapter prepares them, while extension plugins own field semantics. |
 | `ctx.modelAccess` | `seam` | [`model-access`](../packages/llm/model-access) | - | `apiproxy` | - | An optional deployment-owned policy decides exact provider/model routes; the gateway instance supplies the implementation, while apiproxy uses the decision for catalog and selection checks. |
 | `ctx.modelProviderConfig` | `seam` | [`model-provider-config`](../packages/llm/model-provider-config) | - | [`llm-pi-ai`](../packages/llm/llm-pi-ai), `apiproxy` | - | Deployment-owned providers publish immutable organization routes; LLM adapters consume them as non-editable provider profiles and the API proxy exposes their authorized catalog. |
 | `ctx.tokenMeter` | `core` | [`token-meter`](../packages/llm/token-meter) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements. |
 | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction. |
-| `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess`, [`invariants`](../packages/runtime-diagnostics/invariants), [`message-feedback`](../packages/feedback/message-feedback) | - | Owns append-only Session instances and emits the durable session event feed. |
-| `ctx.invariants` | `core` | [`invariants`](../packages/runtime-diagnostics/invariants) | - | [`session`](../packages/core/session), [`agent`](../packages/core/agent), [`scope`](../packages/core/scope), [`agent-loop`](../packages/core/agent-loop) | - | Companion subpaths register owner-local checks; the service owns selection, uniqueness, child fibers, and package-attributed failures. |
+| `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess`, [`message-feedback`](../packages/feedback/message-feedback) | - | Owns append-only Session instances and emits the durable session event feed. |
 | `ctx.typert` | `core` | [`typert-registry`](../packages/typert/registry) | - | [`typert-loader`](../packages/typert/loader), [`api-gateway`](../packages/api/gateway) | - | Plugins register live zod contributions directly or through dsh-typert-loader; the API gateway consumes invocation descriptors and providers, while other runtime consumers query schemas and reflection metadata at their own edges. |
 | `ctx.typertGateway` | `core` | [`api-gateway`](../packages/api/gateway) | - | - | - | Associates generated Remote descriptors with live Cordis services, resolves registered identities, and exposes unary calls through the shared Connection RPC carrier. |
 | `ctx.sessionPersistence` | `seam` | [`session-persistence`](../packages/session/session-persistence) | [`session-persistence-jsonl`](../packages/session/session-persistence-jsonl), [`session-persistence-sqlite`](../packages/session/session-persistence-sqlite), [`session-persistence-gateway`](../packages/session/session-persistence-gateway) | [`agent-loop`](../packages/core/agent-loop), [`tool-bash`](../packages/shell/tool-bash), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), [`message-feedback`](../packages/feedback/message-feedback) | - | Backends persist the same SessionEvent vocabulary; apps choose a backend at composition time. |
@@ -689,7 +720,7 @@ flowchart LR
 | `ctx.tools` | `core` | [`tools`](../packages/core/tools) | - | [`agent-loop`](../packages/core/agent-loop), [`tool-ask-user`](../packages/interaction/tool-ask-user), [`tool-bash`](../packages/shell/tool-bash), [`tool-cordis`](../packages/extensions/tool-cordis), [`tool-fs`](../packages/fs/tool-fs), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-skill`](../packages/skill/tool-skill), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-todo`](../packages/todo/tool-todo), [`tool-web`](../packages/web/tool-web) | - | Registers capabilities, owns the PTC transport, and routes calls through pre-policy, monotonic guards, around dispatch, post-policy, and final-result observation. |
 | `ctx.userQuestions` | `seam` | [`user-questions`](../packages/interaction/user-questions) | - | [`tool-ask-user`](../packages/interaction/tool-ask-user) | - | UI front ends provide the active human-answer provider; tool-ask-user pauses a tool call on the provider-neutral ask() promise. |
 | `ctx.planMode` | `core` | [`plan-mode`](../packages/plan/plan-mode) | - | - | - | Folds logged plan/mode state, flushes user selections at turn boundaries, renders deployment-owned guidance, registers /plan, and keeps the plan-exit schema stable across transitions. |
-| `ctx.agentPresets` | `core` | `agent-preset-registry` | - | - | - | Eagerly mounts YAML-declared preset revisions, binds Agents and cold readers to scoped contributions, and retains retired revisions until their last user releases them. |
+| `ctx.agentPresets` | `core` | [`agent-preset-registry`](../packages/preset/agent-preset-registry) | - | - | - | Eagerly mounts YAML-declared preset revisions, binds Agents and cold readers to scoped contributions, and retains retired revisions until their last user releases them. |
 | `ctx.commands` | `core` | [`commands`](../packages/interaction/commands) | - | - | - | Plugins register direct human commands without sending invocations to the model. |
 | `ctx.sessionProjections` | `core` | [`session-projection`](../packages/session/session-projection) | - | [`tool-todo`](../packages/todo/tool-todo), [`session-title`](../packages/session/session-title), [`host-apiproxy`](../packages/host/apiproxy) | - | Domains register state-driven fold units; the eager drive keeps per-session watermark states and api-proxy serves baselines and pushes changed values. |
 | `ctx.sessionProjectionCache` | `core` | [`session-projection-cache`](../packages/session/session-projection-cache) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | Durably checkpoints projection unit states per session (throttled + turn/end/detach mandatory points) and serves the cold-read ladder: cache row + persistence tail replay, so listings never load full logs. |
@@ -718,11 +749,13 @@ flowchart LR
 | `ctx.subagents` | `seam` | [`subagent`](../packages/subagent/subagent) | [`subagent-spawn-in-process`](../packages/subagent/subagent-spawn-in-process), [`subagent-fork-in-process`](../packages/subagent/subagent-fork-in-process), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code), [`subagent-dsh-sdk`](../packages/subagent/subagent-dsh-sdk) | [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-subagent-control`](../packages/subagent/tool-subagent-control), [`tool-ralph`](../packages/workflow/tool-ralph) | - | Providers implement transports; the service also owns optional Activation-based continuation orchestration, tool-subagent selects one-shot or continuable delegation, tool-subagent-control delivers follow-ups, and tool-ralph requires one fresh structured-output route. |
 | `ctx.subagentModelSelection` | `core` | [`tool-subagent`](../packages/subagent/tool-subagent) | - | [`tool-subagent`](../packages/subagent/tool-subagent) | - | The settings service validates and snapshots the host allowlist used by the delegation tool when model-selection support is explicitly enabled; the shipped composition keeps it disabled by default. |
 | `ctx.agentTeams` | `core` | `agent-team` | - | `tool-agent-team` | - | Owns the implicit-root roster, durable peer mailbox, shared task DAG, and continuable-child lifecycle; tool-agent-team contributes the scoped model policy and controls. |
+| `ctx.claudeCodeMods` | `core` | [`experimental-claude-code-mods`](../packages/experimental/claude-code-mods) | - | - | - | Loads mods that defineMod plugins add, raises their hook chains from harness extension points, and draws the band above the prompt over its Remote. |
 | `ctx.jobs` | `seam` | [`jobs`](../packages/jobs/jobs) | [`jobs-local`](../packages/jobs/jobs-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-jobs`](../packages/jobs/tool-jobs), `api-job-controller` | - | Producers (background bash/pwsh, PTY sends, and subagent delegations) register running work; record-declaring jobs additionally stream raw output for non-consuming observers; tool-jobs is the model-facing controller that reads, lists, and kills it; jobs-local is the process-local registry. |
-| `ctx.web` | `seam` | [`web`](../packages/web/web) | [`web-search-exa`](../packages/web/web-search-exa), [`web-search-perplexity`](../packages/web/web-search-perplexity), [`web-search-deepseek`](../packages/web/web-search-deepseek), [`web-fetch-http`](../packages/web/web-fetch-http) | [`tool-web`](../packages/web/tool-web) | - | Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names. |
+| `ctx.web` | `seam` | [`web`](../packages/web/web) | [`web-search-exa`](../packages/web/web-search-exa), [`web-search-perplexity`](../packages/web/web-search-perplexity), [`web-search-deepseek`](../packages/web/web-search-deepseek), [`web-deepseek-api`](../packages/web/web-deepseek-api), [`web-fetch-http`](../packages/web/web-fetch-http) | [`tool-web`](../packages/web/tool-web) | - | Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names. |
 | `ctx.spillStore` | `seam` | [`spill`](../packages/spill/spill) | [`spill-local`](../packages/spill/spill-local) | [`spill-policy`](../packages/spill/spill-policy) | - | The backend saves oversized tool text and returns a model-facing locator plus retrieval hint; spill-policy is the tools/post-execute consumer that decides when to spill. |
 | `ctx.directoryPicker` | `seam` | `directory-picker` | `directory-picker-native`, `directory-picker-browse` | `apiproxy` | - | Discriminated interaction capability: the native backend opens one OS chooser on the host display, the browse backend serves listing/creation primitives for the in-app browser; dual-face backends fill ui-workspace directory-flow slots from their browser halves (no wire advertisement). |
 | `ctx.webServer` | `core` | `webserver` | - | `connection`, `modules`, [`hmr`](../packages/boot/hmr) | - | Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes. |
+| `ctx.webApp` | `core` | [`web-app`](../packages/bundle/web-app) | - | [`harness-dev-context`](../packages/context/harness-dev-context) | - | The web-runtime row advertises one URL for its Web GUI: the configured publicUrl, otherwise the listener origin; DSH_WEB_URL, the startup URL, and harness-dev-context read the same value. |
 | `ctx.webhookRuntime` | `core` | [`webhook`](../packages/webhook/webhook) | - | [`webhook-github`](../packages/webhook/webhook-github) | - | Fire-and-forget trusted rule registry whose callbacks abort and drain on disposal; session creation is the only built-in action, and providers own their delivery intake. |
 | `ctx.clientModules` | `core` | `modules` | - | [`hmr`](../packages/boot/hmr) | - | Composes the __DSH_BOOT__ entry graph from an incremental dsh.client scan, serves plugin bundles, and notifies rebuilt/graph-changed subscribers. |
 | `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-ptc`](../packages/workflow/workflow-ptc) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | One engine per context, as in bash, with no named-provider registry; the general workflow and fixed Ralph consumers start runs whose agent() calls fan out through ctx.subagents. |

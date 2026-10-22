@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for settings.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for settings.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/settings.md
+document:
+  en: edb1e45169f1702b9f319f530a2df214109fb9a0
+  zh: fc6b4315f6501bc32a4efea17a82042d60c8df1d
 /user-settings:
   en: ab240fd048bc8c2e
   zh: 3a1fe2b751998ad4

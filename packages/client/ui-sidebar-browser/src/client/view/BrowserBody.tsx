@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode, SubmitEvent } from 'react'
 import {
+  Button,
   IconChevronLeftOutline14,
   IconChevronRightOutline14,
   IconLinkOutline14,
@@ -72,20 +73,9 @@ function BrowserOccurrence(props: BrowserBodyProps): ReactNode {
   const [mountCount, setMountCount] = useState(0)
 
   useEffect(() => {
-    mount(tab.id, tab.signal, window.location.origin, initialState.current)
+    mount(tab.id, tab.signal, window.location.origin, initialState.current, initialUrl.current)
     setMountCount(count => count + 1)
   }, [mount, tab.id, tab.signal])
-
-  useEffect(() => {
-    if (mountCount === 0) return
-    const resumed = currentBrowserEntry(initialState.current)
-    if (resumed !== undefined) {
-      reload(tab.id)
-      return
-    }
-    const url = initialUrl.current
-    if (url !== undefined) loadUrl(tab.id, url)
-  }, [loadUrl, mountCount, reload, tab.id])
 
   const frameState = useBrowserFrame(tab.id) ?? INITIAL_BROWSER_FRAME
   const { document, sandboxed, loadFailed } = frameState
@@ -94,7 +84,8 @@ function BrowserOccurrence(props: BrowserBodyProps): ReactNode {
   const externalUrl = navigationUnknown ? undefined : current?.url
   const submit = (event: SubmitEvent<HTMLFormElement>): void => { event.preventDefault(); loadUrl(tab.id, draft) }
   const failure = state.failure === undefined ? undefined : failureText(state.failure.reason, t)
-  const placeholder = current === undefined ? t('start') : t('loading')
+  /* A restored checkpoint is offered, never loaded: the user restores it explicitly. */
+  const restoreTarget = document === undefined ? current : undefined
 
   return (
     <div className={css.root}>
@@ -138,9 +129,8 @@ function BrowserOccurrence(props: BrowserBodyProps): ReactNode {
       {!sandboxed && <div className={css.sandboxWarning} role="status">{t('sandbox.warning')}</div>}
       {loadFailed && <div className={css.failure} role="status">{t('web.loadFailed')}</div>}
       {failure !== undefined && <div className={css.failure} role="alert">{failure}</div>}
-      {document === undefined
-        ? <div className={css.start}>{placeholder}</div>
-        : <iframe
+      {document !== undefined
+        ? <iframe
           key={`${document.target.url}:${String(document.revision)}`}
           className={css.frame}
           src={document.src}
@@ -151,7 +141,17 @@ function BrowserOccurrence(props: BrowserBodyProps): ReactNode {
           /* v8 ignore next -- jsdom does not dispatch React iframe error events; BrowserFrame owns the tested behavior. */
           onError={() => { reportLoadFailed(tab.id, document.revision) }}
           data-sidebar-browser-frame
-        />}
+        />
+        : restoreTarget !== undefined
+          ? <section className={css.restore} aria-label={t('restore.previous')}>
+            <p className={css.restoreLabel}>{t('restore.previous')}</p>
+            <p className={css.restoreTitle}>{restoreTarget.title}</p>
+            <p className={css.restoreUrl}>{restoreTarget.url}</p>
+            <Button variant="primary" size="sm" disabled={mountCount === 0} onClick={() => { reload(tab.id) }}>
+              {t('restore.action')}
+            </Button>
+          </section>
+          : <div className={css.start}>{t('start')}</div>}
       <p className={css.limit}>{t('web.loopback')}</p>
       {navigationUnknown && <p className={css.limit}>{t('web.unknown')}</p>}
     </div>

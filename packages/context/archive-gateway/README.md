@@ -27,20 +27,13 @@ Permanent purge releases idle Host-owned handles before storage mutation and kee
 
 Use `dsh-archive-gateway` to synchronize a Gateway-launched runtime's durable Workspace archive state with the Gateway archive index. Revision-stamped, idempotent batches carry archived ids, lineage, headers, placement, and search projections; Gateway commands apply only after every batch of that revision succeeds. Requests are bounded and disposal joins the in-flight pass.
 
-
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Every sync batch is derived from the durable session corpus and revision-stamped against the Gateway index; the provider holds no local archive truth.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-21-dev-web-skip-build-artifact-isolation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-21-dev-web-skip-build-artifact-isolation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-21-dev-web-skip-build-artifact-isolation.md
+document:
+  en: 9afe9bb61a2e1231ce4a4f22233c4a6edaf46535
+  zh: f636d58212bc478a22e5e10258688e81f3b12f2e
 /agent-note-hmr-live-isolates-dev-web-from-the-lane-s-client-artifacts:
   en: 8ae352e0a9968e36
   zh: c8880c4a1010d48c

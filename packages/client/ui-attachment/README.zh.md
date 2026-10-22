@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "对话输入、消息和 Trajectory 图片的附件展示插件"
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-对话 UI 的动态附件呈现插件。它通过 `ctx.slots.inject` 等待 conversation 包声明 `conversation.input.attachments` 与 `conversation.message.images`，随后注册输入框草稿图片栏、文档拖放目标、聊天历史图片画廊和原图灯箱。conversation slot 持有方提供附件数据、图片加载、回调及其命名空间翻译器；呈现组件保持纯 props，且不从包入口导出。
+对话 UI 的动态附件呈现插件。它通过 `ctx.slots.inject` 等待 conversation 和 Trajectory 包声明 `conversation.input.attachments`、`conversation.message.images`、`conversation.details.images` 与 `conversation.trajectory.images`，随后注册输入框草稿图片栏、文档拖放目标、历史图片画廊和原图灯箱。各 slot 持有方提供附件数据、图片加载与回调，框架绑定 conversation 命名空间翻译器。呈现组件保持纯 props，且不从包入口导出。
 
 只有活动对话面板处理 document 级文件拖放事件；选择器回调始终保留打开它的 Session。
 
@@ -20,7 +20,6 @@ kind: "package-reference"
 - [附件栏](#attachment-rail)
 - [消息图片与灯箱](#message-images-and-the-lightbox)
 - [拖放遮罩](#drop-overlay)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -41,12 +40,6 @@ kind: "package-reference"
 ## 拖放遮罩
 
 `DropOverlay` 是文件拖拽悬停页面时的全视口邀请层：插画、标题，接受拖放时再加一行上限说明（`disabled` 换为禁用插画并隐藏上限行）。该层不接收指针事件——持有方的 document 级拖拽监听器负责 enter/leave 计数和接受与否的判定；遮罩只呈现状态。与灯箱一样经 body portal 渲染。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。本包向会话声明的 slot 贡献展示占位内容；附件数据、加载与回调都经由 slot 所有方的 inject 面到达。
-
 
 <a id="model-experience"></a>
 ## 模型体验

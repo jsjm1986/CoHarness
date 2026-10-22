@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-14-provider-routed-llm-adapters.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-14-provider-routed-llm-adapters.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-14-provider-routed-llm-adapters.md
+document:
+  en: e8b8cbed7b6d209a8b455f4514284b743a2def50
+  zh: 919347c0d7b73152c45440f9eca0c830f490deb6
 /agent-note-provider-routed-llm-adapters-and-a-generic-pi-ai-backend:
   en: e57698907c40f783
   zh: 47004d8f68af1d7d
@@ -15,8 +18,8 @@
   en: 25ec9977ef4292f5
   zh: 579394db8f1a7d8c
 /agent-note-provider-routed-llm-adapters-and-a-generic-pi-ai-backend/decision/explicit-pi-ai-provider-profiles:
-  en: 20d1d8fea222fe16
-  zh: 7fa11bac410d138a
+  en: 2fe5019c8cd167b2
+  zh: 2418077e39da2d8d
 /agent-note-provider-routed-llm-adapters-and-a-generic-pi-ai-backend/decision/recorded-assistant-route-and-replay-state:
   en: cecdc94e5c62f833
   zh: f92ba9556ca7a38f

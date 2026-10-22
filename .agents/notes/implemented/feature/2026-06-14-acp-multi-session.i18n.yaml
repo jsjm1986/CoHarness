@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-14-acp-multi-session.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-14-acp-multi-session.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-14-acp-multi-session.md
+document:
+  en: 7efdf968d1dc71e727c21b0c0ce4a6a51f3e6b42
+  zh: b713d5bd756d739a8876c7720042a34e81c25209
 /agent-note-multiplex-concurrent-acp-sessions-over-one-connection:
   en: d61f322f06b1bd26
   zh: 4300ec01fd711a50

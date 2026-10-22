@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-02-timed-user-questions-mux-port.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-02-timed-user-questions-mux-port.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-timed-user-questions-mux-port.md
+document:
+  en: 2febe3cf07a129aab815ceb18eac5912dab2ccae
+  zh: 6d65575129b1475504c69dffd5640a4347d544d9
 /agent-note-timed-user-questions-ported-onto-the-mux-question-transport:
   en: da90c6dd831daf88
   zh: 4af1eceaf0e2fb83

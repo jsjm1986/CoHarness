@@ -7,7 +7,7 @@ kind: "package-library"
 
 [English](README.md) | 中文
 
-纯 React 原子组件（零 cordis）：StateDot、DisclosureRow、ic_ds_* 图标、Button/Pill/Menu/Modal/Input/Switch、`ConnectionIndicator` 连接恢复控件、手机 Sheet 的 `MobileSheetBackdrop` 关闭遮罩、Toast 短时横幅、OnboardingSurface 首次使用接管层（portal 到 body 的遮罩加不透明展示层，在且仅在自身生命周期内保持 `#root` 为 `inert`）、markdown 家族（MessageText/MarkdownText/JsonBlock）、共享的 `ImageLightbox` 图片模态、自动聚焦的多行行内编辑器 `InlineEditor`（随文本与宽度增高，最多六行后滚动；Enter 保存，Shift+Enter 换行，输入法组合中的 Enter 不生效，Escape 取消）、只读 JsonTree 检查器、用于 portal presenter 的 `useMediaQuery` 视口钩子、`useAnchoredMaxHeight` 钩子（把底部锚定的浮层高度收敛到锚点上方的视口空间，并在 resize、scroll 与调用方提供的依赖变化时重新测量）、`useAnchoredPosition` 钩子（让固定定位的浮动面板跟住锚点：测量、偏移、按视口边距钳制，并在捕获阶段滚动、窗口缩放与面板自身尺寸变化时重新定位），以及支持可选 portal 面板 ref 的 `useDismissOnOutsidePointer`。代码块与 Read 块都会在进入视口前延迟语法高亮；首次进入后在本次挂载中保持语法启用。流式代码块只标记新完成的行，并保留有界的 React 行分组；未改变的围栏在定稿时复用流式树。TerminalBlock、DiffBlock、ReadBlock、SearchBlock，以及 WebBlock 补齐原语集合。
+纯 React 原子组件（零 cordis）：StateDot、DisclosureRow、ic_ds_* 图标、Button/Pill/Menu/Modal/Input/Switch、`ConnectionIndicator` 连接恢复控件、手机 Sheet 的 `MobileSheetBackdrop` 关闭遮罩、Toast 短时横幅、OnboardingSurface 首次使用接管层（portal 到 body 的遮罩加不透明展示层，在且仅在自身生命周期内保持 `#root` 为 `inert`）、markdown 家族（MarkdownText/JsonBlock）、共享的 `ImageLightbox` 图片模态、单行文件路径 `PathLabel`（目录弱化色、文件名主色、悬停显示完整路径；放得下时靠左对齐，溢出时在左边缘裁剪渐隐以保留文件名尾缀，路径或尺寸变化时重新测量）、自动聚焦的多行行内编辑器 `InlineEditor`（随文本与宽度增高，最多六行后滚动；Enter 保存，Shift+Enter 换行，输入法组合中的 Enter 不生效，Escape 取消）、只读 JsonTree 检查器、用于 portal presenter 的 `useMediaQuery` 视口钩子、`useAnchoredMaxHeight` 钩子（把底部锚定的浮层高度收敛到锚点上方的视口空间，并在 resize、scroll 与调用方提供的依赖变化时重新测量）、`useAnchoredPosition` 钩子（让固定定位的浮动面板跟住锚点：测量、偏移、按视口边距钳制，并在捕获阶段滚动、窗口缩放与面板自身尺寸变化时重新定位），以及支持可选 portal 面板 ref 的 `useDismissOnOutsidePointer`。代码块与 Read 块都会在进入视口前延迟语法高亮；首次进入后在本次挂载中保持语法启用。流式代码块只标记新完成的行，并保留有界的 React 行分组；未改变的围栏在定稿时复用流式树。可选择中的单行命令或参数文本 `CommandText` 保持该行逐字呈现并横向滚动，仅在溢出时携带本地化 `label` 以具名 group 进入 Tab 顺序。TerminalBlock、DiffBlock、ReadBlock、SearchBlock，以及 WebBlock 补齐原语集合。`rankByName` 是 `/` 菜单命令源与 skill 源共享的候选排序器：查询必须是名字的不区分大小写的有序子序列；前缀命中排最前，其次按对齐分数，再按来源顺序（[排名决策](../../../.agents/notes/implemented/feature/2026-08-04-web-slash-command-fuzzy-discovery.zh.md)）。`projectUserText` 将已发送的用户文本投影为内联纯文本片段与引用 chip，供消息气泡与命令输入回显使用：`@` token 按会话标签、文件或目录形状装饰，`/name` token 仅在调用方提供该步骤实际解析出的名字时才装饰，slash chip 以代码字体呈现并沿用使用方的字号，以及 `SecretText` 凭据脱敏行内节点：`projectUserText` 对识别到的密钥、令牌与带密码地址输出它，提供逐值揭示开关且脱敏不改动日志原文。
 
 `Menu` 主列表在桌面使用锚点位置；可选的 `header` 固定在可滚动条目视口上方，可选的 `footer` 固定在下方；`listClassName` 允许消费方设置产品自己的列表几何约束，例如高度上限。768px 以下会使用 `--dsw-mobile-sheet-*` 变为遵守安全区的手机 Sheet，并统一提供遮罩和拖拽提示；可滚动菜单会把 header 和 footer 留在条目滚动区外，条目仍是可选择的 menu item，并保留相同的外部按下关闭和 Escape 行为。`Modal` 使用相同的 Sheet 呈现，并在打开期间把键盘焦点保持在对话框内。portal presenter 如果信息层级需要手机专属分支，应使用 `useMediaQuery('(max-width: 767px)')`；外壳内部组件继续使用 `data-viewport` 标记。
 
@@ -26,7 +26,6 @@ kind: "package-library"
 - [搜索结果](#search-results)
 - [Web 检索](#web-retrieval)
 - [兼容性](#compatibility)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -57,7 +56,7 @@ kind: "package-library"
 <a id="terminal-output"></a>
 ## 终端输出
 
-`TerminalBlock` 将一条 shell 命令渲染为终端表层：命令的每一行各占一个提示行（缩短后的 `cwd` 标签只出现在第一行，因为视图只知道一个工作目录，而一个 `cd` 就会让后面的行去到别处，标签之后是该行）、命令输出、非零退出码或终止信号对应的状态胶囊，以及写入原始 `output` prop 的复制控件。一枚运行状态 `StateDot` 为整次调用标记一次，位于第一行，以脱离文档流的方式落在卡片以自身左内边距预留的落区中，因此它位于卡片盒之内、提示文字之左。它用到 `StateDot` 的三种状态——`running` 期间为追逐动画，与渲染状态胶囊相同的退出状态为红色，其余为绿色——因此卡片直接陈述其命令是否仍在运行，而不是让人从有无输出中推断；由于 `StateDot` 是 `aria-hidden`，它携带一处视觉隐藏的文本标签。无论多少行都只有一枚状态点是有意为之：退出状态属于整次调用，因此每行一枚就会声称一个视图并不携带的逐行结果。命令文本使用 `white-space: pre`，因此重复空格、制表符与缩进续行都原样呈现，同时该行仍保持单行并以省略号截断。ANSI 转义序列通过 `anser`（打进本包浏览器产物）解析为 React span；光标移动在剥除无显示意义控制符之前先重放进逐行的列缓冲，因为回车与退格**只移动**光标：单是 `100%` 加回车再加 `OK` 显示为 `OK0%`，而 spinner 随重绘写出的 `\x1b[K` 会擦掉尾巴，因此 `100%\r\x1b[KOK` 显示为 `OK`。行内擦除的三种参数形式都被遵循，光标按终端列推进（8 列制表位；emoji 与 CJK 占两列；组合标记不占列），SGR 状态按单元格归一化存储，与终端一致，并跨行延续、在行结束时的状态处收束；基础 16 色前景色映射到 `--dsw-*` token，而 256 色板与真彩色值按字面 rgb 透传。输出保持 `white-space: pre` 并支持横向滚动，因此按列对齐的输出保留其对齐而不会软换行；超过 `maxLines`（默认 16）时折叠为头部切片加尾部切片，由展开按钮控制。原理：[Web 终端卡片笔记](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.zh.md)。
+`TerminalBlock` 将一条 shell 命令渲染为终端表层：命令的每一行各占一个提示行（缩短后的 `cwd` 标签只出现在第一行，因为视图只知道一个工作目录，而一个 `cd` 就会让后面的行去到别处，标签之后是该行）、命令输出、非零退出码或终止信号对应的状态胶囊，以及写入原始 `output` prop 的复制控件。一枚运行状态 `StateDot` 为整次调用标记一次，位于第一行，以脱离文档流的方式落在卡片以自身左内边距预留的落区中，因此它位于卡片盒之内、提示文字之左。它用到 `StateDot` 的三种状态——`running` 期间为追逐动画，与渲染状态胶囊相同的退出状态为红色，其余为绿色——因此卡片直接陈述其命令是否仍在运行，而不是让人从有无输出中推断；由于 `StateDot` 是 `aria-hidden`，它携带一处视觉隐藏的文本标签。无论多少行都只有一枚状态点是有意为之：退出状态属于整次调用，因此每行一枚就会声称一个视图并不携带的逐行结果。每个命令行经 `CommandText` 渲染：`white-space: pre` 并横向滚动，因此重复空格、制表符与缩进续行保持逐字且可选中；仅在溢出时该行才以具名 group（携带本地化 `commandLine(line)` 标签）进入 Tab 顺序——放得下的文本不产生 Tab 停靠点，而尺寸、文本与字体的变化会重新测量溢出且不丢失滚动位置。需要换行而非滚动的宿主可把 `--dsl-terminal-command-whitespace` 重绑定为 `pre-wrap`。ANSI 转义序列通过 `anser`（打进本包浏览器产物）解析为 React span；光标移动在剥除无显示意义控制符之前先重放进逐行的列缓冲，因为回车与退格**只移动**光标：单是 `100%` 加回车再加 `OK` 显示为 `OK0%`，而 spinner 随重绘写出的 `\x1b[K` 会擦掉尾巴，因此 `100%\r\x1b[KOK` 显示为 `OK`。行内擦除的三种参数形式都被遵循，光标按终端列推进（8 列制表位；emoji 与 CJK 占两列；组合标记不占列），SGR 状态按单元格归一化存储，与终端一致，并跨行延续、在行结束时的状态处收束；基础 16 色前景色映射到 `--dsw-*` token，而 256 色板与真彩色值按字面 rgb 透传。输出保持 `white-space: pre` 并支持横向滚动，因此按列对齐的输出保留其对齐而不会软换行；超过 `maxLines`（默认 16）时折叠为头部切片加尾部切片，由展开按钮控制。原理：[Web 终端卡片笔记](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.zh.md)。
 
 `running` 保持已经收到的输出可见，同时保留运行中指示；没有输出的运行中命令只显示提示行。复制在结算后可用。显式 `exitCode: null` 显示本地化的无退出码状态，绝不表示成功；信号优先于退出码。省略退出码时保持既有呈现方式。
 
@@ -88,12 +87,6 @@ kind: "package-library"
 
 `useMediaQuery` 为每个查询复用一个原生监听器，并在旧版 WebView 中回退到 `addListener`／`removeListener`。`holdInert` 在可用时使用原生 `HTMLElement.inert`，同时在浮层占有页面期间保持 `aria-hidden` 与 tab 停靠点安全。主题样式会先定义 `100vh` 视口回退，待 layout 插件发布可视视口高度后再覆盖。`relativeTime` 把某个时刻归入紧凑的"单位＋数量"桶，使所有为会话标注时间的界面对同一时刻给出一致读数；具体文案保留在各插件自己的词典中。
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。纯 React 原子组件不拥有运行时状态；其渲染契约由单元规格断言。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -110,7 +103,7 @@ kind: "package-library"
 - **字形级图标是重新绘制的近似版本**：鱼形标志（以及 ui-conversation 持有的闪光图标）来自字体字形，而本地设计数据无法导出其矢量几何；在获得精确导出路径前，使用手工重建版本代替。
 - **Pill 与 Input 没有设计来源**：两个原子组件均自行定义；与其相似的侧边栏搜索字段和视图标签条由消费方组合，不是这些原子组件。
 - **StateDot 没有 `Active` 变体**：支持的状态为 done、warning、ongoing 和 error。
-- **面向用户的文案经 label props 本地化，默认值为原中文字面量**：这些原子组件是 zero-cordis 的，拿不到 `ctx.locale`，因此 `HoverCard`（`copyLabel`/`copiedLabel`）、`TerminalBlock`（`labels`）、`JsonTree`（`labels`）、`CodeBlock`（`copyLabel`/`copiedLabel`）、`MarkdownText`（`codeLabels`）、`JsonBlock`（`truncatedLabel`）、`ConnectionBanner`（`label`）和 `Modal`（`closeLabel`）都把文案作为可选 props 接收。已本地化的插件用自己的 `t` 席位传入字典驱动的 label；什么都不传的消费方得到的就是这些默认值。`WebBlock` 尚未跟进这一模式：它的来源列表截断提示与 fetch 截断提示、以及空搜索提示仍是内联中文，待同样的 label-prop 处理。
+- **面向用户的文案经 label props 本地化，默认值为原中文字面量**：这些原子组件是 zero-cordis 的，拿不到 `ctx.locale`，因此 `HoverCard`（`copyLabel`/`copiedLabel`）、`TerminalBlock`（`labels`）、`CommandText`（`label`）、`JsonTree`（`labels`）、`CodeBlock`（`copyLabel`/`copiedLabel`）、`MarkdownText`（`codeLabels`）、`JsonBlock`（`truncatedLabel`）、`ConnectionBanner`（`label`）和 `Modal`（`closeLabel`）都把文案作为可选 props 接收。已本地化的插件用自己的 `t` 席位传入字典驱动的 label；什么都不传的消费方得到的就是这些默认值。`WebBlock` 尚未跟进这一模式：它的来源列表截断提示与 fetch 截断提示、以及空搜索提示仍是内联中文，待同样的 label-prop 处理。
 - **`TerminalBlock` 不是终端模拟器**：它渲染已结束或仍在运行的命令输出，而不是交互式会话：SGR 颜色与属性会被遵循，进度行所用的行内光标移动同样被遵循——回车、退格、行内擦除、制表位与字符宽度。绝对光标定位、清屏与备用屏幕序列会被剥离。基础 16 色中的洋红与青色没有对应 token，保持字面 rgb。
 
 <a id="dev-note"></a>

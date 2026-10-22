@@ -105,7 +105,7 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   // TODO(alpha.2): restore apps/cli/tests/web-agent-presets.e2e.ts with the
   // shipped-presets port that exports SHIPPED_PRESET_ROOT.
   { file: 'apps/web/tests/agent-preset-authoring.e2e.ts', upstream: ['cordis'] },
-  { file: 'packages/preset/agent-presets/tests/session.spec.ts', upstream: ['cordis'] },
+  { file: 'packages/preset/agent-preset-registry/tests/session.spec.ts', upstream: ['cordis'] },
   // The preset's own composition: its header comment and its system prompt name
   // the preset a model mounts, so the scoped name would send the model after an
   // id no roster reports.
@@ -116,6 +116,15 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'apps/cli/tests/windows-shell.spec.ts', upstream: ['cordis'] },
   // `agentPresets.mount(scope, 'cordis')` mounts the `cordis` preset id, not a package.
   { file: 'apps/cli/tests/profiles/web/tests/fixtures/creator-plugin-manager.mjs', upstream: ['cordis'] },
+  // These schedule pages and preset files name the `cordis` agent-preset id
+  // (the directory under apps/cli/config/agent-presets/), not a vendor package.
+  { file: 'docs/subsystems/schedule.md', upstream: ['cordis'] },
+  { file: 'docs/subsystems/schedule.zh.md', upstream: ['cordis'] },
+  { file: 'docs/user/guide/schedule.md', upstream: ['cordis'] },
+  { file: 'docs/user/guide/schedule.zh.md', upstream: ['cordis'] },
+  { file: 'packages/client/ui-agent-preset/src/client/CreatePluginMenuItem.tsx', upstream: ['cordis'] },
+  { file: 'packages/client/ui-agent-preset/tests/create-plugin-menu-item.client.spec.tsx', upstream: ['cordis'] },
+  { file: 'packages/client/ui-agent-preset/tests/settings-store.client.spec.ts', upstream: ['cordis'] },
   // GROUP_ORDER holds `packages/<group>/` directory names, not package names.
   { file: 'scripts/gen-module-graph.ts', upstream: ['cordis'] },
   { file: 'scripts/gen-doc-graphs.ts', upstream: ['cordis'] },
@@ -149,6 +158,13 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/host/apiproxy/tests/api-proxy-config.spec.ts', upstream: ['cordis'] },
   { file: 'packages/typert/protocol/src/types.ts', upstream: ['cordis'] },
   { file: 'scripts/gen-cordis-catalog.ts', upstream: ['cordis'] },
+  // The inspector bridge protocol names its own topics and ops `cordis/tree`
+  // and `cordis-tree/*`; they are wire ids on the bridge channel, not package
+  // specifiers, and both ends of the bridge live in this repository.
+  { file: 'packages/experimental/inspector/src/shared/bridge/messages/cordis.ts', upstream: ['cordis'] },
+  { file: 'packages/experimental/inspector/tests/cordis-query.host.spec.ts', upstream: ['cordis'] },
+  { file: 'packages/experimental/inspector/tests/cordis-tree.host.spec.ts', upstream: ['cordis'] },
+  { file: 'packages/experimental/inspector/tests/plugin.client.spec.ts', upstream: ['cordis'] },
   // The UI locale namespace and input-trigger source id are product keys.
   { file: 'packages/extensions/ui-cordis/src/client/CordisActionRow.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/CordisDefineRow.tsx', upstream: ['cordis'] },
@@ -170,7 +186,6 @@ const POSTCONDITIONS: readonly PostCondition[] = [
   { file: 'vendor/hmr/package.json', text: '"name": "@deepseek-ai/cordis-plugin-hmr"', count: 1 },
   { file: 'scripts/cordis-walk.ts', text: '@deepseek-ai\\/cordis', count: 1 },
   { file: 'scripts/cordis-walk.ts', text: '!== \'@deepseek-ai/cordis\'', count: 1 },
-  { file: 'scripts/gen-scoped-events.ts', text: '=== \'@deepseek-ai/cordis\'', count: 1 },
   { file: 'packages/typert/generator/src/analyzer.ts', text: '!== \'@deepseek-ai/cordis\'', count: 2 },
   { file: 'scripts/check-workspace-constraints.ts', text: '?.[\'@deepseek-ai/cordis\']', count: 2 },
   { file: 'packages/boot/app-boot/tsdown.config.ts', text: '[\'@deepseek-ai/cordis-plugin-include\']', count: 1 },

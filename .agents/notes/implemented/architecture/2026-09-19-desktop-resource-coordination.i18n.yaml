@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-19-desktop-resource-coordination.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-19-desktop-resource-coordination.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-desktop-resource-coordination.md
+document:
+  en: e680accd0ae06e12a5f0fc266ab04083654789e6
+  zh: 9117e9a28dce022f4576a70dedd2f58827ab4189
 /agent-note-gateway-coordinated-interactive-desktop-grants:
   en: 7ad707a826c72430
   zh: e4ff033b9f77cca5

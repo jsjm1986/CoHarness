@@ -1,5 +1,5 @@
 /** A fixed bootstrap runs inside the opaque iframe; no Host callbacks enter its document. */
-import { decodeText, encodeBytes, encodeText } from './bytes.ts'
+import { decodeText, encodeBytes, encodeText } from '../contract/html/bytes.ts'
 
 /** One statically declared local script, stylesheet, or image, already read under the source file's authority. */
 export interface HtmlAsset {

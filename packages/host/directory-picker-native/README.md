@@ -17,17 +17,11 @@ An operator at the host's display picks a workspace directory through a native O
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each `pick` spawns one platform chooser and resolves its outcome; no picker state survives the call.
 
 <a id="model-experience"></a>
 ## Model Experience

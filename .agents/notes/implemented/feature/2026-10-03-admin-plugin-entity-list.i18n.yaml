@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-03-admin-plugin-entity-list.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-03-admin-plugin-entity-list.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-03-admin-plugin-entity-list.md
+document:
+  en: 1ac75f916b99a83fbeafd98d8b4de9f2f3d54ad2
+  zh: 6125fac8c7d6863fd0b683521c6395dd8566d4da
 /agent-note-one-plugin-entity-list-replaces-the-split-composition-and-install-sections-on-the-admin-plugins-page:
   en: 6194290872842810
   zh: 26c7d352b18915f3

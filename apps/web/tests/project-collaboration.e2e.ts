@@ -303,6 +303,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       await scope.waitFor({ timeout: 10_000 })
       await scope.click()
       const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+      await scopePage.waitFor({ timeout: 10_000 })
       await scopePage.getByRole('button', { name: /Audit platform/ }).click()
 
       const dialog = page.getByRole('dialog', { name: 'Switching scope' })
@@ -406,7 +407,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await compareOrRefreshGolden(HEADER_GEOMETRY_EXPECTED, renderHeaderGeometry(metrics), MODE)
   }, 60_000)
 
-  it('creates a private draft instead of reusing a project blank, then idempotently reuses that draft', async () => {
+  it('mints a fresh Session for every bare New Session without probing project blanks', async () => {
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     const gateway = await mockGateway(page, 'rw')
@@ -431,19 +432,23 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       return created.length
     }, { timeout: 10_000 }).toBe(1)
     expect(privateSessionId).not.toBe(BLANK_SESSION_ID)
-    expect(gateway.conversationReads).toContain(BLANK_SESSION_ID)
+    // A bare create never probes the visible project blank's conversation
+    // detail: reuse is intentionally skipped, so no discovery read is issued.
+    expect(gateway.conversationReads).not.toContain(BLANK_SESSION_ID)
     expect(scaffold.ctx.agents.get(SessionId(privateSessionId))).toBeDefined()
 
     const agentCount = scaffold.ctx.agents.list().length
+    // A bare click that lands before the first create's navigation commits
+    // joins the in-flight create instead of minting a second Session+Agent;
+    // the persisted current-session marker flips at sessions.open(), strictly
+    // after that join window closes, so it is the settle signal for re-arming
+    // the button.
+    await expect.poll(() => page!.evaluate(() => localStorage.getItem('dsh.sessions.current')))
+      .toContain(privateSessionId)
     await newSession.click()
-    // Empty drafts stay deferred and are not workspace members yet. The
-    // persisted draft identity makes the second create idempotent, so the
-    // client checks the visible project candidate again but does not issue a
-    // conversation discovery request for the already-reserved private draft.
-    await expect.poll(() => gateway.conversationReads.filter(id => id === BLANK_SESSION_ID).length, { timeout: 10_000 })
-      .toBe(2)
-    await expect.poll(() => scaffold.ctx.agents.list().length, { timeout: 10_000 }).toBe(agentCount)
-    expect(scaffold.ctx.agents.list()).toHaveLength(agentCount)
+    await expect.poll(() => scaffold.ctx.agents.list().length, { timeout: 30_000 }).toBe(agentCount + 1)
+    expect(scaffold.ctx.agents.list()).toHaveLength(agentCount + 1)
+    expect(gateway.conversationReads).not.toContain(BLANK_SESSION_ID)
     expect(scaffold.ctx.agents.get(SessionId(privateSessionId))).toBeDefined()
   }, 60_000)
 
@@ -458,15 +463,19 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await scope.waitFor({ timeout: 10_000 })
     expect(await scope.textContent()).toContain('Read only')
     await scope.click()
-    expect(await page.getByText('New conversation visibility', { exact: true }).count()).toBe(0)
+    const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
+    await scopePage.waitFor({ timeout: 10_000 })
+    expect(await scopePage.getByText('New conversation visibility', { exact: true }).count()).toBe(0)
     await page.keyboard.press('Escape')
+    await scopePage.waitFor({ state: 'hidden' })
 
     const readOnly = page.getByRole('status').filter({ hasText: 'Read-only project' })
     await readOnly.waitFor({ timeout: 10_000 })
     expect(await readOnly.textContent()).toContain('Your project role does not allow changes to this conversation.')
     expect(await page.locator('textarea:enabled:visible').count()).toBe(0)
-    expect(await page.getByRole('status').count()).toBe(1)
-    const snapshot = await captureStableAria(page, '[role="status"]', scaffold.workspaceCwd)
+    // The only other live status is the seeded turn's process announcement.
+    expect(await page.getByRole('status').count()).toBe(2)
+    const snapshot = await captureStableAria(page, '[role="status"]:has-text("Read-only project")', scaffold.workspaceCwd)
     await compareOrRefreshGolden(READ_ONLY_EXPECTED, snapshot, MODE)
   }, 60_000)
 

@@ -16,7 +16,6 @@ kind: "package-library"
 ## 目录
 
 - [API](#api)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -36,12 +35,6 @@ import { bytesToBase64, randomUUID, type Uuid } from '@deepseek-ai/dsh-util-cryp
 | `bytesToBase64(data)` | 以有界分片编码标准 base64。 |
 | `Uuid` | 五段式 UUID 字符串类型。 |
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。不拥有事件流或可变运行时数据的纯库；其编码代数由单元测试强制。
-
-
 ## 模型体验
 
 间接地，经由用它铸造请求、会话与附件标识符的消费方，这些标识符均不作为语义内容进入提示词。
@@ -55,8 +48,6 @@ import { bytesToBase64, randomUUID, type Uuid } from '@deepseek-ai/dsh-util-cryp
 
 - **仅支持 v4**——命名空间和其他 UUID 版本不属于该工具。
 - **唯一性是概率性的**——碰撞检测仍由消费方负责。
-
-**运行时不变式：** 不发布伴生入口。这个纯工具不持有事件流或可变运行时数据；其值运算由单元测试覆盖。
 
 <a id="dev-note"></a>
 ### 开发备注

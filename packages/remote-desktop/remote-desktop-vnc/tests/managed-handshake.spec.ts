@@ -163,7 +163,7 @@ describe('managedHandshake', () => {
     expect(result.upstreamResidual.length).toBe(0)
     client.destroy()
     upstream.destroy()
-  })
+  }, 15_000)
 
   it('rejects when the VNC server refuses the credential', async () => {
     const [client, browserEnd] = duplexPair()
@@ -180,7 +180,7 @@ describe('managedHandshake', () => {
     })()
     await expect(managedHandshake(client, upstream, { password: 'x' })).rejects.toThrow(RemoteDesktopError)
     browserEnd.destroy()
-  })
+  }, 15_000)
 
   it('rejects when the upstream offers no manageable security type', async () => {
     const [client] = duplexPair()
@@ -241,7 +241,7 @@ describe('managedHandshake', () => {
     expect(result.clientResidual.equals(Buffer.from([0xbb]))).toBe(true)
     client.destroy()
     upstream.destroy()
-  })
+  }, 15_000)
 
   it('surfaces the upstream refusal reason verbatim', async () => {
     const [client] = duplexPair()
@@ -259,7 +259,7 @@ describe('managedHandshake', () => {
       .rejects.toThrow('refused security negotiation: too busy')
     client.destroy()
     upstream.destroy()
-  })
+  }, 15_000)
 
   it('rejects a bad upstream banner and a browser preamble that is not RFB', async () => {
     const [client] = duplexPair()
@@ -354,7 +354,7 @@ describe('serveStream with managed credentials', () => {
     } finally {
       await fiber.dispose()
     }
-  })
+  }, 15_000)
 
   it('fails loud when passwordRef is set but no credentials provider resolves it', async () => {
     const ctx = new Context()

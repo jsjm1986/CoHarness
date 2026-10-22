@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-coharness-brand-identity.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-coharness-brand-identity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-coharness-brand-identity.md
+document:
+  en: e7e2d2af717a611f9a5ab5cb7a93e1adec4b371c
+  zh: b2646c7834e62349aec5ad149413ab06eb633212
 /agent-note-coharness-brand-identity-in-the-web-client:
   en: 50a03b60de66130f
   zh: 97aafd4123ad729b

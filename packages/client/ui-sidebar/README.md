@@ -29,17 +29,11 @@ The dsh web client sidebar lets users recognize the active build, start a new se
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The sidebar contributes shell seats and collapse chrome; Workspace and Session rows are owned by `ui-workspace` and their data by runtime mirrors.
 
 <a id="model-experience"></a>
 ## Model Experience

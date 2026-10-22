@@ -34,6 +34,9 @@ function failureFrom(match: ConversationMatch): TurnErrorState['failure'] | unde
   if (reason.kind === 'aborted' && reason.reason.kind === 'hook') {
     return { seq: match.event.seq, time: match.event.time, message: reason.reason.reason }
   }
+  if (reason.kind === 'interrupted') {
+    return { seq: match.event.seq, time: match.event.time, message: 'DSH stopped running before this turn finished.', code: 'INTERRUPTED' }
+  }
   if (reason.kind !== 'error') return undefined
   const failure = reason.error
   return {
@@ -64,6 +67,7 @@ export const turnErrorDefinition: ConversationNodeDefinition<TurnErrorState> = {
   match: (event) => {
     if (event.type === 'turn/start') return { id: String(event.data.turn), role: 'start' }
     if (event.type === 'turn/end' && (event.data.reason.kind === 'error'
+      || event.data.reason.kind === 'interrupted'
       || (event.data.reason.kind === 'aborted' && event.data.reason.reason.kind === 'hook'))) {
       return { id: String(event.data.turn), role: 'update' }
     }

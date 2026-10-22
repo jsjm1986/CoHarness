@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-23-web-todo-display.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-23-web-todo-display.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-23-web-todo-display.md
+document:
+  en: e97301160ff72d4e9c1a4e916bddaa47ac1a793e
+  zh: 84e4801d90311652f6fd66b972ada302cea20e35
 /agent-note-web-todo-display-snapshot-side-effect-channel-two-render-surfaces:
   en: 631c12958ac739d9
   zh: 748bc21be2dfa22b

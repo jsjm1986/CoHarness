@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-12-separate-source-launch-from-build.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-12-separate-source-launch-from-build.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-12-separate-source-launch-from-build.md
+document:
+  en: 639e9de0ce13a571e7f83929d9c76eac2664daab
+  zh: c8fd6626053358e1220fffb7ee0ed808d783b34d
 /agent-note-separate-source-launch-from-repository-build:
   en: b62eb03dc3fa6aa8
   zh: e40cbf88367da8d0

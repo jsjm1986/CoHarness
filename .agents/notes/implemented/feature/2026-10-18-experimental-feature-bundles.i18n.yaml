@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-18-experimental-feature-bundles.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md
+document:
+  en: cd1e6dec78abcb7e42176b5c74e778e40cc12d03
+  zh: 74ad0ac4914a2af69dcaa1f4c9f9b17a2e1dd746
+/agent-note-experimental-feature-bundles-for-upstream-showcase-rows:
+  en: fa2d633298c1d2b1
+  zh: 19438ef0ae13fe6d
+/agent-note-experimental-feature-bundles-for-upstream-showcase-rows/problem:
+  en: 94bd877950da39b7
+  zh: d580822d9b3f47eb
+/agent-note-experimental-feature-bundles-for-upstream-showcase-rows/decision:
+  en: 90434b6c4f376440
+  zh: f7143826cd380356
+/agent-note-experimental-feature-bundles-for-upstream-showcase-rows/alternatives-considered:
+  en: 0ecdf5373256cd21
+  zh: 9fd7486476ff84cd
+/agent-note-experimental-feature-bundles-for-upstream-showcase-rows/testing:
+  en: 062ad46386df6460
+  zh: b42b44526407e338
+/agent-note-experimental-feature-bundles-for-upstream-showcase-rows/consequences:
+  en: 0858d0305b71c313
+  zh: daba3239c42e774c

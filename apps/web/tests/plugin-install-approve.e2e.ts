@@ -16,8 +16,9 @@ import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
-import { captureStableAria } from './scaffold.ts'
+import { captureStableAria, writeWelcomeNoticeAck } from './scaffold.ts'
 import { REPO_ROOT, saveFailureShot, saveFailureDom } from './support.ts'
+import { expectSelectableTerminalCommand } from './terminal-command-browser.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/plugin-install-approve', import.meta.url))
 const MODE = webSnapshotMode()
@@ -132,6 +133,9 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
     }))
     await writeFile(join(addon, 'build.cjs'), 'require("node:fs").writeFileSync("built.txt", "built")\n')
     await writeFile(join(addon, 'cordis.patch.yml'), '[]\n')
+    // The management page is the subject; a first-run home would paint the
+    // versioned welcome modal over it.
+    await writeWelcomeNoticeAck(home)
     await mkdir(SNAPSHOT_DIR, { recursive: true })
 
     signal.throwIfAborted()
@@ -206,6 +210,10 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
       await blocked.getByRole('button', { name: 'Allow these scripts and retry', exact: true }).click()
       await dialog.getByText(`Install scripts allowed for ${pendingKey}`, { exact: true }).waitFor({ timeout: 90_000 })
       await dialog.getByText('Installed', { exact: true }).waitFor()
+      // The recorded install command stays selectable and horizontally
+      // scrollable in the run's terminal card, overflowing or not.
+      await dialog.getByRole('button', { name: 'Show install details', exact: true }).click()
+      await expectSelectableTerminalCommand(page, dialog.locator('[data-terminal]').first(), `pnpm add file:${addon}`, 380)
       expect(await readFile(built, 'utf8')).toBe('built')
       const approvedPolicy = parseYaml(await readFile(join(profileDir, 'pnpm-workspace.yaml'), 'utf8')) as
         { allowBuilds: Record<string, unknown> }
@@ -217,8 +225,15 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
       }
       expect(manifest.dependencies[ADDON]).toMatch(/^file:/u)
       expect(manifest.dsh.profile.bundles).not.toContain(ADDON)
-      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'approved.expected.md'),
-        (await captureStableAria(page, '[role="dialog"]', world)).replaceAll(normalizedKey, fixtureSource), MODE)
+      // CommandText names its scrollport only while the command overflows,
+      // so the same terminal card diffs between a labeled group and one
+      // prompt text depending on the platform's path length and viewport.
+      // Collapse the overflow form; scrollport behavior is asserted above.
+      const approvedSnapshot = (await captureStableAria(page, '[role="dialog"]', world))
+        .replaceAll(normalizedKey, fixtureSource)
+        .replace(/- text: Done \$\n(\s*)- group "[^"]+": "(pnpm add file:[^"]+)"/,
+          '- text: "Done $ $2"')
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'approved.expected.md'), approvedSnapshot, MODE)
       expect(pageErrors).toEqual([])
     } catch (error) {
       await saveFailureShot(page, 'plugin-install-approve')

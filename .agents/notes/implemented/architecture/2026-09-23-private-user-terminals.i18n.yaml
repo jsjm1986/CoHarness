@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-23-private-user-terminals.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-23-private-user-terminals.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-private-user-terminals.md
+document:
+  en: 40684d1ef341ea9c7f419d9b80fcc624ca2ee24a
+  zh: 1372cd44fb6173c3004adc3a72d9370c6403bbd4
 /agent-note-private-user-terminals-in-managed-runtimes:
   en: 5166716870e54bf8
   zh: 3c35b9fbc81bd440

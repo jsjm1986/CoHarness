@@ -6,30 +6,17 @@ import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import * as SessionInvariant from '@deepseek-ai/dsh-session/invariant'
-import * as AgentInvariant from '@deepseek-ai/dsh-agent/invariant'
-import * as AgentLoopInvariant from '@deepseek-ai/dsh-agent-loop/invariant'
 import SubagentRuntime, { type SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as spawn from '../src/index.ts'
 import { STRUCTURED_OUTPUT_TOOL } from '@deepseek-ai/dsh-subagent-in-process-driver'
-import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
-async function mountInvariants(ctx: Context): Promise<void> {
-  await ctx.plugin(InvariantRegistry)
-  await ctx.plugin(SessionInvariant)
-  await ctx.plugin(AgentInvariant)
-  await ctx.plugin(AgentLoopInvariant)
-}
-
 /**
  * Drives the REAL spawn backend end-to-end: a real agent loop + a scripted mock
- * MODEL (the only mocked boundary) + the real SubagentRuntime + the real
- * invariant service plus package companions (so a malformed child session log would fail the test).
+ * MODEL (the only mocked boundary) + the real SubagentRuntime.
  * The parent is a real config agent; the spawn provider creates a real child
  * agent on the same context and we assert its output.
  */
@@ -37,7 +24,6 @@ async function setup(script: Script) {
   const ctx = new Context()
   const adapter = new MockAdapter(script)
   await mountAgentLoopTestDependencies(ctx)
-  await mountInvariants(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
@@ -285,10 +271,15 @@ describe('dsh-subagent-spawn-in-process', () => {
     await parentHandle.dispose()
   })
 
-  it('advertises every start-time capability (depthLimit, outputSchema, toolFilter, persona)', async () => {
+  it('advertises every start-time capability (depthLimit, outputSchema, agentOptions, agentPreset)', async () => {
     const { ctx } = await setup([])
     const provider = ctx.subagents.getProvider('spawn')!
-    expect(provider.capabilities).toEqual({ outputSchema: true, depthLimit: true, toolFilter: true, persona: true, agentOptions: true })
+    expect(provider.capabilities).toEqual({
+      agentOptions: true,
+      agentPreset: true,
+      outputSchema: true,
+      depthLimit: true,
+    })
   })
 
   it('unregisters the provider when its fiber is disposed (HMR safety)', async () => {
@@ -324,7 +315,6 @@ describe('dsh-subagent-spawn-in-process', () => {
     const ctx = new Context()
     const adapter = new MockAdapter(['hang'])
     await mountAgentLoopTestDependencies(ctx)
-    await mountInvariants(ctx)
     await ctx.plugin(AgentLoop, { agents: [] })
     provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
@@ -384,69 +374,6 @@ describe('dsh-subagent-spawn-in-process', () => {
     expect(unwrapped.name).toBe('subagent-spawn-in-process')
     expect(unwrapped.inject).toEqual(['subagents'])
     expect(typeof unwrapped.apply).toBe('function')
-  })
-
-  describe('persona and toolFilter (the scoped child world)', () => {
-    it('a per-child persona shadows the deployment persona in the child request only', async () => {
-      const { ctx, parent, adapter } = await setup([
-        textResponse('parent answer'),
-        textResponse('child answer'),
-      ])
-      parent.followup(createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } }))
-      await parent.whenIdle()
-
-      const run = await start(ctx, 'spawn', {
-        prompt: [{ type: 'text', text: 'do X' }],
-        parent,
-        persona: 'You are the tersest test runner.',
-      })
-      await run.result
-      const childRequest = adapter.requests.at(-1)!
-      expect(childRequest.messages.some(message =>
-        message.role === 'system' && message.content.some(block => block.type === 'text' && block.text.includes('You are the tersest test runner.')),
-      )).toBe(true)
-      // The parent's earlier request carried no such persona.
-      expect(adapter.requests[0]!.system ?? '').not.toContain('tersest test runner')
-      await run.dispose()
-    })
-
-    it('toolFilter hides denied tools from the child prompt AND refuses their execution', async () => {
-      const { ctx, parent, adapter } = await setup([
-        // The child tries the denied tool anyway, then answers.
-        toolCallResponse('c1', 'forbidden_tool', {}),
-        textResponse('done'),
-      ])
-      ctx.tools.register(defineContentToolFixture({
-        name: 'forbidden_tool', description: 'global', parameters: {},
-        execute: () => Promise.resolve([{ type: 'text', text: 'ran' }]),
-      }))
-      const run = await start(ctx, 'spawn', {
-        prompt: [{ type: 'text', text: 'do X' }],
-        parent,
-        toolFilter: { deny: ['forbidden_tool'] },
-      })
-      const result = await run.result
-      expect(result.stopReason).toBe('completed')
-      // Not advertised…
-      const childRequest = adapter.requests[0]!
-      expect((childRequest.tools ?? []).map(t => t.name)).not.toContain('forbidden_tool')
-      // …and the attempted call executed as UNKNOWN_TOOL (visible in the log).
-      const child = ctx.agents.get(run.id)!
-      const toolResult = child.session.snapshotEvents().find(e => e.type === 'tool/result')!
-      expect(JSON.stringify(toolResult.data)).toContain('unknown tool')
-      await run.dispose()
-    })
-
-    it('an unknown toolFilter name fails the spawn loudly with no orphaned child', async () => {
-      const { ctx, parent } = await setup([])
-      const before = ctx.agents.list().length
-      await expect(start(ctx, 'spawn', {
-        prompt: [{ type: 'text', text: 'do X' }],
-        parent,
-        toolFilter: { deny: ['no_such_tool'] },
-      })).rejects.toThrow(/unknown global tool "no_such_tool"/)
-      expect(ctx.agents.list().length).toBe(before)
-    })
   })
 
   it('spawning from a DISPOSING parent fails loud with no orphaned child (INACTIVE_EFFECT teaching error)', async () => {

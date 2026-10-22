@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for upstream-upgrade-playbook.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for upstream-upgrade-playbook.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/upstream-upgrade-playbook.md
+document:
+  en: 0d0e611f508e32eba0bdd45be3e38660b3f41f27
+  zh: 922046ccea569175477c741c6344f14d8b6bd341
 /upstream-upgrade-playbook:
   en: 0f2ed478f81e014e
   zh: a7da4724a1853c60

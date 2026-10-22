@@ -10,8 +10,9 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionEventMap } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import ScheduleService from '@deepseek-ai/dsh-schedule'
+import * as ToolSchedule from '@deepseek-ai/dsh-tool-schedule'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
@@ -21,7 +22,6 @@ import type { ContentBlock, GenerateOptions, MessageId, StreamChunk } from '@dee
 import { ToolCallId, createUserMessage, LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { defineContentToolFixture, type ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime, {
   SubagentError,
@@ -31,7 +31,6 @@ import SubagentRuntime, {
 } from '../src/index.ts'
 import type { SubagentRunEndInfo, SubagentRunInfo } from '../src/index.ts'
 import type { SubagentPromptRequestId } from '../src/control-types.ts'
-import * as SubagentInvariant from '../src/invariant.ts'
 import { loadStoredSession } from './persistence-helpers.ts'
 import {
   continuationActivations,
@@ -136,6 +135,7 @@ async function setupWith(
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
   ctx.llm.registerAdapter(['mock'], adapter)
   const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+  if (options.schedule) await parent.ctx.plugin(ToolSchedule)
   return { ctx, parent, disposePersistence, root }
 }
 
@@ -673,7 +673,7 @@ describe('SubagentRuntime.startContinuable', () => {
     const start = vi.fn(async () => { throw new Error('must not dispatch') })
     ctx.subagents.registerProvider({
       name: 'one-shot',
-      capabilities: { agentOptions: false, outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      capabilities: { agentOptions: false, agentPreset: false, outputSchema: false, depthLimit: false },
       inheritsParentContext: false,
       start,
     })
@@ -904,8 +904,6 @@ describe('SubagentRuntime.startContinuable', () => {
 
   it('omits undeclared composition fields from the descriptor', async () => {
     const { ctx } = await setup([])
-    // A routeless parent declares no provider/model, and this start declares no
-    // persona or tool filter, so the descriptor records only what exists.
     const routeless = await ctx.agentLoop.create(SessionId('routeless'), {})
     const started = await ctx.subagents.startContinuable(startSpec(routeless))
     const child = await vi.waitFor(() => {
@@ -921,41 +919,6 @@ describe('SubagentRuntime.startContinuable', () => {
       provider: 'spawn',
       label: 'child task',
     })
-    await drainManager(ctx)
-  })
-
-  it('records a declared tool filter in the descriptor', async () => {
-    const { ctx } = await setup([])
-    // Register one global tool so the filter names something real.
-    ctx.tools.register(defineTool({
-      name: 'noop',
-      description: 'does nothing',
-      parameters: {},
-      output: {
-        schema: { type: 'object', additionalProperties: false, properties: {} },
-        render: () => [{ type: 'text', text: 'noop' }],
-      },
-      execute: () => Promise.resolve({}),
-    }))
-    const routeless = await ctx.agentLoop.create(SessionId('routeless-filtered'), {})
-    const started = await ctx.subagents.startContinuable({
-      ...startSpec(routeless),
-      request: { prompt: message('filtered work'), parent: routeless, toolFilter: { deny: ['noop'] } },
-    })
-    const child = await vi.waitFor(() => {
-      const found = ctx.agents.get(started.childId)
-      expect(found).toBeDefined()
-      return found!
-    })
-
-    expect(child.session.snapshotEvents().find(event => event.type === 'subagent/descriptor')?.data)
-      .toEqual({
-        version: SUBAGENT_DESCRIPTOR_VERSION,
-        mode: 'continuable',
-        provider: 'spawn',
-        label: 'child task',
-        toolFilter: { deny: ['noop'] },
-      })
     await drainManager(ctx)
   })
 
@@ -1017,28 +980,6 @@ describe('SubagentRuntime.startContinuable', () => {
     expect(loaded.inheritedEventCount).toBeGreaterThan(0)
   })
 
-  it('records the declared persona in the descriptor and reapplies it on cold resume', async () => {
-    const { ctx, parent } = await setup([textResponse('scoped'), textResponse('resumed')])
-    const started = await ctx.subagents.startContinuable({
-      ...startSpec(parent),
-      request: {
-        prompt: message('scoped work'),
-        parent,
-        persona: 'You are scoped.',
-      },
-    })
-    await waitNoActivation(ctx, started.childId)
-
-    const loaded = await loadStoredSession(ctx.sessionPersistence, started.childId)
-    const descriptor = loaded.events.find(event => event.type === 'subagent/descriptor')
-    expect(descriptor?.data).toMatchObject({ persona: 'You are scoped.' })
-
-    // Cold resume reconstructs the declared composition from that descriptor.
-    await queuePrompt(ctx, parent, started.childId, message('resume it'))
-    await waitNoActivation(ctx, started.childId)
-    const resumed = await loadStoredSession(ctx.sessionPersistence, started.childId)
-    expect(hasUserText(resumed.events, 'resume it')).toBe(true)
-  })
 })
 
 describe('continuable image Queue prompts', () => {
@@ -1225,11 +1166,9 @@ describe('direct-child Queue residency routing', () => {
 
   it('cold-resumes after the initial provider unregisters', async () => {
     const { ctx, parent } = await setup([textResponse('first'), textResponse('after resume')])
-    await ctx.plugin(InvariantRegistry)
-    await ctx.plugin(SubagentInvariant)
     const disposeProvider = ctx.subagents.registerProvider({
       name: 'retired',
-      capabilities: { agentOptions: false, outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      capabilities: { agentOptions: false, agentPreset: false, outputSchema: false, depthLimit: false },
       inheritsParentContext: false,
       start: async () => { throw new Error('one-shot start is not used') },
       prepareContinuable: () => Promise.resolve({}),
@@ -4141,7 +4080,7 @@ describe('continuable structured output', () => {
     const { ctx, parent } = await setup([])
     const dispose = ctx.subagents.registerProvider({
       name: 'no-schema',
-      capabilities: { agentOptions: false, outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      capabilities: { agentOptions: false, agentPreset: false, outputSchema: false, depthLimit: false },
       inheritsParentContext: false,
       start: () => Promise.reject(new Error('one-shot path unused')),
       prepareContinuable: () => Promise.resolve({}),

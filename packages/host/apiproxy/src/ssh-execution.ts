@@ -20,7 +20,7 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
-import type { AgentPresets } from '@deepseek-ai/dsh-agent-presets'
+import type { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
 import { SshConnection } from '@deepseek-ai/dsh-ssh'
 import { SshFileSystem } from '@deepseek-ai/dsh-fs-ssh'
 import { SshSubprocessRuntime } from '@deepseek-ai/dsh-subprocess-ssh'
@@ -37,7 +37,7 @@ const SSH_REALM_PREFIX = 'ssh-target/'
  * @param targetId - registered SSH target public id from the session header.
  * @param userId - the authorizing principal's user id.
  * @param projectId - the runtime's project identity, when project-launched.
- * @returns the `realm` argument for `AgentPresets.mount()`.
+ * @returns the `realm` argument for `AgentPresetRegistry.mount()`.
  */
 export function sshRealmKey(targetId: number, userId: number, projectId?: number): string {
   return projectId === undefined
@@ -59,7 +59,7 @@ export function sshRealmKey(targetId: number, userId: number, projectId?: number
  * @param realm - the subject-scoped key from {@link sshRealmKey}.
  * @param targetId - the session-bound SSH target.
  */
-export function ensureSshRealm(presets: AgentPresets, realm: string, targetId: number): void {
+export function ensureSshRealm(presets: AgentPresetRegistry, realm: string, targetId: number): void {
   presets.registerRealm(realm, scopeCtx => mountSshProviders(scopeCtx, targetId, () => {
     presets.invalidateRealm(realm)
   }))

@@ -2,7 +2,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { isWorkspaceAccessFailure, WorkspaceResourceError, parseWorkspaceResourceAddress, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest, WorkspaceResourceRegistry, WorkspaceResourceSource, WorkspaceResourceTarget } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspacePreviewResource } from '../src/client/components/WorkspaceFileTab.tsx'
+import type { WorkspacePreviewResource } from '../src/client/contract/preview/use-preview-read.ts'
 
 /** Rebuild a request whose runtime target comes from the test's owning resolver. */
 export function previewRequest(

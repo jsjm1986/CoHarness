@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-plugins-page-creator-entry.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-plugins-page-creator-entry.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-plugins-page-creator-entry.md
+document:
+  en: fb9768f1431505a9e19736a323f4a623d5918253
+  zh: ceb9aee69ace9a60fe8944abad3f4743dd4dc991
 /agent-note-the-plugins-page-add-menu-carries-the-creator-entry:
   en: 3f369275cee95cf7
   zh: f144846ff9f145f9

@@ -2,6 +2,7 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'header.feedback': '反馈',
   'dialog.title': '提交反馈',
   'dialog.categories': '反馈分类',
   'dialog.detail': '反馈详情',
@@ -46,6 +47,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'header.feedback': 'Feedback',
   'dialog.title': 'Submit feedback',
   'dialog.categories': 'Feedback category',
   'dialog.detail': 'Feedback details',

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for voice-input.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for voice-input.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/voice-input.md
+document:
+  en: 53b9ba90d77e9ca5e85329373c92efe20f979c80
+  zh: ce7f4496c2c091406fb7a4d81d5416dceb87bd7d
 /voice-input:
   en: b21f58d0dcb90287
   zh: be60807d02623a87

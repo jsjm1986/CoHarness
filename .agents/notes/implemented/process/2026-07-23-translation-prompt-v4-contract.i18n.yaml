@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-23-translation-prompt-v4-contract.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-23-translation-prompt-v4-contract.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-23-translation-prompt-v4-contract.md
+document:
+  en: 68d6837971a0bbb40fbc5ee093e5911515905ba3
+  zh: e1505e29840bebe7215780fad950995ba8fc4640
 /agent-note-calibrated-translation-prompt-v4-contract:
   en: 1a924a00930afad5
   zh: 719317ce7818f808

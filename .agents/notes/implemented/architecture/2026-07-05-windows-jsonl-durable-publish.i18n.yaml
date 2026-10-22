@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-05-windows-jsonl-durable-publish.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-05-windows-jsonl-durable-publish.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-05-windows-jsonl-durable-publish.md
+document:
+  en: 546cde6086f3c84e22b4d4de144a48bb3425cd4e
+  zh: b99032e9d7e72e2028f39c5af91659278fd81343
 /agent-note-windows-native-durable-jsonl-publication:
   en: db7fe80708911f2f
   zh: 42c6639defea2bde

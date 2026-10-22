@@ -18,7 +18,6 @@ The OpenTelemetry backend for [the telemetry seam](../session-telemetry/) — th
 - [Config](#config)
 - [What leaves the machine](#what-leaves-the-machine)
 - [Field mapping](#field-mapping)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -65,11 +64,6 @@ In uploading modes, records carry the complete `event.data` as the seam's `sessi
 ## Field mapping
 
 Seam record → SDK log record: `time` → `timestamp`/`observedTimestamp`; `severity` → `severityNumber`/`severityText` (INFO 9 / WARN 13 / ERROR 17); `body` → the structured log body; `attributes` verbatim. Receivers dedupe on `(session.id, event.seq)` and alert on severity. In `FULL`, they may also detect crashes by `shutdown`-record absence: the marker is emitted at the session's own disposal or application teardown, and a marker followed by more events is a telemetry reload. In `FEEDBACK_ONLY`, a released prefix normally has no later `shutdown` marker, so its absence is not a crash signal. Streams are not self-contained across lineage: a resumed session continues its own id's stream from where the previous process left off, and a forked session's stream starts at its inherited boundary — its prefix lives in the parent's stream, stitched via `session.parent_id` + `session.seed_length`. A resumed local log may contain synthetic closers that were never exported; the wire stream stays faithful to records actually handed to the SDK.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The bounded queue holds records exactly as emitted; no second projection exists to compare.
 
 <a id="model-experience"></a>
 ## Model Experience

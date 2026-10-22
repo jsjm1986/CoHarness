@@ -22,7 +22,7 @@ packages/<group>/<pkg>/
 
 当已有分组与包的角色匹配时，选择该分组（`core`、`llm`、`bash`、`compact`、`subagent`、`todo`、`session-persistence`、`ui`、`util` 或 `support`）。允许新建分组，但分组只是纯容器：没有 `package.json`，没有源文件，包仍然恰好位于其下一层。
 
-package.json 不变式（由 `pnpm run constraints` / `scripts/check-workspace-constraints.ts` 强制执行）：`private: true`，`version` 与根 `package.json` 一致，`type: module`，`main: "lib/index.js"`，`types: "lib/types/index.d.ts"`，`exports["."].types: "./lib/types/index.d.ts"`，`exports["."].default: "./lib/index.js"`，`@deepseek-ai/cordis` 同时出现在 peerDependencies 和 devDependencies 中（相同范围）。每个 dsh 对等依赖（peer dependency）都要在 devDependencies 中镜像。`@deepseek-ai/schemastery` 放在 `dependencies` 中（它是运行时校验器），与 agent-loop 保持一致。`files` 列表精确包含 `lib/index.js`、`lib/invariant.js`、`lib/types/**/*.d.ts` 以及门禁认可的包专用运行时产物；如果包的运行时 export 指向输出树，还要包含 `lib/types/**/*.js`。不要发布 `src`、声明映射、JS map 或陈旧的根声明文件。带有 `bin` 的 CLI 应用包在 `files` 中将 `lib/bin.js` 紧跟在 `lib/index.js` 之后。
+package.json 不变式（由 `pnpm run constraints` / `scripts/check-workspace-constraints.ts` 强制执行）：`private: true`，`version` 与根 `package.json` 一致，`type: module`，`main: "lib/index.js"`，`types: "lib/types/index.d.ts"`，`exports["."].types: "./lib/types/index.d.ts"`，`exports["."].default: "./lib/index.js"`，`@deepseek-ai/cordis` 同时出现在 peerDependencies 和 devDependencies 中（相同范围）。每个 dsh 对等依赖（peer dependency）都要在 devDependencies 中镜像。`@deepseek-ai/schemastery` 放在 `dependencies` 中（它是运行时校验器），与 agent-loop 保持一致。`files` 列表精确包含 `lib/index.js`、`lib/types/**/*.d.ts` 以及门禁认可的包专用运行时产物；如果包的运行时 export 指向输出树，还要包含 `lib/types/**/*.js`。不要发布 `src`、声明映射、JS map 或陈旧的根声明文件。带有 `bin` 的 CLI 应用包在 `files` 中将 `lib/bin.js` 紧跟在 `lib/index.js` 之后。
 
 包内的相对导入在源码中使用显式 `.ts` 后缀（例如 `export * from './types.ts'`）。编译器在输出的 JS 中将其重写为 `.js`，在声明文件中保留显式 `.ts` 后缀；标准的 NodeNext/Node16 TypeScript 消费方会将其解析到同目录的 `.d.ts` 文件。
 
@@ -139,12 +139,12 @@ Append-only, prefix-stable, replacing, or independent behavior, including the ex
 
 各字段先独立回退，再按页面规则格式化技术名称；回退优先经过现有 locale 语言链：
 
-- 标题：locale `meta.title` → `package.json.name` → 完整 Cordis 插件名。
-- 描述：locale `meta.description` → `package.json.description` → 不显示描述。
+- 标题：locale `meta.title` → 包根插件的 `package.json.name` → 完整 Cordis 插件名。
+- 描述：locale `meta.description` → 包根插件的 `package.json.description` → 不显示描述。
 
-导出 `<包名>/locale/en.json` 供 locale 查询；需要包字段回退或声明图标时，开放 `<包名>/package.json`。
+导出 `<包名>/locale/en.json` 供 locale 查询；需要包字段回退或声明图标时，开放 `<包名>/package.json`。`<包名>/search` 这样的子路径插件不是包，从不读取 `package.json`，即使导出了 `./search/package.json`；它用 `./search/locale/*.json` 提供文本，用 `./search/icon` 提供图片。
 
-要在组合包卡片、详情和组件行显示图片，在该导出清单顶层设置 `"icon": "./icon.svg"`，并将图片加入 `files`。路径相对于声明清单所在目录，独立导出的插件清单也遵循此规则。支持不超过 256 KiB 的 SVG、PNG、JPEG（`.jpg`/`.jpeg`）和 WebP 文件。绝对路径、URL、目录外路径，以及解析到目录外的符号链接均被拒绝。图片不需要单独导出，且必须自包含；SVG 作为图片渲染，不作为内联 HTML。Host 返回 data URL，不激活插件。声明无效或文件不可读时，显示元信息诊断并保留有效文本；图片缺失或无法解码时使用面板的默认插画。
+要在组合包卡片、详情和组件行显示图片，包根插件在导出清单顶层设置 `"icon": "./icon.svg"`，或在省略该字段时导出 `./icon`。子路径插件导出自己的图标，例如 `"./search/icon": "./search.svg"`。将每张图片加入 `files`。清单 `icon` 相对于清单所在目录；绝对路径、URL、目录外路径，以及解析到目录外的符号链接均被拒绝。导出的图标像 locale 资源一样经 Node exports 解析，且必须位于所属包内。支持不超过 256 KiB 的 SVG、PNG、JPEG（`.jpg`/`.jpeg`）和 WebP 文件。图片必须自包含；SVG 作为图片渲染，不作为内联 HTML。Host 返回 data URL，不激活插件。声明无效或文件不可读时，显示元信息诊断并保留有效文本，不再尝试导出的图标；图片缺失或无法解码时使用面板的默认插画。
 
 已安装 bundle 的卡片和详情、组件列表与配置详情、设置中的插件清单都展示这些元信息，包括禁用插件和预设内插件。读取时不激活插件。
 

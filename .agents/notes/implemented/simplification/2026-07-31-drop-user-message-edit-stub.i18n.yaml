@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-31-drop-user-message-edit-stub.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-31-drop-user-message-edit-stub.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-31-drop-user-message-edit-stub.md
+document:
+  en: 5a34be1dd285f4aced9e6cfb2e324b20ec734bed
+  zh: 288f2bda5d41cf0a331f69f134c8cf1e61a801ef
 /agent-note-drop-the-user-message-edit-stub:
   en: e37ccd0ce04d4f20
   zh: 9ceeb01739a8006e

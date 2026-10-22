@@ -15,24 +15,19 @@ kind: "package-reference"
 
 宿主端在用户设置 seam 中注册 `ui-onboarding`，使仍携带 `welcomeNoticeVersion` 的既有设置文档继续有效。没有任何 GUI 步骤读写该字段；外壳本身仍不持有产品策略。
 
+`shell.overlay` 条目 `host-release-change` 在连接的 Host 提供的 release 与页面启动 release 不同时询问是否刷新。它在其 hooks 隔间绑定 `ctx.modules.entries.releaseChange`，并接收两个回调：一个调用 `ctx.modules.entries.dismissRelease()`，另一个刷新页面。对话框画出 Host 已完成的切换与页面待完成的切换——两端版本号不同时显示版本号，否则显示 commit——期间页面不应用该 release 的任何插件更新；哪个 release 算当前由 [Client Modules](../modules/README.zh.md#host-release-changes) 拥有。
+
 ## 概述
 
 使用本包可为 dsh Web 客户端提供 Settings 面板、连接恢复控件、由功能包贡献的导航，以及依次进行的首次运行引导。用户可以从侧边栏打开面板、立即重试失败的连接，并在宿主为回环浏览器提供本地配置文件时访问该文件。各功能包提供自己的设置行、分区和引导步骤；本包提供共享的界面展示，但不添加引导文案或「通用」分区的内置行。
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该外壳投影由注册方贡献的 `settings.section` 与 `settings.onboarding` 台账；持久值留在 Host settings namespace 中。
-
 
 <a id="model-experience"></a>
 ## 模型体验

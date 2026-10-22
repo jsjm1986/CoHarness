@@ -10,6 +10,7 @@ import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { RpcId, type ClientRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { requestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/request-scope'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   API_PATH,
@@ -28,8 +29,12 @@ import { provideBrowserCredentials } from './browser-credentials.ts'
 function fakeHttpServer(
   routes: WebRoute[],
   upgrades: WebUpgradeRoute[],
-): Pick<WebServer, 'register' | 'registerUpgrade' | 'tapIndex' | 'port'> {
+  host = '127.0.0.1',
+  protocol: WebServer['protocol'] = 'http:',
+): Pick<WebServer, 'register' | 'registerUpgrade' | 'tapIndex' | 'port' | 'host' | 'protocol'> {
   return {
+    host,
+    protocol,
     register(route) {
       if (routes.some(candidate => candidate.kind === route.kind && candidate.path === route.path)) {
         throw new Error(`duplicate route ${route.path}`)
@@ -96,6 +101,8 @@ function fakeResponse(): {
 async function mounted(
   config?: ConnectionConfig,
   apiProxy: ApiProxy = {} as unknown as ApiProxy,
+  bindHost = '127.0.0.1',
+  protocol: WebServer['protocol'] = 'http:',
 ): Promise<{
   ctx: Context
   routes: WebRoute[]
@@ -107,7 +114,7 @@ async function mounted(
   const routes: WebRoute[] = []
   const upgrades: WebUpgradeRoute[] = []
   provideBrowserCredentials(ctx)
-  ctx.provide('webServer', fakeHttpServer(routes, upgrades) as WebServer)
+  ctx.provide('webServer', fakeHttpServer(routes, upgrades, bindHost, protocol) as WebServer)
   ctx.provide('apiProxy', apiProxy)
   const fiber = ctx.plugin({ inject: [...inject], apply }, config)
   await fiber.await()
@@ -185,6 +192,32 @@ describe('connection node half', () => {
     expect(upgrades).toHaveLength(0)
   })
 
+  it('reports allowsRemoteAuthorities from validated trustedHosts only', async () => {
+    const cases: { trustedHosts: string[]; expected: boolean }[] = [
+      { trustedHosts: ['127.0.0.1', 'localhost', '[::1]'], expected: false },
+      { trustedHosts: ['harness.example'], expected: true },
+      { trustedHosts: ['127.0.0.1', 'harness.example'], expected: true },
+    ]
+    for (const { trustedHosts, expected } of cases) {
+      const deployment = await mounted({ trustedHosts })
+      try {
+        expect(deployment.connection.allowsRemoteAuthorities, trustedHosts.join(',')).toBe(expected)
+      } finally {
+        await deployment.dispose()
+      }
+    }
+  })
+
+  it('accepts the bind address of the mounted web carrier port-lessly', async () => {
+    const { connection, dispose } = await mounted({ trustedHosts: ['harness.example'] }, undefined, '10.1.2.3')
+    try {
+      const bound = browserCookie(connection, '10.1.2.3:3080')
+      expect(connection.requestRejection(fakeRequest({ host: '10.1.2.3:3080', cookie: bound }))).toBeUndefined()
+    } finally {
+      await dispose()
+    }
+  })
+
   it('registers one HTTP route plus one upgrade route per downlink and removes all three with the fiber', async () => {
     const { routes, upgrades, dispose } = await mounted()
     expect(routes).toHaveLength(1)
@@ -206,6 +239,90 @@ describe('connection node half', () => {
       expect(state.body).toBe('upgrade required')
     }
     await dispose()
+  })
+
+  it('uses the TLS default port for markerless exact-authority grants', async () => {
+    const { connection, dispose } = await mounted({ trustedHosts: ['tls.example:443', 'plain.example:80'] }, undefined, '127.0.0.1', 'https:')
+    try {
+      expect(connection.requestRejection(fakeRequest({ host: 'tls.example' }))).toBe(401)
+      expect(connection.requestRejection(fakeRequest({ host: 'plain.example' }))).toBe(403)
+      expect(connection.requestRejection(fakeRequest({ host: 'tls.example:444' }))).toBe(403)
+    } finally {
+      await dispose()
+    }
+  })
+
+  it('marks the minted browser cookie Secure from the mounted listener protocol', async () => {
+    for (const [protocol, secure] of [['http:', false], ['https:', true]] as const) {
+      const { connection, dispose } = await mounted(undefined, undefined, '127.0.0.1', protocol)
+      try {
+        const url = new URL(connection.authenticatedUrl('http://127.0.0.1:3080'))
+        const exchanged = fakeResponse()
+        connection.authorizeIndex(
+          fakeRequest({ host: '127.0.0.1:3080', 'x-forwarded-proto': secure ? 'http' : 'https' }, `${url.pathname}${url.search}`),
+          exchanged.response,
+        )
+        const setCookie = exchanged.state.headers?.['set-cookie']
+        expect(setCookie?.endsWith('; Secure'), protocol).toBe(secure)
+        if (setCookie === undefined) throw new Error('browser token exchange did not set a cookie')
+        expect(connection.requestRejection(fakeRequest({
+          host: '127.0.0.1:3080',
+          cookie: setCookie.split(';', 1)[0]!,
+        }))).toBeUndefined()
+      } finally {
+        await dispose()
+      }
+    }
+  })
+
+  it('admits a launch-token operator credential and binds its interaction scope', async () => {
+    const { ctx, connection, dispose } = await mounted()
+    try {
+      const token = new URL(connection.authenticatedUrl('http://127.0.0.1:3080')).searchParams.get('token')!
+      // The same process credential the index redeems admits a programmatic
+      // client directly: query form and Bearer form are equivalent.
+      expect(connection.requestRejection(fakeRequest(
+        { host: '127.0.0.1:3080' }, `${API_PATH}/session.list?token=${token}`,
+      ))).toBeUndefined()
+      expect(connection.requestRejection(fakeRequest(
+        { host: '127.0.0.1:3080', authorization: `Bearer ${token}` },
+      ))).toBeUndefined()
+      // A mismatched credential refuses before the cookie fallback — even a
+      // request that also carries a valid cookie fails rather than launder.
+      const cookie = browserCookie(connection, '127.0.0.1:3080')
+      expect(connection.requestRejection(fakeRequest(
+        { host: '127.0.0.1:3080' }, `${API_PATH}/session.list?token=bad-token`,
+      ))).toBe(401)
+      expect(connection.requestRejection(fakeRequest(
+        { host: '127.0.0.1:3080', cookie: cookie }, `${API_PATH}/session.list?token=bad-token`,
+      ))).toBe(401)
+
+      // The request waterfall binds the admitted mode before dispatch:
+      // operator credentials default to 'none', an explicit declaration wins,
+      // and cookie-only traffic keeps its historical 'answer'.
+      const observed: string[] = []
+      ctx.on('connection/request', (_request, next) => {
+        observed.push(requestInteractions())
+        return next()
+      })
+      const boundary = (url: string, cookieHeader?: string): {
+        kind: 'http'
+        headers: Record<string, string>
+        pathname: string
+        url: string
+      } => ({
+        kind: 'http',
+        headers: { host: '127.0.0.1:3080', ...cookieHeader === undefined ? {} : { cookie: cookieHeader } },
+        pathname: '/api/session.list',
+        url,
+      })
+      await ctx.waterfall('connection/request', boundary(`${API_PATH}/session.list?token=${token}`), async () => {})
+      await ctx.waterfall('connection/request', boundary(`${API_PATH}/session.list?token=${token}&interactions=answer`), async () => {})
+      await ctx.waterfall('connection/request', boundary(`${API_PATH}/session.list`, cookie), async () => {})
+      expect(observed).toEqual(['none', 'answer', 'answer'])
+    } finally {
+      await dispose()
+    }
   })
 
   it('rejects an untrusted WebSocket upgrade before protocol negotiation', async () => {

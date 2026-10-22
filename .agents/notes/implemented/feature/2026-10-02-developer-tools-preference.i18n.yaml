@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-02-developer-tools-preference.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-02-developer-tools-preference.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-developer-tools-preference.md
+document:
+  en: 68c08b7e950d03108a455a38927e365f3a86371e
+  zh: 9ffb692c4dacce44533a87aedb71c8da88e2c19d
 /agent-note-developer-tools-preference-gates-diagnostics-surfaces-through-the-shared-settings-scope:
   en: b17a2d0193023cd6
   zh: 7f1505548540c6d5

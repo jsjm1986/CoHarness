@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-21-candidate-bound-gate-evidence.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-21-candidate-bound-gate-evidence.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-21-candidate-bound-gate-evidence.md
+document:
+  en: 0d4f606ef80191207cf000495e23a888f1ef429e
+  zh: 157f8eb6e4c816011a8bc1726b9a87233a124149
 /agent-note-candidate-bound-gate-evidence-and-fork-consumers:
   en: 57b6d450a5b59895
   zh: a10df6c1fd305d84

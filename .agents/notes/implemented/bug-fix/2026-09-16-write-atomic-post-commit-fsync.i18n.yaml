@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-16-write-atomic-post-commit-fsync.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-16-write-atomic-post-commit-fsync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-write-atomic-post-commit-fsync.md
+document:
+  en: ea2bb268b8618e14113bdebd42709c63622f0260
+  zh: 0670060b0022c935349fa20d36c06d2c096e825a
 /agent-note-post-commit-fsync-failure-is-not-a-write-failure:
   en: 113571c72b22307b
   zh: d9178e5e1e9e2516

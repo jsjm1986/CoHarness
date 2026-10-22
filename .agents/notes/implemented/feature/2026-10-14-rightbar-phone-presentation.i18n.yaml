@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-14-rightbar-phone-presentation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-14-rightbar-phone-presentation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-14-rightbar-phone-presentation.md
+document:
+  en: cc5ecf3809c5413198f97e576cb2a81cb5067740
+  zh: 846bc941338875635bcf65cc3d14768adc13c749
 /agent-note-the-rightbar-s-phone-presentation-is-a-pushed-screen-not-a-shrunken-dock:
   en: 3473027b335f9499
   zh: 486311fd7f1db9e9

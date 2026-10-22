@@ -87,7 +87,6 @@ The observable behavior is covered in [Use this package](#use-this-package); thi
 |---|---|
 | [`src/index.ts`](src/index.ts) | Tool registration: `ask_user_question` schema, execute path, result render |
 | [`src/legacy.ts`](src/legacy.ts) | Frozen pre-timeout description, arguments, output, and blocking execution |
-| — | No runtime invariant companion is published; this model-facing adapter has no independent lifecycle stream; execution relations are owned by the capability seam it calls. |
 
 ### Consumer role
 
@@ -147,7 +146,6 @@ Append-only; newly visible content follows the reusable request prefix and does 
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the tool is a poor fit. They are current package constraints, not a UI backlog.
 

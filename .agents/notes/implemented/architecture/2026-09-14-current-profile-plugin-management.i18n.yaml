@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-14-current-profile-plugin-management.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-14-current-profile-plugin-management.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-current-profile-plugin-management.md
+document:
+  en: f79244c8b6103e8cf2f45a413ed7438950954bc2
+  zh: c1005668af6a0167ef685f9e7150ff87d70267b5
 /agent-note-current-profile-plugin-management-shares-cli-transactions:
   en: 86224d16fc754163
   zh: 1c9948a6f80f2544

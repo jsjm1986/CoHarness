@@ -6,7 +6,7 @@ English | [中文](2026-08-08-windows-acl-restricted-token-sandbox.zh.md)
 
 ## Problem
 
-The original [sandbox decision](2026-07-06-sandbox.md) left `PLATFORM_CHAINS.win32` empty, so shipped Windows profiles degraded to danger-full-access because no confining executor existed. The win32 rung must govern the two file-effect modes in the sandbox vocabulary — `read-only` (no explicit writable root) and `workspace-write` (writes under the workspace root plus a backend-defined temp area) — while reporting any effects its mechanism cannot govern; reads, network, and process visibility remain outside this vocabulary.
+The original [sandbox decision](../../archived/feature/2026-07-06-sandbox.md) left `PLATFORM_CHAINS.win32` empty, so shipped Windows profiles degraded to danger-full-access because no confining executor existed. The win32 rung must govern the two file-effect modes in the sandbox vocabulary — `read-only` (no explicit writable root) and `workspace-write` (writes under the workspace root plus a backend-defined temp area) — while reporting any effects its mechanism cannot govern; reads, network, and process visibility remain outside this vocabulary.
 
 ## Decision
 
@@ -48,6 +48,6 @@ The product-visible Windows roster flip is win32-only, so keyless snapshots that
 
 ## Related
 
-The [pwsh executor decision](2026-08-01-pwsh-tool-and-executor.md) owns the pwsh-sandbox/tool-pwsh dialect split this rung consumes.
+The [pwsh executor decision](../../archived/feature/2026-08-01-pwsh-tool-and-executor.md) owns the pwsh-sandbox/tool-pwsh dialect split this rung consumes.
 
 The [delete-confinement decision](2026-09-19-windows-acl-mandatory-integrity-confinement.md) extends this rung with the Low integrity layer and the ambient-delete deny; it supersedes only the delete route documented here.

@@ -41,4 +41,4 @@ npm 消费方改为安装 `@deepseek-ai/node-addon-landlock-run`；原先的非 
 
 第一次发布 scoped 包时，必须通过 `npm-publish` 环境的 `NPM_TOKEN` 使用 `@deepseek-ai` 组织 token，因为 npm 只有在包已经存在后才能配置 trusted publishing。完成 bootstrap 后，必须让 3 个包都授权本仓库的发布工作流，才能移除后备 token。npm 仍会按顺序发布各个包，且不提供跨包事务，因此发布失败可能留下只完成了一部分的版本。由于 npm 会拒绝已经发布的同名同版本包，操作人员必须检查注册表并只发布缺失的 tarball，而不能原样重新运行工作流。Linux x64 和 arm64 runner 仍提供权威的二进制构建与真实内核检查；macOS checkout 可以验证入口包和不受支持平台上的行为，但不能取代这些作业。
 
-本说明仅取代[沙箱 Agent Note](../feature/2026-07-06-sandbox.zh.md)中有关发布镜像和开发源码时依赖注册表固定版本的表述；该 Agent Note 仍负责沙箱行为、runner 选择和强制执行语义。
+本说明仅取代[沙箱 Agent Note](../../archived/feature/2026-07-06-sandbox.md)中有关发布镜像和开发源码时依赖注册表固定版本的表述；该 Agent Note 仍负责沙箱行为、runner 选择和强制执行语义。

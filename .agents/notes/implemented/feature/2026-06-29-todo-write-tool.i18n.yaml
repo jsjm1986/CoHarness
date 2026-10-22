@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-29-todo-write-tool.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-29-todo-write-tool.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-29-todo-write-tool.md
+document:
+  en: f9f7f178b6907eed5d93b61a9b6fc25a547c6def
+  zh: 38083343e125b4c1868604df3ee7690afd1da678
 /agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state:
   en: 2a67af6ba272f57d
   zh: a434fd835cecabea
@@ -27,8 +30,8 @@
   en: f14c998fbee56e02
   zh: 4c1f3f3c0aa85b12
 /agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/decision/validation-the-cheap-middle:
-  en: c8fcc55b41ad211b
-  zh: 6f7e62513053b642
+  en: 896afbf56e0ae76d
+  zh: 700dd2a105299697
 /agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/why-no-cordis-catalog-entry-no-mode:
   en: 5f446af48107848a
   zh: 148d7889c0e0630e

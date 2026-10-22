@@ -9,7 +9,7 @@ kind: "package-reference"
 
 [目录选择 seam](../directory-picker/README.zh.md) 的**自适应选择器**：一个只有 node 半侧的插件，在启动时一次性判定宿主处境，并把匹配的双面后端——[`-native`](../directory-picker-native/README.zh.md) 或 [`-browse`](../directory-picker-browse/README.zh.md)——作为真实的 Loader 条目挂进内存根树（绝不持久化到配置文件；根树的 `write()` 是 no-op）。由于后端以普通条目的形式到达，其 browser half 被 client 模块表发现的方式与配置行完全相同，因此对判定出的选择，seam 的“一行同时换两面”不变式依然成立。Loader 会记录模块导入失败，但不会因此让 `create()` reject。选择器发现条目没有 fiber 时，会让自己的 fiber 失败并报告包名，不会重试导入。调用方必须在 `loader.await()` 完成后审计激活状态。失败的一面会连带移除已挂载的另一面，卸载选择器会再次移除这些条目——删除条目只请求 dispose（资源释放），所以选择器会在其 disposer 结束前等待每一面 fiber 的卸载完成。
 
-判定是一次纯函数的启动时采样（`resolveDirectoryPickerBackend`），已导出供复用。`native` 要求“操作者看得到宿主屏幕、且 native 后端能服务它”的全部信号：仅回环的绑定（从注入的 `webServer` 读取；全网卡绑定会接入任何 OS 选择器都触及不到的远程浏览器）；非 SSH 启动（`SSH_CONNECTION`／`SSH_TTY` 未设置或为空——SSH 端口转发下选择器会弹在无人值守的服务器上）；以及可服务的显示会话——darwin／win32 上视为存在；linux 上要求 `DISPLAY`／`WAYLAND_DISPLAY`，外加 `PATH` 上有 zenity 或 kdialog 二进制（该探查是又一项启动时事实）；其余任何平台上都不成立，因为 native 后端驱动的平台恰为 darwin／win32／linux。任何含糊情形都判定为处处可用的 `browse`。采样每次启动恰好发生一次，因此挂载的能力在服务生命周期内保持稳定，符合 seam 的要求。固定某种交互在这里不是配置字段——直接组合 `-native` 或 `-browse` 行来替代本行，那才是 seam 文档化的切换点；同时挂载选择器**和**某个后端行会明确报错（重复的 `directoryPicker` 服务、`single` 类 slot 中的重复 client 流程）。
+判定是一次纯函数的启动时采样（`resolveDirectoryPickerBackend`），已导出供复用。`native` 要求“操作者看得到宿主屏幕、且 native 后端能服务它”的全部信号：回环绑定（对注入的 `webServer.host` 判 `isLoopbackHost`；其他任何字面量都会接入任何 OS 选择器都触及不到的远程浏览器）；无远程可信权威（`ctx.connection.allowsRemoteAuthorities` 为 false——某个放行非回环权威的 `trustedHosts` 条目意味着远程浏览器可能合法到达本次启动）；非 SSH 启动（`SSH_CONNECTION`／`SSH_TTY` 未设置或为空——SSH 端口转发下选择器会弹在无人值守的服务器上）；以及可服务的显示会话——darwin／win32 上视为存在；linux 上要求 `DISPLAY`／`WAYLAND_DISPLAY`，外加 `PATH` 上有 zenity 或 kdialog 二进制（该探查是又一项启动时事实）；其余任何平台上都不成立，因为 native 后端驱动的平台恰为 darwin／win32／linux。任何含糊情形都判定为处处可用的 `browse`。采样每次启动恰好发生一次，因此挂载的能力在服务生命周期内保持稳定，符合 seam 的要求。固定某种交互在这里不是配置字段——直接组合 `-native` 或 `-browse` 行来替代本行，那才是 seam 文档化的切换点；同时挂载选择器**和**某个后端行会明确报错（重复的 `directoryPicker` 服务、`single` 类 slot 中的重复 client 流程）。
 
 ## 概述
 
@@ -17,18 +17,11 @@ kind: "package-reference"
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。选择器在启动时一次性解析宿主情形，并把匹配的后端作为普通 Loader 条目挂载；没有持续的选择器状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

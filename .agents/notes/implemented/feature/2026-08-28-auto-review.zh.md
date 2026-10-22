@@ -50,7 +50,7 @@ Reviewer 可以输出 reasoning blocks，随后恰好一个 JSON text block 和�
 
 原生结果与 PTC 结算事件携带同形结构化 `AutoReviewDeniedError`／`AUTO_REVIEW_DENIED` 及可选原始理由。Reviewer 拒绝时，主 agent 通过普通失败渲染收到 `Auto review rejected tool "<name>"; its body was not executed`。PTC 保留既有程序异常／catch 行为；捕获拒绝不会将其提升为外层失败。通用 Web 工具卡片为折叠行提供拒绝身份，为展开行提供一行未执行输出，不提供输入正文。只有该显示过程会 trim、折叠行分隔符，或提供本地化空理由 fallback；持久化与两套 SDK 保留完整原始理由，不增加长度或脱敏规则。
 
-准入与在途 review 登记在首次 await 前同步完成。Integration 拥有一个生命周期 controller 和一个在途操作集合。卸载先关闭新选择／review admission，经由既有 preset writer 把独立本地 Auto Session 切为 Full access，不改变旋钮、不关闭终端；受管 Session 按[执行权威决策](../bug-fix/2026-09-22-auto-review-execution-attribution.zh.md)恢复为 Workspace write，然后中止并等待 review 结清，最后移除 listener 与 contribution。Provider 结算后，lifecycle abort 始终形成规范的 dispatch 前取消，包括晚到 allow、deny 或 failure。Caller 取消保留 ToolRuntime 优先级：晚到 allow 在 dispatch 前取消；晚到 deny 或 failure 保留原结果。被取消的 review 不启动工具 body。
+准入与在途 review 登记在首次 await 前同步完成。Integration 拥有一个生命周期 controller 和一个在途操作集合。卸载先关闭新选择／review admission，经由既有 preset writer 把独立本地 Auto Session 切为 Full access，不改变旋钮、不关闭终端；受管 Session 按[执行权威决策](../bug-fix/2026-09-22-auto-review-execution-attribution.zh.md)恢复为 Workspace write，然后中止并等待 review 结清，最后移除 listener 与 contribution。即使 provider 随后返回 allow、deny 或 failure，调用方与生命周期取消仍产生规范的派发前取消结果。被取消的 review 不启动工具 body。
 
 完整 integration 缺失或失败时，持久 Auto Session 不能发布。日志不改写，也不后台重试。重装后用户可以重新打开它；已经迁移为 Full access 的存活 Session 保持原状，直到显式切换。
 
@@ -63,6 +63,8 @@ Auto 带右上标 `EXP`。两个可见当前会话选择器都要求实验确认
 [委派时权限捕获](2026-07-25-subagent-policy-inheritance.zh.md)在首次 await 前记录 Auto 或 Full access，并在 fork seed 与 sandbox／approval override 之后追加该既有 preset event。单次与可继续创建共用此规则；cold resume 只读取 child 日志。后续 parent 切换不改变该 child，后续 child 自己的切换仍可胜出。Read Only 与 Workspace Write 保留 sandbox 继承加 `approval: never`，因此可能保持 `custom`。Auto child 使用既有 lineage 与消息独立分类每次调用，不增加父 call metadata、委派记录、receipt、Header／descriptor 字段或 Session format。进程外 child 在父委派获准后保留自己的权限系统。
 
 ## 考虑过的替代方案
+
+**直接驱动 adapter 流。** Adapter 可能忽略其中止信号。LLM 服务拥有取消与有界流拆卸，因此 reviewer 使用该服务，由 ToolRuntime 保留调用方的取消结果。
 
 **默认或正式发布 integration** 会把实验模型审批策略带入每个部署。私有源码 Web patch 在复用既有插件安装器的同时保持显式 opt-in。
 

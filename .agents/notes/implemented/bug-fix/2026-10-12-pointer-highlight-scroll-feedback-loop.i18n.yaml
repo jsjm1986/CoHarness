@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-pointer-highlight-scroll-feedback-loop.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-pointer-highlight-scroll-feedback-loop.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-pointer-highlight-scroll-feedback-loop.md
+document:
+  en: 23b3101f74f2c97de9855f55b1809caaa99be50c
+  zh: dc0ff0bbc95e9c05811ab90cecc64b56fc2fce38
 /agent-note-pointer-hover-must-not-drive-keep-visible-scrolling:
   en: 1c436f4be0a5cf22
   zh: 15c34624852d7a99

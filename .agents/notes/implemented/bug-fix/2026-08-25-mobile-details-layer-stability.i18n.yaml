@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-25-mobile-details-layer-stability.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-25-mobile-details-layer-stability.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-mobile-details-layer-stability.md
+document:
+  en: a9db48c40629baa20bd467107ce1d644dbb4481d
+  zh: 09ed6d45dc6cd98b2d943d4341cd60dadfa3044a
 /agent-note-compact-detail-sheets-keep-semantic-headers-and-cover-the-composer:
   en: 6fcba5aff4b38dd4
   zh: a7cee9b5f76f156b

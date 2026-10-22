@@ -18,7 +18,6 @@ agent（智能体）及宿主 UI 可以用各 agent 本地工作区中经过排�
 ## 目录
 
 - [配置](#configuration)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -36,12 +35,6 @@ agent（智能体）及宿主 UI 可以用各 agent 本地工作区中经过排�
 
 所有数值都必须是正的安全整数。排除名称必须是非空基名，且不能包含 `/` 或 `\`。
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每 agent 索引是按需从文件系统重建的有界缓存；文件系统仍是唯一权威。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -54,7 +47,7 @@ agent（智能体）及宿主 UI 可以用各 agent 本地工作区中经过排�
 ##### 文件引用指令
 
 ```markdown
-Tokens prefixed with @ are workspace paths the user explicitly referenced, relative to the workspace root. A trailing slash marks a directory: list it when its contents matter. Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading. @"..." quotes a path containing spaces.
+Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root; absolute paths identify files or directories on the host. A trailing slash marks a directory: list it when its contents matter. Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading. @"..." quotes a path containing spaces.
 ```
 
 #### Token 影响

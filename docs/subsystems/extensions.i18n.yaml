@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for extensions.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for extensions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/extensions.md
+document:
+  en: acb4412e12957f0741e03f23110a2b44676518fc
+  zh: 924a8f7680612d15669cc0bb3c36a99454d7ff81
 /extensions:
   en: 59e910050ccf630f
   zh: fa0f7d54ee45c2b8

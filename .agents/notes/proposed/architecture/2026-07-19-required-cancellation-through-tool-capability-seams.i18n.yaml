@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-required-cancellation-through-tool-capability-seams.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-required-cancellation-through-tool-capability-seams.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-07-19-required-cancellation-through-tool-capability-seams.md
+document:
+  en: 722eefc3c79d3c1c589696bc1876d10ccbce77ea
+  zh: 0ce5956da11ef5144254325f0499d85b817ccfa6
 /agent-note-required-cancellation-through-tool-reachable-capability-seams:
   en: 7999f4da8ee4fe80
   zh: ea49c90e2bbaacb8

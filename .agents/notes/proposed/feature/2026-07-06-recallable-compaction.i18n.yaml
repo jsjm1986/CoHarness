@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-06-recallable-compaction.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-06-recallable-compaction.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-07-06-recallable-compaction.md
+document:
+  en: a36a2d0d23550dd8f52f95cdd4052e67505ab78e
+  zh: 9b4896d5a205b6951f1f0af9e9658aa0905d5a0f
 /agent-note-recallable-compaction-index-checkpoints-a-state-checkpoint-and-in-session-history-recall:
   en: 597e215825c64eb9
   zh: 1986c2ec32437386

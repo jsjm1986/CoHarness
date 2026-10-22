@@ -1,19 +1,22 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-attachment/README.md
+document:
+  en: f42d257361437ee1c6589d14ab1a08411e978ece
+  zh: 2a3441d67a28abdd77b44ca640ce566206aa2e4e
 /:
-  en: 0900fa7c5409e305
-  zh: 61495d48365178df
+  en: 2273de11cc44a9ec
+  zh: 58f6b654532e5faa
 /deepseek-ai-dsh-client-ui-attachment:
-  en: 02f40635b0daf4ba
-  zh: 01c6f3653b2858e4
+  en: 564b5c3f7dfb6237
+  zh: 5788c50f35689775
 /deepseek-ai-dsh-client-ui-attachment/summary:
   en: f36aa7a85597dd66
   zh: f7e87849791fe89a
 /deepseek-ai-dsh-client-ui-attachment/table-of-contents:
-  en: c247cff12ca87f62
-  zh: 2c62c9b41a1434d6
+  en: 427875d1c59fe1d6
+  zh: 7166f609c10249a5
 /deepseek-ai-dsh-client-ui-attachment/attachment-rail:
   en: af1d6ab2acd4e7f5
   zh: df91389ca20ab7bb
@@ -21,11 +24,8 @@
   en: 263a4db1c41055da
   zh: 1a5bef3adef91c0f
 /deepseek-ai-dsh-client-ui-attachment/drop-overlay:
-  en: 5d5fe9086d26516a
-  zh: e9c862da2997d78f
-/deepseek-ai-dsh-client-ui-attachment/invariants:
-  en: cc6ec68477d593c7
-  zh: 87f866104772295e
+  en: 8ac46f8887e781a9
+  zh: 0270226e631db387
 /deepseek-ai-dsh-client-ui-attachment/model-experience:
   en: 25566605d7b38667
   zh: 927d3ea272893296

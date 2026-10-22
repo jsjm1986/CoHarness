@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-unnamed-session-row-label.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-unnamed-session-row-label.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-unnamed-session-row-label.md
+document:
+  en: d6080a4f10f77986509f65022b8d686820d1b1da
+  zh: 00f524f4fe5c06115f50aa5fbb8be369d4b4327e
 /agent-note-unnamed-session-rows-localize-their-label-instead-of-showing-the-directory-name:
   en: 0f02fa9e1df9a194
   zh: 5b370745af24a201

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-subagent-message-settlement-ordering.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-subagent-message-settlement-ordering.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-subagent-message-settlement-ordering.md
+document:
+  en: 2c5c38f2296dda0b24d467dc63b984307b6a56d2
+  zh: b1872ea2953da58eceb65727761b9bb795f9c5ee
 /agent-note-child-agent-messages-precede-their-settlement-notices:
   en: b46c628c107fbdfe
   zh: 829b71dae5e73e0f

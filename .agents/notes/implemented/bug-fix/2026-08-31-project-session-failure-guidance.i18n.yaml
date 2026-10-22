@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-31-project-session-failure-guidance.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-31-project-session-failure-guidance.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-31-project-session-failure-guidance.md
+document:
+  en: 0f707d4679787f2f7509aeafe117c7f9757fd608
+  zh: c62996da79e1f48f1869d5fddc78b1832f63ab23
 /agent-note-project-session-failures-use-safe-user-guidance:
   en: e348a48044cafcce
   zh: d53c6c1bdc5f6b1b

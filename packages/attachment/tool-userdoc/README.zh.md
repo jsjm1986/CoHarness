@@ -13,7 +13,6 @@ kind: "package-reference"
 
 使用 `dsh-tool-userdoc` 让代理获得面向个人文档工作区的 `userdoc_list` 与 `userdoc_read` 工具。代理可以列出文件夹并读取文档文本，使用的是与浏览器文档管理器相同的存储，无需单独的检索通道。本包只注册工具与提示词指引，不改变 agent 循环、存储提供方或文档 HTTP 路由。
 
-
 ## 目录
 
 - [安装](#installation)
@@ -61,7 +60,6 @@ kind: "package-reference"
 ## 扩展点
 
 该包是现有 `UserDocStore` 接缝的 Consumer。未来的项目范围或远程实现应新增独立的文档来源 Service Definition 与 Provider，负责解析已认证的作用域，然后复用此处的工具职责，不暴露 Gateway URL 或主机路径。浏览器管理仍由 `@deepseek-ai/dsh-host-userdoc-http` 与 `@deepseek-ai/dsh-client-ui-documents` 负责。
-
 
 ## 模型体验
 
@@ -121,7 +119,6 @@ Personal documents are a persistent user-owned workspace. When a user refers to 
 - `userdoc_read` 只接受 UTF-8 文本。PDF、Office、图片和其他二进制读取应由可选的格式专用 Consumer 提供，而不是由通用存储包承担。
 - 该包只读。保存、编辑、版本管理和本机打开需要独立的模型侧或 Host Consumer，并各自定义审批与并发约定。
 
-**运行时不变式：** 不发布伴生入口。本包只拥有工具与提示词注册；执行结果与存储约束由其所属接缝验证。
 
 <a id="dev-note"></a>
 ### 开发备注

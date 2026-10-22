@@ -17,7 +17,6 @@ Adopt the upstream boot plane wholesale and replay local product behavior onto i
 - `packages/boot/app-boot`, `packages/boot/cmdline`, `packages/host/plugin-inventory`, and `apps/cli` sources align with upstream; `apps/web/tests/scaffold.ts` keeps the local gateway/downlink scaffold with only signature fixes.
 - The shipped agent-preset root survives as a derived patch appended after `readProfilePatches`, the same position the telemetry patch occupies; upstream's equivalent `includeShippedRoot` lands with the `agent-presets` migration in 7E and retires the launcher patch then.
 - Base and web bundle `cordis.patch.yml` files take the `dsh-hmr` row (`root: []`, `disabled` on missing `profileContext`) and the plugin-manager rows; the old web-side HMR disable is removed because the new package is web-safe.
-- New packages `dsh-hmr`, `dsh-plugin-manager`, `dsh-lazy-require`, `dsh-acp-app`, `dsh-sdk-app`, `dsh-sdk-minimal`, and `dsh-mcp-resources` land with local explained-empty invariant companions, matching the standing companion policy rather than upstream's relaxed gate.
 - `js-yaml` moves to ^5.2.3 in `apps/cli`, matching the vendored include; `SystemPrompt` config forwarding renames `persona` to `personaPrefix` while `SubagentCapabilities.persona` keeps its separate meaning.
 
 ## Alternatives considered

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-web-composer-shared-width-axis.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-web-composer-shared-width-axis.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-04-web-composer-shared-width-axis.md
+document:
+  en: f667363fb26297046b373779e1755928d328ec96
+  zh: 6268cfb198e2136afe48a5feed552dda7f87252d
 /agent-note-web-composer-shared-width-axis-and-control-row-polish:
   en: eda65983e06316a0
   zh: 8a69ad5346b3ed1d

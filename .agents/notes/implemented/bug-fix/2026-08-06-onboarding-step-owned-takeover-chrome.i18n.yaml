@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-onboarding-step-owned-takeover-chrome.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-onboarding-step-owned-takeover-chrome.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-06-onboarding-step-owned-takeover-chrome.md
+document:
+  en: bc0a216cf0aa741bd0e7e845d4f5dbab526abf46
+  zh: d236a5e095d94c54f91c437852c1c7be7d58c86f
 /agent-note-onboarding-takeover-chrome-moves-into-the-step:
   en: d397b324bfb1b035
   zh: fc84f075182936da

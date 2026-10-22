@@ -48,7 +48,6 @@ function statusKey(status: TeamTask['status']): TeamKey {
 function memberStatusKey(status: TeamRosterMember['status']): TeamKey {
   switch (status) {
     case 'running': return 'memberStatus.running'
-    case 'idle': return 'memberStatus.idle'
     case 'inactive': return 'memberStatus.inactive'
     case 'provisioning': return 'memberStatus.provisioning'
     case 'failed': return 'memberStatus.failed'

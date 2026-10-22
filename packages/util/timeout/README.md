@@ -23,7 +23,6 @@ It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds
 - [The `timeoutMs <= 0` sentinel](#the-timeoutms--0-sentinel)
 - [Usage shape](#usage-shape)
 - [What does NOT get a timeout](#what-does-not-get-a-timeout)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -79,11 +78,6 @@ For a streamed transport, create one `idleWatchdog`, pass its stable `signal` in
 ## What does NOT get a timeout
 
 Local file `read`/`write`/`edit` take no `timeoutMs`: file IO runs untimed because a deadline would kill work the OS will still finish. See [the filesystem subsystem page](../../../docs/subsystems/filesystem.md).
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. A zero-dependency pure library; the signal and classification algebra is enforced by unit specs.
 
 <a id="model-experience"></a>
 ## Model Experience

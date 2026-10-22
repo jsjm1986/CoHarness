@@ -21,7 +21,7 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../subagent/subagent"
     },
     {
       "path": "../../../vendor/cordis"

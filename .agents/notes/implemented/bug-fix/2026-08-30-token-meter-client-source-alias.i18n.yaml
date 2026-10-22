@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-30-token-meter-client-source-alias.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-30-token-meter-client-source-alias.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-30-token-meter-client-source-alias.md
+document:
+  en: 50d24f2113902565540c1fe08fb3f5dcf67d5265
+  zh: 8f31eb67cd1f6ffb50f3d3e8da82494cae736040
 /agent-note-keep-token-meter-client-imports-resolvable-in-source-tests:
   en: 13254f3899a549d9
   zh: 39f59fa2a84c1a65

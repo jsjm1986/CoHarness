@@ -39,6 +39,14 @@ print(result.final_response)
 
 `DeepSeekHarness` starts lazily and reuses its runtime until `close()` or context-manager exit. The initial profile handshake has an independent 30-second default bound through `initialize_timeout_seconds`; ordinary turns remain unbounded unless `request_timeout_seconds` is set. A timeout includes retained runtime diagnostics. `cwd` is the agent workspace; `runtime_cwd` independently selects the subprocess working directory. Both become absolute before launch. `provider`, `model`, optional `reasoning_effort`, and optional positive `max_tokens` are sent during JSON-RPC initialization. The child environment inherits the launching process environment; `base_url` and `api_key` explicitly override `DEEPSEEK_BASE_URL` and `DEEPSEEK_API_KEY` there. Input lines, pending requests, incoming requests, notifications, and output are bounded by `HarnessConfig`; initialization, request, and shutdown timeouts must be positive finite seconds within the SDK timer bound.
 
+`harness.resume_session(saved_session_id)` restores persisted history and returns a `Session` ready for `run()`. Save the original session id and reuse its `dsh_home` and workspace. Restoration preserves the stored directory, repairs an interrupted final turn, and sends no new input. Missing, unreadable, incompatible, or occupied sessions raise without creating a replacement. `start_session(id)` only opens a lazy handle; it does not request persisted restoration. This API does not restore shell, browser, or other external processes.
+
+```py
+with DeepSeekHarness(dsh_home="/absolute/path/to/saved-home") as harness:
+    session = harness.resume_session(saved_session_id)
+    result = session.run("Continue the task.")
+```
+
 ## Customize plugins
 
 Persistent customization belongs to a `dsh` profile. Initialize the shipped SDK profile and install an external bundle with the runtime wheel's `dsh` command:

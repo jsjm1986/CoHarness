@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-22-unified-send-and-coalesced-user-messages.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-22-unified-send-and-coalesced-user-messages.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-22-unified-send-and-coalesced-user-messages.md
+document:
+  en: bc195e77c71b554d60c03c91134bbcef95678fff
+  zh: 414b5542aae2972b22ba015ba9397ec44921a6fa
 /agent-note-unify-agent-delivery-on-send-target-wakeup-and-coalesce-injected-context-into-user-message:
   en: feb2582d2137249e
   zh: 022b69b2df0df6b6

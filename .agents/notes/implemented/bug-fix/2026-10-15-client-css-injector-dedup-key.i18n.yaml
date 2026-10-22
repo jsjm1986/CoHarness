@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-15-client-css-injector-dedup-key.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-15-client-css-injector-dedup-key.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-client-css-injector-dedup-key.md
+document:
+  en: 502bfcf0552f4acc87d3d40e5a04594eb4c317b6
+  zh: d6ffe29773118d7bf56281aa626d8145453ca0eb
 /agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path:
   en: 07aaae8057ef9d6d
   zh: 47659f454e8b1c57

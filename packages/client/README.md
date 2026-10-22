@@ -20,7 +20,7 @@ The browser side of the dsh web GUI: shell boot, browser-host communication, sha
 | [`hmr/`](hmr/README.md) | Refreshes client plugins during development. |
 | [`locale/`](locale/README.md) | Provides localization preferences and message dictionaries. |
 | [`test-runtime/`](../test-support/client-runtime/README.md) | Provides shared repository test support for client feature packages. |
-| [`ui-slots/`](ui-slots/README.md) | Defines how UI features register and compose extension slots. |
+| [`ui-slots/`](ui-slots/README.md) | Defines typed extension Slots and reusable Component Factories. |
 | [`ui-theme/`](ui-theme/README.md) | Applies the selected color theme. |
 | [`ui-primitives/`](ui-primitives/README.md) | Provides shared React controls, icons, and content renderers. |
 | [`ui-attachment/`](ui-attachment/README.md) | Registers composer and message-image attachment presentation. |
@@ -53,7 +53,6 @@ The browser side of the dsh web GUI: shell boot, browser-host communication, sha
 Each child reference owns its contract and detailed behavior. The [slot system standard](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) and [web client architecture note](../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.md) own the cross-package composition and loading decisions.
 
 The subsystem reference is [client-modules.md](../../docs/subsystems/client-modules.md); the [slot system standard](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) is the definitive slot model, and the [web client architecture note](../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.md) owns the loading chain and object layer.
-
 
 ## Summary
 

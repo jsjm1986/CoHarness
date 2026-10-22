@@ -44,14 +44,15 @@
 | [compaction.md](compaction.zh.md) | 压缩（compaction）seam：`compaction/*` 会话事件、`CompactionResult`、`CompactionEngine` 接口 |
 | [subagent.md](subagent.zh.md) | subagent seam：命名提供方注册表、`SubagentStartRequest`/`Result`/`Run`、启动时与运行时能力拆分 |
 | [voice-input.md](voice-input.zh.md) | 实验性具名语音识别、临时音频和受版本保护的草稿插入 |
+| [translation.md](translation.zh.md) | 实验性免登录文本翻译与显式 Provider 请求 |
 | [agent-team.md](agent-team.zh.md) | Agent Teams：隐式 Lead 身份、具名 continuable teammate、持久 peer mailbox 与共享任务 DAG |
+| [claude-code-mods.md](claude-code-mods.zh.md) | 经实验性桥接运行的 Claude Code 模组：与 Claude Code 行为不同的每个事件、`$` 成员、链规则、绘制特性与示例模组 |
 | [web.md](web.zh.md) | Web 访问 seam：`WebSearchRequest`/`Result`、`WebFetchRequest`/`Result`、`WebFetchBody`、提供方可用性、`WebError` |
 | [spill.md](spill.zh.md) | spill 存储 seam：`SaveTextSpill`、`SpillOwner`/`SpillSource`、`SpillRef`、品牌类型 `SpillLocator` |
 | [workflow.md](workflow.zh.md) | 工作流 seam：`WorkflowStartRequest`、`WorkflowMeta`、`WorkflowRun`/`Result`、`workflow/*` 事件载荷、`WorkflowError` 致命性 |
 | [jobs.md](jobs.zh.md) | 后台任务运行时：品牌化 `JobId`、producer 约定、消费方视图和 `ctx.jobs` 服务行为 |
 | [permission-presets.md](permission-presets.zh.md) | 权限预设层：`PresetSpec`/`PresetOption`、派生的 `custom` 状态、仅记日志的 `permission/preset` 事件 |
 | [plan.md](plan.zh.md) | 计划模式：仅记日志的 `plan/mode` 状态、待定选择的冲刷、`PlanModeConfig`、`exit_plan_mode` 审阅流程 |
-| [invariants.md](invariants.zh.md) | 运行时不变式注册表：选择配置 `Config`、`InvariantInstaller`/`InvariantFailure`、空配套插件约定 |
 | [web-server.md](web-server.zh.md) | HTTP 载体：`WebRouteKind`/`WebRoute`、匹配顺序、可认领的回退席位、index 渲染挂接点 |
 | [storage.md](storage.zh.md) | 存储子系统：后端约定（`StorageBackend`）、`StorageForms`、`DomainSpec`/`Domain`、`domain/changed` |
 | [deliverables.md](deliverables.zh.md) | 显式文件交付声明与已记录的工作区轮次比较 |
@@ -66,6 +67,7 @@
 | [conversation.md](conversation.zh.md) | Client Session 事件窗口与浏览器视图之间的目标中立装配层：按 binding 的注册表、Turn/Step 位置与增量 Context 组装 |
 | [session-projection.md](session-projection.zh.md) | 投影 seam：`SessionProjectionMap`、纯函数 `ProjectionDefinition` 单元、`ProjectionSnapshot` 的一致切面、变更馈送 |
 | [working-directory.md](working-directory.zh.md) | Session 的有效目录：`working-directory/change` 记录、`ctx.workingDirectory` 的 get/ensure/resolve/set、项目边界约束、执行世界文件系统校验 |
+| [worktrees.md](worktrees.zh.md) | 既有权限下实验性的 Git 分支与检出目录创建 |
 | [session-telemetry.md](session-telemetry.zh.md) | 对外会话上报能力 seam：`SessionTelemetryRecord`/`SessionTelemetrySeverity`、`SessionTelemetrySink` 约定和 `session-telemetry/record` 脱敏 waterfall |
 | [boot.md](boot.zh.md) | 当前 profile 插件管理与 launcher 重载协调 |
 | [mcp.md](mcp.zh.md) | 外部 MCP 连接、作用域工具与资源、服务器指令、协议结果与配置归属 |

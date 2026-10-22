@@ -1,0 +1,97 @@
+- banner:
+  - text: Running
+  - navigation "Session hierarchy":
+    - button "Ask a research subagent to"
+    - button "1 subagent running":
+      - text: 1 subagent
+      - img
+    - text: /
+    - 'button "Switch subagent: event-sourcing researcher"': event-sourcing researcher
+  - text: Standard mode
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "Feedback":
+    - img
+  - button "Open right sidebar":
+    - img
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
+- text: "Explain event sourcing in one sentence.Your parent agent id is \"session-{{uuid}}\". Before you finish, send your result to that agent with send_message({ agent_id: \"session-{{uuid}}\", message: \"<self-contained result>\" }). The parent shares your workspace but does not automatically receive your transcript, tool output, or reasoning. Send earlier messages as well when a finding changes what the parent should do next; sending a message does not end your turn."
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- status: Stopped
+- button "Stopped" [disabled] [expanded]
+- button "Analysis completed"
+- button "Context injection runtime-context":
+  - img
+  - img
+  - text: Context injection runtime-context
+- paragraph: partial
+- text: Stopped
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- text: Keep working until I stop you again.
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- status: Deep diving...
+- button "3 queued messages" [expanded]
+- list:
+  - listitem:
+    - text: Start that queued work now.
+    - button "Edit queued message":
+      - img
+    - button "Remove queued message":
+      - img
+    - button "Steer queued message":
+      - img
+  - listitem:
+    - text: Now give the same explanation to a human reader.
+    - button "Edit queued message":
+      - img
+    - button "Remove queued message":
+      - img
+    - button "Steer queued message":
+      - img
+  - listitem:
+    - img "Queued message image"
+    - button "Edit queued message" [disabled]:
+      - img
+    - button "Remove queued message":
+      - img
+    - button "Steer queued message":
+      - img
+- textbox "Cmd/Ctrl+Enter steers all queued messages"
+- button "Add images or documents" [disabled]:
+  - img
+- button "Choose from Documents" [disabled]:
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Custom"': Custom
+- button "Stop generating"
+- button "Send message" [disabled]
+- group "Session statistics":
+  - button "1 turns · 1 steps":
+    - img
+    - text: 1 turns · 1 steps
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

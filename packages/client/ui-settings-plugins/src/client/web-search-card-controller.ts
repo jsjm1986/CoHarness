@@ -1,19 +1,24 @@
 /**
- * The web-search card's staged form over the `web-search-deepseek` settings
- * namespace.
+ * The web-search card's staged form over three settings namespaces: `web`,
+ * whose provider selection the Search API switch writes, `web-search-deepseek`
+ * for Messages search, and `web-deepseek-api` for the Search and Fetch APIs.
  *
- * The key is the one control that does not live in the section: its literal
+ * The switch selects `deepseek-search-api` and `deepseek-fetch-api` together, or
+ * Messages search with local HTTP fetch. A selection equal to the deployment's
+ * composed value clears the override instead of storing a copy of it.
+ *
+ * The key is the one control that does not live in a section: its literal
  * never rides a response, so the card learns only whether one is configured
  * and writes it through the credentials domain, addressed by the reference the
- * section names. It is still staged with the rest of the form, so one save
- * covers everything the card shows.
+ * selected API's section names. It is still staged with the rest of the form,
+ * so one save covers everything the card shows.
  */
 
 import type { IApiClient } from '@deepseek-ai/dsh-client-connection/client'
-import type { SettingsScope, SettingsScopeSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type SettingsScope, type SettingsScopeSnapshot, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   CardForm, numberField, textField,
-  type CardActions, type CardFieldState, type CardShell,
+  type CardActions, type CardFieldSpec, type CardFieldState, type CardShell,
 } from './card-form.ts'
 
 /**
@@ -21,21 +26,49 @@ import {
  * imported: a client package must not depend on a Host package.
  */
 export const WEB_SEARCH_NS = 'web-search-deepseek'
+/** Namespace of the DeepSeek Search and Fetch API providers. */
+export const WEB_API_NS = 'web-deepseek-api'
+/** Namespace of the web service's provider selection. */
+export const WEB_NS = 'web'
 
-/** Credential reference the provider resolves when the section names none. */
+/** Provider ids the switch writes into the web service's selection. */
+const PROVIDERS = {
+  searchProvider: { api: 'deepseek-search-api', messages: 'deepseek-official' },
+  fetchProvider: { api: 'deepseek-fetch-api', messages: 'http' },
+} as const
+
+/** Credential reference the providers resolve when a section names none. */
 const DEFAULT_API_KEY_REF = 'DEEPSEEK_API_KEY'
 
 /** Form field the credential control stages under. */
 const API_KEY_FIELD = 'apiKey'
 
-/** The search-provider fields this card edits. */
+/** The web service's provider selection. */
+export interface WebProviderSelection {
+  /** Search provider id. */
+  searchProvider?: string
+  /** Fetch provider id. */
+  fetchProvider?: string
+}
+
+/** The Messages search fields this card edits. */
 export interface WebSearchSettings {
   /** Credential reference naming the environment key. */
   apiKeyEnv?: string
-  /** Provider endpoint; blank inherits the provider default. */
+  /** Messages endpoint; blank inherits the provider default. */
   baseURL?: string
-  /** Maximum searches served within one request. */
+  /** Maximum Messages server-tool uses. */
   maxUses?: number
+}
+
+/** The Search and Fetch API fields this card edits. */
+export interface WebApiSettings {
+  /** Credential reference naming the environment key. */
+  apiKeyEnv?: string
+  /** Search and Fetch API base with its path prefix; blank inherits the provider default. */
+  baseURL?: string
+  /** Search API results per search. */
+  count?: number
 }
 
 /** What the credentials domain last reported, and for which reference. */
@@ -50,10 +83,18 @@ interface CredentialState {
 
 /** What the web-search card renders. */
 export interface WebSearchCardState extends CardShell {
-  /** Provider endpoint. */
+  /** Whether the Host serves both the selection and the Search / Fetch API section. */
+  apiSwitchAvailable: boolean
+  /** Invalid edits or failed saves that switching APIs must keep visible. */
+  apiSwitchBlocked: boolean
+  /** Staged switch position: true selects the Search and Fetch APIs. */
+  useSearchApi: boolean
+  /** Endpoint of the selected API. */
   baseURL: CardFieldState
-  /** Searches allowed per request. */
+  /** Maximum Messages server-tool uses. */
   maxUses: CardFieldState
+  /** Search API results per search. */
+  count: CardFieldState
   /** The staged credential, which starts blank on every load. */
   apiKey: CardFieldState
   /** Whether the Host reports a credential configured for the referenced key. */
@@ -68,55 +109,130 @@ export interface WebSearchCardFace extends CardActions {
     /** Card snapshot bound by the renderer as useWebSearchCard. */
     webSearchCard: SnapshotStore<WebSearchCardState>
   }
+  /** Stage the API switch: true selects the Search and Fetch APIs, false Messages search with local fetch. */
+  setSearchApi: (enabled: boolean) => void
 }
 
-/** Bridges the `web-search-deepseek` scope and the credentials domain onto the card. */
+/** Settings scopes for the namespaces the card edits. */
+export interface WebSearchCardScopes {
+  /** The web service's provider selection. */
+  web: SettingsScope<WebProviderSelection>
+  /** Messages search settings. */
+  messages: SettingsScope<WebSearchSettings>
+  /** Search and Fetch API settings. */
+  api: SettingsScope<WebApiSettings>
+}
+
+/** A number field restricted to the Search API's 1–50 result range. */
+function countField(field: string): CardFieldSpec {
+  const base = numberField(field)
+  return {
+    ...base,
+    parse: (text) => {
+      if (text.trim() === '') return { kind: 'clear' }
+      const value = Number(text)
+      return Number.isInteger(value) && value >= 1 && value <= 50 ? { kind: 'set', value } : undefined
+    },
+  }
+}
+
+/** Bridges the three settings scopes and the credentials domain onto the card. */
 export class WebSearchCardController {
-  private readonly form: CardForm<WebSearchSettings>
+  private readonly selection: CardForm<WebProviderSelection>
+  private readonly messages: CardForm<WebSearchSettings>
+  private readonly api: CardForm<WebApiSettings>
   private readonly store: SnapshotStore<WebSearchCardState>
+  private readonly unsubscribe: (() => void)[]
   private credential: CredentialState = { ref: '', configured: false, writable: true }
   private credentialRead = 0
 
   /**
-   * @param scope - the bound settings scope for the `web-search-deepseek` namespace.
-   * @param api - wire face used for the credential the section references.
+   * @param scopes - the bound settings scopes for the card's namespaces.
+   * @param api - wire face used for the credential the selected section references.
    */
   constructor(
-    private readonly scope: SettingsScope<WebSearchSettings>,
-    private readonly api: Pick<IApiClient, 'credentials'>,
+    private readonly scopes: WebSearchCardScopes,
+    private readonly apiClient: Pick<IApiClient, 'credentials'>,
   ) {
-    this.form = new CardForm(
-      scope,
-      [textField('baseURL'), numberField('maxUses')],
+    this.selection = new CardForm(
+      scopes.web,
+      [textField('searchProvider'), textField('fetchProvider')],
       [{ field: API_KEY_FIELD, write: text => this.writeKey(text) }],
     )
-    this.store = this.form.bind(() => this.projection())
-    scope.subscribe(() => { void this.readCredential() })
+    this.messages = new CardForm(
+      scopes.messages,
+      [textField('baseURL'), numberField('maxUses')],
+    )
+    this.api = new CardForm(
+      scopes.api,
+      [textField('baseURL'), countField('count')],
+    )
+    this.store = createSnapshotStore(this.projection())
+    // A staged switch can change which section names the key, without any
+    // scope publishing; a scope change can rename the reference itself.
+    const publish = () => {
+      this.store.set(this.projection())
+      if (this.ref() !== this.credential.ref) void this.readCredential()
+    }
+    this.unsubscribe = [
+      ...[this.selection, this.messages, this.api].map(form => form.subscribe(publish)),
+      ...[scopes.web, scopes.messages, scopes.api].map(scope => scope.subscribe(() => { void this.readCredential() })),
+    ]
     void this.readCredential()
   }
 
+  /** Whether the Host serves both sections the switch needs. */
+  private switchAvailable(): boolean {
+    return this.selection.shell().available && this.api.shell().available
+  }
+
+  /** The staged switch position, read from the staged search selection. */
+  private searchApi(): boolean {
+    return this.switchAvailable() && this.selection.field('searchProvider').text === PROVIDERS.searchProvider.api
+  }
+
   private projection(): WebSearchCardState {
+    const primary = this.messages.shell()
+    const served = [primary, this.selection.shell(), this.api.shell()].filter(item => item.available)
+    const shell: CardShell = {
+      available: primary.available,
+      writable: served.every(item => item.writable),
+      dirty: served.some(item => item.dirty),
+      invalid: served.some(item => item.invalid),
+      saving: served.some(item => item.saving),
+      failed: served.some(item => item.failed),
+    }
+    const searchApi = this.searchApi()
     return {
-      ...this.form.shell(),
-      baseURL: this.form.field('baseURL'),
-      maxUses: this.form.field('maxUses'),
-      apiKey: this.form.field(API_KEY_FIELD),
+      ...shell,
+      apiSwitchAvailable: this.switchAvailable(),
+      apiSwitchBlocked: shell.invalid || shell.failed,
+      useSearchApi: searchApi,
+      baseURL: (searchApi ? this.api : this.messages).field('baseURL'),
+      maxUses: this.messages.field('maxUses'),
+      count: this.api.field('count'),
+      apiKey: this.selection.field(API_KEY_FIELD),
       apiKeyConfigured: this.credential.configured,
       apiKeyWritable: this.credential.writable,
     }
   }
 
+  /** The reference the selected API's section names, or the providers' default. */
+  private ref(): string {
+    return refOf(this.searchApi() ? this.scopes.api.getSnapshot() : this.scopes.messages.getSnapshot())
+  }
+
   /**
-   * Ask the credentials domain about the reference the section currently names.
+   * Ask the credentials domain about the reference the selected section currently names.
    *
-   * The answer is stored with the reference it describes: `apiKeyEnv` can
-   * change between the request and its response, and two reads can settle out
-   * of order, so a response is published only while it still answers for the
-   * reference in force.
+   * The answer is stored with the reference it describes: `apiKeyEnv` and the
+   * switch can change between the request and its response, and two reads can
+   * settle out of order, so a response is published only while it still
+   * answers for the reference in force.
    */
   private async readCredential(): Promise<void> {
     const generation = ++this.credentialRead
-    const ref = refOf(this.scope.getSnapshot())
+    const ref = this.ref()
     if (ref !== this.credential.ref) {
       // A new reference knows nothing yet; keeping the old answer would claim
       // the key is configured under a name nobody has checked.
@@ -125,13 +241,13 @@ export class WebSearchCardController {
     }
     let response: Awaited<ReturnType<IApiClient['credentials']['describe']>>
     try {
-      response = await this.api.credentials.describe({ refs: [ref] })
+      response = await this.apiClient.credentials.describe({ refs: [ref] })
     } catch (_credentialReadFailure) {
       // The card stays usable without this: the key control simply reports the
       // last state it knew, and a write still reaches the Host.
       return
     }
-    if (generation !== this.credentialRead || !response.result.ok || ref !== refOf(this.scope.getSnapshot())) return
+    if (generation !== this.credentialRead || !response.result.ok || ref !== this.ref()) return
     const view = response.result.value.credentials[ref]
     const next: CredentialState = {
       ref,
@@ -159,38 +275,93 @@ export class WebSearchCardController {
   }
 
   /**
-   * Build the face the card's slot registration injects.
+   * Build the face the card's slot registration injects. `baseURL` edits the
+   * selected API's endpoint; `maxUses` and `count` edit their own sections.
    * @returns the card's snapshot and its form actions.
    */
   inject(): WebSearchCardFace {
-    return { hooks: { webSearchCard: this.store }, ...this.form.actions() }
+    const formOf = (field: string): CardForm<never> => {
+      if (field === API_KEY_FIELD) return this.selection as CardForm<never>
+      if (field === 'maxUses') return this.messages as CardForm<never>
+      if (field === 'count') return this.api as CardForm<never>
+      return (this.searchApi() ? this.api : this.messages) as CardForm<never>
+    }
+    return {
+      hooks: { webSearchCard: this.store },
+      edit: (field, text) => { formOf(field).actions().edit(field, text) },
+      resetField: (field) => { formOf(field).actions().resetField(field) },
+      setSearchApi: (enabled) => { this.select(enabled) },
+      save: () => { void this.save() },
+      discard: () => {
+        for (const form of [this.selection, this.messages, this.api]) form.actions().discard()
+      },
+    }
+  }
+
+  /**
+   * Stage both provider selections for one switch position. A target equal to
+   * the composed value clears the override so the deployment default keeps
+   * applying.
+   * @param enabled - true for the Search and Fetch APIs.
+   */
+  private select(enabled: boolean): void {
+    const base = this.scopes.web.getSnapshot().base as WebProviderSelection | undefined
+    const actions = this.selection.actions()
+    for (const field of ['searchProvider', 'fetchProvider'] as const) {
+      const target = PROVIDERS[field][enabled ? 'api' : 'messages']
+      if (base?.[field] === target) actions.resetField(field)
+      else actions.edit(field, target)
+    }
+  }
+
+  /**
+   * Save the provider sections before the selection, so a switch takes effect
+   * only after the endpoint it uses has landed. A refused section stops the
+   * selection from saving and keeps every remaining draft for correction.
+   * @returns settlement after every attempted write.
+   */
+  private async save(): Promise<void> {
+    const state = this.projection()
+    if (!state.available || state.invalid || state.saving) return
+    for (const form of [this.messages, this.api]) {
+      if (!form.shell().available || !form.shell().dirty) continue
+      await form.save()
+      if (form.shell().failed) return
+    }
+    if (this.selection.shell().dirty) await this.selection.save()
   }
 
   /**
    * Write the staged key, then re-read whether the Host now holds one.
    * @param value - the staged credential literal.
-   * @returns whether this write was accepted for the unchanged reference and a credential is configured.
+   * @returns whether the Host reports a configured credential afterwards.
    */
   private async writeKey(value: string): Promise<boolean> {
-    const ref = refOf(this.scope.getSnapshot())
+    const ref = this.ref()
     let accepted = false
     try {
-      const response = await this.api.credentials.set({ ref, value })
+      const response = await this.apiClient.credentials.set({ ref, value })
       accepted = response.result.ok
     } catch (_credentialWriteFailure) {
       // A failed transport cannot acknowledge replacement of an existing credential.
     }
     await this.readCredential()
-    return accepted && ref === refOf(this.scope.getSnapshot()) && this.credential.configured
+    return accepted && ref === this.ref() && this.credential.configured
+  }
+
+  /** Release configuration subscriptions. */
+  dispose(): void {
+    for (const off of this.unsubscribe) off()
+    for (const form of [this.selection, this.messages, this.api]) form.dispose()
   }
 }
 
 /**
- * The credential reference the section names, or the provider's default.
- * @param snapshot - the current scope snapshot.
+ * The credential reference a section names, or the providers' default.
+ * @param snapshot - the section's current scope snapshot.
  * @returns the reference to address.
  */
-function refOf(snapshot: SettingsScopeSnapshot<WebSearchSettings>): string {
+function refOf(snapshot: SettingsScopeSnapshot<{ apiKeyEnv?: string }>): string {
   const declared = snapshot.value?.apiKeyEnv
   return declared !== undefined && declared.length > 0 ? declared : DEFAULT_API_KEY_REF
 }

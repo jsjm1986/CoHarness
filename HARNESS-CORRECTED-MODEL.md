@@ -14,7 +14,7 @@
 |---|---|
 | 插件以「实体 / Entity」为锚 | `packages/**/src` 全文 grep `entity\|Entity` **零命中**。harness 里没有实体这个一等概念 |
 | 「进程」是插件的一个维度 | cordis 插件默认 in-process；进程是 **Provider 的选择**。worker-thread README 明写"不是安全沙箱" |
-| preset 可承载字段 / 表结构 | preset 客户端行只有 `id/trust/isDefault/name/description/broken`（`packages/preset/agent-presets/src/types.ts:11-25`）。**无能力声明、无实体、无 schema**。（`capabilities` 全包仅在注释中出现，`index.ts:386`） |
+| preset 可承载字段 / 表结构 | preset 客户端行只有 `id/trust/isDefault/name/description/broken`（`packages/preset/agent-preset-registry/src/types.ts:11-25`）。**无能力声明、无实体、无 schema**。（`capabilities` 全包仅在注释中出现，`index.ts:386`） |
 | subagent 有 7 个 provider | 实际 **6 个注册型 provider + 1 个共享驱动库**（`subagent-in-process-driver` 非 provider） |
 | 「扩展插件只依赖 Definition」是强制约束 | **约定级**，无 lint / 无类型强制。存在反例：`fs-sandbox` 直接 import `fs-local`（Provider→Provider 继承） |
 

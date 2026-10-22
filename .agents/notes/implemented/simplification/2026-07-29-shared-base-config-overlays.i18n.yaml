@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-29-shared-base-config-overlays.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-29-shared-base-config-overlays.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-29-shared-base-config-overlays.md
+document:
+  en: 5a916b4df7bad5008a9e5e4812cb0031854df7b2
+  zh: ca66c9d5b7c25f97de05c0c8e2fc58f8320a1974
 /agent-note-one-shared-base-config-with-per-surface-overlays:
   en: d7b2f4682e52c7f9
   zh: de7ed5e6afcbc249

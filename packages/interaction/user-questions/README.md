@@ -56,7 +56,6 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **The vocabulary is the question-form shape only** — selectable options plus optional custom text; richer interaction shapes (file pickers, diff-preview confirmations) have no seam vocabulary yet.
 - **Draft text is not part of Host question persistence** — the question survives restart across clients through the projection; unfinished input remains local to one browser profile.
 
-
 <a id="dev-note"></a>
 ### Dev Note
 
@@ -67,4 +66,4 @@ None.
 
 </details>
 
-**Runtime invariant:** the `userQuestions` projection is derived from the tool and inbox events the agent loop already logs; no separate question state is stored. A continued question can create a new user turn, but it cannot resume a finished tool call. No runtime invariant companion is published because the projection fold and the continued-only Remote methods enforce this boundary at their owners.
+**Runtime invariant:** the `userQuestions` projection is derived from recorded tool calls, PTC dispatches, and admitted user messages; no separate question state is stored. A continued question can create a new user turn, but it cannot resume a finished tool call.

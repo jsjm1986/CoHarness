@@ -18,9 +18,9 @@ kind: "package-group"
 | [`tmux-context/`](tmux-context/README.zh.md) | tmux 位置上下文 | — |
 | [`agent-instructions/`](agent-instructions/README.zh.md) | 工作区指令上下文 | — |
 | [`userdoc-context/`](userdoc-context/README.zh.md) | 用户上传文档的准入上下文 | `userdoc/attached` |
+| [`harness-dev-context/`](harness-dev-context/README.zh.md) | 以运行时上下文给出 harness checkout 与 Web GUI URL，使系统提示词跨进程保持稳定 | — |
 
 会话引用见 [docs/subsystems/session-reference.md](../../docs/subsystems/session-reference.zh.md)；[`agent-instructions` 决策记录](../../.agents/notes/implemented/feature/2026-06-24-workspace-context.zh.md)规定了其按 agent（智能体）/会话隔离与生命周期拆分。
-
 
 ## 概述
 

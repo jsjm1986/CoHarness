@@ -13,11 +13,9 @@ Gateway-backed provider for the `dsh-collaboration` Service Definition. It deriv
 
 Use `dsh-collaboration-gateway` as the Gateway-backed provider for the `dsh-collaboration` Service Definition. It derives the participant from `dsh-gateway-runtime`, delegates membership and root-conversation ACL decisions to authenticated internal Gateway endpoints, and validates every returned field before publishing to Consumers.
 
-
 ## Table of Contents
 
 - [Runtime contract](#runtime-contract)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -32,11 +30,6 @@ Use `dsh-collaboration-gateway` as the Gateway-backed provider for the `dsh-coll
 - Personal scope treats existing session ids as readable and interaction claims as accepted; project scope always asks the Gateway for the authoritative result.
 - Project root creation requires `rw` membership and runs under the requested visibility. Personal creation passes through without project metadata.
 - Disposing the provider aborts its lifetime signal and makes every captured authority fail closed before another request.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Participant and ACL answers are validated per request against authenticated Gateway endpoints; no account state is held locally.
 
 <a id="model-experience"></a>
 ## Model Experience

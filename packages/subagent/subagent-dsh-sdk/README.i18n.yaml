@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-dsh-sdk/README.md
+document:
+  en: e6cd82e6bcb9b291f36bf43e5c73fdc481f14a5a
+  zh: 269edf72a03954ad3b58ba8b459684ff6a7927f5
 /:
   en: a0d1fdffa7b1e4b4
   zh: 61495d48365178df
@@ -12,8 +15,8 @@
   en: 0b7768cbc0d34ed5
   zh: 89af162c917e4ec0
 /deepseek-ai-dsh-subagent-dsh-sdk/table-of-contents:
-  en: e72afbefc372f070
-  zh: 3206e6d3fb04f713
+  en: 108a1f0ffcf96dd5
+  zh: 254051d51e62e04f
 /deepseek-ai-dsh-subagent-dsh-sdk/start-and-ownership:
   en: 336f79c20fffdfb8
   zh: 39f3ff327753530a
@@ -21,17 +24,14 @@
   en: 511fbcc375d05958
   zh: fcea675389c9f245
 /deepseek-ai-dsh-subagent-dsh-sdk/capabilities-and-context:
-  en: 309e4d97f4194b5c
-  zh: 35e9f8d94e675789
+  en: 98dd5d592b1b3c4e
+  zh: 88845b202986b95f
 /deepseek-ai-dsh-subagent-dsh-sdk/configuration:
   en: 06ae2972e9025705
   zh: da56c3a84bb3f908
 /deepseek-ai-dsh-subagent-dsh-sdk/process-boundary:
-  en: 4d9e9078b2263287
-  zh: bb3a5008cfec7561
-/deepseek-ai-dsh-subagent-dsh-sdk/invariants:
-  en: ae881f98824bb876
-  zh: 762e4d6dbfdf7914
+  en: 1499d87a9c8b336e
+  zh: 99f49bb5d2757ce3
 /deepseek-ai-dsh-subagent-dsh-sdk/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -39,8 +39,8 @@
   en: 05e6180f1498fdf9
   zh: 2b05d2b97bfa67da
 /deepseek-ai-dsh-subagent-dsh-sdk/model-experience/child-agent-request/what-the-model-sees:
-  en: df7729fa4e60d6f6
-  zh: 458094fbb7a7ea07
+  en: b8e656d956ac5bd2
+  zh: 26fa79357d1ce452
 /deepseek-ai-dsh-subagent-dsh-sdk/model-experience/child-agent-request/token-effect:
   en: c0b78d334d5d0a9c
   zh: 71d1a375a6ab4109
@@ -60,8 +60,8 @@
   en: f5d5f97a153f7c70
   zh: afc7da8783b348c6
 /deepseek-ai-dsh-subagent-dsh-sdk/known-limitations-and-deferred-work:
-  en: 92f210a3ab3d06ba
-  zh: eb078c52f82b84d3
+  en: 24af783e8af0c7c6
+  zh: 440d8ea43b07d07a
 /deepseek-ai-dsh-subagent-dsh-sdk/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

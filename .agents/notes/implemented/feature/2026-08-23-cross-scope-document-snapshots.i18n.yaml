@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-23-cross-scope-document-snapshots.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-23-cross-scope-document-snapshots.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-cross-scope-document-snapshots.md
+document:
+  en: 50d852c5dda90169750491683c9ee58c5077def7
+  zh: 812295f692a4331826a19ef7e2bb97e5f14956d9
 /agent-note-cross-scope-document-snapshots:
   en: 8a30eeb31d4e3355
   zh: 0a13809607945096

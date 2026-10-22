@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-16-gateway-user-logical-deletion.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-16-gateway-user-logical-deletion.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md
+document:
+  en: 0fa7f7ce8ca5214260d99e3df8e1b11a83654ed2
+  zh: 380bb97a8f6819037ecc555c091585570b94e5ae
 /agent-note-gateway-logical-user-deletion:
   en: ab1550fdf4c2c852
   zh: 1fabcb741e2e16e7

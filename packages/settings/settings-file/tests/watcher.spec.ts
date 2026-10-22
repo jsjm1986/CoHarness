@@ -105,33 +105,6 @@ describe('watcher pipeline', () => {
     expect(scope.get()).toEqual({ theme: 'light' })
   })
 
-  it('keeps the reload queue alive after an invariant violation escapes a commit', async () => {
-    const dir = await tempDir()
-    const path = join(dir, 'settings.yaml')
-    await writeFile(path, 'ui-theme:\n  theme: light\n')
-    const ctx = await boot({ path, debounceMs: 5 })
-    const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
-    let arm = true
-    ctx.on('settings/updated', () => {
-      if (!arm) return
-      throw Object.assign(new Error('forged relation'), { code: 'INVARIANT' })
-    })
-    const [instance] = await fakeInstances()
-
-    await writeFile(path, 'ui-theme:\n  theme: broken-commit\n')
-    instance!.watcher.emit('all', 'change', path)
-    await vi.waitFor(() => {
-      expect(scope.get().theme).toBe('broken-commit')
-    })
-
-    arm = false
-    await writeFile(path, 'ui-theme:\n  theme: recovered\n')
-    instance!.watcher.emit('all', 'change', path)
-    await vi.waitFor(() => {
-      expect(scope.get().theme).toBe('recovered')
-    })
-  })
-
   it('quiesces the refresh pipeline before dispose completes', async () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')

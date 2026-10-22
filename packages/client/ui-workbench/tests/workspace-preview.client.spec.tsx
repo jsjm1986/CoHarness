@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceFileTextPage, WorkspaceFileByteWindow } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
@@ -8,9 +8,10 @@ import {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { WorkspaceFilePreview } from '../src/client/components/WorkspaceFilePreview.tsx'
+import type { ZoomPreference } from '../src/client/contract/zoom/types.ts'
 import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const sessionId = 'preview-session' as SessionId
 const request: WorkspaceResourceOpenRequest = {
   runtimeTarget: { kind: 'base' }, sessionId, path: 'notes.txt', address: workspaceResourceAddress(sessionId, 'notes.txt'),
@@ -23,7 +24,12 @@ const extensionlessRequest: WorkspaceResourceOpenRequest = {
 }
 const labels = {
   close: 'Close', reload: 'Reload', previous: 'Previous', next: 'Next', loading: 'Loading',
-  changed: 'Changed; reload', binary: 'Binary (Base64)',
+  changed: 'Changed; reload', binary: 'Binary (Base64)', openNative: 'Open in default app',
+  imageAlt: (name: string) => `Image preview: ${name}`, imageFailed: 'This image could not be displayed.',
+}
+const zoomLabels = {
+  controls: 'Zoom controls', menu: 'Choose zoom', out: 'Zoom out', into: 'Zoom in',
+  fitWidth: 'Fit width', value: (percent: number) => `${String(percent)}%`,
 }
 function harness(value: { version: string; bytes: number } = { version: 'v1', bytes: 10 }) {
   const resources = new WorkspaceResourceRegistry()
@@ -53,11 +59,13 @@ function renderPreview(
   } = {},
 ) {
   const h = harness()
+  const view: { zoom?: ZoomPreference } = {}
   return {
     ...h,
+    view,
     ...render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
       <WorkspaceFilePreview request={request} read={read} readBytes={options.readBytes}
-        resource={resource} close={vi.fn()} labels={labels} />
+        resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
     }</PreviewResourceBinding>),
   }
 }
@@ -141,6 +149,43 @@ describe('WorkspaceFilePreview', () => {
     expect(readBytes).toHaveBeenCalledWith(expect.objectContaining({ length: 10, version: 'v1' }), expect.any(AbortSignal))
   })
 
+  it('offers the authorized native-open action only while the Host can open paths', async () => {
+    const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
+    const readBytes = vi.fn(async () => ({ path: request.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
+    const nativeOpen = vi.fn(async () => {})
+    const h = harness()
+    const view: { zoom?: ZoomPreference } = {}
+    const rendered = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
+      <WorkspaceFilePreview request={request} read={read} readBytes={readBytes} nativeOpen={nativeOpen}
+        resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
+    }</PreviewResourceBinding>)
+    await waitFor(() => { expect(rendered.getByText(/AAEC/)).toBeTruthy() })
+    fireEvent.click(rendered.getByRole('button', { name: 'Open in default app' }))
+    await waitFor(() => { expect(nativeOpen).toHaveBeenCalledOnce() })
+    // Without the injected gesture the fallback degrades to the bytes preview alone.
+    rendered.unmount()
+    const plain = renderPreview(read, { readBytes })
+    await waitFor(() => { expect(plain.getByText(/AAEC/)).toBeTruthy() })
+    expect(plain.queryByRole('button', { name: 'Open in default app' })).toBeNull()
+  })
+
+  it('surfaces a native-open failure as the preview alert', async () => {
+    const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
+    const readBytes = vi.fn(async () => ({ path: request.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
+    const nativeOpen = vi.fn(async () => { throw new Error('path open failed: no handler') })
+    const h = harness()
+    const view: { zoom?: ZoomPreference } = {}
+    const rendered = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
+      <WorkspaceFilePreview request={request} read={read} readBytes={readBytes} nativeOpen={nativeOpen}
+        resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
+    }</PreviewResourceBinding>)
+    await waitFor(() => { expect(rendered.getByText(/AAEC/)).toBeTruthy() })
+    fireEvent.click(rendered.getByRole('button', { name: 'Open in default app' }))
+    await waitFor(() => { expect(rendered.getByRole('alert').textContent).toBe('path open failed: no handler') })
+    // The bounded bytes preview stays up beside the failure.
+    expect(rendered.getByText(/AAEC/)).toBeTruthy()
+  })
+
   it('hides content when the target loses access and reports an ordinary failure', async () => {
     const read = vi.fn(async () => ({ path: request.path, offset: 1, limit: 2, text: 'visible', eof: true, version: 'v1' }))
     const view = renderPreview(read)
@@ -158,12 +203,62 @@ it('renders a fixed image MIME type from the bounded byte window', async () => {
   }, 5)
   const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
   const readBytes = vi.fn(async () => ({ path: imageRequest.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
+  const view: { zoom?: ZoomPreference } = {}
   render(<PreviewResourceBinding resources={resources} request={imageRequest}>{resource =>
     <WorkspaceFilePreview request={imageRequest} read={read} readBytes={readBytes}
-      resource={resource} close={vi.fn()} labels={labels} />
+      resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
   }</PreviewResourceBinding>)
   await waitFor(() => { expect(document.querySelector('[data-workspace-file-image]')).toBeTruthy() })
   expect(document.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AAEC')
+})
+
+it('zooms an image inside the viewport scrollport and retains the tab preference', async () => {
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500)
+  const resources = new WorkspaceResourceRegistry()
+  resources.register({ kind: 'base' }, {
+    stat: async () => ({ sessionId, path: imageRequest.path, type: 'file', bytes: 3, version: 'v1', changed: false }),
+  }, 5)
+  const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
+  const readBytes = vi.fn(async () => ({ path: imageRequest.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
+  const view: { zoom?: ZoomPreference } = {}
+  render(<PreviewResourceBinding resources={resources} request={imageRequest}>{resource =>
+    <WorkspaceFilePreview request={imageRequest} read={read} readBytes={readBytes}
+      resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
+  }</PreviewResourceBinding>)
+  let image: HTMLImageElement | null = null
+  await waitFor(() => { image = document.querySelector('[data-workspace-file-image]'); expect(image).toBeTruthy() })
+  const section = document.querySelector('[data-image-preview]') as HTMLElement
+  expect(section.closest('[data-document-zoom-scrollport]')).not.toBeNull()
+  expect(document.querySelector(`[aria-label="${imageRequest.path}"]`)?.className).toContain('filePreviewZoom')
+  Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 800 })
+  fireEvent.load(image!)
+  const surface = document.querySelector('[data-document-zoom-surface]') as HTMLElement
+  expect(surface.hasAttribute('hidden')).toBe(false)
+  expect(surface.style.getPropertyValue('--document-zoom-width')).toBe('800px')
+  fireEvent.click(screen.getByRole('button', { name: 'Choose zoom' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '150%' }))
+  expect(view.zoom).toEqual({ kind: 'fixed', scale: 1.5 })
+  const frame = document.querySelector('[data-document-zoom-frame]') as HTMLElement
+  expect(frame.getAttribute('data-document-zoom-mode')).toBe('fixed')
+  expect(frame.style.getPropertyValue('--document-zoom')).toBe('1.5')
+})
+
+it('reports an image decode failure in the preview copy', async () => {
+  const resources = new WorkspaceResourceRegistry()
+  resources.register({ kind: 'base' }, {
+    stat: async () => ({ sessionId, path: imageRequest.path, type: 'file', bytes: 3, version: 'v1', changed: false }),
+  }, 5)
+  const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
+  const readBytes = vi.fn(async () => ({ path: imageRequest.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
+  const view: { zoom?: ZoomPreference } = {}
+  render(<PreviewResourceBinding resources={resources} request={imageRequest}>{resource =>
+    <WorkspaceFilePreview request={imageRequest} read={read} readBytes={readBytes}
+      resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
+  }</PreviewResourceBinding>)
+  let image: HTMLImageElement | null = null
+  await waitFor(() => { image = document.querySelector('[data-workspace-file-image]'); expect(image).toBeTruthy() })
+  fireEvent.error(image!)
+  await waitFor(() => { expect(document.querySelector('[role="alert"]')?.textContent).toContain('This image could not be displayed.') })
 })
 
 it('keeps unknown binary types in the Base64 fallback', async () => {
@@ -173,9 +268,10 @@ it('keeps unknown binary types in the Base64 fallback', async () => {
   }, 5)
   const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
   const readBytes = vi.fn(async () => ({ path: extensionlessRequest.path, offset: 0, bytes: 'AAE=', eof: true, version: 'v1' }))
+  const view: { zoom?: ZoomPreference } = {}
   render(<PreviewResourceBinding resources={resources} request={extensionlessRequest}>{resource =>
     <WorkspaceFilePreview request={extensionlessRequest} read={read} readBytes={readBytes}
-      resource={resource} close={vi.fn()} labels={labels} />
+      resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels} view={view} />
   }</PreviewResourceBinding>)
   await waitFor(() => { expect(document.querySelector('[data-workspace-file-bytes]')).toBeTruthy() })
 })
@@ -185,7 +281,8 @@ describe('WorkspaceFilePreview failure paths', () => {
     const registry = new WorkspaceResourceRegistry()
     const read = vi.fn(() => new Promise<WorkspaceFileTextPage>(() => {}))
     const view = render(<PreviewResourceBinding resources={registry} request={request}>{resource =>
-      <WorkspaceFilePreview request={request} read={read} resource={resource} close={vi.fn()} labels={labels} />
+      <WorkspaceFilePreview request={request} read={read} resource={resource} close={vi.fn()} labels={labels} zoomLabels={zoomLabels}
+        view={{}} />
     }</PreviewResourceBinding>)
     expect(view.queryByRole('status')).toBeNull()
     view.unmount()

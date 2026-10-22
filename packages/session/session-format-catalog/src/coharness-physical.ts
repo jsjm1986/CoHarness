@@ -2,9 +2,11 @@
 import {
   createSessionFormatCatalog, isSessionFormatJsonObject, SessionFormatError,
   type SessionFormatCatalog, type SessionFormatCodec, type SessionFormatHeader, type SessionFormatJsonObject,
+  type SessionFormatJsonValue, type SessionFormatMigration,
   type SessionFormatRestore, type SessionFormatRestoreOptions,
 } from '@deepseek-ai/dsh-session-format'
 import { releasedV0SessionFormatCodec, releasedV1SessionFormatCodec } from '@deepseek-ai/dsh-session-format-v0-to-v1'
+import { createSessionFormatV6ToV7, sessionFormatV6ToV7 } from '@deepseek-ai/dsh-session-format-v6-to-v7'
 import { sessionFormatCatalog, sessionFormatCatalogOptions } from './generated.ts'
 import { coharnessV0ToV1Dialect } from './coharness-v0-dialect.ts'
 import { coharnessV1ToV2Dialect } from './coharness-v1-dialect.ts'
@@ -58,18 +60,41 @@ function legacyCodec(version: number): SessionFormatCodec {
   }
 }
 
-const dialectCatalog = createSessionFormatCatalog({
-  ...sessionFormatCatalogOptions,
-  codecs: sessionFormatCatalogOptions.codecs.map(codec => codec.version <= 3 ? legacyCodec(codec.version) : codec),
-  migrations: sessionFormatCatalogOptions.migrations.map((migration) => {
-    switch (migration.fromVersion) {
-      case 0: return coharnessV0ToV1Dialect
-      case 1: return coharnessV1ToV2Dialect
-      case 2: return coharnessJsonlV2ToV3Dialect
-      default: return migration
-    }
-  }),
-})
+/**
+ * Physical codec swap for released CoHarness JSONL framing (v0–v3 seedLength and packed-stream dialect).
+ * @param codec - generated first-party codec for one version.
+ * @returns the dialect-aware codec for versions up to v3, otherwise the input codec.
+ */
+export function coharnessDialectCodec(codec: SessionFormatCodec): SessionFormatCodec {
+  return codec.version <= 3 ? legacyCodec(codec.version) : codec
+}
+
+/**
+ * Migration-edge swap for the released CoHarness JSONL dialect fixups.
+ * @param migration - generated first-party adjacent migration edge.
+ * @returns the CoHarness dialect edge for v0→v1, v1→v2, and v2→v3; the input edge otherwise.
+ */
+export function coharnessDialectMigration(migration: SessionFormatMigration): SessionFormatMigration {
+  switch (migration.fromVersion) {
+    case 0: return coharnessV0ToV1Dialect
+    case 1: return coharnessV1ToV2Dialect
+    case 2: return coharnessJsonlV2ToV3Dialect
+    default: return migration
+  }
+}
+
+function createDialectCatalog(children?: readonly SessionFormatJsonValue[]): SessionFormatCatalog {
+  return createSessionFormatCatalog({
+    ...sessionFormatCatalogOptions,
+    codecs: sessionFormatCatalogOptions.codecs.map(coharnessDialectCodec),
+    migrations: sessionFormatCatalogOptions.migrations.map(migration =>
+      children !== undefined && migration === sessionFormatV6ToV7
+        ? createSessionFormatV6ToV7(children)
+        : coharnessDialectMigration(migration)),
+  })
+}
+
+const dialectCatalog = createDialectCatalog()
 
 function detachDraft(value: SessionFormatJsonObject): { header: unknown; draft: boolean | undefined } {
   const { draft, ...header } = value
@@ -81,20 +106,45 @@ function withDraft(header: SessionFormatHeader, draft: boolean | undefined): Ses
   return draft === undefined ? header : { ...header, draft }
 }
 
-function restore(value: unknown, options: SessionFormatRestoreOptions, stored: boolean): SessionFormatRestore {
-  if (!legacyHeader(value)) {
-    return stored ? sessionFormatCatalog.createStoredRestore(value, options) : sessionFormatCatalog.createRestore(value, options)
+/**
+ * Dispatch CoHarness JSONL reads between a dialect catalog (legacy v0–v3 framing) and a released-format catalog.
+ * @param dialect - catalog whose v0–v3 codecs and migration edges carry the CoHarness dialect.
+ * @param logical - catalog of released codecs and migration edges.
+ * @returns a catalog that routes each header to the dialect or released decoder and preserves `draft` metadata.
+ */
+export function createCoharnessJsonlCatalog(dialect: SessionFormatCatalog, logical: SessionFormatCatalog): SessionFormatCatalog {
+  function restore(value: unknown, options: SessionFormatRestoreOptions, stored: boolean): SessionFormatRestore {
+    if (!legacyHeader(value)) {
+      return stored ? logical.createStoredRestore(value, options) : logical.createRestore(value, options)
+    }
+    const source = detachDraft(value)
+    const reader = stored ? dialect.createStoredRestore(source.header, options) : dialect.createRestore(source.header, options)
+    return {
+      header: withDraft(reader.header, source.draft),
+      decodeRow: reader.decodeRow.bind(reader),
+      finish() {
+        const artifact = reader.finish()
+        return { ...artifact, header: withDraft(artifact.header, source.draft) }
+      },
+    }
   }
-  const source = detachDraft(value)
-  const reader = stored ? dialectCatalog.createStoredRestore(source.header, options) : dialectCatalog.createRestore(source.header, options)
-  return {
-    header: withDraft(reader.header, source.draft),
-    decodeRow: reader.decodeRow.bind(reader),
-    finish() {
-      const artifact = reader.finish()
-      return { ...artifact, header: withDraft(artifact.header, source.draft) }
+  return Object.freeze<SessionFormatCatalog>({
+    ...logical,
+    readHeader(value) {
+      if (!legacyHeader(value)) return logical.readHeader(value)
+      try {
+        const source = detachDraft(value)
+        const result = dialect.readHeader(source.header)
+        return result.status === 'migration-required'
+          ? { ...result, header: withDraft(result.header, source.draft) } : result
+      } catch (error) {
+        return { status: 'malformed', targetVersion: logical.currentVersion,
+          reason: String(error) }
+      }
     },
-  }
+    createRestore: (value, options) => restore(value, options, false),
+    createStoredRestore: (value, options) => restore(value, options, true),
+  })
 }
 
 /**
@@ -102,20 +152,20 @@ function restore(value: unknown, options: SessionFormatRestoreOptions, stored: b
  * dialect. Released isSeeded headers and current writes retain the generated
  * codec rules; every historical body still traverses the adjacent chain.
  */
-export const coharnessJsonlFormatCatalog = Object.freeze<SessionFormatCatalog>({
-  ...sessionFormatCatalog,
-  readHeader(value) {
-    if (!legacyHeader(value)) return sessionFormatCatalog.readHeader(value)
-    try {
-      const source = detachDraft(value)
-      const result = dialectCatalog.readHeader(source.header)
-      return result.status === 'migration-required'
-        ? { ...result, header: withDraft(result.header, source.draft) } : result
-    } catch (error) {
-      return { status: 'malformed', targetVersion: sessionFormatCatalog.currentVersion,
-        reason: String(error) }
-    }
-  },
-  createRestore: (value, options) => restore(value, options, false),
-  createStoredRestore: (value, options) => restore(value, options, true),
-})
+export const coharnessJsonlFormatCatalog = createCoharnessJsonlCatalog(dialectCatalog, sessionFormatCatalog)
+
+/**
+ * Assemble a CoHarness JSONL catalog whose V6→V7 edge knows one parent's historical children.
+ * @param children - complete child evidence retained unchanged for the catalog's lifetime; an empty array declares no children.
+ * @returns a catalog with independent restore state per artifact and unchanged current-format readers.
+ */
+export function createCoharnessJsonlFormatCatalogWithChildren(children: readonly SessionFormatJsonValue[]): SessionFormatCatalog {
+  return createCoharnessJsonlCatalog(
+    createDialectCatalog(children),
+    createSessionFormatCatalog({
+      ...sessionFormatCatalogOptions,
+      migrations: sessionFormatCatalogOptions.migrations.map(migration =>
+        migration === sessionFormatV6ToV7 ? createSessionFormatV6ToV7(children) : migration),
+    }),
+  )
+}

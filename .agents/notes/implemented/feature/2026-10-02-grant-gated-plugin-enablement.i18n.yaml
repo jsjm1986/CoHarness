@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-02-grant-gated-plugin-enablement.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-02-grant-gated-plugin-enablement.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-grant-gated-plugin-enablement.md
+document:
+  en: 77504cc95544d0b3b68efe7f7c993ec493913a17
+  zh: 173b092020c4b1c244b0672cb27c399508cb1fe2
 /agent-note-grant-gated-plugin-enablement-on-the-web-plugins-page:
   en: 2535362cdc32a96d
   zh: 42a8197fc63e613f

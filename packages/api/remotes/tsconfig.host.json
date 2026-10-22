@@ -16,6 +16,9 @@
       "path": "./tsconfig.session-controller.json"
     },
     {
+      "path": "../../boot/plugin-market"
+    },
+    {
       "path": "../../context/collaboration"
     },
     {
@@ -46,7 +49,7 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../preset/agent-presets"
+      "path": "../../preset/agent-preset-registry"
     },
     {
       "path": "../../memory/memory"

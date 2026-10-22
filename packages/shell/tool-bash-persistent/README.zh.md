@@ -82,7 +82,6 @@ kind: "package-reference"
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：shell 注册表、命令包装、scrollback 轮询、提取与渲染 |
-| — | 不发布运行时不变式伴生入口；适配器私有的 owner-to-shell 缓存没有可观察的事件或数据关系。shell 复用仍可通过工具执行观察。生命周期测试会验证其清理行为，无需仅为不变式增加公共 API。 |
 
 ### 命令流程
 
@@ -106,7 +105,6 @@ kind: "package-reference"
 - [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-bash-persistent)——每个受支持配置字段及其源声明。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -143,7 +141,6 @@ kind: "package-reference"
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明工具何时不合适或需要特别小心。它们是当前包约束，不是任务积压。
 

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-web-transcript-log-ordered-projection.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-web-transcript-log-ordered-projection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-web-transcript-log-ordered-projection.md
+document:
+  en: c6071cef9f82ac45315547c941f546c49fb9ac00
+  zh: 9e63c9a4449e68b0fe91fc3977c8de0c18b04293
 /agent-note-the-browser-conversation-is-a-log-ordered-human-transcript:
   en: 19f3623df92ca7be
   zh: fac61f4e18395681

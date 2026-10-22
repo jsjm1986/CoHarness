@@ -4,7 +4,7 @@ Status: implemented
 
 [English](2026-07-26-ptc-dispatch-log-spill.md) | 中文
 
-> 范围：用既有的 spill 实现限制 `tool/ptc-dispatch` 事件的内容。[宿主侧基础 Agent Note](2026-07-26-ptc-dispatch-ui-foundation.zh.md) 有意接受了不设上限的日志，并把 spill 支持留到本次更改；[实时并行 Agent Note](2026-07-26-ptc-live-parallel-dispatch.zh.md) 定义了该监听器处理的事件对。
+> 范围：用既有的 spill 实现限制 `tool/ptc-dispatch` 事件的内容。[宿主侧基础 Agent Note](../../archived/feature/2026-07-26-ptc-dispatch-ui-foundation.md) 有意接受了不设上限的日志，并把 spill 支持留到本次更改；[实时并行 Agent Note](2026-07-26-ptc-live-parallel-dispatch.zh.md) 定义了该监听器处理的事件对。
 
 ## 问题
 

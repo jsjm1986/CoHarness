@@ -19,6 +19,7 @@ import {
   launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
+import { expectSelectableTerminalCommand } from './terminal-command-browser.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/navigation-panes', import.meta.url))
 const SEED = join(SNAPSHOT_DIR, 'seed.jsonl')
@@ -379,6 +380,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     if (await bashRow.getAttribute('aria-expanded') !== 'true') await bashRow.click()
     const card = page.locator('[data-sample="bash"] ~ div [data-terminal]').first()
     await card.waitFor({ timeout: 15_000 })
+    await expectSelectableTerminalCommand(page, card, 'echo NAVIGATION_OK', 300)
     // Real layout, not jsdom's stub (which computes no geometry at all):
     // squeeze the output pane below its content width and the line must keep
     // its single row and overflow sideways instead of folding. Soft-wrapping

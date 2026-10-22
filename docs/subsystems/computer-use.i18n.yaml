@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for computer-use.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for computer-use.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/computer-use.md
+document:
+  en: f753cfc08266cf231cc75ddec0cd4484d0f04741
+  zh: 3947ed0002cfd0319c3a42b35975f0fd22f9c2ad
 /computer-use:
   en: f216bcec22b775b6
   zh: 3f673bdbef20146e

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-16-typed-event-schemas.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-16-typed-event-schemas.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-06-16-typed-event-schemas.md
+document:
+  en: 2279b4d267014b3ec6609b0e60b6c1d34b4a0c63
+  zh: 2950ca65bff7b3fee8e0a52de35ef0a27a43d072
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern:
   en: 4c43e20267c063a5
   zh: 3aaf14457b121e24
@@ -12,13 +15,13 @@
   en: 42d48e48d694d3de
   zh: f556f4624b55a480
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern/blast-radius-measured:
-  en: ec70e76b82ba21b5
-  zh: 25fb4a60f8da5cb5
+  en: be4a4bcd0625d750
+  zh: f895723c217e65d6
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern/alternatives-considered:
   en: 6119e2aff3b6be5a
   zh: 76136ef5249c23eb
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern/alternatives-considered/a-status-quo-merge-extensible-types-isjsonvalue-at-the-durable-boundary:
-  en: d5ea1b3124b341a7
+  en: ef79658d01baf389
   zh: 766ed3689efc1802
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern/alternatives-considered/b-header-closed-shape-validation-only-schemastery-events-stay-opaque:
   en: 5120fc56473696d1
@@ -36,5 +39,5 @@
   en: 79e720cfffe60257
   zh: b4aea0d52f3ee072
 /agent-note-runtime-schemas-for-the-event-vocabulary-zod-vs-the-merge-extensible-map-pattern/open-questions:
-  en: afc8275e1598eb34
-  zh: f3684ee3aba33cf1
+  en: 49475ab7677b3790
+  zh: 2d028988f709bd3f

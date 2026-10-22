@@ -7,6 +7,9 @@
     - button "模型":
       - img
       - text: 模型
+    - button "内置插件":
+      - img
+      - text: 内置插件
     - button "Agent 预设":
       - img
       - text: Agent 预设
@@ -39,9 +42,21 @@
   - button "跟随系统" [pressed]:
     - img
     - text: 跟随系统
+  - text: 字号大小 仅影响会话内容的字号 14
+  - button "增大字号":
+    - img
+  - button "减小字号":
+    - img
+  - text: px
+  - button "更多字体设置":
+    - img
   - text: 工作步骤展示 选择希望看到多少工具调用细节
   - button "详细":
     - text: 详细
+    - img
+  - text: 工作步骤收起时机 选择何时自动收起工作步骤
+  - button "回答结束后":
+    - text: 回答结束后
     - img
   - text: 显示代码工作视图 开启后，显示轨迹、本轮代码差异，可选择完整的 Agent 预设切换
   - switch "显示代码工作视图" [checked]
@@ -69,3 +84,4 @@
   - button "详细":
     - text: 详细
     - img
+  - text: "当前版本：{{version}}"

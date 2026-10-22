@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-16-durable-per-step-time-context.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-16-durable-per-step-time-context.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-16-durable-per-step-time-context.md
+document:
+  en: 5130a93a7212f134d6455027987bae1ffbc60c7a
+  zh: 0766dd1a119c7e1b39e4d2acb8702c92f5a11522
 /agent-note-durable-per-step-time-context:
   en: db25fb8677aa3273
   zh: 9a0435fe86192e54
@@ -9,8 +12,8 @@
   en: 38c5e542cc4512e1
   zh: d5cda0cf5f51ccbe
 /agent-note-durable-per-step-time-context/decision:
-  en: fa11d509d68c3a46
-  zh: 4bea0b93c13d3b20
+  en: 5fe979e0082b2075
+  zh: 66fd875b954e478e
 /agent-note-durable-per-step-time-context/decision/text-and-elapsed-baselines:
   en: 283c610458589eed
   zh: 876cfaa1b14180f8

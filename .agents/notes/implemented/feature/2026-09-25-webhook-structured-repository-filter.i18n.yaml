@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-webhook-structured-repository-filter.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-webhook-structured-repository-filter.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-25-webhook-structured-repository-filter.md
+document:
+  en: 464b93b321c8a301b1e59520c15d058a1c24f539
+  zh: 163df8c08176cfeace5a63009aa4ca0bd86466ca
 /agent-note-webhook-endpoints-carry-a-structured-repository-filter-enforced-at-intake:
   en: 2430ceebdb18d682
   zh: 1ce5d6833e0ad056

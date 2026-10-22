@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for terminal.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for terminal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/terminal.md
+document:
+  en: c1c78963e48f51014678e778bbdc5da530f453c6
+  zh: e97e5771f5681ce98024394752405dca012b0a5e
 /persistent-pty-sessions:
   en: 5debd6ec3dc43d0b
   zh: 716307c837310aaa

@@ -66,7 +66,7 @@ harness 由 `packages/` 能力组组成。各组 README 列出组内的包。
 | [`host/`](host/README.zh.md) | web GUI 宿主半侧：API 网关 + HTTP 路由服务器 | 产品：稳定 API |
 | [`client/`](client/README.zh.md) | web GUI 浏览器半侧：shell、协议层、对象服务、slot、`ui-*` 插件 | 产品：稳定 API |
 | [`examples/`](examples/README.zh.md) | 演示组合包（agent-spine + CLI（命令行界面）/ACP/JSON-RPC bin），由叶节点加载 | 支持：示例基础设施 |
-| [`test-support/`](test-support/README.zh.md) | 支持基础设施（testkit、不变式、回放、Loader 冒烟测试） | 支持：兼容性预期较低 |
+| [`test-support/`](test-support/README.zh.md) | 支持基础设施（testkit、回放、Loader 冒烟测试） | 支持：兼容性预期较低 |
 | [`util/`](util/README.zh.md) | 组间共享的低层零依赖工具（`Branded<B>`、Harness home／路径辅助函数、超时、留存） | 支持：小型、稳定、无 harness 依赖 |
 
 新包加入现有组；新组更新此表。

@@ -9,7 +9,9 @@ import type { DirectoryPickerHostFacts } from '../src/resolve.ts'
 /** Baseline facts that resolve to `native`; each case overrides one signal (darwin never consults `linuxChooser`). */
 const attended: DirectoryPickerHostFacts = {
   bindHost: '127.0.0.1',
+  allowsRemoteAuthorities: false,
   platform: 'darwin',
+  ssh: false,
   env: {},
   linuxChooser: false,
 }
@@ -18,15 +20,21 @@ describe('resolveDirectoryPickerBackend', () => {
   it('resolves native for a loopback bind on a display platform', () => {
     expect(resolveDirectoryPickerBackend(attended)).toBe('native')
     expect(resolveDirectoryPickerBackend({ ...attended, platform: 'win32' })).toBe('native')
+    expect(resolveDirectoryPickerBackend({ ...attended, bindHost: '::1' })).toBe('native')
   })
 
-  it('resolves browse for an all-interfaces bind regardless of other signals', () => {
-    expect(resolveDirectoryPickerBackend({ ...attended, bindHost: '0.0.0.0' })).toBe('browse')
+  it('resolves browse for a non-loopback bind regardless of other signals', () => {
+    expect(resolveDirectoryPickerBackend({ ...attended, bindHost: '10.1.2.3' })).toBe('browse')
+    expect(resolveDirectoryPickerBackend({ ...attended, bindHost: 'fd00::1' })).toBe('browse')
   })
 
-  it('resolves browse under an SSH launch (either env marker)', () => {
-    expect(resolveDirectoryPickerBackend({ ...attended, env: { SSH_CONNECTION: '10.0.0.2 55 10.0.0.9 22' } })).toBe('browse')
-    expect(resolveDirectoryPickerBackend({ ...attended, env: { SSH_TTY: '/dev/pts/3' } })).toBe('browse')
+
+  it('resolves browse when the trust policy admits a remote authority, even on an attended loopback host', () => {
+    expect(resolveDirectoryPickerBackend({ ...attended, allowsRemoteAuthorities: true })).toBe('browse')
+  })
+
+  it('resolves browse under an SSH launch', () => {
+    expect(resolveDirectoryPickerBackend({ ...attended, ssh: true })).toBe('browse')
   })
 
   it('requires a display session and a chooser binary on linux', () => {
@@ -43,7 +51,6 @@ describe('resolveDirectoryPickerBackend', () => {
   })
 
   it('treats blank env exports as unset', () => {
-    expect(resolveDirectoryPickerBackend({ ...attended, env: { SSH_CONNECTION: '', SSH_TTY: '' } })).toBe('native')
     expect(resolveDirectoryPickerBackend({
       ...attended, platform: 'linux', linuxChooser: true, env: { DISPLAY: '', WAYLAND_DISPLAY: '' },
     })).toBe('browse')

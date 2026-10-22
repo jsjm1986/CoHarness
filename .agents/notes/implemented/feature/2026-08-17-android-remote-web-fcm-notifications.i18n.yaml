@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-17-android-remote-web-fcm-notifications.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-17-android-remote-web-fcm-notifications.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-android-remote-web-fcm-notifications.md
+document:
+  en: 8a4cb780d8664569750a0035a5d063e5778cc265
+  zh: 709da728a59614ad27cb346b0c7645748a753d39
 /agent-note-android-remote-web-shell-and-fcm-completion-notifications:
   en: fa691a2e98db6d52
   zh: 767a2e96254eb055

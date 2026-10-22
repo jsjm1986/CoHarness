@@ -51,8 +51,6 @@ The resolved instruction tells the model to interpret otherwise-unqualified date
 
 The plugin prepends an `agent/pre-step` listener and delegates first. When an injection is due and the downstream decision enters, it appends one sourced `UserMessage` to the returned batch. AgentLoop records the final batch after `step/start` and before request derivation. Rejection, listener failure, or an already-aborted signal records nothing.
 
-Each reading uses the exact snapshot source `{ kind: 'plugin', plugin: 'time-context', form: 'snapshot', sections: [{ name: 'time-context', text: <same text> }] }`. The `./invariant` companion validates that shape, re-derives the current-turn browser policy from the original `user-rpc` messages, and checks the timestamp zone and elapsed baseline.
-
 Positive-interval scheduling scans raw durable Session events for the latest plugin-attributed message, including a reading shadowed by compaction. It therefore survives resume without a process-local cache. A positive interval can intentionally let a later request reuse existing history without a fresh reading; the Schedule Web overlay omits the interval.
 
 Step 1 measures from the latest preceding durable user, assistant, or tool-result message. The prompt proposed for that step has not been appended yet. Later steps measure from the preceding time-context event in the same turn. Missing baselines report `unavailable`, and backward wall-clock movement clamps elapsed time to zero.

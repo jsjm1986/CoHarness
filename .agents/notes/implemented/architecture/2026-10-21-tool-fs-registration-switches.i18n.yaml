@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-21-tool-fs-registration-switches.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-21-tool-fs-registration-switches.md
+document:
+  en: f9a2cca4c00fc5ea17fca933c80d658dd87a0ba5
+  zh: 9879cfe42cb2ba4c0a9d46e4ba01ddb1a4eb34ee
+/agent-note-dsh-tool-fs-registers-its-tools-behind-per-tool-switches:
+  en: 1913ce89092867c2
+  zh: 26749dd768d5f403
+/agent-note-dsh-tool-fs-registers-its-tools-behind-per-tool-switches/problem:
+  en: 4244f97e659ce6b7
+  zh: 9333e1e0e40d6250
+/agent-note-dsh-tool-fs-registers-its-tools-behind-per-tool-switches/decision:
+  en: 110dc889fa7acc8c
+  zh: 1dd496e2a0ba1289
+/agent-note-dsh-tool-fs-registers-its-tools-behind-per-tool-switches/alternatives-considered:
+  en: eadfed76eafbc790
+  zh: 43a0e0dad16b5e3e
+/agent-note-dsh-tool-fs-registers-its-tools-behind-per-tool-switches/consequences:
+  en: e3c37e103f28b985
+  zh: d7cfa96ff5ae90ea

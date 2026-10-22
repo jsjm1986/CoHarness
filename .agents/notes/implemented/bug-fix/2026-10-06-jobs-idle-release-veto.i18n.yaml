@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-06-jobs-idle-release-veto.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-06-jobs-idle-release-veto.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-06-jobs-idle-release-veto.md
+document:
+  en: 257a719c67819df556793d0801b1f13135426660
+  zh: ab65489e95f9e2993453d34fcc3478c0a1bff1dd
 /agent-note-jobs-veto-idle-release-while-work-runs:
   en: f38ecb770cd27a28
   zh: b4aa3ea976bc6f1d

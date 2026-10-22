@@ -4,18 +4,22 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
-- button "1 tool call · 1 intermediate message" [expanded]:
-  - text: 1 tool call · 1 intermediate message
-  - img
 - text: "Use the ask_user_question tool to ask me exactly one multi-select question with id \"color\", question \"Which color do you prefer?\", header \"Pick one\", and two options: label \"Blue\" with description \"A cool recessive hue that reads as calm and trustworthy in long reading sessions and dense dashboards.\", and label \"Green\" with description \"A restful mid-spectrum hue with the highest perceived brightness, easiest on the eye over long sessions.\" Set multi_select to true. After I answer, reply with the single word DONE and stop."
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Asked questions"
 - button "Thinking The user wants me to use the ask_user_question tool with specific parameters. Let me do exactly that.":
   - img
   - img
@@ -31,18 +35,20 @@
 - button "Inspect":
   - img
   - text: Inspect
-- button "Process details" [expanded]:
-  - text: Process details
+- "button \"Execution requested {{clock}}\"":
+  - text: Execution requested
+  - time: "{{clock}}"
   - img
-- button "Context injection user-question-reply":
-  - img
-  - img
-  - text: Context injection user-question-reply
+- button "Analysis completed"
 - group "Reply to earlier pending questions":
   - button "Reply to earlier pending questions · Open question details": Reply to earlier pending questions Green, Answered after the timeout
   - text: "{{clock}}"
   - button "Copy":
     - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [expanded]":
+  - text: "Completed in {{duration}}"
+  - img
 - region "Which color do you prefer?":
   - text: Pick one
   - heading "Which color do you prefer?" [level=2]

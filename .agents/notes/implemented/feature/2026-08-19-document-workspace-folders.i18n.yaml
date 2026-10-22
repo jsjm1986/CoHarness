@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-19-document-workspace-folders.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-19-document-workspace-folders.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-document-workspace-folders.md
+document:
+  en: e39ddb32bf94ba32c6b14744f6df256b22b429bb
+  zh: 02485c8d30d42ae8bb7d437bd878e88bdc0589c7
 /agent-note-document-workspace-folders-and-migration:
   en: ab363c8c9e700bb9
   zh: d62269be99ce818a

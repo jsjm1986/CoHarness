@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-cooperative-tool-cancellation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-cooperative-tool-cancellation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-19-cooperative-tool-cancellation.md
+document:
+  en: 5ca2b44b24a4af189df27c6f724021a7bf290e2b
+  zh: d6d49fb44c5d5629729a8b5b4bad07ea9b2f7ee9
 /agent-note-cooperative-tool-cancellation-at-the-registry-boundary:
   en: 84c827aa3baa331a
   zh: 10cad03e58b10e31

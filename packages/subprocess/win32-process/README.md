@@ -77,7 +77,6 @@ The package contributes no stable request prefix, so it does not invalidate mode
 - **Create-to-assignment interruption** — the target starts suspended and cannot execute before Job assignment, but an external termination of the runner in the narrow interval between process creation and assignment can leave the suspended target behind. The package does not claim atomic Job attachment.
 - **Header evidence is architecture-specific** — the committed ABI probe and layout constants cover the repository's current 64-bit Windows targets. A new pointer width or incompatible Windows ABI requires updating the probe before support is claimed.
 
-
 <a id="dev-note"></a>
 ### Dev Note
 
@@ -87,5 +86,3 @@ The package contributes no stable request prefix, so it does not invalidate mode
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. Operations own only call-local native handles.

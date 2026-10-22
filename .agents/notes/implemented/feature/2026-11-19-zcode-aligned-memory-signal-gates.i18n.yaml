@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-11-19-zcode-aligned-memory-signal-gates.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-11-19-zcode-aligned-memory-signal-gates.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-19-zcode-aligned-memory-signal-gates.md
+document:
+  en: 626b40191939bfae9ba7c07c5a06a0595489733d
+  zh: f4281c14420884a07f5afeef636d7bd1511126f3
 /agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture:
   en: 8ee4daa62e204fe4
   zh: 4e3a6e74616408a9

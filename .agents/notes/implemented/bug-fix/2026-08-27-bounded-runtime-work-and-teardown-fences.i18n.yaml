@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-27-bounded-runtime-work-and-teardown-fences.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-27-bounded-runtime-work-and-teardown-fences.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-bounded-runtime-work-and-teardown-fences.md
+document:
+  en: 729e11590aace225e86b0f959047b568036d1764
+  zh: 238e579c3826e0025cc7d2aec2d0160cd8c730f9
 /agent-note-bounded-runtime-work-and-teardown-fences:
   en: e30e46d5c7b78799
   zh: 51896390fbc15bf3
@@ -9,8 +12,8 @@
   en: 8955a97c1ebed9d3
   zh: 658a6c2d0c641201
 /agent-note-bounded-runtime-work-and-teardown-fences/decision:
-  en: 96cc2c3910219dca
-  zh: 2c40ec4ab74be1fa
+  en: 5d6cd691167e6e07
+  zh: 75c3317a4cd620c7
 /agent-note-bounded-runtime-work-and-teardown-fences/alternatives-considered:
   en: bbfefca43a2322c2
   zh: 2465b82e26e6ad85

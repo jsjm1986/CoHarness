@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-settings-replacement-mid-persist-resync.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-settings-replacement-mid-persist-resync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-settings-replacement-mid-persist-resync.md
+document:
+  en: 93465bff1005887ba0c1d17962630616aea9599e
+  zh: c874b4046ad3c058ab3bbf8b8ee691fa382103ba
 /agent-note-mid-persist-namespace-replacement-re-resolves-under-the-new-owner:
   en: e4e7d42727f4c14e
   zh: bc77f98defbc5cd5

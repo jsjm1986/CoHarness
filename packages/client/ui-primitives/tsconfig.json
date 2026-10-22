@@ -13,6 +13,9 @@
   "references": [
     {
       "path": "../../util/code-language"
+    },
+    {
+      "path": "../../util/workspace-path"
     }
   ]
 }

@@ -18,7 +18,6 @@ spawn 提供方会在当前进程中创建一个全新的子 `Agent`。子 agent
 - [行为](#behavior)
 - [能力](#capabilities)
 - [配置](#config)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -30,12 +29,12 @@ spawn 提供方会在当前进程中创建一个全新的子 `Agent`。子 agent
 
 `start(request)` 不传入 seed，直接委托给 [`startInProcessRun`](../subagent-in-process-driver/README.zh.md)，并在子 agent 发布后才返回。子 agent 获得父 agent 的工作目录/会话谱系，并默认继承父 agent 最近一次记录的提供方／模型路由（除非覆盖）；在首次请求尚未记录时回退到父 agent 的创建参数，但以空对话开始运行。
 
-共享驱动器负责深度检查、persona 与工具过滤器设置、结构化输出、通过必需的信号执行取消、单次执行、结果读取和完全停稳后的 dispose（资源释放）。启动遭拒不会留下已发布的子 agent；启动调用兑现后卸载提供方，也不会撤销由持有方拥有的运行。
+共享驱动器负责深度检查、preset 组合与描述符回放、结构化输出、通过必需的信号执行取消、单次执行、结果读取和完全停稳后的 dispose（资源释放）。启动遭拒不会留下已发布的子 agent；启动调用兑现后卸载提供方，也不会撤销由持有方拥有的运行。
 
 <a id="capabilities"></a>
 ## 能力
 
-spawn 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: true }`，因为它控制子 agent 的创建窗口，能够强制执行全部四项功能。
+spawn 声明 `{ agentOptions: true, agentPreset: true, outputSchema: true, depthLimit: true }`，因为它构造全新的子 agent，能够强制执行全部四项功能。启动请求上的 `agentPreset` 会挂载该 preset，而不是继承父级的组合。
 
 <a id="config"></a>
 ## 配置
@@ -44,12 +43,6 @@ spawn 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona:
 |---|---|
 | `providerName` | `ctx.subagents` 上的注册表名称（默认 `spawn`）。 |
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。子 Agent 由共享驱动器在调用内创建并释放；提供方不拥有运行后状态。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -57,15 +50,15 @@ spawn 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona:
 
 #### 模型看到什么
 
-全新子 agent 逐字接收任务内容，作为新空对话中的唯一用户消息，默认使用父级提供方、模型、推理强度、输出 token 上限与工作目录。配置的 persona 会在子 agent 作用域中遮蔽全局提示词文本；工具过滤器会从其 schema、可执行工具查找与 PTC mode SDK 绑定中移除指定的全局工具，但保留独立注册的指导内容。不包含任何父级对话消息；过滤属于组合，而非继承的权限授予。
+全新子 agent 逐字接收任务内容，作为新空对话中的唯一用户消息，默认使用父级提供方、模型、推理强度、输出 token 上限与工作目录。继承或选定的 preset 提供工具和提示词片段。不包含任何父级对话消息。
 
 #### Token 影响
 
-子 agent 会为全新的独立上下文与历史消耗 token，不复制任何父级历史 token。persona 会改变该子 agent 反复使用的提示词成本；工具过滤器会改变其 schema 或生成 SDK 的成本。
+子 agent 会为全新的独立上下文与历史消耗 token，不复制任何父级历史 token。preset 的提示词和工具决定重复提示词、schema 和生成 SDK 的成本。
 
 #### KV Cache 影响
 
-子 agent 的请求缓存与父级相互独立。子 agent 历史仅追加；persona、工具过滤、生成 SDK、提供方或模型变化会建立不同的子 agent 前缀。
+子 agent 的请求缓存与父级相互独立。子 agent 历史仅追加；preset、生成 SDK、提供方或模型变化会建立不同的子 agent 前缀。
 
 ### 父级工具结果（间接）
 
@@ -84,7 +77,7 @@ spawn 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona:
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
-- **全新表示不含父 agent transcript（文本记录）**：子 agent 会继承 cwd、谱系、最近一次记录的路由及显式配置的 persona/工具限制，但不继承父 agent 的任何对话；需要已完成轮次上下文时，请使用 fork 提供方。
+- **全新表示不含父 agent transcript（文本记录）**：子 agent 会继承 cwd、谱系、最近一次记录的路由及所选或继承的 preset 组合，但不继承父 agent 的任何对话；需要已完成轮次上下文时，请使用 fork 提供方。
 
 <a id="dev-note"></a>
 ### 开发备注

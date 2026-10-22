@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-session-reliability-fixes.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-session-reliability-fixes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-session-reliability-fixes.md
+document:
+  en: 9d9030ae94d52a62edbd6e325023c3ac00a0c7e8
+  zh: e0267f1eb57f1ffebbe60becd3c755eb11d69a13
 /agent-note-session-reliability-fixes-wake-cap-executable-errors-opaque-team-content-goal-withdrawal-plan-dismissal:
   en: 174161af7091592d
   zh: ac220c5a91d15388

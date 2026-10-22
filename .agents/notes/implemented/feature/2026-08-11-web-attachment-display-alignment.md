@@ -29,5 +29,3 @@ Both overlays body-portal: the lightbox opened from a chat message sits under tr
 **Keep inline error strips and only add the toast for image intake.** Rejected: `promptError` (the `attachment-error` screenshot in the issue) is the surface users actually complained about, and two error presentations in one composer would leave the strip as the odd survivor.
 
 ## Consequences
-
-The composer and history image surfaces match DeepSeek Chat's interaction model, and the pure-props components render under the conversation slot's locale seat without reaching into application state. The cost is a real dynamic package boundary: `ui-attachment` carries the standard plugin scaffolding (client bundle, invariant companion, bilingual README, tsconfig face, per-file 100% coverage), and omitting it leaves the two optional attachment slots empty. Error banners are transient — a user who looks away for four seconds misses the message, the trade DeepSeek Chat itself makes. Non-image attachments remain unsupported; the rail's card model is ready for them but the composer's intake is image-only (tracked in the package README's limitations).

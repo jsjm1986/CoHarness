@@ -10,7 +10,7 @@ The rc.7 upstream plugin vocabulary uses `cordis/*` event names, while this fork
 
 ## Decision
 
-The compatibility baseline covers the observed rc.7 plugin and event formats without changing the fork's current runtime vocabulary. It is a narrow exception to the repository-owned single-vocabulary rule in the [naming contract](2026-08-11-repository-naming-contract-and-rename-ledger.md) and extends the [Remote event delivery](2026-08-10-remote-event-delivery.md) mechanism only at its external Cordis event boundary.
+The compatibility baseline covers the observed rc.7 plugin and event formats without changing the fork's current runtime vocabulary. It is a narrow exception to the repository-owned single-vocabulary rule in the [naming contract](../../archived/architecture/2026-08-11-repository-naming-contract-and-rename-ledger.md) and extends the [Remote event delivery](2026-08-10-remote-event-delivery.md) mechanism only at its external Cordis event boundary.
 
 - The Host and Remote allowlist declare both prefixes for the six dynamic Cordis events. The Host continues to emit only the existing `@deepseek-ai/cordis/*` names, so one Host notification produces one frame.
 - The Client Remote dispatcher treats the six enumerated `cordis/name` and `@deepseek-ai/cordis/name` pairs as one family, merges matching subscriptions in global registration order, calls a listener once when it is registered under both aliases, and preserves repeated registrations under one exact name. Other Cordis names remain exact matches. Listener failures remain isolated.

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-python-ptc-shared-sandbox-policy.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-python-ptc-shared-sandbox-policy.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-python-ptc-shared-sandbox-policy.md
+document:
+  en: 204ff02b316cf55d1040de15d43cc3736728b506
+  zh: e1db3a3103e37917b2c3b75291a54e686ea9b006
 /agent-note-python-ptc-runs-under-the-shared-file-sandbox-policy:
   en: 47ceed98b9969362
   zh: 585d6133fd77702c

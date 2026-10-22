@@ -199,6 +199,8 @@ export function apply(ctx: ClientContext): void {
 
 `target` and `buildViewNode(context)` declare one target-owned rendering contribution and must appear together. Preserve `context.key` as the React-facing identity, choose `anchorSeq` from durable ordering evidence, and return only renderer-ready data. Once a target Node has been published, keep returning the same key; use `visibility: 'hidden'` when it must temporarily leave the visible flow rather than withdrawing it with `null`.
 
+A Chat node whose kind claims no group-tree position joins the foldable process run between assistant replies: it becomes group evidence and hides when the owning completed Turn folds. Input-level and Turn-level independence is a position built-in kinds declare in [`group-tree.ts`](../../packages/client/ui-conversation/src/client/contract/group-tree.ts), not a per-Definition option; an external kind therefore always renders inside the window.
+
 ## 3. Query an earlier business Context only at start
 
 Some Definitions need the latest earlier State of another business kind. `start` receives a `ConversationContextReader`; call `reader.previous<State>(kind)` there instead of accepting a Context collection or scanning events. The reader returns the nearest started Context before the current start `seq` as read-only data.

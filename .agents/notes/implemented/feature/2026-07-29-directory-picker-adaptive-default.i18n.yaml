@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-29-directory-picker-adaptive-default.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-29-directory-picker-adaptive-default.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.md
+document:
+  en: 7ff6529bb8e445f63343b1019ac520f56b19d5e4
+  zh: ba2bb4424416557b119accc7df14fab4c94ddebf
 /agent-note-adaptive-default-for-the-directory-picker-interaction:
   en: e02bced6761bd7fc
   zh: 53db8706ddd2f980

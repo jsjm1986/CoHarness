@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-artifact-first-npm-baseline-publication.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-artifact-first-npm-baseline-publication.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/process/2026-08-04-artifact-first-npm-baseline-publication.md
+document:
+  en: e79a988531ac266d72f7d2c036bdd10f3e4520a9
+  zh: e071704741fed58e83325bbc2765fe248ef113c7
 /agent-note-artifact-first-npm-baseline-publication:
   en: d10043a375498ea4
   zh: 4eec76254b5cef35

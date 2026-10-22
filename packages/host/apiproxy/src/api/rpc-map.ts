@@ -67,6 +67,7 @@ export interface RpcMethodMap {
   'workspaceFiles.read': WorkspaceFilesApi['read']
   'workspaceFiles.readBytes': WorkspaceFilesApi['readBytes']
   'skill.list': SkillsApi['list']
+  'skill.get': SkillsApi['get']
   'agentPreset.openDocument': AgentPresetsApi['openDocument']
   'settings.describe': SettingsApi['describe']
   'settings.openDocument': SettingsApi['openDocument']

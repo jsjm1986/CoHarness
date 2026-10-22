@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-26-incremental-pr-base-retargeting.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-26-incremental-pr-base-retargeting.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-incremental-pr-base-retargeting.md
+document:
+  en: b2e644d99877b4214b5a6edb2775b3962e6b7da2
+  zh: 1d7bb955206b91af9e78d4c0d9d5e4232edb7691
 /agent-note-retarget-pr-bases-incrementally:
   en: 22f2169defeae2c7
   zh: 60ac932fe4fec1ec

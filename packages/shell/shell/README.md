@@ -28,7 +28,6 @@ Use `ctx.shell` to run foreground shell commands with bounded output or prepare 
 
 - [Service API (`ctx.shell`)](#service-api-ctxshell)
 - [Vocabulary](#vocabulary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -60,11 +59,6 @@ The per-session sandbox-mode override vocabulary (the `'sandbox/mode'` event, th
 `stdin` and ordinary `env` are set by in-process plugins (the hooks bridges, native plugins) to feed a hook command its JSON payload and `CLAUDE_PROJECT_DIR`/`CLAUDE_PLUGIN_ROOT` values. `dshEnv` is a separate trusted overlay restricted by type to managed keys; the exported `DSH_ENV_PREFIX` is the single source for that namespace, its `DshEnvironmentKey` template type, executor scrubbing, registry validation, derived built-in names, and model guidance. Model bash uses the current snapshot collected by `ctx.shellEnv`. Implementations remove inherited managed keys, then merge `dshEnv` after ordinary `env`, so an omitted current fact cannot fall back to stale ambient state and an `env` entry cannot displace a managed value. The model-facing tool exposes none of these as parameters. All three remain optional on the resolved spec; absent means no input/overlay. See [the bash-stdin-env Agent Note](../../../.agents/notes/implemented/architecture/2026-06-30-bash-stdin-env-trusted-plugin-api.md) and [the session environment Agent Note](../../../.agents/notes/implemented/feature/2026-07-10-agent-session-identity-and-log-location.md).
 
 The exported `parseExitStatus` (with `ParsedExitStatus`) reverses the trailing `[exit code: N]` / `[exit code: null]` / `[killed by signal: X]` markers appended by the Bash and PowerShell renderers. An explicit unknown code stays `null`; an unrecognized marker stays in the output body. Both tools’ `presentResult` use this shared parser to separate output from terminal status without changing model-visible text.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam defines the executor contract; job ids, ownership, and cancellation belong to the generic `ctx.jobs` runtime.
 
 <a id="model-experience"></a>
 ## Model Experience

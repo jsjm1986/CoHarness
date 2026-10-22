@@ -21,6 +21,6 @@ A single `HarnessError extends Error` base in `dsh-llm` (the leaf package every 
 - Errors are machine-routable end-to-end: a plugin can branch on `error.code` rather than substring-matching a message.
 - One base class is imported widely, but it lives in the package everyone already depends on, so the cost is a single import, not a new edge.
 - `deriveMessages` does not surface `error` into model history — the model still sees the text block; the structured field is for code and replay.
-- Argument validation retains its existing code and behavior; package-owned diagnostic invariants carry their stable code independently so the invariant registry does not import a product package. The shared base adds cross-seam routing metadata without changing model-facing text.
+- Argument validation retains its existing code and behavior. The shared base adds cross-seam routing metadata without changing model-facing text.
 
 <!-- agent-note-format: alternatives-not-recorded (pre-format Agent Note) -->

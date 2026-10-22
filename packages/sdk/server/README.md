@@ -20,7 +20,6 @@ The `jsonrpc` plugin serves newline-delimited JSON-RPC over stdio so out-of-proc
 - [stdout is the protocol](#stdout-is-the-protocol)
 - [Shutdown and exit semantics](#shutdown-and-exit-semantics)
 - [Wire notes](#wire-notes)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -52,10 +51,9 @@ The plugin answers `shutdown`, flushes the response, disposes the root context s
 
 `initialize` is the runtime-readiness boundary: when the server is mounted by a Loader composition, it waits for the current plugin tree to settle before replying, so async sibling capabilities such as initial MCP tool discovery are visible to the first prompt. Hand-built contexts without Loader remain immediately usable. `initialize.serverInfo.name` is the wire-stable `deepseek-harness-sdk-runtime`. An optional positive `initialize.maxTokens` becomes the request output cap of each SDK-created agent and its in-process descendants; invalid values reject initialization, while omission sends no SDK cap and allows the selected adapter or provider route default to apply. `session/prompt` queues one identified user message and immediately returns `{ messageId }`. The server streams every durable fact as `session.event` and every whole-agent lifecycle transition as `session.status`; it does not assign an assistant message or `turn/end` to that prompt. Independent requests may enqueue more work on the same session. Persistence roots and persona come from `cordis.yml`.
 
-<a id="invariants"></a>
-## Invariants
+`session/resume` accepts a persisted `{ sessionId }` after initialization and returns `{}` once its Agent is ready. It loads history through `agents.resume()`, repairs an interrupted final turn, and preserves the stored origin and effective directory while applying the initialized model route. It sends no new input. Missing, unreadable, incompatible, or occupied sessions reject without creating a replacement, and an id already owned or still opening rejects as occupied. Prompts for an identity currently being restored wait for that restoration; shutdown drains pending restoration and releases its Agent. Historical events stay in the stored log rather than streaming again as new notifications.
 
-**Runtime invariant:** No companion is published. The server translates each stdio frame into harness calls; session state stays in the runtime it drives.
+`session/wait` observes an existing SDK-owned session through managed descendant completion and any resulting root turns. It rejects unknown or retired roots, never creates a session, and responds after the root stays idle across the descendant check. Idle children with parked inbox messages remain resident but do not delay this response; later waking input can resume them. Session notifications emitted before completion precede the response on the stdio transport. A live Agent failure stays associated with that exact session until a later committed `turn/end` accounts for the outcome; otherwise the wait rejects, including when the failure preceded the wait request. Errors already represented by a terminal remain in Session events, and later successful activity clears an earlier live failure.
 
 <a id="model-experience"></a>
 ## Model Experience

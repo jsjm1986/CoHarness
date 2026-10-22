@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-21-mandatory-app-attribution-headers.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-21-mandatory-app-attribution-headers.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.md
+document:
+  en: 479d3a46dc41c5cc9ae9b77b81dbef3d6524370b
+  zh: 1b11cb6ef1e96609c6777134a85de298ca979c58
 /agent-note-mandatory-user-agent-attribution-for-provider-requests:
   en: 3f804e0236d13aba
   zh: ef8b1b7b9c3d8376

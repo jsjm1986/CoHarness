@@ -27,7 +27,6 @@ Use `dsh-lsp` to give agents language-server navigation for definitions, referen
 
 - [Service API (`ctx.lsp`)](#service-api-ctxlsp)
 - [Vocabulary](#vocabulary)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -50,11 +49,6 @@ Providers register **capabilities**, not tools. `dsh-tool-lsp` is the only owner
 ## Vocabulary
 
 `LspQueryRequest` (`operation`, `filePath`, `position`, `workspaceRoot`) — every field required, so no field needs implementation defaulting and there is no `resolve()` step. Positions and ranges are zero-based UTF-16, matching the protocol; the tool owns the one-based cursor convention. `findReferences` always includes declarations — providers enforce this internally, so callers get no flag. `LspQueryResult` is a CLOSED discriminated union: `{ kind: 'locations'; locations; resolvedWorkspaceUri }` for navigation, `{ kind: 'hover'; hover }` for hover (content or `null`) — consumers `switch` to exhaustiveness so a new arm breaks compilation until handled. `resolvedWorkspaceUri` is the provider's canonical workspace `file:` URI; callers relativize location URIs against it instead of applying host-platform path rules to the possibly symlinked request root. See `src/types.ts` for the full contracts and `src/index.ts` for the `LspError` codes, including `LSP_DISPOSED` and `LSP_MALFORMED_RESPONSE`.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam defines the navigation contract; providers own server processes, documents, and caches.
 
 <a id="model-experience"></a>
 ## Model Experience

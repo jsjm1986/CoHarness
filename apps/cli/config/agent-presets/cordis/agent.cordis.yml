@@ -87,6 +87,12 @@
 - id: tool-jobs
   name: '@deepseek-ai/dsh-tool-jobs'
 
+# Reminder management (schedule_create/list/update/delete) registers into this
+# preset's scope: the Host `schedule` service owns storage and delivery, so the
+# tool Consumer needs no realm and presets that omit it get no reminder tools.
+- id: tool-schedule
+  name: '@deepseek-ai/dsh-tool-schedule'
+
 # ── goals ───────────────────────────────────────────────────────────────────
 
 # Only the model-facing tool. The goal SERVICE, its session driver, and the
@@ -223,8 +229,11 @@
     - id: tool-workflow
       name: '@deepseek-ai/dsh-tool-workflow'
 
+    # Mounted but disabled by default; a preset fork or deployment patch
+    # enables Ralph by removing `disabled`.
     - id: tool-ralph
       name: '@deepseek-ai/dsh-tool-ralph'
+      disabled: true
       config:
         subagentProvider: spawn
         maxRounds: 64
@@ -278,4 +287,7 @@
 # row disables with the same condition the host row uses.
 - id: tool-plugin-manager
   name: '@deepseek-ai/dsh-plugin-manager/tools'
+  disabled: !!js "!ctx.get('profileContext')"
+- id: tool-plugin-market
+  name: '@deepseek-ai/dsh-plugin-market/tools'
   disabled: !!js "!ctx.get('profileContext')"

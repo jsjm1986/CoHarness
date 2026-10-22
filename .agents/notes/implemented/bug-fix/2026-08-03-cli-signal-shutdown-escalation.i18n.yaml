@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-03-cli-signal-shutdown-escalation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-03-cli-signal-shutdown-escalation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-03-cli-signal-shutdown-escalation.md
+document:
+  en: 2fe217a79790ffbee360a8fd2f9a054c36cd62f5
+  zh: 341f99afb7f1040778b04030533229675a31a652
 /agent-note-bounded-escalating-signal-shutdown-for-web-and-headless:
   en: d8f8ef8811dfe378
   zh: ca728da97cb35920

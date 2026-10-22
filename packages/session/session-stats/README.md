@@ -17,7 +17,6 @@ This package gives clients whole-session turn and step counts plus LLM, tool, fi
 
 - [Fold semantics](#fold-semantics)
 - [Composition](#composition)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -44,11 +43,6 @@ This package gives clients whole-session turn and step counts plus LLM, tool, fi
 ```
 
 Injects `sessionProjections` — the plugin's whole purpose; in assemblies without the registry the fiber stays pending and nothing registers.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The unit is a pure fold over the durable log served through the projection seam; no state is owned outside that fold.
 
 <a id="model-experience"></a>
 ## Model Experience

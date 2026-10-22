@@ -28,6 +28,7 @@ export const remoteDefaultResponses: RemoteTable = {
     }),
     // ui-skill catalog reads.
     'skill.list': ok({ skills: [] }),
+    'skill.get': ok({}),
     // Desktop confirmation status probe; no host confirms under the mock.
     'desktop.status': ok(null),
     // ui-agent-preset hero chip and header label on first mount.

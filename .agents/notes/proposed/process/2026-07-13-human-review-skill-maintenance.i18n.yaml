@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-13-human-review-skill-maintenance.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-13-human-review-skill-maintenance.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/process/2026-07-13-human-review-skill-maintenance.md
+document:
+  en: b741c8b595fcd36613cb246af483863d1e056697
+  zh: b43e05c79b60056f3f38eabb00dd5af9a3611c6e
 /agent-note-periodic-human-review-maintenance-for-dsh-code-review:
   en: 7c3dc085ce13a5e9
   zh: e24659d5088e7e46

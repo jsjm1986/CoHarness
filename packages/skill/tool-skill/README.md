@@ -19,7 +19,6 @@ Agents can discover and load skills during a session. Before the first request, 
 
 - [Catalog lifecycle](#catalog-lifecycle)
 - [Tool: `skill`](#tool-skill)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -53,11 +52,6 @@ Resource guidance resolves only paths or URLs explicitly referenced by the instr
 An unresolved name reports that the skill is unknown or no longer available. Invalid names and skills whose `invocation.modelInvocable` is `false` produce distinct error results. `invocation.userInvocable` does not restrict this model-facing tool.
 
 Tool execution does not add a synthetic context message. Its freshly loaded result is already recorded as the tool result and becomes available to the next model step without duplicating the body. Only the catalog projection adds replacement summaries.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The tool and catalog read the `ctx.skills` registry; provider registration and content stay behind the seam.
 
 <a id="model-experience"></a>
 ## Model Experience

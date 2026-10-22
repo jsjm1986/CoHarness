@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-10-after-call-compaction-pressure-and-overflow-recovery.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-10-after-call-compaction-pressure-and-overflow-recovery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-10-after-call-compaction-pressure-and-overflow-recovery.md
+document:
+  en: 89c8917484c11057ff2e6b55e2311e83f724f7ed
+  zh: 48f954f2c4720894548ecab387965d3a3d1799b0
 /agent-note-after-call-compaction-pressure-and-context-overflow-recovery:
   en: 8bfe0d8b79d9840f
   zh: 6921dc88e5ef9c83

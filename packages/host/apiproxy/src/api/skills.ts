@@ -1,8 +1,7 @@
 /**
- * skills domain contract: read-only skill catalog lookup addressed by session.
- * The session's header cwd resolves to the canonical project root host-side —
- * the client never submits a raw path, and skill lookup never creates or
- * resumes an Agent.
+ * Read-only skill lookup for an attached session. The Host resolves the
+ * session's working directory and preset scope; clients submit names rather
+ * than filesystem paths. Lookup never creates or resumes an Agent.
  */
 
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -20,14 +19,38 @@ export interface SkillEntry {
   readonly modelInvocable: boolean
 }
 
+/** Current user-invocable instructions, without provider locators or invocation effects. */
+export interface SkillPreview {
+  readonly name: string
+  readonly description: string
+  /** Stored Markdown source; argument expansion and embedded commands are not executed. */
+  readonly contentMarkdown: string
+}
+
 /**
- * Skill-domain unary methods (the map key skill.* of RpcMethodMap). Listing
- * is the domain's only RPC: invocation itself is a plain `session.prompt`
- * whose leading `/name` token the host recognizes at the pre-step boundary
- * (`dsh-tool-skill` injects the rendered body there), so every client shares
- * one deterministic path with no dedicated invocation wire.
+ * Skill-domain reads. Invocation uses ordinary `session.prompt` text:
+ * `dsh-tool-skill` recognizes whitespace-bounded `/name` tokens and injects
+ * rendered instructions at the pre-step boundary.
  */
 export interface SkillsApi {
-  /** Lists the user-invocable skill catalog for the session's project. */
-  list(request: RpcRequest<{ sessionId: SessionId }>): Promise<RpcResponse<{ skills: readonly SkillEntry[] }>>
+  /**
+   * List user-invocable skills without activating an Agent.
+   * @param request - attached session whose working directory and preset select the catalog.
+   * @param signal - cancellation for provider discovery.
+   * @returns visible skill metadata, including the model invocation policy.
+   */
+  list(
+    request: RpcRequest<{ sessionId: SessionId }>,
+    signal?: AbortSignal,
+  ): Promise<RpcResponse<{ skills: readonly SkillEntry[] }>>
+  /**
+   * Read current instructions without invoking the skill or activating an Agent.
+   * @param request - attached session and skill name.
+   * @param signal - cancellation for provider lookup.
+   * @returns no `skill` when the name is absent or not user-invocable.
+   */
+  get(
+    request: RpcRequest<{ sessionId: SessionId; name: string }>,
+    signal?: AbortSignal,
+  ): Promise<RpcResponse<{ skill?: SkillPreview }>>
 }

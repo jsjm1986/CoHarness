@@ -7,7 +7,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { resolveChildExecution } from '../src/out-of-process.ts'
 
-vi.mock('@deepseek-ai/dsh-agent-presets', () => { throw new Error('optional preset package is not installed') })
+vi.mock('@deepseek-ai/dsh-agent-preset-registry', () => { throw new Error('optional preset package is not installed') })
 
 it('resolves a local workspace without presets and rejects missing providers or working directories', async () => {
   const ctx = new Context()

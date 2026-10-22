@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-25-coharness-fixture-alignment.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-25-coharness-fixture-alignment.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/testing/2026-09-25-coharness-fixture-alignment.md
+document:
+  en: a2bc0b30f4b4426cc0ff9e4fac804055b614e02a
+  zh: 33c00b6ca84958a7b1fd547ef01bf501b5f03958
 /agent-note-coharness-fixture-alignment:
   en: 649ca4e23d4a6541
   zh: 4f75c9c5e611f1e3

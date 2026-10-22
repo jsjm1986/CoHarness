@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-chat-font-size-transcript.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-chat-font-size-transcript.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-chat-font-size-transcript.md
+document:
+  en: 4b6512922e9de4e6d67210d70fd491cd1239d0bb
+  zh: d8e9ffed8e1e70782c134ece758cf658dd586f8f
 /agent-note-chat-font-size-preference-reaches-transcript-text:
   en: 3998c146bf092a2f
   zh: d9582eaed3389443

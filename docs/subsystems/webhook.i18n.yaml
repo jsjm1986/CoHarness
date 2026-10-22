@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for webhook.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for webhook.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/webhook.md
+document:
+  en: f3af2b1bba59db2ec66db722c024b1600502d421
+  zh: 936d92583384a50ce1b9312c593cd2055d11f040
 /webhook-runtime:
   en: 07dd27c8f8c195de
   zh: edc175febdd0a744

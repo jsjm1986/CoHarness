@@ -37,9 +37,6 @@ ACP v1 SDK 客户端先初始化 `dsh --profile acp`，再用绝对 `cwd` 与可
 
 完整的受支持方法矩阵、MCP 信任模型、更新映射与停止原因见 [`dsh-acp` 协议约定](../../acp/acp/README.zh.md#protocol-contract)。该 profile 不增加私有方法、能力、`_meta`、环境变量或传输字段。免密钥控制面一致性测试通过公开 ACP SDK 驱动真实 profile。
 
-
-**运行时不变式：** 不发布伴生入口。该 bundle 只增加进程传输与启动 latch；帧纯度、help 排除和关闭行为由源码及构建产物的 stdio 测试负责。
-
 <a id="model-experience"></a>
 ## 模型体验
 

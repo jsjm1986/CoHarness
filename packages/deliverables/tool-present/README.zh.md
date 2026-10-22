@@ -53,8 +53,6 @@ kind: "package-reference"
 
 纯 `./types` 入口声明 `PresentedFile` 与 Session 事件，不导入 Host 运行时代码。Web 消费方在展示或打开文件前校验持久声明。新声明保存绝对路径；历史相对路径声明继续以当前查看的 Session 原始工作区作为基准。
 
-**运行时不变式：** 不发布伴生入口。工具与事件注册归 effect 所有，Session 日志拥有文件声明；插件不维护独立的文件内容存储。
-
 </details>
 
 -----
@@ -66,7 +64,6 @@ kind: "package-reference"
 - [Web 交付](../../client/ui-deliverables/README.zh.md)——源文件打开与卡片。
 - 交付决策——Session 归属与读取端必须识别的事件。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -74,7 +71,7 @@ kind: "package-reference"
 
 #### 模型看到的内容
 
-[present schema](../../../docs/tool-catalog.zh.md#present)要求已有且可访问的文件：“Declare existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.” `files` 参数要求选择 1-2 个最重要的交付物，每次调用最多 4 个。每个文件的结果为 `Presented <path>`；程序结果和持久事件包含路径及可选说明。
+[present schema](../../../docs/tool-catalog.zh.md#present)要求已有且可访问的文件：“Declare selected existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.” `files` 参数要求选择 1-2 个最重要的交付物，每次调用最多 4 个。每个文件的结果为 `Presented <path>`；程序结果和持久事件包含路径及可选说明。
 
 #### Token 影响
 

@@ -19,18 +19,11 @@ patch 在自身上按平台门控两个 shell 栈：`bash-sandbox`/`tool-bash` �
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该 bundle 是静态的 `cordis.patch.yml` 层；它插入的每个插件行都自行拥有其运行时关系与不变量接线。
-
 
 <a id="model-experience"></a>
 ## 模型体验

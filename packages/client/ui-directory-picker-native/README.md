@@ -19,17 +19,11 @@ This package provides the native directory-picking surface for the Web GUI: when
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The OS chooser belongs to the host backend; the renderless occupant forwards each open request and reports one outcome, keeping no directory state.
 
 <a id="model-experience"></a>
 ## Model Experience

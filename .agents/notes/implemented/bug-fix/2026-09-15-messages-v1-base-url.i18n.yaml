@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-15-messages-v1-base-url.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-15-messages-v1-base-url.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-messages-v1-base-url.md
+document:
+  en: 97f7294c28988e6f115963033cdac6794d70d6f3
+  zh: ccb8c5930dbbfa6274770cc03087b4d8077fe27b
 /agent-note-exact-v1-recognition-for-messages-base-urls:
   en: 8e65836ea970f866
   zh: 54ef0765d2c39be8

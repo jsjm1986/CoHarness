@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for publish.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for publish.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/develop/basic/publish.md
+document:
+  en: c13a8ed7891bf15b7db2b9a9d95b722eb9f41b91
+  zh: d3753f941ec6cd1cc0ede7076e00fc65089628f4
 /package-and-install-a-plugin:
   en: 0958da34d1ea9b49
   zh: 66a024ba2f2faba2
@@ -9,8 +12,8 @@
   en: 341c334cee646f58
   zh: 1ac8f40609a71123
 /package-and-install-a-plugin/two-concepts-two-manifests/the-bundle-manifest:
-  en: 37e239efcb195168
-  zh: 6df0acfa1892d7b0
+  en: 0004592bbb9b076a
+  zh: c13932f517a8d6e3
 /package-and-install-a-plugin/two-concepts-two-manifests/the-profile-manifest:
   en: a848c549c54418bf
   zh: 87c3883f64250774

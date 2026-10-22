@@ -14,7 +14,7 @@ Status: implemented
 
 任务 domain 声明整 unit 布局。任务是权威数据，因此 JSON 后端会把文件不可读、文档损坏、版本不受支持或任务非法作为整批加载失败，而不是解释为删除。恢复失败不会改写 `schedule.json`，初始不存在的文件则作为空 domain 打开；修复该文件后会保留任务身份。`Service.init` 等待存储校验和运行时初始化，管理方法等待同一初始化结果；拥有方卸载时释放迟到的存储资源，而不开始投递。投递调度准入与初始化分开：任务变更提交后、运行时清理开始前，祖先可能关闭 Agent 准入。此类拒绝会记录日志而不自动重试，不会将已持久化的变更变成失败的管理结果。存储非法和清理注册失败仍拒绝启动。
 
-此决策替代[会话内提醒记录](../feature/2026-08-05-durable-web-schedule.zh.md)中的 Session 日志权威来源、仅 live 时激活和只读目录决策。其中显式绝对时间校验、固定速率计算，以及区分排队接纳与模型完成的决策仍然适用。历史 `schedule/change` 的创建、fold 和 invariant 类型通过 `LegacyScheduleRecord` 保持为 After、At 和 Every；独立的宿主解码器接受包含 Daily、Weekly 与 Cron 的当前 `ScheduleRecord`。宿主记录解码器要求已存储的 `title` 去除首尾空白后非空、本身已去除首尾空白且不超过 120 个字符，严格的 task schema 会拒绝整个 domain 的打开，而不是丢弃这样的任务。历史变更解码器容忍缺失的 `title`，以便已写入的 Session 日志仍可读取；该成员存在时，同样按这三项检查校验。storage domain 保持版本 1。历史事件不会填充该 domain，已有 `at` 任务也不会转换为每日或每周规则。加载含有活动旧提醒的 Session 时，会警告需要重新创建提醒。
+此决策替代[会话内提醒记录](../feature/2026-08-05-durable-web-schedule.zh.md)中的 Session 日志权威来源、仅 live 时激活和只读目录决策。其中显式绝对时间校验、固定速率计算，以及区分排队接纳与模型完成的决策仍然适用。历史 `schedule/change` 的创建与 fold 类型通过 `LegacyScheduleRecord` 保持为 After、At 和 Every；独立的宿主解码器接受包含 Daily、Weekly 与 Cron 的当前 `ScheduleRecord`。宿主记录解码器要求已存储的 `title` 去除首尾空白后非空、本身已去除首尾空白且不超过 120 个字符，严格的 task schema 会拒绝整个 domain 的打开，而不是丢弃这样的任务。历史变更解码器容忍缺失的 `title`，以便已写入的 Session 日志仍可读取；该成员存在时，同样按这三项检查校验。storage domain 保持版本 1。历史事件不会填充该 domain，已有 `at` 任务也不会转换为每日或每周规则。加载含有活动旧提醒的 Session 时，会警告需要重新创建提醒。
 
 插件来源的 `followup()` 同步将消息追加到 Session 收件箱。Session flush 成功后确认持久投递。一次任务记录 put 存储 `lastDelivery`，追加包含发生目标、确认时间、真实消息 id 和指令快照的发送记录，并更新一次性任务的 `inactive` 状态或重复任务的下一目标和状态。因此，任务状态与其保存的历史共用一次提交。未运行任务仍保留在存储中，且不会再次安排投递；显式删除会阻止后续投递，并把该行连同其已保存记录一并移除。这些记录确认收件箱投递，不表示用户收到消息或模型执行完成。
 

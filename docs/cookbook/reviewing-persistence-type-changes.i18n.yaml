@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for reviewing-persistence-type-changes.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for reviewing-persistence-type-changes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/reviewing-persistence-type-changes.md
+document:
+  en: 3a35cb5dc3ab86685bdbcfa8374eb340e9eb6618
+  zh: 3160f5824b7d388491b48056b2353ed1a62b043e
 /:
   en: 81db5d0ea2dbd0e2
   zh: 2eb04cd5b470fd53

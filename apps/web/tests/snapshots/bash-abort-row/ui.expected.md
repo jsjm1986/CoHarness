@@ -4,11 +4,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "2 tool calls · 1 intermediate message" [expanded]:
-  - text: 2 tool calls · 1 intermediate message
-  - img
 - button "System prompt":
   - img
   - img
@@ -17,6 +16,9 @@
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- status: Stopped
+- button "Stopped" [disabled] [expanded]
+- button "Ran commands"
 - button "Context injection runtime-context":
   - img
   - img

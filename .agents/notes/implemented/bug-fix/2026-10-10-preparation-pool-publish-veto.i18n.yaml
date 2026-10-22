@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-10-preparation-pool-publish-veto.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-10-preparation-pool-publish-veto.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-preparation-pool-publish-veto.md
+document:
+  en: fa9bfe438a3b4c7d6825eddb47c782e1805b9cf8
+  zh: bfd77d194ccb04b205c0efb87ee2be854fb1a226
 /agent-note-preparation-pool-publish-veto-fired-on-cached-cold-reads:
   en: baf38052737dc869
   zh: 5efab7fcfe8ecd8c

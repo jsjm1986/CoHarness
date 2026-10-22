@@ -6,13 +6,13 @@ Status: implemented
 
 ## Problem
 
-`dsh web` 的 index 与全部 `/api` 通道由同一个 HTTP 监听提供，默认仅 loopback，在 `--trusted-host` 下对 LAN 可达。此前准入只有 `api-request-trust.ts` 的 Host/Origin DNS-rebinding 围栏——其自身注释明确声明它不是认证：能到达端口的任何进程都能驱动会话、工作区文件与网关操作。上游 `dsh-v0.2.0-rc.1` 携带 `packages/client/connection/src/browser-auth.ts`；本地分叉没有等价物。
+`dsh web` 的 index 与全部 `/api` 通道由同一个 HTTP(S) 监听提供，默认仅 loopback，在 `--trusted-host` 下对 LAN 可达。此前准入只有 `api-request-trust.ts` 的 Host/Origin DNS-rebinding 围栏——其自身注释明确声明它不是认证：能到达端口的任何进程都能驱动会话、工作区文件与网关操作。上游 `dsh-v0.2.0-rc.1` 携带 `packages/client/connection/src/browser-auth.ts`；本地分叉没有等价物。
 
 ## Decision
 
 [BrowserAuth](../../../../packages/client/connection/src/browser-auth.ts) 以启动令牌交换加持久签名 cookie 认证浏览器侧载体。
 
-`Connection.authenticatedUrl(base)` 是浏览器直连入口：`web-app` 把它作为启动 URL 打印，内嵌保存在 `WeakMap` 中的每进程随机启动令牌。index 属主——发布组合的 `frontend-static`，或没有它的组合里的 `connection.authorizeIndex`——把 `?token` 换成 `303` 并设置 `dsh-auth-<sha256(authority)>`，载荷 `{version, authority, issuedAt, expiresAt}` 由持久在 credentials 服务中的密钥做 HMAC 签名（`client-connection/browser-session`，版本化 grant 记录）。cookie 为 `HttpOnly; SameSite=Strict`，按规范请求 authority 命名，同一监听服务多个 authority 时不会跨 authority 重放。
+`Connection.authenticatedUrl(base)` 是浏览器直连入口：`web-app` 把它作为启动 URL 打印，内嵌保存在 `WeakMap` 中的每进程随机启动令牌。index 属主——发布组合的 `frontend-static`，或没有它的组合里的 `connection.authorizeIndex`——把 `?token` 换成 `303` 并设置 `dsh-auth-<sha256(authority)>`，载荷 `{version, authority, issuedAt, expiresAt}` 由持久在 credentials 服务中的密钥做 HMAC 签名（`client-connection/browser-session`，版本化 grant 记录）。cookie 为 `HttpOnly; SameSite=Strict`，按规范请求 authority 命名，同一监听服务多个 authority 时不会跨 authority 重放。TLS 监听器会追加 `Secure`，并把 `https:` scheme 编入 cookie 名称与签名 audience——由挂载监听器自身的协议决定，而非 `publicUrl` 公告或转发头——因此 HTTP cookie 无法在同一 authority 上认证 TLS 监听器。
 
 `HostConnectionService.requestRejection` 感知子树。声明 `authority: 'loopback'` 的注册与拦截器端点保持 loopback 围栏作为完整准入——webhook、archive 网关等机器调用方无法执行浏览器令牌交换。没有 provider 应答时，其余 `/api` 子树、通用 RPC 通道与 upgrade 请求都要求有效 cookie（`401`），信任围栏仍先行（`403`）。
 
@@ -35,6 +35,8 @@ Status: implemented
 ## Consequences
 
 所有浏览器 e2e 与 profile 测试现在执行令牌交换或附带铸好的 cookie；未认证的 `/api` 消费方必须声明 `authority: 'loopback'` 或经 `authorizeIndex` 获取 cookie。轮换凭证记录会使已发 cookie 全部失效。启动令牌不落日志不落盘，重启后把打印 URL 拷到别的浏览器会失败关闭。挂载 GatewayRuntime 时，provider 对一切缺少有效断言的请求应答 `'deny'`，因此仅有启动令牌 URL 或已签发 Cookie 会得到 401——代理签发的 principal 是该运行时唯一接受的浏览器凭据，销毁 provider 则恢复浏览器直连流程。
+
+[原生 HTTPS 监听器决策](2026-09-23-native-https-web-listener.zh.md)取代本说明仅支持 HTTP 传输及不设置 `Secure` 的前提。`Secure` 由监听器协议决定；令牌交换、签名 cookie 的 authority 与凭据有效期仍由本说明定义。
 
 ## Testing
 

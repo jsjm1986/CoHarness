@@ -91,7 +91,6 @@ This section explains the design decisions behind the registry and points at the
 | [`src/events.ts`](src/events.ts) | Scope-layered event routing: `{ owner }`, `{ owners: 'all' }`, and `{ owners: 'scope' }` subscriptions |
 | [`src/ring.ts`](src/ring.ts) | The bounded per-job output ring: append, retention trim, offset reads |
 | [`src/pump.ts`](src/pump.ts) | The registry-owned pull pump: one timer per job, final drain before settlement |
-| — | No runtime invariant companion is published; `@deepseek-ai/dsh-jobs/invariant` owns the event-protocol and event-versus-read checks. This provider's admission decision uses private configuration and must fail before a backend starter runs; `LocalJobRegistry.start()` enforces it synchronously for current producers. Repeating an aggregate after publication would expose private configuration solely to this companion and would not verify the fail-closed pre-start guarantee. |
 
 ### Scope layers
 
@@ -135,7 +134,6 @@ No direct invalidation; the named consumers own any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the registry is a poor fit. They are current package constraints, not a task backlog.
 

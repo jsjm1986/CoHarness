@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for worktrees.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/worktrees.md
+document:
+  en: 14db6711bc43f2c63cd3c7384ee141513525c608
+  zh: 719d99266b1587914360d12283b944e03253ae7f
+/git-worktrees:
+  en: 21ec4a3b825d7e81
+  zh: c841c5ca4b4e8959
+/git-worktrees/creation-and-retention:
+  en: 53f643c5d30e00b2
+  zh: ba9e52efc62c7656
+/git-worktrees/request-and-result:
+  en: 8391b091607600eb
+  zh: 6c735a337d60d566

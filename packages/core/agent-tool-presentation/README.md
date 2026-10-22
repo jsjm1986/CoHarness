@@ -1,5 +1,5 @@
 ---
-description: "Agent-plane presentation selector: composes one agent's tools as PTC, native, or both"
+description: "Agent-plane presentation selector: composes one agent's tools as PTC or native"
 kind: "package-reference"
 ---
 
@@ -7,17 +7,16 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The row an [agent preset](../../preset/agent-presets/README.md) carries to say which form of its tools the model sees: `native` (every schema), `ptc` (only `run_code` plus a generated TypeScript SDK), or `both`; `code` remains an accepted compatibility alias.
+The row an [agent preset](../../preset/agent-preset-registry/README.md) carries to say which form of its tools the model sees: `native` (every schema) or `ptc` (only `run_code` plus a generated TypeScript SDK).
 
 ## Summary
 
-Use `dsh-agent-tool-presentation` in an [agent preset](../../preset/agent-presets/README.md) to fix whether models see every native tool schema, only `run_code` with a generated SDK, or both forms. Each preset can choose independently, so native and PTC agents can share one process without sharing tool catalogs. Selecting `ptc` or `both` requires a compatible PTC runtime; a deployment without one rejects the preset at mount time before its first prompt. The `mode` field is required when this package is present, while omitting the package keeps the deployment default.
+Use `dsh-agent-tool-presentation` in an [agent preset](../../preset/agent-preset-registry/README.md) to fix whether models see every native tool schema or only `run_code` with a generated SDK. Each preset can choose independently, so native and PTC agents can share one process without sharing tool catalogs. Selecting `ptc` requires a compatible PTC runtime; a deployment without one rejects the preset at mount time before its first prompt. The `mode` field is required when this package is present, while omitting the package keeps the deployment default.
 
 ## Table of Contents
 
 - [Why a row rather than a registry](#why-a-row-rather-than-a-registry)
 - [What it does](#what-it-does)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -34,16 +33,11 @@ What a preset can own is the **presentation** of that registry. `ctx.tools.prese
 <a id="what-it-does"></a>
 ## What it does
 
-`native` applies immediately. A PTC mode instead waits for `ctx.ptcRuntime`, which is a host-plane service ([`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.md)): a preset selecting PTC mode against a deployment composing no runtime then holds this row pending, and `dsh-agent-presets` refuses the mount naming this id. The alternative — applying optimistically — moves the failure to the session's first request, where the operator can act on neither the preset nor the composition.
+`native` applies immediately. A PTC mode instead waits for `ctx.ptcRuntime`, which is a host-plane service ([`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.md)): a preset selecting PTC mode against a deployment composing no runtime then holds this row pending, and `dsh-agent-preset-registry` refuses the mount naming this id. The alternative — applying optimistically — moves the failure to the session's first request, where the operator can act on neither the preset nor the composition.
 
 `mode` is required rather than defaulted, because a preset without this row already gets the deployment default; an omitted value would mean the row was composed for nothing.
 
 One agent declares one presentation. A second declaration in the same composition is refused rather than merged: two answers to "which form does the model see" is a contradiction, not an override.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The package contributes one declarative preset row consumed at composition time; it owns no runtime state.
 
 <a id="model-experience"></a>
 ## Model Experience

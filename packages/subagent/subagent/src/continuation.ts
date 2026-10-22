@@ -21,6 +21,7 @@ import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId, contentHasImage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import {
   childSessionMeta,
@@ -135,8 +136,6 @@ export class SubagentContinuationManager {
       ...agentProvider !== undefined ? { agentProvider } : {},
       ...agentModel !== undefined ? { agentModel } : {},
       ...agentReasoningEffort !== undefined ? { agentReasoningEffort } : {},
-      ...request.persona !== undefined ? { persona: request.persona } : {},
-      ...request.toolFilter !== undefined ? { toolFilter: request.toolFilter } : {},
     })
     // Capture before the first await: a later parent switch belongs to the
     // parent's future, not to this child.
@@ -181,13 +180,13 @@ export class SubagentContinuationManager {
           create: {
             cwd,
             seed,
-            meta: childSessionMeta(parent, childDepth, prepared.seed !== undefined),
+            meta: childSessionMeta(parent, childDepth, prepared.seed !== undefined, request.agentPreset),
             inheritedEventCount,
             delegatedPolicies,
             descriptor,
           },
           agentOptions,
-          composition: { persona: request.persona, toolFilter: request.toolFilter },
+          composition: { agentPreset: request.agentPreset },
           ...request.outputSchema === undefined ? {} : { outputSchema: request.outputSchema },
           signal: spec.signal,
         })
@@ -473,7 +472,8 @@ export class SubagentContinuationManager {
     // Fold only the child's own suffix: a fork seed replays the parent's log,
     // which may carry an ANCESTOR's descriptor when the parent is itself a
     // continuable child.
-    const descriptor = foldSubagentDescriptor(loaded.events.slice(loaded.inheritedEventCount))
+    const ownEvents = loaded.events.slice(loaded.inheritedEventCount)
+    const descriptor = foldSubagentDescriptor(ownEvents)
     if (descriptor === undefined || descriptor.mode !== 'continuable') {
       throw new SubagentError(
         `subagent "${childId}" has no supported continuation state and cannot be resumed; choose a different target`,
@@ -482,6 +482,15 @@ export class SubagentContinuationManager {
     }
     let activation: Activation
     try {
+      const independentlySelected = hasIndependentPresetSelection(ownEvents)
+      const agentPreset = independentlySelected
+        ? this.ctx.get('sessionProjections')?.restore(
+          {}, loaded.events, SessionLogOffset(0), loaded.meta, loaded.inheritedEventCount,
+        ).snapshot.values.agentPreset ?? undefined
+        : undefined
+      if (independentlySelected && typeof agentPreset !== 'string') {
+        throw new SubagentError(`subagent "${childId}" has no agent preset projection for restoration`, 'NOT_RESUMABLE')
+      }
       activation = await this.activations.materialize({
         childId,
         provider: descriptor.provider,
@@ -493,7 +502,7 @@ export class SubagentContinuationManager {
             ? { reasoningEffort: ReasoningEffortId(descriptor.agentReasoningEffort) }
             : {},
         },
-        composition: { persona: descriptor.persona, toolFilter: descriptor.toolFilter },
+        composition: { agentPreset, persona: descriptor.persona, toolFilter: descriptor.toolFilter },
         signal: options.signal,
       })
     } catch (error: unknown) {
@@ -586,6 +595,20 @@ export class SubagentContinuationManager {
     }
     return persistence
   }
+}
+
+/**
+ * Whether the child's own events record an independent `agentPreset` selection
+ * before its first own descriptor — the marker that opts a child into
+ * independent composition restoration.
+ */
+function hasIndependentPresetSelection(events: readonly SessionEvent[]): boolean {
+  for (const event of events) {
+    if (event.type === 'subagent/descriptor') return false
+    if (event.type === 'agent-preset/selected') return true
+  }
+  /* v8 ignore next -- coldResume rejects logs without a supported own descriptor before this lookup. */
+  return false
 }
 
 export default SubagentContinuationManager

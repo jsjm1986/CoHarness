@@ -5,11 +5,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "1 intermediate message":
-  - text: 1 intermediate message
-  - img
 - button "System prompt":
   - img
   - img
@@ -18,10 +17,11 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Thinking The user wants me to reply with a single word. Let me comply.":
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
   - img
-  - img
-  - text: Thinking The user wants me to reply with a single word. Let me comply.
+- button "Analysis completed"
 - paragraph: LIGHTHOUSE
 - button "Copy":
   - img

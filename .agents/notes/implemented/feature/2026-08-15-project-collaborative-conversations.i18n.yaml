@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-15-project-collaborative-conversations.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-15-project-collaborative-conversations.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md
+document:
+  en: d00c692964af6891e3d8ab1f39ce556fa52b30f7
+  zh: 571200788eba55c8c25c63e33abdf20d7d116d02
 /agent-note-project-collaborative-conversations:
   en: 488634139248bc0a
   zh: 1bc530200532a0ac

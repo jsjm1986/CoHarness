@@ -128,7 +128,6 @@ None. The log-only command lifecycle and browser download do not change the deri
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define when this package is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
 
 - **Browser download, not a Host-path writer** — the browser chooses the local destination; no Host path or native folder action is returned.
@@ -147,5 +146,3 @@ This Dev Note is working context for maintainers: open design questions and dire
 The download is deliberately browser-scoped; a Host-path or native folder export would need a new endpoint contract and a decision on where the ZIP lands.
 
 </details>
-
-**Runtime invariant:** No companion is published. Connection and the command registry own both registrations, while each export reads authoritative Session services.

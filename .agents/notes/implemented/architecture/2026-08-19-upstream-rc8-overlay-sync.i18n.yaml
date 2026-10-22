@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-19-upstream-rc8-overlay-sync.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-19-upstream-rc8-overlay-sync.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-upstream-rc8-overlay-sync.md
+document:
+  en: adce0279aa31654a8d512f9aba0a91e584aa68d5
+  zh: 2194208eb1d7f65ce52cf96692b2a66d33ff06a6
 /agent-note-upstream-rc-8-synchronization-with-local-overlays:
   en: 8d6276c3f0b6becd
   zh: 10d7e8dfb5858ffe

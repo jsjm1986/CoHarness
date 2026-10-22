@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-web-context-source-and-steer-marks.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-web-context-source-and-steer-marks.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-04-web-context-source-and-steer-marks.md
+document:
+  en: 4b426797ea60006e9529cdb05498adc463d312f7
+  zh: 2c3e2d21c76743d7485729cdae79766c9dcb1bab
 /agent-note-web-transcript-marks-context-source-recall-and-steering:
   en: a7526b207d7152e5
   zh: 8defcd9495023161

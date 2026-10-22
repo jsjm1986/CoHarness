@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-17-agent-publication-input.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-17-agent-publication-input.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-17-agent-publication-input.md
+document:
+  en: 49a1703b7f21ed4987286e9cb6869de6c12149b1
+  zh: a1d28f33a6b6358dd55a5c2dff033754a592a5af
 /agent-note-hold-input-during-agent-publication:
   en: cbae82262ec1c787
   zh: 423bd0c10209edab

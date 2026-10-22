@@ -82,9 +82,6 @@ tab 的 `kind` 是不透明字符串。种子 tab 是工厂（`DockControllerOpt
 
 本包静态链接：tsdown 的 `staticLinked` 预设在 `lib/index.js` 产出一个浏览器 ESM bundle（所有裸说明符保持为 import，sourcemap 链回源码），并把样式表按其相对 `src` 的路径放到 `lib/` 下；Web 外壳按包名解析并自行打包该产物，因此 vite 仍是 class 哈希的唯一拥有者。有一个后果至关重要——套件只保留**一张**样式表 `dockkit.module.css`，因为消费方按文件名去重注入的样式表，撞名会静默丢掉一张。
 
-
-**运行时不变量：** 不发布 companion。引擎是作用于纯数据的纯函数，组件只上报意图；操作序列的可逆性与 settle 规则由本包的引擎 spec 直接断言，不提供也不观察任何 Cordis 服务。
-
 <a id="model-experience"></a>
 ## 模型体验
 

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-27-current-node-configuration.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-27-current-node-configuration.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-current-node-configuration.md
+document:
+  en: 89af619d06135a043bc69770a2d043bab3ca134e
+  zh: f69a364b68091330d5803f418e89a4471f7e6a57
 /agent-note-current-node-configuration-with-independent-application:
   en: 1c2a4a509b399b4c
   zh: 2fbbb3ee3482a604

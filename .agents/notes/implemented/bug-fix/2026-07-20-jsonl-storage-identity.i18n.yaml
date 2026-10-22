@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-20-jsonl-storage-identity.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-20-jsonl-storage-identity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-20-jsonl-storage-identity.md
+document:
+  en: 1079eb700c819951dbb81e99376c0b71e3e84617
+  zh: 6beb0d9f92ac1b1f4c3b03a783aa67e16b5fa7bb
 /agent-note-bind-jsonl-session-identity-before-mutation:
   en: 1d52db2391f1433e
   zh: 3bcb9dca6b77bfdd

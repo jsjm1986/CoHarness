@@ -130,7 +130,6 @@ interface ImageAttachmentAccess {
 }
 ```
 
-
 The block interfaces (full fields in source): `TextBlock` (`text`), `ReasoningBlock` (thinking, distinct from visible text), `ImageBlock` (a durable [image attachment](attachment.md)), `ToolCallBlock` (`id: CallId`, `name`, raw-JSON `arguments`), and `ToolResultBlock` (`toolCallId`, nested `content: ContentBlock[]`, `isError?`). `ContentBlock = ContentBlockMap[ContentBlockType]`. A new modality belongs in the merge-extensible map only when its adapter, UI, compaction, and durable replay paths honor it.
 
 Source: [`packages/llm/llm/src/message.ts`](../../packages/llm/llm/src/message.ts)
@@ -173,6 +172,10 @@ interface MessageSourceMap {
   model: ModelMessageSource
   tool: ToolMessageSource
   'system-prompt': SystemPromptMessageSource
+  /** Browser fixture transport producer kind; exists only inside fixture-backed web sessions.
+   * @persistenceAttribution
+   */
+  fixture: { kind: 'fixture' }
 }
 ```
 
@@ -598,6 +601,16 @@ interface LlmConfigurableProvider {
   declared?: boolean
   /** Configuration diagnostic for repair; unaffected models may remain serviceable. */
   error?: string
+  /**
+   * Route endpoint the adapter uses when the profile sets no `baseURL`; the
+   * adapter may still send an individual model to that model's own endpoint.
+   * Absent when the route has no fixed endpoint.
+   */
+  defaultBaseURL?: string
+  /** Environment variables used to construct a provider endpoint; absent when none are reported. */
+  baseURLEnv?: readonly string[]
+  /** Authentication the adapter performs when the profile names no credential reference; absent when it reports none. */
+  nativeAuth?: LlmNativeAuth
   /** Optional ownership label supplied by a scoped configuration provider. */
   management?: 'personal' | 'organization' | 'project' | 'external'
   /** Public project id when this route belongs to a project. */

@@ -9,7 +9,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SubagentService from '@deepseek-ai/dsh-subagent'
 import { deliverSubagentPrompt, type HostPromptDeliverer } from '@deepseek-ai/dsh-subagent/internal'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
@@ -172,7 +172,7 @@ describe('Team identity and provisioning', () => {
 
     expect(service.listMembers(lead)).toEqual([expect.objectContaining({
       name: 'lead',
-      status: 'idle',
+      status: 'inactive',
       diagnostics: [],
     })])
     const provisioning = {
@@ -296,7 +296,7 @@ describe('Team identity and provisioning', () => {
     expect(freshInspection.meta.isSeeded).toBe(false)
     expect(freshInspection.inheritedEventCount).toBe(0)
     expect(ctx.agentTeams.listMembers(lead).map(row => [row.name, row.context, row.status])).toEqual([
-      ['lead', undefined, 'idle'],
+      ['lead', undefined, 'inactive'],
       ['fork-worker', 'fork', 'inactive'],
       ['fresh-worker', 'fresh', 'inactive'],
     ])

@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, waitFor, fireEvent } from '@testing-library/react'
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
 import { WorkspaceResourceError, WorkspaceResourceRegistry, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SessionId, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId, WorkspaceResourceOpenRequest, WorkspaceResourceState } from '@deepseek-ai/dsh-client-runtime/client'
+import type { PaneId, TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { WorkspaceFileTab } from '../src/client/components/WorkspaceFileTab.tsx'
 import { previewRequest } from './workspace-preview-resource.fixture.tsx'
 
@@ -22,23 +23,24 @@ function harness(path = 'a.txt') {
   const runtimeTarget = () => ({ kind: 'project' as const, projectId: 8 })
   // The test twin of the renderer's keyedHooks binding: an address-keyed source
   // with a memoized selector, so an identical snapshot never reselects.
-  const useWorkspaceResource = (
-    address: string, selector?: (state: unknown) => unknown, equal?: (a: unknown, b: unknown) => boolean,
-  ): unknown => {
-    const select = selector ?? ((value: unknown) => value)
+  const useWorkspaceResource = <S,>(
+    address: string, selector?: (state: WorkspaceResourceState | undefined) => S, equal?: (a: S, b: S) => boolean,
+  ): S | undefined => {
+    const select: (state: WorkspaceResourceState | undefined) => S = selector ?? (v => v as S)
     const source = useMemo(() => (
       address === '' ? undefined : resources.source(previewRequest(address, sessionId, runtimeTarget()))
     ), [address])
-    const cache = useRef<{ snap: unknown; selected: unknown } | undefined>(undefined)
+    const cache = useRef<{ snap: WorkspaceResourceState; selected: S } | undefined>(undefined)
     const getSnapshot = useCallback(() => {
       if (source === undefined) return select(undefined)
       const snap = source.getSnapshot()
       if (cache.current !== undefined && Object.is(cache.current.snap, snap)) return cache.current.selected
       const selected = select(snap)
+      const prior = cache.current
       cache.current = {
         snap,
-        selected: cache.current !== undefined && equal !== undefined && equal(cache.current.selected, selected)
-          ? cache.current.selected
+        selected: prior !== undefined && equal !== undefined && equal(prior.selected, selected)
+          ? prior.selected
           : selected,
       }
       return cache.current.selected
@@ -49,23 +51,42 @@ function harness(path = 'a.txt') {
   const readBytesPreview = vi.fn()
   const readFileBytes = vi.fn(async () => ({ bytes: '', version: 'v1' }))
   const readDocument = vi.fn(async () => ({ bytes: btoa('PDF v1'), version: 'v1', missingFonts: [] as string[] }))
-  const props = (visible: boolean, line?: number, revision = 0) => ({
+  const props = (visible: boolean, line?: number, revision = 0): Parameters<typeof WorkspaceFileTab>[0] => ({
     sessionId, runtimeTarget, useWorkspaceResource, readPreview, readBytesPreview, readFileBytes, readDocument,
     reloadResource: (request: WorkspaceResourceOpenRequest) => resources.source(request).reload(),
     revokeResource: (request: WorkspaceResourceOpenRequest, message: string) => {
       resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
     },
+    nativeOpenAvailable: () => false,
+    openNativePath: vi.fn(async () => {}),
     renderHtml: vi.fn(async () => '<html></html>'),
     markdownT: (key: string) => key, htmlT: (key: string) => key, pdfT: (key: string) => key, officeT: (key: string) => key,
     excelT: (key: string) => key, excelLimits: { maxBytes: 1024, maxCells: 1000, timeoutMs: 5000 },
     t: (key: string) => key,
+    useSession: () => { throw new Error('unused') },
+    useSessions: () => { throw new Error('unused') },
+    useWorkspaces: () => { throw new Error('unused') },
+    usePanelInfo: () => { throw new Error('unused') },
+    useProjection: () => undefined,
+    useInput: () => { throw new Error('unused') },
+    inputActions: {
+      setDraft: () => {}, addImages: () => true, removeImage: () => {},
+      pruneImages: () => {}, addDocuments: () => true, removeDocument: () => {},
+      pruneDocuments: () => {}, captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+      insertText: () => false, submit: () => {},
+    },
     useTabInfo: () => ({
+      sidebar: { expanded: true, fullscreen: false },
+      panel: { id: 'pane-1' as PaneId },
       tab: {
-        visible, actions: { close },
+        id: 'tab-1' as TabId, kind: 'workspace-file', contentId: workspaceResourceAddress(sessionId, path),
+        title: path, visible,
+        actions: { bindCommands: () => () => {}, openResource: () => {}, openTab: () => {}, close },
         navigation: { address: workspaceResourceAddress(sessionId, path), revision, params: line === undefined ? undefined : { line } },
+        signal: new AbortController().signal,
       },
     }),
-  }) as unknown as Parameters<typeof WorkspaceFileTab>[0]
+  })
   return { props, close, readPreview, readFileBytes, readDocument }
 }
 

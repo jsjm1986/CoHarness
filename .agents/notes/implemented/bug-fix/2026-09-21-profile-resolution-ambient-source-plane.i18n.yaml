@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-21-profile-resolution-ambient-source-plane.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-21-profile-resolution-ambient-source-plane.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-21-profile-resolution-ambient-source-plane.md
+document:
+  en: 7a696f6a9a2a89d0519f0f109bb2507a8a9ff4c3
+  zh: 3c8e640fda59648514931422e2294c56fe7c1f37
 /agent-note-profile-resolution-prefers-ambient-typescript-source-results:
   en: 7f99b03cd74703fa
   zh: afc150c049cb830f

@@ -20,7 +20,6 @@ The Host service for programmatically defined dynamic packages: the definition r
 - [Trust stance](#trust-stance)
 - [Config](#config)
 - [Export shape](#export-shape)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -80,11 +79,6 @@ Client queries accept the first valid page response within `clientInspectTimeout
 ## Export shape
 
 Service package: default-exports `DynamicCordisRunnerService` (service key `dynamicCordisRunner`), with `./types` carrying the payload shapes the `dynamicCordisRunner` remote namespace and its consumers share. The `define` / `undefine` shapes stay inside the package, because they never cross the wire.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Definitions and their sandboxed fibers are private registry state whose mount/invoke/retract lifecycle is asserted by the runner's specs; no independently observable projection is published.
 
 <a id="model-experience"></a>
 ## Model Experience

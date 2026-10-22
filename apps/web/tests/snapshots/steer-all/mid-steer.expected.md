@@ -6,11 +6,10 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
-- button "1 tool call · 1 intermediate message" [expanded]:
-  - text: 1 tool call · 1 intermediate message
-  - img
 - button "System prompt":
   - img
   - img

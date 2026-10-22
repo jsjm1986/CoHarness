@@ -159,6 +159,7 @@ export class CardForm<T> {
   private readonly secretSpecs: Map<string, CardSecretSpec>
   private readonly staged = new Map<string, StagedEdit>()
   private readonly listeners = new Set<() => void>()
+  private readonly unsubscribe: () => void
   private saving = false
   private failed = false
 
@@ -174,7 +175,12 @@ export class CardForm<T> {
   ) {
     this.specs = new Map(specs.map(spec => [spec.field, spec]))
     this.secretSpecs = new Map(secrets.map(spec => [spec.field, spec]))
-    scope.subscribe(() => { this.publish() })
+    this.unsubscribe = scope.subscribe(() => { this.publish() })
+  }
+
+  /** Release the scope subscription. */
+  dispose(): void {
+    this.unsubscribe()
   }
 
   /**
@@ -362,5 +368,16 @@ export class CardForm<T> {
 
   private publish(): void {
     for (const listener of this.listeners) listener()
+  }
+
+  /**
+   * Register a raw publish listener beside the bound stores, for a controller
+   * that merges several forms into one card projection.
+   * @param listener - called after every staged or scope change.
+   * @returns the disposer removing the listener.
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
   }
 }

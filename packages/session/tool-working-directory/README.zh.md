@@ -41,8 +41,6 @@ kind: "package-reference"
 
 此工具将验证、恢复、持久化和上下文通知委托给目录服务。规范结果包含 `cwd`；原生渲染返回该路径。通用工具卡展示参数和结果，无需独立 GUI 渲染器。
 
-不发布 `./invariant` 伴生模块，因为工具将全部目录状态和变更委托给 `workingDirectory`。
-
 </details>
 
 -----

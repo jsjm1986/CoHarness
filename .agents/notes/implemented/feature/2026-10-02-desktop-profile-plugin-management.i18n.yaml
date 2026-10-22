@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-02-desktop-profile-plugin-management.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-02-desktop-profile-plugin-management.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-desktop-profile-plugin-management.md
+document:
+  en: 5da3147bea38499d86d8952da4de0e9aa088fb0a
+  zh: bb3bbb59a9fc72f6fb52aed2d081a02fc472740d
 /agent-note-desktop-installed-carriers-may-manage-the-reserved-desktop-profile-s-plugins:
   en: b4c0f713877436d1
   zh: 09f6200c88bf5c57

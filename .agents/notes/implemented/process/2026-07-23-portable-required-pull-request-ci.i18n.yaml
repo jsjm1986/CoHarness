@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-23-portable-required-pull-request-ci.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-23-portable-required-pull-request-ci.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-23-portable-required-pull-request-ci.md
+document:
+  en: 91b19d56be6c152e844d65e93832fec24275cba8
+  zh: 24dd0d416f2be887b17dcb03fd57452ab49b2b97
 /agent-note-portable-pull-request-ci-recovery-boundary:
   en: 833caf7d473ad23b
   zh: ae8cbd6cf337e90b

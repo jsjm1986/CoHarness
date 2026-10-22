@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 02-lifecycle-and-effects.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 02-lifecycle-and-effects.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cordis-tutorial/02-lifecycle-and-effects.md
+document:
+  en: 8e75708eb0cba1aceb7fa3dae5ae334995eb113f
+  zh: b5f8bc18ed242784528574a861c57bedae6fa880
 /2-lifecycle-and-effects:
   en: d8936e9239303f91
   zh: ee5a15bead15f7fa

@@ -22,8 +22,6 @@ The server reports wire facts only and does not classify retryability. Real-comp
 
 ## Verification
 
-Package tests exercise every request behavior, split UTF-8 request decoding, HTTP validation without script consumption, script exhaustion/repetition, stalled-connection teardown, CLI parsing and delay bounds, IPv6 base URLs, random seed reproducibility, weight validation, single-result telemetry, lifecycle cleanup, and the invariant companion under the per-file coverage gate. The retry integration suite proves exact request counts, numbered retry steps, request-body identity, failed partial-chunk isolation, semantic-empty recovery, clean-EOF classification, timeout recovery, true refused-connection recovery after delayed listener startup, and bounded exhaustion through the real HTTP/SSE adapter.
-
 ## Alternatives considered
 
 **Implement the server in Python** — rejected because Node's standard HTTP and socket APIs expose every required fault, while TypeScript keeps the server, CLI parser, tests, package build, lint, and coverage inside the repository's existing toolchain. A second runtime would add environment and subprocess dependencies without increasing wire isolation.

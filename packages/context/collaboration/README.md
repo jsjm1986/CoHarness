@@ -13,11 +13,9 @@ Service Definition for authenticated [project collaboration](../../../.agents/no
 
 Use `dsh-collaboration` as the Service Definition for authenticated project collaboration: Consumers capture one request-bound authority — participant identity and ACL decisions — instead of reading mutable account state from a process-global service.
 
-
 ## Table of Contents
 
 - [Runtime contract](#runtime-contract)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -29,13 +27,9 @@ Use `dsh-collaboration` as the Service Definition for authenticated project coll
 
 - `capture()` returns the authenticated participant, assertion expiry, provider lifetime signal, session authorization, batch readability filtering, and atomic approval/question claiming for the current request.
 - `authorize()` resolves every descendant through its root conversation and returns the root-inherited project, visibility, creator, and `ro`/`rw` access facts.
+- `capabilities()` is the per-principal access snapshot: `collaborationCapabilities(participant)` derives the scope-permitted action classes without contacting the backend — `personal` yields all verbs, `ro` yields `read`, `rw` yields `read`/`write`/`approve`, and `manage` rides the scope's own grant. Session-level rules such as creator status still apply through `authorize()`.
 - `withSessionCreation()` carries a project root conversation's `project` or `private` visibility through the asynchronous create operation; `currentCreation()` exposes it only inside that operation.
 - `CollaborationError` preserves stable denial codes for RPC and HTTP Consumers. Providers fail closed when membership, visibility, or their authorization backend cannot be established.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The package declares a request-bound authority contract only; providers carry whatever account state exists.
 
 <a id="model-experience"></a>
 ## Model Experience

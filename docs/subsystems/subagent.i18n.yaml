@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for subagent.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for subagent.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/subagent.md
+document:
+  en: 4886d5a9b92d694e5d4d7cd30f41ba2a382d6d98
+  zh: 169ba51f73eb2889f91bb43bd0d0ffc8ffe797b5
 /subagent:
   en: 2f7537253a02c8af
   zh: 24069c7a0f54132d
@@ -12,11 +15,11 @@
   en: ca7e0c9353bc6e13
   zh: 7b8ffaf58a180efd
 /subagent/continuable-children-and-activations:
-  en: ade6f348633f971c
-  zh: 6d2e993fa250efef
+  en: 229747d016e984bf
+  zh: 2ac655217235411f
 /subagent/durable-enumeration-listchildren-listdescendants-and-their-entries:
-  en: f9682526e3d0e71e
-  zh: dac1e254c4f4fb27
+  en: d55f97b1482f64f9
+  zh: caaf4e7ddc2bcdde
 /subagent/the-terminal-result-subagentresult:
   en: 6070effb5f84f701
   zh: 2b8a6980ceb0b7b2
@@ -27,5 +30,5 @@
   en: cc56de313399c6f3
   zh: 8099fedacd259347
 /subagent/in-process-backends-depth-and-seed:
-  en: c4c8b022b4348a4a
-  zh: bb7c1abf383f16eb
+  en: 74dc794c8d058cb3
+  zh: ba1776736fe80f6b

@@ -6,10 +6,6 @@ import { type Agent, type AgentOptions } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import * as SessionInvariant from '@deepseek-ai/dsh-session/invariant'
-import * as AgentInvariant from '@deepseek-ai/dsh-agent/invariant'
-import * as AgentLoopInvariant from '@deepseek-ai/dsh-agent-loop/invariant'
 import SubagentRuntime, { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import { maxTokensResponse, MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
@@ -24,17 +20,9 @@ declare module '@deepseek-ai/dsh-llm' {
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
-async function mountInvariants(ctx: Context): Promise<void> {
-  await ctx.plugin(InvariantRegistry)
-  await ctx.plugin(SessionInvariant)
-  await ctx.plugin(AgentInvariant)
-  await ctx.plugin(AgentLoopInvariant)
-}
-
 async function setup(script: Script, parentOptions: Partial<AgentOptions> = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  await mountInvariants(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
@@ -104,7 +92,6 @@ describe('startInProcessRun', () => {
   it('fails the start when the child context lacks the working-directory service', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await mountInvariants(ctx)
     await ctx.plugin(AgentLoop, { agents: [] })
     ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('unused')]))
     const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
@@ -404,10 +391,17 @@ describe('startInProcessRun', () => {
     const { ctx, parent } = await setup([])
     const beforeAgents = ctx.agents.list().length
     const beforeSessions = ctx.sessions.list().length
-    await expect(startInProcessRun({
+    const failure = await startInProcessRun({
       ...request(parent),
-      toolFilter: { deny: ['unknown-tool'] },
-    }, {})).rejects.toThrow('unknown global tool')
+      agentPreset: 'missing-preset',
+      descriptor: snapshotSubagentDescriptor({
+        mode: 'continuable',
+        provider: 'test',
+        label: 'child task',
+      }),
+    }, {}).then(() => undefined, (error: unknown) => error)
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure instanceof Error ? failure.message : '').toContain('agent-presets service')
     expect(ctx.agents.list()).toHaveLength(beforeAgents)
     expect(ctx.sessions.list()).toHaveLength(beforeSessions)
   })

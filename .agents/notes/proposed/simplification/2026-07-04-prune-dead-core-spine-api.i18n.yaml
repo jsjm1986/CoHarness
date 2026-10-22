@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-04-prune-dead-core-spine-api.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-04-prune-dead-core-spine-api.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/simplification/2026-07-04-prune-dead-core-spine-api.md
+document:
+  en: f2b5636e569630b3072f2c4dc7a79c54a3e51e49
+  zh: dbf68c4ccf97b848cedc70388b7601263229e3da
 /agent-note-prune-dead-public-api-and-result-fields:
   en: 53e0304fd6d4f146
   zh: b446e1ba47225fa2

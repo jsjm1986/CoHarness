@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-25-web-input-machine-and-slash-pipeline.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-25-web-input-machine-and-slash-pipeline.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md
+document:
+  en: fe962b12c4b5369ba29711b6244d80f56d32ef17
+  zh: 4f117ea79314110966a7ccab0ed8f8466355133b
 /agent-note-web-input-state-machine-composer-slots-and-the-slash-pipeline-ui-conversation-input-ui-input-trigger:
   en: 5d508e800b38ed39
   zh: 0ef40e0436b8f29f
@@ -18,14 +21,14 @@
   en: 9818bff048f4ffa3
   zh: aa1bbe0bc9fbf976
 /agent-note-web-input-state-machine-composer-slots-and-the-slash-pipeline-ui-conversation-input-ui-input-trigger/decision/the-slash-pipeline-ui-input-trigger-a-root-inputtriggerservice-a-per-session-inputtriggercontroller:
-  en: d0a930d292be1e6b
-  zh: c98add8222e6ca38
+  en: 5620fb51a69fcfb8
+  zh: 0dd9a3885820fd02
 /agent-note-web-input-state-machine-composer-slots-and-the-slash-pipeline-ui-conversation-input-ui-input-trigger/decision/hub-facade-the-resident-shell-and-the-strict-session-input-body:
   en: 5b723c45875f4b4c
   zh: 17cbff7e48cb3fd2
 /agent-note-web-input-state-machine-composer-slots-and-the-slash-pipeline-ui-conversation-input-ui-input-trigger/decision/plain-text-references-text-outcomes-and-lexicon-decoration:
-  en: fd91df830ebe58ed
-  zh: 3ad3a03c65b00f48
+  en: 3e6c2f0db0ef02f4
+  zh: 7fe1cfea6067ae58
 /agent-note-web-input-state-machine-composer-slots-and-the-slash-pipeline-ui-conversation-input-ui-input-trigger/decision/per-session-provide-contributions-and-the-private-keyboard-surface:
   en: 4c9923553e72331b
   zh: 808f3c6420e5e4aa

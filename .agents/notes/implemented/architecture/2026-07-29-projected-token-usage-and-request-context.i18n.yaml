@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-29-projected-token-usage-and-request-context.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-29-projected-token-usage-and-request-context.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-29-projected-token-usage-and-request-context.md
+document:
+  en: c863c37329f314a43a0a06fb4cf8cece9aa70dd7
+  zh: dfa2d4ac497f20c57b0e23913fde74ac7b1effc7
 /agent-note-projected-token-usage-and-context-occupancy:
   en: 293fcae41011ed29
   zh: 9a018a07b6491173

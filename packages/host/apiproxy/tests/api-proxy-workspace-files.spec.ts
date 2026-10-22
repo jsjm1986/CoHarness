@@ -18,14 +18,14 @@ import { RpcId } from '../src/api/rpc.ts'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import { FsError, FsVersion } from '@deepseek-ai/dsh-fs'
 import type { FileSystem, FsTarget } from '@deepseek-ai/dsh-fs'
-import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
+import { collaborationCapabilities, CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
-import { environmentForAgent } from '@deepseek-ai/dsh-agent-presets'
+import { environmentForAgent } from '@deepseek-ai/dsh-agent-preset-registry'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 
 const realmEnvironment = vi.hoisted(() => ({ real: undefined as unknown }))
-vi.mock('@deepseek-ai/dsh-agent-presets', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@deepseek-ai/dsh-agent-presets')>()
+vi.mock('@deepseek-ai/dsh-agent-preset-registry', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@deepseek-ai/dsh-agent-preset-registry')>()
   realmEnvironment.real = original.environmentForAgent
   return { ...original, environmentForAgent: vi.fn(original.environmentForAgent) }
 })
@@ -85,6 +85,7 @@ function authority(mode: 'ro' | 'rw'): CollaborationAuthority {
     participant: { userId: 1, username: 'alice', displayName: 'Alice', role: 'user', scope: { kind: 'project', projectId: 7, projectName: 'Project', mode } },
     expiresAt: Date.now() + 60_000,
     signal: new AbortController().signal,
+    capabilities() { return collaborationCapabilities(this.participant) },
     authorize: async sessionId => ({ sessionId, rootSessionId: sessionId, canRead: true, canWrite: mode === 'rw', canManage: false, mode }),
     readableSessionIds: async ids => new Set(ids),
     claimInteraction: async () => false,

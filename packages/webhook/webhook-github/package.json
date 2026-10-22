@@ -23,7 +23,8 @@
       "default": "./lib/types/types.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./examples/*": "./examples/*"
   },
   "files": [
     "lib/index.js",

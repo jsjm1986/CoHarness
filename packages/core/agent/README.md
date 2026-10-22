@@ -102,7 +102,6 @@ The package is built on one separation: the public `Agent` surface and registry 
 | [`src/dispatch.ts`](src/dispatch.ts) | `agentEvents` fused dispatcher and `assembleContextFor(agent)` |
 | [`src/consumed-work.ts`](src/consumed-work.ts) | `foldConsumedWork(events)`: what the log's consumed work became |
 | [`src/model-selection.ts`](src/model-selection.ts) | `installModelSelection`: coupling one selection to assembly and routing |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion: no-op `agent/status` transitions fail |
 
 ### Registry and lifecycle
 
@@ -167,7 +166,6 @@ The switch notice appends after the previous history, preserving that prefix, wh
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when this package needs special care. They are current package constraints, not a task backlog.
 

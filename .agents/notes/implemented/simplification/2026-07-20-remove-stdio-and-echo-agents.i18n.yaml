@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-20-remove-stdio-and-echo-agents.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-20-remove-stdio-and-echo-agents.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-20-remove-stdio-and-echo-agents.md
+document:
+  en: 61e6cb31f35010546d13d6300f3e7c0fa3c1856e
+  zh: 59825b64969ff5cab71678565306caced53a80d0
 /agent-note-remove-the-stdio-and-echo-agents:
   en: 26c068618d1ea2b4
   zh: 60a33c2b49a57c00

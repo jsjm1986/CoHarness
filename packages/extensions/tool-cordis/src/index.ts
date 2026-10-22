@@ -74,8 +74,8 @@ export function apply(ctx: Context): void {
       + 'Event.listEvents, query without input to navigate the compact signature directory, then query the exact '
       + 'service or event for its structured contract and referenced types. For Config.listConfigs, query without '
       + 'input to page the live entry directory, then query the exact entry for its projected JSON Schema. For '
-      + 'Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its '
-      + 'complete registration contract and props.',
+      + 'Slots.listSubTree, query without root to navigate the compact tree, then query an exact Slot root for its '
+      + 'complete registration contract and props; an exact Factory root returns its identity, scope, and registrant.',
     parameters: {
       platform: { type: 'string', required: true, enum: ['host', 'client'], description: 'Runtime platform that owns the Provider.' },
       provider: { type: 'string', required: true, description: 'Exact Provider ID returned by cordis_inspect_list.' },

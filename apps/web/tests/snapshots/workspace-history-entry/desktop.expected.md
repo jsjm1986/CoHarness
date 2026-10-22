@@ -1,14 +1,12 @@
-- button "2 tool calls · 2 intermediate messages":
-  - text: 2 tool calls · 2 intermediate messages
-  - img
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Thinking Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed.":
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
   - img
-  - img
-  - text: Thinking Both files have been read. a.txt contains "alpha" and b.txt contains "beta". I'll now reply with DONE as instructed.
+- button "Read files"
 - paragraph: DONE
 - button "Copy":
   - img

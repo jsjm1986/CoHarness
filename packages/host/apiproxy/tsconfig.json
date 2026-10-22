@@ -21,6 +21,9 @@
       "path": "../../attachment/userdoc"
     },
     {
+      "path": "../../boot/plugin-market"
+    },
+    {
       "path": "../../computer-use/computer-use"
     },
     {
@@ -90,7 +93,7 @@
       "path": "../../llm/model-provider-config"
     },
     {
-      "path": "../../preset/agent-presets"
+      "path": "../../preset/agent-preset-registry"
     },
     {
       "path": "../../memory/memory"

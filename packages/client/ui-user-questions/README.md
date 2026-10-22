@@ -111,7 +111,6 @@ No direct invalidation; `dsh-tool-ask-user` owns the model-visible tool call and
 
 <a id="known-limitations-and-deferred-work"></a>
 
-
 These limits define question-card ownership and cross-client behavior; they are current package constraints.
 
 - **Unsubmitted drafts are local to one browser** — Session navigation, page reload, and browser restart preserve them, but another browser or device reconstructs only the Host-stored question.
@@ -128,4 +127,4 @@ None.
 
 </details>
 
-**Runtime invariant:** The Host Session projection is authoritative for durable timed questions. Browser storage only preserves unfinished input and never creates or keeps a question open. No runtime invariant companion is published because the Host validates and projects the durable state before this client package renders it.
+The Host Session projection is authoritative for durable timed questions. Browser storage only preserves unfinished input and never creates or keeps a question open.

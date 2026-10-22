@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-15-target-runtime-ready-window.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-15-target-runtime-ready-window.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-target-runtime-ready-window.md
+document:
+  en: 7bd7cb6434607a0b9b7f00627545210e71991891
+  zh: 737c0cdafeebe10c165f94a127c128644d30e54b
 /agent-note-target-runtime-readiness-waits-out-transient-reconnects:
   en: 6201e296dc2ee4d6
   zh: b9a4ba5006325a0d

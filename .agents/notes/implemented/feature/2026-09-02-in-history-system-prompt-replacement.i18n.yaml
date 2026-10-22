@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-02-in-history-system-prompt-replacement.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-02-in-history-system-prompt-replacement.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-02-in-history-system-prompt-replacement.md
+document:
+  en: 933ef8bae1b2adf4cba56e1c45a496fc7beedf2e
+  zh: 6b131bb86ec3fc3dc2fc494b9f3dc16df4ae32de
 /agent-note-in-history-system-prompt-replacement-for-cache-stable-prompt-changes:
   en: 7b69ac848815886a
   zh: db7a9f4000fe5359

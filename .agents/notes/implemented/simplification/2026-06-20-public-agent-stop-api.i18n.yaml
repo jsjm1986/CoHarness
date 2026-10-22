@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-20-public-agent-stop-api.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-20-public-agent-stop-api.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-06-20-public-agent-stop-api.md
+document:
+  en: bb4a24e70656111510ce92f84c8e79e520f2b5aa
+  zh: 7673b680c18dd8d743a59f0452e1b259d8f7ed43
 /agent-note-keep-one-public-stop-primitive:
   en: d196a36b7a33bd65
   zh: 35dd23a7ae58165b

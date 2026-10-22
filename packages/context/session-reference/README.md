@@ -18,7 +18,6 @@ English | [中文](README.zh.md)
 - [Public API](#public-api)
 - [Snapshot semantics](#snapshot-semantics)
 - [Configuration](#configuration)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -28,7 +27,7 @@ English | [中文](README.zh.md)
 <a id="public-api"></a>
 ## Public API
 
-- `listCandidates(agent, query?, limit?)` lists sessions other than `agent.id`, filters case-insensitively by id, cwd, or the latest projected title, and ranks same-cwd, cwd-less, then other-cwd records while preserving `listSessions()` creation order within each group. Live session projections and durable projection-cache checkpoints provide titles without folding a cold log on every keystroke; a session without a projection uses its id until opened, while compositions without projection services retain the bounded log-backed fallback. The unary `sessionReferenceResolver/candidates` Remote method serves the same discovery under the configured candidate limit and attaches each candidate's canonical mention, so browser consumers call `ctx.remote.sessionReferenceResolver.candidates` without an API Proxy route.
+- `listCandidates(agent, query?, limit?)` lists sessions other than `agent.id`, filters case-insensitively by id, cwd, the latest projected title, or the display title, and ranks same-cwd, cwd-less, then other-cwd records while preserving `listSessions()` creation order within each group. A candidate's display title prefers a subagent's durable creation label over its projected title, and the canonical mention labels with `displayTitle` when present. Live session projections and durable projection-cache checkpoints provide titles without folding a cold log on every keystroke; a session without a projection uses its id until opened, while compositions without projection services retain the bounded log-backed fallback. The unary `sessionReferenceResolver/candidates` Remote method serves the same discovery under the configured candidate limit and attaches each candidate's canonical mention, so browser consumers call `ctx.remote.sessionReferenceResolver.candidates` without an API Proxy route.
 - `prepare(agent, content, references, signal?)` preserves first-mention order, deduplicates ids, rejects self-reference and more than the configured distinct-source limit, reads every source in parallel, and returns detached content plus zero or one aggregated, identified `UserMessage` context. The service calls it for canonical mentions in direct user messages after downstream `agent/pre-step` listeners accept the step.
 - `encodeSessionReferenceUri()` and `decodeSessionReferenceUri()` implement `dsh-session:<base64url(JSON.stringify(sessionId))>` so every JavaScript string id round-trips exactly. `formatSessionReferenceMention()` emits `@[label](uri)`, and `parseSessionReferenceText()` replaces Markdown mentions or bare canonical URIs with readable `@label` text while returning structured references. Explicit Markdown mentions reject every malformed URI; bare text is considered a reference only when a non-empty base64url-shaped payload follows the scheme, and a matching noncanonical candidate still fails. Empty or punctuation-only scheme mentions remain ordinary discussion text.
 
@@ -49,11 +48,6 @@ The context source is `{ kind: 'session-reference', version: 1, references }`; e
 | `maxReferenceBytes` | `65536` | Maximum serialized JSON bytes for one reference object. |
 
 Retention applies `maxReferenceBytes` independently to each source, keeps compact checkpoints and the newest message before dropping older non-checkpoint units, and uses `dsh-output-retention` head/tail truncation with an exact UTF-8 omission notice. If one source's fixed serialized fields cannot fit, preparation fails with `SESSION_REFERENCE_BUDGET_EXCEEDED` instead of returning a partial context.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Snapshots are read-only views delegated to `ctx.sessionQuery`; the resolver keeps no session data of its own.
 
 <a id="model-experience"></a>
 ## Model Experience

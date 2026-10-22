@@ -33,8 +33,7 @@ kind: "package-reference"
 
 V6 codec 把事件成帧与校验委托给既有 V5 codec。迁移原样转发每个事件并观测继承切口标记，而不收集另一份 artifact 拷贝。仅 header 的迁移只改 `version`；整 artifact 校验在 V6 版本标记下应用 V5 事件规则。
 
-不发布运行时不变量伴随包：该纯库没有注册项或可独立变化的状态可比较。其 codec 与迁移行为由直接转换测试与 JSONL 提供方的不可变代测试检验。
-
+其 codec 与迁移行为由直接转换测试与 JSONL 提供方的不可变代测试检验。
 
 <a id="model-experience"></a>
 ## 模型体验

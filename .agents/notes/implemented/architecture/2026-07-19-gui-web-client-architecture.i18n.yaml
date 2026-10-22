@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-gui-web-client-architecture.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-gui-web-client-architecture.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.md
+document:
+  en: b2fda9aa5c51e37d4929b76d5f1f8fce560db21b
+  zh: 467a1dedf5fa3a6e411df6e106ba132bf12e6f09
 /agent-note-web-client-architecture-the-client-cordis-plugin-tree-the-slot-system-and-the-react-free-object-layer:
   en: 40dfaead21fd3018
   zh: 8cfb05f84f3c5685
@@ -21,14 +24,14 @@
   en: 4f4eb58d900469ce
   zh: 19b93e5b34941249
 /agent-note-web-client-architecture-the-client-cordis-plugin-tree-the-slot-system-and-the-react-free-object-layer/the-data-object-layer-packages-client-runtime-src-client-sessions:
-  en: 627fa4001e5a439c
-  zh: cfe81842c32379a5
+  en: a2cdd497729dcefd
+  zh: 3230b6e509e7b9d9
 /agent-note-web-client-architecture-the-client-cordis-plugin-tree-the-slot-system-and-the-react-free-object-layer/the-react-face-packages-client-ui-renderer:
   en: 0971d6196b5358fd
   zh: 26175d648feccfd9
 /agent-note-web-client-architecture-the-client-cordis-plugin-tree-the-slot-system-and-the-react-free-object-layer/directory-shape:
-  en: 6836bd8aa689a062
-  zh: 99a4017165a0a60d
+  en: 9c89a5d48a203206
+  zh: 64ca0ea56df49e4e
 /agent-note-web-client-architecture-the-client-cordis-plugin-tree-the-slot-system-and-the-react-free-object-layer/how-to-develop:
   en: cbc6abcd9f291868
   zh: 0078f15f2d08a02e
@@ -36,5 +39,5 @@
   en: 56a9086da5783306
   zh: 8147576101d22aa0
 /agent-note-web-client-architecture-the-client-cordis-plugin-tree-the-slot-system-and-the-react-free-object-layer/alternatives-considered:
-  en: d0759f20a2ca68e0
-  zh: 04c0e607dec1f2bb
+  en: 8bedf2e688b14322
+  zh: 7cda12f7474832ee

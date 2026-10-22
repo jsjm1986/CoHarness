@@ -107,7 +107,7 @@ export function managementText(error: { readonly code: ManagementError['code']; 
       ? [t('reasonIncompatibleVersionUnnamed')]
       : named.map(plugin => t('reasonIncompatibleVersion', {
         plugin: `${plugin.name}@${plugin.version}`, runtime: plugin.runtimeVersion,
-        peers: Object.entries(plugin.peers).map(([name, range]) => `${name} ${range}`).join(', '),
+        peers: Object.entries(plugin.requirements).map(([name, range]) => `${name} ${range}`).join(', '),
       }))
     return [...sentences, t(error.installing ? 'reasonIncompatibleInstall' : 'reasonIncompatibleInstalled')].join(t('sentenceSeparator'))
   }

@@ -18,7 +18,6 @@ kind: "package-reference"
 - [存储布局](#storage-layout)
 - [配置](#config)
 - [启动清扫](#startup-cleanup)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -50,12 +49,6 @@ kind: "package-reference"
 激活后启动一次尽力而为的清扫，不会推迟服务可用。它扫描已配置的根目录以及操作系统临时目录下既往默认的 `dsh-spill-*` 根目录，删除修改时间严格早于配置截止点的普通文件，裁剪空的会话目录，并且只移除已清空的既往默认根目录。长期运行的进程在重启前不会再次清扫。释放时等待清扫结束；若清扫移除了某个会话目录，并发写入会重新创建它。
 
 清扫解析文件系统身份，从不跟随或删除符号链接，并跳过无关条目。在 POSIX 上，它只接纳由当前用户拥有、组和其他用户不可写、且沿祖先路径不会被替换的根目录和会话目录；`/tmp` 这类可写的 sticky 临时目录是允许的。不安全的路径会产生一条警告并保持原样。文件系统与警告接收器的失败都被包含在内，因此清扫不会让激活或并发的 spill 写入失败。保留期的决策记录在[启动清扫 Agent Note](../../../.agents/notes/implemented/feature/2026-09-14-spill-local-startup-cleanup.zh.md)。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次 spill 写一个会话作用域文件，该文件本身就是记录；后端不保留可供比较的索引。
-
 
 <a id="model-experience"></a>
 ## 模型体验

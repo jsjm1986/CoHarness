@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-21-experimental-capabilities-as-optional-bundles.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-21-experimental-capabilities-as-optional-bundles.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-21-experimental-capabilities-as-optional-bundles.md
+document:
+  en: b7139f6d9a998830f81cbfab11cfb8dd2472d93c
+  zh: af4048bc5e708753c05953f785612b8b6082a298
 /agent-note-ship-experimental-capabilities-as-optional-bundles:
   en: 9ec3d64c70d601b6
   zh: c85722cfc7bf70df

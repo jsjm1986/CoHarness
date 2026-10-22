@@ -7,7 +7,7 @@ import { WorkspaceResourceRegistry, WorkspaceResourceError, workspaceResourceAdd
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import { WorkspaceExcelPreview, isWorkspaceSpreadsheet } from '../src/client/components/WorkspaceExcelPreview.tsx'
-import type { ReadWorkspaceFileData } from '../src/client/html/read-relative.ts'
+import type { ReadWorkspaceFileData } from '../src/client/contract/html/read-relative.ts'
 import { Config } from '../src/config.ts'
 import { en } from '../src/client/excel/locales.ts'
 import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'

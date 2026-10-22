@@ -17,18 +17,11 @@ Web 壳的 SPA dist 服务器：一个函数插件（配置为 `{distIndex}`）�
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。响应从 dist 树无状态地提供；唯一注册是认领的回退席位，其释放由 HMR 安全性规格证明。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-14-web-document-relative-app-routes.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-14-web-document-relative-app-routes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-web-document-relative-app-routes.md
+document:
+  en: e6097672ed9b0c2bd7ad9512f79df03a91bfb898
+  zh: 786d07a043896ea0196535a26a72111030cd3392
 /agent-note-web-app-owned-routes-are-document-relative:
   en: c31a8b2eeced1d7a
   zh: 718b29b0f1e3f995

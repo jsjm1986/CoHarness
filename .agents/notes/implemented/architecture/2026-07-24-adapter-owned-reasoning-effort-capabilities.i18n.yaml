@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-24-adapter-owned-reasoning-effort-capabilities.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-24-adapter-owned-reasoning-effort-capabilities.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-24-adapter-owned-reasoning-effort-capabilities.md
+document:
+  en: f59e5d351970e785e6ade32797f1c1a5dd9e2591
+  zh: 6e657a90e8ef3cd400a3e252f728bb1aadd9f4f2
 /agent-note-adapter-owned-reasoning-effort-capabilities:
   en: fc5b9dfdd1749328
   zh: feefd453fe8cb2c8

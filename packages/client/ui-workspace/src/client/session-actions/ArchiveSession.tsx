@@ -20,7 +20,7 @@ import type {
   ArchiveSessionInjected, SessionArchiveConfirmInjected, SessionArchiveConfirmProps, SessionArchiveConfirmRequest,
   SessionMenuItemProps, SessionRowActionProps,
 } from '../contract/slots.ts'
-import css from '../rows/Rows.module.css'
+import css from '../RowActions.module.css'
 import browserCss from '../WorkspaceBrowser.module.css'
 
 /**

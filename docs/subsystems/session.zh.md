@@ -159,8 +159,8 @@ interface SessionEventMap {
 
    *
    * Only the `Session` constructor and `buildForkSeed` may create this marker.
-   * The invariant companion deliberately constrains nothing here, so a plugin
-   * appending one would silently classify every live bracket before it as seed history.
+   * Session append does not reject other writers, so a plugin appending one
+   * would silently classify every live bracket before it as seed history.
    *
    * An owner of a standalone open/close bracket (`compaction/start` …
    * `compaction/end`) reads it because seed history and live work are otherwise
@@ -385,11 +385,10 @@ type SurfaceIntent<T extends SurfaceEventType = SurfaceEventType> = {
 
 对 `SurfaceEventType` 事件必填：每个产生消息的事件都必须声明它如何加入 surface（派生模型历史的唯一来源）。面向人类的 transcript（文本记录）是另一个投影，读取的是日志中追加来源的事件，因为 surface 会有意遮蔽替换所概括的范围（见 [dsh-session](../../packages/core/session/README.zh.md) 的 `isAppendSurfaceEvent`）。非 surface 类型在编译期拒绝此参数。
 
-### `SessionSurface`：实时只读 surface 投影
+<a id="plugin-owned-message-projections"></a>
+### 插件拥有的消息投影
 
-`Session.surface` 返回会话稳定的 `SessionSurface` 视图。同一个增量管理器在提交前校验追加候选事件，并根据已提交事件推进该投影；调用方可以观察成员关系和替换代次，但不能调用校验。
-
-`SurfaceManager(log, baseSeq?)` 也可以折叠一个连续的已加载窗口，其第一个事件的绝对序号为 `baseSeq`。每个事件在该绝对序号空间中仍保持连续；如果替换跨过窗口头部，由于其声明的范围并不存在，该替换会失败。
+修改内容的插件用 `@messageProjection` 标记事件声明，并通过 `ctx.sessions.registerMessageProjection()` 注册纯处理器。Session 在提交前通过处理器校验完整决策，应用其不可变消息更新，并推进 `contentGeneration`。缺少处理器时拒绝操作，包括恢复和独立折叠，卸载已经使用的处理器后也会拒绝读取缓存。独立读取器将处理器显式传给 `foldSurface(events, projections)`，并通过 `deriveEventMessage()` 应用 `projectedMessages`。当前格式目录为离线读取器装配第一方处理器。[图片省略插件](compaction.zh.md#image-offload)拥有图片专用的事件及解释逻辑。
 
 ```ts type-equiv
 /** Readonly history immediately before a message-projection event. */
@@ -421,6 +420,12 @@ interface SessionMessageProjection<T extends SessionEventType = SessionEventType
   project(event: SessionEvent<T>, context: SessionMessageProjectionContext): ReadonlyMap<SessionSeq, Message>
 }
 ```
+
+### `SessionSurface`：实时只读 surface 投影
+
+`Session.surface` 返回会话稳定的 `SessionSurface` 视图。同一个增量管理器在提交前校验追加候选事件，并根据已提交事件推进该投影；调用方可以观察成员关系和替换代次，但不能调用校验。
+
+`SurfaceManager(log, baseSeq?)` 也可以折叠一个连续的已加载窗口，其第一个事件的绝对序号为 `baseSeq`。每个事件在该绝对序号空间中仍保持连续；如果替换跨过窗口头部，由于其声明的范围并不存在，该替换会失败。
 
 ```ts type-equiv
 /** Readonly live projection of the message-producing session events. */
@@ -711,7 +716,7 @@ declare class Session {
 
 - `fork(source, boundary?, childSessionId?)` 接受一个活跃的 `Session` 对象或活跃的 `SessionId`，选取到 `SessionSeq` boundary（含）为止的源事件（默认为当前最后一个事件），要求所选前缀结束时没有开放轮次，然后创建一个活跃的子会话，包含深克隆的 seed event、`parentSession`、`isSeeded: true`、精确 `inheritedEventCount` 及继承的 `cwd`。
 
-显式 `boundary` 允许调用者从任意稳定的轮次间位置 fork，包括之前的 `turn/end` 或更晚的独立纯日志事件，即使源会话有更新的事件或正在进行的轮次。API 拒绝结束于开放轮次内的前缀，而不是静默截断。更广泛的执行关系健全性检查留在既有的 `dsh-invariants` 插件和持久化修复路径中，不在 `fork()` 中重复。`dsh-subagent-fork-in-process` 保留其已完成前缀截断逻辑，因为工具调用时的委托通常在父轮次仍然打开时启动；普通的会话分支应显式指定请求的 boundary。
+显式 `boundary` 允许调用者从任意稳定的轮次间位置 fork，包括之前的 `turn/end` 或更晚的独立纯日志事件，即使源会话有更新的事件或正在进行的轮次。API 拒绝结束于开放轮次内的前缀，而不是静默截断。`dsh-subagent-fork-in-process` 保留其已完成前缀截断逻辑，因为工具调用时的委托通常在父轮次仍然打开时启动；普通的会话分支应显式指定请求的 boundary。
 
 <a id="why-a-turn-ended-turnendreasonmap"></a>
 
@@ -763,7 +768,7 @@ interface TurnEndReasonMap {
 
 一个轮次包围一次 model-loop 执行，而非整个会话日志。AgentLoop 只记录进入轮次内 pre-step 批次的注入 `user/message` 事件；插件自持的 log-only 事件仍可能出现在 `turn/end` 与下一个 `turn/start` 之间，消耗事件 seq 但不递增轮次号。持久化把每个连续接受的事件纳入有界持久批次，而崩溃修复只关闭真正未闭合的尾部轮次。需要即时持久屏障的生产方显式等待 `ctx.sessions.flush(session)`。
 
-可选的 `dsh-session/invariant` 伴随件强制 core 自持的关系：轮次与步数编号、执行事件包围、同步工具调用/结果配对。可合并扩展的事件关系归声明它的插件所有，因此 core 不会仅因没有打开的轮次而拒绝未知事件。见[独立事件决策](../../.agents/notes/implemented/simplification/2026-07-28-remove-synthetic-log-only-turns.zh.md)。
+可合并扩展事件的关系归声明它的插件所有，因此 core 不会仅因没有打开的轮次而拒绝未知事件。见[独立事件决策](../../.agents/notes/implemented/simplification/2026-07-28-remove-synthetic-log-only-turns.zh.md)。
 
 ## 结束种子边界：`session/end-seed`
 
@@ -777,11 +782,53 @@ interface TurnEndReasonMap {
 
 ## 插件贡献的 log-only 事件
 
-插件可以通过声明合并追加 `SessionEventMap` 类型。这些类型是 **log-only**：不是 `SurfaceEventType`（不携带 `surfaceOp`，对派生历史无贡献）。其持有方决定它们属于打开的执行轮次还是可以独立于轮次存在，并在自己的 invariant 伴随件中强制任何关系。生成的[持久化日志事件目录](../persistence-catalog.zh.md)枚举每个 core 与插件贡献的事件及其载荷、surface 徽标与声明位置；compaction seam 的 `compaction/*` 语义见 [compaction.md](compaction.zh.md)。
+插件可以通过声明合并追加 `SessionEventMap` 类型。这些类型是 **log-only**：不是 `SurfaceEventType`（不携带 `surfaceOp`，对派生历史无贡献）。其持有方决定它们属于打开的执行轮次还是可以独立于轮次存在。生成的[持久化日志事件目录](../persistence-catalog.zh.md)枚举每个 core 与插件贡献的事件及其载荷、surface 徽标与声明位置；compaction seam 的 `compaction/*` 语义见 [compaction.md](compaction.zh.md)。
 
 当一个插件自持族内多条事件装配成一个 Web Client Conversation Node 时，该族内每个 start、update、result、resource 或 interruption 事件都携带或可独立派生同一个稳定业务 id。该要求适用于相关联的 Node 族，而非每条 Session 事件；它让客户端无需依赖相邻关系或扫描历史即可归组每条事件。见 [Conversation Node 手册](../cookbook/adding-a-conversation-node.zh.md)。
 
 hook 桥的 `hook/invoked` / `hook/result` 配对（来自 `@deepseek-ai/dsh-hook-protocol`）按 `handlerId` 关联。`UserPromptSubmit`、`PreToolUse`、`PostToolUse` 与 `Stop` 在循环打开的轮次内触发，因此它们的 `hook/*` 记录天然被轮次包围。`SessionStart` 没有 `hook/*` 记录，因为它在轮次 1 之前运行；其上下文留在 inbox 中处于待决，直到一次唤醒投递打开轮次（见 [hook 桥 Agent Note](../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.zh.md)）。
+
+### 插件记录
+
+实验性包在 `PluginRecordMap` 中声明插件自有的状态：`appendPluginRecord()` 根据每项声明约束名称与 payload 类型，并在 `plugin:` 命名空间中追加一条带 `ignorable: true` 标记的事件。`pluginRecordOf()` 读取已存记录，其 payload 为未知类型，不受当前声明约束。[实验性持久化目录](../experimental-persistence-catalog.zh.md)列出当前声明。调用方限制、保留方式与读取路径见[包 README](../../packages/core/session/README.zh.md#write-experimental-plugin-records)。
+
+```ts type-equiv
+/**
+ * Event type of an experimental plugin record: `plugin:` followed by
+ * slash-separated segments of lowercase letters, digits, `.`, `_`, and `-`,
+ * each starting with a letter or digit. A record type is never a
+ * {@link SessionEventMap} member.
+ */
+type PluginRecordType = `plugin:${string}`
+```
+
+```ts type-equiv
+/**
+ * Payloads written by experimental packages, keyed by their `plugin:` record
+ * names. Packages augment this map to type writes and enter the current plugin
+ * record catalog; these declarations do not enter {@link SessionEventMap} or
+ * released persistence schemas. Stored records still require owner validation.
+ */
+interface PluginRecordMap {}
+```
+
+```ts type-equiv
+/**
+ * One committed experimental plugin record, read from the log by
+ * `pluginRecordOf`. The record's owner validates `data` before use, because a
+ * restored record carries whatever JSON an earlier build of its owner wrote.
+ */
+interface PluginRecord {
+  /** The record type, chosen by the owning plugin. */
+  readonly type: PluginRecordType
+  /** The record's position in the Session log. */
+  readonly seq: SessionSeq
+  /** Unix epoch milliseconds at append. */
+  readonly time: number
+  /** The JSON payload as committed. */
+  readonly data: unknown
+}
+```
 
 ## 持久化约定
 
@@ -919,8 +966,8 @@ announce(session: Session): void
  * store owns the carrier, so callers (the checkpoint policy's per-request
  * barrier, goal-round-driver's idle checkpoint, teardown drains, and consumers
  * that flush themselves before reading storage) must come through here
- * rather than dispatch a raw `ctx.parallel('session/flush', …)` — one owner,
- * one spelling, and the scoped-dispatch invariant can pin it.
+ * rather than dispatch a raw `ctx.parallel('session/flush', …)` — one owner
+ * and one spelling.
  * @param session - the session whose buffered events must reach durable storage.
  * @returns whether at least one durability listener participated, after every
  *   listener has settled successfully.
@@ -983,7 +1030,6 @@ Creation announcement during session publication. A synchronous throw vetoes and
  * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners
  * receive only sessions entered through that agent's context.
  * @param session - the session just entered and announced.
- * @dshScopeScan unsupported
  * @mode emit
  */
 'session/created'(this: Scoped<Session>, session: Session): void
@@ -1006,7 +1052,6 @@ Emitted once when an announced session leaves the store, including publication r
  * did not begin. Listener failures are logged and contained.
  * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`) reuses the owner scope.
  * @param session - the session that is no longer live in the store.
- * @dshScopeScan unsupported
  * @mode emit
  */
 'session/disposed'(this: Scoped<Session>, session: Session): void
@@ -1031,7 +1076,6 @@ Post-commit, fire-and-forget append feed. The listener snapshot resolves before 
  * receive only events from sessions entered through that agent's context.
  * @param session - the session whose log grew.
  * @param event - the appended event, exactly as recorded.
- * @dshScopeScan unsupported
  * @mode emit
  */
 'session/event'(this: Scoped<Session>, session: Session, event: SessionEvent): void
@@ -1053,7 +1097,6 @@ Awaited parallel durability checkpoint: every listener runs and the caller await
  * caller awaits all of them, with no waterfall veto. Scope-filtered dispatch
  * (`@deepseek-ai/dsh-scope`) reuses the session's owner scope.
  * @param session - the session whose buffered events must reach durable storage.
- * @dshScopeScan unsupported
  * @mode parallel
  */
 'session/flush'(this: Scoped<Session>, session: Session): Promise<void> | void

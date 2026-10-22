@@ -70,7 +70,9 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     // The button enables once the dormant catalog lands in the join.
     await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
     await add.click()
-    const pick = dialog.getByLabel('提供方')
+    // The provider field is the adopt panel's <select>; the add-mode tablist
+    // beside it is also labelled by the add copy, so name the control role.
+    const pick = dialog.getByRole('combobox', { name: '提供方' })
     await pick.waitFor({ timeout: 10_000 })
     await expect.poll(async () => pick.locator('option').count(), { timeout: 10_000 }).toBeGreaterThan(30)
     const options = await pick.locator('option').allTextContents()
@@ -227,19 +229,23 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
   it('declares a route the adapter does not ship', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-declare'))
     const dialog = page.getByRole('dialog', { name: '设置' })
-    const declare = dialog.getByRole('button', { name: '添加自定义提供方' })
-    await expect.poll(async () => declare.isEnabled(), { timeout: 10_000 }).toBe(true)
-    await declare.click()
-    await dialog.getByLabel('Provider ID').fill('acme-gateway')
-    await dialog.getByLabel('显示名称').fill('Acme Gateway')
-    await dialog.getByLabel('API 地址').fill('https://gateway.acme.example/v1')
+    // One add button opens the card on the catalog tab; a declared route is a
+    // form on the sibling custom tab, whose panel owns the create fields.
+    const add = dialog.getByRole('button', { name: '添加提供方' })
+    await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
+    await add.click()
+    await dialog.getByRole('tab', { name: '自定义', exact: true }).click()
+    const custom = dialog.locator('#models-add-custom-panel')
+    await custom.getByLabel('Provider ID').fill('acme-gateway')
+    await custom.getByLabel('显示名称').fill('Acme Gateway')
+    await custom.getByLabel('API 地址').fill('https://gateway.acme.example/v1')
     // No reasoning effort on a provider card at all: effort is a per-model
     // capability, the models under one provider disagree about it, and a
     // switch in the composer already records provider+model+effort together.
     expect(await dialog.getByLabel('推理强度').count()).toBe(0)
-    await dialog.getByRole('button', { name: '添加模型' }).click()
-    await dialog.getByLabel('模型 ID 1').fill('acme-large')
-    await dialog.getByRole('button', { name: '创建提供方', exact: true }).click()
+    await custom.getByRole('button', { name: '添加模型' }).click()
+    await custom.getByLabel('模型 ID 1').fill('acme-large')
+    await custom.getByRole('button', { name: '创建提供方', exact: true }).click()
 
     const row = dialog.getByText('Acme Gateway', { exact: true }).first()
     await row.waitFor({ timeout: 10_000 })

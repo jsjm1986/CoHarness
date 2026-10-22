@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-workspace-release-ranges.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-workspace-release-ranges.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-22-workspace-release-ranges.md
+document:
+  en: 57c74df3eaeac16ba40f55cdc4069762ae8fe2ef
+  zh: f39ede4fb1941956af12d0391f5b88bd244db6f8
 /agent-note-workspace-dependency-release-ranges:
   en: 8b7bf2179034aa08
   zh: a7a8b5dc60849d88

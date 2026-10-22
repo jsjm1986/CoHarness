@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for attachment.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for attachment.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/attachment.md
+document:
+  en: 53b286acf66ac7146e1fa82443e909ac64acbdb4
+  zh: 55e0d68c739905420ccdacf8661888d385cc70ad
 /durable-image-attachments:
   en: 82a5600d372d3d73
   zh: fce634b46be78821

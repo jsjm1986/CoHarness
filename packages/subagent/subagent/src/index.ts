@@ -82,7 +82,7 @@ import SubagentContinuationManager from './continuation.ts'
 import { listChildren as listSubagentChildren, listDescendants as listSubagentDescendants } from './list-children.ts'
 import type { SubagentDescendantListEntry, SubagentListEntry } from './list-children.ts'
 import { snapshotSubagentDescriptor } from './descriptor.ts'
-import { establishCatalogChild, subagentCatalogProjectionDefinition } from './catalog.ts'
+import { establishCatalogChild, establishExternalCatalogChild, subagentCatalogProjectionDefinition } from './catalog.ts'
 import { subagentIdentityProjectionDefinition, subagentTimingProjectionDefinition } from './projection.ts'
 import { deliverSubagentPrompt, subagentPendingDirectChildren } from './internal.ts'
 
@@ -173,7 +173,6 @@ declare module '@deepseek-ai/cordis' {
      * parent-scoped listener observes only its own delegations. Paired with
      * `subagent/end`.
      * @param info - the provider and published child identity.
-     * @dshScopeScan unsupported
      * @mode emit
      */
     'subagent/start'(this: Scoped<SubagentRuntime>, info: SubagentRunInfo): void
@@ -182,7 +181,6 @@ declare module '@deepseek-ai/cordis' {
      * parent carrier as `subagent/start`, so the lifecycle pair reaches the
      * same scoped audience.
      * @param info - the run identity and terminal outcome.
-     * @dshScopeScan unsupported
      * @mode emit
      */
     'subagent/end'(this: Scoped<SubagentRuntime>, info: SubagentRunEndInfo): void
@@ -789,22 +787,21 @@ export class SubagentRuntime extends TypertRemoteService {
       this.leasedRuns.set(request.parent, owned)
       owned.add(run)
       const child = run.localAgent?.session
-      if (child !== undefined) {
+      try {
+        if (child !== undefined) establishCatalogChild(request.parent.session, child.header, descriptor)
+        else establishExternalCatalogChild(request.parent.session, run.id, request.label ?? name)
+      } catch (error: unknown) {
+        // No caller receives this run; the catalog error owns the failed start.
+        void run.result.catch(() => undefined)
         try {
-          establishCatalogChild(request.parent.session, child.header, descriptor)
-        } catch (error: unknown) {
-          // No caller receives this run; the catalog error owns the failed start.
-          void run.result.catch(() => undefined)
-          try {
-            await run.dispose()
-            owned.delete(run)
-          } catch (cleanupError: unknown) {
-            this.ctx.logger.warn(
-              `subagent: disposal after catalog append failure also failed: ${String(cleanupError)}`,
-            )
-          }
-          throw error
+          await run.dispose()
+          owned.delete(run)
+        } catch (cleanupError: unknown) {
+          this.ctx.logger.warn(
+            `subagent: disposal after catalog append failure also failed: ${String(cleanupError)}`,
+          )
         }
+        throw error
       }
       const observed = observeRun(this.emitLifecycle, name, request.parent, run)
       const dispose = observed.dispose.bind(observed)
@@ -877,16 +874,17 @@ export class SubagentRuntime extends TypertRemoteService {
   }
 
   /** Reject the first requested capability that the provider lacks. */
-  private assertCapabilities(
-    provider: SubagentProvider,
-    request: Pick<SubagentStartRequest, 'agentOptions' | 'outputSchema' | 'maxDepth' | 'toolFilter' | 'persona'>,
-  ): void {
+  private assertCapabilities(provider: SubagentProvider, request: Omit<SubagentStartRequest, 'label' | 'signal'>): void {
+    if (request.agentPreset !== undefined && (!provider.capabilities.agentPreset || provider.inheritsParentContext)) {
+      throw new SubagentError(
+        `subagent provider "${provider.name}" does not support independent agent preset selection`,
+        'UNSUPPORTED_CAPABILITY',
+      )
+    }
     const needs: { when: boolean; cap: keyof SubagentCapabilities }[] = [
       { when: request.agentOptions !== undefined, cap: 'agentOptions' },
       { when: request.outputSchema !== undefined, cap: 'outputSchema' },
       { when: request.maxDepth !== undefined, cap: 'depthLimit' },
-      { when: request.toolFilter !== undefined, cap: 'toolFilter' },
-      { when: request.persona !== undefined, cap: 'persona' },
     ]
     for (const { when, cap } of needs) {
       if (when && !provider.capabilities[cap]) {
@@ -897,6 +895,7 @@ export class SubagentRuntime extends TypertRemoteService {
       }
     }
   }
+
 }
 
 export default SubagentRuntime

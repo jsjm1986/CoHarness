@@ -66,7 +66,7 @@ export interface TeamMemberView {
   readonly id: SessionId
   readonly name: string
   readonly role: 'lead' | 'teammate'
-  readonly status: 'running' | 'idle' | 'inactive' | 'provisioning' | 'failed'
+  readonly status: 'running' | 'inactive' | 'provisioning' | 'failed'
   readonly description?: string
   readonly provider?: string
   readonly context?: 'fresh' | 'fork'

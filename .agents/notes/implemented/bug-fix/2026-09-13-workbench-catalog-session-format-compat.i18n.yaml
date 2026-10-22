@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-13-workbench-catalog-session-format-compat.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-13-workbench-catalog-session-format-compat.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-13-workbench-catalog-session-format-compat.md
+document:
+  en: 3d277780560311dac922650ef0692513fce47b2d
+  zh: dbaf67928d6986691000ffea817f83e886fea3e1
 /agent-note-workbench-catalog-survives-legacy-session-formats:
   en: 1d8b70f06d0ec0c6
   zh: 5c164110ff9254ce

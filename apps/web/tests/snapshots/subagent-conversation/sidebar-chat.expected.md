@@ -1,0 +1,44 @@
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
+- text: "Explain event sourcing in one sentence.Your parent agent id is \"session-{{uuid}}\". Before you finish, send your result to that agent with send_message({ agent_id: \"session-{{uuid}}\", message: \"<self-contained result>\" }). The parent shares your workspace but does not automatically receive your transcript, tool output, or reasoning. Send earlier messages as well when a finding changes what the parent should do next; sending a message does not end your turn."
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
+- paragraph: Event sourcing is a pattern where all changes to an application's state are stored as an immutable, append-only sequence of events, rather than persisting only the current state, enabling full auditability, temporal queries, and event-driven architectures.
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- textbox "Message COHARNESS"
+- button "Add images or documents" [disabled]:
+  - img
+- button "Choose from Documents" [disabled]:
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Custom"'
+- button "6% of context used": 6%
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turns · 1 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 1 steps{{throughput}} tok/s"
+  - button "7.9K tok · Cache hit 99%":
+    - img
+    - text: 7.9K tokCache hit 99%

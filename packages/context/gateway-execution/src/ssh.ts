@@ -111,10 +111,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** exactOptionalPropertyTypes rejects wire-parsed `key: undefined`; absent means absent. */
 function connectionConfig(value: z.infer<typeof resolvedConfig>): SshResolvedTarget['config'] {
   return {
-    host: value.host, node: value.node, helper: value.helper, helperHash: value.helperHash,
+    host: value.host,
+    // Gateway targets register script deployments; the executable launch kind is
+    // a direct cordis.yml configuration and needs no remote Node column.
+    launch: {
+      kind: 'node-script', node: value.node,
+      ...(value.bootstrapPath === undefined || value.bootstrapHash === undefined
+        ? {} : { bootstrapPath: value.bootstrapPath, bootstrapHash: value.bootstrapHash }),
+    },
+    helper: value.helper, helperHash: value.helperHash,
     workspace: value.workspace,
-    ...(value.bootstrapPath === undefined || value.bootstrapHash === undefined
-      ? {} : { bootstrapPath: value.bootstrapPath, bootstrapHash: value.bootstrapHash }),
     ...(value.passwordRef === undefined ? {} : { passwordRef: value.passwordRef }),
     ...(value.requestTimeoutMs === undefined ? {} : { requestTimeoutMs: value.requestTimeoutMs }),
     ...(value.maxFrameBytes === undefined ? {} : { maxFrameBytes: value.maxFrameBytes }),

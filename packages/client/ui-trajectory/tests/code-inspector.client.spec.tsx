@@ -25,6 +25,7 @@ function Harness({ cell = CELL, wrapLines = false, onToggleWrapLines }: {
   onToggleWrapLines?: (wrapped: boolean) => void
 }) {
   return <TrajectoryTable
+    renderImages={() => null}
     turns={[{ turn: 1, groups: [{ title: 'Step 1', cells: [cell] }] }]}
     t={t}
     wrapLines={wrapLines} onToggleWrapLines={onToggleWrapLines}

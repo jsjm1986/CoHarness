@@ -466,7 +466,7 @@ describe('slot-store scope prune hook', () => {
 })
 
 describe('catalog-addressed navigation', () => {
-  it('uses catalog labels for a listed addressed route', async () => {
+  it('keeps projected titles in standard list rows for an addressed route', async () => {
     const b = bench()
     b.api.onSubagentList = (payload) => {
       const { parentSessionId } = payload as { parentSessionId: SessionId }
@@ -490,6 +490,10 @@ describe('catalog-addressed navigation', () => {
       }
       return Promise.resolve(ok({ entries: [], parentAvailable: false }))
     }
+    b.svc.handleMuxEnvelope({
+      rpcId: 'title' as never,
+      payload: { type: 'session/projection', sessionId: sid('child'), key: 'title', value: 'Child session title', seq: 2 } as never,
+    })
     await feedList(b, [
       { id: 'root' },
       { id: 'child', cwd: '/summary-child', parentId: 'root', origin: 'subagent' },
@@ -501,7 +505,11 @@ describe('catalog-addressed navigation', () => {
       parentSessionId: sid('child'), childSessionId: sid('grandchild'), mode: 'continuable',
     })
 
-    expect(b.svc.list.getSnapshot().byId[sid('child')]?.displayTitle).toBe('Child')
+    expect(b.svc.list.getSnapshot().byId[sid('child')]).toMatchObject({
+      title: 'Child session title',
+      displayTitle: 'Child session title',
+      projectionValues: { title: 'Child session title' },
+    })
     expect(b.svc.list.getSnapshot().byId[sid('grandchild')]?.displayTitle).toBe('Grandchild')
   })
 

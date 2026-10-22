@@ -52,10 +52,9 @@ fork 出的会话会原样继承种子中的标题事件。首消息节奏不会
 <a id="provider-contract"></a>
 ## 提供方约定
 
-提供方会提供带品牌类型的稳定 id、自动模式（`first-prompt` 或 `all-prompts`）和 `generate(request)`。请求携带活跃会话、截至一次固定修订的所有符合条件消息、可用时当前已记录的主请求路由，以及取消信号。结果包含非空标题、该请求中互不重复且有序的来源消息 seq，以及生成该标题时使用的可选提供方／模型路由。服务会在结果持久保存前进行规范化和验证。
+提供方会提供带品牌类型的稳定 id、自动模式（`first-prompt` 或 `all-prompts`）和 `generate(request)`。请求携带活跃会话、截至一次固定修订的所有符合条件消息、可用时当前已记录的主请求路由、调用前刚捕获并已深度冻结的最新已接受标题（包括回退标题）的 `currentTitle` 快照，以及取消信号。提供方自行决定是否以及如何使用当前标题。结果包含非空标题、该请求中互不重复且有序的来源消息 seq，以及生成该标题时使用的可选提供方／模型路由。服务会在结果持久保存前进行规范化和验证。
 
 参见[会话标题数据结构](../../../docs/subsystems/session-title.zh.md)与[已实现决策](../../../.agents/notes/implemented/feature/2026-07-21-log-backed-session-titles.zh.md)。
-
 
 <a id="model-experience"></a>
 ## 模型体验

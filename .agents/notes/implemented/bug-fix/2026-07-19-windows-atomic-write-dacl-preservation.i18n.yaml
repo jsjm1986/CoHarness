@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-windows-atomic-write-dacl-preservation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-windows-atomic-write-dacl-preservation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-19-windows-atomic-write-dacl-preservation.md
+document:
+  en: be9f82174300a7d605c6a6e63878728f08cb37be
+  zh: ed52773b0314e06ecdc470f9d569685c47a7aec3
 /agent-note-preserve-windows-dacls-during-atomic-file-replacement:
   en: b4db086f6ff72468
   zh: 64229600f97432b3

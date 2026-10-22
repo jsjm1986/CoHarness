@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-26-project-scope-switch-performance.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-26-project-scope-switch-performance.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.md
+document:
+  en: 62754c3cd22e8a637a47d7d2619475671bac3210
+  zh: 49e52a79c1d865ca721176e12a41d8f7b7bb3c0c
 /agent-note-keep-repeated-project-scope-reloads-cheap:
   en: 8a6fbf587db16e7c
   zh: 627743b9104fce15

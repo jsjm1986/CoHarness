@@ -61,7 +61,9 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     const add = settings.getByRole('button', { name: '添加提供方' })
     await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
     await add.click()
-    const pick = settings.getByLabel('提供方')
+    // The adopt panel's <select> is the provider field; the add-mode tablist
+    // shares the add label, so name the control role to single it out.
+    const pick = settings.getByRole('combobox', { name: '提供方' })
     await pick.waitFor({ timeout: 10_000 })
     await pick.selectOption('minimax-cn')
     await expect.poll(
@@ -72,7 +74,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     // Cancelling the setup card must not close the independent add-provider
     // draft beside it.
     await settings.getByRole('button', { name: '取消', exact: true }).first().click()
-    expect(await settings.getByLabel('提供方').count()).toBe(1)
+    expect(await settings.getByRole('combobox', { name: '提供方' }).count()).toBe(1)
     await expect.poll(
       async () => settings.getByRole('textbox', { name: 'API 密钥', exact: true }).count(),
       { timeout: 10_000 },

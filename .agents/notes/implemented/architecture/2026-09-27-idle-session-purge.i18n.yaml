@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-27-idle-session-purge.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-27-idle-session-purge.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-idle-session-purge.md
+document:
+  en: 2be459e7a669c2ccf17fc34f8752f85a57fccc23
+  zh: 38cb24f4c031f2eca4e0509e7b05f08d973243a5
 /agent-note-idle-session-purge-through-its-lifecycle-owner:
   en: e7df88ce43013618
   zh: 0e60e567ac40522a

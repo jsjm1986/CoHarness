@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-20-config-hot-reload-resilience.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-20-config-hot-reload-resilience.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-20-config-hot-reload-resilience.md
+document:
+  en: 89315eae4bce195042564067b89fdcc8b56b1834
+  zh: ca7e353e07af3b4aa41db9a4d9d5f8d6994a19d2
 /agent-note-a-config-hot-reload-must-not-kill-or-degrade-a-live-app:
   en: 2f9db5195fa5512b
   zh: 356a720b813469c8

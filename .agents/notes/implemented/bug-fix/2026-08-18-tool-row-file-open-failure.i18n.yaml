@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-18-tool-row-file-open-failure.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-18-tool-row-file-open-failure.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-tool-row-file-open-failure.md
+document:
+  en: e36552395b992e688fad35b3163b92c9f6189e43
+  zh: f09c41585a538b408f6258f64583f63c0fa57b0d
 /agent-note-tool-row-file-open-failures-stay-visible:
   en: 995ed40db206ebe2
   zh: b87ebd6c6a31e485

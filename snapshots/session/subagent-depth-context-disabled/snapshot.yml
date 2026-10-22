@@ -1,0 +1,10 @@
+version: 1
+scenario: subagent-depth-context-disabled
+profile: headless
+composition: depth-context-disabled
+recording: authored
+header:
+  class: depth-context-disabled
+  pin: true
+  systemPromptSource: text-turn
+  toolSchemasSource: text-turn

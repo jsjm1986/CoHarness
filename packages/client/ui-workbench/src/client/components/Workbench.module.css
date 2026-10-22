@@ -202,7 +202,14 @@
   overflow: auto;
 }
 
-.filePreviewActions { display: flex; gap: 8px; padding: 8px; flex-wrap: wrap; }
+/* Zoomable document/image previews own scrolling inside the zoom viewport. */
+.filePreviewZoom {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.filePreviewActions { display: flex; gap: 8px; padding: 8px; flex-wrap: wrap; flex: none; }
 
 .filePreviewText {
   max-height: 65vh;
@@ -222,13 +229,52 @@
 .fileBrowserEntry:hover, .fileBrowserEntry:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }
 .fileBrowserEntry:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
 
-.filePreviewImage { display: block; max-width: 100%; max-height: 65vh; margin: 0 auto; object-fit: contain; }
+.filePreviewImageFrame {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 100%;
+  height: max-content;
+  min-height: 100%;
+  padding: 12px;
+  font-family: var(--dsw-font, sans-serif);
+  white-space: normal;
+}
+
+.filePreviewImageSurface { display: block; flex: none; max-width: none; margin: auto; }
+.filePreviewImageSurface[hidden] { display: none; }
+
+.filePreviewImage { display: block; width: 100%; max-width: none; height: auto; max-height: none; border-radius: 8px; user-select: none; }
 
 .markdownDocument {
   min-width: 0;
   padding: 10px 12px;
   font-family: var(--dsw-font, inherit);
   white-space: normal;
+}
+
+/* Leading YAML frontmatter: a bordered metadata box above the body, never heading text. */
+.frontmatter {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  font: var(--dsw-font-markdown-small);
+  color: var(--dsw-alias-label-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A document without frontmatter content leaves the box empty. */
+.frontmatter:empty {
+  display: none;
+}
+
+.frontmatterSource {
+  margin: 0;
+  font-family: var(--ds-font-family-code);
+  white-space: inherit;
 }
 
 .htmlFrame {

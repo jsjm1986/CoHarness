@@ -18,7 +18,6 @@ Agents and host UIs can complete `@file` mentions with ranked paths from each ag
 ## Table of Contents
 
 - [Configuration](#configuration)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -36,11 +35,6 @@ Agents and host UIs can complete `@file` mentions with ranked paths from each ag
 
 Every numeric value must be a positive safe integer. Excluded names must be non-empty basenames without `/` or `\`.
 
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The per-agent index is a bounded cache rebuilt from the filesystem on demand; the filesystem remains the only authority.
-
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -53,7 +47,7 @@ When the addressed agent has an effective `read` tool, the provider contributes 
 ##### File-reference instruction
 
 ```markdown
-Tokens prefixed with @ are workspace paths the user explicitly referenced, relative to the workspace root. A trailing slash marks a directory: list it when its contents matter. Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading. @"..." quotes a path containing spaces.
+Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root; absolute paths identify files or directories on the host. A trailing slash marks a directory: list it when its contents matter. Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading. @"..." quotes a path containing spaces.
 ```
 
 #### Token effect

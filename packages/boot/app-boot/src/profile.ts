@@ -120,7 +120,7 @@ export interface Profile {
   skippedBundles: SkippedBundle[]
 }
 
-/** A selected bundle the profile could not load, or whose own DSH peers the profile does not exempt. */
+/** A selected bundle the profile could not load, or whose own DSH requirements the profile does not exempt. */
 export interface SkippedBundle {
   /** The bundle's package name from `dsh.profile.bundles`. */
   packageName: string
@@ -235,7 +235,15 @@ export const OPTIONAL_BUNDLES: readonly string[] = [
   '@deepseek-ai/dsh-experimental-agent-team-profile',
   '@deepseek-ai/dsh-experimental-voice-input-bundle',
   '@deepseek-ai/dsh-experimental-auto-review',
+  '@deepseek-ai/dsh-experimental-cot-translation-bundle',
+  '@deepseek-ai/dsh-experimental-inspector-profile',
+  '@deepseek-ai/dsh-experimental-plugin-market-bundle',
   '@deepseek-ai/dsh-experimental-schedule-bundle',
+  '@deepseek-ai/dsh-experimental-terminal-bundle',
+  '@deepseek-ai/dsh-experimental-session-titles-bundle',
+  '@deepseek-ai/dsh-experimental-badge-skill-bundle',
+  '@deepseek-ai/dsh-experimental-ralph-bundle',
+  '@deepseek-ai/dsh-experimental-session-search',
 ]
 
 const PROFILE_PATCH_TEMPLATE = `# Your patch layer for this dsh profile, applied after every bundle layer:
@@ -1135,7 +1143,7 @@ export function resolveBundleDir(
  * Load an already initialized profile directory without resolving it through
  * the shared Harness home. This is used by application-owned profiles whose
  * package project and lifecycle belong to that application.
- * Unreadable bundles, and bundles whose own dsh peers the profile does not exempt, are skipped
+ * Unreadable bundles, and bundles whose own dsh requirements the profile does not exempt, are skipped
  * without changing the manifest and listed in `skippedBundles`; nothing is printed.
  * @param binName - the diagnostic prefix on thrown errors.
  * @param dir - absolute profile package directory.
@@ -1163,7 +1171,7 @@ export function loadProfileDirectory(
       if (bundle === undefined) {
         throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
       }
-      // A bundle is not a plugin row, so row admission never reads its own peers.
+      // A bundle is not a plugin row, so row admission never reads its own dsh requirements.
       const issue = evaluatePluginCompatibility(bundleManifest, exemptions)
       if (issue !== undefined && !issue.exempted) throw new Error(pluginCompatibilityWarning(issue))
       const patchPaths = bundlePatchPaths(packageDir, bundle)

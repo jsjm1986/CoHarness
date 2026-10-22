@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-20-client-session-conversation-ownership.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-20-client-session-conversation-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-20-client-session-conversation-ownership.md
+document:
+  en: 0d2f19cff1d4625d678a25c87bcc55fc3f2bfad4
+  zh: fdb2420efff88e0a5a33dba79bebf0d072280453
 /agent-note-client-session-conversation-and-ui-ownership-layers:
   en: 24e6b5894fbcdc97
   zh: 1fe37f9234be5ff4

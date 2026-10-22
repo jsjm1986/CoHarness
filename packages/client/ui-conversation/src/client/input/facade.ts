@@ -13,11 +13,12 @@ import type {
   ReferenceInsert, InputTriggerController, SubmitImageAttachment, SubmitOutcome, TokenSpan,
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {
-  DraftAttachmentId, DraftDocumentId, EditRange, EditSelection, InputActions, InputEffect, InputNotice, InputState,
-  PasteComponent, QueuedMessage, SessionInput, SubmitAttempt,
+  DraftAttachmentId, DraftDocumentId, DraftSnapshot, EditRange, EditSelection, InputActions, InputEffect, InputNotice,
+  InputState, PasteComponent, QueuedMessage, SessionInput, SubmitAttempt,
 } from './contract.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
-import { InputMachine, projectClipboard } from './machine.ts'
+import { InputMachine } from './machine.ts'
+import { readPersistedDraft } from './persisted-draft.ts'
 
 /** Popup face the shell needs (dismissal only; typed structurally to avoid a value import). */
 export interface PopupDismissFace {
@@ -88,7 +89,7 @@ export class SessionInputShell implements SessionInput {
   readonly notices: SnapshotStore<InputNotice | null> = createSnapshotStore<InputNotice | null>(null)
   /** The public provide-channel action face (one stable identity per session). */
   readonly actions: InputActions = {
-    setDraft: (text) => { this.setDraft(text) },
+    setDraft: (input) => { this.setDraft(input) },
     captureInsertion: () => {
       const snapshot = this.snapshot
       const caret = this.lastCaret ?? snapshot.draft.length
@@ -111,7 +112,6 @@ export class SessionInputShell implements SessionInput {
   // production (the machine's no-clock default is a constant for pure tests).
   private readonly core = new InputMachine({ now: () => Date.now() })
   private noticeSeq = 0
-  private lastMirroredDraft = ''
   private imageIds: readonly DraftAttachmentId[] = []
   private documentIds: readonly DraftDocumentId[] = []
   /** One attachment-only send at a time: Enter during the Host round-trip is a no-op. */
@@ -122,8 +122,8 @@ export class SessionInputShell implements SessionInput {
   private lastCaret: number | undefined
   /** Queue projection subscription owned by this shell's lifetime. */
   private queueUnsubscribe: (() => void) | undefined
-  /** Draft persistence mirror (chat store write; receives the clipboard projection, never display-only ranges). */
-  private mirrorFn: ((text: string) => void) | undefined
+  /** Draft persistence mirror; semantic references omit machine-local identities. */
+  private mirrorFn: ((draft: string | DraftSnapshot) => void) | undefined
 
   constructor(private readonly deps: SessionInputDeps) {
     this.state = createSnapshotStore<InputState>(this.compose())
@@ -134,13 +134,22 @@ export class SessionInputShell implements SessionInput {
 
   /**
    * Single draft write path (all mutation rides machine events).
-   * @param text - the full next draft.
+   * @param input - the full next draft, or a carried structured snapshot
+   * (reference spans re-mint; see the `draft-restored` machine event).
    * @param editRange - the DOM-observed edit shape, when the caller knows it
    * (narrows the machine's occurrence math; absent → diff scan).
    */
-  setDraft(text: string, editRange?: EditRange): void {
-    this.lastCaret = text.length
-    this.run(this.core.dispatch({ type: 'draft-changed', draft: text, ...(editRange !== undefined ? { editRange } : {}) }))
+  setDraft(input: string | DraftSnapshot, editRange?: EditRange): void {
+    if (typeof input !== 'string') {
+      this.run(this.core.dispatch({ type: 'draft-restored', snapshot: input }))
+      return
+    }
+    this.lastCaret = input.length
+    this.run(this.core.dispatch({ type: 'draft-changed', draft: input, ...(editRange !== undefined ? { editRange } : {}) }))
+  }
+
+  draftSnapshot(): DraftSnapshot {
+    return captureDraft(this.snapshot)
   }
 
   /** Append ordered image ids unless an admission transaction is locked. */
@@ -475,15 +484,19 @@ export class SessionInputShell implements SessionInput {
   }
 
   /**
-   * Bind the draft persistence mirror (chat store write). Adopt-on-bind: the
-   * store draft may hold a persisted value from a previous mount; the caller
-   * seeds it via setDraft BEFORE binding, and afterwards every machine-adopted
-   * draft mirrors out.
+   * Restore an empty, editable input from persisted data and bind its mirror.
+   * An existing draft or live submission takes precedence. Binding immediately
+   * persists the current semantic draft, including input prepared before mount.
    * @param write - store draft write.
+   * @param initialDraft - optional JSON-parsed draft from the session store.
    * @returns the unbind disposer.
    */
-  bindMirror(write: (text: string) => void): () => void {
+  bindMirror(write: (draft: string | DraftSnapshot) => void, initialDraft?: unknown): () => void {
+    if (this.snapshot.draft === '' && initialDraft !== undefined) {
+      this.setDraft(readPersistedDraft(initialDraft))
+    }
     this.mirrorFn = write
+    write(persistDraft(this.snapshot))
     return () => {
       if (this.mirrorFn === write) this.mirrorFn = undefined
     }
@@ -697,13 +710,27 @@ export class SessionInputShell implements SessionInput {
     // actually moved. Session/queue notifies that leave input state
     // untouched must not republish a fresh object — every gratuitous set
     // schedules a synchronous render on every InputZone subscriber.
-    if (!sameInputState(this.state.getSnapshot(), next)) this.state.set(next)
-    const mirroredDraft = projectClipboard(next)
-    if (mirroredDraft !== this.lastMirroredDraft) {
-      this.lastMirroredDraft = mirroredDraft
-      this.mirrorFn?.(mirroredDraft)
+    const previous = this.state.getSnapshot()
+    if (!sameInputState(previous, next)) this.state.set(next)
+    if (previous.draft !== next.draft || previous.occurrences !== next.occurrences
+      || previous.claim?.token !== next.claim?.token) {
+      this.mirrorFn?.(persistDraft(next))
     }
   }
+}
+
+/** Copy semantic draft data without carrying occurrence ids or executable claims. */
+function captureDraft(state: InputState): DraftSnapshot {
+  return {
+    text: state.draft,
+    references: state.occurrences.map(({ occurrenceId: _, ...reference }) => reference),
+    ...state.claim === undefined ? {} : { command: { token: state.claim.token } },
+  }
+}
+
+/** Plain drafts retain the compact string representation accepted by older clients. */
+function persistDraft(state: InputState): string | DraftSnapshot {
+  return state.occurrences.length === 0 && state.claim === undefined ? state.draft : captureDraft(state)
 }
 
 /**

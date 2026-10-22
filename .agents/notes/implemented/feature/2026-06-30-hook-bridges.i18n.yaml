@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-06-30-hook-bridges.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-06-30-hook-bridges.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-30-hook-bridges.md
+document:
+  en: 806e6851f0d71856698755f7dc7a502d0f86480e
+  zh: 1648cbb16a9d091782dbdc50e9b010bf1f4d4ed8
 /agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges:
   en: cda23626c478d1bb
   zh: b06fae512c8a89e6

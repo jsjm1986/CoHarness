@@ -10,33 +10,61 @@ import type { DirectoryListing, SessionId, WorkspaceId, WorkspaceView } from '@d
 import type { WorkspaceListState } from '../workspaces/service.ts'
 import type { ObservableSnapshot } from './store.ts'
 
+/**
+ * Options for {@link IWorkspaces.startSession}. A shallow copy captures these
+ * values before asynchronous creation, so the result addresses only the
+ * retained target Session.
+ */
+export interface StartSessionOptions {
+  /** Unsent composer text the new conversation starts with — a prefill only; nothing is sent or executed. */
+  readonly prompt?: string
+  /** Replace the target Session's draft text; omitted preserves a nonempty draft. Attachments are untouched either way. */
+  readonly clearPreviousDraft?: boolean
+  /** Observer for the rejected connect/open, for surfaces that turn an explicit New Session click into a notice. */
+  readonly onFailure?: (reason: unknown) => void
+}
+
 /** The workspaces-service face injected as `ctx.workspaces`. */
 export interface IWorkspaces {
   /** The useWorkspaces standard feed (read face — writes stay inside the domain). */
   readonly list: ObservableSnapshot<WorkspaceListState>
   /**
-   * Connect a Workspace to its reusable or freshly created blank session.
+   * Connect a Workspace to its reusable or freshly created blank session —
+   * the workspace-reconnection arm ({@link openWorkspace} fallback and
+   * draft-prepared starts); a bare New Session never lands here and always
+   * mints a fresh Session instead.
    * @param workspaceId - target workspace.
+   * @param options - `agentPreset` names the composition the conversation
+   *   runs; omitted composes the deployment default. A reused blank runs this
+   *   choice rather than its recorded preset, and a preset the roster no
+   *   longer declares degrades to the default instead of failing the connect.
    * @returns the connected session id.
    */
-  connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
+  connectWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId>
   /**
    * Open the most recent historical conversation in a Workspace.
    * @param workspaceId - target Workspace.
+   * @param options - forwarded to {@link connectWorkspace} when the Workspace
+   *   has no selectable history.
    * @returns the selected historical or fallback blank Session id.
    */
-  openWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
+  openWorkspace(workspaceId: WorkspaceId, options?: { readonly agentPreset?: string }): Promise<SessionId>
   /**
-   * The New Session flow: connect the explicit, current-Session, or recent
-   * Workspace and open the resulting session. Connect and navigation failures
+   * The New Session flow: resolve the explicit, current-Session, or recent
+   * Workspace, then create a fresh Session+Agent under the current preset
+   * definition and open it. Draft-preparation options instead keep the
+   * reconnect arm (`connectWorkspace`), so the landed Session may be the
+   * Workspace's existing draft or blank. Connect and navigation failures
    * are non-fatal — they log and reach `onFailure` when supplied; the current
    * view stays usable.
    * @param workspaceId - explicit target; omitted inherits the current
    * Session's Workspace before falling back to the recency projection.
-   * @param onFailure - observer for the rejected connect/open, for surfaces
-   * that turn an explicit New Session click into a notice.
+   * @param options - draft initialization (`prompt` prefills the target
+   * Session's composer without sending; `clearPreviousDraft` discards its
+   * draft text first) plus `onFailure`, the observer for the rejected
+   * connect/open. A call carrying neither draft option always creates fresh.
    */
-  startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void
+  startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void
   /**
    * Register an existing path as a Workspace.
    * @param input - the Host create payload.

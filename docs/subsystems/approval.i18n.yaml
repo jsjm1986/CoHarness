@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for approval.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for approval.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/approval.md
+document:
+  en: af21be44ea6b429181d685a586c82e0a2bfa8b9c
+  zh: fb428450d5e49a84625e0d3684f42547004a61e1
 /user-approval:
   en: 490b0cce7f1ceed5
   zh: 1126f2d7261b490a

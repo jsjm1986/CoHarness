@@ -26,14 +26,29 @@ The adjacent V6 → V7 Session migration and the released V7 codec. V7 rewrites 
 
 The generated first-party Session format catalog imports this edge through `dsh.sessionFormatMigration` metadata. Persistence providers read V6 through the released V6 codec and reconstruct V7 in memory for reads; an explicit write open publishes a separate V7 generation. Existing V6 generation bytes, inode, and modification time remain unchanged; their presence never permits fallback from a broken V7 generation.
 
-V6 `kind: 'plugin'` message sources are rewritten to the namespaced `plugin:<name>` form using the producer's plugin identity; sources already carrying a qualified kind keep their value. Tool-result blocks nested inside assistant messages move to their own `tool`-role messages, and opaque producer events whose type no V6 writer could emit are admitted under a `plugin:` namespace instead of failing admission.
+Header-only migration validates and advances metadata without reading the body or collecting children:
+
+```text
+const targetHeader = sessionFormatV6ToV7.migrateHeader(sourceHeader)
+```
+
+Historical body restoration requires explicit child evidence. `sessionFormatV6ToV7.createStage()` refuses without that binding; an empty array explicitly declares no children. Persistence must collect the complete available direct-child set, while isolated transcript replay can supply its deliberately empty set. Keep the evidence unchanged for the catalog's lifetime.
+
+```text
+const catalog = createSessionFormatCatalogWithChildren(childFacts)
+const restore = catalog.createRestore(physicalHeader, {
+  recovery: 'strict', validation: 'current',
+})
+for (const row of physicalRows) restore.decodeRow(row)
+const artifact = restore.finish()
+```
+
+V6 `kind: 'plugin'` message sources are rewritten to the namespaced `plugin:<name>` form using the producer's plugin identity; sources already carrying a qualified kind keep their value. A `tool/result` event whose user-role message wraps exactly one `tool-result` block matching its tool source is lifted into a first-class `tool`-role message; a result containing another `tool-result` block is refused as unsupported. Unknown event types keep their payload and coordinates under a `plugin:` namespace only when marked `ignorable`; every other unknown type fails admission.
 
 <a id="implementation"></a>
 ## Implementation
 
 The migration forwards each V6 event through source rewriting, tool-result lifting, and content migration, then validates the result under the V7 delivery rules: header fields, message sources, developer data, system-message fields, lifecycle relationships, fork results, and retired-syntax rejection. A header-only migration changes only `version`; whole-artifact validation applies the V7 event rules after conversion.
-
-No runtime invariant companion is published: this pure library has no registrations or independently mutable state to compare. Its codec and migration behavior is exercised by direct conversion tests and the JSONL provider's immutable-generation tests.
 
 <a id="model-experience"></a>
 ## Model Experience

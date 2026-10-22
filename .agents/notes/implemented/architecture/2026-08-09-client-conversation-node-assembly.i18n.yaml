@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-09-client-conversation-node-assembly.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-09-client-conversation-node-assembly.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-09-client-conversation-node-assembly.md
+document:
+  en: bfa8ae02d419611782159ff327f67833279aac63
+  zh: 63a4f6fc0f04e1ac90575f96eccf76e2bfbda13f
 /agent-note-client-conversation-business-node-assembly-and-keyed-chat-snapshots:
   en: 32abbd757c29e1ee
   zh: ea0b9de97fd04196
@@ -78,8 +81,8 @@
   en: abd270b2c4d65831
   zh: f3f9723940c5f45b
 /agent-note-client-conversation-business-node-assembly-and-keyed-chat-snapshots/view-builder-and-react-identity:
-  en: ed8c6034f0aa2241
-  zh: 1851fd7f2bb29dfc
+  en: 1403ae184a6de421
+  zh: ab0dfbb88abbe12e
 /agent-note-client-conversation-business-node-assembly-and-keyed-chat-snapshots/runtime-and-render-path:
   en: 114ca8db361d22e5
   zh: 37b6d474e855c187
@@ -90,5 +93,5 @@
   en: 2354937ee6448433
   zh: 4a30da2dde4d225f
 /agent-note-client-conversation-business-node-assembly-and-keyed-chat-snapshots/consequences:
-  en: 52c0437ab330ea88
-  zh: e2ebd0c517ae5f10
+  en: 5b7931af33a1837b
+  zh: 9bbd1652abfb1cc3

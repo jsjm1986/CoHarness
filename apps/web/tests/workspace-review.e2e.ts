@@ -4,12 +4,13 @@ import { cp, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser, type Page } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {} from '@deepseek-ai/dsh-workspace-changes/types'
 import type {} from '@deepseek-ai/dsh-tool-present/types'
+import type { ChangesSummary } from '@deepseek-ai/dsh-client-ui-deliverables/src/changes.ts'
 import {
   launchWebScaffold, watchConsole, captureStableAria, compareOrRefreshGolden, assertFixtureInventory,
   webSnapshotMode, type WebScaffold,
@@ -29,6 +30,9 @@ describe('web e2e: delivered files and historical review', () => {
     scaffold = await launchWebScaffold({ workbench: true })
     const { ctx, workspaceCwd } = scaffold
     execFileSync('git', ['init', '--quiet'], { cwd: workspaceCwd })
+    // The scaffold plants the private harness homes inside the workspace; a
+    // work-tree snapshot must never walk their live temporary files.
+    await writeFile(join(workspaceCwd, '.gitignore'), '.dsh-home/\n.agents-home/\n.bundled-skills/\n')
     await writeFile(join(workspaceCwd, 'review.txt'), 'before the turn\n')
     const created = await ctx.apiProxy.sessions.create({ rpcId: RpcId('review-create'), payload: { sessionId: SESSION, cwd: workspaceCwd } })
     if (!created.result.ok) throw new Error(created.result.error.message)
@@ -38,7 +42,9 @@ describe('web e2e: delivered files and historical review', () => {
     session.append('turn/start', { turn: 1 })
     session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'Update the review file.' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
     session.append('step/start', { turn: 1, step: 1 })
-    const args = { file_path: 'review.txt', content: 'after the turn\n' }
+    // The extra appended line leaves an empty fill row on the comparison's
+    // left side, which exercises the full-width paint of empty alignment rows.
+    const args = { file_path: 'review.txt', content: 'after the turn\nand one more line\n' }
     // The recorder observes the same pre-execution waterfall as a real file tool.
     await ctx.waterfall('tools/pre-execute', { agent, name: 'write', arguments: args } as never, () => Promise.resolve(undefined as never))
     await writeFile(join(workspaceCwd, 'review.txt'), args.content)
@@ -99,11 +105,47 @@ describe('web e2e: delivered files and historical review', () => {
     expect(await review.textContent()).toContain('after the turn')
     expect(await review.textContent()).not.toContain('current file changed later')
     // The host reports an open-in-app handler only on desktops that probe
-    // one, so the default-app row is environment-dependent chrome.
+    // one, so the default-app row and its overflow menu are
+    // environment-dependent chrome.
     const reviewSnapshot = (await captureStableAria(page, '[data-changes-review]', scaffold.workspaceCwd))
       .replace(/\n *- button "Open [^\n]* in default app":\n *- img/g, '')
+      .replace(/\n *- button "More file actions for [^\n]*":\n *- img/g, '')
     await compareOrRefreshGolden(join(DIRECTORY, 'review.expected.md'), reviewSnapshot, webSnapshotMode())
     await review.locator('[data-review-tool="split"]').click()
+    // The appended row has no old-side text; constrain the columns so the hunk header overflows it.
+    const emptyRowLayout = await page.addStyleTag({ content: `
+      [data-diff-side="left"] { width: 90px; }
+      [data-diff-side="right"] { width: 120px; }
+    ` })
+    try {
+      const left = review.locator('[data-diff-side="left"]')
+      const emptyRow = left.locator('[data-diff-line="add"]').last()
+      const maximum = await left.evaluate(element => element.scrollWidth - element.clientWidth)
+      expect(maximum).toBeGreaterThan(0)
+      await left.evaluate((element) => { element.scrollLeft = element.scrollWidth })
+      await expect.poll(() => left.evaluate(element => element.scrollLeft)).toBe(maximum)
+      const fill = await emptyRow.evaluate((row) => {
+        const column = row.closest('[data-diff-side]')!
+        const columnBox = column.getBoundingClientRect()
+        const rowBox = row.getBoundingClientRect()
+        const y = rowBox.top + rowBox.height / 2
+        return {
+          rowWidth: rowBox.width,
+          contentWidth: column.scrollWidth,
+          background: getComputedStyle(row).backgroundColor,
+          coversViewport: [columnBox.left + 4, columnBox.right - 4].every(x =>
+            document.elementFromPoint(x, y)?.closest('[data-diff-line]') === row),
+        }
+      })
+      expect(fill.background).not.toBe('rgba(0, 0, 0, 0)')
+      expect(fill.rowWidth).toBeGreaterThanOrEqual(fill.contentWidth - 0.5)
+      expect(fill.coversViewport).toBe(true)
+    } finally {
+      await emptyRowLayout.evaluate(element => element.parentNode!.removeChild(element))
+      await review.locator('[data-diff-side]').evaluateAll((elements) => {
+        for (const element of elements) element.scrollLeft = 0
+      })
+    }
     await review.locator('[data-review-tool="wrap"]').click()
     expect(await review.locator('[data-review-tool="split"]').getAttribute('aria-pressed')).toBe('true')
     await review.locator('[data-review-tool="open-file"]').click()
@@ -113,6 +155,149 @@ describe('web e2e: delivered files and historical review', () => {
     expect(tripwire.pageErrors).toEqual([])
     expect(await page.locator('[data-slot-error]').count()).toBe(0)
   }, 60_000)
+
+  it('keeps edge gestures inside either diff column and accepts reverse scrolling', async () => {
+    if (scaffold === undefined) throw new Error('Web scaffold unavailable')
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-review-overscroll'))
+    const tripwire = watchConsole(page)
+    // The previous scenario leaves the file preview active; the review stays as a sibling tab.
+    await page.getByRole('tab', { name: 'Review · turn 1' }).click()
+    const review = page.locator('[data-changes-review]')
+    const wrapButton = review.getByRole('button', { name: 'Line wrap' })
+    if (await wrapButton.getAttribute('aria-pressed') === 'true') await wrapButton.click()
+    const body = review.locator('[data-review-view="split"]:not([data-review-wrap])')
+    await body.waitFor({ state: 'visible' })
+    // A scrollable parent makes escaped edge gestures observable without native trackpad rebound.
+    const layout = await page.addStyleTag({ content: `
+      [data-changes-review] { height: 220px !important; }
+      [data-review-view="split"] { display: block; max-width: 220px; }
+      [data-review-view="split"] > div { width: 160px; height: 60px; margin: 160px; }
+    ` })
+    onTestFinished(async () => {
+      await layout.evaluate(element => element.parentNode!.removeChild(element))
+      await body.evaluate((element) => { element.scrollTo(0, 0) })
+      if (await wrapButton.getAttribute('aria-pressed') !== 'true') await wrapButton.click()
+    })
+    const input = await page.context().newCDPSession(page)
+    try {
+      for (const side of ['left', 'right']) {
+        const column = review.locator(`[data-diff-side="${side}"]`)
+        for (const axis of ['x', 'y'] as const) {
+          for (const end of [false, true]) {
+            const parentPosition = await body.evaluate((element) => {
+              const x = (element.scrollWidth - element.clientWidth) / 2
+              const y = (element.scrollHeight - element.clientHeight) / 2
+              element.scrollTo(x, y)
+              return { x: element.scrollLeft, y: element.scrollTop }
+            })
+            expect(parentPosition.x).toBeGreaterThan(0)
+            expect(parentPosition.y).toBeGreaterThan(0)
+            const edge = await column.evaluate((element, { axis, end }) => {
+              const maximum = axis === 'x'
+                ? element.scrollWidth - element.clientWidth
+                : element.scrollHeight - element.clientHeight
+              element.scrollTo(axis === 'x' && end ? maximum : 0, axis === 'y' && end ? maximum : 0)
+              return { maximum, offset: end ? maximum : 0 }
+            }, { axis, end })
+            expect(edge.maximum).toBeGreaterThan(0)
+            const position = () => column.evaluate((element, axis) => axis === 'x' ? element.scrollLeft : element.scrollTop, axis)
+            await expect.poll(position).toBe(edge.offset)
+            const box = await column.boundingBox()
+            if (box === null) throw new Error('diff column has no visible bounds')
+            const gesture = { x: box.x + box.width / 2, y: box.y + box.height / 2, gestureSourceType: 'mouse' as const }
+            const distance = end ? -80 : 80
+            // CDP acknowledges the completed gesture, including default scrolling, before observation.
+            await input.send('Input.synthesizeScrollGesture', {
+              ...gesture, xDistance: axis === 'x' ? distance : 0, yDistance: axis === 'y' ? distance : 0,
+            })
+            expect(await body.evaluate(element => ({ x: element.scrollLeft, y: element.scrollTop }))).toEqual(parentPosition)
+            expect(await position()).toBe(edge.offset)
+            await input.send('Input.synthesizeScrollGesture', {
+              ...gesture, xDistance: axis === 'x' ? -distance : 0, yDistance: axis === 'y' ? -distance : 0,
+            })
+            await expect.poll(position).not.toBe(edge.offset)
+          }
+        }
+      }
+    } finally {
+      await input.detach()
+    }
+    expect(tripwire.pageErrors).toEqual([])
+  })
+
+  it('preserves filename endings when the review narrows and updates the fade after resizing', async () => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold unavailable')
+    const previewContext = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    const preview = await previewContext.newPage()
+    onTestFinished(async () => { await previewContext.close() })
+    const previewTripwire = watchConsole(preview)
+    const longName = 'src/components/review/' + 'long-filename-'.repeat(8) + 'before.ts'
+    // Project a long display name into a separate page; recorded paths, comparisons, and Session data stay intact.
+    await preview.route('**/workspaceChanges.summary*', async (route) => {
+      const response = await route.fetch()
+      const wire = await response.json() as { result?: { ok?: boolean; value?: ChangesSummary } }
+      if (wire.result?.ok === true && wire.result.value !== undefined) {
+        wire.result.value = {
+          ...wire.result.value,
+          files: wire.result.value.files.map((file, index) => index === 0 ? { ...file, display: longName } : file),
+        }
+      }
+      await route.fulfill({ response, json: wire })
+    })
+    await preview.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await preview.locator('[data-changed-files] button').first().click()
+    const review = preview.locator('[data-changes-review]')
+    const selector = review.getByRole('button', { name: 'Choose the file to review' })
+    const label = selector.locator('[data-path-label]')
+    const layout = await preview.addStyleTag({ content: '[data-sidebar-right-panel] { width: 340px !important; }' })
+    const resize = async (width: number) => {
+      await layout.evaluate((element, width) => {
+        element.textContent = `[data-sidebar-right-panel] { width: ${width}px !important; }`
+      }, width)
+    }
+    const metrics = () => label.evaluate((element) => {
+      const text = element.firstElementChild!
+      const box = element.getBoundingClientRect()
+      const textBox = text.getBoundingClientRect()
+      const filename = text.lastElementChild!
+      const suffix = document.createRange()
+      const node = filename.firstChild!
+      suffix.setStart(node, Math.max(0, node.textContent!.length - 'before.ts'.length))
+      suffix.setEnd(node, node.textContent!.length)
+      const suffixBox = suffix.getBoundingClientRect()
+      return {
+        clipped: element.hasAttribute('data-path-clipped'), mask: getComputedStyle(element).maskImage,
+        left: textBox.left - box.left, right: box.right - textBox.right,
+        suffixVisible: suffixBox.left >= box.left && suffixBox.right <= box.right + 0.5,
+        directoryColor: getComputedStyle(text.firstElementChild!).color,
+        nameColor: getComputedStyle(filename).color,
+      }
+    })
+    await expect.poll(async () => (await metrics()).clipped).toBe(true)
+    const clipped = await metrics()
+    expect(clipped.left).toBeLessThan(0)
+    expect(Math.abs(clipped.right)).toBeLessThanOrEqual(0.5)
+    expect(clipped.suffixVisible).toBe(true)
+    expect(clipped.mask).toContain('linear-gradient')
+    expect(clipped.directoryColor).not.toBe(clipped.nameColor)
+    expect(await label.getAttribute('title')).toBe(longName)
+    const controls = await selector.evaluate((button) => {
+      const header = button.parentElement!.parentElement!
+      const bounds = header.getBoundingClientRect()
+      const caret = button.querySelector('svg')!
+      const counts = button.parentElement!.nextElementSibling!
+      return [caret, counts, ...header.querySelectorAll('[data-review-tool]')].map((element) => {
+        const box = element.getBoundingClientRect()
+        return box.width > 0 && box.left >= bounds.left && box.right <= bounds.right
+      })
+    })
+    expect(controls.every(Boolean)).toBe(true)
+    await resize(1400)
+    await expect.poll(async () => (await metrics()).clipped).toBe(false)
+    expect((await metrics()).left).toBeCloseTo(0, 1)
+    expect((await metrics()).mask).toBe('none')
+    expect(previewTripwire.pageErrors).toEqual([])
+  })
 
   it('owns only its review golden', async () => { await assertFixtureInventory(DIRECTORY, ['review.expected.md']) })
 

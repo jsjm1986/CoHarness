@@ -16,7 +16,6 @@ kind: "package-reference"
 ## 目录
 
 - [插件（命名空间：`timeout-policy`）](#plugin-namespace-timeout-policy)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -54,12 +53,6 @@ kind: "package-reference"
 ### 与其他 `tools/execute` 包装层组合
 
 多个 `tools/execute` 监听器按 Cordis 注册顺序组合。与未来的重试／沙箱／指标包装层一起使用时，注册顺序决定语义：「超时覆盖整个重试操作」（超时注册在外层），或「超时覆盖每次尝试」（超时注册在内层）。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次调用按工具自身声明装配一个新的协作式截止时间；不存在跨调用状态。
-
 
 <a id="model-experience"></a>
 ## 模型体验

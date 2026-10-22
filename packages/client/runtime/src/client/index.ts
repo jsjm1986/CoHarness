@@ -6,6 +6,7 @@ import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/c
 // project sits in the Host build graph.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { TypertContext } from '@deepseek-ai/dsh-typert-protocol'
+import { typertOwnedValue } from '@deepseek-ai/dsh-typert-protocol'
 import type { MaybeSnapshotSelectorHook, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from './slots.ts'
 import { SessionRuntime } from './sessions/service.ts'
@@ -57,7 +58,7 @@ export type { SessionProvideChannelHost } from './sessions/provide.ts'
 export { createScope, scopeIdentityOf } from './scope.ts'
 export type { AgentScopeHandle } from './scope.ts'
 export { DirectoryBrowseError, WorkspaceArchiveError, WorkspaceCreateError, WorkspaceRuntime } from './workspaces/service.ts'
-export { abbreviateHomePath, resolveWorkspacePath } from './workspaces/path.ts'
+export { abbreviateHomePath, isAbsoluteWorkspacePath, resolveWorkspacePath } from './workspaces/path.ts'
 // Contract only: the scope implementation and its Host transport belong to
 // dsh-client-ui-settings (see that package's settings-scope.ts).
 export type {
@@ -100,11 +101,16 @@ export type {
   SubmissionHandle,
 } from './contract/session.ts'
 export type { AgentContext, ISessions, SessionRuntimeTarget, SessionTarget, SessionReference, SessionRetainOptions, SessionRetainInfo } from './contract/sessions.ts'
-export type { IWorkspaces } from './contract/workspaces.ts'
+export type { IWorkspaces, StartSessionOptions } from './contract/workspaces.ts'
 export type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/session-create.ts'
 export type {
   SessionBinding, SessionListState, SessionProvideContribution, SessionProvideDescriptor, SessionSummary,
 } from './sessions/service.ts'
+export { MutableSessionEventSource, sessionEventLikeEntry } from './contract/events.ts'
+export type {
+  SessionAssistantSettlementEntry, SessionEventChange, SessionEventLikeEntry,
+  SessionEventSource, SessionEventWindow, SessionLiveEventEntry, SessionTransientEventEntry,
+} from './contract/events.ts'
 export type { SessionListPhase, SessionSearchResultItem, SubagentCatalogSnapshot } from './sessions/manager.ts'
 export type { SubagentAddress, JobView, JobOutputChunk, JobOutputCoords, JobOutputValue } from '@deepseek-ai/dsh-client-connection/client'
 export type { ObservedJob } from './sessions/manager.ts'
@@ -128,7 +134,8 @@ export {
 } from '@deepseek-ai/dsh-host-apiproxy/client'
 export type {
   AssistantBlock, AssistantMessageNode, AssistantProviderMetadataView, AssistantRequestConfig,
-  AssistantTiming, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot, ChatTurnNavigationIndex, TurnNavigationItem,
+  AssistantTiming, ChatFlowEntry, ChatGroupMember, ChatGroupSnapshot, ChatGroupStore,
+  ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot, ChatTurnNavigationIndex, TurnNavigationItem,
   CommandNode, CompactionSummaryNode, ComposerPhase,
   ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryNavigationItem, HistoryNavigationSnapshot,
   HistoryNavigationState, HistoryWindowMode,
@@ -142,7 +149,7 @@ export {
 } from './sessions/conversation.ts'
 export { emptyAssistantBlock, IncrementalAssistantBlocks } from './sessions/partial.ts'
 export { assistantStreamFirstTokenTime, isTokenDelta } from './sessions/assistant-timing.ts'
-export { contextForm, contextProducer, sessionRecallLabels } from './sessions/context-producer.ts'
+export { contextForm, contextProducer, sessionRecallLabels, skillInvocationName } from './sessions/context-producer.ts'
 export { displayFailureMessage, isSessionPersistenceFailureMessage } from './sessions/failure-display.ts'
 export type {
   ConversationContext, ConversationContextOriginKind,
@@ -239,7 +246,8 @@ declare module '@deepseek-ai/cordis' {
       next: () => Promise<boolean>,
     ): Promise<boolean>
     /**
-     * A slot's definition or registration set changed.
+     * An ordinary Slot's definition or entry registration set changed. Factory
+     * definitions publish through `subscribeFactory()` instead.
      * @mode emit
      * @param key - the mutated SlotMap key.
      */
@@ -265,6 +273,20 @@ declare module '@deepseek-ai/cordis' {
      * @returns true when a Browser consumer accepts the link; absent handlers retain external navigation.
      */
     'web/browser-open'(request: { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; url: string }): true | undefined
+    /**
+     * Initialize one Session's composer draft after a New Session navigation
+     * commits. A prefill only — listeners mutate the unsent draft and never
+     * send, execute, or log anything.
+     * @param payload - target Session, prompt text, and the clear flag.
+     * @mode emit
+     */
+    'conversation/draft-initialize'(
+      payload: {
+        sessionId: import('@deepseek-ai/dsh-session/types').SessionId
+        prompt?: string
+        clearPreviousDraft?: boolean
+      },
+    ): void
   }
   interface Context {
     slots: import('./slots.ts').SlotRegistry
@@ -328,6 +350,10 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => { permissionCatalog.dispose() }, 'runtime: permission catalog directory')
   ctx.typert.contexts.registerClient('agent', {
     identity: candidate => sessions.sessionOf(candidate)?.sessionId,
+    resolve: (sessionId) => {
+      const reference = sessions.retainAgentScope(sessionId)
+      return typertOwnedValue(reference.binding.ctx, () => { reference.release() })
+    },
   })
   const workspaces = new WorkspaceRuntime(ctx, connection.api, sessions)
   ctx.effect(
@@ -375,6 +401,7 @@ export interface SessionReferenceSourceMap {
   controllerOperation: true
   conversation: true
   workbench: true
+  gateway: true
 }
 
 /** Registered source of a local Session reference. */

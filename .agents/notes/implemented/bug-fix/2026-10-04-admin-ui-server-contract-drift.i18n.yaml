@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-admin-ui-server-contract-drift.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-admin-ui-server-contract-drift.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-admin-ui-server-contract-drift.md
+document:
+  en: f7837313551c28b01698d00cdf8114357105c4b5
+  zh: 5d90c59bd37c7c18ff6129f92a75c1bd67c84b35
 /agent-note-close-admin-ui-drift-against-gateway-server-contracts:
   en: 9d4db4d898294499
   zh: 70641bfabb0e5614

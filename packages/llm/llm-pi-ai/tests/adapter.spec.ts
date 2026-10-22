@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { AttachmentId, AttachmentStore, ImageVariantId } from '@deepseek-ai/dsh-attachment'
 import type {
@@ -28,6 +28,7 @@ import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, taggedThinkingEvents, textEvents } from './mock-server.ts'
 
 afterEach(async () => {
+  vi.useRealTimers()
   vi.unstubAllEnvs()
   await closeMockServers()
 })
@@ -759,17 +760,24 @@ describe('PiAiAdapter provider routing', () => {
   })
 
   it('stops the SDK request when the adapter idle watchdog expires', async () => {
-    const server = await mockServer([{ events: textEvents, delayMs: 200 }])
+    const server = await mockServer([{ holdOpen: true }])
     const ctx = await harness(server.url, { streamIdleTimeoutMs: 20 })
+    const controller = new AbortController()
+    onTestFinished(async () => {
+      controller.abort()
+      await ctx.fiber.dispose()
+    })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
 
-    const result = await assemble(ctx, { model: 'deepseek-flash', messages: [] })
+    const pending = assemble(ctx, { model: 'deepseek-flash', messages: [], signal: controller.signal })
+    await server.requestReceived
+    expect(server.closedResponses).toBe(0)
+    await vi.advanceTimersByTimeAsync(20)
+    vi.useRealTimers()
+
+    const result = await pending
     expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'TIMEOUT' } })
-    await Promise.race([
-      server.responseClosed,
-      new Promise<never>((_resolve, reject) => {
-        setTimeout(() => { reject(new Error('SDK request did not close after idle timeout')) }, 10_000)
-      }),
-    ])
+    await server.responseClosed
 
     expect(server.paths).toEqual(['/chat/completions'])
     expect(server.closedResponses).toBe(1)
@@ -1437,10 +1445,23 @@ it.each([
   new LlmError('missing credential', 'MISSING_CREDENTIAL'),
   new LlmError('invalid credential', 'INVALID_CREDENTIAL'),
   new Error('credential storage failed'),
-])('retains its configured catalog independently of credential failures: $message', async (error) => {
+])('distinguishes missing credentials from catalog failures: $message', async (error) => {
   const adapter = new PiAiAdapter({
     profiles: () => resolveProfiles({ deepseek: { apiKeyEnv: 'PI_TEST_KEY' } }),
     resolveApiKey: () => Promise.reject(error),
+    auth: memoryAuth(),
+  })
+  if (error instanceof LlmError && error.code === 'MISSING_CREDENTIAL') {
+    expect(await adapter.listModels('deepseek')).toEqual([])
+  } else await expect(adapter.listModels('deepseek')).rejects.toBe(error)
+})
+
+it('keeps its configured catalog for a route naming no credential', async () => {
+  const adapter = new PiAiAdapter({
+    profiles: () => resolveProfiles({ deepseek: {} }),
+    // The plugin resolves `undefined` for a profile without apiKeyEnv: pi-ai's
+    // own auth owns the route, and the catalog stays offered.
+    resolveApiKey: () => Promise.resolve(undefined),
     auth: memoryAuth(),
   })
   expect(await adapter.listModels('deepseek')).not.toHaveLength(0)

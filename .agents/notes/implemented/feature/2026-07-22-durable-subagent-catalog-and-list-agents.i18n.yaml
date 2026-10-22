@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-22-durable-subagent-catalog-and-list-agents.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-22-durable-subagent-catalog-and-list-agents.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-22-durable-subagent-catalog-and-list-agents.md
+document:
+  en: a13f3c0a9a90805ce709915ae1801cb493cd92fc
+  zh: 8ca077957e6c5b0ce1b7d2d6b4f7165885ee6872
 /agent-note-durable-subagent-catalog-and-list-agents:
   en: 46c037587724ec5d
   zh: 7ec2ae63a50f9c1c

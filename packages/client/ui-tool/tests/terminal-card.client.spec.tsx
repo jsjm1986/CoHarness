@@ -494,14 +494,49 @@ describe('BashRow terminal card', () => {
     expect(view.getByText('List files')).toBeTruthy()
   })
 
-  it('a non-terminal bash call (background start) renders the summary row alone', () => {
+  it.each([undefined, 'dispatch-parent'])(
+    'expands a background launch into its original arguments and acknowledgement, but no exit status (parent %s)',
+    (parentCallId) => {
+      const argsRaw = JSON.stringify({ command: 'sleep 600', description: 'wait', run_in_background: true })
+      const parent = parentCallId === undefined ? {} : { parentCallId }
+      const genericCall: ToolCallView = { card: 'generic', title: 'sleep 600', kind: 'execute' }
+      const view = render(<BashRow {...rowProps(running({ argsRaw, callView: genericCall, ...parent }))} />)
+      const row = view.container.querySelector('[data-sample="bash"]')!
+      expect(row.getAttribute('aria-expanded')).toBe('false')
+
+      fireEvent.keyDown(row, { key: 'Enter' })
+      expect(view.container.querySelector('[data-command-text]')?.textContent)
+        .toBe(JSON.stringify({ command: 'sleep 600', description: 'wait', run_in_background: true }, null, 2))
+      expect(view.container.querySelector('[data-terminal]')).toBeNull()
+
+      const onOpen = vi.fn()
+      const content = [{ type: 'text' as const, text: 'Ack' }]
+      view.rerender(<BashRow
+        {...rowProps(settled({
+          call: { name: 'bash', argsRaw }, callView: genericCall,
+          resultView: { card: 'generic' }, content, ...parent,
+        }))}
+        inspect={onOpen} />)
+      expect(view.container.querySelector('[data-terminal]')).toBeNull()
+      expect(row.textContent).not.toContain('已完成')
+      expect(view.getByText('Ack')).toBeTruthy()
+      expect(view.container.querySelector('[data-command-text]')?.textContent)
+        .toBe(JSON.stringify({ command: 'sleep 600', description: 'wait', run_in_background: true }, null, 2))
+      fireEvent.click(view.getByText('查看'))
+      expect(onOpen).toHaveBeenCalledTimes(1)
+      fireEvent.keyDown(row, { key: 'Enter' })
+      expect(view.container.querySelector('[data-command-text]')).toBeNull()
+      expect(view.queryByText('查看')).toBeNull()
+    })
+
+  it('keeps malformed shell arguments collapsed even when background execution is requested', () => {
     const view = render(<BashRow {...rowProps(settled({
-      callView: { card: 'generic', title: 'sleep 30', kind: 'execute' },
+      call: { name: 'bash', argsRaw: '{"command":' },
+      callView: { card: 'generic', title: 'bash', kind: 'execute' },
       resultView: { card: 'generic' },
+      content: [{ type: 'text', text: 'Background task started. ID: task_1' }],
     }))} />)
-    expect(view.getByText('List files')).toBeTruthy()
-    expect(view.queryByText(/a\.ts/)).toBeNull()
-    expect(view.container.querySelector('[data-sample="bash"]')?.getAttribute('role')).toBeNull()
+    expect(view.container.querySelector('[data-sample="bash"]')?.hasAttribute('data-expandable')).toBe(false)
   })
 
   it('expands a generic execution error to its original args and full output', () => {

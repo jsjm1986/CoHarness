@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-08-automatic-translation-pairing-merges.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-08-automatic-translation-pairing-merges.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-08-automatic-translation-pairing-merges.md
+document:
+  en: ac4e0c11290abfd48d0f3caf037062aa2fe36c4d
+  zh: 820ebdbe8c20988c4e917704db2f1994ae830fad
 /agent-note-automatically-compose-translation-pairing-records:
   en: ecf5a26a95fa0acc
   zh: 76dd60e779a88ca4

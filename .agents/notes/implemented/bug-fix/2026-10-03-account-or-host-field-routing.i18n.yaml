@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-03-account-or-host-field-routing.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-03-account-or-host-field-routing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-03-account-or-host-field-routing.md
+document:
+  en: 6588e76d88923f7c218950232bb11180beacb0b1
+  zh: 3045237999934e7def84a27d48c1d8832995c981
 /agent-note-route-account-or-host-settings-writes-by-field-whitelist:
   en: 37f48eb36a7bad06
   zh: 419f4f5afd9931b1

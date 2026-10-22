@@ -91,7 +91,6 @@ kind: "package-reference"
 | [`src/events.ts`](src/events.ts) | 按 scope 分层的事件路由：`{ owner }`、`{ owners: 'all' }` 与 `{ owners: 'scope' }` 订阅 |
 | [`src/ring.ts`](src/ring.ts) | 每个任务的有界输出环：追加、保留裁剪、按偏移读取 |
 | [`src/pump.ts`](src/pump.ts) | 注册表拥有的拉取泵：每个任务一个定时器，结算前最后一次排干 |
-| — | 不发布运行时不变式伴生入口；事件协议与事件对读取的检查位于 `@deepseek-ai/dsh-jobs/invariant`。此提供方的准入决策使用私有配置，并且必须在后端启动器运行前失败；当前生产方由 `LocalJobRegistry.start()` 同步执行该决策。发布后再重复聚合只会向 companion 暴露私有配置，也无法验证失败发生在启动前。 |
 
 ### scope 分层
 
@@ -135,7 +134,6 @@ kind: "package-reference"
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 这些限制说明注册表何时不合适。它们是当前包约束，不是任务积压。
 

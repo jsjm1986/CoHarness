@@ -6,20 +6,19 @@ Status: implemented
 
 ## 问题
 
-[原始 `todo_write` 设计](2026-06-29-todo-write-tool.zh.md)在 `execute` 和持久日志不变式中都强制每个列表至多一个 `in_progress` 任务。该不变式假设工作是顺序进行的，但 harness 会运行真正并行的工作（通过委派工具启动的并发 subagent、后台 bash 命令、工作流扇出），而一个只能标出单个活跃任务的列表无法表示这种情况。模型被迫要么把并行任务错误标记为 `pending`，要么把它们合并成一个含糊的条目，导致 UI 进度清单少报了实际正在运行的工作。
+[原始 `todo_write` 设计](2026-06-29-todo-write-tool.zh.md)在 `execute` 中强制每个列表至多一个 `in_progress` 任务。该强制假设工作是顺序进行的，但 harness 会运行真正并行的工作（通过委派工具启动的并发 subagent、后台 bash 命令、工作流扇出），而一个只能标出单个活跃任务的列表无法表示这种情况。模型被迫要么把并行任务错误标记为 `pending`，要么把它们合并成一个含糊的条目，导致 UI 进度清单少报了实际正在运行的工作。
 
 ## 决策
 
 把单一 `in_progress` 上限从固定规则改为部署策略，并要求每个组合都作出选择：
 
 - `packages/todo/tool-todo/src/index.ts` 新增必填的 `Config.allowParallelInProgress` 字段。为 `true` 时，`execute` 接受任意数量的活跃条目，描述指示模型把每个正在处理的任务标记为 `in_progress`（并行工作时可以有多个，顺序工作时只有一个），并在仍有工作未完成时至少保留一个；为 `false` 时，描述要求恰好一个，`execute` 拒绝标记多个活跃条目的调用。
-- `packages/todo/tool-todo/src/invariant.ts` 中的持久日志不变式不再拒绝含多个活跃条目的快照，且不跟随该配置，因此此前持久化的日志不受影响，并行快照在任一策略下都能干净回放。
 
-其余编码的不变式保持不变：`content` 去除首尾空白后非空且唯一、status 为合法枚举值。本决定取代[原始设计的校验决策](2026-06-29-todo-write-tool.zh.md)中「至多一个活跃」的条款；该 Agent Note 的其余部分（整列表替换、日志支撑的状态、单一所有者）依然成立。
+其余编码规则保持不变：`content` 去除首尾空白后非空且唯一、status 为合法枚举值。本决定取代[原始设计的校验决策](2026-06-29-todo-write-tool.zh.md)中「至多一个活跃」的条款；该 Agent Note 的其余部分（整列表替换、日志支撑的状态、单一所有者）依然成立。
 
-## 为何用指引而非感知并行的不变式
+## 为何用指引而非感知并行的规则
 
-编码的不变式只能看到列表，看不到运行时：两个 `in_progress` 条目是否合理，取决于工作是否真的在并发运行，而这一点工具无法观测。因此，恰恰在并行让上限变得重要的场景里，强制上限反而是错的；任何替代方案（例如把活跃条目数限制为当前运行中的 subagent 数量）都会把工具耦合到它有意一无所知的运行时上。把 `in_progress` 标记与真正并发的工作对应起来这一纪律，转移到工具描述中，也就是排序与列表新鲜度已经所在的地方。
+编码规则只能看到列表，看不到运行时：两个 `in_progress` 条目是否合理，取决于工作是否真的在并发运行，而这一点工具无法观测。因此，恰恰在并行让上限变得重要的场景里，强制上限反而是错的；任何替代方案（例如把活跃条目数限制为当前运行中的 subagent 数量）都会把工具耦合到它有意一无所知的运行时上。把 `in_progress` 标记与真正并发的工作对应起来这一纪律，转移到工具描述中，也就是排序与列表新鲜度已经所在的地方。
 
 ## 该策略是部署层的选择
 
@@ -27,7 +26,7 @@ Status: implemented
 
 该开关会同时改变面向模型的指令与接受的输入。把两者拆开才是 bug：描述要求只保留一个活跃任务、而 `execute` 却接受多个，等于教给模型一条工具并不遵守的规则；反过来则会拒绝描述所邀请的调用。描述中只有活跃状态那一句会变化，因为这是该策略唯一改变的指令。
 
-持久日志不变式刻意**不**跟随该开关。在允许并行时写下的日志，在部署收紧策略之后仍必须可回放，因此把 `invariant.ts` 绑定到当前配置会拒绝在写入当时合法的历史。不变式对活跃数量保持沉默；策略生效之处是工具，时机是写入的那一刻。
+回放刻意**不**跟随该开关。在允许并行时写下的日志，在部署收紧策略之后仍必须可回放——没有任何环节会按当前配置重判历史列表。策略生效之处是工具，时机是写入的那一刻。
 
 ## 曾考虑的替代方案
 
@@ -51,4 +50,4 @@ Status: implemented
 
 ## 后果
 
-现在 todo 列表可以忠实反映并行执行，并且每个展示面都能一次渲染多个活跃标记：计划横条的表头会计数活跃条目，工具行则需要上述推导。设置 `allowParallelInProgress: true` 的组合不再拒绝一种此前无效的快照形状；设置为 `false` 的组合仍保留旧的拒绝行为，而持久日志不变式两者都接受。面向模型的描述发生了变化，这重新记录了 tool-catalog 页面以及每个带有 todo schema 的快照伴随文件。此处不记录数量：该集合会随每个新落地的 pin 场景增长。有效规则是：改动工具描述的分支必须刷新它分叉之后落地的那些伴随文件——包括固定 subagent 类工具的编号文件 `tool-schemas.<n>.expected.json`，其 schema 不被父场景覆盖——`pnpm run test:snapshot:refresh` 可以无 key 地对整个语料完成刷新。web fixture（测试前置数据）的 todo 样本现在有两个条目处于 `in_progress`，因此两个由 fixture 驱动的展示面渲染的都是并行计划。`packages/client/ui-conversation/tests/todo-panel.client.spec.tsx` 在 src 上固定工具行摘要与计划横条，ACP（Agent Client Protocol）`todo-write` 场景录制的是三条目、两个活跃的计划，而 `apps/web/tests/todo-row.snapshot.ts` 在组装后的应用中固定这两个面——它从构建产物 `packages/client/*/lib/client.js` 启动，因此是唯一覆盖 keyed 注册与打包接线的地方。该文件把 `summary`、`suffix` 与横条表头记录为独立字段，因此即便拼接后的文本读起来一样，把 `+N` 计数折回摘要字符串也会改变预期输出。
+现在 todo 列表可以忠实反映并行执行，并且每个展示面都能一次渲染多个活跃标记：计划横条的表头会计数活跃条目，工具行则需要上述推导。设置 `allowParallelInProgress: true` 的组合不再拒绝一种此前无效的快照形状；设置为 `false` 的组合仍保留旧的拒绝行为，而回放两者都接受。面向模型的描述发生了变化，这重新记录了 tool-catalog 页面以及每个带有 todo schema 的快照伴随文件。此处不记录数量：该集合会随每个新落地的 pin 场景增长。有效规则是：改动工具描述的分支必须刷新它分叉之后落地的那些伴随文件——包括固定 subagent 类工具的编号文件 `tool-schemas.<n>.expected.json`，其 schema 不被父场景覆盖——`pnpm run test:snapshot:refresh` 可以无 key 地对整个语料完成刷新。web fixture（测试前置数据）的 todo 样本现在有两个条目处于 `in_progress`，因此两个由 fixture 驱动的展示面渲染的都是并行计划。`packages/client/ui-conversation/tests/todo-panel.client.spec.tsx` 在 src 上固定工具行摘要与计划横条，ACP（Agent Client Protocol）`todo-write` 场景录制的是三条目、两个活跃的计划，而 `apps/web/tests/todo-row.snapshot.ts` 在组装后的应用中固定这两个面——它从构建产物 `packages/client/*/lib/client.js` 启动，因此是唯一覆盖 keyed 注册与打包接线的地方。该文件把 `summary`、`suffix` 与横条表头记录为独立字段，因此即便拼接后的文本读起来一样，把 `+N` 计数折回摘要字符串也会改变预期输出。

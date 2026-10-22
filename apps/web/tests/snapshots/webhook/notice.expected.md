@@ -1,1 +1,6 @@
+- "button \"GitHub event received {{clock}}\" [expanded]":
+  - text: GitHub event received
+  - time: "{{clock}}"
+  - img
+- paragraph: This notification triggered this turn.
 - text: A signed external event requests a review.

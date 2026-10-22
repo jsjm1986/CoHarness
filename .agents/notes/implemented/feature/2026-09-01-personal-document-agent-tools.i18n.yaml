@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-01-personal-document-agent-tools.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-01-personal-document-agent-tools.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-01-personal-document-agent-tools.md
+document:
+  en: 18b15b83db7c9fcf827d31d0aae5580c1437bbbc
+  zh: e35a09ef1082c8b548358ca58335535ad690e23c
 /agent-note-personal-document-discovery-is-an-opt-in-agent-consumer:
   en: efdbe2a5c98c70ca
   zh: 60080af6e86630c9

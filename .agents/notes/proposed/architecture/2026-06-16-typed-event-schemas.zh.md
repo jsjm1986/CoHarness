@@ -28,7 +28,7 @@ harness 将其核心词汇——内容块、消息来源、结束原因、轮次
 - **六个 merge-extensible map**（约 370 行核心类型）：`ContentBlockMap`、`MessageSourceMap`、`FinishReasonMap`（位于 `dsh-llm`）；`TurnTriggerMap`、`TurnEndReasonMap`、`SessionEventMap`（位于 `dsh-session`）。
 - **约 10 处 `declare module` 声明增补位置**，分布在 `dsh-agent`、`dsh-agent-loop`、`dsh-shell`、`dsh-llm`、`dsh-session`、`dsh-session-persistence`、`dsh-system-prompt`、`dsh-tools` 各包中——每处都将从声明合并改为运行时 `register()` 调用。
 - **事件生产者**——agent loop（智能体循环）中 16 处 `session.append(...)` 调用——形状不变，但现在在边界处被校验。
-- **约 7 个 switch 消费方**，对这些联合类型进行分支：`deriveMessages` 与包自有的不变式 companion（`dsh-session`）、`BlockAssembler`（`dsh-llm`）、两个 LLM（大语言模型）适配器（`dsh-llm-deepseek`、`dsh-llm-pi-ai`）以及工具 schema 层（`dsh-tools`）。`assertNever` 对封闭联合类型的穷举 vs 对可扩展联合类型的 fall-through 约定（一条已记录的 lint 规则）需要重新考量——运行时变体在静态层面不可穷举。
+- **约 7 个 switch 消费方**，对这些联合类型进行分支：`deriveMessages`、`BlockAssembler`（`dsh-llm`）、两个 LLM（大语言模型）适配器（`dsh-llm-deepseek`、`dsh-llm-pi-ai`）以及工具 schema 层（`dsh-tools`）。`assertNever` 对封闭联合类型的穷举 vs 对可扩展联合类型的 fall-through 约定（一条已记录的 lint 规则）需要重新考量——运行时变体在静态层面不可穷举。
 - **`defineTool` 的 `InferArgs` DSL**（`dsh-tools`），它从编译期 schema 规范派生出零类型转换的 `execute` 参数类型——这是当前方案的标杆用例。
 - **文档**：architecture.md（该模式被描述为基础性的）、[开发模式不变式](../../implemented/architecture/2026-06-11-dev-invariants-over-deep-readonly.zh.md)，以及所有引用该模式的 Agent Note。
 
@@ -72,4 +72,3 @@ harness 将其核心词汇——内容块、消息来源、结束原因、轮次
 
 - 如果采用注册表，库选 **schemastery**（已在仓库中，已作为配置 schema 库）还是 **Zod**（生态更丰富，目前仅为传递依赖）？同时维护两个 schema 库本身就是一种成本。
 - 能否采用混合方案：保留编译期推断（使 `defineTool` 和插件开发体验不受影响），同时为每个变体添加*可选*的运行时 schema，仅在持久化/协议边界校验，而非每次进程内 append 都校验？
-- `ctx.invariants` 服务启用后是否已覆盖了足够多的运行时形状缺口，使得边界校验仅在面对真正不可信输入（重新加载外部修改过的日志）时才有必要？

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-19-make-jsonrpc-directional.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-19-make-jsonrpc-directional.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/simplification/2026-07-19-make-jsonrpc-directional.md
+document:
+  en: be0d8003e066b8695fb413d5a546e43694bf2225
+  zh: d070983b14898078b481a930eb70e7f6db53714a
 /agent-note-make-json-rpc-completion-and-transport-directional:
   en: b6581586a3a5cb53
   zh: 6cf431bf3c345d7c

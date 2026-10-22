@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-28-sdk-max-output-tokens.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-28-sdk-max-output-tokens.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-sdk-max-output-tokens.md
+document:
+  en: 72a9e87484ca87e0a750f52d7e46db7aee436d21
+  zh: 820008ec7293cfee20c0a9c26037f746c9e081c2
 /agent-note-sdk-max-output-tokens:
   en: edf7002dd118a633
   zh: 491f3145e4b6e40d

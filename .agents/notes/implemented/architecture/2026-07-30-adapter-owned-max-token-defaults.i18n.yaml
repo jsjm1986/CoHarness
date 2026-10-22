@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-adapter-owned-max-token-defaults.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-adapter-owned-max-token-defaults.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-adapter-owned-max-token-defaults.md
+document:
+  en: ec6a68b74d0cdaefcd214be98efb32377721169a
+  zh: 700d90125c125184625afc33ebf64add4ab9191c
 /agent-note-adapter-owned-max-token-defaults:
   en: bf9d5b4ba5d7009d
   zh: 1a727fec99e0481f

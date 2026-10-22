@@ -18,7 +18,7 @@
       "path": "../deepseek-llm-api-extensions"
     },
     {
-      "path": "../../preset/agent-presets"
+      "path": "../../preset/agent-preset-registry"
     },
     {
       "path": "../../../vendor/cordis"

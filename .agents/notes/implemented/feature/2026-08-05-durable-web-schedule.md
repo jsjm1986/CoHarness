@@ -14,7 +14,7 @@ Busy Agents, long waits, wall-clock changes, cold Sessions, forks, persistence f
 
 The [`examples/web-schedule`](../../../../examples/web-schedule/README.md) overlay explicitly loads `@deepseek-ai/dsh-time-context` and `@deepseek-ai/dsh-schedule`; the default Web tree remains unchanged. Schedule observes only root Agents published after the plugin loads and installs its three tools plus one disposable owner in that Agent scope. Cold history reads, already-published roots, child Agents, and other hosts do not activate it.
 
-The user-visible boundary is `session-local`: the original Session runs an on-time reminder only while live, does no external notification while cold, and processes an overdue reminder after it becomes live again. Due work waits until the Agent is fully idle, then enters the ordinary next-turn queue through `followup()`; it never steers the current turn and has no independent Web receipt ([conversational delivery](../simplification/2026-08-09-conversational-schedule-delivery.md)).
+The user-visible boundary is `session-local`: the original Session runs an on-time reminder only while live, does no external notification while cold, and processes an overdue reminder after it becomes live again. Due work waits until the Agent is fully idle, then enters the ordinary next-turn queue through `followup()`; it never steers the current turn and has no independent Web receipt ([conversational delivery](../../archived/simplification/2026-08-09-conversational-schedule-delivery.md)).
 
 | Scenario | Durable fact | Live behavior | User-visible result |
 | --- | --- | --- | --- |
@@ -46,7 +46,7 @@ Every is a fixed-duration interval, not a calendar rule. The first target is cre
 
 All distinct overdue Every records participate in one batch, each with one latest occurrence and one shared `acceptedAt`. There is no cross-record cooldown, gate, quota, or retained batch timestamp. A five-minute minimum bounds wake and model-request frequency. If the next sequence point would exceed the four-digit-year storage range, dispatch terminates that record.
 
-Calendar and Cron expressions are deliberately absent ([bounded recurrence simplification](../simplification/2026-08-09-bounded-fixed-rate-schedule.md)); supporting them would add a time-zone-sensitive calendar language, evaluator dependency, validation surface, and tzdata replay policy unrelated to fixed-rate reminders.
+Calendar and Cron expressions are deliberately absent ([bounded recurrence simplification](../../archived/simplification/2026-08-09-bounded-fixed-rate-schedule.md)); supporting them would add a time-zone-sensitive calendar language, evaluator dependency, validation surface, and tzdata replay policy unrelated to fixed-rate reminders.
 
 ### Live delivery lifecycle
 

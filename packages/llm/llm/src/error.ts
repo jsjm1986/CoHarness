@@ -9,7 +9,7 @@ import type { LlmFailure } from './types.ts'
 
 /**
  * Base class for all harness errors. Carries a `code` (stable, programmatic —
- * e.g. `NO_ADAPTER`, `INVALID_ARGS`, `INVARIANT`) distinct from the
+ * e.g. `NO_ADAPTER`, `INVALID_ARGS`) distinct from the
  * human-readable `message`, and supports `cause` chaining via the standard
  * `ErrorOptions`. `name` defaults to the subclass constructor name.
  */

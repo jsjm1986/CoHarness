@@ -5,7 +5,7 @@
  * conversation wiring layer alone sees the full SessionInput. InputMachine
  * (machine.ts) is package-private and never exported.
  */
-import type { ClientContext, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionId, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { UserDocIdType } from '@deepseek-ai/dsh-userdoc'
 import type {
@@ -56,7 +56,7 @@ export interface InputTarget {
 /** Draft and browser-owned attachment mutations shared by action faces. */
 interface InputDraftActions {
   /** Single public draft write path (full next draft; occurrence math via diff scan). */
-  setDraft(text: string): void
+  setDraft(input: string | DraftSnapshot): void
   /** Append ordered browser-owned image ids; busy admission phases refuse. */
   addImages(ids: readonly DraftAttachmentId[]): boolean
   /** Remove one browser-owned image id; busy admission phases refuse. */
@@ -88,14 +88,39 @@ export interface SessionInput extends InputTarget, InputDraftActions {
    * @param text - notice body.
    */
   notify(level: 'info' | 'error', text: string): void
+  /**
+   * Export the draft as an editor-independent snapshot for cross-session
+   * carry-over: reference spans without machine-local ids.
+   * @returns the current semantic draft.
+   */
+  draftSnapshot(): DraftSnapshot
   /** Input state store (InputZone currency + decorations read here). */
   readonly state: SnapshotStore<InputState>
+}
+
+/**
+ * Draft initialization handed to a Session's input before its composer
+ * exists. Carried by the `conversation/draft-initialize` root event.
+ */
+export interface DraftInitializationOptions {
+  /** Unsent text the draft starts with — a prefill only; nothing is sent or executed. */
+  readonly prompt?: string
+  /** Replace the Session's draft text; omitted preserves a nonempty draft. Attachments are untouched either way. */
+  readonly clearPreviousDraft?: boolean
 }
 
 /** Session-addressed access to the per-session input facade. */
 export interface SessionInputResolver {
   /** Resolve the facade for one session-scope ctx. */
   for(actx: ClientContext): SessionInput
+  /**
+   * Apply draft initialization to one Session — immediately when its shell
+   * exists, or at shell creation otherwise. A live submission owns the draft
+   * and refuses the change; the latest request supersedes an unconsumed one.
+   * @param sessionId - target Session.
+   * @param options - prompt text and/or the clear flag.
+   */
+  requestDraftInitialization(sessionId: SessionId, options: DraftInitializationOptions): void
 }
 
 /**
@@ -217,6 +242,22 @@ export interface Occurrence {
   readonly invalid?: boolean
 }
 
+/** A reference occurrence without its machine-local identity. */
+export type DraftReference = Omit<Occurrence, 'occurrenceId'>
+
+/**
+ * Semantic draft snapshot shared by cross-session carry-over: display text
+ * plus ordered, non-overlapping reference spans. `command.token` records the
+ * leading claimed token for validation only — a live claim's submit closure
+ * cannot move sessions, so a restored token is re-claimed by the trigger
+ * watcher on the next track.
+ */
+export interface DraftSnapshot {
+  readonly text: string
+  readonly references: readonly DraftReference[]
+  readonly command?: { readonly token: string }
+}
+
 /** One sync-matched paste component; start/end are relative to the pasted text. */
 export interface PasteComponent extends EditSelection {
   readonly reference: ReferenceInsert
@@ -318,6 +359,8 @@ export type InputEvent =
   | { readonly type: 'adjudicated'; readonly attempt: SubmitAttempt; readonly outcome: PickOutcome }
   | { readonly type: 'adjudication-failed'; readonly attempt: SubmitAttempt; readonly message: string }
   | { readonly type: 'submit-settled'; readonly attempt: SubmitAttempt; readonly ok: boolean; readonly outcome?: SubmitOutcome; readonly message?: string }
+  /** Wholesale draft install for cross-session carry-over; reference spans re-mint as fresh occurrences. */
+  | { readonly type: 'draft-restored'; readonly snapshot: DraftSnapshot }
   /** Commit an image-only send whose empty draft did not need an attempt. */
   | { readonly type: 'send-committed' }
   | { readonly type: 'release' }

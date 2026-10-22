@@ -152,6 +152,56 @@ describe('sessions.list cold merge', () => {
     ]))
   })
 
+  it('serves a probed cold Session preset from its events, not its header', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const root = mkdtempSync(join(tmpdir(), 'dsh-cold-preset-'))
+    const smallPath = join(root, 'small.log')
+    const largePath = join(root, 'large.log')
+    writeFileSync(smallPath, 'x'.repeat(1024))
+    writeFileSync(largePath, 'x'.repeat(1025))
+    // Both rows recorded 'creation' at birth; the small one then switched
+    // while blank — a fact only its event log carries.
+    const metas = [
+      header('probed-switched', 100, { agentPreset: 'creation' }),
+      header('unprobed-switched', 200, { agentPreset: 'creation' }),
+    ]
+    const readFrom = vi.fn(async (id: SessionId) => {
+      if (id === sid('probed-switched')) {
+        return {
+          meta: metas[0]!,
+          events: [
+            { type: 'agent-preset/selected', seq: 0, time: 800, data: { agentPreset: 'switched' } },
+          ] as SessionEvent[],
+        }
+      }
+      throw new Error(`unexpected cold read: ${id}`)
+    })
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve(metas.map(header => ({ header }))),
+      listHeaders: () => Promise.resolve(metas),
+      locate: (meta: SessionHeader) => meta.id === sid('unprobed-switched')
+        ? { kind: 'jsonl', path: largePath }
+        : { kind: 'jsonl', path: smallPath },
+      readFrom,
+    } as never)
+    ctx.provide('sessionProjectionCache', { cachedSnapshot: () => undefined } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.list(request({}))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    const byId = Object.fromEntries(response.result.value.items.map(item => [item.sessionId, item]))
+    // The probe already paid the log read, so the summary resolves the
+    // blank-window switch the same way a live row would.
+    expect(byId['probed-switched']).toMatchObject({ agentPreset: 'switched' })
+    // An unprobed row stays header-only: a large log read for that switch
+    // would defeat the index read.
+    expect(byId['unprobed-switched']).toMatchObject({ agentPreset: 'creation' })
+    expect(readFrom).toHaveBeenCalledTimes(1)
+  })
+
   it('can disable bounded blank probes without hiding cold Sessions', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

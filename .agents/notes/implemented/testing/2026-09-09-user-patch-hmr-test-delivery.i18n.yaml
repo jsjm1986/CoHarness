@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-09-user-patch-hmr-test-delivery.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-09-user-patch-hmr-test-delivery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-09-user-patch-hmr-test-delivery.md
+document:
+  en: 32ee3073dcb67e1f6bed70c515dd9b6990b97d03
+  zh: bcd6f261c0ec4428f4f28138e7e62b80141dd981
 /agent-note-user-patch-tests-control-filesystem-event-delivery:
   en: c2c70a16f6deea8b
   zh: 3b11c81b87910ce7

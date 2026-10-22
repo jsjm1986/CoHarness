@@ -51,13 +51,10 @@ kind: "package-reference"
 
 续行启用状态绝不持久化。新缓存与每次 `agent/created` 初始化都会停用续行，即使回放找到了持久 phase 为 active 的目标。续行驱动器在卸载前或持久性不确定后也会调用 `disarm()`。因此，会话恢复、fork 与驱动器替换会保留目标、phase、revision 和已准入 Round 数量，却不会启动工作；之后必须通过显式 resume 变更重新启用续行。
 
-单独发布的 `./invariant` 配套模块会为每个已挂接会话维护独立折叠。它会在候选事件进入持久日志前拒绝格式错误的 goal 变更、不连续 revision、非法生命周期转换、时间戳回退，以及不连续的已准入 Round。
-
 <a id="extension-points"></a>
 ## 扩展点
 
 策略插件调用服务动词，并响应限定范围的 `goal/changed` 事件。续行消费方将 Round 准入为 `user/message` 事件，并携带 `GoalMessageSource`；普通的人类轮次绝不会增加 `roundsStarted`。消费方使用 `Agent` 接口和事件，不导入 `dsh-agent-loop`。
-
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-22-tsconfig-solution-root-two-aggregates.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-22-tsconfig-solution-root-two-aggregates.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-22-tsconfig-solution-root-two-aggregates.md
+document:
+  en: 6e8d192b5fea1c7045ade6935fd0e2dc8434c502
+  zh: 6c8ad99168bd566a37b02d602c12328275b9458a
 /agent-note-solution-root-over-two-aggregate-programs:
   en: 6c84b47b35c9afdf
   zh: 713a0ec10ff582b0

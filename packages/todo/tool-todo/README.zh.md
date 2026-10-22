@@ -67,7 +67,6 @@ kind: "package-reference"
 
 函数／命名空间插件：导出 `name`/`inject`/`apply`，不提供默认导出。意外的 `export default` 会被 Loader 的 `unwrapExports` 折叠为默认导出，并导致 `inject` 丢失（参见 [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)）。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 

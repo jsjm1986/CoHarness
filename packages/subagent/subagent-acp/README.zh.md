@@ -21,7 +21,6 @@ ACP（Agent Client Protocol）提供方会在全新的子进程中运行每个 s
 - [持续成员（`resume`）](#persistent-members-resume)
 - [结束原因映射](#stop-reason-mapping)
 - [进程边界](#process-boundary)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -44,7 +43,7 @@ ACP（Agent Client Protocol）提供方会在全新的子进程中运行每个 s
 <a id="capabilities-and-context"></a>
 ## 能力与上下文
 
-ACP 不声明任何启动时能力，因为当前进程无法强制执行远程子 agent 的深度、工具过滤、persona 或结构化输出运行时。它也报告 `inheritsParentContext: false`：远程会话从全新状态开始，唯一源自父级的输入是上述工作区 cwd；对话上下文不会跨越进程边界。
+ACP 不声明任何启动时能力，因为当前进程无法强制执行远程子 agent 的 preset、路由选项、深度或结构化输出运行时。它也报告 `inheritsParentContext: false`：远程会话从全新状态开始，唯一源自父级的输入是上述工作区 cwd；对话上下文不会跨越进程边界。
 
 <a id="configuration"></a>
 ## 配置
@@ -102,12 +101,6 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 本包没有默认导出。否则 Cordis loader 的解包会隐藏具名 `inject` 元数据；见[事故复盘（postmortem）0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)。
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次运行通过 ACP 有线驱动一个子方；子方的运行时拥有其会话，提供方只持有进行中的客户端。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -115,7 +108,7 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 #### 模型看到什么
 
-远程子 agent 通过 ACP 接收独立任务内容，并使用其自身进程配置的系统提示词、工具和全新会话。它不接收父级对话。本提供方不声明可选启动时能力，因此本地服务会拒绝要求 `agentOptions`、persona、工具过滤、深度强制或结构化输出的请求，而不是静默省略。
+远程子 agent 通过 ACP 接收独立任务内容，并使用其自身进程配置的系统提示词、工具和全新会话。它不接收父级对话。本提供方不声明可选启动时能力，因此本地服务会拒绝要求 `agentPreset`、`agentOptions`、深度强制或结构化输出的请求，而不是静默省略。
 
 #### Token 影响
 
@@ -144,7 +137,7 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 - **每次运行使用全新进程**：持久进程池属于后续优化（见 [seam Agent Note](../../../.agents/notes/implemented/feature/2026-06-21-subagent-capability-seam.zh.md)）。
 - **仅支持本地工作区**：解析后的 cwd 是交给同一台机器上子进程的本地路径；远程 ACP agent 的工作区映射需要独立的后端能力，此处尚未设计这种能力。
-- **不支持可选启动时能力**：该提供方无法在远程进程内应用本地 harness 的 `outputSchema`、深度上限、工具过滤器或 persona，因此不会声明这些能力；服务会拒绝需要它们的请求。
+- **不支持可选启动时能力**：本提供方无法在远程进程内应用 `agentPreset`、`agentOptions`、`outputSchema` 或深度上限，因此不会声明这些能力；服务会拒绝需要它们的请求。
 - **只收集已提交的 `agent_message_chunk` 文本**：自动化服务器把推理（reasoning）、工具活动、计划和其他 trace 数据保留在子 agent 会话日志中，不通过 ACP 发出。
 - **权限提示自动回答**（`permission: allow | reject`）：不会把子 agent 的 `session/request_permission` 呈现给人。
 

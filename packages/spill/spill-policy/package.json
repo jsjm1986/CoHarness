@@ -70,7 +70,7 @@
     "@deepseek-ai/dsh-tool-fs": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.5",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:*"
   }
 }

@@ -23,9 +23,11 @@ import { SettingsRoot } from './SettingsRoot.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
 import { DeveloperToolsRow, type DeveloperToolsRowInjected } from './DeveloperToolsRow.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
+import { CurrentVersionRow } from './CurrentVersionRow.tsx'
 import { SettingsDocumentAction } from './SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.tsx'
 import { SettingsDocumentStore } from './settings-document-store.ts'
+import { HostReleasePrompt, type HostReleasePromptInjected } from './HostReleasePrompt.tsx'
 import { createSettingsShellStore } from './shell-store.ts'
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -58,7 +60,7 @@ const NS = 'settings'
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registrations depend on their slots through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'shortcuts']
+export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'shortcuts', 'modules']
 
 /**
  * Register the `settings` dictionaries, the chrome content, and the General
@@ -155,8 +157,8 @@ export function apply(ctx: ClientContext): void {
         'desktop:macos': { code: 'Comma', modifiers: ['primary'] },
         'desktop:windows': { code: 'Comma', modifiers: ['primary'] },
         'desktop:linux': { code: 'Comma', modifiers: ['primary'] },
-        'web:macos': { code: 'Comma', modifiers: ['primary'] },
-        'web:windows': { code: 'Comma', modifiers: ['primary'] },
+        'web:macos': { code: 'Comma', modifiers: ['primary', 'alt'] },
+        'web:windows': { code: 'Comma', modifiers: ['primary', 'alt'] },
       },
       regions: ['page', 'editable', 'terminal'], modals: ['settings'],
       resolve: ({ modal }) => {
@@ -206,6 +208,10 @@ export function apply(ctx: ClientContext): void {
       setEnabled: enabled => ctx.settingsScope.developerTools.setEnabled(enabled),
     }),
   }, DeveloperToolsRow))
+  // Version information follows the core preferences.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item', id: 'current-version', order: 100, locale: NS,
+  }, CurrentVersionRow))
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'general',
@@ -214,4 +220,13 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     children: { 'settings.general.item': { kind: 'list', scope: 'root' } },
   }, GeneralSection))
+  // The page's module system applies no plugin update from another Host release; this dialog offers the reload.
+  const releasePromptInjected = (): HostReleasePromptInjected => ({
+    dismissRelease: () => { ctx.modules.entries.dismissRelease() },
+    reloadPage: () => { globalThis.location.reload() },
+    hooks: { releaseChange: ctx.modules.entries.releaseChange },
+  })
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay', id: 'host-release-change', locale: NS, inject: releasePromptInjected,
+  }, HostReleasePrompt))
 }

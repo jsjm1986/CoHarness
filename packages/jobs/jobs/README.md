@@ -13,7 +13,7 @@ A running or stopping job answers the Workspace registry's archive-admission pro
 
 ## Summary
 
-`dsh-jobs` lets tools keep long-running work active while an agent continues. Each job receives a stable `<kind>-N` id, and its owning agent can read output, wait with a timeout, or request cancellation. Ownership is scoped to the agent session, so other agents cannot inspect or stop the job; completion arrives as an in-session notice without polling. Users can watch retained live output without consuming what the agent can read. Background jobs can start only when the deployment supplies job execution.
+`dsh-jobs` lets tools keep long-running work active while an agent continues. Each job receives a stable `<kind>-<short-uuid>` id, and its owning agent can read output, wait with a timeout, or request cancellation. Ownership is scoped to the agent session, so other agents cannot inspect or stop the job; completion arrives as an in-session notice without polling. Users can watch retained live output without consuming what the agent can read. Background jobs can start only when the deployment supplies job execution.
 
 ## Table of Contents
 
@@ -33,13 +33,13 @@ Use this package when you are composing a background-job capability or writing a
 
 ### What a background job gives you
 
-A producer registers work with a kind and a one-line label; the registry returns a `<kind>-N` id such as `bash-1`. Anyone who owns the job can read output, list jobs, wait up to a timeout for settlement, and request cancellation — each call returns a fresh projection of the job's status, from `running` and `stopping` to the terminal `completed`, `killed`, or `failed`. When a job settles, the registry's event stream announces it and `dsh-tool-jobs` turns the settlement into an in-session notice, so no polling is needed. A producer may attach an optional byte cap so each complete model-facing read or notice stays bounded.
+A producer registers work with a kind and a one-line label; the registry returns a `<kind>-<short-uuid>` id such as `bash-<short-uuid>`, where the suffix is 16 lowercase UUID hex characters. Anyone who owns the job can read output, list jobs, wait up to a timeout for settlement, and request cancellation — each call returns a fresh projection of the job's status, from `running` and `stopping` to the terminal `completed`, `killed`, or `failed`. When a job settles, the registry's event stream announces it and `dsh-tool-jobs` turns the settlement into an in-session notice, so no polling is needed. A producer may attach an optional byte cap so each complete model-facing read or notice stays bounded.
 
 A producer streams output by naming pull sources on its spec — non-consuming offset readers the registry pumps at its own cadence — or by pushing chunks through the `JobHandle` its starter receives; both land in the job's bounded ring, where `stdout` and `stderr` chunks reach the model and `log` chunks reach observers only. Observers read retained chunks at absolute byte offsets and are signaled on advancement; the settlement that ends the job also ends the stream, and `updateProgress` publishes a live progress line into every projection until then. Observation is invisible to the model: `readAt` consumes nothing and never touches notice state.
 
 ### The ownership boundary
 
-A job belongs to the agent session that started it: another agent cannot read or stop it. Ids such as `bash-1` are predictable, so this fence is authorization, not secrecy. A job started without an owner is open to any caller and lasts until the service is disposed.
+A job belongs to the agent session that started it: another agent cannot read or stop it. Ids such as `bash-<short-uuid>` are unforgeable-looking but the fence is still authorization, not secrecy. A job started without an owner is open to any caller and lasts until the service is disposed.
 
 ### Starting background work needs a controller
 
@@ -86,7 +86,6 @@ This section explains the design decisions behind the contract and points at the
 | [`src/brand.ts`](src/brand.ts) | `JobId` branded identifier, importable without the agent dependency |
 | [`src/archive-admission.ts`](src/archive-admission.ts) | The `job` family of the Workspace registry's archive admission, installed by the seam's constructor for every implementation |
 | [`src/idle-release.ts`](src/idle-release.ts) | The jobs veto on `agent/idle-release-check`, installed by the seam's constructor for every implementation |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion: checks the announced event protocol per job (registered first, one settlement, removal last) and each announced projection against the registry's own read |
 
 ### Service operations
 
@@ -125,7 +124,6 @@ No direct invalidation; the named consumers own any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the contract is a poor fit. They are current package constraints, not a task backlog.
 

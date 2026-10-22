@@ -20,7 +20,6 @@ Install `@deepseek-ai/dsh-subagent-codex` into a Profile when delegated work sho
 - [Configuration](#configuration)
 - [Persistent members](#persistent-members)
 - [Product compatibility and evidence](#product-compatibility-and-evidence)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -145,11 +144,6 @@ Generated schema evidence and package tests pin all sixteen error-info variants,
 
 Installing with optional dependencies omitted, using an unsupported platform, or losing the selected payload makes the first delegation fail at `initialize` with the safe `unknown` category and any observed process outcome. Raw wrapper text remains on Host stderr; the provider neither probes a host CLI nor retries with one. An isolated wrapper fixture separately proves the native payload failure and absence of host fallback.
 
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run submits one task to an ephemeral Codex thread in the delegating workspace and returns its result; no session state is retained between runs.
-
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -190,7 +184,7 @@ Append-only: foreground adds one result after the reusable parent prefix, while 
 - **Compatibility is pinned by development evidence** — upgrading from the verified 0.153.4 protocol baseline requires regenerating upstream schema evidence and rerunning handshake, answer-selection, approval, cancellation, keyless real-product, and credentialed DeepSeek nonce tests.
 - **No human approval path** — known unattended approval requests are denied and unknown server requests fail closed; the three Profile modes never create a DSH interaction channel or per-call allow policy.
 - **Assistant payload is final text only** — a failed run may additionally expose the separate safe diagnostic; reasoning, commentary, intermediate messages, tool traffic, usage, raw stderr, and workspace diffs remain outside the parent Session, while generic Job ids, notices, and status come from the shared job runtime.
-- **No optional shared capabilities** — output schemas, child personas, tool filtering, and harness depth enforcement are rejected by the shared service for this provider.
+- **No optional shared capabilities** — `agentPreset`, `agentOptions`, output schemas, and harness depth enforcement are rejected by the shared service for this provider.
 - **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
 
 <a id="dev-note"></a>

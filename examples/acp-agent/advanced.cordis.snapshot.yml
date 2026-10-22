@@ -17,7 +17,7 @@
           workspaceContext:
             maxBytes: 65536
           tools:
-            mode: both
+            mode: native
           persona: |
             You are a coding assistant powered by the {{model}} model.
 
@@ -29,6 +29,8 @@
             name: '@deepseek-ai/dsh-cordis-host-runner'
           - id: tool-cordis
             name: '@deepseek-ai/dsh-tool-cordis'
+          - id: advanced-toolchain-presentation
+            name: './advanced-toolchain-presentation.mjs'
           - id: llm-replay
             name: '@deepseek-ai/dsh-llm-replay'
             config:

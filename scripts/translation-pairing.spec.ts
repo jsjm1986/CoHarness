@@ -5,14 +5,17 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { gitIndexPaths, readGitIndexBlob } from './translation-pairing-git.ts'
+import { gitBlobHash, gitIndexPaths, readGitIndexBlob } from './translation-pairing-git.ts'
+import { normalizeTranslationMarkdownLinkEdits } from './translation-links.ts'
 import {
   computeTranslationPairingRecord,
+  normalizedTopLevelBlocks,
   parseTranslationPairingRecord,
   renderTranslationPairingRecord,
   translationPairingRecordDiff,
   translationPairPaths,
   type TranslationPairingRecord,
+  type TranslationSectionHashes,
 } from './translation-pairing-record.ts'
 import {
   isTranslationPairingManifestExcluded,
@@ -70,7 +73,7 @@ describe('translation pairing index reads', () => {
       execFileSync('git', ['-C', root, 'add', 'owner.md'])
       writeFileSync(join(root, 'owner.md'), 'unstaged')
 
-      expect(readGitIndexBlob(root, 'owner.md')?.toString('utf8')).toBe('staged')
+      expect(readGitIndexBlob(root, 'owner.md')?.content.toString('utf8')).toBe('staged')
       expect(readGitIndexBlob(root, 'absent.md')).toBeUndefined()
     } finally {
       rmSync(root, { recursive: true, force: true })
@@ -133,6 +136,7 @@ describe('translation pairing manifest', () => {
 
 describe('translation pairing switchers', () => {
   it('exempts only paired generated English sources from reciprocal switchers', () => {
+    expect(requiresSourceLanguageSwitcher('docs/cli-help.md')).toBe(false)
     expect(requiresSourceLanguageSwitcher('docs/config-catalog.md')).toBe(false)
     expect(requiresSourceLanguageSwitcher('docs/cordis-api/context.md')).toBe(false)
     expect(requiresSourceLanguageSwitcher('docs/cordis-api/inherited.md')).toBe(false)
@@ -226,15 +230,18 @@ describe('translation pairing records', () => {
 
   it('keys sections by English heading path and hashes everything outside code blocks and generated regions', () => {
     const computed = record(en, zh)
-    expect([...computed.keys()]).toEqual(['/guide', '/guide/events', '/guide/code'])
-    expect(record(en.replace('pnpm run x', 'pnpm run y'), zh.replace('pnpm run x', 'pnpm run y'))).toEqual(computed)
+    expect([...computed.keys()]).toEqual(['document', '/guide', '/guide/events', '/guide/code'])
+    const sections = (computedRecord: TranslationPairingRecord): [string, TranslationSectionHashes][] =>
+      [...computedRecord].filter(([key]) => key !== 'document')
+    expect(sections(record(en.replace('pnpm run x', 'pnpm run y'), zh.replace('pnpm run x', 'pnpm run y'))))
+      .toEqual(sections(computed))
     expect(record(
       en.replace('| `b` | `emit` |', '| `b` | `emit` |\n| `c` | `emit` |'),
       zh.replace('| `b` | `emit` |', '| `b` | `emit` |\n| `c` | `emit` |'),
     )).not.toEqual(computed)
     const region = (rows: string): string => renderGeneratedRegion('events', `| Event |\n| --- |\n${rows}`)
-    expect(record(`${en}\n${region('| `a` |')}\n`, `${zh}\n${region('| `a` |')}\n`))
-      .toEqual(record(`${en}\n${region('| `b` |')}\n`, `${zh}\n${region('| `b` |')}\n`))
+    expect(sections(record(`${en}\n${region('| `a` |')}\n`, `${zh}\n${region('| `a` |')}\n`)))
+      .toEqual(sections(record(`${en}\n${region('| `b` |')}\n`, `${zh}\n${region('| `b` |')}\n`)))
     expect(record(`${en}\n## \`x\`\n\nshared\n`, `${zh}\n## \`x\`\n\nshared\n`).has('/guide/x')).toBe(true)
     const packaged = renderGeneratedRegion('pkg', '## `x`\n\n- `inject`: `a`\n\n```sh\nx\n```')
     expect(record(`${en}\n${packaged}\n`, `${zh}\n${packaged}\n`).has('/guide/x')).toBe(false)
@@ -245,9 +252,77 @@ describe('translation pairing records', () => {
       `---\nkind: guide\n---\n${en}\nSee [bar](bar.md).\n\n## Events\n\nAgain.\n`,
       `---\nkind: 指南\n---\n${zh}\nSee [bar](bar.zh.md).\n\n## 事件\n\n再次。\n`,
     )
-    expect([...computed.keys()]).toEqual(['/', '/guide', '/guide/events', '/guide/code', '/guide/events~2'])
+    expect([...computed.keys()]).toEqual(['document', '/', '/guide', '/guide/events', '/guide/code', '/guide/events~2'])
     expect(record(`${en}\nSee [bar](bar.md).\n`, `${zh}\nSee [bar](bar.zh.md).\n`))
-      .toEqual(record(`${en}\nSee [bar](bar.zh.md).\n`, `${zh}\nSee [bar](bar.md).\n`))
+      .not.toEqual(record(`${en}\nSee [bar](bar.zh.md).\n`, `${zh}\nSee [bar](bar.md).\n`))
+    expect([...record(`${en}\nSee [bar](bar.md).\n`, `${zh}\nSee [bar](bar.zh.md).\n`)].filter(([key]) => key !== 'document'))
+      .toEqual([...record(`${en}\nSee [bar](bar.zh.md).\n`, `${zh}\nSee [bar](bar.md).\n`)].filter(([key]) => key !== 'document'))
+  })
+
+  it('retains section hashes after normalized links move later heading offsets', () => {
+    const english = '# Guide\n\n[Reference](bar.md?x=1&amp;y=2#tail)\n\n## Tail\n\nTail body.\n'
+    const chinese = '# 指南\n\n[参考](bar.zh.md?x=1&amp;y=2#tail)\n\n## 尾部\n\n尾部正文。\n'
+    const trees = { en: parseTranslationMarkdown(english), zh: parseTranslationMarkdown(chinese) }
+    const originalTrees = structuredClone(trees)
+    const computed = computeTranslationPairingRecord(paths, english, chinese, context, trees)
+
+    expect([...computed]).toEqual([
+      ['document', { en: gitBlobHash(Buffer.from(english)), zh: gitBlobHash(Buffer.from(chinese)) }],
+      ['/guide', { en: '3f43f06d1244d874', zh: '021cfe53b05ba084' }],
+      ['/guide/tail', { en: '945d8537bf1f2b5f', zh: '0a851cb395705d76' }],
+    ])
+    expect(computed).toEqual(record(english, chinese))
+    expect(trees).toEqual(originalTrees)
+  })
+
+  it('retains section hashes when the authored tree needs no link normalization', () => {
+    const english = '# Guide\n\nBody.\n'
+    const chinese = '# 指南\n\n正文。\n'
+    const trees = { en: parseTranslationMarkdown(english), zh: parseTranslationMarkdown(chinese) }
+
+    expect([...computeTranslationPairingRecord(paths, english, chinese, context, trees)]).toEqual([
+      ['document', { en: gitBlobHash(Buffer.from(english)), zh: gitBlobHash(Buffer.from(chinese)) }],
+      ['/guide', { en: '5e1bfa97a822af7a', zh: '3409c92bef7306bb' }],
+    ])
+  })
+
+  it('places normalized nodes from the authored parse when every rewritten destination is parse-neutral', () => {
+    const english = [
+      '# Guide', '', 'See [bar](<bar.md>) and [baz][b], [q](./bar.md#x_y).', '', '[b]: baz.md', '',
+      '## Tail', '', '| [a](bar.md) | b |', '| --- | --- |', '',
+    ].join('\n')
+    const chinese = [
+      '# 指南', '', '参见[bar](<bar.zh.md>)和[baz][b]、[q](./bar.zh.md#x_y)。', '', '[b]: baz.zh.md', '',
+      '## 尾部', '', '| [a](bar.zh.md) | b |', '| --- | --- |', '',
+    ].join('\n')
+    const tree = parseTranslationMarkdown(english)
+    const normalized = normalizeTranslationMarkdownLinkEdits(english, { ...context, sourcePath: paths.source }, [], tree)
+    const reparsed = parseTranslationMarkdown(normalized.content)
+
+    expect(normalized.edits).toHaveLength(4)
+    expect(normalizedTopLevelBlocks(english, tree, normalized.edits)?.map(({ node, start, end, line }) => [node.type, start, end, line]))
+      .toEqual('children' in reparsed && reparsed.children.map(node => [
+        node.type, node.position?.start.offset, node.position?.end.offset, node.position?.start.line,
+      ]))
+    expect(computeTranslationPairingRecord(paths, english, chinese, context, { en: tree, zh: parseTranslationMarkdown(chinese) }))
+      .toEqual(record(english, chinese))
+  })
+
+  it.each([
+    ['a space that unlinks a heading', '# [Guide](a%20b.md)\n\nBody.\n', '# [指南](a%20b.zh.md)\n\n正文。\n', ['/guide-dsh-translation-target-docs-a-b-md']],
+    ['a pipe that turns a paragraph into a table', '# Guide\n\nSee [a](a%7Cb.md)\n| --- | --- |\n', '# 指南\n\n参见 [a](a%7Cb.zh.md)\n| --- | --- |\n', ['/guide']],
+    ['a title', '# Guide\n\nSee [bar](bar.md "Bar").\n', '# 指南\n\n参见[bar](bar.zh.md "Bar")。\n', ['/guide']],
+    ['a destination on the next line', '# Guide\n\nSee [bar](\nbar.md).\n', '# 指南\n\n参见[bar](\nbar.zh.md)。\n', ['/guide']],
+    ['an entity in the query', '# Guide\n\n[bar](bar.md?x=1&amp;y=2)\n', '# 指南\n\n[bar](bar.zh.md?x=1&amp;y=2)\n', ['/guide']],
+  ])('reparses normalized text for %s', (_case, english, chinese, keys) => {
+    const tree = parseTranslationMarkdown(english)
+    const normalized = normalizeTranslationMarkdownLinkEdits(english, { ...context, sourcePath: paths.source }, [], tree)
+    const computed = computeTranslationPairingRecord(paths, english, chinese, context, { en: tree, zh: parseTranslationMarkdown(chinese) })
+
+    expect(normalized.edits).toHaveLength(1)
+    expect(normalizedTopLevelBlocks(english, tree, normalized.edits)).toBeUndefined()
+    expect([...computed.keys()]).toEqual(['document', ...keys])
+    expect(computed).toEqual(record(english, chinese))
   })
 
   it('refuses sides with different heading counts', () => {
@@ -270,31 +345,36 @@ describe('translation pairing records', () => {
     const confirmed = record(en, zh)
     expect(translationPairingRecordDiff(confirmed, confirmed)).toEqual([])
     expect(translationPairingRecordDiff(confirmed, record(en.replace('Intro.', 'Intro!'), zh)))
-      .toEqual(['section /guide changed since confirmation (en)'])
+      .toEqual(['document changed since confirmation (en)', 'section /guide changed since confirmation (en)'])
     expect(translationPairingRecordDiff(confirmed, record(`${en}\n## Tail\n\nx\n`, `${zh}\n## 尾部\n\ny\n`)))
-      .toEqual(['section /guide/tail has unconfirmed translated content'])
+      .toEqual(['document changed since confirmation (en, zh)', 'section /guide/tail has unconfirmed translated content'])
     expect(translationPairingRecordDiff(
       new Map([...confirmed, ['/gone', { en: '0'.repeat(16), zh: '0'.repeat(16) }]]),
       confirmed,
     )).toEqual(['section /gone is recorded but no longer has translated content'])
   })
 
-  it('merges records of edits to different sections with the default text merge', () => {
-    const edit = (heading: string, english: string, chinese: string): string => renderTranslationPairingRecord(
+  it('merges section entries of edits to different sections with the default text merge', () => {
+    // The document entry's whole-file blob IDs differ on every edited side, so
+    // the sectioned-entry portion is what independent section edits keep
+    // mergeable; the pairing driver recomposes the document entry itself.
+    const withoutDocument = (content: string): string =>
+      content.replace(/^document:\n {2}en: [0-9a-f]+\n {2}zh: [0-9a-f]+\n/m, '')
+    const edit = (heading: string, english: string, chinese: string): string => withoutDocument(renderTranslationPairingRecord(
       paths,
       record(en.replace(heading, english), zh.replace(heading === 'Intro.' ? '简介。' : '事件表。', chinese)),
-    )
+    ))
     const root = mkdtempSync(join(tmpdir(), 'dsh-translation-pairing-merge-'))
     try {
-      writeFileSync(join(root, 'base'), renderTranslationPairingRecord(paths, record(en, zh)))
+      writeFileSync(join(root, 'base'), withoutDocument(renderTranslationPairingRecord(paths, record(en, zh))))
       writeFileSync(join(root, 'current'), edit('Intro.', 'New intro.', '新简介。'))
       writeFileSync(join(root, 'other'), edit('Event table.', 'New table.', '新表。'))
       const merged = spawnSync('git', ['merge-file', '-p', 'current', 'base', 'other'], { cwd: root, encoding: 'utf8' })
       expect(merged.status).toBe(0)
-      expect(merged.stdout).toBe(renderTranslationPairingRecord(paths, record(
+      expect(merged.stdout).toBe(withoutDocument(renderTranslationPairingRecord(paths, record(
         en.replace('Intro.', 'New intro.').replace('Event table.', 'New table.'),
         zh.replace('简介。', '新简介。').replace('事件表。', '新表。'),
-      )))
+      ))))
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

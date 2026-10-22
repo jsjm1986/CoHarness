@@ -27,7 +27,7 @@ kind: "package-library"
 
 ### 何时使用
 
-当持久化与测试支持读取方需要在任何功能插件挂载前取得完整第一方已发布格式清单时，导入本库。功能组合不会注册或重排其条目。它不发布运行时不变式伴生入口，因为构造过程会拒绝无效静态清单，每次完成的还原也会校验结果；可变行 decoder 状态只属于一次由调用方持有的流式还原。
+当持久化与测试支持读取方需要在任何功能插件挂载前取得完整第一方已发布格式清单时，导入本库。功能组合不会注册或重排其条目。
 
 ### 入口
 
@@ -51,7 +51,7 @@ Production 历史读取使用 `{ recovery: 'recoverable', validation: 'transform
 
 该目录直接包含所有受支持的历史读取器。Profile 无法通过挂载功能插件来添加、移除或重新排列迁移边。它通过对 `dsh-session` 的对等依赖（peer dependency）获得已安装的当前事件词表与当前还原规则，而历史迁移边校验器保持冻结。浏览器安全的 `./message-projections` 导出为独立构造函数和 surface 折叠装配当前插件拥有的处理器，不挂载恢复监听器。
 
-`createSessionFormatCatalogWithChildren(childFacts)` 在组装时将显式的子 Session 证据绑定到 V3→V4，见[目录补齐规范](../session-format-v3-to-v4/README.zh.md)。`historicalSessionFormatCatalog` 使用固定的已发布 V3 事件词汇恢复 V0–V3，收集子日志前置事实而不递归补齐其目录。即使已安装写入方认识事件名，可忽略 V3 扩展仍保持不透明。独立转录回放显式提供空数组；持久化必须收集完整的可用直属子 Session 集合。在 catalog 的生命周期内保持传入证据不变。每次恢复各自拥有独立的 stage 状态。静态 `sessionFormatCatalog` 支持 header 和原生当前格式读取；历史正文读取必须使用已绑定子 Session 的 catalog。
+`createSessionFormatCatalogWithChildren(childFacts)` 在组装时将显式的子 Session 证据绑定到 V6→V7；CoHarness JSONL 读取方使用 `createCoharnessJsonlFormatCatalogWithChildren(childFacts)`，让 legacy v0–v3 来源在同一条绑定边上保留 dialect 准入。见[目录补齐规范](../session-format-v6-to-v7/README.zh.md)。`historicalSessionFormatCatalog` 以已发布编解码器和 CoHarness dialect 恢复 V0–V6，收集子日志前置事实而不递归补齐其目录。独立转录回放显式提供空数组；持久化必须收集完整的可用直属子 Session 集合。在 catalog 的生命周期内保持传入证据不变。每次恢复各自拥有独立的 stage 状态。静态 `sessionFormatCatalog` 和 `coharnessJsonlFormatCatalog` 支持 header 和原生当前格式读取；历史正文读取必须使用已绑定子 Session 的 catalog。
 
 -----
 
@@ -78,7 +78,6 @@ Production 历史读取使用 `{ recovery: 'recoverable', validation: 'transform
 - [JSONL 持久化](../session-persistence-jsonl/README.zh.md)——不可变 generation 命名与排他发布。
 
 -----
-
 
 <a id="model-experience"></a>
 ## 模型体验

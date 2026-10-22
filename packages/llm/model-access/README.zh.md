@@ -13,21 +13,13 @@ kind: "package-reference"
 
 使用 `dsh-model-access` 作为部署方自有、精确到 `(provider, model)` 路由的授权服务定义：目录、模型选择与执行共用同一个 `ctx.modelAccess` 决策；服务缺省即表示未挂载授权策略。
 
-
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知局限与延后工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。该定义声明一个决定契约，其缺失意味着无策略；任何规则状态由提供方拥有。
-
 
 ## 模型体验
 

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-14-lossless-history-wire-pagination.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-14-lossless-history-wire-pagination.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.md
+document:
+  en: 0c35773a5f97f91fa31c492e571abd58d6d7dec5
+  zh: a89d4550d73ea861c5af2ac369c586072dcd50da
 /agent-note-lossless-history-wire-pagination:
   en: d2dc8909f346b451
   zh: 23b0d4784cb1f413

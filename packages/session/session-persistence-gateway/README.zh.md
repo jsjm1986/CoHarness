@@ -13,7 +13,6 @@ kind: "package-reference"
 
 使用 `dsh-session-persistence-gateway` 作为共享项目运行时的 Gateway PostgreSQL `SessionPersistence` 提供方：已存头部与事件、修订、幂等追加批次与崩溃修复提交在标准 `PersistenceCoordinator` 生命周期下经已认证的 Gateway 内部 API 传输。
 
-
 ## 目录
 
 - [持久化约定](#persistence-contract)
@@ -46,7 +45,6 @@ kind: "package-reference"
 - `maxPendingBytes` — 单个活动会话写入 controller 可保留的最大 UTF-8 JSON 字节数；默认 `48 MiB`，为 Gateway 的 64 MiB 请求上限预留 envelope 空间。
 - `requestTimeoutMs` — 单次 Gateway 内部请求的正数期限；默认 `30000`。
 
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -64,7 +62,6 @@ kind: "package-reference"
 
 此提供方不重写有效历史。当重建前缀、当前 envelope 和 route 一致时，恢复可以复用提供方缓存；新提交事件追加到后缀。
 
-**运行时不变式：** 不发布伴生入口。后端正确性由共享持久化契约覆盖。
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作

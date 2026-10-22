@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for architecture.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for architecture.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/architecture.md
+document:
+  en: 16c5a866aacfb7a1bae37a01b045e15b3b8da24b
+  zh: 162a6b21cfd05292d68cb96b081f5952dd430461
 /deepseek-harness-architecture:
   en: 2125f3ec236bc7b2
   zh: 23d8815579592ec4
@@ -27,8 +30,8 @@
   en: 26a9212175c63bf4
   zh: 96ae362d9de3586b
 /deepseek-harness-architecture/session-log:
-  en: 484f7b3afce61b61
-  zh: ceacefd40e6d095d
+  en: 6484bb9301849165
+  zh: 49bfe8d0a5664c7a
 /deepseek-harness-architecture/capability-seams:
   en: fe7c7c2ddf06d65a
   zh: 17462b8e8272c4d0

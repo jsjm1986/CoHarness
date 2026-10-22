@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-12-durable-path-safety-fixes.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-12-durable-path-safety-fixes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-durable-path-safety-fixes.md
+document:
+  en: ea3a2a7d798a9b242b70042c16f800a78d3199ea
+  zh: 830a84c3e2d247f74088c78f638d394b3af1de20
 /agent-note-durable-path-safety-fixes-spill-publish-attachment-carriers-v3-restart-repair:
   en: cf0edb7456b1cb88
   zh: 474ce49ba4766ff0

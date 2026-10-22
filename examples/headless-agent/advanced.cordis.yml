@@ -15,7 +15,7 @@
           workspaceContext:
             maxBytes: 65536
           tools:
-            mode: both
+            mode: native
           persona: |
             You are headless-agent, a coding assistant powered by the {{model}} model.
 
@@ -34,3 +34,5 @@
             name: '@deepseek-ai/dsh-tool-cordis/host'
           - id: tool-cordis
             name: '@deepseek-ai/dsh-tool-cordis'
+          - id: advanced-toolchain-presentation
+            name: './advanced-toolchain-presentation.mjs'

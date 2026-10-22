@@ -18,7 +18,6 @@ kind: "package-reference"
 - [工具](#tools)
 - [权限](#authority)
 - [配置](#config)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -58,12 +57,6 @@ complete 与 blocked 还接受完全一致的当前 Goal Round：来源为 goal 
 ```
 
 该值必须是正的安全整数。它既提供模型自行报告阻塞的硬下限，也决定模型指引中指明的数值。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。这些工具是 `ctx.goals` 之上的注册；目标状态由目标域拥有。
-
 
 <a id="model-experience"></a>
 ## 模型体验

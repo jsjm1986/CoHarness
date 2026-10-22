@@ -41,6 +41,10 @@ Declared read compatibility — reads tolerate vouched-for older versions, write
 
 7. **A predecessor title is a listing hint, not a fold shortcut**: Session-list startup remains metadata/cache-only and never opens cold log bodies. The log header is authoritative; a lifecycle-matching checkpoint is a durable-prefix witness that may lag but cannot lead the log. `cachedPredecessorTitle` therefore exposes only a predecessor `title` row that still passes the current title unit's `stateVersion` and schema. Both adjacent Session-format edges preserve title text. The hint uses `asOfSeq: -1` rather than the stored row sequence because a cardinality-changing log migration can remap that coordinate. Other predecessor rows remain hidden, and `hydratePrepared`/`coldSnapshot` retain strict format identity, because normalizers can change values such as `blank` or `lastPromptAt` even when storage is physically consistent.
 
+### Opaque checkpoint values
+
+The domain validates each checkpoint's `val` with the same lossless JSON predicate used by writes. Validation preserves the value's own keys, including `__proto__` inside records and arrays. A parser that silently removes keys would leave the row's identity and sequence watermark valid while changing the state used to resume a fold. The projection unit's own `stateSchema` remains responsible for interpreting that state.
+
 ### v3-v6 → v7 disposition
 
 Versions 3 through 6 remain structurally readable because their record and row representations are valid inputs to the current schema. Their identities lack `formatVersion`, so they are deliberately unusable as current fold shortcuts. An unseeded, lifecycle-matching record may still provide its version-compatible title to zero-I/O listing; it cannot provide any authoritative seed. A cold read or live checkpoint rebuilds the values from the migrated Session log and writes a v7 record with the complete format and lineage identity. No eager value migration runs at startup; a schema-invalid accepted record follows `backup-and-skip`.

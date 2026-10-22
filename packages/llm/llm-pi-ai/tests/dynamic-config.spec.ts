@@ -73,6 +73,8 @@ describe('request-level dynamic profiles', () => {
       settingsNs: 'llm-pi-ai',
       settingsPath: ['providers', 'openai'],
       declared: false,
+      defaultBaseURL: 'https://api.openai.com/v1',
+      nativeAuth: { env: ['OPENAI_API_KEY'], oauth: true },
     })
     await ctx.settings.update(NS, {
       providers: { deepseek: { apiKeyEnv: 'PI_DYNAMIC_KEY', baseURL: server.url } },

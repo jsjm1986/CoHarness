@@ -66,7 +66,6 @@ The Host sends one RFC 6455 Ping control frame to every open mux socket at the c
 
 After an initial connection failure or the loss of a connected socket, open logical streams end their current physical generation with `RemoteStreamCarrierError`. `ConnectionController` owns the continuous exponential retry schedule with a capped delay; each attempt asks the mux to replace any candidate or active socket exactly once before reopening `$events`. A user-requested reconnect resets the attempt sequence and bypasses the delay through the same path ([decision](../../archived/feature/2026-08-28-web-connection-recovery-control.md)).
 
-
 The browser's network-status events are inputs to the same Controller. `offline` withdraws the Connection generation and suspends automatic retries; the next `online` transition restarts the base backoff. These events never establish connectivity: only a fresh `$events` ready frame publishes a Connection generation.
 
 In-process `connection.rpc.open` uses the same logical endpoint semantics while bypassing the browser WebSocket mux.

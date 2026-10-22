@@ -34,15 +34,16 @@ function fact(
   childId: string,
   childCreatedAt: number,
   descriptor:
-    | { readonly mode: 'one-shot'; readonly label?: string }
-    | { readonly mode: 'continuable'; readonly label: string },
+    | { readonly version: 0; readonly mode: 'one-shot'; readonly label?: string }
+    | { readonly version: 0; readonly mode: 'continuable'; readonly label: string }
+    | { readonly version: 1; readonly mode: 'unknown'; readonly label?: string }
+    | { readonly version: 2; readonly mode: 'external'; readonly label?: string } = { version: 0, mode: 'one-shot' },
 ): SessionEvent<'subagent/catalog'> {
   return {
     type: 'subagent/catalog',
     seq: SessionSeq(seq),
     time: 0,
     data: {
-      version: 0,
       childId: SessionId(childId),
       childCreatedAt,
       ...descriptor,
@@ -62,7 +63,7 @@ describe('subagent catalog projection', () => {
       ctx.sessionProjections.onChanged(changes)
       expect(ctx.sessionProjections.snapshot(parent).values.subagentCatalog).toEqual([])
 
-      parent.append('subagent/catalog', fact(0, 'first', 1, { mode: 'one-shot' }).data)
+      parent.append('subagent/catalog', fact(0, 'first', 1, { version: 0, mode: 'one-shot' }).data)
       const first = ctx.sessionProjections.snapshot(parent)
       expect(first.values.subagentCatalog).toEqual([
         { id: SessionId('first'), createdAt: 1, mode: 'one-shot' },
@@ -70,7 +71,7 @@ describe('subagent catalog projection', () => {
       changes.mockClear()
       parent.append('session/title', { title: 'Parent', messageSeqs: [], source: { kind: 'user' } })
       expect(changes).not.toHaveBeenCalled()
-      parent.append('subagent/catalog', fact(2, 'second', 2, { mode: 'continuable', label: 'Next' }).data)
+      parent.append('subagent/catalog', fact(2, 'second', 2, { version: 0, mode: 'continuable', label: 'Next' }).data)
       expect(changes).toHaveBeenCalledOnce()
       expect(first.values.subagentCatalog).toHaveLength(1)
       const second = ctx.sessionProjections.snapshot(parent)
@@ -84,12 +85,12 @@ describe('subagent catalog projection', () => {
 
   it('preserves event order across chunk rollover and checkpoint restoration', () => {
     const first = fold(Array.from({ length: 64 }, (_, i) =>
-      fact(i, `child-${i}`, 130 - i, { mode: 'one-shot' })))
+      fact(i, `child-${i}`, 130 - i, { version: 0, mode: 'one-shot' })))
     const checkpoint = JSON.stringify(first)
     let state = first
     for (let i = 64; i < 130; i += 1) {
       state = subagentCatalogProjectionDefinition.apply(
-        state, fact(i, `child-${i}`, 130 - i, { mode: 'one-shot' }),
+        state, fact(i, `child-${i}`, 130 - i, { version: 0, mode: 'one-shot' }),
       )
     }
     const restored = subagentCatalogProjectionDefinition.stateSchema.parse(
@@ -104,9 +105,9 @@ describe('subagent catalog projection', () => {
 
   it('validates recursive chunk state and materializes every label variant in event order', () => {
     const events: SessionEvent[] = [
-      fact(0, 'child-b', 1, { mode: 'one-shot' }),
-      fact(1, 'child-a', 1, { mode: 'one-shot', label: 'once' }),
-      fact(2, 'child-d', 3, { mode: 'continuable', label: 'later' }),
+      fact(0, 'child-b', 1, { version: 0, mode: 'one-shot' }),
+      fact(1, 'child-a', 1, { version: 0, mode: 'one-shot', label: 'once' }),
+      fact(2, 'child-d', 3, { version: 0, mode: 'continuable', label: 'later' }),
     ]
     const state = fold(events)
 
@@ -132,7 +133,7 @@ describe('subagent catalog projection', () => {
     })
     const inherited = subagentCatalogProjectionDefinition.apply(
       unrelated,
-      fact(1, 'inherited', 1, { mode: 'one-shot' }),
+      fact(1, 'inherited', 1, { version: 0, mode: 'one-shot' }),
     )
 
     expect(unrelated).toBe(initial)
@@ -150,7 +151,7 @@ describe('subagent catalog projection', () => {
       await ctx.plugin(SessionProjectionRegistry)
       ctx.sessionProjections.register(subagentCatalogProjectionDefinition)
       const events = [
-        fact(0, 'valid-child', 0, { mode: 'one-shot' }),
+        fact(0, 'valid-child', 0, { version: 0, mode: 'one-shot' }),
         { type: 'subagent/catalog', seq: SessionSeq(1), time: 0, data } as unknown as SessionEvent,
       ]
       expect(() => ctx.sessionProjections.restore({}, events, SessionLogOffset(0), header, SessionLogOffset(0))).toThrow(z.ZodError)
@@ -158,4 +159,32 @@ describe('subagent catalog projection', () => {
       await ctx.fiber.dispose()
     }
   })
+})
+
+it('folds unknown-mode and external executions as leaf discovery rows', () => {
+  const state = fold([
+    fact(0, 'legacy', 1, { version: 0, mode: 'one-shot' }),
+    fact(1, 'synced', 2, { version: 1, mode: 'unknown' }),
+    fact(2, 'remote', 3, { version: 2, mode: 'external', label: 'acp' }),
+    fact(3, 'continued', 4, { version: 0, mode: 'continuable', label: 'kept' }),
+  ])
+  expect(subagentCatalogProjectionDefinition.wire.view(state)).toEqual([
+    { id: SessionId('legacy'), createdAt: 1, mode: 'one-shot' },
+    { id: SessionId('synced'), createdAt: 2, mode: 'unknown' },
+    { id: SessionId('remote'), createdAt: 3, mode: 'external', label: 'acp' },
+    { id: SessionId('continued'), createdAt: 4, mode: 'continuable', label: 'kept' },
+  ])
+})
+
+it('rejects mismatched catalog versions and restores checkpointed state', () => {
+  const bad = (version: number, mode: string): SessionEvent => ({
+    type: 'subagent/catalog',
+    seq: SessionSeq(0),
+    time: 0,
+    data: { version, childId: SessionId('x'), childCreatedAt: 1, mode, label: 'l' },
+  } as SessionEvent)
+  const state = subagentCatalogProjectionDefinition.init(header, SessionLogOffset(0))
+  for (const event of [bad(0, 'external'), bad(1, 'external'), bad(2, 'one-shot'), bad(3, 'external')]) {
+    expect(() => subagentCatalogProjectionDefinition.apply(state, event)).toThrow()
+  }
 })

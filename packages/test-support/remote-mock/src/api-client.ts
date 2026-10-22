@@ -78,7 +78,7 @@ const API_METHODS = {
     read: 'workspaceFiles.read',
     readBytes: 'workspaceFiles.readBytes',
   },
-  skills: { list: 'skill.list' },
+  skills: { list: 'skill.list', get: 'skill.get' },
   agentPresets: { openDocument: 'agentPreset.openDocument' },
   settings: {
     describe: 'settings.describe',

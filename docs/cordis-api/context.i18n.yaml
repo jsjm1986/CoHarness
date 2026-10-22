@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for context.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for context.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cordis-api/context.md
+document:
+  en: 320b23de1c8d19e2dacdf0ec9f2361037bcf8048
+  zh: b97fe51eb8afdd5c2235ac9cf8586c3ff68830d4
 /:
   en: d2c0c5bce430d1be
   zh: a317d7ff7fc9f112

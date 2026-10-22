@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-26-runtime-archive-package-closure.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-26-runtime-archive-package-closure.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-runtime-archive-package-closure.md
+document:
+  en: 33f7b7b316a40af5d590f14a2354ed19711edcc9
+  zh: 0e55538b7dd0f6863cefec40666766e71c7e20a3
 /agent-note-keep-the-archive-runtime-package-in-the-installation-dependency-closure:
   en: 9282ffe9b66c3aa4
   zh: 51f2086b9f246893

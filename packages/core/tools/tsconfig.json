@@ -27,10 +27,10 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../ptc-runtime/ptc-runtime"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../ptc-runtime/ptc-runtime"
     },
     {
       "path": "../../sandbox/sandbox"

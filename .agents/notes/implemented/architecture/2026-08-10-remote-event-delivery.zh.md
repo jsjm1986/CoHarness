@@ -113,7 +113,6 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 
 `events.host()` 打开时按名单挂监听；每条流自持 disposers，无需新增广播集合或派生失效 listener。
 
-
 `api/events.ts` 是浏览器侧也要编译的 wire 契约文件，所以它引用的每个类型都必须走 owner 包的 **client-safe type-only 子路径**，绝不能走包根出口。实证：从 `@deepseek-ai/dsh-session` 根引一个类型，就把根出口的 `declare module 'cordis' { interface Context { sessions: SessionStore } }` 拖进 client 编译面、把 client 的 `ctx.sessions: ISessions` 顶掉，在完全无关的 `ui-input-trigger` / `ui-conversation` 里炸出 18 条错。`JsonValue` 因此需要 `dsh-session/src/types.ts` 补一条 re-export。
 
 ### apps/web 的 browser e2e 属于 Host 面
@@ -175,4 +174,3 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 - **测试侧镜像值可能漂移**：没有任何机制核对 `apps/web/tests` 中镜像的 client 常量与其源；安全网只是漂移会让选择器失配。规则写在 `apps/web/tests/README.md`，由 review 守；grep 级门禁经评估后刻意不做。
 - **放弃的能力**：不支持投影或脱敏载荷、不支持 Scope 化事件（`agentCtx.remote.$on`）、重连不重放——这些都是纯失效信号，且 `connection/reset` 已覆盖重连后的重新拉取。mux 流的会话事件、可应答帧与快照基线不在范围内。
 - **仍有 client 包留在 host 图里**：12 个工程（`connection`、`runtime`、`ui-slots` 等）经未拆分的 `directory-picker-browse`/`-native` 与 `api/gateway → client/connection` 仍可达 host 图。它们都能编译且不再牵连 api/remotes 的 client face，因此没有阻塞本次改动；拆分那些包能减少几个，但经评估后不做。两个 chat e2e 直接引 `dsh-client-runtime/client` 依赖 `runtime` 本来就在图里——属偶然而非保证。
-- **invariant companion 不做运行期检查**：早先的修订曾在活事件总线上断言投递形状（`thisArg === null`、`mode === 'emit'`），这让 companion 与名单值耦合，并使 rolldown 把它提成第三个 bundle chunk——而机械推导的发布文件清单并不携带它。host 面的 `TypertForwardableEvent` 断言在编译期已拒绝这两种偏离，因此该 companion 是一个带说明的空 installer。

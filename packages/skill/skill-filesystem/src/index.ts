@@ -9,17 +9,16 @@
  * @module @deepseek-ai/dsh-skill-filesystem
  */
 
-import { access, lstat, readdir, readFile, stat } from 'node:fs/promises'
+import { access, lstat, readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { unwatchFile, watchFile, type Stats } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { homedir } from 'node:os'
+import { canonicalizeWatchPath, resolveAgentsHome, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import type { Context } from '@deepseek-ai/cordis'
 import chokidar from 'chokidar'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import { parse as parseYaml } from 'yaml'
 import type { FileSystem, FsDirEntry, FsTarget } from '@deepseek-ai/dsh-fs'
-import { canonicalizeWatchPath, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import {
   BUNDLED_SKILL_RANK,
   isSkillName,
@@ -109,6 +108,7 @@ interface ParsedSkill {
   whenToUse?: string
   invocation: SkillInvocationPolicy
   metadata?: Record<string, unknown>
+  path: string
   content: string
 }
 
@@ -161,7 +161,7 @@ export class FileSystemSkillProvider implements SkillProvider {
     this.name = config.providerName ?? 'filesystem'
     this.includeDefaultRoots = config.includeDefaultRoots ?? true
     this.dshHome = resolveDshHome(config.dshHome)
-    this.agentsHome = resolve(config.agentsHome ?? process.env.DSH_AGENTS_HOME ?? join(homedir(), '.agents'))
+    this.agentsHome = resolveAgentsHome(config.agentsHome)
     this.customSkillDirs = (config.customSkillDirs ?? []).map(root => resolve(root))
     this.watchManager = new SkillWatchManager(ctx, control.invalidate, resolveWatchConfig(config))
     control.signal.addEventListener('abort', () => { void this.dispose() }, { once: true })
@@ -215,7 +215,7 @@ export class FileSystemSkillProvider implements SkillProvider {
       source: candidate.source,
       provider: this.name,
       resourceBase: { kind: 'directory', path: locator.directory },
-      path: locator.path,
+      path: parsed.path,
       ...parsed.metadata !== undefined ? { metadata: parsed.metadata } : {},
       content: parsed.content,
     }
@@ -739,7 +739,7 @@ async function discoverRoot(root: SkillRoot, ctx: Context, provider: string): Pr
       rank: root.rank,
       locator,
       resourceBase: { kind: 'directory', path: locator.directory },
-      path: locator.path,
+      path: parsed.path,
       ...parsed.metadata !== undefined ? { metadata: parsed.metadata } : {},
     })
   }
@@ -798,7 +798,7 @@ async function parseSkillFile(path: string, ctx: Context, signal?: AbortSignal, 
   }
   let parsed
   try {
-    parsed = parseFrontmatter(raw)
+    parsed = parseFrontmatter(raw.content)
   } catch (error) {
     ctx.logger.warn(`skill file ${path} ignored: invalid YAML frontmatter: ${errorMessage(error)}`)
     return undefined
@@ -830,6 +830,7 @@ async function parseSkillFile(path: string, ctx: Context, signal?: AbortSignal, 
     ...optionalString(parsed.data, 'whenToUse'),
     invocation,
     ...optionalMetadata(parsed.data),
+    path: raw.path,
     content: parsed.body.trim(),
   }
 }
@@ -838,14 +839,17 @@ function optionalFileSystem(ctx: Context): FileSystem | undefined {
   return ctx.get('fs')
 }
 
-async function readSkillText(ctx: Context, path: string, signal?: AbortSignal, trustedHost = false): Promise<string | undefined> {
+async function readSkillText(
+  ctx: Context, path: string, signal?: AbortSignal, trustedHost = false,
+): Promise<{ path: string; content: string } | undefined> {
   signal?.throwIfAborted()
   const fs = optionalFileSystem(ctx)
   if (fs !== undefined && !trustedHost) {
     return await readSkillTextFromFileSystem(ctx, fs, path, signal)
   }
   try {
-    return await readFile(path, { encoding: 'utf8', signal })
+    const resolvedPath = await realpath(path)
+    return { path: resolvedPath, content: await readFile(resolvedPath, { encoding: 'utf8', signal }) }
   } catch (error) {
     signal?.throwIfAborted()
     if (isAbsentSkillPathError(error)) return undefined
@@ -853,7 +857,9 @@ async function readSkillText(ctx: Context, path: string, signal?: AbortSignal, t
   }
 }
 
-async function readSkillTextFromFileSystem(ctx: Context, fs: FileSystem, path: string, signal?: AbortSignal): Promise<string | undefined> {
+async function readSkillTextFromFileSystem(
+  ctx: Context, fs: FileSystem, path: string, signal?: AbortSignal,
+): Promise<{ path: string; content: string } | undefined> {
   // A missing or temporarily inaccessible skill file is not fatal to discovery.
   signal?.throwIfAborted()
   let target
@@ -874,7 +880,7 @@ async function readSkillTextFromFileSystem(ctx: Context, fs: FileSystem, path: s
   }
   if (info === undefined || info.type !== 'file') return undefined
   try {
-    return await fs.readText(target, signal)
+    return { path: fs.processPath(target), content: await fs.readText(target, signal) }
   } catch (error) {
     signal?.throwIfAborted()
     if (isAbsentSkillPathError(error)) return undefined

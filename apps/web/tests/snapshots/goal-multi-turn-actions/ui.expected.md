@@ -5,6 +5,8 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - button "Feedback":
+    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
@@ -15,17 +17,19 @@
   - img
   - img
   - text: "goal Goal created Status: active Objective: 做两个turn，每个turn输出随机一个包的文件结构。注意你做完一个turn之后，直接输出内容，停止，我们的系统会帮你再开一个turn，你看着做一个类似的 Rounds: 0/256 Activation: armed Commands: /goal edit <objective>, /goal pause, /goal clear"
-- button "6 tool calls · 6 intermediate messages":
-  - text: 6 tool calls · 6 intermediate messages
-  - img
 - button "System prompt":
   - img
   - img
   - text: System prompt
-- 'button "Thinking Turn 1 is done. Per the objective: \"你做完一个turn之后，直接输出内容，停止\" — after finishing a turn, directly output the content and stop. The system will open another turn."':
+- "button \"Continuing goal {{clock}}\"":
+  - text: Continuing goal
+  - time: "{{clock}}"
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
   - img
-  - text: "Thinking Turn 1 is done. Per the objective: \"你做完一个turn之后，直接输出内容，停止\" — after finishing a turn, directly output the content and stop. The system will open another turn."
+- button "Ran commands and updated the plan"
 - paragraph:
   - strong: Turn 1 / 2
   - text: — 随机选中的包：
@@ -55,9 +59,17 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message time and speed": "{{clock}}"
-- button "5 tool calls · 6 intermediate messages":
-  - text: 5 tool calls · 6 intermediate messages
+- "button \"Continuing goal {{clock}}\"":
+  - text: Continuing goal
+  - time: "{{clock}}"
   - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Ran commands"
+- button "Updated the plan"
+- button "Updated the plan"
 - paragraph: 两个 turn 都完成了 ✅
 - paragraph:
   - strong: 总结：

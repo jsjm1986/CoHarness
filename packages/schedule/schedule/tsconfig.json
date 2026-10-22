@@ -15,6 +15,9 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../util/brand"
     },
     {
@@ -36,9 +39,6 @@
       "path": "../../session/session-persistence-jsonl"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../api/remotes/tsconfig.session-controller.json"
     },
     {
@@ -52,9 +52,6 @@
     },
     {
       "path": "../../workspace/workspace"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

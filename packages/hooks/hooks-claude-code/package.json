@@ -30,14 +30,15 @@
     "@deepseek-ai/schemastery": "workspace:~"
   },
   "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-agent": "workspace:*",
     "@deepseek-ai/dsh-hook-protocol": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-persistence": "workspace:*",
+    "@deepseek-ai/dsh-session-projection": "workspace:*",
     "@deepseek-ai/dsh-subagent": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
-    "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-working-directory": "workspace:*"
   },
   "devDependencies": {
@@ -46,6 +47,7 @@
     "@deepseek-ai/dsh-agent-loop": "workspace:*",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:*",
     "@deepseek-ai/dsh-bash-local": "workspace:*",
+    "@deepseek-ai/dsh-fs-local": "workspace:*",
     "@deepseek-ai/dsh-hook-protocol": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",

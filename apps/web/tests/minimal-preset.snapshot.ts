@@ -1,17 +1,17 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { AgentHandle } from '@deepseek-ai/dsh-agent'
 import { ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-agent-presets'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { assertFixtureInventory, launchWebScaffold, type WebScaffold } from './scaffold.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/minimal-preset', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
-const PROMPT = 'Reply exactly MINIMAL_PRESET_REQUEST_OK and stop.'
+const PROMPT = 'Use the bash tool to run exactly: printf \'MINIMAL_BASH_CARD_OK\\n\'. Then reply exactly MINIMAL_PRESET_REQUEST_OK and stop.'
 
 describe('minimal agent preset', () => {
   let scaffold: WebScaffold
@@ -46,7 +46,7 @@ describe('minimal agent preset', () => {
     if (failures.length > 1) throw new AggregateError(failures, 'minimal preset smoke teardown failed')
   })
 
-  it('sends the exact RL prompt and schemas, then executes the persistent shell and editor', async () => {
+  it('sends the exact RL prompt and schemas, then executes the persistent shell', async () => {
     agentHandle.agent.followup(createUserMessage({
       content: [{ type: 'text', text: PROMPT }],
       source: { kind: 'user' },
@@ -62,9 +62,22 @@ describe('minimal agent preset', () => {
     expect(runtimeContexts).toEqual([
       `Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: ${JSON.stringify(agentHandle.agent.session.header.cwd)}.`,
     ])
-    const presetFileSystem = scaffold.ctx.agentPresets.serviceFor(agentHandle.agent, 'fs')
-    expect(presetFileSystem).toBeDefined()
-    expect(presetFileSystem?.sandboxMode).toBeUndefined()
+    // The recorded call ran through the preset's persistent shell: the session
+    // committed exactly the replayed `bash` call and its real result.
+    const replayedCalls = agentHandle.agent.session.snapshotEvents()
+      .flatMap(event => event.type === 'tool/call' ? [event.data.name] : [])
+    expect(replayedCalls).toEqual(['bash'])
+    const replayedResult = agentHandle.agent.session.snapshotEvents()
+      .flatMap(event => event.type === 'tool/result'
+        ? event.data.message.content.flatMap(block => block.type === 'text' ? [block.text] : [])
+        : [])
+      .join('\n')
+    expect(replayedResult).toContain('MINIMAL_BASH_CARD_OK')
+    expect(replayedResult).toContain('[Command finished with exit code 0]')
+
+    // The preset mounts no filesystem provider or compaction of its own; the
+    // shared host services stay out of the mounted subtree's registry reads.
+    expect(scaffold.ctx.agentPresets.serviceFor(agentHandle.agent, 'fs')).toBeUndefined()
     expect(scaffold.ctx.agentPresets.serviceFor(agentHandle.agent, 'compaction')).toBeUndefined()
 
     const stateDir = join(scaffold.workspaceCwd, 'persistent-state')
@@ -82,15 +95,6 @@ describe('minimal agent preset', () => {
       callId: ToolCallId('minimal-bash-state-read'),
       name: 'bash',
       arguments: { command: 'printf \'%s:%s\n\' "$DSH_MINIMAL_STATE" "$PWD"' },
-      agent: agentHandle.agent,
-    })
-    const seedPath = join(scaffold.workspaceCwd, 'preset-smoke.txt')
-    await writeFile(seedPath, 'MINIMAL_EDITOR_OK\n')
-    const editor = await scaffold.ctx.tools.execute({
-      signal,
-      callId: ToolCallId('minimal-editor-smoke'),
-      name: 'str_replace_editor',
-      arguments: { command: 'view', path: seedPath },
       agent: agentHandle.agent,
     })
 
@@ -112,18 +116,13 @@ describe('minimal agent preset', () => {
       prompt: systemPrompt,
       tools: requestHeader.tools?.map(tool => tool.name),
       bash: text(bash),
-      editor: text(editor),
     }).toMatchInlineSnapshot(`
       {
         "bash": "PERSISTED:{{cwd}}/persistent-state
       [Command finished with exit code 0]",
-        "editor": "Here's the content of {{cwd}}/preset-smoke.txt with line numbers (which has a total of 2 lines):
-           1  MINIMAL_EDITOR_OK
-           2",
         "prompt": "You are a helpful software engineer assistant.",
         "tools": [
           "bash",
-          "str_replace_editor",
           "working_directory",
         ],
       }

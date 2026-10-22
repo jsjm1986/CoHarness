@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-07-30-independent-ci-consumer-build.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-07-30-independent-ci-consumer-build.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-30-independent-ci-consumer-build.md
+document:
+  en: 9f0748b06803eb46c4048d539a7b6821c532b15b
+  zh: fb8e89d94603a5e33f2b941da8035792a0444929
 /agent-note-independent-ci-consumer-build:
   en: aa147d59d288649a
   zh: 465f60b2470e4015

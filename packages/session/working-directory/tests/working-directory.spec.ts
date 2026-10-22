@@ -12,7 +12,7 @@ import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { FileSystem, FsTargetKey, FsVersion } from '@deepseek-ai/dsh-fs'
 import type { FsInfo, FsTarget } from '@deepseek-ai/dsh-fs'
 import { PluginPackages } from '@deepseek-ai/dsh-app-boot'
-import AgentPresets from '@deepseek-ai/dsh-agent-presets'
+import AgentPresetRegistry from '@deepseek-ai/dsh-agent-preset-registry'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import WorkingDirectory, { type Config as WorkingDirectoryConfig } from '@deepseek-ai/dsh-working-directory'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -646,7 +646,7 @@ describe('SSH-bound Sessions', () => {
     f.ctx.loader.builtins.include = Include
     f.ctx.loader.builtins.group = Group
     await f.ctx.plugin(TypertRegistry)
-    await f.ctx.plugin(AgentPresets, {
+    await f.ctx.plugin(AgentPresetRegistry, {
       default: 'empty',
       roots: [{ path: SSH_FIXTURES, trust: 'system' }],
       includeUserRoot: false,

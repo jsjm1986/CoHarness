@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-18-schedule-task-tab-restore.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-18-schedule-task-tab-restore.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-schedule-task-tab-restore.md
+document:
+  en: 3809dfadce32c75adbebe373587f163df80638ae
+  zh: 84a1a1247b03affb12dba64cf682750aec7f5916
 /agent-note-task-tab-recovery-after-a-reload:
   en: d7edcc16307d350a
   zh: 63301b138b2a203b

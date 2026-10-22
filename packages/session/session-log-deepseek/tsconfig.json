@@ -15,9 +15,6 @@
       "path": "../../llm/deepseek-llm-api-extensions"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {

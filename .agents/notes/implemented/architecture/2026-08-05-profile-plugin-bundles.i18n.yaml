@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-05-profile-plugin-bundles.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-05-profile-plugin-bundles.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.md
+document:
+  en: 3d077ef7c20ade65b69e8c798c10dc94457a113a
+  zh: 356b59f2e1cbd1b89a3e37ed8a5ab902025340c8
 /agent-note-profile-plugin-bundles-replace-the-fixed-surface-overlays:
   en: 178252acff6e206f
   zh: 2e5785ca3485f1e7
@@ -9,8 +12,8 @@
   en: 504dd5f06475d707
   zh: 6557fd5649f48944
 /agent-note-profile-plugin-bundles-replace-the-fixed-surface-overlays/decision:
-  en: ab8412237ff82af7
-  zh: f00021376983dd9f
+  en: 1e1e1eab810655a6
+  zh: ca27026b6cfadd61
 /agent-note-profile-plugin-bundles-replace-the-fixed-surface-overlays/alternatives-considered:
   en: 003e1493ae480c2d
   zh: f95e9641c33b7cfb

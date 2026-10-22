@@ -18,7 +18,6 @@ Use `dsh-client-ui-workflow-run` to inspect each durable top-level workflow run 
 - [Durable state and replay](#durable-state-and-replay)
 - [Presentation and navigation](#presentation-and-navigation)
 - [Composition](#composition)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -43,11 +42,6 @@ A member opens a child Session only while every current fact agrees: the member 
 ## Composition
 
 The package registers its Definition, locale dictionary, and `workflow-run` renderer as Cordis effects. Removing the client entry retracts all three contributions. The shipped Web bundle includes the plugin after `ui-conversation` and `ui-tool`.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The node definition is a pure reconstruction over durable `tool-workflow/*` session events; it adds no state beyond the rendered node.
 
 <a id="model-experience"></a>
 ## Model Experience

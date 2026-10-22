@@ -56,7 +56,6 @@ kind: "package-reference"
 - **词汇仅包含问题表单形态**：可供选择的选项加可选的自定义文本；更丰富的交互形态（文件选择器、diff 预览确认）尚无 seam 词汇。
 - **草稿文本不属于 Host 问题持久化状态**：问题通过 projection 跨客户端重启保留；未完成的输入仍只保存在一个浏览器配置中。
 
-
 <a id="dev-note"></a>
 ### 开发备注
 
@@ -67,4 +66,4 @@ kind: "package-reference"
 
 </details>
 
-**运行时不变式：** `userQuestions` projection 由 agent loop 本来就记录的工具与 inbox 事件推导，不存储单独的问题状态。已继续的问题可以创建新的用户轮次，但不能恢复已结束的工具调用。此包不发布运行时不变量 companion，因为 projection 折叠和只接受已继续问题的 Remote 方法已在各自归属处保证这一边界。
+**运行时不变式：** `userQuestions` projection 由已记录的工具调用、PTC 子调用和准入的用户消息推导，不存储单独的问题状态。已继续的问题可以创建新的用户轮次，但不能恢复已结束的工具调用。

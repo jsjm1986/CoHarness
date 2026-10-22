@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-04-admin-plugins-bilingual-dict.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-04-admin-plugins-bilingual-dict.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-admin-plugins-bilingual-dict.md
+document:
+  en: 393877257776396301f4439f90a29fb6b7fce290
+  zh: 0544fe920d92456455ec67bc85a8d5fa72b810f7
 /agent-note-wire-the-admin-plugins-surface-s-english-dictionary:
   en: a5003f3bb34fde36
   zh: ff1ae5db7fb35a20

@@ -4,8 +4,7 @@
  * matchers, snake_case payloads without a trailing newline, no hook environment
  * or command substitution, and no pre-tool approval or rewrite path; only
  * blocking decisions are honored. Shared execution and parsing live in
- * `dsh-hook-protocol`; see the
- * [hook-bridges Agent Note](../../../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.md).
+ * `dsh-hook-protocol`.
  * @module @deepseek-ai/dsh-hooks-codex
  */
 
@@ -17,6 +16,8 @@ import { readFileSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-session-projection'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 declare module '@deepseek-ai/dsh-llm' {
@@ -27,7 +28,6 @@ declare module '@deepseek-ai/dsh-llm' {
 
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { PostToolDecision, PreToolDecision, ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import {
   appendHookInvoked,
@@ -47,7 +47,7 @@ import { parseCodexConfig, type CodexHookConfig } from './config.ts'
 /* jscpd:ignore-end */
 
 export const name = 'hooks-codex'
-export const inject = ['shell', 'workingDirectory']
+export const inject = ['shell', 'sessionProjections', 'workingDirectory']
 
 /** Plugin config: where the Codex hooks.json lives + the model name for payloads. */
 export interface Config {
@@ -119,7 +119,9 @@ export function apply(ctx: Context, config: Config): void {
 
   const model = config.model ?? ''
 
-  // Track initialization continuations so bridge disposal aborts and drains them.
+  // SessionStart is the one emit-shaped (detached) point Codex has: track its
+  // run chains so disposal aborts a still-running hook process and drains the
+  // continuation (docs/defensive-patterns.md: dispose must reach quiescence).
   const detached = createDetachedRuns()
   ctx.effect(() => () => detached.drain(), 'hooks-codex: drain detached hook runs')
 
@@ -143,8 +145,6 @@ export function apply(ctx: Context, config: Config): void {
     const groups = selectHookGroups(parsed[point], matchQuery, 'codex')
     if (groups.length === 0) return mergeHookOutputs([])
     const outputs: HookOutput[] = []
-    // Run hooks in the agent's current directory so relative paths address the
-    // session's workspace rather than the server launch directory.
     const workdir = opts.agent === undefined ? undefined : await ctx.workingDirectory.ensure(opts.agent, opts.signal)
     for (const group of groups) {
       for (const hook of group.hooks) {
@@ -153,7 +153,7 @@ export function apply(ctx: Context, config: Config): void {
         if (session && opts.turn !== undefined) {
           appendHookInvoked(session, {
             turn: opts.turn, point, dialect: 'codex', handlerId,
-            ...group.matcher !== undefined ? { matcher: group.matcher } : {},
+            matcher: group.matcher,
           })
         }
         const { output, durationMs } = await runHook(ctx.shell, hook, {
@@ -201,10 +201,9 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   ctx.on('agent/created', async ({ agent, source, signal }) => {
-    const initializationSignal = signal === undefined ? detached.signal : AbortSignal.any([signal, detached.signal])
-    const run = runPoint('SessionStart', source, { ...base(ctx, agent, 'SessionStart', model), source }, { agent, plainStdoutAsContext: true, signal: initializationSignal })
+    const ownerSignal = signal === undefined ? detached.signal : AbortSignal.any([signal, detached.signal])
+    const run = runPoint('SessionStart', source, { ...base(ctx, agent, 'SessionStart', model), source }, { agent, plainStdoutAsContext: true, signal: ownerSignal })
       .then((merged) => {
-        if (initializationSignal.aborted) return
         const context = contextFrom(merged)
         if (context) agent.inject(context)
       })
@@ -235,14 +234,14 @@ export function apply(ctx: Context, config: Config): void {
     const ours = contextFrom(merged)
     if (!ours || downstream.kind !== 'enter') return downstream
     return {
-      kind: 'enter',
+      ...downstream,
       messages: [...downstream.messages, ours],
     }
   })
 
   // PreToolUse → PreToolDecision. Codex blocks only (no allow/ask honored).
   ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
-    const turn = lastTurn(exec.agent)
+    const turn = lastTurn(ctx, exec.agent)
     const merged = await runPoint('PreToolUse', exec.name, preToolPayload(ctx, exec, model), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
     /* jscpd:ignore-end */
     if (merged.decision === 'deny') return { kind: 'deny', reason: cap(merged.reason ?? 'blocked by PreToolUse hook') }
@@ -251,7 +250,7 @@ export function apply(ctx: Context, config: Config): void {
 
   // PostToolUse → PostToolDecision (block with feedback, or attach context).
   ctx.on('tools/post-execute', async (exec, result, next): Promise<PostToolDecision> => {
-    const turn = lastTurn(exec.agent)
+    const turn = lastTurn(ctx, exec.agent)
     /* jscpd:ignore-start */
     const merged = await runPoint('PostToolUse', exec.name, postToolPayload(ctx, exec, result, model), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
     const context = contextFrom(merged)
@@ -295,12 +294,10 @@ export function apply(ctx: Context, config: Config): void {
 // These small payload helpers intentionally remain next to the dialect shape;
 // sharing them would pull bridge-only agent/LLM dependencies into hook-protocol.
 /* jscpd:ignore-start */
-function lastTurn(agent: Agent | undefined): number {
+function lastTurn(ctx: Context, agent: Agent | undefined): number {
   if (!agent) return 0
-  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-  const last = [...agent.session.snapshotEvents()].findLast(e => e.type === 'turn/start')
-  /* v8 ignore next -- agent-present turnBase callers are tool/stop extension points inside an open turn. */
-  return last?.type === 'turn/start' ? last.data.turn : 0
+  /* v8 ignore next -- agent-present hook points run inside AgentLoop, which owns this projection. */
+  return ctx.sessionProjections.stateOf(agent.session, 'turnBoundary')?.lastTurn ?? 0
 }
 
 function blocksToText(content: ContentBlock[]): string {
@@ -323,7 +320,7 @@ function base(ctx: Context, agent: Agent | undefined, event: string, model: stri
 
 /** Base + turn_id, for the turn-scoped events (PreToolUse/PostToolUse/UserPromptSubmit/Stop). */
 function turnBase(ctx: Context, agent: Agent | undefined, event: string, model: string): Record<string, unknown> {
-  return { ...base(ctx, agent, event, model), turn_id: String(lastTurn(agent)) }
+  return { ...base(ctx, agent, event, model), turn_id: String(lastTurn(ctx, agent)) }
 }
 
 /** Extract a `command` string from a tool call's parsed arguments, else ''. */

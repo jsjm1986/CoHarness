@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-12-onboarding-reads-every-provider.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-12-onboarding-reads-every-provider.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-12-onboarding-reads-every-provider.md
+document:
+  en: 1f247a6c93257c24052f55eb4297ec3c9c3df06d
+  zh: fc6e43195a46eaea881f8b4bee3219b5e583b284
 /agent-note-first-run-readiness-reads-every-provider-and-the-setup-card-closes:
   en: ac309f11d5e7237a
   zh: 9319863a1eb436ba

@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-20-remote-desktop-stream-url-runtime-pinning.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-20-remote-desktop-stream-url-runtime-pinning.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-stream-url-runtime-pinning.md
+document:
+  en: 1fd58a42406858b22a2742f538fe100f46435745
+  zh: 4a50f72647ccaeb9c1fb3eb8462539422843bb4e
 /agent-note-remote-desktop-stream-url-binds-the-document-runtime-target-through-identity-pinning:
   en: 73396cf117f9e006
   zh: 82f6c92fbac2cfe4

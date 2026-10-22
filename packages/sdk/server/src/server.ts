@@ -11,7 +11,7 @@ import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import { admitEncodedImages, type EncodedImageAttachment, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { ReasoningEffortId, createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import { carrierKeyOf, type Scoped } from '@deepseek-ai/dsh-scope'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId, type SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { SubagentRunEndInfo } from '@deepseek-ai/dsh-subagent'
 import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek-api-key'
@@ -23,6 +23,8 @@ import type {
   SessionEventNotification,
   SessionPromptParams,
   SessionPromptResult,
+  SessionResumeParams,
+  SessionWaitParams,
   SessionWorkingDirectoryParams,
   SessionWorkingDirectoryResult,
   SessionWorkingDirectorySetParams,
@@ -33,6 +35,8 @@ import type {} from '@deepseek-ai/dsh-working-directory'
 
 interface SessionRecord {
   handle: AgentHandle
+  /** Latest live failure not superseded by a subsequently committed terminal. */
+  failure: { readonly error: unknown; readonly atOffset: SessionLogOffset } | undefined
 }
 
 function encodedImage(block: SessionPromptParams['contentBlocks'][number]): block is SdkEncodedImageBlock {
@@ -120,8 +124,18 @@ export class HarnessSdkJsonRpcServer {
     const serverOptions = this.options
     const notify = (method: string, params: object): void => { this.notify(method, params) }
     this.disposers.push(ctx.on('session/event', (session, event) => {
+      const record = this.sessions.get(session.id)
+      if (event.type === 'turn/end' && record?.handle.agent.session === session
+        && record.failure !== undefined && event.seq >= record.failure.atOffset) {
+        record.failure = undefined
+      }
       const payload: SessionEventNotification = { sessionId: String(session.id), event }
       notify('session.event', payload)
+    }))
+    this.disposers.push(ctx.on('agent/error', ({ agent, error }) => {
+      const record = this.sessions.get(agent.session.id)
+      if (record?.handle.agent !== agent) return
+      record.failure = { error, atOffset: agent.session.seq }
     }))
     this.disposers.push(ctx.on('agent/status', ({ agent, status }) => {
       notify('session.status', { sessionId: String(agent.session.id), status })
@@ -259,18 +273,64 @@ export class HarnessSdkJsonRpcServer {
     // An agent-loop-only reload disposes the loop's agents while this record
     // survives; a retained agent accepts followup() silently, so validate the
     // record against the live registry before delivery (as the ACP bridge does).
-    if (this.ctx.agents.get(rec.handle.agent.id) !== rec.handle.agent) {
-      throw new Error(`session agent was disposed outside the server: ${params.sessionId}`)
-    }
+    this.assertLiveAgent(rec, params.sessionId)
     const content = await durablePromptContent(this.ctx, params.contentBlocks)
     // Attachment admission crosses an async boundary where shutdown or an
     // agent-loop reload may detach the retained handle.
-    if (this.ctx.agents.get(rec.handle.agent.id) !== rec.handle.agent) {
-      throw new Error(`session agent was disposed outside the server: ${params.sessionId}`)
-    }
+    this.assertLiveAgent(rec, params.sessionId)
     const message = createUserMessage({ content, source: { kind: 'user' } })
     rec.handle.agent.followup(message)
     return { messageId: message.id }
+  }
+
+  /**
+   * Restore a persisted session and repair its interrupted final turn without sending input.
+   * Uses the initialized model route while preserving the stored session identity and directory.
+   * Rejects missing, unreadable, or already owned sessions; never creates a replacement.
+   * @param params - persisted session identity in the configured persistence store.
+   * @returns an empty result after the Agent is ready for prompts.
+   */
+  async resume(params: SessionResumeParams): Promise<Record<string, never>> {
+    if (!this.initialized) throw new Error('SDK server must be initialized before session/resume')
+    if (this.shuttingDown) throw new Error('SDK server is shutting down')
+    const sessionId = params.sessionId
+    if (this.sessions.has(sessionId) || this.sessionCreations.has(sessionId)) {
+      throw new Error(`SDK session is already open or opening: ${sessionId}`)
+    }
+    await this.openSession(sessionId, true)
+    return {}
+  }
+
+  /**
+   * Wait for an existing owned Agent and its managed descendants to finish.
+   * The response follows all Session notifications emitted during the wait.
+   * Rejects a live Agent failure that has no subsequent durable terminal.
+   * @param params - the SDK-owned session to observe without creating one.
+   * @returns an empty result after the root stays idle across the descendant check.
+   */
+  async wait(params: SessionWaitParams): Promise<Record<string, never>> {
+    if (!this.initialized) throw new Error('SDK server must be initialized before session/wait')
+    const rec = this.sessions.get(params.sessionId)
+    if (rec === undefined) throw new Error(`unknown SDK session: ${params.sessionId}`)
+    const agent = rec.handle.agent
+    const subagents = this.ctx.get('subagents')
+    while (true) {
+      this.assertLiveAgent(rec, params.sessionId)
+      await agent.whenIdle()
+      const idleSeq = agent.session.seq
+      const children = await subagents?.waitForChildren(agent)
+      this.assertLiveAgent(rec, params.sessionId)
+      if (!children && agent.status === 'idle' && agent.session.seq === idleSeq) {
+        if (rec.failure !== undefined) throw rec.failure.error
+        return {}
+      }
+    }
+  }
+
+  private assertLiveAgent(rec: SessionRecord, sessionId: string): void {
+    if (this.ctx.agents.get(rec.handle.agent.id) !== rec.handle.agent) {
+      throw new Error(`session agent was disposed outside the server: ${sessionId}`)
+    }
   }
 
   /**
@@ -299,9 +359,7 @@ export class HarnessSdkJsonRpcServer {
     if (this.shuttingDown) throw new Error('SDK server is shutting down')
     // Same live-registry check as `prompt`: an agent-loop reload may dispose
     // the retained handle while its record survives.
-    if (this.ctx.agents.get(rec.handle.agent.id) !== rec.handle.agent) {
-      throw new Error(`session agent was disposed outside the server: ${sessionId}`)
-    }
+    this.assertLiveAgent(rec, sessionId)
     return rec.handle.agent
   }
 
@@ -332,6 +390,11 @@ export class HarnessSdkJsonRpcServer {
         failures.push(error)
       }
     }
+    try {
+      await this.ctx.get('subagents')?.drainContinuableDescendants(records.map(rec => rec.handle.agent))
+    } catch (error: unknown) {
+      failures.push(error)
+    }
     const teardownResults = await Promise.allSettled([
       ...records.map(rec => Promise.resolve().then(() => rec.handle.dispose())),
       ...(this.llmFiber === undefined ? [] : [Promise.resolve().then(() => this.llmFiber?.dispose())]),
@@ -359,6 +422,18 @@ export class HarnessSdkJsonRpcServer {
         return this.initialize(params as unknown as InitializeParams)
       case 'session/prompt':
         return this.prompt(params as unknown as SessionPromptParams)
+      case 'session/resume': {
+        const sessionId = params?.sessionId
+        if (typeof sessionId !== 'string' || sessionId.length === 0) {
+          throw new TypeError('session/resume requires a non-empty sessionId string')
+        }
+        return this.resume({ sessionId })
+      }
+      case 'session/wait': {
+        const sessionId = params?.sessionId
+        if (typeof sessionId !== 'string') throw new TypeError('session/wait requires a sessionId string')
+        return this.wait({ sessionId })
+      }
       case 'session/working-directory/get':
       case 'session/working-directory/set': {
         if (typeof params?.sessionId !== 'string' || params.sessionId.length === 0) {
@@ -383,10 +458,14 @@ export class HarnessSdkJsonRpcServer {
     if (existing) return existing
     const pending = this.sessionCreations.get(sessionId)
     if (pending) return pending
+    return this.openSession(sessionId, false)
+  }
+
+  private openSession(sessionId: string, resume: boolean): Promise<SessionRecord> {
     if (this.sessions.size + this.sessionCreations.size >= this.maxSessions) {
       throw new Error(`SDK session limit exceeded (maximum ${String(this.maxSessions)})`)
     }
-    const creation = this.createSession(sessionId)
+    const creation = this.createSession(sessionId, resume)
     this.sessionCreations.set(sessionId, creation)
     void creation.then(
       () => { this.sessionCreations.delete(sessionId) },
@@ -395,22 +474,26 @@ export class HarnessSdkJsonRpcServer {
     return creation
   }
 
-  private async createSession(sessionId: string): Promise<SessionRecord> {
+  private async createSession(sessionId: string, resume: boolean): Promise<SessionRecord> {
     // No preset composition: this server's compositions keep the model-facing
     // rows in the host plane, so this agent reads them from the global layer. A
     // deployment that configures a roster has to join one here first
     // (@deepseek-ai/dsh-agent-preset-registry README, "Composing a child agent").
-    const handle = await this.ctx.agents.create({
+    const agentOptions = {
+      provider: this.provider,
+      model: this.model,
+      ...this.reasoningEffort === undefined ? {} : { reasoningEffort: this.reasoningEffort },
+      ...this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens },
+    }
+    const handle = await (resume ? this.ctx.agents.resume({
+      resumeSessionId: SessionId(sessionId),
+      agentOptions,
+    }) : this.ctx.agents.create({
       sessionId: SessionId(sessionId),
       meta: { cwd: this.cwd },
-      agentOptions: {
-        provider: this.provider,
-        model: this.model,
-        ...this.reasoningEffort === undefined ? {} : { reasoningEffort: this.reasoningEffort },
-        ...this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens },
-      },
-    })
-    const rec: SessionRecord = { handle }
+      agentOptions,
+    }))
+    const rec: SessionRecord = { handle, failure: undefined }
     this.sessions.set(sessionId, rec)
     return rec
   }

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-09-19-concrete-web-bind-address.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-concrete-web-bind-address.md
+document:
+  en: 4609ae8870e23b244078a2dba95775cb8a11638c
+  zh: f96691b9d5aabe5e1641c17e5ce88f518abda18b
+/agent-note-bind-one-concrete-web-address:
+  en: f70f2b6b24ef16dd
+  zh: 64100dbc55eee33d
+/agent-note-bind-one-concrete-web-address/problem:
+  en: ffc265e61eadc31b
+  zh: fcc70f0a8817914c
+/agent-note-bind-one-concrete-web-address/decision:
+  en: 950b074f05754d64
+  zh: 0e3983687500f74a
+/agent-note-bind-one-concrete-web-address/alternatives-considered:
+  en: 0e4d475347796821
+  zh: e621e606bc5b1045
+/agent-note-bind-one-concrete-web-address/consequences:
+  en: ba7a839bca09992d
+  zh: a11171005405d1e2
+/agent-note-bind-one-concrete-web-address/testing:
+  en: 4bb8f4bf4ad943c3
+  zh: 2e24d56d01b52574

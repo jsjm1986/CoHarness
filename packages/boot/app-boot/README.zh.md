@@ -47,7 +47,7 @@ const ctx = await boot('dsh', resolveConfigPath(argv[2], process.env.DSH_SNAPSHO
 
 Profile 与组合包的声明类型从 [`@deepseek-ai/dsh-package-manifest`](../../util/package-manifest/README.zh.md) 导入。App-boot 将 `DshPackageManifest` 适配为包身份可选的 `ProfileManifest`，因为本地 profile 无需发布版本。App-boot 负责 profile 加载、JSON 校验和解析后的运行时数据。
 
-profile 是同一套 dsh 安装提供不同应用界面的方式：`web`、`headless`、`acp`、`sdk` 与 `sdk-minimal` 从同一 launcher 启动不同组合。profile 位于 `$DSH_HOME/profiles/<name>`，由可安装组合包和自身 `cordis.patch.yml` 组成。组合包的 `dsh.bundle.patch` 指定一个 patch 文件或一个有序的文件列表；`bundlePatchFiles` 校验该声明，`bundlePatchPaths` 把它解析为绝对路径；该层按此顺序拼接各文件的 patch 列表。YAML 组合决定是否启用 HMR。随产品交付的 `web` 模板实时重载，其他随附模板只在启动时应用 patch。`sdk-minimal` 只列出自身的独立组合包，其他模板保留 base 加模式的组合包栈。`dsh --profile <name> --from-default-profile <template>` 从一个随附模板，在新的非内置名称处创建自定义 profile；`dsh plugin` 则初始化以 base 为基础的 profile，并管理其中安装的组合包。组合包解析、manifest 读取或 patch 加载失败时会跳过该组合包，不改变其选择状态；加载结果在 `skippedBundles` 中列出每个被跳过的组合包，启动器每次启动时通过 `reportSkippedBundles` 输出一次。其余组合包保持原顺序；profile 和用户 patch 错误仍会导致启动失败。跳过组合包不保证剩余组合能够提供所需服务。由应用持有的 npm 项目（例如 Electron 保留的 Desktop profile）通过 `loadProfileDirectory` 加载已经初始化的目录，而不会将它暴露给 CLI profile 查找。
+profile 是同一套 dsh 安装提供不同应用界面的方式：`web`、`headless`、`acp`、`sdk` 与 `sdk-minimal` 从同一 launcher 启动不同组合。profile 位于 `$DSH_HOME/profiles/<name>`，由可安装组合包和自身 `cordis.patch.yml` 组成。组合包的 `dsh.bundle.patch` 指定一个 patch 文件或一个有序的文件列表；`bundlePatchFiles` 校验该声明，`bundlePatchPaths` 把它解析为绝对路径；该层按此顺序拼接各文件的 patch 列表。YAML 组合决定是否启用 HMR。随产品交付的 `web` 模板实时重载，其他随附模板只在启动时应用 patch。`sdk-minimal` 只列出自身的独立组合包，其他模板保留 base 加模式的组合包栈。`dsh --profile <name> --from-default-profile <template>` 从一个随附模板，在非内置名称处创建或替换自定义 profile；`dsh plugin` 则初始化以 base 为基础的 profile，并管理其中安装的组合包。组合包解析、manifest 读取或 patch 加载失败时会跳过该组合包，不改变其选择状态；加载结果在 `skippedBundles` 中列出每个被跳过的组合包，启动器每次启动时通过 `reportSkippedBundles` 输出一次。其余组合包保持原顺序；profile 和用户 patch 错误仍会导致启动失败。跳过组合包不保证剩余组合能够提供所需服务。由应用持有的 npm 项目（例如 Electron 保留的 Desktop profile）通过 `loadProfileDirectory` 加载已经初始化的目录，而不会将它暴露给 CLI profile 查找。
 
 profile 导入插件前，DSH 会检查其 `peerDependencies` 中对 `@deepseek-ai/dsh` 和 `@deepseek-ai/dsh-*` 的依赖，与 `getDshRuntimeVersion()` 返回的唯一运行时版本比较。每个声明的版本范围都必须匹配；预发布版本参与范围匹配。源码工作区的 `workspace:^`、`workspace:~` 和 `workspace:*` 指向同一个运行时。未声明 DSH peer 时不施加版本约束；无效范围视为不兼容。这些检查使用 peer 声明，而不是 `engines.dsh`，也不是防范恶意包代码的沙箱。
 
@@ -84,7 +84,7 @@ profile 导入插件前，DSH 会检查其 `peerDependencies` 中对 `@deepseek-
 
 ### 读取插件展示元信息
 
-使用 `readPluginMeta(specifier, parentURL)` 或 `ctx.pluginPackages.metaOf(specifier, parentURL)` 读取已安装包的展示文本，无需导入或激活插件。查询使用完整包标识与调用方的解析基准，并遵循 Node exports。文件路径与文件 URL 不解析资源，直接返回无元信息。缺失的 locale 字段回退到该地址下可访问的 `package.json`；格式错误的元信息返回 `error` 诊断。结果保留翻译，由 Client 选择语言。即使 locale 文本完整，读取器也会将 `package.json.icon` 加载为图片 data URL；图标出错时，保留有效文本并附上诊断。作者格式见[插件展示元信息](../../../docs/cookbook/adding-a-package.zh.md#plugin-display-metadata)。
+使用 `readPluginMeta(specifier, parentURL)` 或 `ctx.pluginPackages.metaOf(specifier, parentURL)` 读取已安装包的展示文本，无需导入或激活插件。查询使用完整包标识与调用方的解析基准，并遵循 Node exports。文件路径与文件 URL 不解析资源，直接返回无元信息。包根标识缺失的 locale 字段回退到可访问的 `package.json`；子路径标识从不读取 `package.json`。格式错误的元信息返回 `error` 诊断。结果保留翻译，由 Client 选择语言。即使 locale 文本完整，读取器也会加载图片 data URL：包根使用清单 `icon`，省略该字段时使用 `<包名>/icon`；子路径使用 `<标识>/icon`。图标出错时，保留有效文本并附上诊断。作者格式见[插件展示元信息](../../../docs/cookbook/adding-a-package.zh.md#plugin-display-metadata)。
 
 <a id="startup-and-reload-failures"></a>
 ### 启动与重载失败
@@ -113,10 +113,6 @@ Loader 结算后，app-boot 在仅 optional 条目未激活时输出警告。如
 [Web 进程矩阵](../../../apps/cli/tests/profiles/web/tests/web-failure-matrix.expected.e2e.ts)和[启动验收测试](../../../apps/cli/tests/profiles/web/tests/web-best-effort-startup.expected.e2e.ts)通过随附 Web profile 验证这些结果；[app-boot 测试](tests/app-boot.spec.ts)还覆盖根 Include 失败。
 
 如果你的应用持有终端，它可以在进程退出前把终端交还，你的 shell 绝不会残留在 raw 模式。交还过程有界：卡住的清理只会延迟致命退出，而不会取消它。
-
-### 告诉 agent（智能体）harness 所在位置
-
-当你的应用启动模型驱动的 agent 时，你可以告诉 agent DSH 实现代码 checkout 的位置：它得知该路径，也知道不得据此推断工作目录——它应使用 `pwd`。这条指示在系统提示词靠前位置出现一次。没有系统提示词服务的应用会跳过；开发环境中，重新加载系统提示词后它会消失，直至下次启动。
 
 -----
 
@@ -149,19 +145,18 @@ Loader 结算后，app-boot 在仅 optional 条目未激活时输出警告。如
 
 ### Helper 行为
 
-每个导出各负责启动的一个阶段：配置解析与快照回放、分层环境加载、明确报错的保护机制、激活审计、patch 解析、根 include 挂载、配置 dump 渲染、profile 组合，以及 harness 源码段落。各导出的约定在代码中，不在本 README——见 [`src/index.ts`](src/index.ts) 与 [`src/profile.ts`](src/profile.ts)。
+每个导出各负责启动的一个阶段：配置解析与快照回放、分层环境加载、明确报错的保护机制、激活审计、patch 解析、根 include 挂载、配置 dump 渲染与 profile 组合。各导出的约定在代码中，不在本 README——见 [`src/index.ts`](src/index.ts) 与 [`src/profile.ts`](src/profile.ts)。
 
 ### 源码地图
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 启动 helper：配置解析、环境加载、会明确报错的保护机制、激活审计、patch 解析、配置 dump、harness 源码段落 |
+| [`src/index.ts`](src/index.ts) | 启动 helper：配置解析、环境加载、会明确报错的保护机制、激活审计、patch 解析、配置 dump |
 | [`src/profile.ts`](src/profile.ts) | profile 发现、初始化、组合包解析、runtime resolution 构造 |
 | [`src/profile-plugins.ts`](src/profile-plugins.ts) | 已安装依赖、bundle 启用策略与 manifest 更新 |
 | [`src/profile-sanitize.ts`](src/profile-sanitize.ts) | profile patch 备份与恢复 bundle 启用状态 |
 | [`src/config-schema/`](src/config-schema/) | Profile schema 生成、发现、原生投影与结果类型 |
 | [`src/profile-resolution/`](src/profile-resolution/) | 运行时 resolver、package metadata 服务与构建后 Worker bootstrap |
-| — | 不发布运行时不变式伴生入口；每个 runtime resolution 只有一个拦截所有，dual 模式在解析时比对独立物化的结果。 |
 
 </details>
 
@@ -186,11 +181,11 @@ Loader 结算后，app-boot 在仅 optional 条目未激活时输出警告。如
 <a id="model-experience"></a>
 ## 模型体验
 
-模型通过此包加载的插件树间接受影响——只有该树贡献模型上下文；唯一贡献模型可见文本的导出 `addHarnessSourceSection`，也只有在消费方启动后调用它时才会产生影响。
+模型通过此包加载的插件树间接受影响——只有该树贡献模型上下文；没有导出会添加模型可见文本。
 
 #### KV Cache 影响
 
-启动本身不改变请求前缀。`addHarnessSourceSection` 将源码路径放在第一方可复用指令之后，因此工具与配置一致时，不同 checkout 不会改变前置字节。不保证提供方复用缓存。
+启动本身不改变请求前缀。
 
 ## 已知限制与延期工作
 

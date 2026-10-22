@@ -1,4 +1,5 @@
 /** Shared conversation view, selection, and store-state contracts. */
+import type { DraftSnapshot } from '../input/contract.ts'
 
 /** Tool call identity as carried on the wire (branded upstream in connection). */
 export type ToolCallId = string
@@ -21,8 +22,8 @@ export interface ViewTab { id: string; label: string }
 export interface ChatStoreState {
   /** Details-linkage channel (conversation writes, details reads). */
   selection: SelectionTarget | null
-  /** Composer draft (persisted; survives session switches and reloads). */
-  draft: string
+  /** Persisted text or semantic draft; reference spans survive browser reloads. */
+  draft: string | DraftSnapshot
   /** Active conversation view id ('conversation.view' entry id); null falls back to Chat. */
   view: string | null
   /**

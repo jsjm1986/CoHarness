@@ -23,18 +23,11 @@ chip 携带无障碍描述 "Plan mode on, press to turn off"。准入失败（`m
 
 ## 目录
 
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知局限与延后工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。Plan 状态由 `dsh-plan-mode` 拥有并经 `plan` 投影到达；chip 是纯渲染器，node 侧是空 apply。
-
 
 ## 模型体验
 

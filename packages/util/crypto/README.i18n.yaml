@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/crypto/README.md
+document:
+  en: b0ba1adcd99a0546ba9a672f679700d60e03a7c7
+  zh: 1c8f9f588300efb48e4937f26637d0a6e4ac358c
 /:
   en: 58bd7f089e72bee8
   zh: 51e441375196f25d
@@ -12,14 +15,11 @@
   en: 55f117af7ba9f8fe
   zh: 2cde7f6b69dc4bf8
 /dsh-util-crypto/table-of-contents:
-  en: dc3917f6a6306e2f
-  zh: 8bb43653456f237a
+  en: 69e1e1639e7f0650
+  zh: 632c2e2991f0b0c8
 /dsh-util-crypto/api:
-  en: 374f8b3e0a5f2d98
-  zh: 714f7d83e71fbb61
-/dsh-util-crypto/invariants:
-  en: 5f29335e38060184
-  zh: e81f194a4ae31fb2
+  en: 464b4f5e536b3fe1
+  zh: 7b8f483a66e4febb
 /dsh-util-crypto/model-experience:
   en: beb00a2635b78870
   zh: d93b828c08217472
@@ -28,7 +28,7 @@
   zh: 1d52cae70914dc0b
 /dsh-util-crypto/known-limitations-and-deferred-work:
   en: 01829c8a7cf82f10
-  zh: ab409b689259acc7
+  zh: 3acabdfc5e8260dc
 /dsh-util-crypto/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 4438af76c19be347

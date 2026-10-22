@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/home-paths/README.md
+document:
+  en: 87cd9cc6bd207dbc94ef6e68ff17a7f05dc57876
+  zh: 8628ef0f75255a9550f1d554a32e1311f5696957
 /:
   en: 19153ecc0af2af6f
   zh: 0a51af1cad6486b4
@@ -9,17 +12,17 @@
   en: ecaf4f6abc67bbbd
   zh: beecdb38213c64d9
 /dsh-home-paths/summary:
-  en: 0d5f47f14146d38f
-  zh: f92e92f30ed8798d
+  en: dff21ab90db0d8b8
+  zh: bb9840f6a3881565
 /dsh-home-paths/table-of-contents:
   en: 81fa167f330c9369
   zh: 4986ae49626aead6
 /dsh-home-paths/dsh-home:
-  en: c21bf6700fa9a4ed
-  zh: 647a2b4fe436957b
+  en: 1136b6b65c010829
+  zh: 5098c387f17f1009
 /dsh-home-paths/watch-paths:
-  en: 5507b11765ccd4fd
-  zh: d463e30467f535ec
+  en: 3070851223c38ad6
+  zh: dabefa8223a29f85
 /dsh-home-paths/known-limitations-and-deferred-work:
   en: a2e080f1a2d359d5
   zh: 64464d7dbd307792

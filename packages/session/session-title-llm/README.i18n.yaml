@@ -1,28 +1,28 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-title-llm/README.md
+document:
+  en: 26e62c45ba787714b02f530a9d339765016401e1
+  zh: 58b42d949e8103c1c45796888d4e8f003c396c11
 /:
-  en: 6184e467da62f0c8
+  en: 129d1901a10435e8
   zh: 0a51af1cad6486b4
 /deepseek-ai-dsh-session-title-llm:
-  en: 1c56063916d08b7d
-  zh: d99d72dcd6e55803
+  en: b0bceb537bef8d44
+  zh: 2cd86ed67141e567
 /deepseek-ai-dsh-session-title-llm/summary:
-  en: 741cd917e857bd99
-  zh: 43c290b6baf222e6
+  en: 8b46da08303b9521
+  zh: 99dd0d1f5d88b780
 /deepseek-ai-dsh-session-title-llm/table-of-contents:
-  en: 5c327cb51d492dee
-  zh: 1bb6e148e00b460d
+  en: 71eddffdffd8d82a
+  zh: 7f267ebd12f53f74
 /deepseek-ai-dsh-session-title-llm/route-and-failure-contract:
-  en: 7431d3f954179fe8
-  zh: 81b3861aed670ab3
+  en: 891af83d6c0b20fc
+  zh: e857069d6d4bc2b9
 /deepseek-ai-dsh-session-title-llm/configuration:
-  en: c0045003bb9354fd
-  zh: 2f281532c60f8086
-/deepseek-ai-dsh-session-title-llm/invariants:
-  en: eda0961d8863c725
-  zh: 03b01f61e76b9254
+  en: 6c3a69995e222f02
+  zh: fce9e59eadd5925e
 /deepseek-ai-dsh-session-title-llm/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -30,17 +30,17 @@
   en: 7dcc6f74474f78e7
   zh: 64cffa0b4d94c69d
 /deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/what-the-model-sees:
-  en: 65a72db46b8c2df3
-  zh: 3f93c653efbc1aa8
+  en: 9bb1ab32a64393e7
+  zh: 5a20875223408699
 /deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/token-effect:
-  en: 4d59f31ebbff4d31
-  zh: 6104f3b7a4c690af
+  en: 37b7841dcd3d25e9
+  zh: a56fa44ccf056b4e
 /deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/kv-cache-effect:
-  en: 5d3b5b7c8d8b4b67
-  zh: 587eb6cadf03490d
+  en: ebf780cb08ebf13d
+  zh: e5147e1ae82d5761
 /deepseek-ai-dsh-session-title-llm/known-limitations-and-deferred-work:
-  en: f52e8fc0c45d3d40
-  zh: 7e75c73412cef4e3
+  en: 0d4a31280b831c8c
+  zh: 05963596cf3fa514
 /deepseek-ai-dsh-session-title-llm/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

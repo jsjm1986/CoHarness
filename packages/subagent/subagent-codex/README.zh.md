@@ -20,7 +20,6 @@ kind: "package-bundle"
 - [配置](#configuration)
 - [持续成员](#persistent-members)
 - [产品兼容性与证据](#product-compatibility-and-evidence)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -145,12 +144,6 @@ dsh --profile <name>
 
 如果安装时省略 optional dependencies、当前平台不受支持，或所选载荷缺失，第一次委派会在 `initialize` 阶段以安全 `unknown` 类别和已观测到的进程结果失败。原始 wrapper 文本只保留在 Host stderr；提供方既不会探测宿主 CLI，也不会用它重试。独立 wrapper fixture 会另行证明原生载荷失败与不存在宿主回退。
 
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。每次运行向委托工作区中的一个临时 Codex 线程提交一个任务并返回其结果；运行之间不保留会话状态。
-
-
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -192,7 +185,7 @@ Codex 子级会在一个全新的临时线程中，以单个轮次接收这些�
 - **兼容性由开发证据锁定**：若要从已验证的 0.153.4 协议基线升级，必须重新生成上游 schema 证据，并重新运行握手、答案选择、审批、取消、无密钥真实产品以及带密钥的 DeepSeek 随机数测试。
 - **没有人工审批路径**：已知的无人值守审批请求会被拒绝，未知服务器请求会以默认拒绝方式使运行失败；三种 Profile 模式都不会创建 DSH 交互通道或逐次调用 allow 策略。
 - **assistant 载荷仅包含最终文本**：失败运行可以额外公开独立的安全诊断；推理、过程说明、中间消息、工具通信、用量信息、原始 stderr 和工作区差异不会进入父会话，通用 Job id、通知与状态来自共享作业运行时。
-- **没有可选的共享能力**：对于本提供方，共享服务会拒绝输出 schema、子任务角色设定、工具筛选和 harness 深度强制约束。
+- **没有可选的共享能力**：对于本提供方，共享服务会拒绝 `agentPreset`、`agentOptions`、输出 schema 和 harness 深度强制约束。
 - **没有按实际经过时间触发的超时或副作用回滚**：长时间运行的工作由调用方取消，且取消前已更改的文件或外部系统不会恢复原状。
 
 <a id="dev-note"></a>

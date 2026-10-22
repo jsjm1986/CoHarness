@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-14-user-uploaded-documents.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-14-user-uploaded-documents.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-user-uploaded-documents.md
+document:
+  en: e461ef59dbf59ac15337ce4e15f0fce61b2d53d6
+  zh: eb5e9a836e70af34d71ddbcbac0f9bda3b21e26e
 /agent-note-user-uploaded-documents-as-real-files:
   en: 1fe56e514dc3d4d2
   zh: 97df8771121cef1a

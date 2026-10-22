@@ -31,6 +31,7 @@ import type {
   CredentialRef,
   ResolvedCredential,
 } from '@deepseek-ai/dsh-credentials'
+import { collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { ApprovalRequestId } from '@deepseek-ai/dsh-cordis-host-runner/types'
 import type { HostFrame } from '../src/api/index.ts'
@@ -261,6 +262,7 @@ async function harness(options?: {
       },
       expiresAt: Date.now() + 60_000,
       signal: new AbortController().signal,
+      capabilities() { return collaborationCapabilities(this.participant) },
       authorize: () => Promise.reject(new Error('session authorization is not exercised')),
       readableSessionIds: ids => Promise.resolve(new Set(ids)),
       claimInteraction: () => Promise.resolve(true),

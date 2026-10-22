@@ -163,6 +163,8 @@ interface TargetRecords {
 /** Shared resource registry. Existing Host streams deliver observations; resources open no extra streams. */
 export class WorkspaceResourceRegistry {
   private readonly targets = new Map<string, TargetRecords>()
+  /** Per-target observers of every `host/workspace-file-changed` frame, before record matching. */
+  private readonly changeObservers = new Map<string, Set<(change: { sessionId: SessionId; path: string; version?: string }) => void>>()
 
   /**
    * Register a runtime provider.
@@ -261,6 +263,23 @@ export class WorkspaceResourceRegistry {
   }
 
   /**
+   * Observe every file-change frame routed to one runtime target, before
+   * per-resource matching — directory-level consumers need paths no registered
+   * record covers.
+   * @param target - runtime target owning the connection the frames arrive on.
+   * @param listener - receives each frame's Session, relative path, and version.
+   * @returns idempotent unsubscribe.
+   */
+  observeChanges(target: WorkspaceResourceTarget,
+    listener: (change: { sessionId: SessionId; path: string; version?: string }) => void): () => void {
+    const key = targetKey(target)
+    const set = this.changeObservers.get(key) ?? new Set()
+    this.changeObservers.set(key, set)
+    set.add(listener)
+    return () => { if (set.delete(listener) && set.size === 0) this.changeObservers.delete(key) }
+  }
+
+  /**
    * Consume an observation from its owning Host stream.
    * @param target - stream identity.
    * @param change - observed relative path and optional present version.
@@ -268,6 +287,7 @@ export class WorkspaceResourceRegistry {
   handleChange(target: WorkspaceResourceTarget, change: { sessionId: SessionId; path: string; version?: string }): void {
     const owner = this.targets.get(targetKey(target))
     if (owner?.connected !== true) return
+    for (const listener of this.changeObservers.get(targetKey(target)) ?? []) listener(change)
     const address = workspaceResourceAddress(change.sessionId, change.path)
     const record = owner.records.get(address)
     if (record === undefined) return

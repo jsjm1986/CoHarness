@@ -71,8 +71,6 @@ panel 通过 portal 渲染，由 `useAnchoredPosition` 锚定到触发器右缘�
 -----
 
 
-**运行时不变式：** 不发布伴生入口。RPC 是权威来源，本包只持有一个可释放的 slot 注册。
-
 <a id="model-experience"></a>
 ## 模型体验
 

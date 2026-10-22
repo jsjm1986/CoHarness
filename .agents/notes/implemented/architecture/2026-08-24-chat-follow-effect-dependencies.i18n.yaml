@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-24-chat-follow-effect-dependencies.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-24-chat-follow-effect-dependencies.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-24-chat-follow-effect-dependencies.md
+document:
+  en: a8e4dc6ad8a3669deca681e2c496813555aa4ce3
+  zh: 34b1f32ee98a0f29b598c8f4fb407809cc9fea38
 /agent-note-flow-gated-chat-follow-layout-effect:
   en: a07acc92f801554f
   zh: 12c1a4a9d0c7a990

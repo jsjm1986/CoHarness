@@ -4,7 +4,7 @@
  * participates in method lookup, invocation, or type exposure.
  */
 
-import { ConnectionRpcStreamInterrupted } from '@deepseek-ai/dsh-client-connection/client'
+import { ConnectionRpcStreamInterrupted, interactionsUnavailableError } from '@deepseek-ai/dsh-client-connection/client'
 import { RemoteStreamCarrierError } from './stream-error.ts'
 import { RemoteStream, type RemoteStreamOptions } from './remote-stream.ts'
 export { RemoteStream, type RemoteStreamOptions, type RemoteStreamItem } from './remote-stream.ts'
@@ -162,6 +162,10 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     event: Event,
     listener: Events[Event],
   ): ReturnType<TypertClientRemote['$on']> {
+    // A 'none' connection never receives forwarded events server-side; let the
+    // subscriber learn that at subscription instead of waiting for silence.
+    const mode = (this.ownerCtx.get('connection') as ConnectionHandle | undefined)?.interactions
+    if (mode === 'none') throw interactionsUnavailableError()
     // The ordered table erases the argument list this signature pins per event;
     // `$dispatch` restores it from the frame carrying that same event family.
     const subscription: RemoteEventSubscription = { event, listener }

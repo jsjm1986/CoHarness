@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-10-13-profile-package-refresh-and-manifest-invalidation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-10-13-profile-package-refresh-and-manifest-invalidation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-13-profile-package-refresh-and-manifest-invalidation.md
+document:
+  en: ba92f3ad4c9da3b07d6c0b8e98a286107cac36d3
+  zh: 059c7ebda77f1eb9f5ebb31d769bc12883ffcd94
 /agent-note-refresh-runtime-resolution-after-package-operations-and-expire-hmr-package-configuration:
   en: 305f7f126f5c2bbc
   zh: d5bc173a3a224c92

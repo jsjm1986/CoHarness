@@ -27,17 +27,11 @@ The shell base styles apply automatic CJK/Latin spacing to ordinary content in s
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Boot is a one-shot module-load and plugin-mount sequence; a failed entry keeps the static boot page and there is no ongoing relation to observe.
 
 <a id="model-experience"></a>
 ## Model Experience

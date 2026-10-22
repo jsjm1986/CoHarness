@@ -142,7 +142,7 @@ export function apply(ctx: ClientContext): void {
         loadChangesDiff: (id, seq, index) => diffs.load(id, seq, index),
         loadPresentedApps: (key, path) => { opener.loadApplications(key, path) },
         openPresented: (id, seq, index, action, path, application) => opener.open(id, seq, index, action, path, application),
-        openChanged: (id, seq, index, path, application) => opener.openChanged(id, seq, index, path, application),
+        openChanged: (id, seq, index, action, path, application) => opener.openChanged(id, seq, index, action, path, application),
         openChangesReview: (coordinates, index) => {
           if (coordinates.sessionId !== sessionId) throw new Error('Review navigation belongs to another Session')
           ctx.sidebarRight.openSessionResource(sessionId, changesReviewAddress(coordinates), { params: { index } })
@@ -162,11 +162,15 @@ export function apply(ctx: ClientContext): void {
     inject: (sessionId): ReviewInjected => {
       const { summaries, diffs, opener } = forSession(sessionId)
       return {
-        hooks: { changesSummary: summaries.state, changesDiff: diffs.state, presentedOpen: opener.state, presentedHost: opener.host },
+        hooks: {
+          changesSummary: summaries.state, changesDiff: diffs.state,
+          presentedOpen: opener.state, presentedHost: opener.host, presentedApps: opener.apps,
+        },
         loadChangesSummary: (id, seq) => summaries.load(id, seq),
         loadChangesDiff: (id, seq, index) => diffs.load(id, seq, index),
         reloadPresentedHost: () => opener.loadHost(),
-        openChanged: (id, seq, index, path) => opener.openChanged(id, seq, index, path),
+        loadPresentedApps: (key, path) => { opener.loadApplications(key, path) },
+        openChanged: (id, seq, index, action, path, application) => opener.openChanged(id, seq, index, action, path, application),
       }
     },
   }, ReviewTab))

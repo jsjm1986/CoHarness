@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-06-bundled-dsh-badge-skill.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-06-bundled-dsh-badge-skill.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-bundled-dsh-badge-skill.md
+document:
+  en: 4c6fbdcb76298759c2f17b3b5349a5b48198595e
+  zh: fe291d498660e744cf193e123aa1a4a4f4a27b3b
 /agent-note-bundled-dsh-badge-skill:
   en: 9186e2302cb9db6d
   zh: 8249c44f6f272015

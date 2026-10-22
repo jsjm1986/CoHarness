@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-04-composer-tab-gutter-reservation.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-04-composer-tab-gutter-reservation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.md
+document:
+  en: 8bd9fb2d86982d82b44a82c55b7303fcd9a5bf4d
+  zh: d3a9691f5f5fb095fc53b4cf6b627025220a8148
 /agent-note-the-conversation-column-reserves-one-scrollbar-gutter-for-every-view:
   en: fd02bc766b6b9f71
   zh: 4f1636b7cc0cfb77

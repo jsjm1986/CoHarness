@@ -19,17 +19,11 @@ Host-backed user interfaces use `dsh-file-reference` to offer `@file` completion
 
 ## Table of Contents
 
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam defines the list contract and `@file` grammar; providers own indexing, caching, and invalidation.
 
 <a id="model-experience"></a>
 ## Model Experience

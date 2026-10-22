@@ -9,8 +9,6 @@ English | [中文](README.zh.md)
 
 Event-sourced session log and in-memory store. A `Session` is the append-only source of truth for an agent's whole interaction history — the LLM message history is *derived* from it. A **surface** layer (an ordered projection of message-producing events) is maintained on top of the raw log for efficient derivation and compaction.
 
-The optional `@deepseek-ai/dsh-session/invariant` companion registers this package's relational trace checks with `ctx.invariants`: monotonic sequence numbers, turn/step enclosure, and same-step tool call/result pairing. It replays existing sessions when loaded or reloaded; storage validation, snapshotting, freezing, cited source-event validation, and surface acceptance remain always-on responsibilities of the root session package.
-
 ## Summary
 
 `dsh-session` records every model-visible fact in an append-only session log and derives model history from that record. Consumers can inspect, replay, fork, and flush sessions while preserving historical events; compaction hides superseded entries from the active conversation without deleting them. Sessions remain in memory unless a persistence backend is added, and durability checkpoints wait for configured backends. Choose this package wherever an agent needs a reconstructable session record; it does not call models.
@@ -83,6 +81,18 @@ Plain class (not a Cordis Service). Create live sessions through `ctx.sessions.c
 Durable values need one accepted representation, not a check followed by a second read. `isJsonValue(value)` is the boolean predicate; `snapshotJsonValue(value)` iteratively validates and copies a plain value in one pass, returning `undefined` for invalid input and propagating a throwing getter. The snapshot helper accepts finite JSON numbers except `-0` (JSON rewrites it to `0`), dense ordinary arrays, and plain or null-prototype objects; it rejects cycles, unsupported scalars, and exotic prototypes before normalization without imposing a call-stack depth limit.
 
 Session-event import separates ownership from message validation. `snapshotSessionEvent(event)` clones a borrowed event before validating and freezing its identified message. `adoptSessionEvent(event)` performs the same message work in place and returns the original event; callers may use it only when they transfer an exclusively owned object graph with no mutable child shared with another event. Both paths apply the same canonical payload and event-local surface-metadata validation as `append`; history relations are not checked.
+
+<a id="write-experimental-plugin-records"></a>
+
+### Write experimental plugin records
+
+`appendPluginRecord(session, type, data)` appends one plugin record for a package under `packages/experimental/`; the `verify-plugin-record-callers` check rejects any other production caller in this repository. Plugins outside this repository must not call it either, although no repository check can inspect them.
+
+Declare each record in `PluginRecordMap` through `@deepseek-ai/dsh-session/types`, with a description and an explicit payload type annotation in the owning experimental package's `src/`. Names use `plugin:<owner>/<record>`, where `owner` is the suffix of the package name `@deepseek-ai/dsh-experimental-<owner>`; for example, `plugin:pi-extensions/entry`. TypeScript checks each name and payload against its declaration; the writer's runtime JSON snapshot rejects values that cannot be preserved losslessly. Put extension-defined or other dynamic names inside the payload of a declared record.
+
+The [experimental persistence catalog](../../../docs/experimental-persistence-catalog.md) lists current plugin-record declarations with their owners, descriptions, payload type annotations, and source files. These declarations remain separate from `SessionEventMap`, expanded persistence schemas, released type history, and `KNOWN_SESSION_EVENT_TYPES`. Records carry `ignorable: true`: a build that does not recognize one retains and skips it on read. Records never enter the model-visible surface. Resume and fork carry them with the rest of the log; Session format migration keeps them on a best-effort basis.
+
+`pluginRecordOf(event)` returns an event as a record, or `undefined` for any other event; a `ctx.sessionProjections` unit that passes each event to it rebuilds plugin state on resume. Its `data` remains `unknown` even when the current map declares the name. The owner validates it before use because earlier builds can write different payloads, and a format edge can carry an unknown ignorable event into the same `plugin:` namespace. Removing or renaming a declaration does not discard stored records. The [ignorable events decision](../../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md) owns the compatibility policy.
 
 ### Chunk-row storage codec (`chunk-rows.ts`)
 
@@ -182,7 +192,6 @@ Logging causes no invalidation, and exact reconstruction preserves request-prefi
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-
 
 These limits define when the session store needs special care. They are current package constraints, not a task backlog.
 

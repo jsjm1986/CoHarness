@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-08-10-unary-apiproxy-remote-migration.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-08-10-unary-apiproxy-remote-migration.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-08-10-unary-apiproxy-remote-migration.md
+document:
+  en: 6e4121fb1ece092afcaf912fa96d40e0b6c463f8
+  zh: f4c9fccc44414956afccd9b18a56cdec6a7f0e77
 /agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services:
   en: 5cf3fdb9d2b95aa5
   zh: 91e7b1251e08be25

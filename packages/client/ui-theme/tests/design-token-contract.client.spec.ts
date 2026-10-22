@@ -14,6 +14,7 @@ const PACKAGES_DIR = fileURLToPath(new URL('../../../', import.meta.url))
 const RUNTIME_TOKENS = new Set([
   '--dsw-viewport-height',
   '--dsw-font',
+  '--dsw-font-mono',
 ])
 
 function cssFiles(root: string): string[] {

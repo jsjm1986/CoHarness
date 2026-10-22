@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for 2026-09-22-stream-producers-publish-on-frame-cadence.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for 2026-09-22-stream-producers-publish-on-frame-cadence.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-stream-producers-publish-on-frame-cadence.md
+document:
+  en: 7a1fa0f8dd40000b9442adda414b34ea937da071
+  zh: a4160f6129aa68ae896ffa7497f5022f6a65f99d
 /agent-note-envelope-driven-stream-producers-publish-on-the-animation-frame-channel:
   en: e74c44d8cbdb6903
   zh: 349a1765a20dd1ae

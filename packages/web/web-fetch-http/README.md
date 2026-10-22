@@ -20,7 +20,6 @@ With `dsh-web-fetch-http`, the harness can fetch public HTTP(S) pages through th
 - [Responsibility split](#responsibility-split)
 - [Transport hygiene](#transport-hygiene)
 - [Config](#config)
-- [Invariants](#invariants)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -61,11 +60,6 @@ A shipping web-tool deployment sets the provider backstop above the tool budget,
 | `userAgent` | `deepseek-harness/…` | `User-Agent` header. |
 
 The numeric limits are validated at plugin construction: every cap except `maxRedirects` must be a positive finite number, and `maxRedirects` must be a non-negative integer. An invalid value throws rather than silently constructing a provider with nonsensical limits.
-
-<a id="invariants"></a>
-## Invariants
-
-**Runtime invariant:** No companion is published. Each call performs one bounded anonymous fetch and returns decoded content; no connection or cache state is retained.
 
 <a id="model-experience"></a>
 ## Model Experience

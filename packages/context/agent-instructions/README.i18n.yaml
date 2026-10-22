@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/agent-instructions/README.md
+document:
+  en: d7068fafe28e2433ae844d683bd1c9c5ee1bd19c
+  zh: b1c6d2c04a871a8b85015aaa0fb2fb0ffc0e38c9
 /:
   en: 182699a95945ba76
   zh: 61495d48365178df
@@ -12,11 +15,11 @@
   en: 9d849b3c7bc5e3b7
   zh: aee26ccc12e73fe3
 /deepseek-ai-dsh-agent-instructions/table-of-contents:
-  en: 96e820483a20b08e
-  zh: 0bf3797e13b41e06
+  en: 9db09dc322b335b2
+  zh: 30f46d45f1637ccb
 /deepseek-ai-dsh-agent-instructions/lifecycle:
-  en: 92786651e779bb39
-  zh: 4ce71ba5edd3bcdc
+  en: b96b391f84deaa05
+  zh: b51e61dd6eb16a15
 /deepseek-ai-dsh-agent-instructions/prompt-shape:
   en: 4f022617ba460f3f
   zh: 40ce24430792f2c8
@@ -24,14 +27,11 @@
   en: 55a5789c3077c3ba
   zh: ab2a555a19f54015
 /deepseek-ai-dsh-agent-instructions/configuration:
-  en: 2561912735c5488d
-  zh: 553f614ceb09a8b9
+  en: b25c4f3e7e13c559
+  zh: b4ec8fc4ef5eed63
 /deepseek-ai-dsh-agent-instructions/budgeting-and-bounded-reads:
-  en: 841284a0de56b1ea
-  zh: f6369e13822ebeef
-/deepseek-ai-dsh-agent-instructions/invariants:
-  en: 5cb780c9b10a5778
-  zh: 0cbbf5e7f6a2edb5
+  en: e7cddee5ba22b027
+  zh: 52ceb600bb96936c
 /deepseek-ai-dsh-agent-instructions/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -54,8 +54,8 @@
   en: bbf8f11dbb279b78
   zh: eb537ade3fa1e573
 /deepseek-ai-dsh-agent-instructions/model-experience/newly-discovered-scope-context/what-the-model-sees:
-  en: 99226255009f8432
-  zh: 3b1661ca1a98ae4a
+  en: d806c4e1f67d7e94
+  zh: 0a6fe61576b2aba4
 /deepseek-ai-dsh-agent-instructions/model-experience/newly-discovered-scope-context/what-the-model-sees/additional-instruction-template:
   en: 50655306b787c8c6
   zh: bcdc631a35f9de91
@@ -81,8 +81,8 @@
   en: 2fbf2175168e8244
   zh: 003f251b4beef2b9
 /deepseek-ai-dsh-agent-instructions/known-limitations-and-deferred-work:
-  en: aac0dd38619eb68c
-  zh: 723f11b9fc2a6281
+  en: d30ee38d757f636d
+  zh: 70ed0947dafbf7be
 /deepseek-ai-dsh-agent-instructions/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

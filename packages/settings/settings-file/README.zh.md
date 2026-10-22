@@ -17,7 +17,6 @@ kind: "package-reference"
 
 - [配置](#config)
 - [行为](#behavior)
-- [不变量](#invariants)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -50,12 +49,6 @@ kind: "package-reference"
 - **dispose（资源释放）在每种 watch 模式下都保证完全停稳。** 卸载先把提供方标记为已关闭，在 watcher 存在时将其关闭，再等待所有已排队或进行中的文档操作完成，之后不再有任何发布。
 - **按内容抑制自写。** 提供方缓存最后可用文本；watcher 事件内容与缓存相同（含自己的写入）即为 no-op。
 - **Host 配置适配器会收到解析后的路径。** `ctx.settings.documentPath` 是 `resolveSpec()` 得出的绝对文件名，包括自定义 YAML/JSON 路径；`prepareDocument()` 会保留现有文件，或在 Host 打开文档前，以仅属主可访问的权限独占创建缺失的空文件。浏览器只收到可用性标志，绝不重建 `$DSH_HOME`，也绝不提交文件系统目标。
-
-<a id="invariants"></a>
-## 不变量
-
-**运行时不变量：** 未发布配套入口。磁盘上的文档是单一权威：更新在写回前于写锁下重读它，外部编辑会重新发布，因此不存在第二份可能分歧的持久副本。
-
 
 <a id="model-experience"></a>
 ## 模型体验

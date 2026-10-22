@@ -9,6 +9,7 @@ import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import { SubagentModelSelectionCardController } from '../src/client/subagent-model-selection-card-controller.ts'
+import type { PluginsSettingsSectionInjected } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
@@ -64,6 +65,25 @@ function declarePluginsItem(slots: SlotRegistry): () => void {
   } as never, () => null)
 }
 
+/** Stand in for the Settings shell: it declares `settings.section` for its pages. */
+function declareSettingsSection(slots: SlotRegistry): () => void {
+  return slots.register({
+    name: 'root',
+    children: { 'settings.section': { kind: 'list', scope: 'root' } },
+  } as never, () => null)
+}
+
+/** Stand in for both owners at once: `root` admits a single registration. */
+function declareBothSurfaces(slots: SlotRegistry): () => void {
+  return slots.register({
+    name: 'root',
+    children: {
+      'plugins.item': { kind: 'list', scope: 'root' },
+      'settings.section': { kind: 'list', scope: 'root' },
+    },
+  } as never, () => null)
+}
+
 describe('ui-settings-plugins apply', () => {
   it('invalidates the subagent directory on adapter changes', async () => {
     const refresh = vi.spyOn(SubagentModelSelectionCardController.prototype, 'refreshCatalog')
@@ -84,11 +104,12 @@ describe('ui-settings-plugins apply', () => {
   })
 
   it('keys each card it ships on the settings namespace that card edits', async () => {
-    const { ctx, slots } = await bench()
+    const { ctx, slots } = await bench(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
     declarePluginsItem(slots)
 
     await ctx.plugin({ inject: [...inject], apply }).await()
 
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(5) })
     const entries = slots.entries('plugins.item')
     expect(entries.map(entry => entry.options.id))
       .toEqual(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
@@ -96,11 +117,35 @@ describe('ui-settings-plugins apply', () => {
       .toEqual(['终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索'])
   })
 
-  it('injects one business face per card', async () => {
-    const { ctx, slots } = await bench()
+  it('registers a card only while the Host serves the namespace it edits', async () => {
+    const { ctx, slots, describeSettings } = await bench(['shell'])
     declarePluginsItem(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
 
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(1) })
+    expect(slots.entries('plugins.item')[0]!.options.id).toBe('shell')
+
+    describeSettings.mockResolvedValue({
+      rpcId: 's',
+      result: {
+        ok: true,
+        value: {
+          writable: true,
+          hasDocument: true,
+          namespaces: [{ ns: 'agent-loop', schema: {}, value: {}, applies: 'live', secrets: [], revision: 1 }],
+        },
+      },
+    })
+    ctx.remote.$dispatch('settings/document-updated', ['agent-loop', 1])
+    await vi.waitFor(() => { expect(slots.entries('plugins.item').map(entry => entry.options.id)).toEqual(['agent-loop']) })
+  })
+
+  it('injects one business face per card', async () => {
+    const { ctx, slots } = await bench(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
+    declarePluginsItem(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(5) })
     for (const entry of slots.entries('plugins.item')) {
       const face = (entry as { inject?: () => unknown }).inject?.() as { hooks: Record<string, unknown> }
       // Each card injects exactly one snapshot store plus its own actions.
@@ -169,7 +214,7 @@ describe('ui-settings-plugins apply', () => {
   })
 
   it('registers into a declaration that arrives after apply', async () => {
-    const { ctx, slots } = await bench()
+    const { ctx, slots } = await bench(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
     await ctx.plugin({ inject: [...inject], apply }).await()
 
     declarePluginsItem(slots)
@@ -178,15 +223,62 @@ describe('ui-settings-plugins apply', () => {
   })
 
   it('collapses every contribution on teardown', async () => {
-    const { ctx, slots } = await bench()
-    declarePluginsItem(slots)
+    const { ctx, slots } = await bench(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
+    declareBothSurfaces(slots)
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(slots.entries('plugins.item')).toHaveLength(5)
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(5) })
+    expect(slots.entries('settings.section')).toHaveLength(1)
 
     await fiber.dispose()
 
     expect(slots.entries('plugins.item')).toHaveLength(0)
+    expect(slots.entries('settings.section')).toHaveLength(0)
+  })
+
+  it('registers one Built-in plugins section and declares its tab slot, contributing no tab of its own', async () => {
+    const { ctx, slots } = await bench()
+    declareSettingsSection(slots)
+
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    const section = slots.entries('settings.section')[0]!
+    expect(section.options).toMatchObject({ id: 'plugins', order: 15 })
+    // The nav label is a locale-following thunk; owners resolve it at read time.
+    expect(resolveSlotLabel(section.options.label)).toBe('内置插件')
+    expect(slots.spec('settings.plugins.tab')).toMatchObject({ kind: 'list', scope: 'root' })
+    expect(slots.entries('settings.plugins.tab')).toHaveLength(0)
+  })
+
+  it('injects a live tab projection ordered by the contributions', async () => {
+    const { ctx, slots } = await bench()
+    declareSettingsSection(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    const section = slots.entries('settings.section')[0]!
+    const sectionFace = (section.inject as () => Pick<PluginsSettingsSectionInjected, 'hooks'>)()
+    const initialTabs = sectionFace.hooks.tabs.getSnapshot()
+    expect(initialTabs).toEqual([])
+    expect(sectionFace.hooks.tabs.getSnapshot()).toBe(initialTabs)
+
+    const unsubscribe = sectionFace.hooks.tabs.subscribe(vi.fn())
+    slots.register({ name: 'settings.plugins.tab', id: 'plain' } as never, () => null)
+    slots.register({ name: 'settings.plugins.tab', id: 'first', order: -1 } as never, () => null)
+    // Tabs follow their contribution's order, whatever order they registered in.
+    expect(sectionFace.hooks.tabs.getSnapshot()).toEqual([
+      { id: 'first', order: -1, label: '' },
+      { id: 'plain', order: 0, label: '' },
+    ])
+    unsubscribe()
+  })
+
+  it('registers the section into a declaration that arrives after apply', async () => {
+    const { ctx, slots } = await bench()
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    declareSettingsSection(slots)
+
+    await vi.waitFor(() => { expect(slots.entries('settings.section')).toHaveLength(1) })
   })
 })
 

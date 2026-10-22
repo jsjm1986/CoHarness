@@ -1,7 +1,10 @@
-# Bilingual-pair consistency record for working-directory.md (docs/i18n/README.md): per heading
-# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# Bilingual-pair consistency record for working-directory.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/working-directory.md
+document:
+  en: fe403fe3c8bc718b199579077aae75acbb816e12
+  zh: 018d10f39139241edac93f526ee59a3fb71fa4a8
 /working-directory:
   en: 0882d8b4c09c2890
   zh: a75af7ce19f661fa
