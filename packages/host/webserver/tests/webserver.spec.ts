@@ -8,7 +8,7 @@
  * binds; one wildcard load denial goes through the real Loader.
  */
 
-import { generateKeyPairSync } from 'node:crypto'
+import { generateKeyPairSync, X509Certificate } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { once } from 'node:events'
 import { Agent, request as httpsRequest } from 'node:https'
@@ -533,6 +533,11 @@ describe('real Loader composition', () => {
 
   it('serves HTTPS to a verifying client and reports the https protocol', { timeout: 60_000 }, async () => {
     const fixture = await tlsFixture()
+    const certificate = new X509Certificate(fixture.ca)
+    expect(certificate.checkHost('localhost')).toBe('localhost')
+    expect(certificate.checkIP('127.0.0.1')).toBe('127.0.0.1')
+    expect(certificate.checkIP('::1')).toBe('::1')
+    expect(Date.parse(certificate.validTo) - Date.parse(certificate.validFrom)).toBe(30 * 24 * 60 * 60 * 1000)
     const tls = { certFile: fixture.certFile, keyFile: fixture.keyFile }
     expect(HttpServer.Config({ host: '127.0.0.1', port: 0, tls })).toEqual({
       host: '127.0.0.1',

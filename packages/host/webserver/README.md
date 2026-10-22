@@ -52,9 +52,6 @@ None; this package neither assembles nor sends a provider request.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-Two working notes, both non-authoritative:
-
-- TLS test material is generated at test time (`tests/tls-fixture.ts`), never committed: GitHub push protection rejects PEM private keys even in tests, and the certificate is disposable anyway. The helper issues one self-signed localhost certificate per process, covering 127.0.0.1, `::1`, and `localhost`, and writes the key owner-only.
-- `selfsigned` stays on the 4.x line: 5.x installs two `@peculiar/asn1-schema` copies under pnpm, and its extension builder then throws for every `generate()` call.
+- TLS test material is generated asynchronously at test time (`tests/tls-fixture.ts`), never committed: GitHub push protection rejects PEM private keys even in tests, and the certificate is disposable anyway. The helper shares one pending `selfsigned` generation per process, issues a 30-day self-signed certificate covering 127.0.0.1, `::1`, and `localhost`, and writes the key owner-only.
 
 </details>
