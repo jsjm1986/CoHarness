@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-18-atomic-macos-gateway-releases.md
 document:
-  en: 9e93c0aa6e8cc2be62872909c75c8afdb746af01
-  zh: 5bd021bdc9a2963f053c9c1f09b78acd80d8a86c
+  en: 2e739709616f8cd5cee0a43e2e2716009a1c0d99
+  zh: f29a02c88a83a4db50ad4f3fd77ee72bbd7a50ce
 /agent-note-atomic-macos-gateway-release-lifecycle:
   en: d25cec3a8cbaff56
   zh: 00d384b2f405e2f6
@@ -12,14 +12,14 @@ document:
   en: 7a0ca7cb91f24bb5
   zh: 57ce3d1261ffb541
 /agent-note-atomic-macos-gateway-release-lifecycle/decision:
-  en: e5cfe32a85058578
-  zh: fcb46c4b967b9646
+  en: bca28690e7352949
+  zh: d62864cd3b82ea9c
 /agent-note-atomic-macos-gateway-release-lifecycle/verification:
-  en: 5a08ecc5f715e6cd
-  zh: bd894307bfdcd260
+  en: 173d011ac7c314f2
+  zh: 2dabb73f65850865
 /agent-note-atomic-macos-gateway-release-lifecycle/alternatives-considered:
-  en: 741bf64c3210c74e
-  zh: 92823a44903d5bf4
+  en: 1d5e21d3237fdba1
+  zh: c508c96aecae42ca
 /agent-note-atomic-macos-gateway-release-lifecycle/consequences:
   en: 1d8fbf3b87485c6a
   zh: 29367e77e4517ba8

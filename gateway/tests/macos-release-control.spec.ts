@@ -1,10 +1,12 @@
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
+  rmSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
@@ -12,7 +14,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 
 const control = resolve(import.meta.dirname, '../deploy/macos/release-control.sh')
 
@@ -108,6 +110,7 @@ function fakeTools(root: string, state: string): string {
   mkdirSync(bin)
   executable(join(bin, 'launchctl'), `#!/bin/bash
 set -euo pipefail
+printf 'launchctl %s\\n' "$*" >> "$FAKE_STATE/actions"
 case "$1" in
   print)
     if [[ "$2" == *-config ]]; then [[ "\${FAKE_CONFIG_APPLIER:-}" == 1 ]] || exit 1; fi
@@ -119,6 +122,7 @@ case "$1" in
     printf '%s\\n' "$next" > "$FAKE_STATE/pid"
     current="$(cd "$HGW_RELEASES_ROOT/current" && pwd -P)"
     printf '%s\\n' "$current/gateway" > "$FAKE_STATE/cwd"
+    basename "$current" >> "$FAKE_STATE/started"
     ;;
   *) exit 2 ;;
 esac
@@ -128,15 +132,68 @@ set -euo pipefail
 current="$(cd "$HGW_RELEASES_ROOT/current" && pwd -P)"
 release="$(basename "$current")"
 [[ "\${FAKE_FAIL_RELEASE:-}" != "$release" ]] || exit 22
-printf '{"ok":true,"release":"%s"}\\n' "$release"
+[[ "\${FAKE_FAIL_ROLLBACK_RELEASE:-}" != "$release" ]] || exit 22
+printf '{"ok":true,"release":"%s"}\\n' "\${FAKE_HEALTH_RELEASE:-$release}"
 `)
   executable(join(bin, 'lsof'), `#!/bin/bash
 set -euo pipefail
 if [[ "$1" == '+D' ]]; then exit 1; fi
 printf 'p%s\\nfcwd\\nn%s\\n' "$(cat "$FAKE_STATE/pid")" "$(cat "$FAKE_STATE/cwd")"
 `)
+  executable(join(bin, 'ps'), `#!/bin/bash
+set -euo pipefail
+printf 'ps %s\\n' "$*" >> "$FAKE_STATE/actions"
+if [[ -f "$FAKE_STATE/processes" ]]; then cat "$FAKE_STATE/processes"; fi
+`)
   mkdirSync(state)
   return bin
+}
+
+function activationFixture() {
+  const root = mkdtempSync(join(tmpdir(), 'hgw-release-fallback-'))
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }))
+  const previous = release(root, 'release-previous')
+  const candidate = release(root, 'release-candidate')
+  const fallback = release(root, 'release-compatible')
+  pointCurrent(root, previous)
+  const currentInode = lstatSync(join(root, 'current')).ino
+  const envFile = environmentFile(root)
+  const state = join(root, 'state')
+  const bin = fakeTools(root, state)
+  writeFileSync(join(state, 'pid'), '60000\n')
+  writeFileSync(join(state, 'cwd'), `${realpathSync(previous)}/gateway\n`)
+  writeFileSync(join(state, 'processes'), '910001 60000\n910002 70000\n910003 60001\n')
+  const shellEnv = join(root, 'shell.env')
+  // Bash's builtin kill cannot be intercepted by a PATH executable.
+  writeFileSync(shellEnv, 'kill() { printf \'kill %s\\n\' "$*" >> "$FAKE_STATE/actions"; }\n')
+  const env = {
+    ...process.env,
+    PATH: `${bin}:${process.env.PATH ?? ''}`,
+    BASH_ENV: shellEnv,
+    FAKE_STATE: state,
+    HGW_GATEWAY_ENV_FILE: envFile,
+    FAKE_FAIL_RELEASE: '',
+    FAKE_FAIL_ROLLBACK_RELEASE: '',
+    FAKE_HEALTH_RELEASE: '',
+    FAKE_CONFIG_APPLIER: '',
+  }
+  const activate = (args: string[], overrides: NodeJS.ProcessEnv = {}) => {
+    const result = spawnSync('/bin/bash', [control, 'activate', ...args], {
+      encoding: 'utf8', env: { ...env, ...overrides }, timeout: 25_000,
+    })
+    expect(result.error).toBeUndefined()
+    expect(result.signal).toBeNull()
+    return result
+  }
+  const actions = (): string => existsSync(join(state, 'actions')) ? readFileSync(join(state, 'actions'), 'utf8') : ''
+  const expectUnchanged = (): void => {
+    expect(realpathSync(join(root, 'current'))).toBe(realpathSync(previous))
+    expect(lstatSync(join(root, 'current')).ino).toBe(currentInode)
+    expect(readFileSync(join(state, 'pid'), 'utf8')).toBe('60000\n')
+    expect(actions()).toBe('')
+    expect(existsSync(join(root, '.activation.lock'))).toBe(false)
+  }
+  return { root, previous, candidate, fallback, state, activate, actions, expectUnchanged }
 }
 
 const macos = describe.skipIf(process.platform !== 'darwin')
@@ -315,6 +372,97 @@ printf '%s\n' "$*" > "$CAPTURE"
     expect(realpathSync(join(root, 'current'))).toBe(realpathSync(r1))
     expect(failed.stderr).toContain('failed health verification; restored release-one')
   })
+
+  it.each(['unknown flag', 'missing value', 'extra argument', 'duplicate flag'] as const)(
+    'rejects %s before inspecting processes or switching current', kind => {
+      const f = activationFixture()
+      const args = kind === 'unknown flag' ? [f.candidate, '--fallback', f.fallback]
+        : kind === 'missing value' ? [f.candidate, '--rollback-target']
+          : kind === 'extra argument' ? [f.candidate, '--rollback-target', f.fallback, 'extra']
+            : [f.candidate, '--rollback-target', f.fallback, '--rollback-target', f.previous]
+      const result = f.activate(args)
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('usage:')
+      f.expectUnchanged()
+    },
+  )
+
+  it.each(['missing', 'same', 'same via alias', 'current', 'current/.', 'outside', 'nested', 'incomplete', 'source-only'] as const)(
+    'rejects a %s rollback target without changing the active release', kind => {
+      const f = activationFixture()
+      let target = f.fallback
+      if (kind === 'missing') target = join(f.root, 'missing')
+      if (kind === 'same') target = f.candidate
+      if (kind === 'same via alias') {
+        target = join(f.root, 'candidate-alias')
+        symlinkSync(f.candidate, target)
+      }
+      if (kind === 'current' || kind === 'current/.') target = `${join(f.root, 'current')}${kind === 'current/.' ? '/.' : '/'}`
+      if (kind === 'outside') {
+        const outside = mkdtempSync(join(tmpdir(), 'hgw-release-outside-'))
+        onTestFinished(() => rmSync(outside, { recursive: true, force: true }))
+        target = release(outside, 'release-outside')
+      }
+      if (kind === 'nested') target = release(join(f.root, 'nested'), 'release-nested')
+      if (kind === 'incomplete' || kind === 'source-only') unlinkSync(join(target, 'gateway/lib/index.js'))
+      if (kind === 'source-only') {
+        mkdirSync(join(target, 'gateway/src'), { recursive: true })
+        mkdirSync(join(target, 'gateway/node_modules/tsx'), { recursive: true })
+        writeFileSync(join(target, 'gateway/src/index.ts'), 'fixture\n')
+        writeFileSync(join(target, 'gateway/node_modules/tsx/package.json'), 'fixture\n')
+      }
+      const result = f.activate([f.candidate, '--rollback-target', target])
+      expect(result.status).toBe(1)
+      expect(result.stderr).not.toContain('usage:')
+      f.expectUnchanged()
+    },
+  )
+
+  it('validates the candidate before any process operation with a complete fallback selected', () => {
+    const f = activationFixture()
+    unlinkSync(join(f.candidate, 'gateway/lib/runtime-api.js'))
+    const result = f.activate([f.candidate, '--rollback-target', f.fallback])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('release has no complete compiled Gateway payload')
+    f.expectUnchanged()
+  })
+
+  it('keeps the selected fallback inactive when the candidate becomes healthy', () => {
+    const f = activationFixture()
+    const result = f.activate([f.candidate, '--rollback-target', f.fallback])
+    expect(result.status, result.stderr).toBe(0)
+    expect(realpathSync(join(f.root, 'current'))).toBe(realpathSync(f.candidate))
+    expect(readFileSync(join(f.state, 'started'), 'utf8')).toBe('release-candidate\n')
+    expect(f.actions()).toContain('kill -TERM 910001\n')
+    expect(f.actions()).not.toContain('kill -TERM 910002\n')
+  })
+
+  it('restores only the explicitly selected release after candidate health fails', () => {
+    const f = activationFixture()
+    const result = f.activate([f.candidate, '--rollback-target', f.fallback], { FAKE_FAIL_RELEASE: 'release-candidate' })
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('failed health verification; restored release-compatible')
+    expect(realpathSync(join(f.root, 'current'))).toBe(realpathSync(f.fallback))
+    expect(readFileSync(join(f.state, 'started'), 'utf8')).toBe('release-candidate\nrelease-compatible\n')
+    expect(f.actions()).toContain('kill -TERM 910001\n')
+    expect(f.actions()).not.toContain('kill -TERM 910002\n')
+  })
+
+  it.each(['unhealthy', 'wrong release identity'] as const)(
+    'reports a %s fallback without enabling the original previous release', kind => {
+      const f = activationFixture()
+      const result = f.activate([f.candidate, '--rollback-target', f.fallback], {
+        FAKE_FAIL_RELEASE: 'release-candidate',
+        ...(kind === 'unhealthy' ? { FAKE_FAIL_ROLLBACK_RELEASE: 'release-compatible' }
+          : { FAKE_HEALTH_RELEASE: 'release-previous' }),
+      })
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('rollback release-compatible did not become healthy')
+      expect(realpathSync(join(f.root, 'current'))).toBe(realpathSync(f.fallback))
+      expect(readFileSync(join(f.state, 'started'), 'utf8')).toBe('release-candidate\nrelease-compatible\n')
+      expect(existsSync(join(f.root, '.activation.lock'))).toBe(false)
+    },
+  )
 
   it('refuses to prune a release still used by the live gateway after current moved elsewhere', () => {
     const root = mkdtempSync(join(tmpdir(), 'hgw-release-prune-'))
