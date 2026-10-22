@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-checkpoint-policy/README.md
 document:
-  en: 9f20bfe1ae6d8373be15a069da486ca90204a3f8
-  zh: cac9ec1e6c1c53436c522b16b57b7a07eca85800
+  en: 1b96f5c8af6331d9d60d63b033d1ed734822bdf2
+  zh: da88f6af8a011f7e95c094356ffa94530537b29e
 /:
   en: e1933877dd46d32e
   zh: 61495d48365178df

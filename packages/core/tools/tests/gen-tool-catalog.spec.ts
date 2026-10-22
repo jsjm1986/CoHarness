@@ -29,9 +29,11 @@ describe('gen-tool-catalog collectToolCatalog', () => {
       'ask_user_question', 'bash', 'bash', 'cordis_inspect_list',
       'cordis_inspect_query', 'cordis_inspect_self', 'create_goal', 'create_worktree', 'edit', 'exit_plan_mode', 'followup_task', 'get_goal', 'glob', 'grep',
       'interrupt_agent', 'interrupt_agent', 'job_kill', 'job_list', 'job_output',
-      'list_agents', 'list_agents', 'list_mcp_resource_templates', 'list_mcp_resources', 'load_workspace_dependencies', 'lsp',
+      'list_agents', 'list_agents', 'list_mcp_resource_templates', 'list_mcp_resources',
+      'list_subagent_models', 'load_workspace_dependencies', 'lsp',
       'memory_delete', 'memory_read', 'memory_save', 'memory_search',
       'plugin_manager', 'plugin_market', 'present', 'pwsh', 'pwsh', 'ralph',
+
       'read', 'read_image', 'read_mcp_resource', 'run_code', 'schedule_create', 'schedule_delete',
       'schedule_list', 'schedule_update', 'send_message', 'send_message', 'session_event_read', 'session_event_search',
       'session_event_trace', 'session_handoff', 'session_search', 'session_trace', 'skill', 'spawn_teammate',
@@ -47,6 +49,11 @@ describe('gen-tool-catalog collectToolCatalog', () => {
         expect((schema.parameters as unknown as JsonSchema).type).toBe('object')
       }
     }
+    const directory = catalog.find(entry => entry.pkg === '@deepseek-ai/dsh-tool-working-directory')
+    expect(directory?.sources.working_directory).toBe('packages/session/tool-working-directory/src/index.ts')
+    const parameters = directory?.schemas[0]?.parameters
+    expect(parameters).toHaveProperty('properties.cd.type', 'string')
+    expect(parameters?.required ?? []).not.toContain('cd')
   })
 
   it('resolves a runtime-spread enum to its literal members (the payoff over AST)', async () => {
@@ -92,7 +99,7 @@ describe('gen-tool-catalog collectToolCatalog', () => {
     // agents surface this one package as both `subagent` and `subagent_fork`.
     const catalog = await collectToolCatalog()
     const subagent = catalog.find(entry => entry.pkg === '@deepseek-ai/dsh-tool-subagent')
-    expect(subagent?.schemas.map(s => s.name)).toEqual(['subagent'])
+    expect(subagent?.schemas.map(s => s.name)).toEqual(['list_subagent_models', 'subagent'])
     expect(subagent?.note).toMatch(/subagent_fork/)
   })
 })

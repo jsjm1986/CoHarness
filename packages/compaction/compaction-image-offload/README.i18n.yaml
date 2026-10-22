@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/compaction/compaction-image-offload/README.md
 document:
-  en: d1d3f606870e3008ddf6e3c020a5ea9535e3f7d2
-  zh: 02888770d04a3eb0486ea5a3c4e1f4b7a6a07e4f
+  en: e417c8d1ec98f8a56d2b52da2d66e4771a01e432
+  zh: f77defcc1d9d0bf63e6b5b327779a9579cee7d75
 /:
   en: b599a8ee08c48558
   zh: 4534254e1fd4cdcf
@@ -27,8 +27,8 @@ document:
   en: 6a156ba4e44b520a
   zh: a61fc63697f85095
 /deepseek-ai-dsh-compaction-image-offload/use-this-package/failures-and-recovery:
-  en: 5e4ac1980eec905a
-  zh: 0284e597c82cb179
+  en: 453802a8e8338955
+  zh: cdd4c9f9e8e069bb
 /deepseek-ai-dsh-compaction-image-offload/understand-the-implementation:
   en: 61d7de1373f1c420
   zh: bec696992dfa774a

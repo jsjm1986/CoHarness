@@ -75,6 +75,7 @@ function trackedAgentFactory(config: OTLPExporterNodeConfigBase, track: Set<Tran
   }
 }
 
+
 /** Session-sharing policy selected by {@link Config.mode}. */
 export enum SessionTelemetryMode {
   FEEDBACK_ONLY = 'FEEDBACK_ONLY',
@@ -139,8 +140,10 @@ export interface Config {
    * `compression`, `keepAlive`, …) minus self-observability metering, which
    * no owning MeterProvider exists to consume. `url` is the one field this
    * package requires and validates itself.
+
    */
   exporter?: Omit<OTLPExporterNodeConfigBase, 'selfObsMeterProvider'> & {
+
     /** Full logs endpoint (e.g. `https://collector.example.com/v1/logs`). Required outside `DISABLED`; validated at load. */
     url?: string
   }
@@ -150,8 +153,10 @@ export interface Config {
    * fills, and self-observability metering, which no owning MeterProvider
    * exists to consume). A watchdog warning never releases an unsettled
    * transport slot.
+
    */
   processor?: TelemetryProcessorOptions
+
   /** Uncompressed OTLP request byte limit, at most 4,000,000. */
   maxRequestBytes?: number
   /** Maximum time spent awaiting the SDK provider's complete shutdown path. */
@@ -164,6 +169,7 @@ export interface Config {
  * so their errors name the fields. Both SDK option objects pass through unchanged:
  * the SDK defines and validates their fields. Re-declaring them here would
  * silently drop every field this plugin did not repeat.
+
  */
 export const Config: z<Config> = z.object({
   mode: z.union(Object.values(SessionTelemetryMode)).default(DEFAULT_TELEMETRY_MODE),

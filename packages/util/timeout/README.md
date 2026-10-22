@@ -72,6 +72,27 @@ The signal only *notifies* — the caller MUST attach its own termination (`d.si
 
 Pass your own `code` to `timeoutOf` so classification composes under nesting. When `upstream` is itself a deadline signal, `AbortSignal.any` preserves its `TimeoutReason` if that timer fires first. Scoping to your code makes a foreign timeout read as an ordinary upstream cancel instead of claiming that the local timer expired.
 
+<details>
+<summary>Implementation internals — click to expand</summary>
+
+The library is built on one boundary: share the timing and classification, keep the hard kill local.
+
+### Source map
+
+| File | Role |
+|---|---|
+| [`src/index.ts`](src/index.ts) | `clampTimeout`, `deadline`, `idleWatchdog`, `timeoutOf`, `TimeoutReason`, `MAX_TIMER_DELAY_MS` |
+
+### How a deadline fuses sources
+
+`deadline` arms one timer and fuses its abort with the upstream signal via `AbortSignal.any`, which adopts the reason of whichever source aborts first — so a race resolves to a single cause. The `TimeoutReason` carries the capability-owned `code` and the elapsed `timeoutMs`; `timeoutOf` reads it only when the timeout won, and upstream-wins leaves an ordinary abort reason. `[Symbol.dispose]` clears the timer.
+
+### The no-timeout sentinel
+
+`timeoutMs <= 0` arms no timer and forwards only the upstream signal — or a never-aborting signal when there is none — so every caller keeps one call shape. The sentinel exists for backend-owned background work; external request hints are validated positive and finite before they reach `deadline`.
+
+### Why an idle watchdog rearms
+
 For a streamed transport, create one `idleWatchdog`, pass its stable `signal` into the transport, and call `watchdog.next(iterator)` for each provider read. Call `watchdog.pulse()` when transport activity does not yield an iterator value. The interval must be positive, finite, and no greater than `MAX_TIMER_DELAY_MS`; Node otherwise clamps it to one millisecond. It measures only outstanding demand, so no timer runs while downstream code renders or otherwise waits before asking for the next chunk. Unlike `deadline()`, an idle watchdog settles its outstanding demand on its own deadline: a read the transport leaves pending after an abort rejects `next()` with the watchdog's `TimeoutReason`, so a transport that never observes the signal cannot extend the wait past the idle interval. The signal still tells the transport to release its own resources — the DeepSeek and pi-ai adapters prove that timeout closes their real response body or SDK request.
 
 <a id="what-does-not-get-a-timeout"></a>

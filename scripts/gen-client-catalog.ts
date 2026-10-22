@@ -47,8 +47,10 @@ const MAX_DECL_CHARS = 1200
  * 121 lines, so this leaves room to document a slot properly while catching the
  * two ways a report runs away: an owner share that hands down a subsystem
  * instead of a share, and prose that grew into a manual.
+
  */
 const MAX_ENTRY_LINES = 128
+
 
 /** One register-call option as the catalog teaches it. */
 interface OptionDoc {
@@ -255,7 +257,8 @@ function standardKits(files: readonly ScannedFile[]): ReadonlyMap<string, readon
   const kits = new Map<string, readonly string[]>()
   for (const scope of SCOPES) {
     const extra = SCOPE_KIT[scope]
-    kits.set(scope, [...global, ...extra === undefined ? [] : standardKitMembers(files, extra)])
+    // A scope-kit member replaces the global member of the same name, so each seat is listed once.
+    kits.set(scope, [...new Set([...global, ...extra === undefined ? [] : standardKitMembers(files, extra)])])
   }
   return kits
 }

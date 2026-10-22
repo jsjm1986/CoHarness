@@ -8,7 +8,7 @@ Status: implemented
 
 [提示词变量 Agent Note](2026-07-05-prompt-variables-and-tool-guidance-ownership.zh.md) 让 `dsh-tool-subagent` 从其提供方派生面向模型的措辞：`SubagentProvider.inheritsParentContext`（spawn 和 ACP（Agent Client Protocol）为 `false`，fork 为 `true`）同时驱动工具描述和 `prompt` 参数描述，使 fork 工具不再在上下文继承问题上对模型撒谎。这一修复引入了跨 fiber 的数据依赖：工具描述在工具注册时固定（这是有意为之——描述是 tool-choice 引导所在之处），但提供方在自己的插件 fiber 上到达，时机不确定。
 
-如果在工具插件的 `apply` 时刻解析提供方，就会产生一个隐式的加载顺序要求（「在 cordis.yml 中把后端列在工具前面」）。这个要求不成立，因为 Cordis Loader 并发启动同级条目，且 `Entry.init()` 不会等待激活完成：延迟到达的后端即使列在前面，也可能让工具 fiber 失败。Loader 不提供同级顺序保证——「异步状态不是同步状态」（见[防御性模式](../../../../docs/defensive-patterns.zh.md)）。
+如果在工具插件的 `apply` 时刻解析提供方，就会产生一个隐式的加载顺序要求（「在 cordis.yml 中把后端列在工具前面」）。这个要求不成立，因为 Cordis Loader 并发启动同级条目，且 `Entry.init()` 不会等待激活完成：延迟到达的后端即使列在前面，也可能让工具 fiber 失败。Loader 不提供同级顺序保证——「异步状态不是同步状态」（见[防御性模式](../../../../docs/defensive-patterns/general.zh.md)）。
 
 ## 决策
 

@@ -6,6 +6,7 @@
  * error containment, the TLS listener and its teardown). The bind-address
  * schema and both address predicates are asserted directly, before any server
  * binds; one wildcard load denial goes through the real Loader.
+
  */
 
 import { generateKeyPairSync } from 'node:crypto'
@@ -90,6 +91,7 @@ async function loadComposition(
   tls?: Partial<TlsConfig> | null,
 ): Promise<Context> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-webserver-loader-'))
+
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
     "- name: '@deepseek-ai/dsh-host-webserver'",
@@ -105,6 +107,7 @@ async function loadComposition(
           ...(tls.certFile === undefined ? [] : [`      certFile: '${tls.certFile}'`]),
           ...(tls.keyFile === undefined ? [] : [`      keyFile: '${tls.keyFile}'`]),
         ]),
+
     ...(gzip
       ? [
         '    compression: gzip',
@@ -143,6 +146,7 @@ function boundPort(port: number | undefined): number {
   if (port === undefined) throw new Error('webserver test: the listener has not bound a port')
   return port
 }
+
 
 /** GET (by default) one path against the running server; returns status plus a body prefix. */
 async function request(
@@ -309,6 +313,7 @@ describe('real Loader composition', () => {
   })
 
   it('compresses eligible socket responses without touching stream or range semantics', { timeout: 60_000 }, async () => {
+
     expect(HttpServer.Config({ host: '127.0.0.1', port: 0 })).toEqual({
       host: '127.0.0.1',
       port: 0,
@@ -578,6 +583,7 @@ describe('real Loader composition', () => {
     await expect(tlsRequest(server.port, '/plain')).rejects.toThrow()
   })
 
+
   it('rejects unusable TLS material at activation, before the listener binds', { timeout: 60_000 }, async () => {
     const fixture = await tlsFixture()
     const directory = dirname(fixture.certFile)
@@ -619,6 +625,7 @@ describe('real Loader composition', () => {
         expected: /tls\.keyFile/,
       },
     ]
+
     try {
       for (const { label, config, expected } of cases) {
         const denied = await loadComposition(port, false, '127.0.0.1', config)

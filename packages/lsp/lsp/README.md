@@ -41,6 +41,7 @@ Use `dsh-lsp` to give agents language-server navigation for definitions, referen
 | `registerProvider(provider)` | Register a backend, atomically reserving its branded `id` and every normalized file extension. Any invalid input or conflict publishes nothing and throws `LspError` (`LSP_INVALID_PROVIDER` / `LSP_CONFLICT`). Returns a disposer releasing all reservations. Disposed with the calling fiber. |
 | `query(request, signal?)` | Select the provider by the file's final extension, derive the `languageId` from that provider's mapping, and run one query. No match throws `LspError` `LSP_UNAVAILABLE`. |
 
+
 Selection is per query and order-independent: a provider owns a set of extensions exclusively, so registration and HMR order never change routing. Extension keys normalize to lowercase, leading-dot form; the `languageId` only synchronizes the transient document, never participates in selection. The first version has no glob, language-id, or explicit route selector.
 
 Providers register **capabilities**, not tools. `dsh-tool-lsp` is the only owner of the model-facing name, description, prompt guidance, schema, and presentation.

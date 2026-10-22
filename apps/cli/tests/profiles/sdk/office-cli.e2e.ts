@@ -51,7 +51,7 @@ it.skipIf(!process.env.DEEPSEEK_API_KEY || process.platform === 'win32')(`agent 
       await writeFile(decoy, '#!/bin/sh\nprintf invoked > ' + "'" + decoyMarker.replaceAll("'", "'\\''") + "'" + '\nexit 86\n')
       await chmod(decoy, 0o755)
     }
-    const lookup = await execa('/bin/sh', ['-c', 'command -v node || command -v libreoffice-kit'], { env: { PATH: path }, reject: false })
+    const lookup = await execa('/bin/sh', ['-c', 'command -v node || command -v dsoffice'], { env: { PATH: path }, reject: false })
     expect(lookup.exitCode, 'the fixture must not expose Node or the Office CLI through PATH').not.toBe(0)
     const child = execa(executable, [
       ...carrier === 'sdk' ? [] : [entry], '--profile', 'sdk', '--patch', patch,

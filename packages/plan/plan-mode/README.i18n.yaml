@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/plan/plan-mode/README.md
 document:
-  en: 961203f770eeddbc284dfd5237e40f98a6693516
-  zh: e0e57bf268665219fc4584e5f8f51a2a8e225904
+  en: 35291bb2d5d23e737149516028dec04c0867e57c
+  zh: 5b22d19980138ee39913b87d384dc488409c56f4
 /:
   en: 2d2e1f1234a40dd8
   zh: 137e06497bc0faa4
@@ -30,8 +30,8 @@ document:
   en: 2d300cdb883352ec
   zh: 5a81be005b3716d3
 /deepseek-ai-dsh-plan-mode/use-this-package/the-reviewed-exit:
-  en: ffc56477380b9411
-  zh: 17cac060f2252d78
+  en: dbf12997d2359e81
+  zh: c4a3473f462dc67e
 /deepseek-ai-dsh-plan-mode/use-this-package/observing-plan-state:
   en: b44e92bc38406015
   zh: ed56190bee5d71a4
@@ -57,8 +57,8 @@ document:
   en: fa97e858495a8105
   zh: 8be1fbd7e420ff8a
 /deepseek-ai-dsh-plan-mode/further-exploration:
-  en: 95af9d32d70964b1
-  zh: 09d29834302f26f5
+  en: 5008d6d632002f49
+  zh: 99b3bd68730da43d
 /deepseek-ai-dsh-plan-mode/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

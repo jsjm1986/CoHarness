@@ -3,8 +3,9 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 import { defineConfig } from 'vitest/config'
 import { sourcePlaneAliases, standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './scripts/coverage-exempt.ts'
-import { COVERAGE_PARTITION_MODE_ENV } from './scripts/coverage-partitions.ts'
+import { COVERAGE_PARTITION_MODE_ENV, COVERAGE_TEST_TIMEOUT_ENV, coverageTestTimeoutOptions } from './scripts/coverage-partitions.ts'
 import { COVERAGE_SCOPED_MODE_ENV } from './scripts/coverage-scoped.ts'
+import { LOCAL_TEST_PARALLELISM_CAP, defaultParallelism } from './scripts/parallelism.ts'
 import { probePwshAvailable, repositoryCoveragePolicy, repositoryTestExclusions, resolveCoveragePolicy, type CoveragePolicy } from './scripts/coverage-policy.ts'
 
 // Prints exact `path:line:col` records for every uncovered statement, branch
@@ -22,6 +23,15 @@ const pathsPlugin = (): ReturnType<typeof tsconfigPaths> => tsconfigPaths({ proj
 // Plain test runs need only the platform test exclusions; the pure-type
 // source scan is a coverage-lane concern and stays lazy (see below).
 const windowsUnsupportedTests = [...repositoryTestExclusions()]
+
+// Per-test, hook, and expect.poll budgets travel together through
+// DSH_COVERAGE_TEST_TIMEOUT_MS; they land in each inline project below
+// because CLI flags do not reach them (coverageTestTimeoutOptions documents
+// why).
+const laneTestBudget = coverageTestTimeoutOptions(process.env[COVERAGE_TEST_TIMEOUT_ENV])
+
+// Outside CI, forks follow the local worker budget; CI keeps Vitest's own default for its runner.
+const localWorkerBudget = process.env.CI === 'true' ? {} : { maxWorkers: defaultParallelism(process.env, undefined, LOCAL_TEST_PARALLELISM_CAP) }
 
 const testIncludes = [
   'packages/*/*/tests/**/*.spec.{ts,tsx}',
@@ -104,6 +114,7 @@ export default defineConfig({
   plugins: [pathsPlugin(), standardDecoratorPlugin()],
   resolve: { alias: [...sourcePlaneAliases, ...claudeCodeTestingAliases] },
   test: {
+    ...localWorkerBudget,
     setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-dom-environment.ts'],
     // .tsx: client component specs (jsdom via per-file @vitest-environment pragma).
     include: testIncludes,
@@ -121,6 +132,7 @@ export default defineConfig({
           // MaybeLocal in cjs_lexer::Parse) from worker threads on macOS,
           // Linux, and Windows. Forked workers avoid that shared thread path.
           pool: 'forks',
+          ...laneTestBudget,
           setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-dom-environment.ts'],
           include: testIncludes,
           exclude: [
@@ -137,6 +149,7 @@ export default defineConfig({
           name: 'process-bound',
           execArgv: vitestExecArgv,
           pool: 'forks',
+          ...laneTestBudget,
           setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-dom-environment.ts'],
           include: processBoundTests,
           exclude: [

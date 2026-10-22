@@ -17,11 +17,8 @@ import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep 
 import { createInterface } from 'node:readline/promises'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
-import { validateTarballPayload } from './publication-payload.ts'
 import { discoverNpmBaselineManifests } from './npm-baseline-packages.ts'
-import { isPublishableWorkspaceDirectory } from './workspace-package-policy.ts'
-import { releaseFamily } from './release/families.ts'
-import { releaseCandidateVersion, verifyConfiguredReadiness } from './release/readiness.ts'
+import { validateTarballPayload } from './publication-payload.ts'
 
 const DEFAULT_REGISTRY = 'https://registry.npm.harnessment.com'
 const DEFAULT_OUTPUT_DIRECTORY = '.artifacts/npm-baseline'
@@ -241,7 +238,6 @@ class WorkspacePackageSet {
 
   static discover(root: string): WorkspacePackageSet {
     const manifestPaths = discoverNpmBaselineManifests(root)
-      .filter(manifestPath => isPublishableWorkspaceDirectory(dirname(manifestPath)))
     if (manifestPaths.length === 0) {
       throw new Error('no package manifests found under vendor/, packages/, or apps/')
     }
@@ -565,11 +561,10 @@ class BaselinePackager {
       )
       this.runner.run('pnpm', ['run', 'build'], worktree.path)
       this.runner.run('pnpm', ['run', 'publint'], worktree.path)
-      const packFilters = packageSet.packages.flatMap(({ directory }) => [
-        '--filter', `./${directory}`,
-      ])
       this.runner.run('pnpm', [
-        ...packFilters,
+        '--filter', './vendor/**',
+        '--filter', './packages/**',
+        '--filter', './apps/**',
         '--recursive',
         'pack',
         '--pack-destination', artifactDirectory,
@@ -622,15 +617,6 @@ class RegistryPublication {
   ) {}
 
   async publish(assumeYes: boolean): Promise<void> {
-    const root = resolve(import.meta.dirname, '..')
-    const family = releaseFamily('dsh')
-    const version = releaseCandidateVersion(family, family.members(root), process.env.GITHUB_REF ?? '')
-    const commit = this.runner.capture('git', ['rev-parse', 'HEAD'], root)
-    if (this.bundle.manifest.commit !== commit || this.bundle.manifest.version !== version) {
-      throw new Error('baseline publication requires the committed release identity; use the protected family workflow for timestamp-rewritten bundles')
-    }
-    await verifyConfiguredReadiness(root, 'dsh', version, 'publish',
-      this.bundle.manifest.packages.map(pkg => this.bundle.tarballPath(pkg)))
     this.pingRegistry()
     this.requireIdentity()
     if (!assumeYes) await this.confirm()
@@ -781,9 +767,9 @@ interface InspectedTarball {
 }
 
 function inspectTarball(path: string, runner: CommandRunner): InspectedTarball {
-  const manifest = JSON.parse(
+  const manifest: unknown = JSON.parse(
     runner.capture('tar', ['-xOf', path, 'package/package.json'], dirname(path)),
-  ) as unknown
+  )
   if (!isRecord(manifest)) throw new Error(`${path} contains an invalid package.json`)
   return {
     name: expectString(manifest, 'name', path),

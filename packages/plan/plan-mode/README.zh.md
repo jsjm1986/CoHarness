@@ -60,7 +60,7 @@ kind: "package-reference"
 
 agent 完成计划后，会以 markdown 形式、从标题开头书写计划并调用 `exit_plan_mode`。你评审该计划的原文，选择 `Approve` 离开计划模式，或选择 `Keep planning` 带反馈把 agent 送回去。
 
-选择 `Keep planning`（可附自由文本反馈）会让 agent 回去修订计划；关闭评审改为发言，则告知 agent 等待你的下一条消息。若没有可用的交互评审，`exit_plan_mode` 无法运行，你仍可用 `/plan off` 离开计划模式。
+选择 `Keep planning`（可附自由文本反馈）会让 agent 回去修订计划；关闭评审改为发言，则结束 agent 的当前轮次，你的下一条消息会开启新的请求。若没有可用的交互评审，`exit_plan_mode` 无法运行，你仍可用 `/plan off` 离开计划模式。
 
 ### 观察计划状态
 
@@ -119,7 +119,7 @@ agent 完成计划后，会以 markdown 形式、从标题开头书写计划并�
 - [plan/ 包映射](../README.zh.md)——本组及其唯一的包。
 - [`exit_plan_mode` 工具目录条目](../../../docs/tool-catalog.zh.md#deepseek-aidsh-plan-mode)——模型收到的确切 schema。
 - [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-plan-mode)——每个受支持配置字段及其含义。
-- [plan 专用协作状态](../../../.agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md)——计划模式背后的设计决策。
+- [已归档 plan 专用协作状态](../../../.agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md)——计划模式背后的设计决策。
 
 -----
 

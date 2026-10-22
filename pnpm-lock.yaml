@@ -101,6 +101,9 @@ importers:
       '@types/papaparse':
         specifier: 5.3.16
         version: 5.3.16
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
       '@types/spdx-expression-parse':
         specifier: ^4.0.0
         version: 4.0.0
@@ -176,8 +179,11 @@ importers:
       publint:
         specifier: ^0.3.24
         version: 0.3.24
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
       smol-toml:
-        specifier: ^1.7.1
+        specifier: ^1.9.0
         version: 1.9.1
       spdx-expression-parse:
         specifier: ^5.0.0
@@ -13739,6 +13745,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: 0.124.0
         version: 0.124.0(zod@4.4.3)
+      '@deepseek-ai/dsh-tool-subagent':
+        specifier: workspace:*
+        version: link:../tool-subagent
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -13788,6 +13797,9 @@ importers:
       '@deepseek-ai/dsh-sdk-protocol':
         specifier: workspace:*
         version: link:../../sdk/protocol
+      '@deepseek-ai/dsh-tool-subagent':
+        specifier: workspace:*
+        version: link:../tool-subagent
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -14325,6 +14337,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
       '@deepseek-ai/dsh-subprocess-local':
         specifier: workspace:*
         version: link:../../subprocess/subprocess-local

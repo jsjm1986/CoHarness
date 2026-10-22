@@ -44,6 +44,7 @@ kind: "package-reference"
 
 注入 `sessionProjections`——这是插件的全部用途；在没有 registry 的装配中 fiber 保持挂起，不注册任何内容。
 
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为 sessionStats 单元把已写入日志的步边界折叠成面向客户端的读模型，不注册任何面向模型的内容。
@@ -69,5 +70,3 @@ kind: "package-reference"
 无。
 
 </details>
-
-<a id="model-experience"></a>

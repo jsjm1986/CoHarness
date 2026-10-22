@@ -13,7 +13,7 @@
 | 本轮实施基线 | `8cb2cf1d3459d6fb121915c6b2e3375eef684af9` / `feat/upstream-sync-batch2` | 新候选必须取得自己的验证证据 |
 | 发布版本 | 暂拟 `0.2.1-rc.2.coharness.1` | release families 与生产版本核验后确定 |
 
-[清单](../manifests/UPGRADE-MANIFEST-dsh-v0.2.1-rc.2.json)记录决定与阶段;[矩阵](../alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json)记录 9323 个累计差异路径的 395 个唯一 area、30 条 gate replay 复审;[发行说明台账](../alignment/UPSTREAM-RELEASE-NOTES-LEDGER-dsh-v0.2.1-rc.1.md)登记 rc.1/rc.2 逐条裁决。[同步记录](../../scripts/upstream-sync.json)已固定 rc.2 源码比较目标(`syncedTag: dsh-v0.2.1-rc.2` / `687f282e`);当前主权门禁输出为 72 tracked、225 adapted、46 owned(含 1 个 `upstreamShadowed`)、2 replaced、42 upstreamOnly。
+[清单](../manifests/UPGRADE-MANIFEST-dsh-v0.2.1-rc.2.json)记录决定与阶段;[矩阵](../alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.1-rc.2.json)记录 9323 个累计差异路径的 395 个唯一 area、30 条 gate replay 复审;[发行说明台账](../alignment/UPSTREAM-RELEASE-NOTES-LEDGER-dsh-v0.2.1-rc.1.md)登记 rc.1/rc.2 逐条裁决。[同步记录](../../scripts/upstream-sync.json)已固定 rc.2 源码比较目标(`syncedTag: dsh-v0.2.1-rc.2` / `687f282e`);当前主权门禁输出为 71 tracked、226 adapted、57 owned、2 replaced、42 upstreamOnly(2026-10-22 复核,`preset/agent-preset` 因生成 `packages.md` 目录改列 adapted)。
 
 ## 已锁定的实施决策(已落地)
 
@@ -69,3 +69,29 @@
 
 - `experimental/` 迁位:上游 rc.2 将 10 个包移入 `experimental/`(hook-protocol、hooks-claude-code、hooks-codex、tool-terminal、tool-ralph、tool-session-query、session-title-all-prompts-llm、skill-badge、webhook、webhook-github);fork 保留自身分组路径,经 `upstreamOnly.replacedBy` 反向映射,不追随路径改名——下次同步须复核映射无漂移。
 - 主权翻转:8 个原记 `owned` 的包经核证为上游同源移植(plugin-market 四件、harness-dev-context、web-deepseek-api、working-directory 两件),已改 `adapted`;`session-format-v3-to-v4` 维持 owned+`upstreamShadowed`。
+- 上游同键包扩散：除已遮蔽两包外，新增包再撞 fork-owned 名时需同样走 upstreamShadowed 流程。
+- CI 演进与本地门禁脚本交互（parallelism/coverage 改造影响 run-gates.spec 断言面），P1 需重跑受影响 spec。
+- hooks/webhook 降级若不跟随，需保持原位包持续通过主权门；若跟随，bundle/文档双侧同步改名。
+
+## P0 执行记录
+
+- 2026-10-19：清单 1,622 commit / 矩阵 395 行 / 30 gate replay（23 条变更逐条复核登记）/ 审计与 manifest 落地 / `verify-upgrade-records` 通过（21 份记录）。
+
+## P1 执行记录
+
+已完成（cherry-pick 至 `feat/upstream-sync-batch2`）：
+
+- `a6d2a03`：`engines.dsh` 兼容性检查（上游 `plugin-compatibility.ts` 直取）+ `peers`→`requirements` 改名传遍 plugin-manager 类型/操作/失败映射、web 与 gateway admin-ui 渲染及双语文案、api-catalog 重生成。
+- `1ff3fb8`：cordis publish 版本 4.0.4→4.0.5（rc.2 窗口内 vendor 唯一变更，src 零差）。
+- `334feeb`：`scripts/parallelism.ts` 直取（LOCAL_PARALLELISM_CAP=12 / TEST=48，CI 用全核）+ run-oxlint 归并（cpus 参数、本地预算绑定、调用方 `--threads` 透传；保留我方 CI=1 拼写与 fix/unused-disable 道）+ `actions/cache`→v6.1.0 批量 pin + benchmark timeout 15→20m。
+- `81484f4`：`release/publish.ts`、`publish-npm-baseline.ts` 直取（dist-tag 校验 + 通道核验；我方 `packFilters` 死代码冲突块按上游删除，静态目录 glob 覆盖同一集合）；根 devDeps 加 `semver@^7.8.5`/`@types/semver@^7.8.0`，pnpm→11.28.5、smol-toml→^1.9.0；pyproject 吸收 Pillow==12.3.0 + core-metadata 2.4（ruff 保留——我方 ci.yml 仍跑 quality 组；license 保 Apache-2.0 不回退 MIT）。
+- `651c4da`：timeout 注入路径切换为上游语义——`coverageTestTimeoutOptions`/`parseCoverageTestTimeout` 进 config 内联 project（CLI 不转发 hookTimeout/poll），`coverageTestTimeoutArgs` 及其三个调用点（run-gates 双道、run-coverage-partitions）移除；vitest 根道挂 `localWorkerBudget`（本地 maxWorkers≤48，CI 保 Vitest 默认）。我方 `coverage-policy.ts`/`coverage-scoped.ts` 抽象层保留——上游内联重构不覆盖;`test-invariants.ts` 当时保留,随后按上游不变量机制移除(b569ce4f87e)一并删除。
+
+P1 剩余（2026-10-20 逐条对账核销）：
+
+- `coverage-partitions.ts`：**已等价**——我方同样 `vitest list --filesOnly --json=<file>` + `JSON.parse`；时长史走自有 `COVERAGE_TIMINGS_FILE`/`coverageTimingCacheKey`/`readFileDurations`，与上游 `.coverage-times.json` reporter 同职。
+- `vitest.config.ts`：**已等价**——pwshCoverageExclusions 经 `coverage-policy.ts` 的 `resolveCoveragePolicy(platform, probePwshAvailable())` 承载（同清单同探针）；`test-invariants.ts` +14 行自有不变量当时保留,后随上游不变量机制移除(b569ce4f87e)删除；`sourcePlaneAliases`/`claudeCodeTestingAliases` 两组别名并存于我方共享层，改名无新增语义。
+- `run-gates.ts`/`.spec`：**已携带**——`ci-unit` 模式、`ConcurrencyDefault` 导出、`defaultConcurrency`、sharedHygieneGates 均已在位；我方 +191 行 CoHarness 车道保留。
+- `ci.yml`：**已携带**——`.coverage-times.json` restore/save 缓存在位；`sandbox.yml` `check:ci:unit` 道在位。
+- `package.json` scripts / `tsconfig.base.json`：随各包携带相位吸收。
+- `gen-third-party-notices.ts`：**已补齐**——inspector devtools 披露 import + `browser.add('chrome-devtools-frontend')` + 披露段落，产物重生成，spec 37/37 绿。

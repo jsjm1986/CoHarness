@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/web/tool-web/README.md
 document:
-  en: e8af30448f7a49475161e101c4e75eae8234cabd
-  zh: ac53851b1852080fcf976ff786565f7a3b92398d
+  en: da314257b6fbac3db10172a88883ee87b98ba732
+  zh: 53633322740fecda1eb831283a2a99961122719d
 /:
   en: 9e857edd3d1cf6ba
   zh: 61495d48365178df

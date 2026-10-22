@@ -45,7 +45,8 @@
         "scripts/bundle-input-isolation.ts",
         "scripts/coverage-canonical-locations.ts",
         "scripts/web-product-bundle-isolation.ts",
-        "scripts/workspace-runtime/verify-installed.ts"
+        "scripts/workspace-runtime/verify-installed.ts",
+        "scripts/compile-referenced-projects.ts"
       ],
       "ignoreUnresolved": [
         "client-build-environment"
@@ -897,6 +898,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-tool-subagent"
       ]
     },
     "packages/subagent/subagent-claude-code": {
@@ -907,6 +911,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-tool-subagent"
       ]
     },
     "packages/fs/tool-fs": {

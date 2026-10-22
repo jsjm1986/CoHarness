@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/tool-catalog.md
 document:
-  en: 0ab45377a668191a640d2238bac03ef27cea3363
-  zh: 61353e0d2f40da9c84725b5329a22fa0f9b73b9e
+  en: dc8d4470c5b0274ee671418c740edda0fcacd4f1
+  zh: 0e3031a1b4142d498c5e715489847d405002ac26
 /:
   en: 0be8ffbf23193557
   zh: ce2c69aa86875171
@@ -12,8 +12,8 @@ document:
   en: ddbe8316ec6b1363
   zh: b2d705c03641df84
 /tool-schema-catalog/tool-package-map:
-  en: 46fa8c299248ca85
-  zh: 3e383aaa454f8e25
+  en: 429a9d58908b69fa
+  zh: 62342d257e0774ba
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -263,8 +263,11 @@ document:
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent:
   en: 841abe0dd5913ea7
   zh: 841abe0dd5913ea7
+/tool-schema-catalog/deepseek-ai-dsh-tool-subagent/list-subagent-models:
+  en: ce3f08bb51c4b682
+  zh: 910db5555d747f34
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent/subagent:
-  en: b9966fd7ab633ea4
+  en: 3e71848bf9a0ed2a
   zh: 6d5012046cef3d4c
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent-control:
   en: ab82e130c3413f04

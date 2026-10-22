@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/storage/storage/README.md
 document:
-  en: 728c851638b5f1122c9d382ef339edd5111e038d
-  zh: 30a8688b79746b8dada1f64c326144a60722d108
+  en: efe5b024c7bf6cc1f9489f808f44b1b7f67b8609
+  zh: 2d6ce28d6adec897e12ce709885a7d682a900d7e
 /:
   en: d2cc77c152fab345
   zh: 61495d48365178df

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/typert/generator/README.md
 document:
-  en: e179e26566b4d2d81f53b0095efcb178c0bbeffb
-  zh: 53cab47c6e56f0137141550ecd5d41ebb8fa867f
+  en: 6b3d13e2db36aaa97d4f0ae7ae85bd71a73b6324
+  zh: d183473c88e200c4289e014308caa53534f9e463
 /:
   en: 3fe330c4d51197ec
   zh: 5874f3bcd419dbbc

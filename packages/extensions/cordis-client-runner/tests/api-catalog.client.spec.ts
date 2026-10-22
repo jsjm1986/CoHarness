@@ -37,6 +37,7 @@ describe('Client Cordis inspect catalog', () => {
     })
     expect(result.service.access.hardDependency.inject).toEqual([key])
     expect(Array.isArray(result.referencedTypes)).toBe(true)
+
   })
 
   it('rejects unknown service keys', () => {
@@ -60,6 +61,7 @@ describe('Client Cordis inspect catalog', () => {
       mode: string
       event: { name: string; parameters: unknown[] }
       referencedTypes: { name: string }[]
+
     }
     expect(result.mode).toBe('event')
     expect(result.event.name).toBe(name)

@@ -581,8 +581,8 @@ describe('PluginInventorySettingsTab', () => {
   it('renders a rosterless deployment as one global list, folded until opened', async () => {
     const view = await renderReady({
       entries: [
-        { entryId: 'hmr' as PluginEntryId, moduleName: '@deepseek-ai/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
-        { entryId: 'off', moduleName: '@fixture/off', enabled: false, fiberPhase: null },
+        { entryId: 'hmr', moduleName: '@deepseek-ai/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
+        { entryId: 'off' as PluginEntryId, moduleName: '@fixture/off', enabled: false, fiberPhase: null },
       ],
     } as Snapshot)
 

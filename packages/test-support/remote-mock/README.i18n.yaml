@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/test-support/remote-mock/README.md
 document:
-  en: c5d3649f66fcf55ce6dc11a22056665bd8b796df
-  zh: c4e42b32cc4fe193cc5ba8484a6cfb5ab686030e
+  en: ed5c7aa0cfcf546935706808a4e7331a7d9e5c67
+  zh: 340bbc6b866ee8b075c11f844f81cbaec0c3da01
 /:
   en: 9c06b921d6c65eae
   zh: c6d1a06a2f19ce94
