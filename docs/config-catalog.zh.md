@@ -2958,11 +2958,11 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-session-persistence-jsonl`
 
-- `source`: [`packages/session/session-persistence-jsonl/src/index.ts:94`](../packages/session/session-persistence-jsonl/src/index.ts)
+- `source`: [`packages/session/session-persistence-jsonl/src/index.ts:95`](../packages/session/session-persistence-jsonl/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config for the JSONL backend's root and physical encoding. */
-export interface Config {
+export interface Config extends JsonlRetentionLimits {
   /**
    * Root directory for all session files. Required (no default): a default of
    * `process.cwd()` would scatter session files as the process's cwd changes
@@ -2975,6 +2975,14 @@ export interface Config {
   compression?: JsonlCompression
   /** Maximum concurrent filesystem reads while enumerating sessions; defaults to {@link DEFAULT_LIST_CONCURRENCY}. */
   listConcurrency?: number
+}
+
+/** Deployment limits shared by every write handle belonging to one JSONL provider. */
+export interface JsonlRetentionLimits {
+  /** Maximum events retained across pending queues, reservations, and active writes. */
+  readonly maxPendingEvents?: number
+  /** Maximum complete UTF-8 JSON event bytes retained across those writes. */
+  readonly maxPendingBytes?: number
 }
 
 /** Physical encoding selected for JSONL session artifacts. */
