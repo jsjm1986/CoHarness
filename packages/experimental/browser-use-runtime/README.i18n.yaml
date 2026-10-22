@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/browser-use-runtime/README.md
 document:
-  en: ba3f20fc32f43bf1cae48d56dc67e0f1007ee699
-  zh: 69a801242f74741d28ae9309576fbc98054be1c3
+  en: 61c29a77e37bd63228ec0e6ece2ba1237d4cada0
+  zh: d6518db762d1c3b3fe0c4e7affe1c73f402536e3
 /:
   en: 32bd01db6a5146ed
   zh: 31e56827b98bc1b3
@@ -27,11 +27,11 @@ document:
   en: 2a8d2c9b217b9e95
   zh: 084c9ad664e55498
 /deepseek-ai-dsh-experimental-browser-use-runtime/model-experience:
-  en: 705441e08df596c9
-  zh: d70a7ba9611daca5
+  en: b05ec94221da0296
+  zh: c7fca64315bb59bd
 /deepseek-ai-dsh-experimental-browser-use-runtime/model-experience/kv-cache-effect:
-  en: 68b91a73746b663a
-  zh: 9b9045b029789b92
+  en: 066ff4d955210cfe
+  zh: a26b6c72f527d701
 /deepseek-ai-dsh-experimental-browser-use-runtime/known-limitations-and-deferred-work:
   en: 5a3a9c35a8097d30
   zh: 9e67f2c4279becf7

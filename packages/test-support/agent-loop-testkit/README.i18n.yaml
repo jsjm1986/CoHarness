@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/test-support/agent-loop-testkit/README.md
 document:
-  en: bcbf0cdb400cd714d2a00e2c5c49cabb6e8fc404
-  zh: d60047b9984ee198be4e6134d18806320f7be334
+  en: ea99216afa4fb26b765bfde5e9384dfdbfbf230b
+  zh: c5d77c0a8343387601d363faa4f3aacf76e24ed9
 /:
   en: 56bf98b380f80f74
   zh: 4e26deb963e89c68
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-agent-loop-testkit/use-this-package:
-  en: c0e407323250d8a9
-  zh: 0d0d6c7862c3d61e
+  en: 6286160c69aaf1d2
+  zh: e22f909638eadb24
 /deepseek-ai-dsh-agent-loop-testkit/use-this-package/drive-a-production-agent:
   en: 55af6e8dcc16bf46
   zh: 9e1a6a7f70fde817

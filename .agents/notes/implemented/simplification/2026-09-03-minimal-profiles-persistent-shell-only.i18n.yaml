@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-03-minimal-profiles-persistent-shell-only.md
 document:
-  en: 4640a8fc76f26cfdd7e09e8233f52ae3062a4d59
-  zh: 61d4e6f388bdd8b42081c379e64cdc8bc31dee4e
+  en: 07e88128a1b5300238e3daeba6b1da3492badc87
+  zh: 11122545d563db3b3cfb91917e8e6061b582f49f
 /agent-note-minimal-profiles-expose-only-a-persistent-shell:
   en: d48e78dc2040921c
   zh: 70122e09d8c78e77
@@ -12,11 +12,11 @@ document:
   en: a5d116f8ba3ed48b
   zh: d60d307237a69573
 /agent-note-minimal-profiles-expose-only-a-persistent-shell/decision:
-  en: ade4bba197f64520
-  zh: 21bdb3943195018f
+  en: 0b4b0aa5a2a675f5
+  zh: 48d4b8d09d607ece
 /agent-note-minimal-profiles-expose-only-a-persistent-shell/alternatives-considered:
   en: 55fc282c31b7d4e8
   zh: 6daa72fb5527fcca
 /agent-note-minimal-profiles-expose-only-a-persistent-shell/consequences:
-  en: 4f0e22319608c3be
-  zh: a6393182b9452c4a
+  en: 8ffcfd2dd096ede8
+  zh: d6cf2c37eb80850d

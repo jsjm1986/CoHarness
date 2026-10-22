@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/interaction/commands/README.md
 document:
-  en: f22ff02c2365ae78c0db98288b8dc66d3f915027
-  zh: c3d94ebe699117964f83d9bf7416004945278b12
+  en: be0610fbf9621d7068a68a3bd679c12675f85de8
+  zh: 2253e387a045896def98331b8f61e18fc7fd0089
 /:
   en: d331b9706513154d
   zh: 20e08461c498d058
@@ -54,8 +54,8 @@ document:
   en: ee0efa5308dcf1e3
   zh: da5a1d938301426c
 /deepseek-ai-dsh-commands/further-exploration:
-  en: 08f357382002761f
-  zh: f6790cf1d058fe8c
+  en: c221545424b96d68
+  zh: f2e2261ac9e59dfa
 /deepseek-ai-dsh-commands/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-10-19-job-events.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-19-job-events.md
+document:
+  en: 70eb1665ded28309697fa0f49d6118b57ad1d37b
+  zh: 87ebb15794b7ce1b70d159665abc2b1b54f168d1
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-19-job-events:
+  en: 5ac30464c5d1969c
+  zh: a9b87538328f0ca4
+/2026-10-19-job-events/summary:
+  en: 8e2a7494f8e8e986
+  zh: d603e180e67ace91
+/2026-10-19-job-events/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-19-job-events/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-19-job-events/compatibility:
+  en: e222e668c4004688
+  zh: 73c8c66f00af2fa3
+/2026-10-19-job-events/verification:
+  en: 6b8cdb3ba962c272
+  zh: 463c64649f77c245
+/2026-10-19-job-events/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

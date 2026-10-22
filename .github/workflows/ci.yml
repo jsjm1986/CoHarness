@@ -196,7 +196,7 @@ jobs:
       # Pull requests consume the default-branch cache but do not put cache
       # compression and upload on the paid latency-critical path. Skipped
       # under failover — see the coverage lane's identical rationale.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
@@ -297,7 +297,7 @@ jobs:
       # Skipped under failover: the self-hosted VM's persistent pnpm store
       # already serves warm installs, while restoring the hosted archive
       # would spend ~52 s pulling ~180 MB into that populated store.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
@@ -328,7 +328,7 @@ jobs:
 
       - name: Restore compatible scheduling weights
         if: needs.pr-scope.outputs.coverage_mode == 'full'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6.1.0
         with:
           path: .coverage-times.json
           key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -349,7 +349,7 @@ jobs:
         run: pnpm run check:ci:coverage
       - name: Save successful scheduling weights
         if: success() && needs.pr-scope.outputs.coverage_mode == 'full' && hashFiles('.coverage-times.json') != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6.1.0
         with:
           path: .coverage-times.json
           key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -368,7 +368,7 @@ jobs:
       DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-bench-${{ github.run_attempt }}
     # Wall-clock budgets need an otherwise idle runner, so this job runs the
     # benchmark lane alone instead of joining a concurrent gate aggregate.
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -390,7 +390,7 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -500,7 +500,7 @@ jobs:
 
       # Pull requests read the store produced by the master release-pack job.
       # The persistent failover VM already owns a warm store.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
@@ -639,7 +639,7 @@ jobs:
 
       # Skipped under failover — the self-hosted VM's persistent store is
       # already warm (same rationale as the consumer job's restore).
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
           && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
@@ -652,7 +652,7 @@ jobs:
             ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
 
       # Skipped under failover: the VM's persistent browser cache is already warm.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         if: >-
           (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
           && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
@@ -1089,14 +1089,14 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         id: browser-cache
         with:
           path: ~/.cache/ms-playwright
@@ -1131,7 +1131,7 @@ jobs:
 
       - name: Populate the PR browser cache from master
         if: github.event_name == 'push' && github.ref == 'refs/heads/master' && steps.browser-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ steps.browser-cache.outputs.cache-primary-key }}
@@ -1312,7 +1312,7 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1326,7 +1326,7 @@ jobs:
         id: wine-cache-key
         run: echo "key=wine-debs-${ImageOS:-linux}-${ImageVersion:-v0}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6.1.0
         with:
           path: ~/wine-debs
           key: ${{ steps.wine-cache-key.outputs.key }}

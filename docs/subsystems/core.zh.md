@@ -386,6 +386,8 @@ type SessionStartSource = 'startup' | 'resume' | 'clear' | 'compact'
 
 其完整字段、`defineTool`/`ValueSchemaSpec`/`ParameterSchemaSpec` 类型化 schema DSL、`ToolExecution`/`ToolExecutionResult` waterfall 类型，以及工具展示 UI 类型都在 **[tools.md](tools.zh.md)** 中。
 
+<a id="repo-wide-type-patterns"></a>
+
 ## 全仓通用类型模式
 
 两个模式在每个子系统中反复出现，只在此处记录一次。

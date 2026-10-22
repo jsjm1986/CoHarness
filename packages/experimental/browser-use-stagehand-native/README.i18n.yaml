@@ -3,7 +3,7 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/browser-use-stagehand-native/README.md
 document:
-  en: 61f6c82c0aa913e2fd0a24b57e4b3f897b859e89
+  en: add854d36c91ea7b89a2e970e41a1d4ed39fb57c
   zh: b09c0a2c870e27629649e914f1268a60b95cf593
 /:
   en: 3f9127c3981e9453

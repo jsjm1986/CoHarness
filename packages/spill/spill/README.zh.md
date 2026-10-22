@@ -40,6 +40,7 @@ kind: "package-reference"
 |---|---|
 | `saveText(input)` | 逐字保存 `input.content`；成功时返回 `SpillRef`（不透明定位信息、写入的精确字节数和取回指引）。**发生真实存储故障时，调用会以拒绝状态结束**（权限、ENOSPC、后端不可用）；由调用方决定如何降级。 |
 
+
 存储操作以请求的 `owner` 会话作为保存时命名空间进行分组；后端自行选择私有表示，并可以从调用方的 `suggestedName` 派生名称，但绝不能将其当作可信路径。该 seam 只负责存储：不提供保留策略（由 [`@deepseek-ai/dsh-output-retention`](../../util/output-retention) 负责），不替换工具结果（由 `@deepseek-ai/dsh-spill-policy` 负责），也不提供取回/搜索 API（后端的 `retrievalHint` 会告诉模型如何使用定位信息）。
 
 <a id="vocabulary"></a>

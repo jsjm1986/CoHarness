@@ -92,6 +92,7 @@ The host owns each launched Chromium process and its temporary profile before wa
 
 The [native runtime](src/native.ts) passes the explicit model configuration to Stagehand's public initialization API. Stagehand owns the model requests, response validation, and token accounting inside its browser extension. DSH records browser tool inputs and returned data, including SDK result metadata, through the existing Session log. Underlying inference request/response capture and integration into DSH Session usage accounting are deferred.
 
+
 </details>
 
 -----

@@ -75,8 +75,8 @@ These pages cover server configuration, execution, and the decisions behind reso
 
 - [MCP client](../mcp-client/README.md) — server transports, instructions, and connection lifecycle.
 - [Tools subsystem](../../../docs/subsystems/tools.md) — canonical values and model-visible results.
-- [Resource visibility decision](../../../.agents/notes/implemented/feature/2026-09-13-mcp-resources-in-profiles.md) — shared profile mounting and visibility from configured servers.
-- [Resources and instructions decision](../../../.agents/notes/implemented/feature/2026-09-12-mcp-resources-and-instructions.md) — scope, on-demand access, and excluded mechanisms.
+- [Resource visibility reference](README.md) — shared profile mounting and visibility from configured servers.
+- [Resources and instructions reference](README.md) — scope, on-demand access, and excluded mechanisms.
 
 -----
 

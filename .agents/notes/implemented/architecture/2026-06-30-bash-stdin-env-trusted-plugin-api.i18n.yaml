@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-30-bash-stdin-env-trusted-plugin-api.md
 document:
-  en: 41be63fff598587ee9b873cf7edf51da788bc02a
-  zh: 60721539d9d37857e145e289bb262482588139bf
+  en: fb35916260317470dc66a9b3b08ecb992ecae79a
+  zh: 2ae89bdba396f9930b92cf16eece639a90000f5c
 /agent-note-stdin-extra-env-on-the-bash-seam:
   en: 38af6a14bc3b1ff3
   zh: 853c8280a549f038
 /agent-note-stdin-extra-env-on-the-bash-seam/problem:
-  en: 2e5d26b3b1202a73
-  zh: ada477abb2875def
+  en: 4cf4c26c64f7d71a
+  zh: 56a878b688047106
 /agent-note-stdin-extra-env-on-the-bash-seam/decision:
   en: e8839c1f644960ed
   zh: 2828c463d83093b3

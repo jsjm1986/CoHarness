@@ -58,6 +58,12 @@
       "phase": "E12",
       "command": "pnpm exec tsx scripts/verify-upstream-sovereignty.ts",
       "exitCode": 0,
+      "note": "71 tracked, 226 adapted, 57 owned, 2 replaced, 42 upstream-only package(s) conform to dsh-v0.2.1-rc.2; preset/agent-preset adapted for the generated packages.md catalog"
+    },
+    {
+      "phase": "E12",
+      "command": "pnpm exec tsx scripts/verify-upstream-sovereignty.ts",
+      "exitCode": 0,
       "note": "63 tracked, 219 adapted, 46 owned, 2 replaced, 57 upstream-only package(s) conform to dsh-v0.2.1-rc.2"
     },
     {
@@ -167,14 +173,14 @@
     },
     {
       "id": "schedule-tool-preset-declaration",
-      "status": "defer",
+      "status": "adapt",
       "localOwner": "schedule/preset owners",
       "commitScope": [
         "packages/schedule/",
         "packages/preset/"
       ],
-      "reviewState": "deferred-platform-review",
-      "notes": "upstream schedule/tool-schedule declared into presets at rc.2; the fork ships schedule/schedule locally and records the preset declaration as an open gap"
+      "reviewState": "implemented-local-tests-passing",
+      "notes": "upstream schedule/tool-schedule declared into presets at rc.2; the fork declares @deepseek-ai/dsh-tool-schedule in the cordis/ptc/standard agent presets and ships schedule locally"
     },
     {
       "id": "python-alias-validation",

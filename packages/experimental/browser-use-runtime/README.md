@@ -31,6 +31,7 @@ Native providers construct `SessionResources` from the package root, supplying r
 
 MCP providers use `mountSessionMcp` from `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp`, supplying their fixed server name, executable, arguments, and ownership policy. The helper awaits one scoped client startup and discovery attempt within each future Agent's `agent/created` event. Agent creation or resume completes after discovery, before queued input runs; a successful client remains owned by that Session across turns. The MCP server process starts in the Session's current working directory resolved through `workingDirectory`.
 
+
 A busy attachment skips startup permanently for that live activation while its other work continues. Releasing the attachment does not retry skipped activations; a newly created or resumed Agent can acquire it. Startup failure or cancellation rejects Agent creation or resume and triggers creation rollback, including client cleanup. Reconnection is disabled. Loading or reloading a provider applies only to future Agent activations.
 
 Callers can inspect prompt assembly and scoped tool definitions after awaited Agent creation or resume completes.
@@ -51,6 +52,7 @@ Disposed-cause cancellation starts resource cleanup before AgentHandle waits for
 
 The [MCP helper](src/mcp.ts) connects within serial `agent/created`; [AgentLoop](../../core/agent-loop/README.md#loop-lifecycle-agentts) holds queued input and owns creation rollback. Prompt assembly reads the initialized catalog. The helper retains the provider registration through resource cleanup and uses the [MCP client](../../mcp/mcp-client/README.md) for transport, schema discovery, result conversion, and durable image admission.
 
+
 </details>
 
 -----
@@ -67,11 +69,11 @@ The [MCP helper](src/mcp.ts) connects within serial `agent/created`; [AgentLoop]
 <a id="model-experience"></a>
 ## Model Experience
 
-Indirectly, through provider-owned browser tools, whose catalogs the MCP helper discovers before model request assembly; providers and the MCP client own descriptions, schemas, results, and image behavior.
+Indirectly, through provider-owned browser tools discovered before model request assembly and through [working-directory recovery](../../session/working-directory/README.md); providers and the MCP client own tool descriptions, schemas, results, and image behavior, while the directory service owns directory context.
 
 #### KV Cache effect
 
-The library adds no prompt text. Discovered tool schemas and provider guidance determine request-prefix changes; ordinary browser resource reuse does not alter those schemas.
+Discovered tool schemas and provider guidance determine request-prefix changes; ordinary browser resource reuse does not alter those schemas. Directory recovery appends user context without replacing the system-prompt prefix.
 
 ## Known Limitations and Deferred Work
 

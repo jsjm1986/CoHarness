@@ -76,6 +76,8 @@ In `workspace` mode it emits every explicit contributor once without blocking bu
 
 With `rejectBuildOutputs: true`, analysis fails with a `TypertAnalysisError` when a face program loads a file from a workspace package's `lib/` directory, or cannot resolve an import of a workspace package, as on a tree whose packages are not yet compiled. The error names each such import specifier and the source file a `paths` alias should map it to, so a passing generation depends only on workspace source and can run before or beside package compilation. Leave it off for a face whose sources import generated outputs, such as a Client face importing `/remote`.
 
+
+
 -----
 
 <a id="understand-the-implementation"></a>

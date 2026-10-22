@@ -86,7 +86,7 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6.1.0
         id: pnpm-cache
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -99,7 +99,7 @@ jobs:
 
       - name: Populate the PR dependency cache from master
         if: github.event_name == 'push' && github.ref == 'refs/heads/master' && steps.pnpm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}

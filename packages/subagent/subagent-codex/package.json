@@ -19,8 +19,8 @@
       "default": "./lib/index.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json",
-    "./locale/*.json": "./locale/*.json"
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
   },
   "files": [
     "locale/*.json",
@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-sdk-protocol": "workspace:*",
+    "@deepseek-ai/dsh-tool-subagent": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
     "@openai/codex": "0.153.4"
   },

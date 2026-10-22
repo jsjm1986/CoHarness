@@ -81,6 +81,7 @@ seam 记录 → SDK 日志记录：`time` → `timestamp`/`observedTimestamp`；
 - **真实 collector 行为属于 SDK 导出器**：身份验证、TLS、限流及其他真实 OTLP 部署行为遵循上游 SDK，不由本包自有兼容层处理。
 - **反馈时快照**：`FEEDBACK_ONLY` 在反馈前不保留遥测自有副本。记录反馈时，它读取并脱敏当前的权威日志；反馈前发生崩溃时什么都不上传，而反馈前的策略变更会影响该次回放的导出内容。
 
+
 <a id="dev-note"></a>
 ### 开发备注
 

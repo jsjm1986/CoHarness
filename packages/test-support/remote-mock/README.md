@@ -115,6 +115,8 @@ A fake that stands in for a generated stream method returns an `AsyncIterable` â
 | [`src/log.ts`](src/log.ts) | Log store with the shared `seq` counter |
 | [`src/transports.ts`](src/transports.ts) | `MockAccountPreferences` / `MockProjectModelSettings` seed transports |
 
+
+
 </details>
 
 -----

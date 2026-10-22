@@ -76,6 +76,8 @@ JSON、YAML、SVG、PNG、JPEG 和 WebP 资源导出不提供 TypeScript 声明�
 
 设置 `rejectBuildOutputs: true` 后，若 face program 载入了工作区包 `lib/` 目录下的文件，或无法解析对工作区包的 import（例如包尚未编译的工作区），分析会以 `TypertAnalysisError` 失败。错误信息列出每个这样的 import 说明符，以及应由 `paths` 别名映射到的源文件；因此通过的生成只依赖工作区源码，可以在包编译之前或与之并行运行。若某个 face 的源码 import 生成产物（例如 Client face import `/remote`），则不要开启它。
 
+
+
 -----
 
 <a id="understand-the-implementation"></a>

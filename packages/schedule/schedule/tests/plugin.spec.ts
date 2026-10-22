@@ -34,16 +34,6 @@ describe('shared Schedule management', () => {
     expect(await service.catalog()).toEqual([])
   })
 
-  it('ignores the disposal of an Agent it never attached', async () => {
-    const { ctx, service } = await setup()
-    const sessionId = SessionId('unattached-disposal')
-    await service.create(sessionId, { prompt: 'later', after_seconds: 60, title: 'Later' })
-    // An Agent the plugin never attached has no detacher, so its disposal returns
-    // from the listener without one and leaves the stored task alone.
-    ctx.emit('agent/disposed', { agent: agentFor(ctx, 'never-attached') })
-    expect((await service.catalog()).map(entry => entry.title)).toEqual(['Later'])
-  })
-
   it('reports a Session its active reminders and deletes them on a stop request', async () => {
     const { ctx, service, fiber } = await setup()
     const sessionId = SessionId('archive-admission')

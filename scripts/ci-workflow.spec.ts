@@ -685,10 +685,10 @@ describe('CI workflow', () => {
     expect(aggregate.needs).toContain('node-24-bench')
   })
 
-  it('bounds the complete benchmark job to fifteen minutes', () => {
+  it('bounds the complete benchmark job to twenty minutes', () => {
     const benchmark = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-24-bench')
 
-    expect(benchmark['timeout-minutes']).toBe(15)
+    expect(benchmark['timeout-minutes']).toBe(20)
     expect(benchmark.steps).toContainEqual({
       name: 'Run performance benchmarks',
       env: { DSH_GATE_VERBOSE: '1' },
@@ -699,7 +699,7 @@ describe('CI workflow', () => {
   it('always restores the hosted benchmark pnpm cache', () => {
     const benchmark = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-24-bench')
     if (!Array.isArray(benchmark.steps)) throw new TypeError('benchmark job must define steps')
-    const caches = benchmark.steps.filter(step => isRecord(step) && step.uses === 'actions/cache/restore@v4')
+    const caches = benchmark.steps.filter(step => isRecord(step) && step.uses === 'actions/cache/restore@v6.1.0')
 
     expect(caches).toHaveLength(1)
     expect(caches[0]).not.toHaveProperty('if')

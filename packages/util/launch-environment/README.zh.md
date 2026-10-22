@@ -24,6 +24,7 @@ kind: "package-library"
 ## 目录
 
 - [解析](#resolving)
+- [进一步探索](#further-exploration)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
@@ -46,8 +47,52 @@ declare const ctx: Context
 const endpoint = launchEnvironmentOf(ctx).get('DEEPSEEK_BASE_URL')?.value
 ```
 
+`launchedThroughSsh(snapshot)` 只在继承的进程层存在非空 `SSH_CONNECTION` 或 `SSH_TTY` 时返回 true。Web 浏览器接力、自适应目录选择器与 Open In 共用该判定；项目与用户 `.env` 的值不会建立 SSH 会话。
+
+### 层级如何排序
+
+| 层 | 它是什么 |
+|---|---|
+| 继承的进程环境 | 启动 shell、CI 任务或容器传入的东西——本次运行的明确意图 |
+| `<invocation cwd>/.env` | harness 被启动于其中的项目；产品信任它配置自己的 agent（智能体） |
+| `$DSH_HOME/.env` | 用户自己的机器级默认值 |
+
+变量名按平台自身的规则匹配：POSIX 上精确匹配，Windows 上不区分大小写。在 Windows 上做大小写敏感的查找会选错层——shell 里的 `deepseek_api_key` 与项目 `.env` 里的 `DEEPSEEK_API_KEY` 对操作系统而言是同一个变量。
+
+### 没有启动器启动这棵树时
+
 当产品 CLI（命令行界面）启动了这棵树时，`launchEnvironmentOf(ctx)` 返回启动器的快照；否则返回只含继承环境的那一层。该回退并不削弱规则：SDK 宿主或裸 `cordis.yml` 从未发现过任何文件，因此它拥有的一切确实就是它被启动时的环境。
 
+-----
+
+<a id="understand-the-implementation"></a>
+## 理解实现
+
+<details>
+<summary>实现细节——点击展开</summary>
+
+快照建立在一个分离之上：启动器决定哪些文件存在，快照决定值如何排序。
+
+### 源码地图
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | `createLaunchEnvironmentSnapshot`、`launchEnvironmentOf` 与 `ctx.launchEnvironment` 槽位 |
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## 进一步探索
+
+当你需要构建快照的启动器或通过快照解析的消费方时，阅读以下页面。
+
+- [boot 包](../../boot/app-boot/README.zh.md)——在任何配置项挂载之前填充 `ctx.launchEnvironment` 的启动器。
+- [凭据存储](../../credentials/credentials-local/README.zh.md)——针对快照各层解析已存储的凭据。
+- [DeepSeek 提供方](../../llm/llm-deepseek/README.zh.md)——通过启动环境读取提供方配置。
+
+-----
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项

@@ -3,26 +3,26 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/bundle/sdk-minimal/README.md
 document:
-  en: b189ac373abfcd6c6e8fa2aac4d04cac09d57400
-  zh: 6dbc5e2d4b8f762dbb5c1c41fd84614a5784f025
+  en: 1ba065f6eef5778af371ca93b2aee9ef5abbc882
+  zh: 6968197a346322099bfc34385c3a506a0678001c
 /:
-  en: ae5bdac5add26503
-  zh: 93cd37d41c05fc9c
+  en: 3e4c00c567aacca0
+  zh: ebba948c7d5a3201
 /deepseek-ai-dsh-sdk-minimal:
   en: 807c43eedba7d53e
   zh: 9f1efe5d6ac393f7
 /deepseek-ai-dsh-sdk-minimal/summary:
-  en: 1885da605fd804b8
-  zh: 742cbfdd2a4a224b
+  en: ada0a9ec527270ea
+  zh: 21a2c28cdc191141
 /deepseek-ai-dsh-sdk-minimal/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-sdk-minimal/use-this-package:
-  en: 107f4613e077f9ad
-  zh: e7d89433a98b296b
+  en: fe320e0b68cc9232
+  zh: f3c23164c8d538f9
 /deepseek-ai-dsh-sdk-minimal/understand-the-implementation:
-  en: 281b8d6f1aa0e526
-  zh: 070c2a66b1b2feee
+  en: 55acf966af516b6d
+  zh: 82b656a37e835e2a
 /deepseek-ai-dsh-sdk-minimal/understand-the-implementation/source-map:
   en: 3784c554e96ab004
   zh: 0a05d4fe1e26b3b1
@@ -36,11 +36,11 @@ document:
   en: bd87e16b0c6e0506
   zh: c8ee5e3b4578754e
 /deepseek-ai-dsh-sdk-minimal/model-experience/minimal-coding-agent-composition/what-the-model-sees:
-  en: fa9af6239831a097
-  zh: 6951e08b165cb282
+  en: 1f1305993b32030b
+  zh: 461423bf18c655c0
 /deepseek-ai-dsh-sdk-minimal/model-experience/minimal-coding-agent-composition/token-effect:
-  en: 65613fb41fcc3151
-  zh: fc20a732aca8282c
+  en: 3bb5930fcd75527b
+  zh: f633099aaa8001e2
 /deepseek-ai-dsh-sdk-minimal/model-experience/minimal-coding-agent-composition/kv-cache-effect:
   en: 904ae09b5fdb87c1
   zh: 16269189c8b79491

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/browser-use-chrome-devtools-mcp/README.md
 document:
-  en: 0892864895d8c3b220191dba1e28d92de507e7d9
-  zh: beecd4e1ca19d3ea1dafbf98367bc990373c8352
+  en: cbe959c3064af175dbcf4f37dd2ec2ec3eefc19c
+  zh: 3054b11dadfc730aed1d471b3a07c665577e33f2
 /:
   en: 49dd7963da817a62
   zh: a1a62d762aacc55d
@@ -18,11 +18,11 @@ document:
   en: d152484eb41ac6b4
   zh: ea2227f28624a0e6
 /deepseek-ai-dsh-experimental-browser-use-chrome-devtools-mcp/use-this-package:
-  en: 6257bdaa22e67fb5
-  zh: a083c080c6fadac1
+  en: 2e0eaab087a45f7b
+  zh: 5b7585dd4440c9aa
 /deepseek-ai-dsh-experimental-browser-use-chrome-devtools-mcp/understand-the-implementation:
-  en: 70402ba45a01074f
-  zh: 67c4777921953478
+  en: ff4974b30697f375
+  zh: b59f56e20f8c5e3b
 /deepseek-ai-dsh-experimental-browser-use-chrome-devtools-mcp/further-exploration:
   en: f97bf132ae1ff7ac
   zh: 74c01d1cbca5281a

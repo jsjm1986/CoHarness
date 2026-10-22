@@ -41,6 +41,7 @@ The policy wraps `llm/stream` lazily, so the downstream stream is not constructe
 
 Checkpoint rejection is fail-closed at the model and tool boundaries: neither the adapter nor the top-level tool body runs. A step-boundary rejection fails the turn before another request starts. Concurrent tool checkpoints share the session store's serialized persistence drain and cannot duplicate sequence numbers.
 
+
 <a id="model-experience"></a>
 ## Model Experience
 
