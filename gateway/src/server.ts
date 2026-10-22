@@ -60,7 +60,8 @@ export interface GatewayDeps {
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
   /** Optional human-facing project progress journal; absent without PostgreSQL. */
-  progress?: Pick<import('./postgres/progress-service.ts').PostgresProgressService, 'progressForUser' | 'generateNow'>
+  progress?: Pick<import('./postgres/progress-service.ts').PostgresProgressService,
+    'progressForUser' | 'generateNow' | 'digestModelSettings' | 'setDigestModel'>
   /** PostgreSQL-backed account preferences; absent in legacy test compositions. */
   userPreferences?: GatewayUserPreferencesService
   /** Optional organization-level document metadata catalog. */

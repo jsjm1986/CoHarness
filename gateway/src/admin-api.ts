@@ -573,6 +573,23 @@ async function dispatch(
     return true
   }
 
+  if (pathname === '/admin/api/progress/digest-model') {
+    if (deps.progress === undefined) { sendError(res, 503, 'progress unavailable'); return true }
+    if (method === 'GET') { sendJson(res, 200, await deps.progress.digestModelSettings()); return true }
+    if (method === 'POST') {
+      const parsed = JSON.parse(body || '{}') as { model?: unknown }
+      if (parsed.model !== undefined && parsed.model !== null && typeof parsed.model !== 'string') {
+        sendError(res, 400, 'digest-model-format')
+        return true
+      }
+      const model = parsed.model === undefined || parsed.model === null ? null : parsed.model
+      await deps.progress.setDigestModel(model)
+      await write('admin.progress.digest-model', { model })
+      sendJson(res, 200, await deps.progress.digestModelSettings())
+      return true
+    }
+    return false
+  }
   if (pathname === '/admin/api/plugins/target' && method === 'GET') {
     if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams

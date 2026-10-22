@@ -8,6 +8,9 @@ import {
   listUsers,
   saveModel,
   setModelAccess,
+  getDigestModelSettings,
+  setDigestModel,
+  type DigestModelSettings,
   type AdminUser,
   type ModelGovernanceRow,
   type ModelRegistrationAction,
@@ -253,7 +256,9 @@ export function ModelsPage() {
       {view === 'catalog'
         ? <OrganizationModelsEditor onChanged={modelSettingsChanged} />
         : view === 'governance' ? (
-          <ModelDirectory
+          <>
+            <DigestModelSection />
+            <ModelDirectory
             loading={loading}
             models={models}
             users={users}
@@ -266,6 +271,7 @@ export function ModelsPage() {
             onEdit={openGovernanceEditor}
             onOverride={changeOverride}
           />
+          </>
         ) : (
           <PersonalRegistrationAudit
             users={users}
@@ -592,4 +598,64 @@ function PriceSummary({ row }: { row: ModelGovernanceRow }) {
 
 function messageFrom(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
+}
+
+/** Organization-level default route for the project progress digest. */
+function DigestModelSection() {
+  const t = useMemo(() => modelsPageT(), [])
+  const [settings, setSettings] = useState<DigestModelSettings | null>(null)
+  const [draft, setDraft] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [sectionError, setSectionError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    void getDigestModelSettings().then(result => {
+      if (!active) return
+      setSettings(result)
+      setDraft(result.model ?? '')
+    }).catch(cause => {
+      if (active) setSectionError(messageFrom(cause))
+    })
+    return () => { active = false }
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    setSaved(false)
+    try {
+      const result = await setDigestModel(draft === '' ? null : draft)
+      setSettings(result)
+      setDraft(result.model ?? '')
+      setSaved(true)
+      setSectionError('')
+    } catch (cause) {
+      setSectionError(messageFrom(cause))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Section title={t('digestTitle')} className="formSectionSpacing">
+      <ErrorBanner message={sectionError} />
+      {settings === null ? <LoadingState /> : (
+        <div className="formSectionSpacing">
+          <Field label={t('digestModelLabel')} hint={t('digestModelHint')}>
+            <select className="select" value={draft} onChange={event => { setDraft(event.target.value); setSaved(false) }}>
+              <option value="">{t('digestModelAuto')}</option>
+              {settings.candidates.map(candidate => {
+                const route = `${candidate.provider}/${candidate.model}`
+                return <option key={route} value={route}>{route}</option>
+              })}
+            </select>
+          </Field>
+          <Button type="button" variant="primary" loading={saving} disabled={draft === (settings.model ?? '')} onClick={() => { void save() }}>
+            {saved ? t('digestModelSaved') : t('digestModelSave')}
+          </Button>
+        </div>
+      )}
+    </Section>
+  )
 }

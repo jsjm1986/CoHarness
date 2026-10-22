@@ -572,9 +572,10 @@ export class PostgresProgressService {
       }
       const endpoints = await this.resolveEndpoints(publicId)
       if (endpoints.length === 0) {
-        throw new Error(this.config.model === undefined
+        const pin = await this.digestModelPin()
+        throw new Error(pin === undefined
           ? 'no resolvable model route'
-          : `configured digest model ${this.config.model} is not an allowed served route`)
+          : `configured digest model ${pin} is not an allowed served route`)
       }
       const periodKey = periodKeyOf(material[material.length - 1]!.occurredAt)
       const [openPeriod, current, projectName] = await Promise.all([
@@ -655,13 +656,73 @@ export class PostgresProgressService {
         : await governance.resolveManagedCredential({ kind: 'project', id: projectId }, provider.credentialRef)
       endpoints.push({ provider: route.provider, model: route.model, baseURL: provider.baseURL, apiKey })
     }
-    if (this.config.model !== undefined) {
+    if (endpoints.length === 0) return endpoints
+    const pin = await this.digestModelPin()
+    if (pin !== undefined) {
       const preferred = endpoints.findIndex(
-        endpoint => `${endpoint.provider}/${endpoint.model}` === this.config.model)
+        endpoint => `${endpoint.provider}/${endpoint.model}` === pin)
       if (preferred < 0) return []
       endpoints.unshift(...endpoints.splice(preferred, 1))
     }
     return endpoints
+  }
+
+  /**
+   * Effective digest route pin: the organization setting when an
+   * administrator selected one, else the deployment's HGW_PROGRESS_MODEL.
+   */
+  private async digestModelPin(): Promise<string | undefined> {
+    const row = await this.pool.query<{ digest_model: string | null }>(
+      `SELECT digest_model FROM harness.organizations WHERE id=$1`, [this.context.organizationId])
+    return row.rows[0]?.digest_model ?? this.config.model
+  }
+
+  /**
+   * Administrator-facing digest route setting plus the enabled
+   * openai-completions candidates the selector may offer.
+   * @returns current pin and candidate routes in `provider/model` form
+   */
+  async digestModelSettings(): Promise<{
+    model: string | null
+    candidates: Array<{ provider: string; model: string }>
+  }> {
+    const [setting, candidates] = await Promise.all([
+      this.pool.query<{ digest_model: string | null }>(
+        `SELECT digest_model FROM harness.organizations WHERE id=$1`, [this.context.organizationId]),
+      this.pool.query<{ provider_key: string; model_key: string }>(
+        `SELECT c.provider_key, c.model_key FROM harness.model_catalog c
+         JOIN harness.model_providers p
+           ON p.organization_id=$1 AND p.provider_key=c.provider_key
+         WHERE c.enabled AND p.status='enabled' AND p.protocol='openai-completions'
+         ORDER BY c.provider_key, c.model_key`, [this.context.organizationId]),
+    ])
+    return {
+      model: setting.rows[0]?.digest_model ?? null,
+      candidates: candidates.rows.map(row => ({ provider: row.provider_key, model: row.model_key })),
+    }
+  }
+
+  /**
+   * Store or clear the organization digest route pin. The value must name an
+   * enabled openai-completions candidate so a stale or unauthorized route can
+   * never be pinned.
+   * @param model - `provider/model`, or `null` to return to catalog order
+   */
+  async setDigestModel(model: string | null): Promise<void> {
+    if (model !== null && !/^\S+\/\S+$/u.test(model)) throw new Error('digest-model-format')
+    if (model !== null) {
+      const found = await this.pool.query(
+        `SELECT 1 FROM harness.model_catalog c
+         JOIN harness.model_providers p
+           ON p.organization_id=$1 AND p.provider_key=c.provider_key
+         WHERE c.enabled AND p.status='enabled' AND p.protocol='openai-completions'
+           AND c.provider_key || '/' || c.model_key = $2`,
+        [this.context.organizationId, model])
+      if (found.rowCount === 0) throw new Error('digest-model-unavailable')
+    }
+    await this.pool.query(
+      `UPDATE harness.organizations SET digest_model=$2, updated_at=now() WHERE id=$1`,
+      [this.context.organizationId, model])
   }
 
   /** One non-streaming OpenAI-completions request bounded by the request timeout. */

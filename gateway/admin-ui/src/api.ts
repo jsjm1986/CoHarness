@@ -1452,3 +1452,15 @@ export function tunnelAccessAction(
 ): Promise<TunnelAccessView> {
   return request('/admin/api/tunnel/actions', { method: 'POST', body: JSON.stringify(body) })
 }
+
+export type DigestModelSettings = {
+  model: string | null
+  candidates: Array<{ provider: string; model: string }>
+}
+
+export function getDigestModelSettings(): Promise<DigestModelSettings> {
+  return request('/admin/api/progress/digest-model')
+}
+export function setDigestModel(model: string | null): Promise<DigestModelSettings> {
+  return request('/admin/api/progress/digest-model', { method: 'POST', body: JSON.stringify({ model }) })
+}

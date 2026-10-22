@@ -21,7 +21,10 @@ function scriptedPool(handlers: Handler[]): Pool & { query: ReturnType<typeof vi
   const query = vi.fn(async (sql: string) => {
     if (/^\s*(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 }
     const handler = handlers.find(entry => entry.match.test(sql))
-    if (handler === undefined) throw new Error(`unhandled query: ${sql.slice(0, 140)}`)
+    if (handler === undefined) {
+      if (/digest_model FROM harness\.organizations/.test(sql)) return { rows: [{ digest_model: null }], rowCount: 1 }
+      throw new Error(`unhandled query: ${sql.slice(0, 140)}`)
+    }
     return handler.result()
   })
   return {
