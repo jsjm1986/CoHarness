@@ -375,6 +375,7 @@ async function dispatch(
     const input = parseObject(body)
     const id = str(input, 'id')
     if (id === undefined) throw new BackupError(400, 'backup-id-required')
+    if (!/^[0-9a-f-]{36}$/iu.test(id)) throw new BackupError(400, 'invalid-backup-id')
     const record = await deps.backupWork.verify(id)
     await deps.audit.write({ userId: admin.id, action: 'admin.backups.verify',
       detail: JSON.stringify({ backupId: id, status: record.status }), ip })

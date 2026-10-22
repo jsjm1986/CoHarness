@@ -149,8 +149,9 @@ describe('deployment admin API', () => {
 
   it('delegates backup creation and complete artifact verification and propagates admission refusal', async () => {
     const { deps, post } = await setup()
+    const backupId = 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'
     const recorded: BackupRecordView = {
-      id: 'b1', path: '/backups/fixture.dump', format: 'pg-dump-custom', migrationVersion: 46, writeEpoch: '1',
+      id: backupId, path: '/backups/fixture.dump', format: 'pg-dump-custom', migrationVersion: 46, writeEpoch: '1',
       sizeBytes: 42, sha256: 'f'.repeat(64),
       managedSnapshot: { version: 1, roots: [], directories: [], absent: [], files: [] }, status: 'verified',
       createdBy: 1, createdAt: 'now', verifiedAt: 'now', restoredAt: null, error: null,
@@ -162,14 +163,15 @@ describe('deployment admin API', () => {
     deps.backups = { list: vi.fn(async () => [recorded]), get: vi.fn(async () => recorded), record: vi.fn(), setVerified: vi.fn() }
     expect((await post('/admin/api/backups', {})).status).toBe(200)
     expect(create).toHaveBeenCalledExactlyOnceWith(expect.any(Number))
-    expect((await post('/admin/api/backups/verify', { id: 'b1' })).status).toBe(200)
-    expect(verify).toHaveBeenCalledExactlyOnceWith('b1')
+    expect((await post('/admin/api/backups/verify', { id: 'not-a-uuid' })).status).toBe(400)
+    expect((await post('/admin/api/backups/verify', { id: backupId })).status).toBe(200)
+    expect(verify).toHaveBeenCalledExactlyOnceWith(backupId)
     expect((await post('/admin/api/backups/node-configuration', { id: 'b1' })).status).toBe(200)
     expect(previewNodeConfiguration).toHaveBeenCalledExactlyOnceWith('b1')
     create.mockRejectedValueOnce(new MaintenanceError(409, 'writers-not-quiesced'))
     expect((await post('/admin/api/backups', {})).status).toBe(409)
     verify.mockRejectedValueOnce(new MaintenanceError(409, 'backup-manifest-differs-from-registry'))
-    expect((await post('/admin/api/backups/verify', { id: 'b1' })).status).toBe(409)
+    expect((await post('/admin/api/backups/verify', { id: backupId })).status).toBe(409)
   })
 })
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type { UserRow } from '../auth.ts'
 import type { GatewayConfig } from '../config.ts'
@@ -332,11 +333,28 @@ export class PostgresUserService {
     })
   }
 
-  async changeOwnPassword(id: number, newPassword: string): Promise<void> {
+  async changeOwnPassword(id: number, newPassword: string, keepToken?: string): Promise<void> {
     const passwordHash = await hashPassword(newPassword)
-    await this.context.pool.query(`UPDATE harness.password_credentials c SET password_hash=$3,
-      password_version=password_version+1,must_change_password=false,changed_at=now()
-      FROM harness.users u WHERE u.id=c.user_id AND u.organization_id=$1 AND u.public_id=$2`,
-    [this.context.organizationId, id, passwordHash])
+    await transaction(this.context.pool, async (client) => {
+      const user = await client.query<{ id: string }>(
+        'SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2 AND deleted_at IS NULL',
+        [this.context.organizationId, id],
+      )
+      const userId = user.rows[0]?.id
+      if (userId === undefined) return
+      await client.query(`UPDATE harness.password_credentials SET password_hash=$2,
+        password_version=password_version+1,must_change_password=false,changed_at=now() WHERE user_id=$1`,
+      [userId, passwordHash])
+      // A stolen parallel session survives a password change unless the other
+      // tokens are revoked — the caller keeps only the session it proved it owns.
+      if (keepToken === undefined) {
+        await client.query(`UPDATE harness.auth_sessions SET revoked_at=now(),revoked_reason='password-change'
+          WHERE organization_id=$1 AND user_id=$2 AND revoked_at IS NULL`, [this.context.organizationId, userId])
+      } else {
+        await client.query(`UPDATE harness.auth_sessions SET revoked_at=now(),revoked_reason='password-change'
+          WHERE organization_id=$1 AND user_id=$2 AND revoked_at IS NULL AND token_hash!=$3`,
+        [this.context.organizationId, userId, createHash('sha256').update(keepToken).digest()])
+      }
+    })
   }
 }

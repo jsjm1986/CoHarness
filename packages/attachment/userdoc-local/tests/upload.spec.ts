@@ -316,4 +316,15 @@ describe('resumable local document uploads', () => {
     await restarted.list()
     await expect(readFile(manifestPath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
+
+  it('reports missing sessions as not found on complete and cancel', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-missing-'))
+    roots.push(root)
+    const service = await store(root)
+    const missing = '00000000-0000-0000-0000-000000000000' as never
+    await expect(service.completeUpload(missing, 'a'.repeat(64)))
+      .rejects.toMatchObject({ code: DOCUMENT_UPLOAD_NOT_FOUND_CODE })
+    await expect(service.cancelUpload(missing))
+      .rejects.toMatchObject({ code: DOCUMENT_UPLOAD_NOT_FOUND_CODE })
+  })
 })
