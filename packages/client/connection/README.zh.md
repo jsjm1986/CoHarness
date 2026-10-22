@@ -17,7 +17,7 @@ kind: "package-reference"
 
 一个页面固定其已验证的 Gateway 账号。fetch 包装仅覆盖同源 `/api` 和 `/account/api/` 请求，携带 `x-dsh-expected-principal-id`；socket 等待首次 HTTP 身份结果后携带 `dshPrincipal` 建连。Gateway 将其与已认证用户比较，并返回 `x-dsh-principal-id`。明确不一致、认证被撤销或引导运行时访问被拒绝时，旧请求先中止，Runtime 所有的 Session 与 slot 状态撤下，然后重载页面。临时连接失败导致身份缺失不会被当成另一个账号。不带预期身份字段的旧客户端继续遵守服务端授权。
 
-解码后的 Host 描述先固定页面的引导 runtime，再开放依赖作用域的请求与 socket。未显式指定 runtime 的请求使用该固定目标，其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；公共链接保持不变。
+解码后的 Host 描述先固定页面的引导 runtime，再开放依赖作用域的请求与 socket。未显式指定 runtime 的请求使用该固定目标，包括项目活动分页；其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；公共链接保持不变。
 
 ## 概述
 
