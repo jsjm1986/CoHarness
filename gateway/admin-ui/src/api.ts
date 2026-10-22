@@ -1260,6 +1260,21 @@ export interface PluginManagementState {
 export function pluginManagementState(kind: 'user' | 'project', id: number, signal?: AbortSignal): Promise<PluginManagementState> {
   return request(`/admin/api/plugins/state?kind=${kind}&id=${String(id)}`, { signal })
 }
+
+/** One space holding a saved plugin composition, as the cross-space overview lists it. */
+export interface PluginManagementOverviewRow {
+  target: { kind: 'user' | 'project'; id: number; label: string }
+  entries: number
+  disabled: number
+  bundles: number
+  revision: string
+  updatedAt: string
+  live: boolean
+  generation: number | null
+}
+export function pluginManagementOverview(signal?: AbortSignal): Promise<PluginManagementOverviewRow[]> {
+  return request('/admin/api/plugins/overview', { signal })
+}
 export function pluginManagementSaveState(input: { target: { kind: 'user' | 'project'; id: number }; revision: string; state: PluginDesiredState | null }, signal?: AbortSignal): Promise<PluginManagementState> {
   return request('/admin/api/plugins/state', { method: 'POST', body: JSON.stringify(input), signal })
 }

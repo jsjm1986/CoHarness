@@ -15,6 +15,17 @@ export interface PluginStateEntry { id: string; name?: string; disabled: boolean
 export interface PluginDesiredState { entries: PluginStateEntry[]; bundles: string[] }
 /** Current desired state with its optimistic-concurrency marker; `state` is null while no row exists. */
 export interface PluginStateSnapshot { revision: string; state: PluginDesiredState | null }
+/** One organization's saved desired-state row as the administrator overview lists it. */
+export interface PluginStateOverviewRow {
+  target: RuntimeTarget & { label: string }
+  entries: number
+  disabled: number
+  bundles: number
+  revision: string
+  updatedAt: string
+  live: boolean
+  generation: number | null
+}
 /** A state request was invalid, addressed a missing owner, or carried a stale revision. */
 export class PluginStateError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 500, message: string) { super(message) }
@@ -206,6 +217,47 @@ export class PostgresPluginState {
     const row = result.rows[0]
     if (row === undefined) return { revision: '0', state: null }
     return { revision: row.revision, state: parseState(row) }
+  }
+
+  /**
+   * Every saved desired state in this organization joined with the owner's
+   * live instance row, for the administrator's cross-space overview. Spaces
+   * without a saved override are absent: their composition is file-driven.
+   * @returns one row per owner carrying counts and the runtime's liveness.
+   */
+  async list(): Promise<PluginStateOverviewRow[]> {
+    const result = await this.context.pool.query<{
+      user_public: number | null; project_public: number | null
+      username: string | null; project_name: string | null
+      entries: unknown; bundles: unknown; revision: string; updated_at: string
+      desired_state: string | null; observed_state: string | null; generation: number | null
+    }>(
+      `SELECT u.public_id AS user_public, p.public_id AS project_public,
+        u.username, p.name AS project_name,
+        s.entries, s.bundles, s.revision::text, s.updated_at::text,
+        i.desired_state, i.observed_state, i.generation
+       FROM harness.plugin_states s
+       LEFT JOIN harness.users u ON u.id=s.user_id AND u.deleted_at IS NULL
+       LEFT JOIN harness.projects p ON p.id=s.project_id
+       LEFT JOIN harness.instances i ON i.organization_id=s.organization_id
+         AND ((s.user_id IS NOT NULL AND i.user_id=s.user_id) OR (s.project_id IS NOT NULL AND i.project_id=s.project_id))
+       WHERE s.organization_id=$1
+       ORDER BY s.updated_at DESC`,
+      [this.context.organizationId])
+    const rows: PluginStateOverviewRow[] = []
+    for (const row of result.rows) {
+      const state = parseState(row)
+      const target = row.user_public !== null
+        ? { kind: 'user' as const, id: row.user_public, label: row.username ?? `user ${row.user_public}` }
+        : row.project_public !== null
+          ? { kind: 'project' as const, id: row.project_public, label: row.project_name ?? `project ${row.project_public}` }
+          : undefined
+      if (target === undefined) continue
+      rows.push({ target, entries: state.entries.length, disabled: state.entries.filter(entry => entry.disabled).length,
+        bundles: state.bundles.length, revision: row.revision, updatedAt: row.updated_at,
+        live: row.observed_state === 'ready', generation: row.generation })
+    }
+    return rows
   }
 
   /**

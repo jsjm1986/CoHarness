@@ -9,7 +9,7 @@ import { PluginsPage } from './PluginsPage.tsx'
 vi.mock('../api.ts', () => ({
   listUsers: vi.fn(), listProjects: vi.fn(), pluginManagementTarget: vi.fn(),
   getPluginPolicy: vi.fn(), setPluginPolicy: vi.fn(),
-  pluginManagementState: vi.fn(), pluginManagementSaveState: vi.fn(),
+  pluginManagementState: vi.fn(), pluginManagementSaveState: vi.fn(), pluginManagementOverview: vi.fn(async () => []),
 }))
 vi.mock('../plugins/transport.ts', () => ({ pluginManagementRemote: vi.fn() }))
 afterEach(cleanup)

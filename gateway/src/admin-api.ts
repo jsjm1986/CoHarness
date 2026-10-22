@@ -590,6 +590,11 @@ async function dispatch(
     }
     return false
   }
+  if (pathname === '/admin/api/plugins/overview' && method === 'GET') {
+    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
+    sendJson(res, 200, await deps.pluginManagement.overview(admin))
+    return true
+  }
   if (pathname === '/admin/api/plugins/target' && method === 'GET') {
     if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams

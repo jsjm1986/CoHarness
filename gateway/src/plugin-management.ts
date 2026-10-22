@@ -5,7 +5,7 @@ import { z } from 'zod'
 import type { UserRow } from './auth.ts'
 import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
-import { INSTANCE_PROFILE, parseDesiredState, PluginStateError, type PluginDesiredState } from './plugin-state.ts'
+import { INSTANCE_PROFILE, parseDesiredState, PluginStateError, type PluginDesiredState, type PluginStateOverviewRow } from './plugin-state.ts'
 import { PluginStateMetaResolver, type PluginStateMetaIndex } from './plugin-meta.ts'
 import type { GatewayDeps } from './server.ts'
 
@@ -114,6 +114,23 @@ export class GatewayPluginManagement {
     await this.authorize(admin, parsed.data)
     const generation = await this.deps.instances.isLive(parsed.data) ? await this.deps.instances.generationOf(parsed.data) : null
     return { nodeId: this.nodeId, target: parsed.data, generation }
+  }
+
+  /**
+   * Every space holding a saved plugin composition, with entry counts and
+   * liveness — the administrator's map into per-target management without
+   * touching a runtime that has never been overridden.
+   * @param admin - current authenticated administrator.
+   * @returns one row per space that carries a saved desired state.
+   */
+  async overview(admin: UserRow): Promise<PluginStateOverviewRow[]> {
+    const current = await this.deps.users.getById(admin.id)
+    if (admin.role !== 'admin' || current?.role !== 'admin' || current.status !== 'active') {
+      throw new PluginManagementError(403, 'administrator permission required')
+    }
+    const store = this.deps.pluginState
+    if (store === undefined) throw new PluginManagementError(503, 'plugin state store unavailable')
+    return store.list()
   }
 
   /** The owner's runtime home, where the observed profile projection lives. */
