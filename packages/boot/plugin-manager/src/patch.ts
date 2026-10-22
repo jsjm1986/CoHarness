@@ -79,6 +79,9 @@ export async function writePluginConfig(
     if (config === null) {
       if (!target.has('config')) return false
       target.delete('config')
+      // A row created only to carry the override leaves a no-op entry behind;
+      // rows that also disable or otherwise annotate the plugin stay.
+      if (target.items.every(pair => pair.key?.toString() === 'id' || pair.key?.toString() === 'name')) items.splice(index, 1)
     } else {
       document.setIn([index, 'config'], config)
     }
