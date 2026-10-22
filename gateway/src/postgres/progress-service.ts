@@ -79,6 +79,13 @@ export interface ProgressGenerateResult {
 /** Digest gate, bound, and model-call knobs (env-overridable via GatewayConfig). */
 export interface ProgressConfig {
   readonly enabled: boolean
+  /**
+   * Preferred digest route as `provider/model` (HGW_PROGRESS_MODEL). When set
+   * it is tried first; it must resolve to an allowed served route for the
+   * project or the digest reports itself unavailable rather than silently
+   * billing an unpinned model.
+   */
+  readonly model?: string
   /** Member-visible rows required to fire, unless a decision row is present. */
   readonly minActivity: number
   /** Minimum quiet after the newest activity before a pass fires. */
@@ -564,7 +571,11 @@ export class PostgresProgressService {
         return
       }
       const endpoints = await this.resolveEndpoints(publicId)
-      if (endpoints.length === 0) throw new Error('no resolvable model route')
+      if (endpoints.length === 0) {
+        throw new Error(this.config.model === undefined
+          ? 'no resolvable model route'
+          : `configured digest model ${this.config.model} is not an allowed served route`)
+      }
       const periodKey = periodKeyOf(material[material.length - 1]!.occurredAt)
       const [openPeriod, current, projectName] = await Promise.all([
         this.periodEntry(internal, periodKey), this.currentEntry(internal), this.projectName(internal),
@@ -643,6 +654,12 @@ export class PostgresProgressService {
         ? null
         : await governance.resolveManagedCredential({ kind: 'project', id: projectId }, provider.credentialRef)
       endpoints.push({ provider: route.provider, model: route.model, baseURL: provider.baseURL, apiKey })
+    }
+    if (this.config.model !== undefined) {
+      const preferred = endpoints.findIndex(
+        endpoint => `${endpoint.provider}/${endpoint.model}` === this.config.model)
+      if (preferred < 0) return []
+      endpoints.unshift(...endpoints.splice(preferred, 1))
     }
     return endpoints
   }

@@ -654,8 +654,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (launcher === 'systemd' && (!systemdUnitDir.startsWith('/') || /[\u0000-\u001f\u007f:]/u.test(systemdUnitDir))) {
     throw new Error('HGW_SYSTEMD_UNIT_DIR must be an absolute path without control or colon characters')
   }
+  const progressModel = env.HGW_PROGRESS_MODEL
+  if (progressModel !== undefined && !/^\S+\/\S+$/u.test(progressModel)) {
+    throw new Error('HGW_PROGRESS_MODEL must be a route id in provider/model form')
+  }
   const progress: ProgressConfig = {
     enabled: env.HGW_PROGRESS !== 'off',
+    ...(progressModel === undefined ? {} : { model: progressModel }),
     minActivity: positiveSafeInteger(
       env.HGW_PROGRESS_MIN_ACTIVITY, DEFAULT_PROGRESS_CONFIG.minActivity, 'HGW_PROGRESS_MIN_ACTIVITY'),
     idleMs: timerDelay(env.HGW_PROGRESS_IDLE_MS, DEFAULT_PROGRESS_CONFIG.idleMs, 'HGW_PROGRESS_IDLE_MS'),
