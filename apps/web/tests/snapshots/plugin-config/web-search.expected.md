@@ -1,4 +1,5 @@
 - button "返回插件": 插件
+- switch "启用组件 网页搜索" [checked]
 - heading "网页搜索" [level=3]
 - paragraph: DeepSeek 搜索提供方。
 - text: 启用新版 Web 搜索 API

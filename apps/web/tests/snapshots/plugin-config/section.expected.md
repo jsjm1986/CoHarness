@@ -7,27 +7,33 @@
     - img
     - text: 添加插件
   - button "选择添加插件方式"
-- heading "内置插件配置" [level=3]
+- heading "内置功能" [level=3]
 - list:
   - listitem:
     - button "查看 终端": 终端
     - text: 限制 agent 运行的每一条命令。
+    - switch "启用组件 终端" [checked]
   - listitem:
     - button "查看 Agent 循环": Agent 循环
     - text: Agent 如何派发工具调用。
+    - switch "启用组件 Agent 循环" [checked]
   - listitem:
     - button "查看 子智能体": 子智能体
     - text: 设置子智能体的递归层级和并行数量。
+    - switch "启用组件 子智能体" [checked]
   - listitem:
     - button "查看 模型选择": 模型选择
     - text: 允许 Agent 为子智能体选择模型
+    - switch "启用组件 模型选择" [checked]
   - listitem:
     - button "查看 网页搜索": 网页搜索
     - text: DeepSeek 搜索提供方。
+    - switch "启用组件 网页搜索" [checked]
   - listitem:
     - button "查看 记忆": 记忆
     - text: 跨会话保留的持久记忆
-- heading "实验性插件" [level=3]
+    - switch "启用组件 记忆" [checked]
+- heading "可选插件" [level=3]
 - button "更多"
 - list:
   - listitem:
