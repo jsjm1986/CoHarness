@@ -103,49 +103,34 @@ describe('ui-settings-plugins apply', () => {
     expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope'])
   })
 
-  it('keys each card it ships on the settings namespace that card edits', async () => {
-    const { ctx, slots } = await bench(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
+  it('keys each card it ships on the patch row its feature runs as', async () => {
+    const { ctx, slots } = await bench()
     declarePluginsItem(slots)
 
     await ctx.plugin({ inject: [...inject], apply }).await()
 
-    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(5) })
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(6) })
     const entries = slots.entries('plugins.item')
     expect(entries.map(entry => entry.options.id))
-      .toEqual(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
+      .toEqual(['bash-sandbox', 'pwsh-sandbox', 'agent-loop', 'subagent', 'subagent-model-selection-settings', 'web-search-deepseek'])
     expect(entries.map(entry => resolveSlotLabel(entry.options.label)))
-      .toEqual(['终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索'])
+      .toEqual(['终端', '终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索'])
   })
 
-  it('registers a card only while the Host serves the namespace it edits', async () => {
-    const { ctx, slots, describeSettings } = await bench(['shell'])
+  it('registers every card up front so a switched-off feature keeps its card', async () => {
+    const { ctx, slots } = await bench(['shell'])
     declarePluginsItem(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
 
-    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(1) })
-    expect(slots.entries('plugins.item')[0]!.options.id).toBe('shell')
-
-    describeSettings.mockResolvedValue({
-      rpcId: 's',
-      result: {
-        ok: true,
-        value: {
-          writable: true,
-          hasDocument: true,
-          namespaces: [{ ns: 'agent-loop', schema: {}, value: {}, applies: 'live', secrets: [], revision: 1 }],
-        },
-      },
-    })
-    ctx.remote.$dispatch('settings/document-updated', ['agent-loop', 1])
-    await vi.waitFor(() => { expect(slots.entries('plugins.item').map(entry => entry.options.id)).toEqual(['agent-loop']) })
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(6) })
   })
 
   it('injects one business face per card', async () => {
-    const { ctx, slots } = await bench(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
+    const { ctx, slots } = await bench()
     declarePluginsItem(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
 
-    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(5) })
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(6) })
     for (const entry of slots.entries('plugins.item')) {
       const face = (entry as { inject?: () => unknown }).inject?.() as { hooks: Record<string, unknown> }
       // Each card injects exactly one snapshot store plus its own actions.
@@ -214,20 +199,20 @@ describe('ui-settings-plugins apply', () => {
   })
 
   it('registers into a declaration that arrives after apply', async () => {
-    const { ctx, slots } = await bench(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
+    const { ctx, slots } = await bench()
     await ctx.plugin({ inject: [...inject], apply }).await()
 
     declarePluginsItem(slots)
 
-    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(5) })
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(6) })
   })
 
   it('collapses every contribution on teardown', async () => {
-    const { ctx, slots } = await bench(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
+    const { ctx, slots } = await bench()
     declareBothSurfaces(slots)
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(5) })
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(6) })
     expect(slots.entries('settings.section')).toHaveLength(1)
 
     await fiber.dispose()

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-plugins-item-patch-row-binding.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-23-plugins-item-patch-row-binding.md
+document:
+  en: 39cb58fbc461c8b34d40649b762834a06d917490
+  zh: ec6064fea6c3ca2e7577b0b4ddc5dcded66c8534
+/agent-note-plugins-page-feature-cards-bind-their-patch-row:
+  en: 6427c8e6455c7548
+  zh: 5eb33eee5dc39de7
+/agent-note-plugins-page-feature-cards-bind-their-patch-row/problem:
+  en: 36d6e160bb556d0f
+  zh: 6ea10186de0f9a27
+/agent-note-plugins-page-feature-cards-bind-their-patch-row/decision:
+  en: b618047e204e7d5f
+  zh: ddbef5f68ae25696
+/agent-note-plugins-page-feature-cards-bind-their-patch-row/alternatives-considered:
+  en: 89b273fd06a53811
+  zh: 759d67339cbae085
+/agent-note-plugins-page-feature-cards-bind-their-patch-row/consequences:
+  en: 8b8a99b2d3c0ec0c
+  zh: e1d9933298cacc3d
+/agent-note-plugins-page-feature-cards-bind-their-patch-row/testing:
+  en: 6fb07c7e8f9d7155
+  zh: 49dc2c9bd699ed2e

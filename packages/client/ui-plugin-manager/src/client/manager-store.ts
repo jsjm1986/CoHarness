@@ -316,6 +316,13 @@ export interface PluginManagerState {
    */
   readonly refreshStatus: 'idle' | 'refreshing' | 'failed'
   readonly packages: readonly PackageView[]
+  /**
+   * The Host's running-profile entries from the same read as {@link packages}:
+   * the page resolves the `plugins.item` entries that name a patch row against
+   * this list, whose `patchId` and `readOnlyReason` say whether the row is
+   * switchable and whose `entryId` addresses it while it is off.
+   */
+  readonly plugins: readonly PluginInfo[]
   /** Package names and row keys with an action crossing the wire. */
   readonly busy: readonly string[]
   readonly notice: ManagerNotice | null
@@ -624,7 +631,7 @@ export class PluginManagerController {
     private readonly ctx: ClientContext,
   ) {
     this.store = createSnapshotStore<PluginManagerState>({
-      status: 'idle', refreshStatus: 'idle', packages: [], busy: [], notice: null, manage: true,
+      status: 'idle', refreshStatus: 'idle', packages: [], plugins: [], busy: [], notice: null, manage: true,
       install: IDLE_INSTALL, confirm: null, highlight: null,
     })
   }
@@ -942,7 +949,7 @@ export class PluginManagerController {
         }
         if (inventory.value.managementAvailable !== true) {
           this.hasCachedInventory = false
-          this.patch({ status: 'unavailable', packages: [] })
+          this.patch({ status: 'unavailable', packages: [], plugins: [] })
           continue
         }
         const [bundles, plugins, access] = await Promise.all([
@@ -960,7 +967,7 @@ export class PluginManagerController {
           if ((!plugins.ok && plugins.error.code === 'plugin-management/forbidden')
             || (!bundles.ok && bundles.error.code === 'plugin-management/forbidden')) {
             this.hasCachedInventory = false
-            this.patch({ status: 'denied', packages: [] })
+            this.patch({ status: 'denied', packages: [], plugins: [] })
             continue
           }
           this.patch({ status: 'error' })
@@ -974,6 +981,7 @@ export class PluginManagerController {
           manage: access?.ok === true ? access.value.manage : true,
           refreshStatus: this.getSnapshot().refreshStatus === 'refreshing' ? 'refreshing' : 'idle',
           packages: sortPackages(bundles.value.map(bundle => packageView(bundle, plugins.value))),
+          plugins: plugins.value,
         })
       } while (this.shouldRerun())
     } finally {

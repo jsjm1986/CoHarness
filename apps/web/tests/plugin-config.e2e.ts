@@ -319,14 +319,14 @@ describe('web e2e: plugin configuration section', () => {
 
   it('saves model authorization atomically and retains choices when disabled', async () => {
     const panel = await openItem('模型选择')
-    const card = panel.locator('[data-plugin-item-detail="subagent-model-selection"]')
+    const card = panel.locator('[data-plugin-item-detail="subagent-model-selection-settings"]')
     const enabled = card.getByRole('switch')
     expect(await enabled.getAttribute('aria-checked')).toBe('false')
     await enabled.click()
     await card.getByRole('checkbox', { name: /deepseek-v4-flash$/ }).waitFor()
     expect(await card.getByRole('button', { name: '保存', exact: true }).isDisabled()).toBe(true)
     await card.getByRole('checkbox', { name: /deepseek-v4-flash$/ }).check()
-    const snapshot = await captureStableAria(page, '[data-plugin-item-detail="subagent-model-selection"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[data-plugin-item-detail="subagent-model-selection-settings"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'subagent-models.expected.md'), snapshot, MODE)
     await card.getByRole('button', { name: '保存', exact: true }).click()
     await expect.poll(() => scaffold.ctx.subagentModelSelection.current()).toEqual({
