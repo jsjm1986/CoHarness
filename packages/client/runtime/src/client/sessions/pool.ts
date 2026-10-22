@@ -73,6 +73,7 @@ export class SessionRuntimePool implements ISessions {
   private readonly entries = new Map<string, RuntimeEntry>()
   private readonly archivedByTarget = new Map<string, ReadonlySet<SessionId>>()
   private readonly sessionOwners = new Map<SessionId, RuntimeEntry>()
+  private readonly summaryProjections = new WeakMap<SessionSummary, { target: ConnectionRuntimeTarget; value: SessionSummary }>()
   private readonly providers = new Map<SessionProvideDescriptor, Map<RuntimeEntry, () => void>>()
   private stagedIds: readonly SessionId[] = []
   private readonly retentionSources = new Map<SessionId, ObservableSnapshot<SessionRetainInfo>>()
@@ -264,13 +265,17 @@ export class SessionRuntimePool implements ISessions {
     const archivedById: Record<SessionId, SessionSummary> = {}
     for (const summary of Object.values(state.byId)) {
       const id = key(summary.id)
-      const projected = {
-        ...summary, id,
-        ...(summary.parentId === undefined ? {} : { parentId: key(summary.parentId) }),
-        ...(entry.target.kind === 'project' ? { projectId: entry.target.projectId,
-          ...(entry.target.projectName === undefined ? {} : { workspaceName: entry.target.projectName }) } : {}),
+      let cached = this.summaryProjections.get(summary)
+      if (cached === undefined || cached.target !== entry.target) {
+        cached = { target: entry.target, value: {
+          ...summary, id,
+          ...(summary.parentId === undefined ? {} : { parentId: key(summary.parentId) }),
+          ...(entry.target.kind === 'project' ? { projectId: entry.target.projectId,
+            ...(entry.target.projectName === undefined ? {} : { workspaceName: entry.target.projectName }) } : {}),
+        } }
+        this.summaryProjections.set(summary, cached)
       }
-      ;(archived.has(summary.id) ? archivedById : byId)[id] = projected
+      ;(archived.has(summary.id) ? archivedById : byId)[id] = cached.value
     }
     const subagentsByParent = Object.fromEntries(Object.entries(state.subagentsByParent)
       .map(([parent, catalog]) => [key(parent as SessionId), {

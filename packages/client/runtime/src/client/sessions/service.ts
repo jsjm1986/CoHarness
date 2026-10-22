@@ -26,11 +26,15 @@ import type { ConversationRuntime } from './conversation-assembler.ts'
 import { SessionManager } from './manager.ts'
 import type { SessionRemotes } from './remotes.ts'
 import type { ObservedJob, SessionListPhase, SessionSearchResultItem, SubagentCatalogSnapshot } from './manager.ts'
+import type { SessionListEntry } from './lineage.ts'
 import type { PendingInteractionStatus } from './pending.ts'
 import { SessionProvideChannel } from './provide.ts'
 import type { Session } from './session.ts'
 
-/** Session list row projected from the host list RPC plus live stream increments. */
+/**
+ * Session list row projected from Host state. Runtime and pooled lists preserve
+ * an unchanged row's reference; a changed runtime descriptor replaces pooled rows.
+ */
 export interface SessionSummary {
   id: SessionId
   /** Latest durable log-backed title, absent until the host projects one. */
@@ -341,6 +345,7 @@ export class SessionRuntime implements ISessions {
   readonly list: SnapshotStore<SessionListState>
   /** The object-layer instance cluster and frame dispatch entry. */
   private readonly manager: SessionManager
+  private readonly summaryProjections = new WeakMap<SessionListEntry, SessionSummary>()
   /**
    * Atomic current-session provide projection: selection changes and
    * provider-roster changes publish through this one source (the renderer
@@ -1046,28 +1051,33 @@ export class SessionRuntime implements ISessions {
     const byId: Record<SessionId, SessionSummary> = {}
     for (const entry of items) {
       ids.push(entry.sessionId)
-      byId[entry.sessionId] = {
-        id: entry.sessionId,
-        displayTitle: displayTitleOf(entry.title, entry.cwd, entry.sessionId),
-        running: entry.running,
-        ...(entry.completed ? { completed: true } : {}),
-        blank: entry.blank,
-        updatedAt: entry.updatedAt,
-        ...(entry.pendingInteraction === undefined
-          ? {}
-          : { pendingInteraction: entry.pendingInteraction }),
-        ...(entry.projectionValues === undefined
-          ? {}
-          : { projectionValues: entry.projectionValues }),
-        ...(entry.title !== undefined ? { title: entry.title } : {}),
-        ...(entry.cwd !== undefined ? { cwd: entry.cwd } : {}),
-        ...(entry.workspaceId !== undefined ? { workspaceId: entry.workspaceId } : {}),
-        ...(entry.parentSessionId !== undefined ? { parentId: entry.parentSessionId } : {}),
-        ...(entry.origin !== undefined ? { origin: entry.origin } : {}),
-        ...(entry.agentPreset !== undefined ? { agentPreset: entry.agentPreset } : {}),
-        ...(entry.visibility !== undefined ? { visibility: entry.visibility } : {}),
-        ...(entry.projectId !== undefined ? { projectId: entry.projectId } : {}),
+      let summary = this.summaryProjections.get(entry)
+      if (summary === undefined) {
+        summary = {
+          id: entry.sessionId,
+          displayTitle: displayTitleOf(entry.title, entry.cwd, entry.sessionId),
+          running: entry.running,
+          ...(entry.completed ? { completed: true } : {}),
+          blank: entry.blank,
+          updatedAt: entry.updatedAt,
+          ...(entry.pendingInteraction === undefined
+            ? {}
+            : { pendingInteraction: entry.pendingInteraction }),
+          ...(entry.projectionValues === undefined
+            ? {}
+            : { projectionValues: entry.projectionValues }),
+          ...(entry.title !== undefined ? { title: entry.title } : {}),
+          ...(entry.cwd !== undefined ? { cwd: entry.cwd } : {}),
+          ...(entry.workspaceId !== undefined ? { workspaceId: entry.workspaceId } : {}),
+          ...(entry.parentSessionId !== undefined ? { parentId: entry.parentSessionId } : {}),
+          ...(entry.origin !== undefined ? { origin: entry.origin } : {}),
+          ...(entry.agentPreset !== undefined ? { agentPreset: entry.agentPreset } : {}),
+          ...(entry.visibility !== undefined ? { visibility: entry.visibility } : {}),
+          ...(entry.projectId !== undefined ? { projectId: entry.projectId } : {}),
+        }
+        this.summaryProjections.set(entry, summary)
       }
+      byId[entry.sessionId] = summary
     }
     if (current !== undefined && currentAddress !== undefined) {
       const seen = new Set<SessionId>()

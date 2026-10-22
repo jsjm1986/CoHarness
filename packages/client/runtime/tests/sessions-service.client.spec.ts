@@ -54,6 +54,42 @@ async function feedList(b: Bench, rows: FeedRow[]): Promise<void> {
 }
 
 describe('list store projection', () => {
+  it('keeps unrelated summaries stable when one Session changes', async () => {
+    const b = bench()
+    try {
+      await feedList(b, [{ id: 's1' }, { id: 's2' }])
+      const before = b.svc.list.getSnapshot()
+      b.svc.handleHostEnvelope({
+        rpcId: 'status' as never,
+        payload: { type: 'host/session-status', sessionId: sid('s1'), running: true },
+      })
+      await Promise.resolve()
+      const after = b.svc.list.getSnapshot()
+      expect(after.byId[sid('s1')]).not.toBe(before.byId[sid('s1')])
+      expect(after.byId[sid('s1')]?.running).toBe(true)
+      expect(after.byId[sid('s2')]).toBe(before.byId[sid('s2')])
+    } finally { await b.ctx.fiber.dispose() }
+  })
+
+  it('publishes visibility and project changes even when activity stays unchanged', async () => {
+    const b = bench()
+    let visibility: 'project' | 'private' = 'project'
+    let projectId = 7
+    b.api.onList = async () => ok({ items: [{
+      sessionId: sid('s1'), updatedAt: 1, running: false, blank: false, visibility, projectId,
+    }] })
+    try {
+      await b.svc.refresh()
+      expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ visibility: 'project', projectId: 7 })
+      visibility = 'private'
+      await b.svc.refresh()
+      expect(b.svc.list.getSnapshot().byId[sid('s1')]?.visibility).toBe('private')
+      projectId = 8
+      await b.svc.refresh()
+      expect(b.svc.list.getSnapshot().byId[sid('s1')]?.projectId).toBe(8)
+    } finally { await b.ctx.fiber.dispose() }
+  })
+
   it('projects durable titles separately from cwd/id display fallbacks and parent links', async () => {
     const b = bench()
     b.svc.handleMuxEnvelope({

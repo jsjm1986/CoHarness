@@ -29,6 +29,37 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
 }
 
 describe('SessionRuntimePool', () => {
+  it('keeps unrelated pooled summaries stable and refreshes renamed runtime labels', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const first = 'pool-first' as SessionId
+    const second = 'pool-second' as SessionId
+    api.onList = async () => ok({ items: [first, second].map(sessionId => ({
+      sessionId, updatedAt: 1, running: false, blank: false,
+    })) })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 7, projectName: 'Before' })
+      await base.refresh()
+      const firstKey = pool.keyFor(first)
+      const secondKey = pool.keyFor(second)
+      const before = pool.list.getSnapshot()
+      base.handleHostEnvelope({
+        rpcId: 'status' as never,
+        payload: { type: 'host/session-status', sessionId: first, running: true },
+      })
+      await Promise.resolve()
+      const after = pool.list.getSnapshot()
+      expect(after.byId[firstKey]?.running).toBe(true)
+      expect(after.byId[firstKey]).not.toBe(before.byId[firstKey])
+      expect(after.byId[secondKey]).toBe(before.byId[secondKey])
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 7, projectName: 'After' })
+      expect(pool.list.getSnapshot().byId[secondKey]?.workspaceName).toBe('After')
+      expect(pool.list.getSnapshot().byId[secondKey]).not.toBe(after.byId[secondKey])
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('loads a project session through a target runtime without merging its transport', async () => {
     const ctx = new Context()
     const baseApi = new FakeApiClient()

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-client-list-projection-reuse.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-client-list-projection-reuse.md
+document:
+  en: 015b71b76a4ca534444c3ab1250ea1a49f1fbe04
+  zh: 0fb0926a107a492391e5e93f07663943243e8cb6
+/agent-note-reuse-client-list-projections-by-source-identity:
+  en: 2904cec1db7d56df
+  zh: 5d483cd00094ada9
+/agent-note-reuse-client-list-projections-by-source-identity/problem:
+  en: dbf377e2a88489fa
+  zh: 6d1ceeb96fa3c171
+/agent-note-reuse-client-list-projections-by-source-identity/decision:
+  en: ffec689316c7f5c8
+  zh: 386fe85c0bac6e96
+/agent-note-reuse-client-list-projections-by-source-identity/alternatives-considered:
+  en: 3ab7e72ba010682c
+  zh: 2212a03d87e3fa22
+/agent-note-reuse-client-list-projections-by-source-identity/consequences:
+  en: a543331f23a65b40
+  zh: e0963ea27600490b
+/agent-note-reuse-client-list-projections-by-source-identity/verification:
+  en: 38c9d0fc816b04e8
+  zh: 55fbbfeb62b28cdd

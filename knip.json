@@ -165,7 +165,8 @@
     },
     "packages/client/runtime": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/list-projection.perf.client.ts"
       ],
       "project": [
         "src/**/*.ts",
