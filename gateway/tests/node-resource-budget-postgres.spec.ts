@@ -59,6 +59,10 @@ describePg('durable node resource budget', () => {
       maxQueuedPerProject: 8, maxQueuedBytes: 64 * 1024, maxWaitMs: 30_000, ...overrides,
     }
     const budget = new NodeResourceBudget(pool, organizationId, context.nodeId, config)
+    const grant = (credits: number) => pool.query(
+      "UPDATE harness.node_resource_state SET credits=credits+$3,valid_until='infinity' WHERE organization_id=$1 AND node_id=$2",
+      [organizationId, context.nodeId, credits],
+    )
     const subjects: RuntimeCredentialSubject[] = [
       ...users.map(user => ({ organizationId, target: { kind: 'user' as const, id: user.id }, generation: 1, userInternalId: user.uuid })),
       ...projects.map(project => ({ organizationId, target: { kind: 'project' as const, id: project.id }, generation: 1, projectInternalId: project.uuid })),
@@ -67,11 +71,12 @@ describePg('durable node resource budget', () => {
     const request = (subjectIndex: number, sequence: number, actorIndex = subjectIndex < 2 ? subjectIndex : 0, kind: NodeResourceRequest['kind'] = 'model'): NodeResourceRequest => ({
       sequence, kind, actorId: users[actorIndex]!.id, projectId: subjects[subjectIndex]!.target.kind === 'project' ? subjects[subjectIndex]!.target.id : 0,
     })
-    return { budget, context, subjects, users, projects, request, config }
+    return { budget, context, subjects, users, projects, request, config, grant }
   }
 
   it('keeps one active budget across Runtime processes and a reconstructed Gateway coordinator', async () => {
     const f = await fixture()
+    await f.grant(1)
     expect(await f.budget.request(f.subjects[0]!, f.request(0, 1))).toEqual({ state: 'active' })
     expect(await f.budget.request(f.subjects[1]!, f.request(1, 1))).toEqual({ state: 'queued' })
     const restarted = new NodeResourceBudget(pool, f.context.organizationId, f.context.nodeId, f.config)
@@ -80,21 +85,26 @@ describePg('durable node resource budget', () => {
     expect((await restarted.snapshot()).kinds.model).toMatchObject({ active: 1, uncertain: 1, queued: 1 })
     expect(await restarted.status(f.subjects[1]!, 1)).toEqual({ state: 'queued' })
     await f.budget.finish(f.subjects[0]!, 1, 'quiescent')
+    await f.grant(1)
     expect(await restarted.status(f.subjects[1]!, 1)).toEqual({ state: 'active' })
   })
 
   it('rotates users before projects, so extra projects cannot buy another user turn', async () => {
     const f = await fixture()
+    await f.grant(1)
     await f.budget.request(f.subjects[0]!, f.request(0, 1))
     await f.budget.request(f.subjects[2]!, f.request(2, 1))
     await f.budget.request(f.subjects[3]!, f.request(3, 1))
     await f.budget.request(f.subjects[1]!, f.request(1, 1))
     await f.budget.request(f.subjects[2]!, f.request(2, 2))
     await f.budget.finish(f.subjects[0]!, 1, 'quiescent')
+    await f.grant(1)
     expect(await f.budget.status(f.subjects[2]!, 1)).toEqual({ state: 'active' })
     await f.budget.finish(f.subjects[2]!, 1, 'quiescent')
+    await f.grant(1)
     expect(await f.budget.status(f.subjects[1]!, 1)).toEqual({ state: 'active' })
     await f.budget.finish(f.subjects[1]!, 1, 'quiescent')
+    await f.grant(1)
     expect(await f.budget.status(f.subjects[3]!, 1)).toEqual({ state: 'active' })
     expect(await f.budget.status(f.subjects[2]!, 2)).toEqual({ state: 'queued' })
   })
@@ -103,6 +113,7 @@ describePg('durable node resource budget', () => {
     const f = await fixture()
     await f.budget.finish(f.subjects[0]!, 1, 'not-started')
     expect(await f.budget.request(f.subjects[0]!, f.request(0, 1))).toEqual({ state: 'closed' })
+    await f.grant(1)
     expect(await f.budget.request(f.subjects[0]!, f.request(0, 2))).toEqual({ state: 'active' })
     await f.budget.finish(f.subjects[0]!, 2, 'quiescent')
     await f.budget.finish(f.subjects[0]!, 2, 'quiescent')
@@ -113,6 +124,7 @@ describePg('durable node resource budget', () => {
   it('replays one request and rejects changed metadata or a skipped sequence', async () => {
     const f = await fixture()
     const request = f.request(0, 1)
+    await f.grant(1)
     await f.budget.request(f.subjects[0]!, request)
     expect(await f.budget.request(f.subjects[0]!, request)).toEqual({ state: 'active' })
     await expect(f.budget.request(f.subjects[0]!, { ...request, kind: 'process' })).rejects.toMatchObject({ status: 409 })
@@ -122,10 +134,12 @@ describePg('durable node resource budget', () => {
 
   it('bounds retained requests and consumes refused sequences without permitting a replay', async () => {
     const f = await fixture({ maxQueued: 1, maxQueuedPerUser: 1, maxQueuedPerProject: 1 })
+    await f.grant(1)
     await f.budget.request(f.subjects[0]!, f.request(0, 1))
     await f.budget.request(f.subjects[0]!, f.request(0, 2))
     expect(await f.budget.request(f.subjects[1]!, f.request(1, 1))).toEqual({ state: 'refused', reason: 'queue-full' })
     await f.budget.finish(f.subjects[0]!, 1, 'quiescent')
+    await f.grant(1)
     expect(await f.budget.request(f.subjects[1]!, f.request(1, 1))).toEqual({ state: 'closed' })
     expect(await f.budget.request(f.subjects[1]!, f.request(1, 2))).toEqual({ state: 'queued' })
   })
@@ -139,6 +153,7 @@ describePg('durable node resource budget', () => {
 
   it('expires only waiting work, retaining an active reservation beyond its former deadline', async () => {
     const f = await fixture()
+    await f.grant(1)
     await f.budget.request(f.subjects[0]!, f.request(0, 1))
     await f.budget.request(f.subjects[1]!, f.request(1, 1))
     await pool.query("UPDATE harness.node_resource_requests SET deadline='-infinity' WHERE organization_id=$1", [f.context.organizationId])
@@ -150,6 +165,7 @@ describePg('durable node resource budget', () => {
   it('blocks new reservations while an existing Runtime has no accounting provider', async () => {
     const f = await fixture()
     await pool.query("DELETE FROM harness.node_resource_runtimes WHERE organization_id=$1 AND runtime_kind='user' AND runtime_public_id=$2", [f.context.organizationId, f.subjects[1]!.target.id])
+    await f.grant(1)
     expect(await f.budget.request(f.subjects[0]!, f.request(0, 1))).toEqual({ state: 'queued' })
     expect((await f.budget.snapshot()).unregisteredRuntimes).toBe(1)
     await f.budget.register(f.subjects[1]!)
@@ -158,17 +174,20 @@ describePg('durable node resource budget', () => {
 
   it('reclaims only a confirmed stopped generation and refuses stale late requests', async () => {
     const f = await fixture()
+    await f.grant(1)
     await f.budget.request(f.subjects[0]!, f.request(0, 1))
     await f.budget.request(f.subjects[1]!, f.request(1, 1))
     await pool.query("UPDATE harness.instances SET observed_state='stopped' WHERE organization_id=$1 AND user_id=$2", [f.context.organizationId, f.users[0]!.uuid])
     await f.budget.stopped(f.subjects[0]!.target, 1)
+    await f.grant(1)
     expect(await f.budget.status(f.subjects[1]!, 1)).toEqual({ state: 'active' })
     await expect(f.budget.request(f.subjects[0]!, f.request(0, 2))).rejects.toMatchObject({ status: 409 })
   })
 
-  it('holds the same active ceiling through concurrent Gateway coordinators', async () => {
+  it('paces concurrent admissions through the shared credit ledger across Gateway coordinators', async () => {
     const f = await fixture({ maxQueuedPerUser: 2, maxQueuedPerProject: 2 })
     const other = new NodeResourceBudget(pool, f.context.organizationId, f.context.nodeId, f.config)
+    await f.grant(2)
     const offered = await Promise.all(f.subjects.map((subject, index) => (index % 2 ? other : f.budget).request(subject, f.request(index, 1))))
     expect(offered.filter(item => item.state === 'active')).toHaveLength(2)
     expect(offered.filter(item => item.state === 'queued')).toHaveLength(2)
