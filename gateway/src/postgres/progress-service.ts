@@ -10,7 +10,6 @@
 import type { Pool } from 'pg'
 import { transaction } from './database.ts'
 import { internalProjectId, type PostgresRuntimeContext } from './runtime-context.ts'
-import { defaultModelFromPolicy } from '../apply-model-governance.ts'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type { GatewayModelGovernanceService } from '../services.ts'
 import type { PostgresCollaborationService } from './collaboration-service.ts'
@@ -352,7 +351,7 @@ export class PostgresProgressService {
     const state = await this.stateRow(internal)
     const pending = await this.pending(internal, state)
     const entries = await this.entries(internal)
-    const enabled = this.config.enabled && (await this.resolveEndpoint(projectId)) !== undefined
+    const enabled = this.config.enabled && (await this.resolveEndpoints(projectId)).length > 0
     const status: ProgressStatus = {
       enabled,
       pending: pending.count,
@@ -383,7 +382,7 @@ export class PostgresProgressService {
     if (authority.mode !== 'rw' && !authority.administrator) throw new CollaborationDeniedError('forbidden')
     const internal = await internalProjectId(this.pool, this.context.organizationId, projectId)
     if (internal === null) throw new CollaborationDeniedError('not-member')
-    if (!this.config.enabled || (await this.resolveEndpoint(projectId)) === undefined) {
+    if (!this.config.enabled || (await this.resolveEndpoints(projectId)).length === 0) {
       return { started: false, reason: 'unavailable' }
     }
     if (!(await this.acquire(internal))) return { started: false, reason: 'generating' }
@@ -564,8 +563,8 @@ export class PostgresProgressService {
         await this.clearLease(internal)
         return
       }
-      const endpoint = await this.resolveEndpoint(publicId)
-      if (endpoint === undefined) throw new Error('no resolvable model route')
+      const endpoints = await this.resolveEndpoints(publicId)
+      if (endpoints.length === 0) throw new Error('no resolvable model route')
       const periodKey = periodKeyOf(material[material.length - 1]!.occurredAt)
       const [openPeriod, current, projectName] = await Promise.all([
         this.periodEntry(internal, periodKey), this.currentEntry(internal), this.projectName(internal),
@@ -578,11 +577,22 @@ export class PostgresProgressService {
         .replace('{since}', state?.watermark_ts?.toISOString() ?? 'the beginning')
         .replace('{material}', material.map((row, index) => materialLine(index + 1, row)).join('\n'))
         .replace('{maxItems}', String(this.config.maxItemsPerSection))
-      const raw = await this.callModel(endpoint, prompt)
+      let raw: string | undefined
+      let model = ''
+      let failure: unknown = new Error('no resolvable model route')
+      for (const endpoint of endpoints) {
+        try {
+          raw = await this.callModel(endpoint, prompt)
+          model = `${endpoint.provider}/${endpoint.model}`
+          break
+        } catch (error) {
+          failure = error instanceof Error ? new Error(`${endpoint.provider}: ${error.message}`) : error
+        }
+      }
+      if (raw === undefined) throw failure
       const content = resolveDigestOutput(raw, material, this.config.maxItemsPerSection)
       const last = material[material.length - 1]!
       const memberRows = material.filter(row => row.kind !== 'agent').length
-      const model = `${endpoint.provider}/${endpoint.model}`
       await transaction(this.pool, async (client) => {
         await client.query(`INSERT INTO harness.project_journal(
             organization_id,project_id,kind,content,activity_count,model,generated_at,created_at,updated_at)
@@ -612,19 +622,29 @@ export class PostgresProgressService {
     }
   }
 
-  /** Resolve the project's default route into a callable endpoint, or undefined. */
-  private async resolveEndpoint(projectId: number): Promise<DigestEndpoint | undefined> {
+  /**
+   * Resolve the project's allowed served routes into callable endpoints in
+   * catalog order. A pass tries them in sequence so one dead provider key or
+   * unreachable upstream does not stall the digest.
+   */
+  private async resolveEndpoints(projectId: number): Promise<DigestEndpoint[]> {
     const governance = this.deps.governance
-    if (governance === undefined) return undefined
+    if (governance === undefined) return []
     const policy = await governance.policyForProject(projectId)
-    const target = defaultModelFromPolicy(policy)
-    if (target === undefined) return undefined
-    const provider = policy.providers.find(entry => entry.provider === target.provider)
-    if (provider === undefined || provider.protocol !== 'openai-completions') return undefined
-    const apiKey = provider.credentialRef === undefined || governance.resolveManagedCredential === undefined
-      ? null
-      : await governance.resolveManagedCredential({ kind: 'project', id: projectId }, provider.credentialRef)
-    return { provider: target.provider, model: target.model, baseURL: provider.baseURL, apiKey }
+    const endpoints: DigestEndpoint[] = []
+    const seen = new Set<string>()
+    for (const route of policy.models) {
+      if (!route.allowed || seen.has(`${route.provider}${route.model}`)) continue
+      seen.add(`${route.provider}${route.model}`)
+      const provider = policy.providers.find(entry => entry.provider === route.provider)
+      if (provider === undefined || provider.protocol !== 'openai-completions') continue
+      if (!provider.models.some(entry => entry.id === route.model)) continue
+      const apiKey = provider.credentialRef === undefined || governance.resolveManagedCredential === undefined
+        ? null
+        : await governance.resolveManagedCredential({ kind: 'project', id: projectId }, provider.credentialRef)
+      endpoints.push({ provider: route.provider, model: route.model, baseURL: provider.baseURL, apiKey })
+    }
+    return endpoints
   }
 
   /** One non-streaming OpenAI-completions request bounded by the request timeout. */
