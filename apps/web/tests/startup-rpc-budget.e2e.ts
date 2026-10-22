@@ -1,14 +1,8 @@
-// Cold-boot RPC budget. The describe mirror (packages/client/ui-settings) is
-// the one `settings.describe` reader in the browser, so startup describe
-// traffic stays bounded no matter how many client plugins own a preference.
-// A regression here means a consumer bypassed the mirror — grep for
-// `settings.describe(` outside ui-settings' client sources.
-//
-// Zero model calls: the lane only boots chrome, so no replay fixture mounts.
-import type { Browser, Page } from 'playwright'
+/** Cold-boot RPC budgets for the shared settings and workspace baselines; no model calls. */
+import type { Browser, Request } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
+import { expect, it } from 'vitest'
+import { launchWebScaffold, watchConsole } from './scaffold.ts'
 import { newEnglishPage } from './support.ts'
 
 /**
@@ -18,37 +12,40 @@ import { newEnglishPage } from './support.ts'
  * its invalidation is lost. Every settings consumer derives from these two.
  */
 const DESCRIBE_BUDGET = 2
+const WORKSPACE_LIST_BUDGET = 1
 
-let scaffold: WebScaffold
-let browser: Browser
-let page: Page
-
-beforeAll(async () => {
-  scaffold = await launchWebScaffold()
-  browser = await chromium.launch()
-})
-
-afterAll(async () => {
-  await page?.close()
-  await browser?.close()
-  await scaffold?.close()
-})
-
-describe('startup RPC budget', () => {
-  it('keeps cold-boot settings.describe at the mirror count', async () => {
-    page = await newEnglishPage(browser)
-    watchConsole(page)
+it('shares cold-boot settings and workspace baselines across their consumers', async () => {
+  const scaffold = await launchWebScaffold()
+  let browser: Browser | undefined
+  const failures: unknown[] = []
+  try {
+    browser = await chromium.launch()
+    const page = await newEnglishPage(browser)
+    const consoleWatch = watchConsole(page)
     const calls: string[] = []
+    const pending = new Set<Request>()
     page.on('request', (request) => {
       const url = new URL(request.url())
-      if (url.pathname.startsWith('/api/')) calls.push(url.pathname.slice('/api/'.length))
+      if (!url.pathname.startsWith('/api/')) return
+      calls.push(url.pathname.slice('/api/'.length))
+      pending.add(request)
     })
+    page.on('requestfinished', request => pending.delete(request))
+    page.on('requestfailed', request => pending.delete(request))
     await page.goto(scaffold.authenticatedUrl)
-    // Boot settles when the workspace picker is interactive; the trailing wait
-    // absorbs the first-connection reset wave the budget must include.
     await page.getByRole('textbox', { name: 'Choose workspace' }).waitFor({ timeout: 30_000 })
-    await page.waitForTimeout(3000)
-    const describeCount = calls.filter(method => method === 'settings.describe').length
-    expect(describeCount, `startup /api calls:\n${calls.join('\n')}`).toBe(DESCRIBE_BUDGET)
-  })
+    await expect.poll(() => calls.filter(method => method === 'settings.describe').length).toBe(DESCRIBE_BUDGET)
+    await expect.poll(() => pending.size).toBe(0)
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => { requestAnimationFrame(() => { resolve() }) })
+    }))
+    const details = `startup /api calls:\n${calls.join('\n')}`
+    expect(calls.filter(method => method === 'settings.describe').length, details).toBe(DESCRIBE_BUDGET)
+    expect(calls.filter(method => method === 'workspace.list').length, details).toBe(WORKSPACE_LIST_BUDGET)
+    expect(consoleWatch.pageErrors).toEqual([])
+  } catch (error) { failures.push(error) } finally {
+    await browser?.close().catch((error: unknown) => failures.push(error))
+    await scaffold.close().catch((error: unknown) => failures.push(error))
+  }
+  if (failures.length > 0) throw new AggregateError(failures, 'startup RPC budget failed')
 })

@@ -30,7 +30,7 @@ The [client architecture](2026-07-19-gui-web-client-architecture.md), [multi-ses
 
 Row identity is stable across unrelated updates without changing list order, Session references, connection ownership, or notification cadence. List construction still traverses the catalog; this change reduces summary reconstruction and selector invalidation rather than making every list operation incremental. The upstream immutable entry and runtime descriptor identities are the cache revision signals.
 
-`settleAssistant()` still replaces the Conversation window when retiring transient rows. The list diagnostic does not measure that operation or browser rendering, so it provides no basis for changing settlement replay.
+The list diagnostic measures row projection reuse. [Client interaction work](2026-10-23-client-interaction-work.md) separately owns selective settlement replay, navigation invalidation, and browser verification; projection counters do not measure those operations.
 
 ## Verification
 

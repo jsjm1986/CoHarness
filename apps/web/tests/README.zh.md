@@ -41,3 +41,7 @@ harness 的用途，且这两个包本来就在 Host 图中。另外，chat 场�
 构建受影响的 Client 包和 Web 前端后，运行 `pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/project-activity.e2e.ts apps/web/tests/timed-question-claim.e2e.ts`。`DSH_SNAPSHOT=refresh` 重写 UI golden；普通执行无需 API key，直接比较 golden。
 
 活动场景在第二个浏览器标签页更改共用作用域 cookie，验证原页面仍请求固定项目，再跳转到真实种子会话。只替代外部账户 Gateway 端点。计时问题场景将发行的 standard preset 复制到隔离目录，选择受支持的计时 ask-user 配置，并延迟真实浏览器 claim 请求，直到实际 Host 等待超时。回放的模型工具调用、计时工具、Session 投影、迟到回答 Remote 调用与后续模型轮次都经过完整装配的应用。
+
+`frontend-responsiveness.e2e.ts` 通过真实的轨迹检查器打开生成的搜索结果，展开和折叠完整 JSON 数组，并检查文件树刷新后的目录展开状态。此场景使用合成数据，不调用模型。
+
+`startup-rpc-budget.e2e.ts` 检查冷启动共享一次工作区基线读取，并保留 settings 镜像的两次读取。它等待选择器可交互、连接重置的 settings 读取出现以及启动 RPC 完成后，再检查请求次数。

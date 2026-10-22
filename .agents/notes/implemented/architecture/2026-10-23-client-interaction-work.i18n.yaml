@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-23-client-interaction-work.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-client-interaction-work.md
+document:
+  en: 7614ccd4641a5cc807186ba6002264e7ce1604c3
+  zh: a0d0c9b68a1771adad5f3f7691d261441ae01062
+/agent-note-keep-client-update-work-proportional-to-the-visible-change:
+  en: 301117c0f7cf3bda
+  zh: d81b27e1ec38c83a
+/agent-note-keep-client-update-work-proportional-to-the-visible-change/problem:
+  en: 786517ec3557c416
+  zh: 9e558d6449d3caa2
+/agent-note-keep-client-update-work-proportional-to-the-visible-change/decision:
+  en: 124440c1472a1a91
+  zh: 7fd3e671d86a0d82
+/agent-note-keep-client-update-work-proportional-to-the-visible-change/alternatives-considered:
+  en: 63bc03ef9e64fa4d
+  zh: 0f4f87c7d882db3d
+/agent-note-keep-client-update-work-proportional-to-the-visible-change/consequences:
+  en: 6683bf8be64d071b
+  zh: 6773db7b76e95cb5
