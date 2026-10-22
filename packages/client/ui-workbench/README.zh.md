@@ -36,9 +36,13 @@ Markdown 文件链接在现有鉴权文件标签中打开，并从请求的首�
 
 文件标签按扩展名选择预览正文。Markdown 文件（`md`、`markdown`）累计同样的带版本保护分页，经 `MarkdownText` 渲染且不自动换行。文档开头的 YAML frontmatter（首行 `---` 开始，以 `---` 或 `...` 结束）通过包内 `client.frontmatter-fields.js` 分块在正文上方显示为键值列表；字符串值显示解析后的文本，其他标量、集合与别名保留原始 YAML 写法，无效 YAML 或非映射文档原样显示整个块，空块不显示，未闭合的块仍按 Markdown 渲染。HTML 文件（`html`、`htm`）经 [`preview-readers.ts`](src/client/preview-readers.ts) 的 `readFileBytes` 以 Base64 读取完整源——带版本保护的 `workspaceFiles.readBytes` 窗口按调用方完整文件上限约束——由 [`contract/html/read-relative.ts`](src/client/contract/html/read-relative.ts) 的 `workspaceFileBytes` 解码后打包，收集通过同一授权 Session 和 runtime 目标读取的直接声明相对 `.js` classic 脚本、`.css` 样式表与可识别图片文件。依赖读取限定在 Session 工作区内解析，[`contract/html/pack.ts`](src/client/contract/html/pack.ts) 实施单资源 4 MiB、总量 32 MiB、最多 64 个资源的边界；外部、根相对、module 及 CSS 遍历得到的引用一律不读取。打包后的文档在仅有 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行；替换或卸载预览即吊销 Blob URL。非法 UTF-8、读取失败或超出限制使预览失败，而不会发布残缺包。PDF 与其余 Office 文件保留各自的文档正文，其余文件继续使用文本或有界 Base64 窗口。
 
-表格文件（`xlsx`、`xls`、`csv`、`tsv`）经同一条有界 `readFileBytes` 路径读取完整授权 Base64——以配置的 `excelMaxBytes` 为上限——并交由懒加载的工作簿查看器只读渲染，而不再请求转换。一次性 Worker 在配置的字节数、单元格面积与超时限制下解析工作簿，公式连同缓存结果一并保留且不重算；图表、图片、形状与条件格式按不支持的预览特性报告。解析限制来自插件 `Config`（`excelMaxBytes`、`excelMaxCells`、`excelTimeoutMs`）。源版本、重新加载、撤权与隐藏标签的生命周期与其他文件预览一致：迟到或过期的读取被丢弃，权限拒绝立即清空内容。
+独立的 HTML 资源按并行批次读取，各批次按单资源最大字节数预留的空间不超过剩余打包预算；剩余不足单资源上限时，逐个读取以确定实际大小。资源保留文档顺序；任一读取失败都会取消并等待本批次收尾，再报告预览失败。
+
+表格文件（`xlsx`、`xls`、`csv`、`tsv`）经同一条有界 `readFileBytes` 路径读取完整授权 Base64——以配置的 `excel.maxBytes` 为上限——并交由懒加载的工作簿查看器只读渲染，而不再请求转换。一次性 Worker 在配置的字节数、单元格面积与超时限制下解析工作簿，公式连同缓存结果一并保留且不重算；图表、图片、形状与条件格式按不支持的预览特性报告。解析限制来自插件 `Config`（`excel.maxBytes`、`excel.maxCells`、`excel.timeoutMs`）。源版本、重新加载、撤权与隐藏标签的生命周期与其他文件预览一致：迟到或过期的读取被丢弃，权限拒绝立即清空内容。
 
 其余 Office 文件通过同一文件标签请求授权转换；PDF.js 在独立 Worker 中按可见页面渲染，提供可选择文本及缺失字体提示。隐藏正文释放内容与 Worker，标签保留页码偏好。源变化要求重新加载，撤权立即清空内容。普通 PDF 读取仍受 Workspace 单窗口字节限制；Office 输入和输出由转换器限制。引擎及适配规则见[文档转换](../../../docs/subsystems/office-to-pdf.zh.md)。
+
+授权元数据可用时，当前文件所需的 PDF 或表格查看器导入与内容读取或 Office 转换同时启动。加载查看器代码不会挂载内容或 Worker；它们须等待授权字节读取成功。关闭或撤权后，迟到的导入或读取结果不会挂载预览正文。
 
 PDF、转换后的 Office 预览以及位图或 SVG 图片预览共用同一浮动缩放控件，提供**适应宽度**、25%、50%、100%、150% 和 200% 选项，并在 25%–400% 固定范围内按 25% 逐级缩放。适应宽度是默认模式并跟随面板尺寸变化，但不会放大小于面板的内容；100% 表示 PDF 的 96 DPI 页面尺寸或图片的固有 CSS 像素尺寸。在精细指针设备上，控件初始隐藏；指针进入底部 72 个 CSS 像素时向上滑入，离开 420 ms 后向下退出；控件悬停、键盘焦点、菜单展开和手势进行期间保持显示，无 hover 的设备则始终显示。Chromium 将 macOS 触控板捏合映射到与 Ctrl+滚轮相同的实时指针锚定路径，静止后的偏好保留在标签自己的 view 中，正文重新挂载后继续生效，直至标签关闭。缩放视口拥有自己的滚动区，固定缩放可在预览内产生横向和纵向滚动，而文本与二进制面板保留原有滚动器。缩放静止后，可见 PDF 页面按设备像素比乘以缩放比例重绘，旧位图保留到新渲染完成；图片始终在单个 `<img>` 内按固有纵横比显示，SVG 继续使用浏览器的矢量渲染路径。文本、Markdown、HTML 与表格预览不提供缩放控件。
 

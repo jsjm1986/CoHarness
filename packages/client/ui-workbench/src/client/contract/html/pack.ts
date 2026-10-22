@@ -32,6 +32,9 @@ function relative(reference: string): boolean {
  * A base element leaves URL resolution to the browser. Only direct .js classic scripts, .css
  * stylesheet links, and .png/.jpg/.gif/.webp/.avif/.svg/.ico/.bmp images are packed; srcset,
  * local CSS url/import, modules and dynamically constructed URLs are unsupported.
+ * Independent assets read in document-ordered batches sized by the remaining
+ * package bytes and the maximum asset size. A failed batch cancels and drains
+ * every read it started before rejecting; no partial package is published.
  * @param data - complete UTF-8 HTML bytes.
  * @param readRelative - original-document-scoped read, never exposed to the iframe.
  * @param signal - stops reads and prevents publication after cancellation.
@@ -51,6 +54,7 @@ export async function packHtml(
   if (template.content.querySelector('base[href]') !== null) return { data, assets }
 
   const seen = new Set<string>()
+  const references: Omit<HtmlAsset, 'data'>[] = []
   for (const element of template.content.querySelectorAll('script[src],link[href],img[src]')) {
     const script = element.localName === 'script'
     const image = element.localName === 'img'
@@ -74,17 +78,48 @@ export async function packHtml(
     if (!relative(reference)) continue
     const key = `${kind}:${reference}`
     if (seen.has(key)) continue
-    if (assets.length >= MAX_ASSETS) throw new Error('HTML package exceeds its asset count limit')
-    signal.throwIfAborted()
-    const asset = await readRelative(reference, signal)
-    signal.throwIfAborted()
-    const size = asset.byteLength
-    if (size > MAX_ASSET_BYTES) throw new Error('HTML asset exceeds its byte limit')
-    total += size
-    if (total > MAX_TOTAL_BYTES) throw new Error('HTML package exceeds its total byte limit')
-    if (kind !== 'image') decodeText(asset)
-    assets.push({ kind, reference, type: mime, data: asset })
+    if (references.length >= MAX_ASSETS) throw new Error('HTML package exceeds its asset count limit')
+    references.push({ kind, reference, type: mime })
     seen.add(key)
   }
-  return { data, assets }
+  const abort = new AbortController()
+  const readSignal = AbortSignal.any([signal, abort.signal])
+  try {
+    for (let offset = 0; offset < references.length;) {
+      readSignal.throwIfAborted()
+      // One asset may still fit when the remaining bytes are below the per-asset maximum.
+      const width = Math.max(1, Math.floor((MAX_TOTAL_BYTES - total) / MAX_ASSET_BYTES))
+      const batch = references.slice(offset, offset + width)
+      const pending = batch.map(async (reference): Promise<HtmlAsset> => {
+        try {
+          readSignal.throwIfAborted()
+          const asset = await readRelative(reference.reference, readSignal)
+          readSignal.throwIfAborted()
+          if (asset.byteLength > MAX_ASSET_BYTES) throw new Error('HTML asset exceeds its byte limit')
+          if (reference.kind !== 'image') decodeText(asset)
+          return { ...reference, data: asset }
+        } catch (error) {
+          abort.abort(error)
+          throw error
+        }
+      })
+      let completed: HtmlAsset[]
+      try {
+        completed = await Promise.all(pending)
+      } finally {
+        await Promise.allSettled(pending)
+      }
+      readSignal.throwIfAborted()
+      for (const asset of completed) {
+        total += asset.data.byteLength
+        if (total > MAX_TOTAL_BYTES) throw new Error('HTML package exceeds its total byte limit')
+        assets.push(asset)
+      }
+      offset += batch.length
+    }
+    readSignal.throwIfAborted()
+    return { data, assets }
+  } finally {
+    abort.abort()
+  }
 }

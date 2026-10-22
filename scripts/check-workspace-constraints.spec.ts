@@ -376,11 +376,14 @@ it('rejects a shared Web payload that omits the stylesheet chunks', () => {
   } })).toEqual([expect.stringContaining('package.json files must be')])
 })
 
-it('publishes the Workbench PDF chunk while rejecting unrestricted client chunks', () => {
+it('publishes the Workbench viewer chunks while rejecting unrestricted and unused client chunks', () => {
   const dir = 'packages/client/ui-workbench'
   const manifest = JSON.parse(readFileSync(`${dir}/package.json`, 'utf8')) as WorkspaceManifest['manifest']
   expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
   expect(expectedDshPackageFiles(manifest)).toContain('lib/client.pdf.js')
+  expect(expectedDshPackageFiles(manifest)).toContain('lib/client.excel.js')
+  expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: [...manifest.files!, 'lib/client.LazyExcelBody.js'] } }))
+    .toContainEqual(expect.stringContaining('package.json files must be'))
   expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.map(file => file === 'lib/client.pdf.js' ? 'lib/client.*.js' : file) } }))
     .toContainEqual(expect.stringContaining('package.json files must be'))
 })

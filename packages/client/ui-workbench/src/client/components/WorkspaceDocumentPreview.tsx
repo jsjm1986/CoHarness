@@ -1,5 +1,5 @@
 /** Office and PDF previews share the existing authorized Workspace resource lifetime. */
-import { lazy, Suspense, useMemo } from 'react'
+import { Suspense, useMemo } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { FontNotice } from '../contract/office/FontNotice.tsx'
@@ -8,11 +8,12 @@ import type {} from '../pdf/locales.ts'
 import { ZoomViewport, zoomSurfaceClass } from '../contract/zoom/ZoomViewport.tsx'
 import type { ZoomPreference } from '../contract/zoom/types.ts'
 import { useWorkspacePreviewRead } from '../contract/preview/use-preview-read.ts'
+import { usePreviewViewer } from '../contract/preview/use-preview-viewer.ts'
 import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import { WorkspacePreviewChrome } from './WorkspacePreviewChrome.tsx'
 import css from './Workbench.module.css'
 
-const PdfBody = lazy(async () => ({ default: (await import('../pdf/pdf.tsx')).PdfBody }))
+const loadPdfBody = async () => ({ default: (await import('../pdf/pdf.tsx')).PdfBody })
 
 /** One complete authorized result; bytes remain local to this mounted preview. */
 export interface WorkspaceDocumentBytes { bytes: string; version: string; missingFonts: string[] }
@@ -49,6 +50,7 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
     read({ resource: request, version: next.version, bytes: next.bytes }, signal), [read, request])
   const state = useWorkspacePreviewRead({ request, resource, input, read: readDocument })
   const { result, error, denied, lifetime } = state
+  const PdfBody = usePreviewViewer(loadPdfBody, input !== undefined && !denied)
   const data = useMemo(() => result === undefined ? undefined : Uint8Array.from(atob(result.bytes), c => c.charCodeAt(0)), [result])
   const code = (error as { code?: unknown } | undefined)?.code
   const failure = error === undefined ? resource.metadata.error : { message: error.message, code: typeof code === 'string' ? code : undefined }

@@ -96,7 +96,6 @@
     "lib/client.js",
     "lib/client.excel.js",
     "lib/client.frontmatter-fields.js",
-    "lib/client.LazyExcelBody.js",
     "lib/client.pdf.js",
     "lib/types/**/*.d.ts"
   ]

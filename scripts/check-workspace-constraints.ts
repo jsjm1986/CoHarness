@@ -200,7 +200,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-client-ui-sidebar-documentpreview': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
   // Workbench loads its PDF renderer and spreadsheet parser/renderer on demand, including licensed Worker assets.
-  '@deepseek-ai/dsh-client-ui-workbench': ['lib/client.excel.js', 'lib/client.frontmatter-fields.js', 'lib/client.LazyExcelBody.js', 'lib/client.pdf.js'],
+  '@deepseek-ai/dsh-client-ui-workbench': ['lib/client.excel.js', 'lib/client.frontmatter-fields.js', 'lib/client.pdf.js'],
   // TODO(alpha.2): restore 'lib/apply-injections.js' when the worker-page
   // index-injection interpreter is ported with its first consumer.
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],

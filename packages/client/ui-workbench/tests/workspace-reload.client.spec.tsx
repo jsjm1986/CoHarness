@@ -23,8 +23,8 @@ import { en as excelEn } from '../src/client/excel/locales.ts'
 import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/pdf/pdf.tsx', () => ({ PdfBody: ({ data }: { data: Uint8Array }) => <pre data-testid="pdf">{new TextDecoder().decode(data)}</pre> }))
-vi.mock('../src/client/excel/LazyExcelBody.tsx', () => ({
-  LazyExcelBody: ({ data, path }: { data: Uint8Array; path: string }) =>
+vi.mock('../src/client/excel/excel.tsx', () => ({
+  ExcelBody: ({ data, path }: { data: Uint8Array; path: string }) =>
     <pre data-testid="excel">{`${path}:${new TextDecoder().decode(data)}`}</pre>,
 }))
 

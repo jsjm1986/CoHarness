@@ -1,4 +1,4 @@
-/* Centered load state for the eager chunk: the heavier ExcelBody.module.css belongs to the lazy chunk. */
+/* The main bundle supplies parser loading content while the workbook's styles remain lazy. */
 .loading {
   display: flex;
   gap: 8px;

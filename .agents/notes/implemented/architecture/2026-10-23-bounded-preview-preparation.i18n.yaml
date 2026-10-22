@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-bounded-preview-preparation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-bounded-preview-preparation.md
+document:
+  en: 774d5fb885d84261e0b3f8651a4417c183951dd1
+  zh: 83cfd6f18c82255c5f6acf3340d551718194105b
+/agent-note-bounded-workspace-preview-preparation:
+  en: b6157af3336ff35d
+  zh: 0ff5fd470c67c7ae
+/agent-note-bounded-workspace-preview-preparation/problem:
+  en: 3fe6fb80ebf090e1
+  zh: ed54d07ffd46380a
+/agent-note-bounded-workspace-preview-preparation/decision:
+  en: 4d9bb80672af16c2
+  zh: 0a3aea83f94e8fce
+/agent-note-bounded-workspace-preview-preparation/alternatives-considered:
+  en: 768a13415f43da84
+  zh: 6bf1b20b5e02d805
+/agent-note-bounded-workspace-preview-preparation/verification:
+  en: 95048923f0ad2b0d
+  zh: 2ad2f648a8985aa5
+/agent-note-bounded-workspace-preview-preparation/consequences:
+  en: c0ef48674e601011
+  zh: 305ff9f472baeabc

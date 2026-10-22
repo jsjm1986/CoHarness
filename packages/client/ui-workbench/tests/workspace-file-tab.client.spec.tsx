@@ -9,7 +9,7 @@ import { WorkspaceFileTab } from '../src/client/components/WorkspaceFileTab.tsx'
 import { previewRequest } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/pdf/pdf.tsx', () => ({ PdfBody: ({ data }: { data: Uint8Array }) => <pre data-testid="pdf">{new TextDecoder().decode(data)}</pre> }))
-vi.mock('../src/client/excel/LazyExcelBody.tsx', () => ({ LazyExcelBody: ({ path }: { path: string }) => <pre data-testid="excel">{path}</pre> }))
+vi.mock('../src/client/excel/excel.tsx', () => ({ ExcelBody: ({ path }: { path: string }) => <pre data-testid="excel">{path}</pre> }))
 
 afterEach(cleanup)
 const sessionId = 'files-owner' as SessionId

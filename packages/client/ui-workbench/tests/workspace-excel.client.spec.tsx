@@ -12,9 +12,9 @@ import { Config } from '../src/config.ts'
 import { en } from '../src/client/excel/locales.ts'
 import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
-vi.mock('../src/client/excel/LazyExcelBody.tsx', () => ({
-  LazyExcelBody: ({ data, path }: { data: Uint8Array; path: string }) =>
-    <pre data-testid="excel">{`${path}:${new TextDecoder().decode(data)}`}</pre>,
+vi.mock('../src/client/excel/excel.tsx', () => ({
+  ExcelBody: ({ data, path, format }: { data: Uint8Array; path: string; format: string }) =>
+    <pre data-testid="excel" data-format={format}>{`${path}:${new TextDecoder().decode(data)}`}</pre>,
 }))
 afterEach(cleanup)
 const id = 'excel-session' as SessionId
@@ -52,6 +52,11 @@ it('reads complete authorized bytes and hands them to the spreadsheet body', asy
   await waitFor(() => { expect(h.getByTestId('excel').textContent).toBe('budget.xlsx:xlsx v1') })
   expect(read.mock.calls[0]![0].resource).toMatchObject({ path: 'budget.xlsx' })
   expect(read.mock.calls[0]![1]).toBeInstanceOf(AbortSignal)
+})
+
+it.each(['xlsx', 'xls', 'csv', 'tsv'])('selects the %s parser in the authorized preview', async (format) => {
+  const h = harness(async () => ({ bytes: btoa('workbook'), version: 'v1' }), `book.${format}`)
+  await waitFor(() => { expect(h.getByTestId('excel').getAttribute('data-format')).toBe(format) })
 })
 
 it('retains the displayed revision until explicit reload, then clears it on revocation', async () => {
