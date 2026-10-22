@@ -8,7 +8,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { PluginInstallFailureKind, Registry } from '../../../../packages/boot/plugin-manager/src/types.ts'
+import type { PluginConfigValue, PluginInstallFailureKind, Registry } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import {
   Button, IconCheckOutline16, IconChevronDownOutline14, IconChevronLeftOutline14, IconChevronRightOutline14, IconCloseOutline16,
   IconPlusOutline16, IconRefreshOutline16, IconTrashOutline16, IconWarningOutline16, Input, Modal, pointerModality,
@@ -447,13 +447,16 @@ function ItemDetail({ item, t, resolveText, renderSlot, onBack }: {
  * A row's configuration page: the crumb back to its bundle's page, the row id
  * over the module it names and the entry's one-liner, and the form the entry renders.
  */
-function RowDetail({ pkg, row, t, resolveText, onBack, renderSlot }: {
+function RowDetail({ pkg, row, t, resolveText, onBack, renderSlot, busy, describeRowConfig, setRowConfig }: {
   readonly pkg: PackageView
   readonly row: PackageRow
   readonly t: Translate
   readonly resolveText: ResolveText
   readonly onBack: () => void
   readonly renderSlot: RenderConfig
+  readonly busy: boolean
+  readonly describeRowConfig: PluginManagerPageProps['describeRowConfig']
+  readonly setRowConfig: PluginManagerPageProps['setRowConfig']
 }): ReactNode {
   const { title } = packageText(pkg, resolveText)
   const { title: rowTitle, description } = rowText(row, resolveText)
@@ -478,7 +481,75 @@ function RowDetail({ pkg, row, t, resolveText, onBack, renderSlot }: {
       <div className={css.detailSections} data-plugin-config>
         {renderSlot('plugins.row.config', { view: 'page' }, { entryKey: key })}
       </div>
+      <EntryConfigSection row={row} t={t} busy={busy} describeRowConfig={describeRowConfig} setRowConfig={setRowConfig} />
     </div>
+  )
+}
+
+/**
+ * A row's entry-level `config:` override: the JSON the profile patch writes
+ * under the entry. Rows whose live entry cannot be addressed keep their
+ * registered page only. An empty save clears the override.
+ */
+function EntryConfigSection({ row, t, busy, describeRowConfig, setRowConfig }: {
+  readonly row: PackageRow
+  readonly t: Translate
+  readonly busy: boolean
+  readonly describeRowConfig: PluginManagerPageProps['describeRowConfig']
+  readonly setRowConfig: PluginManagerPageProps['setRowConfig']
+}): ReactNode {
+  const entryId = row.entryId
+  const [loaded, setLoaded] = useState(false)
+  const [hasSchema, setHasSchema] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [draftError, setDraftError] = useState<string | null>(null)
+  useEffect(() => {
+    if (entryId === undefined) return
+    let alive = true
+    void describeRowConfig(entryId).then(desc => {
+      if (!alive) return
+      setLoaded(true)
+      if (desc === undefined) return
+      setHasSchema(desc.schema !== undefined)
+      setDraft(desc.config === null ? '' : JSON.stringify(desc.config, null, 2))
+    })
+    return () => { alive = false }
+  }, [entryId, describeRowConfig])
+  if (entryId === undefined) return null
+  const save = (): void => {
+    const text = draft.trim()
+    if (text === '') { setDraftError(null); setRowConfig(entryId, null); return }
+    try {
+      setRowConfig(entryId, JSON.parse(text) as PluginConfigValue)
+      setDraftError(null)
+    } catch (error) {
+      setDraftError(error instanceof Error ? error.message : String(error))
+    }
+  }
+  return (
+    <section className={css.detailSection} data-entry-config={entryId}>
+      <div className={css.sectionHead}><h4 className={css.sectionTitle}>{t('entryConfigTitle')}</h4></div>
+      <p className={css.detailDesc}>{t('entryConfigHint')}{hasSchema ? ` ${t('entryConfigSchema')}` : ''}</p>
+      {loaded
+        ? (
+          <>
+            <textarea
+              className={css.entryConfigInput}
+              value={draft}
+              rows={Math.min(14, Math.max(4, draft.split('\n').length + 1))}
+              spellCheck={false}
+              aria-label={t('entryConfigTitle')}
+              aria-invalid={draftError !== null}
+              onChange={event => { setDraft(event.target.value); setDraftError(null) }}
+            />
+            {draftError === null ? null : <p className={css.reason} role="alert">{t('entryConfigInvalidJson', { reason: draftError })}</p>}
+            <div className={css.detailActions}>
+              <Button disabled={busy} onClick={save}>{busy ? t('configSaving') : t('configSave')}</Button>
+            </div>
+          </>
+        )
+        : <p className={css.detailDesc}>{t('configLoading')}</p>}
+    </section>
   )
 }
 
@@ -1326,6 +1397,9 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
               t={t}
               resolveText={resolveText}
               renderSlot={renderSlot}
+              busy={openRow.entryId !== undefined && state.busy.includes(rowKey(openRow.entryId))}
+              describeRowConfig={props.describeRowConfig}
+              setRowConfig={props.setRowConfig}
               onBack={() => { setView({ kind: 'package', name: pkg.name }) }}
             />
           )

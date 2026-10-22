@@ -36,6 +36,7 @@ beforeEach(() => {
       listPlugins: vi.fn(async () => ({ ok: true as const, value: [] })),
       listBundles: vi.fn(async () => ({ ok: true as const, value: [] })),
       inspect: unused, setPluginEnabled: unused, setBundleEnabled: unused,
+      describePluginConfig: unused, setPluginConfig: unused,
       installBundle: unused, cancelInstall: unused, removeBundle: unused,
       registries: vi.fn(async () => ({ ok: true as const, value: { registry: null, fallbackRegistries: [], resolved: null } })),
       waitForInstall: unused,

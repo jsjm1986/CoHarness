@@ -13,6 +13,8 @@ import type { PluginManagementRemote } from './transport.ts'
 import type {
   BundleInfo,
   ChangeResult,
+  PluginConfigDescription,
+  PluginConfigValue,
   IncompatiblePlugin,
   ManagementError,
   PluginEntryId,
@@ -33,7 +35,7 @@ import type { ConfigLedger } from './config-ledger.ts'
 import { shortName } from './presentation.ts'
 
 /** The action a failed notice names. */
-export type FailedAction = 'enable' | 'disable' | 'uninstall' | 'rowEnable' | 'rowDisable'
+export type FailedAction = 'enable' | 'disable' | 'uninstall' | 'rowEnable' | 'rowDisable' | 'rowConfig'
 
 /** What the last action left to say, shown as a toast; `seq` tells one showing from the next. */
 export type ManagerNotice =
@@ -350,6 +352,10 @@ export interface PluginManagerFace {
   cancelConfirm: () => void
   /** Switch one of a bundle's rows on or off in the profile's user layer. */
   setRowEnabled: (entryId: PluginEntryId, enabled: boolean) => void
+  /** Read a row's entry config and its schema for the config editor. */
+  describeRowConfig: (entryId: PluginEntryId) => Promise<PluginConfigDescription | undefined>
+  /** Write a row's entry config; `null` clears the override. */
+  setRowConfig: (entryId: PluginEntryId, config: PluginConfigValue | null) => void
   dismissNotice: () => void
 }
 
@@ -624,6 +630,15 @@ export class PluginManagerController {
       setRowEnabled: (entryId, enabled) => {
         void this.run(rowKey(entryId), { packageName: entryId, action: enabled ? 'rowEnable' : 'rowDisable' }, async () => {
           this.applied(await this.ctx.remote.pluginManager.setPluginEnabled(entryId, enabled), entryId)
+        })
+      },
+      describeRowConfig: async (entryId) => {
+        const answer = await this.ctx.remote.pluginManager.describePluginConfig(entryId)
+        return answer.ok ? answer.value : undefined
+      },
+      setRowConfig: (entryId, config) => {
+        void this.run(rowKey(entryId), { packageName: entryId, action: 'rowConfig' }, async () => {
+          this.applied(await this.ctx.remote.pluginManager.setPluginConfig(entryId, config), entryId)
         })
       },
       dismissNotice: () => { this.patch({ notice: null }) },

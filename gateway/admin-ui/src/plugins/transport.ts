@@ -18,7 +18,7 @@ export interface ProfileSettingsRemote {
 }
 export interface PluginManagementRemote {
   settings: ProfileSettingsRemote
-  pluginManager: Answers<Pick<ClientRemote['pluginManager'], 'listPlugins' | 'listBundles' | 'inspect' | 'setPluginEnabled' | 'setBundleEnabled' | 'installBundle' | 'cancelInstall' | 'removeBundle' | 'registries' | 'waitForInstall'>>
+  pluginManager: Answers<Pick<ClientRemote['pluginManager'], 'listPlugins' | 'listBundles' | 'inspect' | 'setPluginEnabled' | 'setPluginConfig' | 'describePluginConfig' | 'setBundleEnabled' | 'installBundle' | 'cancelInstall' | 'removeBundle' | 'registries' | 'waitForInstall'>>
   pluginInventory: Answers<Pick<ClientRemote['pluginInventory'], 'list'>>
   /** The gateway answers it locally; the managed runtime carries no such service. */
   pluginRegistryProbe: { fastest(): Promise<Answer<string | null>> }
@@ -74,6 +74,8 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
       listBundles: () => call('pluginManager/listBundles', {}),
       inspect: (spec, options, signal) => call('pluginManager/inspect', { spec, options }, signal),
       setPluginEnabled: (id, enabled) => call('pluginManager/setPluginEnabled', { id, enabled }),
+      describePluginConfig: id => call('pluginManager/describePluginConfig', { id }),
+      setPluginConfig: (id, config) => call('pluginManager/setPluginConfig', { id, config }),
       setBundleEnabled: (name, enabled) => call('pluginManager/setBundleEnabled', { name, enabled }),
       removeBundle: (name, signal) => call('pluginManager/removeBundle', { name }, signal),
       cancelInstall: requestId => call('pluginManager/cancelInstall', { requestId }),

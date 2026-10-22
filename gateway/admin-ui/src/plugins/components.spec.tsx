@@ -118,6 +118,8 @@ function renderTab(state: Partial<PluginManagerState> = {}, config: Partial<Conf
     confirm: vi.fn(),
     cancelConfirm: vi.fn(),
     setRowEnabled: vi.fn(),
+    describeRowConfig: vi.fn(async () => undefined),
+    setRowConfig: vi.fn(),
     dismissNotice: vi.fn(),
   }
   const props = {

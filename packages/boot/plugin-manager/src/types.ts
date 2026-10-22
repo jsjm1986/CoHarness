@@ -95,7 +95,7 @@ export interface IncompatiblePlugin {
 
 /** Localizable management failure and optional external diagnostic. */
 export interface ManagementError {
-  code: ReadOnlyReason | 'unknown-plugin' | 'invalid-spec' | 'already-installed' | 'ambiguous-install' | 'not-bundle' | 'not-removable' | 'stop-profile' | 'bundle-in-use' | 'stale-approval' | 'incompatible-version' | 'operation-error'
+  code: ReadOnlyReason | 'unknown-plugin' | 'invalid-spec' | 'invalid-config' | 'already-installed' | 'ambiguous-install' | 'not-bundle' | 'not-removable' | 'stop-profile' | 'bundle-in-use' | 'stale-approval' | 'incompatible-version' | 'operation-error'
   diagnostic?: string
   /** Present with `incompatible-version`: the packages the running DSH version rejects. */
   incompatible?: IncompatiblePlugin[]
@@ -197,6 +197,17 @@ export interface PackageResult {
   incompatible?: IncompatiblePlugin[]
 }
 
+/** JSON value crossing the Remote boundary for plugin entry configuration. */
+export type PluginConfigValue = null | boolean | number | string | PluginConfigValue[] | { [key: string]: PluginConfigValue }
+
+/** One entry's config plus its schemastery `toJSON` serialization, when declared. */
+export interface PluginConfigDescription {
+  /** The composition entry's config; `null` when no row declares one. */
+  config: PluginConfigValue | null
+  /** Schemastery-serialized `Config` schema for form rendering; absent without a schema. */
+  schema?: PluginConfigValue
+}
+
 /** Persisted change and independently observed application outcome. */
 export interface ChangeResult {
   changed: boolean
@@ -205,7 +216,7 @@ export interface ChangeResult {
   /** Present with `restart-required`: why the change takes effect only at the next start. */
   restartReason?: RestartReason
   /** Last attempted step; successful installation can proceed to enablement. */
-  stage: 'install' | 'enable' | 'remove'
+  stage: 'install' | 'enable' | 'remove' | 'configure'
   target: string
   enabled?: boolean
   error?: ManagementError

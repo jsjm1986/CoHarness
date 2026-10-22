@@ -24,7 +24,7 @@ import { installationStream } from './install-stream.ts'
 import { classifyInstallFailure } from './install-failure.ts'
 import { dependencySpec, InvalidInstallSpecError, parseInstallSpec } from './install-spec.ts'
 import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryPlan } from './registry.ts'
-import { writePluginEnabled } from './patch.ts'
+import { writePluginConfig, writePluginEnabled } from './patch.ts'
 import { applyDesiredState, readDesiredState } from './desired-state.ts'
 import { incompatiblePlugin, ManagementFailure } from './failure.ts'
 import { approveBuilds, capturePendingBuilds } from './build-approval.ts'
@@ -34,6 +34,7 @@ import type {
   PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress,
   PluginInstallRequestId, PluginInstallFrame, PluginManagementAccess, PluginManagementCapability, PluginRegistries,
   PluginSpecInspection, PluginManagementAuthorization, ParsedInstallSpec, Registry,
+  PluginConfigDescription, PluginConfigValue,
 } from './types.ts'
 export type * from './types.ts'
 export { classifyInstallFailure, type InstallFailureFacts } from './install-failure.ts'
@@ -538,6 +539,61 @@ export class PluginManager extends TypertRemoteService {
       const current = (await this.listPlugins()).find(item => item.entryId === id)
       return current?.enabled !== enabled && this.ownerContext.get('hmr') !== undefined ? 'overridden' : undefined
     }), { stage: 'enable', target: id, enabled }, 'plugin')
+  }
+
+  /** Read one plugin row's current config and its schema, when the module declares one.
+   * The schema serializes through schemastery `toJSON` for form rendering;
+   * modules without a `Config` schema report `schema: undefined`.
+   * @param id Loader entry identity returned by listPlugins.
+   * @returns The entry's declared config and its JSON-serialized schema.
+   */
+  @Remote
+  async describePluginConfig(id: PluginEntryId): Promise<PluginConfigDescription> {
+    await this.authorize('read')
+    const actual = [...this.ctx.loader.entries()].find(row => row.id === id)
+    if (actual === undefined) throw new ManagementFailure('unknown-plugin')
+    let schema: unknown
+    try {
+      const candidate = actual.fiber?.runtime?.Config as { toJSON?: () => unknown } | undefined
+      schema = typeof candidate?.toJSON === 'function' ? candidate.toJSON() : undefined
+    } catch {
+      schema = undefined
+    }
+    const options = actual.options as { config?: PluginConfigValue }
+    return { config: options.config ?? null, ...(schema === undefined ? {} : { schema: schema as PluginConfigValue }) }
+  }
+
+  /** Replace one plugin row's config in the profile patch, validated against its schema.
+   * `config: null` removes the override so composition defaults apply. The loader
+   * rejects a failing schema at reload as well; validating here first reports a
+   * readable error instead of a broken reload.
+   * @param id Loader entry identity returned by listPlugins.
+   * @param config JSON-serializable config object, or `null` to clear the override.
+   * @returns Saved and runtime outcomes.
+   */
+  @Remote
+  async setPluginConfig(id: PluginEntryId, config: PluginConfigValue | null): Promise<ChangeResult> {
+    await this.authorize()
+    return this.change(result => this.configure(async () => {
+      const row = (await this.listPlugins()).find(item => item.entryId === id)
+      if (row === undefined) throw new ManagementFailure('unknown-plugin')
+      if (row.readOnlyReason !== undefined) throw new ManagementFailure(row.readOnlyReason)
+      if (config !== null && (typeof config !== 'object' || Array.isArray(config))) {
+        throw new ManagementFailure('invalid-config')
+      }
+      if (config !== null) {
+        const actual = [...this.ctx.loader.entries()].find(item => item.id === id)
+        const schema = actual?.fiber?.runtime?.Config as
+          { '~standard'?: { validate: (value: unknown) => { issues?: unknown[] } | Promise<{ issues?: unknown[] }> } } | undefined
+        if (schema?.['~standard'] !== undefined) {
+          const verdict = await schema['~standard'].validate(config)
+          if (verdict.issues !== undefined && verdict.issues.length > 0) throw new ManagementFailure('invalid-config')
+        }
+      }
+      await writePluginConfig(this.profile.patchPath, row.patchId, row.moduleName, config)
+      Object.assign(result, await this.reload([row.patchId]))
+      return undefined
+    }), { stage: 'configure', target: id }, 'plugin')
   }
 
   /** Select or remove a bundle layer while retaining installed dependencies.

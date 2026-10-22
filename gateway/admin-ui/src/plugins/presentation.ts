@@ -81,6 +81,7 @@ const CODE_KEYS = {
   'bundle-in-use': 'reasonBundleInUse',
   'stale-approval': 'reasonStaleApproval',
   'incompatible-version': 'reasonIncompatibleVersionUnnamed',
+  'invalid-config': 'reasonInvalidConfig',
   'operation-error': 'reasonOperationError',
 } satisfies Record<ManagementError['code'], PluginManagerLocaleKey>
 
@@ -91,6 +92,7 @@ const FAILED_KEYS = {
   uninstall: 'failedUninstall',
   rowEnable: 'failedRowEnable',
   rowDisable: 'failedRowDisable',
+  rowConfig: 'failedRowConfig',
 } satisfies Record<FailedAction, PluginManagerLocaleKey>
 
 /**
