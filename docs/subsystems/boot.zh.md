@@ -113,7 +113,7 @@ Deployment-owned authority for current-profile management.
 
 ```ts cordis-catalog
 /** Recheck the current caller before profile reads or writes.
- * @param capability - 'read' permits any runtime principal; 'manage' enforces the deployment's policy.
+ * @param capability - the deployment's policy gates both 'read' and 'manage'; an unqualified account sees nothing.
  * @returns After the deployment permits the operation; rejects without permission.
  */
 authorize(capability?: PluginManagementCapability): Promise<void>
@@ -144,14 +144,15 @@ Manage profile files and apply their declared reload lifecycle.
 
 ```ts cordis-catalog
 /** Check deployment authority independently of tool approval or sandbox mode.
- * @param capability - 'read' permits every caller that reached the service;
- * 'manage' enforces the deployment's authorization provider.
+ * @param capability - the deployment's authorization provider gates both
+ * 'read' and 'manage'; without a provider, reads stay open unless the
+ * profile requires authorization.
  * @returns After the current caller is permitted the operation.
  */
 async authorize(capability: PluginManagementCapability = 'manage'): Promise<void>
 
 /** Report whether the caller may change the profile, for interfaces gating controls on it.
- * @returns `manage` after probing the deployment policy; read access is unconditional.
+ * @returns `manage` after probing the deployment policy.
  */
 @Remote async access(): Promise<PluginManagementAccess>
 

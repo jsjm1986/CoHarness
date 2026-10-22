@@ -1890,7 +1890,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'authorize(capability?: PluginManagementCapability): Promise<void>',
         description: 'Recheck the current caller before profile reads or writes.',
-        parameters: [{ name: 'capability', description: '\'read\' permits any runtime principal; \'manage\' enforces the deployment\'s policy.' }],
+        parameters: [{ name: 'capability', description: 'the deployment\'s policy gates both \'read\' and \'manage\'; an unqualified account sees nothing.' }],
         returns: 'After the deployment permits the operation; rejects without permission.',
       },
       {
@@ -1915,14 +1915,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'async authorize(capability: PluginManagementCapability = \'manage\'): Promise<void>',
         description: 'Check deployment authority independently of tool approval or sandbox mode.',
-        parameters: [{ name: 'capability', description: '\'read\' permits every caller that reached the service; \'manage\' enforces the deployment\'s authorization provider.' }],
+        parameters: [{ name: 'capability', description: 'the deployment\'s authorization provider gates both \'read\' and \'manage\'; without a provider, reads stay open unless the profile requires authorization.' }],
         returns: 'After the current caller is permitted the operation.',
       },
       {
         signature: '@Remote async access(): Promise<PluginManagementAccess>',
         description: 'Report whether the caller may change the profile, for interfaces gating controls on it.',
         parameters: [],
-        returns: '`manage` after probing the deployment policy; read access is unconditional.',
+        returns: '`manage` after probing the deployment policy.',
       },
       {
         signature: '@Remote async listVersionExemptions(): Promise<{ exemptions: Record<string, string[]>; warnings: string[] }>',
@@ -2802,6 +2802,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'In-memory session store (`ctx.sessions`).',
     description: 'In-memory session store (`ctx.sessions`).\n\nPersistence is intentionally not implemented here — persistence plugins subscribe to `session/event` and flush on `session/flush` / dispose.',
     methods: [
+      {
+        signature: 'registerAppendAdmission(admission: SessionAppendAdmission): () => Promise<void>',
+        description: 'Register synchronous resource admission for every Session attached to this store. Refusal leaves the log and event feed unchanged. Reservations roll back in reverse order if any admission, surface validation, or dispatch validation fails; committed reservations pass to the `session/event` consumer.',
+        parameters: [{ name: 'admission', description: 'resource reservation over an immutable candidate; rollback must be synchronous.' }],
+        returns: 'the registering fiber\'s disposer, which removes future admission calls.',
+        throws: ['when the same callback already has a live registration.'],
+      },
       {
         signature: 'registerMessageProjection(projection: SessionMessageProjection): () => Promise<void>',
         description: 'Register one event interpreter for live creation, restore, and fork. Disposing the contribution makes sessions that used it refuse further derivation.',
@@ -7522,6 +7529,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionActivityRequest',
     declaration: 'export interface SessionActivityRequest {\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SessionAppendAdmission',
+    declaration: 'export type SessionAppendAdmission = (session: Session, candidate: SessionEvent) => (() => void) | undefined;',
   },
   {
     name: 'SessionAvailability',

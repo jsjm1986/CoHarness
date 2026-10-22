@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-10-child-agents-join-their-parent-preset.md
 document:
-  en: fbeb6875f67873a09cfdc630c70c5981b9ea45e7
-  zh: fafdc7d0d2f03441d1cbdeeaf554d5c693e57afd
+  en: 58e31efee58ed78a5c8879ffca509635c232d3da
+  zh: 2c7598ba801acfc9c1d1eabd1c4d92c2cfb4310e
 /agent-note-child-agents-join-their-parent-s-preset-composition:
   en: ad623e2fef93c033
   zh: a37abf059f39aefa
@@ -18,8 +18,8 @@ document:
   en: 88a48e6bba3d30e2
   zh: 842d835a7a9db434
 /agent-note-child-agents-join-their-parent-s-preset-composition/testing:
-  en: 8da196455f805140
-  zh: 13c85483cd97930b
+  en: cafaa71b0ce7f850
+  zh: 757d4c3048ba3db5
 /agent-note-child-agents-join-their-parent-s-preset-composition/consequences:
   en: 09fd94b5ceaa95e6
   zh: bf8e4e22f5b70b45

@@ -45,7 +45,9 @@ pnpm dsh plugin --profile web remove @deepseek-ai/dsh-experimental-auto-review
 
 ### What you get
 
-Auto reviews every supported call once before its body, including each started PTC `tools.*` inner call. It classifies actual effects: ordinary project-local work and exact cleanup of objects created in this Session are low risk and allowed; irreversible deletion of pre-existing objects, production operations, external writes, and security changes are medium risk and require explicit current human or direct-parent authorization of the action, target, and scope. Sensitive exfiltration across a trust boundary is high risk and always denied. Ambiguous effects, unresolved authorization conflicts, malformed responses, and technical failures fail closed.
+Auto reviews every supported call once before its body, including each started PTC `tools.*` inner call. It classifies actual effects: ordinary project-local work and exact cleanup of objects created in this Session are low risk and allowed; irreversible deletion of pre-existing objects, production operations, external writes, and security changes are medium risk and require explicit current human or direct-parent authorization of the action, target, and scope. Sensitive exfiltration across a trust boundary is high risk and always produces a reviewer denial. Ambiguous effects and unresolved authorization conflicts also produce reviewer denials; malformed responses and technical failures reject the call without asking the user.
+
+A reviewer denial rejects immediately when the Session approval policy is `never`. Under `ask`, a denial asks the user only after the remaining tool policies allow the call; a user grant is required to execute it. Downstream denials and cancellation remain authoritative, and eligibility failures never enter this approval path.
 
 A denied call uses the ordinary tool card. The collapsed row identifies Auto review; expanded output states that the body did not execute and displays the optional reason. [The Web permission package](../../client/ui-permission-presets/README.md) owns picker interaction, and [the tool UI](../../client/ui-tool/README.md) owns reason display.
 
@@ -86,7 +88,7 @@ Each reviewer request carries its Session identity and `purpose: auto-review` fo
 
 #### What the model sees
 
-The reviewer uses the latest `request/header.config` provider and model with the shipped adapter's default reasoning. Its fixed `REVIEW_POLICY` replaces human approval for exactly one action: allow executes immediately with Full access. The other four sections contain only the retained facts described above. It returns one strict JSON text object with `risk` and `decision`; deny may include a string `reason`. Reasoning blocks may precede that single text block. Only `low + allow`, `medium + allow/deny`, and `high + deny` are valid.
+The reviewer uses the latest `request/header.config` provider and model with the shipped adapter's default reasoning. Its fixed `REVIEW_POLICY` classifies one pending action; an allow proceeds through the remaining tool policies with Full access, while a deny follows the Session approval policy described above. The other four sections contain only the retained facts described above. It returns one strict JSON text object with `risk` and `decision`; deny may include a string `reason`. Reasoning blocks may precede that single text block. Only `low + allow`, `medium + allow/deny`, and `high + deny` are valid.
 
 #### Token effect
 
@@ -100,7 +102,7 @@ The fixed reviewer policy can share a prefix; retained history and the pending a
 
 #### What the model sees
 
-Reviewer rejection uses `Auto review rejected tool "<name>"; its body was not executed`. An eligibility refusal instead explains that the execution is not authorized for Auto and asks the user to choose an ordinary permission mode or contact an administrator. Ordinary native error rendering prefixes it with `Error: `. PTC uses the existing inner-call exception and catch behavior; a caught denial does not force the outer `run_code` to fail. The raw optional reason is durable structured error detail for users, never main-model content. Risk, reviewer prompt, reasoning, and raw response are not persisted.
+A reviewer denial under `never` uses `Auto review rejected tool "<name>"; its body was not executed`. Under `ask`, the approval channel displays the reviewer denial and optional reason, and the tool receives the ordinary approval outcome. An eligibility refusal instead explains that the execution is not authorized for Auto and asks the user to choose an ordinary permission mode or contact an administrator. Ordinary native error rendering prefixes it with `Error: `. PTC uses the existing inner-call exception and catch behavior; a caught denial does not force the outer `run_code` to fail. The raw optional reason is durable structured error detail for users, never main-model content. Risk, reviewer prompt, reasoning, and raw response are not persisted.
 
 #### Token effect
 
@@ -116,7 +118,7 @@ The denial appends an ordinary tool result; it does not rewrite earlier context 
 
 - Auto requires this Web layer switched on; it is absent from default Web, Headless, General settings, and new-session defaults.
 - Auto provides no file sandbox. The outer `run_code` transport and direct Node effects inside a PTC program do not pass through inner-tool review.
-- Model classification can be wrong. There are no deterministic tool exemptions, persistent grants, manual fallback, configurable policy, or retry layer.
+- Model classification can be wrong. There are no deterministic tool exemptions, persistent grants, configurable policy, or retry layer.
 - In-process Auto children review their own calls. Out-of-process children retain their native permission systems after the parent delegation call is allowed.
 - The reviewer reads the Session action history through the deprecated synchronous `snapshotEvents()` reader under a line-scoped waiver. Prior calls, PTC starts, and the direct parent's initial prompt have no projection or paged reader yet, so the migration stays deferred by [the synchronous-read decision](../../../.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md).
 
