@@ -10,6 +10,8 @@ import { openDb } from '../src/db.ts'
 import { ModelGovernanceService, type ModelRegistrationEvent, type UsageEvent } from '../src/model-governance.ts'
 import { createUsageIntakeServer } from '../src/usage-intake.ts'
 import { UserService } from '../src/users.ts'
+import { GatewayPerformanceObserver } from '../src/performance-observer.ts'
+import { PostgresCheckoutQueueFullError } from '../src/postgres/database.ts'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of closers.splice(0).reverse()) await close() })
@@ -33,11 +35,41 @@ function deniedEvent(eventId = 'denied-1'): UsageEvent {
 }
 
 describe('model governance integration', () => {
+  it.each(['authentication', 'ingestion'] as const)('keeps a valid bill retryable when %s checkout admission is full', async stage => {
+    const { user, governance } = await fixture()
+    const token = governance.issueIntakeToken({ kind: 'user', id: user.id })
+    const ingest = governance.ingest.bind(governance)
+    const authenticate = governance.subjectForIntakeToken.bind(governance)
+    if (stage === 'authentication') governance.subjectForIntakeToken = () => { throw new PostgresCheckoutQueueFullError(1) }
+    else governance.ingest = () => { throw new PostgresCheckoutQueueFullError(1) }
+    const server = createUsageIntakeServer(governance)
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    closers.push(() => new Promise(resolve => server.close(() => resolve())))
+    const url = 'http://127.0.0.1:' + String((server.address() as AddressInfo).port) + '/usage'
+    const post = () => fetch(url, {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+      body: JSON.stringify(deniedEvent('capacity-retry')),
+    })
+    const overloaded = await post()
+    expect(overloaded.status).toBe(503)
+    expect(await overloaded.json()).toEqual({ error: 'DB_CHECKOUT_QUEUE_FULL' })
+    governance.ingest = ingest
+    governance.subjectForIntakeToken = authenticate
+    const retried = await post()
+    expect(retried.status).toBe(200)
+    expect(await retried.json()).toMatchObject({ inserted: true })
+    const duplicate = await post()
+    expect(await duplicate.json()).toMatchObject({ inserted: false })
+  })
+
   it('authenticates intake, deduplicates denial audit, and rejects source/class spoofing', async () => {
     const { db, user, governance } = await fixture()
     const audit = new AuditService(db)
     const token = governance.issueIntakeToken({ kind: 'user', id: user.id })
-    const server = createUsageIntakeServer(governance, audit)
+    const observation = new GatewayPerformanceObserver({ enabled: true, eventLoopResolutionMs: 20 })
+    closers.push(async () => { observation.dispose() })
+    const server = createUsageIntakeServer(governance, audit, undefined, observation)
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     closers.push(() => new Promise(resolve => server.close(() => resolve())))
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -50,6 +82,9 @@ describe('model governance integration', () => {
     expect(audit.query({ action: 'model.denied' })).toHaveLength(1)
     const spoofed = { ...deniedEvent('spoof'), status: 'succeeded', credentialSource: 'file', credentialClass: 'company' }
     expect((await post(spoofed)).status).toBe(400)
+    expect(observation.snapshot(null).operationClasses.internal).toMatchObject({
+      started: 4, completed: 4, inflight: 0, clientErrors: 2,
+    })
   })
 
   it('accepts and deduplicates personal model registration records on the same intake', async () => {

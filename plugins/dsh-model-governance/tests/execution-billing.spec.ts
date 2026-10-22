@@ -22,12 +22,19 @@ afterEach(async () => {
   if (errors.length > 0) throw new AggregateError(errors, 'billing fixture cleanup failed')
 })
 
+/** Authorization-only fixture; input transports and captured callbacks remain unavailable. */
 class Authority extends ExecutionAuthority {
   allowed = true
   readonly calls: Array<{ agent: Agent; capability: ExecutionCapability }> = []
   state: ExecutionState = { revision: '1', inputs: ['input-a' as ExecutionInputId, 'input-b' as ExecutionInputId], actors: [{ userId: 7 }, { userId: 8 }], primaryActorUserId: 7, unverifiedHistory: false }
   stamp(_session: Session, _message: UserMessage): Promise<UserMessage> { throw new Error('billing fixture has no input transport') }
   answer(_session: Session, _questionId: string, _answer: unknown): Promise<boolean> { throw new Error('billing fixture has no questions') }
+  runCaptured<T>(_agent: Agent, _scope: ExecutionInheritance, _work: () => T): T {
+    throw new Error('billing fixture does not run captured callbacks')
+  }
+  runRequest<T>(_agent: Agent, _input: unknown, _work: () => T): Promise<Awaited<T>> {
+    throw new Error('billing fixture has no command transport')
+  }
   capture(_agent: Agent): ExecutionInheritance { throw new Error('billing fixture does not delegate') }
   captureSession(_sessionId: SessionId): Promise<ExecutionInheritance> { throw new Error('billing fixture does not capture another Session') }
   inherit(_session: Session, _scope: ExecutionInheritance): void { throw new Error('billing fixture does not inherit') }
@@ -126,7 +133,9 @@ describe('verified execution billing', () => {
   it('retains rejected proof records without retrying as an actorless bill', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-proof-outbox-'))
     cleanups.push(() => rm(root, { recursive: true, force: true }))
-    const received = Promise.withResolvers<undefined>()
+    let resolveReceived!: () => void
+    let rejectReceived!: (error: unknown) => void
+    const received = new Promise<void>((resolve, reject) => { resolveReceived = resolve; rejectReceived = reject })
     const bodies: unknown[] = []
     const server = createServer((req, res) => {
       void (async () => {
@@ -134,8 +143,8 @@ describe('verified execution billing', () => {
         for await (const chunk of req) chunks.push(Buffer.from(chunk as Uint8Array))
         bodies.push(JSON.parse(Buffer.concat(chunks).toString('utf8')))
         res.writeHead(400).end('{}')
-        received.resolve(undefined)
-      })().catch(error => received.reject(error))
+        resolveReceived()
+      })().catch(error => rejectReceived(error))
     })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     cleanups.push(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())))
@@ -143,7 +152,7 @@ describe('verified execution billing', () => {
     cleanups.push(() => outbox.close())
     const record: UsageRecord = { eventId: 'proof-rejection', occurredAt: 1, provider: 'p', model: 'm', purpose: 'auto-review', sessionId: 'session', actorUserId: 7, executionInputIds: ['input-a'], credentialSource: 'organization', credentialClass: 'company', status: 'succeeded' }
     outbox.enqueue(record)
-    await received.promise
+    await received
     await outbox.close()
     expect(bodies).toEqual([record])
     expect(JSON.parse(await readFile(join(root, 'proof-rejection.json'), 'utf8'))).toEqual(record)
