@@ -1,4 +1,5 @@
 - button "返回插件": 插件
+- switch "启用组件 子智能体" [checked]
 - heading "子智能体" [level=3]
 - paragraph: 设置子智能体的递归层级和并行数量。
 - text: 最大递归深度

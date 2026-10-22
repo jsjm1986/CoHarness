@@ -320,7 +320,7 @@ describe('web e2e: plugin configuration section', () => {
   it('saves model authorization atomically and retains choices when disabled', async () => {
     const panel = await openItem('模型选择')
     const card = panel.locator('[data-plugin-item-detail="subagent-model-selection-settings"]')
-    const enabled = card.getByRole('switch')
+    const enabled = card.getByRole('switch', { name: '允许 Agent 为子智能体选择模型' })
     expect(await enabled.getAttribute('aria-checked')).toBe('false')
     await enabled.click()
     await card.getByRole('checkbox', { name: /deepseek-v4-flash$/ }).waitFor()
