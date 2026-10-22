@@ -96,6 +96,10 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 PostgreSQL 连接池统一限制原生查询、直接取连接和事务辅助函数的待取连接数量。准入耗尽返回 HTTP 503 和 `DB_CHECKOUT_QUEUE_FULL`；用量接收端在认证及入库期间都保留这一可重试状态，避免把过载期间的有效账单当作无效输入丢弃。[连接池决策](../.agents/notes/implemented/architecture/2026-10-23-postgres-checkout-admission.zh.md)说明计数和恢复规则。
 
+组织和项目的运行时 Provider 投影在每次查询结果内只规范化一次各 Provider 的 profile，并为配置的模型建立一次索引。重复的配置模型 ID 保留首项。复用随该结果结束，后续策略读取使用当前数据库行，不保留跨请求缓存。
+
+构建 Gateway 后，在仓库根目录运行 `npm exec -- tsx gateway/tests/runtime-provider-projection.perf.ts`，可针对构建后的投影执行离线诊断。它报告两种作用域下 16、64 和 256 个合成模型的 profile 克隆调用次数及被克隆模型条目数。诊断不包含数据库解码、认证、网络、Runtime 就绪和浏览器渲染；这些计数不证明端到端延迟或容量。
+
 ## 管理端与项目授权
 
 `/admin` 托管从 `gateway/admin-ui` 构建到 `gateway/public/admin` 的 Vite SPA；外壳 `index.html` 携带 `cache-control: no-store`，使版本切换不会让被钉住的外壳继续引用已删除的哈希分块，`assets/*` 按内容哈希命名并携带 `private, max-age=31536000, immutable`。`/admin/api/*` 是网关 JSON API（非 `admin` 角色 403）。管理员发起项目有两种创建模式：**默认目录**只提交名称，并以 `0770` 权限创建或复用 `<HGW_PROJECTS_ROOT>/<name>`；**现有目录**提交名称以及从 Gateway 宿主机选择的目录。用户发起项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下分配目录。两种来源使用同一套工作空间、共享运行时、成员和对话模型。用户创建的项目把创建者设为 `rw` 所有者，并提供邀请生命周期操作；管理员可以在同一列表中查看两种来源并按来源筛选。
