@@ -493,6 +493,7 @@ interface SessionEntry {
   readonly session: Session
   readonly carrier: Scoped<Session>
   readonly emitCtx: Context
+  readonly appendAdmissions: ReadonlySet<SessionAppendAdmission>
   announced: boolean
   announcing: boolean
   appending: boolean
@@ -502,6 +503,17 @@ interface SessionEntry {
 
 /** Store attachment for the append path; module-private to keep Session store-agnostic publicly. */
 const attachments = new WeakMap<Session, SessionEntry>()
+
+/**
+ * Reserve resources for one frozen candidate before its attached Session commits.
+ * A throw refuses the candidate. A returned synchronous rollback runs if a later
+ * admission or validation refuses it; successful reservations belong to the
+ * post-commit `session/event` consumer. Detached Sessions do not run admissions.
+ * @param session - attached Session receiving the candidate.
+ * @param candidate - immutable event with its proposed sequence number.
+ * @returns a rollback for the reservation, or undefined when no resource is reserved.
+ */
+export type SessionAppendAdmission = (session: Session, candidate: SessionEvent) => (() => void) | undefined
 
 /**
  * Grammar of a {@link PluginRecordType}: `plugin:` followed by
@@ -880,7 +892,9 @@ export class Session {
    *   of truth, so a bad event fails at the append site rather than later during
    *   a backend flush. A synchronous internal dispatch validation failure or an
    *   append reentered while this acceptance/publication boundary is open also
-   *   rejects before the log changes.
+   *   rejects before the log changes. Attached-store resource admissions reserve
+   *   before surface and dispatch validation; refusal rolls back earlier
+   *   reservations without publishing the candidate.
    */
   append<T extends SessionEventType>(
     type: T,
@@ -962,20 +976,37 @@ export class Session {
    * @param entry - the attachment read before the candidate was built.
    */
   private commit(event: SessionEvent, entry: SessionEntry | undefined): void {
-    this.surfaceManager.validateNext(event)
-
     if (entry !== undefined) entry.appending = true
+    let rollbacks: Array<() => void> | undefined
+    let committed = false
     try {
+      if (entry !== undefined && entry.appendAdmissions.size > 0) {
+        for (const admission of [...entry.appendAdmissions]) {
+          const rollback = admission(this, event)
+          if (rollback !== undefined) (rollbacks ??= []).push(rollback)
+        }
+      }
+      this.surfaceManager.validateNext(event)
       let callbacks: SessionCallback[] | undefined
       const callbackArgs: unknown[] = [this, event]
       if (entry !== undefined) {
         callbacks = collectSessionCallbacks(entry.emitCtx, [entry.carrier, 'session/event', ...callbackArgs])
       }
       this.log.push(event)
+      committed = true
       this.eventsSnapshot = undefined
       if (callbacks !== undefined && entry !== undefined) {
         invokeContainedSessionObservers(entry.emitCtx, 'session/event', entry.id, callbackArgs, callbacks)
       }
+    } catch (error: unknown) {
+      if (!committed && rollbacks !== undefined) {
+        const failures: unknown[] = [error]
+        for (const rollback of rollbacks.reverse()) {
+          try { rollback() } catch (failure: unknown) { failures.push(failure) }
+        }
+        if (failures.length > 1) throw new AggregateError(failures, 'session append admission rollback failed')
+      }
+      throw error
     } finally {
       if (entry !== undefined) {
         entry.appending = false
@@ -1137,6 +1168,24 @@ export class SessionStore extends Service {
   private store = new Map<SessionId, SessionEntry>()
   private counter = 0
   private readonly projections: SessionMessageProjection[] = []
+  private readonly appendAdmissions = new Set<SessionAppendAdmission>()
+
+  /**
+   * Register synchronous resource admission for every Session attached to this store.
+   * Refusal leaves the log and event feed unchanged. Reservations roll back in
+   * reverse order if any admission, surface validation, or dispatch validation
+   * fails; committed reservations pass to the `session/event` consumer.
+   * @param admission - resource reservation over an immutable candidate; rollback must be synchronous.
+   * @returns the registering fiber's disposer, which removes future admission calls.
+   * @throws when the same callback already has a live registration.
+   */
+  registerAppendAdmission(admission: SessionAppendAdmission): () => Promise<void> {
+    if (this.appendAdmissions.has(admission)) throw new Error('session append admission is already registered')
+    return this.ctx.effect(() => {
+      this.appendAdmissions.add(admission)
+      return () => { this.appendAdmissions.delete(admission) }
+    }, 'sessions.registerAppendAdmission()')
+  }
 
   /** Borrowed definitions for detached replay; contributions live until their registering fibers unload. */
   get messageProjections(): readonly SessionMessageProjection[] {
@@ -1310,6 +1359,7 @@ export class SessionStore extends Service {
       session,
       carrier,
       emitCtx: this.ctx,
+      appendAdmissions: this.appendAdmissions,
       announced: false,
       announcing: false,
       appending: false,

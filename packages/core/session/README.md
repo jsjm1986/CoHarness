@@ -33,6 +33,11 @@ Creates and holds event-sourced `Session` instances. Persistence is intentionall
 
 Projection events retain original durable messages and sequence identities. `surface.contentGeneration` invalidates the derived-message cache for either positional replacements or content changes; `replaceGeneration` counts only positional replacements. This adds no event-format version or committed-generation rewrite. Provider-owned image events remain separate consumers.
 
+<a id="append-admission"></a>
+### Append admission
+
+`ctx.sessions.registerAppendAdmission(admission)` registers a fiber-owned synchronous resource reservation for attached Sessions. The callback receives the frozen candidate before commit and may return a rollback. A refusal, surface-validation failure, or dispatch-validation failure runs earlier rollbacks in reverse order and leaves the log and event feed unchanged; a successful reservation passes to its `session/event` consumer. Same-Session reentrance rejects throughout admission and publication. Detached Sessions do not run these callbacks.
+
 ### Public API
 
 - `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` validates and detaches durable seed/header data, fills the version and id, defaults `createdAt` to now, publishes the session, and binds it to the calling fiber. A seeded header (`meta.isSeeded: true`) must supply both `seed` and the exact `inheritedEventCount`, because the constructor seed can contain child-owned setup events after the inherited prefix; an unseeded header rejects a nonzero cut. Persisted reconstruction supplies its original `createdAt`, lineage, and `delegationDepth`.
