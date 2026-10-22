@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-23-python-sdk-reader-and-shutdown.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-python-sdk-reader-and-shutdown.md
+document:
+  en: 3667af0686524835292f4a4acbe8c6226295a616
+  zh: cf9435decc51103daa638fc8d4b028483a8fa175
+/agent-note-python-sdk-subscriber-failure-and-eof-shutdown-ownership:
+  en: cc625cfcc8c33225
+  zh: e8ba4b3558285f1c
+/agent-note-python-sdk-subscriber-failure-and-eof-shutdown-ownership/problem:
+  en: 9ed308a33f42ee5b
+  zh: 793d449860362e6f
+/agent-note-python-sdk-subscriber-failure-and-eof-shutdown-ownership/decision:
+  en: 09f69e9ff1c6897f
+  zh: 394508b3e9c6a06a
+/agent-note-python-sdk-subscriber-failure-and-eof-shutdown-ownership/alternatives-considered:
+  en: 7aa7abd9d218353d
+  zh: e1a216f5250f0c65
+/agent-note-python-sdk-subscriber-failure-and-eof-shutdown-ownership/consequences:
+  en: 8227dfb75f530716
+  zh: c31d77ba131718b0

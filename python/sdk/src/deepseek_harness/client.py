@@ -176,6 +176,7 @@ class HarnessClient:
             self._start_stderr_thread()
 
     def close(self) -> None:
+        """Request shutdown, allow EOF cleanup, then terminate and reap an unresponsive runtime."""
         with self._lock:
             if self._closed:
                 return
@@ -194,16 +195,18 @@ class HarnessClient:
                 proc.stdin.close()
             except Exception as exc:
                 self._stderr_lines.append(f"stdin close failed: {exc}")
-        if proc.poll() is None:
+        try:
+            proc.wait(timeout=self.config.shutdown_timeout_seconds)
+        except subprocess.TimeoutExpired:
             try:
                 proc.terminate()
             except ProcessLookupError:
                 pass
-        try:
-            proc.wait(timeout=self.config.shutdown_timeout_seconds)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
+            try:
+                proc.wait(timeout=self.config.shutdown_timeout_seconds)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
         self._proc = None
         self._runtime_dead = True
         with self._lock:
@@ -559,7 +562,7 @@ class HarnessClient:
                         current = self._notification_subscribers.get(subscription_id)
                         if current is not None and current[0] is subscriber:
                             self._notification_subscribers.pop(subscription_id, None)
-                    subscriber.put(exc)
+                    self._put_terminal(subscriber, exc)
                     continue
                 if matches:
                     try:
