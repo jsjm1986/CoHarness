@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3'
 import { toUserRow, type UserRow } from './auth.ts'
@@ -171,8 +172,15 @@ export class UserService {
     this.db.prepare(`DELETE FROM auth_sessions WHERE user_id = ?`).run(id)
   }
 
-  async changeOwnPassword(id: number, newPassword: string): Promise<void> {
+  async changeOwnPassword(id: number, newPassword: string, keepToken?: string): Promise<void> {
     this.db.prepare(`UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ? AND deleted_at IS NULL`)
       .run(await hashPassword(newPassword), Date.now(), id)
+    // Revoke every other session so a stolen token cannot survive a password change.
+    if (keepToken === undefined) {
+      this.db.prepare(`DELETE FROM auth_sessions WHERE user_id = ?`).run(id)
+    } else {
+      this.db.prepare(`DELETE FROM auth_sessions WHERE user_id = ? AND token_hash != ?`)
+        .run(id, createHash('sha256').update(keepToken).digest('hex'))
+    }
   }
 }

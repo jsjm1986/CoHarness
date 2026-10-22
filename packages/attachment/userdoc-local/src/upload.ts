@@ -690,7 +690,7 @@ export class LocalUploadManager {
       throw new UserDocError('The final upload hash is invalid.', DOCUMENT_UPLOAD_HASH_CODE)
     }
     const path = manifestPath(this.root, String(uploadId))
-    return withFileLock(path, async () => {
+    return this.withSessionLock(path, async () => {
       const manifest = await this.load(uploadId)
       if ((manifest.state === 'complete' || manifest.state === 'verifying')
         && manifest.finalSha256 !== undefined && manifest.finalSha256 !== sha256) {
@@ -708,7 +708,7 @@ export class LocalUploadManager {
       await writeFileAtomic(path, `${JSON.stringify(next)}\n`, { mode: 0o600, dirMode: 0o700 })
       this.startFinalization(next)
       return asPublic(next)
-    }, { waitMs: 30_000 })
+    })
   }
 
   /**
@@ -719,11 +719,28 @@ export class LocalUploadManager {
     const id = String(uploadId)
     await this.cancelFinalization(id)
     const path = manifestPath(this.root, id)
-    await withFileLock(path, async () => {
+    await this.withSessionLock(path, async () => {
       const manifest = await this.load(uploadId)
       if (manifest.state === 'complete') throw new UserDocError('Completed documents cannot be cancelled.', DOCUMENT_UPLOAD_STATE_CODE)
       await rm(join(sessionRoot(this.root), id), { recursive: true, force: true })
-    }, { waitMs: LOCK_WAIT_MS })
+    })
+  }
+
+  /**
+   * Run `body` under the session lock. The lock file lives inside the session
+   * directory, so an unknown or already-swept upload id fails lock creation
+   * with ENOENT before `load` can report the missing session — translate it
+   * into the same not-found error callers get from `load`.
+   */
+  private async withSessionLock<T>(lockPath: string, body: () => Promise<T>): Promise<T> {
+    try {
+      return await withFileLock(lockPath, body, { waitMs: LOCK_WAIT_MS })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new UserDocError('The upload session was not found.', DOCUMENT_UPLOAD_NOT_FOUND_CODE, { cause: error })
+      }
+      throw error
+    }
   }
 
   private async load(uploadId: UserDocUploadId, options: { readonly allowExpired?: boolean } = {}): Promise<Manifest> {

@@ -92,7 +92,8 @@ export interface GatewayUserService {
   setDisplayName(id: number, name: string): Awaitable<void>
   remove(id: number): Awaitable<boolean>
   resetPassword(id: number, newPassword: string): Promise<void>
-  changeOwnPassword(id: number, newPassword: string): Promise<void>
+  /** Revokes every other session for the user; `keepToken` keeps the caller's own session alive. */
+  changeOwnPassword(id: number, newPassword: string, keepToken?: string): Promise<void>
 }
 
 /** Project and effective-directory-grant operations consumed by the Gateway. */
