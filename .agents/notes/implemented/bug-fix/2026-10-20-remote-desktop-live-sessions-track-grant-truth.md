@@ -12,6 +12,8 @@ The VNC provider's `live` session map diverged from authorization truth in three
 
 Session bookkeeping now shares one commit path. `attach` arms a per-token timer; an unconsumed token expires into `finishDetach`, which removes the `live` entry, records `detach`, and emits `remote-desktop/attached`. Every `serveStream` failure after the token is consumed — missing endpoint, dial failure, recorder-open failure, an expired entry — destroys both sockets and finishes the same detach, so `live` never holds a session without a stream. `revoke` and `setLevel` call `enforceLiveSessions`, which re-runs `matchingGrants` per live session against the committed store and detaches any session whose resolved level is no longer authorized; a surviving grant keeps the stream open. `listGrants` gains `attachable` plus a caller-bound `sessionId`, filtered through the same `matchingGrants` predicate `resolve` uses and requiring a configured endpoint for the target; the browser controller binds `sessionId` to the addressed agent and the guide passes `attachable: true`, so listed targets are exactly the ones attach would authorize. The tab body exposes the previously dead `disconnect`/`reconnect` copy: disconnect closes the RFB socket (which detaches server-side), and reconnect re-runs status → attach for a fresh token.
 
+The grant store publishes a candidate to live authorization only after its atomic file replacement succeeds. Mutations and reloads share one per-instance queue so a failed candidate cannot leak into a later successful write, and concurrent inserts retain both committed rows. The queue retains the last committed map through write failures.
+
 ## Alternatives considered
 
 **Keep live sessions until the client disconnects, even after revoke.** Rejected: revocation is an administrator action that must take effect; a control-level stream surviving its own revoke silently widens access past the authorization boundary.
@@ -19,6 +21,8 @@ Session bookkeeping now shares one commit path. `attach` arms a per-token timer;
 **Sweep expired pending entries lazily inside `attach`.** The original `sweepPending` only ran on the next attach, so a deployment with no new attaches held phantom sessions indefinitely. The per-token timer makes expiry self-driving; the sweep is removed rather than kept as a second clock.
 
 **Filter attachable rows in the controller or the guide.** Rejected: session-scope matching must agree with `resolve`, and duplicating it outside `matchingGrants` would let the listing drift from the enforcement predicate.
+
+**Mutate the live grant set and roll it back after a write fails.** Concurrent mutations and reloads can observe the uncommitted grant or overwrite the rollback. Serializing candidates and publishing only at commit keeps authorization consistent without rollback.
 
 **Expose a `detach` Remote method instead of closing the socket.** Deferred: the stream close already reaches `finishDetach`, and an explicit force-detach administrator method remains the open follow-up rather than a user-facing call.
 
