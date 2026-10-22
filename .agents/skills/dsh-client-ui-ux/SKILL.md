@@ -12,7 +12,7 @@ This skill is guidance, not a complete checklist. It covers judgment calls that 
 Component structure, state flow, and effect usage follow the architecture rules; read them before redesigning a component:
 
 - [packages/client/AGENTS.md](../../../packages/client/AGENTS.md) — Slot and props discipline, reactive read, export, ctx, and layering rules.
-- [Client component rules](../../../docs/defensive-patterns.md) — those requirements stated with the defects they prevent.
+- [Client component rules](../../../docs/defensive-patterns/README.md) — those requirements stated with the defects they prevent.
 
 ## Visual foundation
 
