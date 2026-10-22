@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "远程桌面流",
+    "description": "ctx.remoteDesktop 的 WebSocket 挂载。"
+  }
+}

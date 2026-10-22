@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "File settings",
+    "description": "File-backed settings provider (settings.yaml) for the DeepSeek Harness"
+  }
+}

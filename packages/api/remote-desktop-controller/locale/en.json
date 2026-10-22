@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Remote desktop controller",
+    "description": "Browser-facing BFF controller for ctx.remoteDesktop"
+  }
+}
