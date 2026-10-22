@@ -55,7 +55,7 @@ export interface PluginManagementAuthorization {
   /** Modules a managed profile cannot disable or replace through a bundle. */
   readonly protectedModules: ReadonlySet<string>
   /** Recheck the current caller before profile reads or writes.
-   * @param capability - 'read' permits any runtime principal; 'manage' enforces the deployment's policy.
+   * @param capability - the deployment's policy gates both 'read' and 'manage'; an unqualified account sees nothing.
    * @returns After the deployment permits the operation; rejects without permission.
    */
   authorize(capability?: PluginManagementCapability): Promise<void>
