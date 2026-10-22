@@ -14,6 +14,8 @@ Status: implemented
 
 ### 存储：迁移 059
 
+[已发布 SQL 文件](../../../../gateway/deploy/postgres/migrations/059_project_journal.sql)保持文件名与字节不变；资源预算存储独立追加。[PostgreSQL 基线](../architecture/2026-08-14-postgresql-jsonb-gateway-baseline.zh.md)拥有不可变迁移身份与回滚识别规则。
+
 - `harness.project_journal`：条目。`kind='current'` 是滚动覆写的「项目现在到哪了」行（部分唯一索引，每项目一行，每次 pass upsert）；`kind='period'` 行携带 ISO 周 `period_key`（`YYYY-Www`）、结构化 `content`（`summary` 加 `定了`/`完成`/`进行中`/`卡点` 四节，节内条目署名 `{ text, actor?, sessionId, sessionTitle, seq? }`）、`activity_count`、素材周期边界与解析出的 `model` 路由。
 - `harness.project_journal_state`：每项目 pass 状态——已提交水位线（`watermark_ts`、`watermark_session`、`watermark_seq`，与 feed keyset 同序）、`last_run_at`、`generating_since`（在途租约）、`last_error`。
 

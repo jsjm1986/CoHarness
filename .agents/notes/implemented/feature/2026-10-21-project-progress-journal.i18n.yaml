@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-21-project-progress-journal.md
 document:
-  en: 6286271b2f8587156f33dd682956537be6d18899
-  zh: 3feb57843dba5f8aba45c613afb64fd8201d04fd
+  en: af9e623e0b34c6d2f5302b4fc9c9e870f28c4cd8
+  zh: 650ae8bc22582271c55e53cfcc6c3ef9f23e3f94
 /agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity:
   en: 0e62f9e9949e35e7
   zh: 19576a7e88941175
@@ -15,8 +15,8 @@ document:
   en: bab2b1167bd3cad7
   zh: 10011b18adbb69a0
 /agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/storage-migration-059:
-  en: a6f4262bdd208e98
-  zh: c4a2d5ad79cf0580
+  en: 2e91aa49c3ce1457
+  zh: e9d69fed6ae2cf3e
 /agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/material-member-visible-only:
   en: a8f0fb3b1196e2ee
   zh: a35ed83889a62b6a

@@ -14,6 +14,8 @@ Add a **project progress journal**: an event-gated AI digest pass in the Gateway
 
 ### Storage: migration 059
 
+The [published SQL file](../../../../gateway/deploy/postgres/migrations/059_project_journal.sql) retains its filename and bytes; resource-budget storage appends independently. The [PostgreSQL baseline](../architecture/2026-08-14-postgresql-jsonb-gateway-baseline.md) owns immutable migration identities and rollback recognition.
+
 - `harness.project_journal`: entries. `kind='current'` is the rolling "where the project stands" row (partial unique index, one per project, upserted every pass); `kind='period'` rows carry an ISO-week `period_key` (`YYYY-Www`), a structured `content` payload (`summary` plus `decided`/`done`/`doing`/`blocked` sections whose items attribute `{ text, actor?, sessionId, sessionTitle, seq? }`), `activity_count`, the source period bounds, and the resolved `model` route.
 - `harness.project_journal_state`: per-project pass state — the committed watermark (`watermark_ts`, `watermark_session`, `watermark_seq`, ordered like the feed keyset), `last_run_at`, `generating_since` (the in-flight lease), and `last_error`.
 

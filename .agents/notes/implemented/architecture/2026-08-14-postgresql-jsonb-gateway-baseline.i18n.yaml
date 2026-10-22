@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-postgresql-jsonb-gateway-baseline.md
 document:
-  en: 9acd89e9c67d01e128cc91e5c2a5f84f6d5c8f0a
-  zh: b46c83a309d461f07c3a06e62a72e422bac36460
+  en: e5a2fa59674d0bf701e407eca0a8ee68bcc10671
+  zh: 97e02f0bf583101fc6f4b5cfd4a4e0794dd9e745
 /agent-note-postgresql-jsonb-gateway-baseline:
   en: abba41a344d756ac
   zh: 7ee56b3ea39ddd7e
@@ -12,11 +12,11 @@ document:
   en: a4560bea94bf7e80
   zh: e35b101e385743d0
 /agent-note-postgresql-jsonb-gateway-baseline/decision:
-  en: 456dfca6d148dda7
-  zh: bf5bc12333ce9540
+  en: 0dbd47c0c42cd37c
+  zh: eac7d62333e5f195
 /agent-note-postgresql-jsonb-gateway-baseline/testing:
-  en: da2a84b79d00e5ff
-  zh: e4d167ac5134b30a
+  en: 7a5a550fca3333b0
+  zh: 7aeb09b9201a584f
 /agent-note-postgresql-jsonb-gateway-baseline/alternatives-considered:
   en: 9c869934b9dac93a
   zh: 54291cd37fe7e82e

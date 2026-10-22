@@ -179,8 +179,31 @@ describePg('PostgreSQL baseline', () => {
       await pool.query(`INSERT INTO harness.conversation_events(
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
-      const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61], current: 61 })
+      const releasedNames = (await readdir(MIGRATIONS)).filter(name => Number(name.slice(0, 3)) <= 60)
+      await Promise.all(releasedNames.map(name => copyFile(join(MIGRATIONS, name), join(legacyMigrations, name))))
+      const released = await runMigrations(pool, legacyMigrations)
+      expect(released.current).toBe(60)
+      expect(released.applied).toEqual(Array.from({ length: 45 }, (_, index) => index + 16))
+      const project = await pool.query<{ id: string }>(
+        "INSERT INTO harness.projects(organization_id,name) VALUES($1,'Published journal fixture') RETURNING id",
+        [legacyOrganizationId],
+      )
+      const journalProjectId = project.rows[0]!.id
+      const journalContent = { summary: 'Published synthetic journal remains', sections: { decided: [], done: [], doing: [], blocked: [] } }
+      await pool.query(`INSERT INTO harness.project_journal(organization_id,project_id,kind,content,activity_count)
+        VALUES($1,$2,'current',$3::jsonb,7)`, [legacyOrganizationId, journalProjectId, JSON.stringify(journalContent)])
+      await pool.query(`INSERT INTO harness.project_journal_state(organization_id,project_id,watermark_seq)
+        VALUES($1,$2,7)`, [legacyOrganizationId, journalProjectId])
+      expect((await pool.query<{ present: string | null }>("SELECT to_regclass('harness.node_resource_state')::text present")).rows[0]?.present).toBeNull()
+      expect(await runMigrations(pool, MIGRATIONS)).toEqual({ applied: [61], current: 61 })
+      expect((await pool.query<{ content: unknown; activity_count: number }>(
+        'SELECT content,activity_count FROM harness.project_journal WHERE project_id=$1', [journalProjectId],
+      )).rows).toEqual([{ content: journalContent, activity_count: 7 }])
+      expect((await pool.query<{ watermark_seq: string }>(
+        'SELECT watermark_seq::text FROM harness.project_journal_state WHERE project_id=$1', [journalProjectId],
+      )).rows).toEqual([{ watermark_seq: '7' }])
+      expect((await pool.query<{ present: string | null }>("SELECT to_regclass('harness.node_resource_state')::text present")).rows[0]?.present)
+        .toBe('harness.node_resource_state')
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -439,6 +462,17 @@ describePg('PostgreSQL baseline', () => {
     } finally {
       await runtime.close()
     }
+  })
+
+  it('preserves published journal migration 59 and appends resource budget at 61', async () => {
+    const ledger = await pool.query<{ version: number; name: string; checksum: string }>(
+      'SELECT version,name,checksum FROM harness.schema_migrations WHERE version IN (59,60,61) ORDER BY version',
+    )
+    expect(ledger.rows.map(row => [row.version, row.name])).toEqual([
+      [59, '059_project_journal.sql'], [60, '060_organization_digest_model.sql'], [61, '061_node_resource_budget.sql'],
+    ])
+    expect(ledger.rows[0]?.checksum).toBe('f5633d1213202ad0d7d157f7b49105c52e90eccb49c99b0e72c97e0756f43bf8')
+    expect(await runMigrations(pool, MIGRATIONS)).toEqual({ applied: [], current: 61 })
   })
 
   it('rejects changed or unknown applied migrations', async () => {
