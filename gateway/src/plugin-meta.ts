@@ -1,5 +1,5 @@
 /** Offline plugin display metadata: locale dictionaries resolved without starting the runtime. */
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** A localized field always carries `en` — the display fallback, mirroring `readPluginMeta`. */
@@ -60,23 +60,28 @@ function indexRoot(root: string, index: Map<string, string>): void {
     return
   }
   for (const group of groups) {
-    for (const dir of [join(root, group)]) {
-      let manifest: string
-      try {
-        manifest = readFileSync(join(dir, 'package.json'), 'utf8')
-      } catch {
-        for (const leaf of readdirSync(dir)) {
-          const pkgDir = join(dir, leaf)
-          try {
-            const name = (JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')) as { name?: string }).name
-            if (typeof name === 'string') index.set(name, pkgDir)
-          } catch { /* Not a package directory. */ }
-        }
-        continue
-      }
-      const name = (JSON.parse(manifest) as { name?: string }).name
-      if (typeof name === 'string') index.set(name, dir)
+    const dir = join(root, group)
+    try {
+      if (!statSync(dir).isDirectory()) continue
+    } catch {
+      continue
     }
+    let manifest: string
+    try {
+      manifest = readFileSync(join(dir, 'package.json'), 'utf8')
+    } catch {
+      for (const leaf of readdirSync(dir)) {
+        const pkgDir = join(dir, leaf)
+        try {
+          if (!statSync(pkgDir).isDirectory()) continue
+          const name = (JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')) as { name?: string }).name
+          if (typeof name === 'string') index.set(name, pkgDir)
+        } catch { /* Not a package directory. */ }
+      }
+      continue
+    }
+    const name = (JSON.parse(manifest) as { name?: string }).name
+    if (typeof name === 'string') index.set(name, dir)
   }
 }
 

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "会话持久化网关",
+    "description": "面向 CoHarness 的网关 PostgreSQL 会话持久化提供者。"
+  }
+}
