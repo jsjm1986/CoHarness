@@ -19,6 +19,7 @@ const requiredArtifacts = [
   'packages/client/connection/lib/index.js',
   'packages/api/remotes/lib/client.js',
   'packages/boot/plugin-manager/lib/index.js',
+  'packages/boot/plugin-manager/lib/types/catalog.js',
   'packages/boot/plugin-manager/lib/typert.host.js',
   'packages/core/agent/lib/index.js',
   'packages/core/session/lib/index.js',
@@ -28,13 +29,16 @@ const requiredArtifacts = [
   'packages/api/gateway/lib/index.js',
   'packages/typert/registry/lib/client.js',
   'packages/typert/registry/lib/index.js',
+  'vendor/loader/lib/index.js',
 ].every(path => existsSync(artifact(path)))
 
 describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
   it('runs root and Agent-scoped calls through generated bundles and real HTTP', async () => {
     const urls = Object.fromEntries(Object.entries({
       manager: 'packages/boot/plugin-manager/lib/index.js',
+      managerCatalog: 'packages/boot/plugin-manager/lib/types/catalog.js',
       managerTypert: 'packages/boot/plugin-manager/lib/typert.host.js',
+      loader: 'vendor/loader/lib/index.js',
       agent: 'packages/core/agent/lib/index.js',
       apiGatewayClient: 'packages/api/gateway/lib/client.js',
       apiGatewayHost: 'packages/api/gateway/lib/index.js',
@@ -52,10 +56,19 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
       import { tmpdir } from 'node:os'
       import { join } from 'node:path'
+      import { pathToFileURL } from 'node:url'
       import * as cordis from '@deepseek-ai/cordis'
 
       const urls = ${JSON.stringify(urls)}
       const { Context } = cordis
+      const { default: Loader } = await import(urls.loader)
+      const loaderHost = new Context()
+      loaderHost.baseUrl = pathToFileURL(${JSON.stringify(artifact('packages/bundle/web-app/'))}).href + '/'
+      await loaderHost.plugin(Loader)
+      await loaderHost.loader.create({ name: '@deepseek-ai/dsh-plugin-manager/catalog' })
+      await loaderHost.loader.await()
+      const loaderUnmanaged = await loaderHost.pluginManagerCatalog.catalog(new AbortController().signal)
+      await loaderHost.fiber.dispose()
       const { default: AgentRegistry } = await import(urls.agent)
       const connectionHost = await import(urls.connectionHost)
       const { default: TypertRemoteService } = await import(urls.apiGatewayHost)
@@ -91,21 +104,25 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       await host.plugin(GoalService)
       host.typert.register(TYPERT)
       const { default: PluginManager } = await import(urls.manager)
+      const { default: PluginManagerCatalogGateway } = await import(urls.managerCatalog)
       const managerTypert = await import(urls.managerTypert)
       const profileDir = mkdtempSync(join(tmpdir(), 'built-manager-'))
       writeFileSync(join(profileDir, 'package.json'), JSON.stringify({ name: 'test-profile', dependencies: {}, dsh: { profile: { bundles: [] } } }))
       host.provide('loader', { entries: () => [] })
-      host.provide('profileContext', {
+      const profileContext = {
         name: 'test-profile', startedBundles: [], dir: profileDir, patchPath: join(profileDir, 'cordis.patch.yml'),
         installAnchor: join(profileDir, 'package.json'), cwd: profileDir, home: profileDir, overlays: [], telemetryDisabledEnv: undefined,
-      })
+      }
       const { RemoteError } = await import('@deepseek-ai/dsh-typert-protocol')
       let administrator = false
+      let readDenied = false
       const stopPolicy = host.provide('pluginManagementAuthorization', {
         protectedModules: new Set(),
-        async authorize() { if (!administrator) throw new RemoteError('plugin-management/forbidden', 'administrator required', {}) },
+        async authorize(capability) {
+          if (readDenied || (capability === 'manage' && !administrator)) throw new RemoteError('plugin-management/forbidden', 'administrator required', {})
+        },
       })
-      await host.plugin(PluginManager, { authorization: 'required' })
+      await host.plugin(PluginManagerCatalogGateway)
       host.typert.register(managerTypert.TYPERT)
 
       const makeAgent = rawId => {
@@ -203,6 +220,13 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
         identity: candidate => candidate.builtAgentId,
       })
 
+      const catalogUnmanaged = await client.remote.pluginManager.catalog()
+      host.provide('profileContext', profileContext)
+      await host.plugin(PluginManager, { authorization: 'required' })
+      const catalogReadOnly = await client.remote.pluginManager.catalog()
+      readDenied = true
+      const catalogDenied = await client.remote.pluginManager.catalog()
+      readDenied = false
       const managementReads = []
       for (const call of [
         () => client.remote.pluginManager.listPlugins(), () => client.remote.pluginManager.listBundles(),
@@ -218,6 +242,7 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       ]) managementDenied.push(await call())
       const accessDenied = await client.remote.pluginManager.access()
       administrator = true
+      const catalogAllowed = await client.remote.pluginManager.catalog()
       const managementAllowed = await client.remote.pluginManager.listBundles()
       const accessAllowed = await client.remote.pluginManager.access()
       stopPolicy()
@@ -236,6 +261,9 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       const agentContext = client.extend({ builtAgentId: scopedAgent.id })
       const scopedResult = await agentContext.remote.goals.create({ objective: 'scoped goal', maxGoalRounds: 3 })
       const result = {
+        loaderUnmanaged, catalogUnmanaged, catalogReadOnly,
+        catalogDenied: catalogDenied.ok ? catalogDenied : { ok: false, error: { code: catalogDenied.error.code } },
+        catalogAllowed,
         managementReads, managementDenied, accessDenied,
         managementAllowed, accessAllowed, managementMissing, accessMissing, writeMissing,
         invalidResult,
@@ -261,6 +289,11 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
     const result = await runPlainNode(script)
     expect(result.exitCode, `stderr:\n${result.stderr}`).toBe(0)
     const output = JSON.parse(result.stdout.trim().split('\n').at(-1) ?? '{}') as {
+      loaderUnmanaged: unknown
+      catalogUnmanaged: unknown
+      catalogReadOnly: unknown
+      catalogDenied: unknown
+      catalogAllowed: unknown
       managementReads: Array<{ ok: boolean; value: unknown[] }>
       managementDenied: Array<{ ok: boolean; error?: { code: string } }>
       accessDenied: { ok: boolean; value: { manage: boolean } }
@@ -278,6 +311,46 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       rootEvents: number
       scopedEvents: number
     }
+    expect(output.loaderUnmanaged).toEqual({ managementAvailable: false, manage: false, bundles: [], plugins: [] })
+    expect([
+      output.catalogUnmanaged, output.catalogReadOnly, output.catalogDenied, output.catalogAllowed,
+    ]).toMatchInlineSnapshot(`
+      [
+        {
+          "ok": true,
+          "value": {
+            "bundles": [],
+            "manage": false,
+            "managementAvailable": false,
+            "plugins": [],
+          },
+        },
+        {
+          "ok": true,
+          "value": {
+            "bundles": [],
+            "manage": false,
+            "managementAvailable": true,
+            "plugins": [],
+          },
+        },
+        {
+          "error": {
+            "code": "plugin-management/forbidden",
+          },
+          "ok": false,
+        },
+        {
+          "ok": true,
+          "value": {
+            "bundles": [],
+            "manage": true,
+            "managementAvailable": true,
+            "plugins": [],
+          },
+        },
+      ]
+    `)
     // Profile reads stay open without a grant; the manage grant gates only mutations.
     for (const result of output.managementReads) expect(result).toEqual({ ok: true, value: [] })
     expect(output.managementDenied).toHaveLength(6)

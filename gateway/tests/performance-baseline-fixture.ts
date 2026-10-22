@@ -48,7 +48,7 @@ export async function createPerformanceFixture(enabled: boolean, plane: 'source'
     }
     const deps: GatewayDeps = {
       cfg, performance: observer,
-      auth: { validate: token => token === 'fixture-only' ? user : null, login: unreachable, revoke: unreachable },
+      auth: { validate: token => token === 'fixture-only' ? user : null, qualifyForStream: unreachable, login: unreachable, revoke: unreachable },
       users: {
         count: unreachable, create: unreachable, list: unreachable, getById: unreachable, getListedById: unreachable,
         getByUsername: unreachable, setStatus: unreachable, setRole: unreachable, setDisplayName: unreachable,

@@ -10,6 +10,43 @@ const target = { nodeId: 'node', target: { kind: 'user' as const, id: 4 }, gener
 const requestId = '00000000-0000-4000-8000-000000000002' as PluginInstallRequestId
 const complete: PluginInstallFrame = { type: 'result', value: { changed: true, application: 'applied', stage: 'install', target: 'bundle', bundle: 'bundle' } }
 
+it('validates one catalog response through the generated codec and exact target', async () => {
+  const remote = pluginManagementRemote(target, new AbortController().signal, () => {}, () => {})
+  const catalog = { managementAvailable: true, manage: false, bundles: [], plugins: [] }
+  vi.mocked(pluginManagementInvoke).mockImplementation(async input => ({ rpcId: (input as { rpcId: string }).rpcId, result: { ok: true, value: catalog } }))
+  expect(await remote.pluginManager.catalog()).toEqual({ ok: true, value: catalog })
+  expect(pluginManagementInvoke).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ...target, endpoint: 'pluginManager/catalog', args: {} }), expect.any(AbortSignal))
+  vi.mocked(pluginManagementInvoke).mockImplementation(async input => ({ rpcId: (input as { rpcId: string }).rpcId, result: { ok: true, value: { ...catalog, manage: 'yes' } } }))
+  expect(await remote.pluginManager.catalog()).toMatchObject({ ok: false })
+})
+
+it.each(['request', 'target'] as const)('rejects a late catalog after its %s is cancelled', async owner => {
+  const targetAbort = new AbortController(), requestAbort = new AbortController(), invalidate = vi.fn()
+  const pending = Promise.withResolvers<unknown>()
+  vi.mocked(pluginManagementInvoke).mockReturnValue(pending.promise)
+  const remote = pluginManagementRemote(target, targetAbort.signal, () => {}, invalidate)
+  const operation = remote.pluginManager.catalog(requestAbort.signal)
+  const signal = vi.mocked(pluginManagementInvoke).mock.calls[0]![1]!
+  const input = vi.mocked(pluginManagementInvoke).mock.calls[0]![0] as { rpcId: string }
+  try {
+    const cancellation = owner === 'request' ? requestAbort : targetAbort
+    cancellation.abort()
+    expect(signal.aborted).toBe(true)
+  } finally {
+    pending.resolve({ rpcId: input.rpcId, result: { ok: true, value: { managementAvailable: true, manage: true, bundles: [], plugins: [] } } })
+    await operation
+  }
+  expect(await operation).toMatchObject({ ok: false })
+  expect(invalidate).not.toHaveBeenCalled()
+})
+
+it('does not open a catalog transport for a cancelled target', async () => {
+  const abort = new AbortController(); abort.abort()
+  const remote = pluginManagementRemote(target, abort.signal, () => {}, () => {})
+  expect(await remote.pluginManager.catalog()).toMatchObject({ ok: false })
+  expect(pluginManagementInvoke).not.toHaveBeenCalled()
+})
+
 it('validates correlation and the generated result while preserving exact target arguments', async () => {
   const remote = pluginManagementRemote(target, new AbortController().signal, () => {}, () => {})
   vi.mocked(pluginManagementInvoke).mockImplementation(async input => ({ rpcId: (input as { rpcId: string }).rpcId, result: { ok: true, value: [] } }))

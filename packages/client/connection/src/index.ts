@@ -49,6 +49,8 @@ export interface ConnectionRequestBoundary {
   pathname?: string
   /** Full request URL as sent by the client; carriers that cannot set headers declare credentials and modes in its query. */
   url?: string
+  /** Socket-owned close/error lifetime on upgrades; absent on carriers without a retained socket. */
+  signal?: AbortSignal
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -344,15 +346,25 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
             rejectWebSocketUpgrade(socket)
             return
           }
+          const lifetime = new AbortController()
+          const close = (): void => {
+            socket.removeListener('close', close)
+            socket.removeListener('error', close)
+            lifetime.abort()
+          }
+          socket.once('close', close)
+          socket.once('error', close)
+          if (socket.destroyed) close()
           return apiCtx.waterfall('connection/request', {
             kind: 'upgrade',
+            signal: lifetime.signal,
             headers: req.headers,
             ...(req.method === undefined ? {} : { method: req.method }),
             pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
             ...(req.url === undefined ? {} : { url: req.url }),
           }, async () => {
             await handle(req, socket, head)
-          })
+          }).catch((error: unknown) => { close(); throw error })
         },
       }), `client-connection: ${path} WebSocket`)
     }

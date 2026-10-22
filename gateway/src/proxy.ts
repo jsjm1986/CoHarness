@@ -10,13 +10,14 @@ import {
   writeModelGovernanceFile,
   writeProjectModelGovernanceFile,
 } from './apply-model-governance.ts'
-import type { UserRow } from './auth.ts'
+import type { UserRow, StreamSessionQualification } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
 import type { EffectiveGrant } from './projects.ts'
 import { gateCopy, gateLanguage, stoppedPage, waitingPage } from './html.ts'
 import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type ProjectRuntime, type RuntimeTarget } from './instances.ts'
-import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
+import { PRINCIPAL_HEADER, type GatewayPrincipalSigner, type PrincipalScope } from './principal.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
+import { StreamPrincipalLeases } from './stream-principal-leases.ts'
 import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ProxyHandler, type UpgradeHandler } from './server.ts'
 
 function wantsHtml(req: IncomingMessage): boolean {
@@ -90,7 +91,7 @@ const STREAMING_MEDIA_TYPES = new Set(['text/event-stream', 'application/x-ndjso
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
-): { proxy: ProxyHandler; upgrade: UpgradeHandler; invalidateAccess: GatewayAccessInvalidation; close(): void } {
+): { proxy: ProxyHandler; upgrade: UpgradeHandler; invalidateAccess: GatewayAccessInvalidation; streamPrincipals?: StreamPrincipalLeases; close(): void } {
   const { cfg, instances, audit, projects } = deps
   const server = httpProxy.createProxyServer({
     xfwd: true,
@@ -119,6 +120,31 @@ export function createProxyHandlers(
     resOrSocket.destroy()
   })
   const active = new Set<{ context: GatewayRequestContext; cancel(): void }>()
+  const qualifyStream = async (token: string, context: GatewayRequestContext): Promise<(StreamSessionQualification & { scope: PrincipalScope }) | null> => {
+    const current = await deps.auth.qualifyForStream(token)
+    if (current === null || current.user.id !== context.user.id || current.user.mustChangePassword
+      || current.user.homePath !== context.user.homePath) return null
+    if (context.scope.kind === 'personal') return { ...current, scope: { kind: 'personal' } }
+    const project = await deps.collaboration?.projectForUser(context.scope.projectId, current.user.id)
+    if (project === undefined || project === null || 'username' in context.runtime || project.path !== context.runtime.path) return null
+    const detail = await deps.projects.getById(project.projectId)
+    return { ...current, scope: {
+      kind: 'project', projectId: project.projectId, projectName: project.name, mode: project.mode,
+      canManage: current.user.role === 'admin' || project.administrator || detail?.owner?.id === current.user.id,
+      ...(project.kind === 'steward' ? { steward: true } : {}),
+      ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+    } }
+  }
+  const streamPrincipals = principalSigner === undefined || !cfg.streamPrincipalRenewal.enabled ? undefined : new StreamPrincipalLeases({
+    signer: principalSigner,
+    maxBatchSize: cfg.streamPrincipalRenewal.maxBatchSize,
+    synchronize: async () => {
+      if (deps.accessMonitor === undefined) throw new Error('event connection access monitor is unavailable')
+      await deps.accessMonitor.synchronize()
+      if (!deps.accessMonitor.available) throw new Error('event connection access monitor is unavailable')
+    },
+    qualify: qualifyStream,
+  })
   const invalidateAccess: GatewayAccessInvalidation = (subject) => {
     for (const operation of [...active]) {
       const { user, scope } = operation.context
@@ -470,11 +496,33 @@ export function createProxyHandlers(
         socket.destroy()
         return
       }
-      const principal = principalSigner?.issue({
+      const eventConnection = ['/api/events.mux', '/api/events.host'].includes(new URL(req.url ?? '/', 'http://gateway.invalid').pathname)
+      let streamLogin: Awaited<ReturnType<typeof qualifyStream>> | undefined
+      if (eventConnection && principalSigner !== undefined) {
+        streamLogin = token === undefined ? null : await qualifyStream(token, context)
+        await deps.accessMonitor?.synchronize()
+        if (streamLogin === null || streamLogin.expiresAt <= Date.now() || socket.destroyed) {
+          releaseWebSocketLease()
+          socket.destroy()
+          return
+        }
+        context.user = streamLogin.user
+        context.scope = streamLogin.scope
+      }
+      const principalInput = {
         user: context.user,
         scope: context.scope,
         runtime: { kind: ready.target.kind, id: ready.target.id, generation: ready.generation },
-      })
+      }
+      const principal = eventConnection ? principalSigner?.issueStream(principalInput, streamLogin?.expiresAt) : principalSigner?.issue(principalInput)
+      if (eventConnection && principal !== undefined && token !== undefined && streamPrincipals !== undefined) {
+        const lifetime = new AbortController()
+        const close = (): void => { lifetime.abort() }
+        socket.once('close', close)
+        socket.once('error', close)
+        streamPrincipals.register({ assertion: principal, token, context, signal: lifetime.signal, cancel: () => { socket.destroy() } })
+        if (socket.destroyed) lifetime.abort()
+      }
       server.ws(req, socket as Duplex & NodeJS.WritableStream, head, targetOptions(ready.port, principal), () => socket.destroy())
     } catch (error: unknown) {
       releaseWebSocketLease()
@@ -499,7 +547,8 @@ export function createProxyHandlers(
     }
     if (socket.destroyed) release()
   }
-  return { proxy, upgrade, invalidateAccess, close: () => {
+  return { proxy, upgrade, invalidateAccess, streamPrincipals, close: () => {
+    streamPrincipals?.close()
     unsubscribeAccess?.()
     invalidateAccess({})
     active.clear()

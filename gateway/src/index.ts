@@ -582,6 +582,7 @@ const server = createGatewayServer(deps, {
   }),
   admin: createAdminApiHandler(deps, documentAdmin, proxyHandlers.invalidateAccess),
   runtime: createRuntimeApiHandler({
+    renewStreamPrincipals: proxyHandlers.streamPrincipals?.renew.bind(proxyHandlers.streamPrincipals),
     accessMonitor,
     executionWatchHeartbeatMs: cfg.executionWatchHeartbeatMs,
     context,

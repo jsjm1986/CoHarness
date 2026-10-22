@@ -33,6 +33,7 @@ beforeEach(() => {
     settings: { describe: vi.fn(async () => ({ ok: true as const, value: { writable: true, hasDocument: false, namespaces: [] } })), mutate: unused },
     pluginInventory: { list: vi.fn(async () => ({ ok: true as const, value: { managementAvailable: true, entries: [] } })) },
     pluginManager: {
+      catalog: vi.fn(async () => ({ ok: true as const, value: { managementAvailable: true, manage: true, bundles: [], plugins: [] } })),
       listPlugins: vi.fn(async () => ({ ok: true as const, value: [] })),
       listBundles: vi.fn(async () => ({ ok: true as const, value: [] })),
       inspect: unused, setPluginEnabled: unused, setBundleEnabled: unused,

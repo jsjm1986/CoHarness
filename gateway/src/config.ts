@@ -38,6 +38,8 @@ export interface GatewayConfig {
   principalKeyDir: string
   /** Lifetime of one browser-request principal assertion. */
   principalAssertionTtlMs: number
+  /** Private renewal of registered event WebSockets; disabled leaves fixed assertion expiry. */
+  streamPrincipalRenewal: { enabled: boolean; intervalMs: number; requestTimeoutMs: number; maxBatchSize: number }
   /** Maximum time an HTTP/WebSocket proxy waits on one runtime upstream operation. */
   upstreamTimeoutMs: number
   /** Idle keep-alive lifetime of the public HTTP listener; must outlive the front proxy's origin pool. */
@@ -574,6 +576,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     30_000,
     'HGW_PRINCIPAL_ASSERTION_TTL_MS',
   )
+  const streamRenewalEnabled = env.HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED ?? 'true'
+  if (streamRenewalEnabled !== 'true' && streamRenewalEnabled !== 'false') throw new Error('HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED must be true or false')
+  const streamPrincipalRenewal = {
+    enabled: streamRenewalEnabled === 'true',
+    intervalMs: timerDelay(env.HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS, 10_000, 'HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS'),
+    requestTimeoutMs: timerDelay(env.HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS, 5_000, 'HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS'),
+    maxBatchSize: positiveSafeInteger(env.HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH, 64, 'HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH'),
+  }
+  if (streamPrincipalRenewal.maxBatchSize > 1024) throw new Error('HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH must not exceed 1024')
   const upstreamTimeoutMs = timerDelay(
     env.HGW_UPSTREAM_TIMEOUT_MS,
     DEFAULT_UPSTREAM_TIMEOUT_MS,
@@ -745,6 +756,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     projectRuntimeUser,
     principalKeyDir,
     principalAssertionTtlMs,
+    streamPrincipalRenewal,
     upstreamTimeoutMs,
     keepAliveTimeoutMs,
     upstreamResponseLimitBytes,

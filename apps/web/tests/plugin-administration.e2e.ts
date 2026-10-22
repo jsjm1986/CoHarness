@@ -19,7 +19,7 @@ import { UserService } from '../../../gateway/src/users.ts'
 import { ProjectService } from '../../../gateway/src/projects.ts'
 import { AuditService } from '../../../gateway/src/audit.ts'
 import { InstanceManager } from '../../../gateway/src/instances.ts'
-import { GatewayPrincipalSigner } from '../../../gateway/src/principal.ts'
+import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../../../gateway/src/principal.ts'
 import { GatewayPluginManagement } from '../../../gateway/src/plugin-management.ts'
 import { createGatewayServer, type GatewayDeps } from '../../../gateway/src/server.ts'
 import { createAdminApiHandler } from '../../../gateway/src/admin-api.ts'
@@ -79,6 +79,18 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     const runtime = /dsh web: (http:\/\/\S+)/u.exec(output)?.[1]
     if (runtime === undefined) throw new Error('CLI did not report its Web address')
     runtimePort = Number(new URL(runtime).port)
+    const assertion = new GatewayPrincipalSigner(pair.privateKey, 'fixture', 30000).issuePluginManagement({
+      user: admin, runtime: { kind: 'user', id: admin.id, generation: 1 }, scope: { kind: 'personal' },
+    }, 120000)
+    const rpcId = randomUUID(), endpoint = 'pluginManager/catalog'
+    const catalog = await fetch(`http://127.0.0.1:${runtimePort}/api/${endpoint}`, {
+      method: 'POST', headers: { 'content-type': 'application/json', [PRINCIPAL_HEADER]: assertion },
+      body: JSON.stringify({ type: 'client-request', rpcId, method: endpoint, payload: { args: {} } }),
+    })
+    expect(catalog.status).toBe(200)
+    expect(await catalog.json()).toMatchObject({
+      rpcId, result: { ok: true, value: { managementAvailable: true, manage: true } },
+    })
     const browser = await chromium.launch(); cleanup.push(() => browser.close())
     const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } })
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))

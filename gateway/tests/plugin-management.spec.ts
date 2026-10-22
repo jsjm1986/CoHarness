@@ -58,8 +58,10 @@ it('binds current-node state and forwards only a correlated, leased profile meth
   expect(JSON.parse(await f.invoke())).toMatchObject({ rpcId: f.request.rpcId, result: { ok: true, value: [] } })
   expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4]])
   expect(f.requests).toHaveLength(1)
+  await f.invoke({ ...f.request, endpoint: 'pluginManager/catalog' })
+  expect(f.requests[1]).toMatchObject({ path: '/api/pluginManager/catalog' })
   await f.invoke({ ...f.request, endpoint: 'pluginManager/installBundleStream' })
-  expect(f.requests[1]).toMatchObject({ path: '/api/_stream/pluginManager/installBundleStream' })
+  expect(f.requests[2]).toMatchObject({ path: '/api/_stream/pluginManager/installBundleStream' })
 })
 
 it('does not start an idle runtime or accept another node or generation', async () => {

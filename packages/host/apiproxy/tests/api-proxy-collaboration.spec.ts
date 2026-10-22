@@ -353,8 +353,17 @@ describe('project collaboration Typert Remote ACL', () => {
     )).resolves.toBeUndefined()
     await expect(authorizeTypertRemote(
       ctx,
+      typertRequest('pluginManager/catalog', {}),
+    )).resolves.toBeUndefined()
+    await expect(authorizeTypertRemote(
+      ctx,
       typertRequest('dynamicCordisRunner/syncInspectManifest', { providers: [] }),
     )).resolves.toBeUndefined()
+  })
+
+  it('delegates catalog authority for read-only project members to plugin management', async () => {
+    const { ctx } = await harness(readOnlyAuthority())
+    await expect(authorizeTypertRemote(ctx, typertRequest('pluginManager/catalog', {}))).resolves.toBeUndefined()
   })
 
   it('applies Session write ACL to inspect-query resolution', async () => {
@@ -834,6 +843,40 @@ describe('project collaboration streams', () => {
     } finally {
       abort.abort()
       await consuming
+    }
+  })
+
+  it.each(['mux', 'host'] as const)('keeps the %s stream open only through its current verified deadline', async (kind) => {
+    const source = new AbortController()
+    let expiresAt = Date.now() + 30_000
+    const authority: CollaborationAuthority = {
+      ...controlledAuthority().authority,
+      get expiresAt() { return expiresAt },
+      signal: source.signal,
+      readableSessionIds: sessionIds => Promise.resolve(new Set(sessionIds)),
+    }
+    const { api } = await harness(authority)
+    vi.useFakeTimers()
+    const stream = kind === 'mux'
+      ? api.events.mux(request({}), source.signal)
+      : api.events.host(request({}), source.signal)
+    let finished = false
+    const consuming = (async () => {
+      for await (const _frame of stream) { /* The deadline owns completion even without publications. */ }
+      finished = true
+    })()
+    try {
+      await vi.advanceTimersByTimeAsync(10_000)
+      expiresAt += 10_000
+      await vi.advanceTimersByTimeAsync(20_001)
+      expect(finished).toBe(false)
+      await vi.advanceTimersByTimeAsync(10_000)
+      await consuming
+      expect(finished).toBe(true)
+    } finally {
+      source.abort()
+      await consuming
+      vi.useRealTimers()
     }
   })
 

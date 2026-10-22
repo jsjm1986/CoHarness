@@ -16,6 +16,8 @@ import type {
 } from '@deepseek-ai/dsh-client-connection'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-execution-authority'
+import { StreamPrincipalLeasePool, type StreamPrincipalRenewalConfig } from './stream-principal-leases.ts'
+export type { StreamPrincipalRenewalConfig } from './stream-principal-leases.ts'
 
 /** HTTP header carrying one Gateway-signed browser principal. */
 export const GATEWAY_PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
@@ -73,12 +75,16 @@ export interface GatewayRuntimeCredential {
   runtime: GatewayRuntimeIdentity
   token: string
   principalPublicKey: string
+  /** Present only when this managed release enables private event-connection renewal. */
+  streamPrincipalRenewal?: StreamPrincipalRenewalConfig
 }
 
 /** Request-local assertion and its verified claims. */
 export interface GatewayRequestPrincipal {
   assertion: string
   claims: GatewayPrincipalClaims
+  /** Finite socket authority for a renewable event connection; absent for fixed HTTP assertions. */
+  readonly signal?: AbortSignal
 }
 
 /** Opaque Gateway capability for one delayed project-root materialization. */
@@ -292,6 +298,14 @@ export function parseGatewayRuntimeCredential(value: unknown): GatewayRuntimeCre
     throw new Error('Gateway runtime credential must name a loopback HTTP origin')
   }
   createPublicKey(credential.principalPublicKey)
+  if (credential.streamPrincipalRenewal !== undefined) {
+    const renewal = record(credential.streamPrincipalRenewal)
+    if (renewal?.enabled !== true || !positiveInteger(renewal.intervalMs) || renewal.intervalMs > 2_147_483_647
+      || !positiveInteger(renewal.requestTimeoutMs) || renewal.requestTimeoutMs > 2_147_483_647
+      || !positiveInteger(renewal.maxBatchSize) || renewal.maxBatchSize > 1024) {
+      throw new Error('invalid Gateway stream principal renewal configuration')
+    }
+  }
   return value as GatewayRuntimeCredential
 }
 
@@ -408,7 +422,7 @@ export function readGatewayRuntimeCredential(env: NodeJS.ProcessEnv = process.en
 }
 
 const PLUGIN_MANAGEMENT_PATHS = new Set([
-  'access', 'listVersionExemptions', 'setVersionExemption', 'listPlugins', 'listBundles', 'registries',
+  'access', 'catalog', 'listVersionExemptions', 'setVersionExemption', 'listPlugins', 'listBundles', 'registries',
   'inspect', 'setPluginEnabled', 'describePluginConfig', 'setPluginConfig', 'setBundleEnabled', 'installBundle', 'waitForInstall', 'cancelInstall', 'removeBundle',
 ].map(method => `/api/pluginManager/${method}`))
 PLUGIN_MANAGEMENT_PATHS.add('/api/pluginInventory/list')
@@ -431,6 +445,7 @@ export class GatewayRuntime extends Service {
   private readonly requests = new AsyncLocalStorage<{ principal: GatewayRequestPrincipal; interactive: boolean }>()
   private readonly readinessRequests = new AsyncLocalStorage<string>()
   private readonly sessionCreations = new Map<SessionId, Promise<GatewaySessionCreationAuthorization>>()
+  private readonly streamPrincipals: StreamPrincipalLeasePool | undefined
 
   constructor(ctx: Context) {
     super(ctx, 'gatewayRuntime')
@@ -439,6 +454,23 @@ export class GatewayRuntime extends Service {
     this.organization = this.credential.organization
     this.gatewayUrl = new URL(this.credential.gatewayUrl)
     this.publicKey = createPublicKey(this.credential.principalPublicKey)
+    this.streamPrincipals = this.credential.streamPrincipalRenewal === undefined ? undefined : new StreamPrincipalLeasePool({
+      config: this.credential.streamPrincipalRenewal,
+      verify: assertion => verifyGatewayPrincipal(assertion, this.credential, this.publicKey),
+      renew: async (leaseIds, signal) => {
+        const response = await this.request('/internal/runtime/stream-principals/renew', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ version: 1, leaseIds }), signal,
+        })
+        if (!response.ok) {
+          await response.body?.cancel()
+          throw new Error('Gateway event connection renewal is unavailable')
+        }
+        return readGatewayResponseJson(response, 4 * 1024 * 1024, signal)
+      },
+      reportUnavailable: () => { ctx.logger.warn('Gateway event connection renewal failed; reconnect if the signed authority expires.') },
+    })
+    ctx.effect(() => () => this.streamPrincipals?.close(), 'gateway-runtime: event connection principal leases')
     if (ctx.root.get('executionAuthorityRequired') !== true) {
       ctx.root.effect(() => ctx.root.provide('executionAuthorityRequired', true),
         'gateway-runtime: managed application identity')
@@ -479,11 +511,16 @@ export class GatewayRuntime extends Service {
         return this.readinessRequests.run(readinessNonce, next)
       }
       if (typeof header !== 'string') throw new Error('Gateway principal assertion is required')
-      const principal = {
+      let principal: GatewayRequestPrincipal = {
         assertion: header,
         claims: verifyGatewayPrincipal(header, this.credential, this.publicKey),
       }
       this.assertPurposePermitted(principal.claims, request.kind, requestMeta.method, requestMeta.pathname)
+      if (request.kind === 'upgrade' && request.signal !== undefined
+        && (requestMeta.pathname === '/api/events.mux' || requestMeta.pathname === '/api/events.host')
+        && this.streamPrincipals !== undefined) {
+        principal = this.streamPrincipals.open(principal, request.signal)
+      }
       const requestScope = { principal, interactive: request.kind === 'http' }
       return this.requests.run(requestScope, async () => {
         try { await next() } finally { requestScope.interactive = false }

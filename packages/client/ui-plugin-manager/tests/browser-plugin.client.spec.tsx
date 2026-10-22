@@ -25,11 +25,14 @@ async function bench() {
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
-  const list = vi.fn(() => Promise.resolve({ ok: true as const, value: { entries: [], managementAvailable: true } }))
+  const list = vi.fn(() => Promise.resolve({
+    ok: true as const, value: { managementAvailable: true, manage: true, bundles: [], plugins: [] },
+  }))
   const remote = new TestRemote(ctx)
-  const pluginInventory = { list }
+  const pluginInventory = { list: vi.fn(async () => ({ ok: true as const, value: { entries: [] } })) }
   const pluginRegistryProbe = { fastest: vi.fn(async () => ({ ok: true as const, value: null })) }
   const pluginManager = {
+    catalog: list,
     listBundles: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
     listPlugins: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
     registries: vi.fn(() => Promise.resolve({ ok: true as const, value: { registry: null, fallbackRegistries: [], resolved: null } })),
@@ -142,7 +145,7 @@ describe('ui-plugin-manager browser plugin', () => {
   })
 
   it('declares only the services the page and its Remote methods use', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'settingsScope', 'layout', 'modules', 'projectUiPolicy'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginRegistryProbe', 'settingsScope', 'layout', 'modules', 'projectUiPolicy'])
   })
 
   it('registers the sidebar entry and its page, which reads the Host only once rendered and follows Host changes', async () => {

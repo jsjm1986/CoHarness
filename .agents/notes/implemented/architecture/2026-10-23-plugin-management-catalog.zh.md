@@ -1,0 +1,43 @@
+# Agent Note: 一次经过授权的插件管理目录读取
+
+Status: implemented
+
+[English](2026-10-23-plugin-management-catalog.md) | 中文
+
+## 问题
+
+插件页需要 profile 可用性、变更权限、组合包和存活条目，才能提供可用的卡片。只为了解可用性而读取完整 Loader 清单，会让一个无关的大响应串行阻塞其他读取。盲目并行启动全部读取，则会在未托管或被拒绝的目标上执行多余工作。进程级 profile 快照还需要独立的授权与失效规则。
+
+## 决策
+
+现有 `pluginManager` Remote 命名空间拥有一次聚合读取。[包参考](../../../../packages/boot/plugin-manager/README.zh.md#use-this-package)定义响应、授权与取消。Web 组合挂载独立的只读入口，使没有 profile 的状态也可被查询，而不削弱受管服务必需的 `profileContext` 依赖。共享 base、headless 和 SDK 组合保留原有提供者。该读取器不增加第二个 profile 所有者，也不跨请求缓存。
+
+授权继续由[部署策略](2026-09-22-gateway-profile-management-authority.zh.md)与现有传输断言拥有。读取器在启动原有读取前，以及发布结果前检查权限；把多个值装进一个响应不会使它们成为原子 profile 修订。高级 Admin 组成矩阵、工具及其他消费者仍可使用现有方法。
+
+Gateway 运行时的签名用途 HTTP 允许列表显式列出 `pluginManager/catalog`。注册 Remote 方法并不会放行其传输路由。管理员断言仍受已声明的 POST 路径限制，并保留 profile 权限检查。
+
+一次目录请求拥有一个操作，直到它已经启动的读取全部结束。取消和销毁会拒绝晚到结果，并在释放 effect 前等待这些读取。当前单项读取不接受取消，因此聚合入口不声称中止请求会停止同步文件工作。浏览器控制器取消自己拥有的目录读取生命周期，保留刷新合并规则，并拒绝销毁后的响应；Admin 切换目标时拥有新的控制器与传输代次。
+
+## 考虑过的替代方案
+
+**在浏览器并行执行四个请求。** 可用性仍需通过完整 Loader 清单获知，另外三个调用则会在管理不可用或读取被拒绝时启动。由单个所有者执行现有检查，可以在 profile 工作开始前完成准入。
+
+**在全局 Host 描述中加入 profile 字段。** 每次连接握手都要承担特定功能的目录读取，中央传输也会持有 profile 管理职责。当前 Remote 服务才是这些读取的所有者。
+
+**跨请求缓存合并目录。** profile 编辑、Loader 替换和权限撤销有不同生命周期。缓存增加失效处理工作，并带来旧权限风险，却不会消除初次请求依赖。
+
+**在共享 base 挂载读取器。** 当前目录消费者都选择 Web 运行时。由 Web 拥有的行支持未托管 Web 组合，同时保持 headless 和 SDK 的启动范围。
+
+**目录缺失时回退旧端点。** 静默版本回退会恢复串行依赖，并掩盖自定义 Web 组合的不完整配置。[升级指南](../../../../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/plugin-management-catalog/guide.zh.md)负责明确的迁移步骤。
+
+## 验证
+
+生产页面控制器在受控完成屏障前只发出一次目录请求，不发出清单、组合包、条目或权限请求。该断言会拒绝串行参考实现。请求次数证明依赖被消除，不代表首屏绘制或保证延迟下降。
+
+普通 Node [发行产物 Remote 测试](../../../../packages/api/remotes/tests/built-lib.e2e.ts)通过 Web 组合的真实 Loader 解析发布入口，并通过带认证的 HTTP 与生成的 Client codec 验证未托管、只读、拒绝及已授权的受管目录。提供者测试要求准入前零 profile 读取、最终权限复核、失败时等待同批读取，以及销毁时等待全部操作。控制器与 Admin 传输测试保留刷新和变更行为，拒绝无效传输值、取消所选目标，并忽略被替换代次的晚到结果。
+
+装配后的 [Admin 流程](../../../../apps/web/tests/plugin-administration.e2e.ts)先通过内置 CLI 的签名 `plugin-admin` 路由，再经真实页面安装并启用本地组合包。[运行时准入测试](../../../../packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts)拒绝未签名的目录请求；用途方法矩阵拒绝该端点的 GET 与 upgrade 请求。
+
+## 影响
+
+页面初次加载和刷新使用一个响应，消除清单先返回、再执行三个读取的串行依赖。profile 数据保持实时并经过权限检查，无需另一份持久化投影。自定义原始 Web 组合必须挂载明确的目录入口，Host、Client 与 Admin 生成产物必须对同一端点保持一致。实际网络延迟和卡片可见时间仍需通过完整浏览器应用测量。

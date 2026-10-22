@@ -69,6 +69,16 @@ describe('Gateway runtime credential', () => {
     })).toThrow(/invalid Gateway runtime credential/)
   })
 
+  it('validates optional private renewal pacing at the launch credential parser', () => {
+    const { credential } = fixture()
+    const renewal = { enabled: true, intervalMs: 10_000, requestTimeoutMs: 5000, maxBatchSize: 64 }
+    expect(parseGatewayRuntimeCredential({ ...credential, streamPrincipalRenewal: renewal }).streamPrincipalRenewal).toEqual(renewal)
+    for (const invalid of [null, {}, { ...renewal, enabled: false }, { ...renewal, intervalMs: 0 },
+      { ...renewal, requestTimeoutMs: 2_147_483_648 }, { ...renewal, maxBatchSize: 1025 }, { ...renewal, maxBatchSize: 1.5 }]) {
+      expect(() => parseGatewayRuntimeCredential({ ...credential, streamPrincipalRenewal: invalid })).toThrow('renewal configuration')
+    }
+  })
+
   it('rejects tampering, expiry, and a foreign runtime generation', () => {
     const { credential, issue } = fixture()
     const assertion = issue()
@@ -394,7 +404,7 @@ it('limits cross-user plugin administration to declared profile methods', async 
   }) }
   const called = vi.fn(async () => {})
   try {
-    const methods = ['listPlugins', 'listBundles', 'inspect', 'setPluginEnabled', 'setBundleEnabled', 'installBundle', 'cancelInstall', 'removeBundle']
+    const methods = ['catalog', 'listPlugins', 'listBundles', 'inspect', 'setPluginEnabled', 'setBundleEnabled', 'installBundle', 'cancelInstall', 'removeBundle']
     for (const method of methods) {
       await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: `/api/pluginManager/${method}`, headers }, called)
     }
@@ -402,7 +412,7 @@ it('limits cross-user plugin administration to declared profile methods', async 
     for (const pathname of ['/api/settings.describe', '/api/settings.mutate']) {
       await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname, headers }, called)
     }
-    expect(called).toHaveBeenCalledTimes(11)
+    expect(called).toHaveBeenCalledTimes(12)
     for (const request of [
       { kind: 'http' as const, method: 'POST', pathname: '/api/terminal/adminList' },
       { kind: 'http' as const, method: 'POST', pathname: '/api/settings.replace' },
@@ -411,8 +421,10 @@ it('limits cross-user plugin administration to declared profile methods', async 
       { kind: 'http' as const, method: 'POST', pathname: '/api/pluginManager/futureMethod' },
       { kind: 'http' as const, method: 'GET', pathname: '/api/pluginManager/listPlugins' },
       { kind: 'upgrade' as const, pathname: '/api/pluginManager/listPlugins' },
+      { kind: 'http' as const, method: 'GET', pathname: '/api/pluginManager/catalog' },
+      { kind: 'upgrade' as const, pathname: '/api/pluginManager/catalog' },
     ]) await expect(async () => ctx.waterfall('connection/request', { ...request, headers }, called)).rejects.toThrow('only profile management')
-    expect(called).toHaveBeenCalledTimes(11)
+    expect(called).toHaveBeenCalledTimes(12)
     expect(() => verifyGatewayPrincipal(issue({ purpose: 'plugin-admin', runtime: personal.runtime, scope: { kind: 'personal' } }), personal))
       .toThrow()
   } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }) }

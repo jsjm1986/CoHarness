@@ -81,6 +81,7 @@ async function request(
   let status = 0
   let responseBody = ''
   const res = {
+    setHeader() { return this },
     writeHead(nextStatus: number) {
       status = nextStatus
       return this
@@ -200,6 +201,46 @@ function fixture() {
     pluginState,
   }
 }
+
+describe('private event principal renewal transport', () => {
+  it('requires runtime bearer admission and sends no browser-selected authority to renewal', async () => {
+    const runtime = fixture()
+    const renew = vi.fn(async (subject: unknown, value: unknown, current: () => Promise<boolean>) => {
+      expect(subject).toMatchObject({ target: { kind: 'project', id: PROJECT_ID }, generation: GENERATION })
+      expect(value).toEqual({ version: 1, leaseIds: ['registered'] })
+      expect(await current()).toBe(true)
+      return { version: 1 as const, leases: [{ leaseId: 'registered', status: 'denied' as const }] }
+    })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, renewStreamPrincipals: renew })
+    const path = '/internal/runtime/stream-principals/renew'
+    expect(await request(handler, path, { body: { version: 1, leaseIds: ['registered'] }, token: 'browser-cookie-is-not-runtime' })).toMatchObject({ status: 401 })
+    expect(renew).not.toHaveBeenCalled()
+    expect(await request(handler, path, { body: { version: 1, leaseIds: ['registered'] } })).toMatchObject({ status: 200 })
+    expect(renew).toHaveBeenCalledOnce()
+    expect(runtime.deps.instances.authenticateRuntimeToken).toHaveBeenCalledTimes(3)
+  })
+
+  it('keeps disabled renewal unavailable without falling back to a browser assertion', async () => {
+    const runtime = fixture()
+    expect(await request(runtime.handler, '/internal/runtime/stream-principals/renew', {
+      body: { version: 1, leaseIds: ['registered'] }, principal: runtime.issuePrincipal(CREATOR_ID),
+    })).toMatchObject({ status: 503, body: { error: 'stream-principal-renewal-unavailable' } })
+  })
+
+  it('rechecks the same runtime generation after asynchronous qualification', async () => {
+    const runtime = fixture()
+    const authenticate = runtime.deps.instances.authenticateRuntimeToken
+    const first = await authenticate(RUNTIME_TOKEN)
+    let stillCurrent = true
+    const handler = createRuntimeApiHandler({ ...runtime.deps, renewStreamPrincipals: async (_subject, _value, current) => {
+      authenticate.mockResolvedValueOnce({ ...first!, generation: GENERATION + 1 })
+      stillCurrent = await current()
+      return { version: 1, leases: [{ leaseId: 'registered', status: 'denied' }] }
+    } })
+    expect(await request(handler, '/internal/runtime/stream-principals/renew', { body: { version: 1, leaseIds: ['registered'] } })).toMatchObject({ status: 200 })
+    expect(stillCurrent).toBe(false)
+  })
+})
 
 describe('profile management authorization', () => {
   it('admits an active administrator and rechecks a later revocation', async () => {

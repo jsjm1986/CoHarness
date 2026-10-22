@@ -301,6 +301,11 @@
       "source": "packages/context/gateway-runtime/src/index.ts"
     },
     {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "StreamPrincipalRenewalConfig",
+      "source": "packages/context/gateway-runtime/src/stream-principal-leases.ts"
+    },
+    {
       "doc": "docs/subsystems/commands.md",
       "symbol": "CommandDefinition",
       "source": "packages/interaction/commands/src/index.ts"

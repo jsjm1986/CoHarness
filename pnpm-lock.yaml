@@ -2766,6 +2766,9 @@ importers:
       '@deepseek-ai/dsh-office-to-pdf':
         specifier: workspace:*
         version: link:../../document/office-to-pdf
+      '@deepseek-ai/dsh-plugin-manager':
+        specifier: workspace:*
+        version: link:../../boot/plugin-manager
       '@deepseek-ai/dsh-remote-desktop-stream':
         specifier: workspace:*
         version: link:../../remote-desktop/remote-desktop-stream

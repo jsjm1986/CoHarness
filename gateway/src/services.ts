@@ -60,6 +60,12 @@ export interface GatewayAuthService {
     userAgent: string,
   ): Promise<{ token: string; user: UserRow } | 'invalid' | 'locked'>
   validate(token: string): Awaitable<UserRow | null>
+  /**
+   * Check an existing stream's login without updating activity or either login deadline.
+   * @param token - original login token owned by the Gateway socket registry.
+   * @returns current user and existing earliest deadline, or null when ineligible.
+   */
+  qualifyForStream(token: string): Awaitable<import('./auth.ts').StreamSessionQualification | null>
   revoke(token: string): Awaitable<void>
 }
 

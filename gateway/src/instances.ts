@@ -932,6 +932,7 @@ export class InstanceManager {
         runtime: { kind: runtime.kind, id: runtime.ownerId, generation },
         token: runtimeToken,
         principalPublicKey: this.security.principalPublicKey,
+        ...(this.cfg.streamPrincipalRenewal.enabled ? { streamPrincipalRenewal: this.cfg.streamPrincipalRenewal } : {}),
       })
       try { proc = await this.launcher.start({ ...runtime, gatewayCredential }) } catch (launchError: unknown) {
         if (launchError instanceof RuntimeLaunchCleanupError) {

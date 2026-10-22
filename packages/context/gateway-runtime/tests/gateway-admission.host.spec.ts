@@ -219,6 +219,7 @@ describe('gateway runtime admission', () => {
       const purposes: Array<[GatewayPrincipalClaims['purpose'], string | undefined]> = [
         ['terminal-admin', '/api/terminal/adminList'],
         ['plugin-admin', '/api/pluginManager/listPlugins'],
+        ['plugin-admin', '/api/pluginManager/catalog'],
         ['webhook-dispatch', GATEWAY_WEBHOOK_DISPATCH_PATH],
         // Archive and document purposes carry no declared HTTP endpoint of
         // their own; ordinary HTTP admission stays unrestricted for them.
@@ -238,6 +239,9 @@ describe('gateway runtime admission', () => {
         expect([purpose, (await call(gateway.origin, '/', headers)).status]).toEqual([purpose, 401])
         expect(await wsUpgrade(gateway.port, headers)).not.toEqual({ upgraded: true })
       }
+      expect((await call(gateway.origin, '/api/pluginManager/catalog', {
+        origin: gateway.origin, 'content-type': 'application/json',
+      }, 'POST', '{}')).status).toBe(401)
       // The three pinned purposes also refuse unrelated HTTP endpoints.
       for (const purpose of ['terminal-admin', 'plugin-admin', 'webhook-dispatch'] as const) {
         const headers = principalHeaders(gateway.origin, gateway.issue({

@@ -18,7 +18,7 @@ export interface ProfileSettingsRemote {
 }
 export interface PluginManagementRemote {
   settings: ProfileSettingsRemote
-  pluginManager: Answers<Pick<ClientRemote['pluginManager'], 'listPlugins' | 'listBundles' | 'inspect' | 'setPluginEnabled' | 'setPluginConfig' | 'describePluginConfig' | 'setBundleEnabled' | 'installBundle' | 'cancelInstall' | 'removeBundle' | 'registries' | 'waitForInstall'>>
+  pluginManager: Answers<Pick<ClientRemote['pluginManager'], 'catalog' | 'listPlugins' | 'listBundles' | 'inspect' | 'setPluginEnabled' | 'setPluginConfig' | 'describePluginConfig' | 'setBundleEnabled' | 'installBundle' | 'cancelInstall' | 'removeBundle' | 'registries' | 'waitForInstall'>>
   pluginInventory: Answers<Pick<ClientRemote['pluginInventory'], 'list'>>
   /** The gateway answers it locally; the managed runtime carries no such service. */
   pluginRegistryProbe: { fastest(): Promise<Answer<string | null>> }
@@ -55,8 +55,11 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
   const request = (endpoint: string, args: object) => ({ ...target, rpcId: randomUUID(), endpoint, args })
   const call = async <T,>(endpoint: string, args: object, signal?: AbortSignal): Promise<Answer<T>> => {
     const input = request(endpoint, args)
+    const abort = signal === undefined ? lifetime : AbortSignal.any([lifetime, signal])
     try {
-      const value = await pluginManagementInvoke(input, signal === undefined ? lifetime : AbortSignal.any([lifetime, signal]))
+      abort.throwIfAborted()
+      const value = await pluginManagementInvoke(input, abort)
+      abort.throwIfAborted()
       if (typeof value !== 'object' || value === null || !('rpcId' in value) || value.rpcId !== input.rpcId || !('result' in value)) throw new Error(t()('wireMismatched'))
       const result = value.result
       if (typeof result !== 'object' || result === null || !('ok' in result)) throw new Error(t()('wireNoResult'))
@@ -70,6 +73,7 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
     pluginInventory: { list: () => call('pluginInventory/list', {}) },
     pluginRegistryProbe: { fastest: () => call('pluginRegistryProbe/fastest', {}) },
     pluginManager: {
+      catalog: signal => call('pluginManager/catalog', {}, signal),
       listPlugins: () => call('pluginManager/listPlugins', {}),
       listBundles: () => call('pluginManager/listBundles', {}),
       inspect: (spec, options, signal) => call('pluginManager/inspect', { spec, options }, signal),

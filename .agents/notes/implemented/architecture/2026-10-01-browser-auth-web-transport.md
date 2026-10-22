@@ -20,6 +20,8 @@ Between the fence and the cookie check sits one generic admission point: `connec
 
 `apply` is asynchronous because `BrowserAuth.create` awaits the credential record. Web-server registration moved inside `ctx.inject(['webServer'], ...)`, so non-Web compositions keep RPC registration without paying for an HTTP surface. Test and scaffold helpers mint the cookie in-process through `authorizeIndex`; Node-side `hostFetch` attaches it explicitly.
 
+Active event-connection renewal retains the same initial admission and purpose restrictions; the [socket-owned principal decision](2026-10-23-event-stream-principal-renewal.md) owns requalification, bounded private batches and signed deadlines.
+
 ## Alternatives considered
 
 **Keep the trust fence as the sole admission.** The fence blocks DNS rebinding but not a LAN peer or a local process outside the trust list from calling `/api` once `--trusted-host` opens the listener. Session and filesystem authority require a real credential, not reachability.

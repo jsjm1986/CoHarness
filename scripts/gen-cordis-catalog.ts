@@ -56,6 +56,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   userTerminalAuthorization: 'collaboration.md',
   userTerminalAdministration: 'collaboration.md',
   pluginManager: 'boot.md',
+  pluginManagerCatalog: 'boot.md',
   pluginMarket: 'boot.md',
   pluginRegistryProbe: 'boot.md',
   profileContext: 'boot.md',
@@ -92,6 +93,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   fs: 'filesystem.md',
   gatewayRuntime: 'collaboration.md',
   executionAuthority: 'collaboration.md',
+  resourceBudget: 'resource-budget.md',
   goals: 'goal.md',
   webServer: 'web-server.md',
   webApp: 'web-server.md',
@@ -299,6 +301,9 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  * appear on more than one page.
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
+  ResourceKind: 'resource-budget.md',
+  ResourceLease: 'resource-budget.md',
+  ResourceRequest: 'resource-budget.md',
   WorkspaceChangesSummary: 'deliverables.md',
   SshConnection: 'ssh.md',
   OfficeToPdfRequest: 'office-to-pdf.md',
@@ -859,6 +864,10 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   MarketSearchResult: 'boot.md',
   MarketSort: 'boot.md',
   PluginManagementAccess: 'boot.md',
+  PluginManagementCatalog: 'boot.md',
+  ParsedInstallSpec: 'boot.md',
+  PluginConfigDescription: 'boot.md',
+  PluginConfigValue: 'boot.md',
   PluginManagementCapability: 'boot.md',
   PluginDesiredState: 'boot.md',
   PluginDesiredStateSnapshot: 'boot.md',

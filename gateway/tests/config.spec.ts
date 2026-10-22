@@ -10,6 +10,16 @@ import {
 } from '../src/config.ts'
 
 describe('loadConfig', () => {
+  it('validates bounded private event principal renewal settings', () => {
+    expect(loadConfig({}).streamPrincipalRenewal).toEqual({ enabled: true, intervalMs: 10000, requestTimeoutMs: 5000, maxBatchSize: 64 })
+    expect(loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'false' }).streamPrincipalRenewal.enabled).toBe(false)
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'yes' })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED')
+    for (const key of ['HGW_STREAM_PRINCIPAL_RENEWAL_INTERVAL_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS', 'HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH']) {
+      for (const value of ['0', '-1', '1.5', 'invalid', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH: '1025' })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH')
+    expect(() => loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS')
+  })
   it('accepts an explicit SQL executor wrapper and rejects an empty command', () => {
     expect(loadConfig({ HGW_PSQL_COMMAND: '/opt/postgres/bin/psql' }).psqlCommand).toEqual(['/opt/postgres/bin/psql'])
     expect(loadConfig({}).psqlCommand).toBeUndefined()
@@ -17,12 +27,12 @@ describe('loadConfig', () => {
   })
 
   it('validates node-wide Runtime admission and performance settings', () => {
-    expect(loadConfig({}).runtimeCapacity).toEqual({ maxStarting: 2, maxResident: 8, maxQueued: 32, maxQueueWaitMs: 30000 })
+    expect(loadConfig({}).runtimeCapacity).toEqual({ maxStarting: 2, maxResident: 0, maxQueued: 32, maxQueueWaitMs: 30000 })
     expect(loadConfig({}).performanceEnabled).toBe(true)
     expect(loadConfig({}).performanceEventLoopResolutionMs).toBe(20)
     expect(loadConfig({ HGW_PERFORMANCE_ENABLED: 'false' }).performanceEnabled).toBe(false)
     for (const key of ['HGW_RUNTIME_MAX_STARTING', 'HGW_RUNTIME_MAX_RESIDENT', 'HGW_RUNTIME_MAX_QUEUED', 'HGW_RUNTIME_QUEUE_WAIT_MS', 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS']) {
-      for (const value of ['0', '-1', '1.5', 'wat', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+      for (const value of ['-1', '1.5', 'wat', '9007199254740992', ...(key === 'HGW_RUNTIME_MAX_RESIDENT' ? [] : ['0'])]) expect(() => loadConfig({ [key]: value })).toThrow(key)
     }
     expect(() => loadConfig({ HGW_RUNTIME_MAX_STARTING: '3', HGW_RUNTIME_MAX_RESIDENT: '2' })).toThrow('HGW_RUNTIME_MAX_STARTING')
     expect(() => loadConfig({ HGW_RUNTIME_QUEUE_WAIT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_RUNTIME_QUEUE_WAIT_MS')

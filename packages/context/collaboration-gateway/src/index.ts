@@ -97,8 +97,9 @@ function withSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 
 class GatewayAuthority implements CollaborationAuthority {
   readonly participant: CollaborationParticipant
-  readonly expiresAt: number
   readonly signal: AbortSignal
+
+  get expiresAt(): number { return this.principal.claims.expiresAt }
 
   constructor(
     private readonly runtime: GatewayRuntime,
@@ -107,8 +108,7 @@ class GatewayAuthority implements CollaborationAuthority {
     private readonly assertActive: () => void,
   ) {
     const claims = principal.claims
-    this.expiresAt = claims.expiresAt
-    this.signal = signal
+    this.signal = principal.signal === undefined ? signal : AbortSignal.any([signal, principal.signal])
     this.participant = {
       userId: claims.user.id,
       username: claims.user.username,
@@ -126,8 +126,14 @@ class GatewayAuthority implements CollaborationAuthority {
     }
   }
 
-  private async post(path: string, body: unknown): Promise<unknown> {
+  private assertAuthority(): void {
     this.assertActive()
+    if (this.signal.aborted) throw new CollaborationError('gateway-unavailable', 'Gateway event connection authority ended')
+  }
+
+  private async post(path: string, body: unknown): Promise<unknown> {
+    this.assertAuthority()
+    this.signal.throwIfAborted()
     let response: Response
     try {
       response = await this.runtime.request(path, {
@@ -168,7 +174,7 @@ class GatewayAuthority implements CollaborationAuthority {
   }
 
   async authorize(sessionId: SessionIdentity, action: CollaborationAction): Promise<CollaborationAccess> {
-    this.assertActive()
+    this.assertAuthority()
     const creationAuthorization = await this.creationAuthorization(sessionId)
     const value = record(await this.post('/internal/runtime/collaboration/authorize', {
       sessionId,
@@ -179,7 +185,7 @@ class GatewayAuthority implements CollaborationAuthority {
   }
 
   async readableSessionIds(sessionIds: readonly SessionIdentity[]): Promise<ReadonlySet<SessionIdentity>> {
-    this.assertActive()
+    this.assertAuthority()
     if (sessionIds.length === 0) return new Set()
     if (this.participant.scope.kind === 'personal') return new Set(sessionIds)
     // Deduplicate before issuing requests: the public result is a Set, so
@@ -189,7 +195,7 @@ class GatewayAuthority implements CollaborationAuthority {
     const readable = new Set<SessionIdentity>()
     const unique = [...new Map(sessionIds.map(id => [String(id), id] as const)).values()]
     for (let offset = 0; offset < unique.length; offset += READABLE_SESSION_BATCH_SIZE) {
-      this.assertActive()
+      this.assertAuthority()
       const batch = unique.slice(offset, offset + READABLE_SESSION_BATCH_SIZE)
       const creationAuthorizations = (await Promise.all(batch.map(async (sessionId) => {
         const authorization = await this.creationAuthorization(sessionId)
@@ -220,7 +226,7 @@ class GatewayAuthority implements CollaborationAuthority {
     outcome: unknown,
     callId?: string,
   ): Promise<boolean> {
-    this.assertActive()
+    this.assertAuthority()
     if (this.participant.scope.kind === 'personal') return true
     const value = record(await this.post('/internal/runtime/collaboration/claim-interaction', {
       sessionId,

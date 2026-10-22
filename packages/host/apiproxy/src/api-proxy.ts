@@ -278,6 +278,7 @@ export const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/syncInspectManifest',
   'agentPresets/list',
   'pluginManager/access',
+  'pluginManager/catalog',
   'pluginManager/listPlugins',
   'pluginManager/listBundles',
   'pluginManager/listVersionExemptions',
@@ -2302,15 +2303,27 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return items.filter((workspaceId): workspaceId is WorkspaceId => workspaceId !== undefined)
   }
 
-  /** End a long-lived stream when its signed request principal expires. */
+  /** Enforce the current signed deadline, including verified connection renewals. */
   function principalSignal(
     signal: AbortSignal,
     authority: CollaborationAuthority | undefined,
   ): AbortSignal {
     if (authority === undefined) return signal
-    const remaining = authority.expiresAt - Date.now()
-    const expiry = remaining <= 0 ? AbortSignal.abort() : AbortSignal.timeout(remaining)
-    return AbortSignal.any([signal, authority.signal, expiry])
+    const expiry = new AbortController()
+    const combined = AbortSignal.any([signal, authority.signal, expiry.signal])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const check = (): void => {
+      if (combined.aborted) return
+      const remaining = authority.expiresAt - Date.now()
+      if (remaining <= 0) expiry.abort()
+      else {
+        timer = setTimeout(check, remaining)
+        timer.unref()
+      }
+    }
+    combined.addEventListener('abort', () => { clearTimeout(timer) }, { once: true })
+    check()
+    return combined
   }
 
   /** Serialize image admission with model selection for one agent. */

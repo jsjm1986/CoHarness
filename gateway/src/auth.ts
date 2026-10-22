@@ -15,6 +15,12 @@ export interface UserRow {
   autoReviewEligible: boolean
 }
 
+/** Existing login eligibility without renewing its idle or absolute deadline. */
+export interface StreamSessionQualification {
+  user: UserRow
+  expiresAt: number
+}
+
 const LOCK_WINDOW_MS = 10 * 60 * 1000
 const LOCK_THRESHOLD = 5
 
@@ -119,6 +125,21 @@ export class AuthService {
       if (user === undefined || user.status !== 'active' || user.deleted_at !== null) return null
       return toUserRow(user)
     })()
+  }
+
+  /**
+   * Read a live login without updating activity or extending its lifetime.
+   * @param token - original login token retained by an active event socket.
+   * @returns the active user and existing earliest login deadline, or null when ineligible.
+   */
+  qualifyForStream(token: string): StreamSessionQualification | null {
+    const now = Date.now()
+    const session = this.db.prepare(`SELECT user_id,expires_at,absolute_expires_at FROM auth_sessions WHERE token_hash = ?`)
+      .get(tokenHash(token)) as { user_id: number; expires_at: number; absolute_expires_at: number } | undefined
+    if (session === undefined || session.expires_at <= now || session.absolute_expires_at <= now) return null
+    const user = this.db.prepare(`SELECT * FROM users WHERE id = ?`).get(session.user_id) as DbUser | undefined
+    if (user === undefined || user.status !== 'active' || user.deleted_at !== null || user.must_change_password === 1) return null
+    return { user: toUserRow(user), expiresAt: Math.min(session.expires_at, session.absolute_expires_at) }
   }
 
   revoke(token: string): void {

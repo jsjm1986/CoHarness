@@ -28,13 +28,14 @@ Use `dsh-gateway-runtime` for the authenticated request context and private loop
 - The launch credential is read from exactly one of `DSH_GATEWAY_CREDENTIAL_FD` or `DSH_GATEWAY_CREDENTIAL_FILE`. It contains a loopback-only Gateway origin, runtime bearer token, runtime generation, organization, and Ed25519 public key.
 - The runtime registers the `connection/authenticate` provider, so Connection admits a verified principal to the index, `/api`, generic channels, and event streams ahead of the browser token exchange and cookie; a gateway-launched process never admits a browser credential alone. A purpose-bound assertion is confined to HTTP operations and never serves the index or opens an event stream — the pinned purposes (`terminal-admin`, `plugin-admin`, `webhook-dispatch`) reach only their declared POST routes.
 - The `connection/request` listener requires `x-dsh-gateway-principal`, verifies its signature, lifetime, organization, scope, runtime identity, and generation, then exposes it through request-local `current()` / `requireCurrent()` access.
+- Only admitted `/api/events.mux` and `/api/events.host` upgrades with an owned socket signal can use private renewal. A service-owned pool keeps one in-flight bounded batch, verifies every replacement against the same identity/permissions/scope/generation and applies it only before the preceding signed deadline. Socket closure, disposal, denial or expiry aborts the retained principal; late replies cannot revive it. HTTP assertions remain fixed.
 - `interactive()` exposes that principal only while an authenticated HTTP operation remains active. `current()` identifies the originating authenticated dispatch and can follow its asynchronous context; it does not grant detached work interactive authority.
 - `request()` accepts only absolute `/internal/runtime/` paths on the credential's loopback origin, adds the private bearer token, and forwards a browser principal only when the caller explicitly requests it.
 - The private `/api/internal/gateway/readiness` endpoint accepts only a nonce plus an HMAC derived from the launch token and exact runtime identity, and returns a matching response proof; an arbitrary listener on the runtime port cannot satisfy Gateway readiness.
 - Credentials and principal assertions fail closed at their parsing and request boundaries. The runtime bearer token is never exposed through the public service fields.
 - Consumers that read a private JSON response use `readGatewayResponseJson()` (or its byte-level companion) with a domain limit and optional `AbortSignal`; chunked bodies are cancelled when the limit or signal is reached, so `Content-Length` is not the only protection.
 
-The `plugin-admin` purpose permits only declared profile-management HTTP methods plus `settings.describe` and `settings.mutate`. These settings methods recheck live administrator authority; mutations require a held revision and cannot edit account preferences. The purpose grants no native document opener, credential API, terminal or Session execution access.
+The `plugin-admin` purpose permits only declared profile-management HTTP methods, including the aggregate `pluginManager/catalog` read, plus `settings.describe` and `settings.mutate`. These settings methods recheck live administrator authority; mutations require a held revision and cannot edit account preferences. The purpose grants no native document opener, credential API, terminal or Session execution access.
 
 ### Execution authorization
 
@@ -53,7 +54,7 @@ None; the package never assembles or sends provider requests.
 
 - **Gateway-launched runtimes only** — loading the plugin without a valid private launch credential fails startup.
 - **Request context is not execution authority** — a retained `current()` principal identifies its originating dispatch. Background, delegated and restored work must use [Execution Authority](../execution-authority/README.md); an earlier request cannot establish current privilege.
-- **Short-lived assertions** — the shipped Gateway defaults `HGW_PRINCIPAL_ASSERTION_TTL_MS` to 30 seconds. A verified principal freezes its project scope mode until `expiresAt`; Session Consumers use `ctx.collaboration` for current membership and ACL decisions. The [Gateway](../../../gateway/README.md) owns proxy expiry and access invalidation.
+- **Short-lived assertions** — the shipped Gateway defaults `HGW_PRINCIPAL_ASSERTION_TTL_MS` to 30 seconds. A verified principal fixes its project scope mode; active event sockets may receive another short signature only after Gateway requalification. Session Consumers use `ctx.collaboration` for current membership and ACL decisions. The [Gateway](../../../gateway/README.md) owns proxy expiry and access invalidation.
 
 <a id="dev-note"></a>
 ### Dev Note

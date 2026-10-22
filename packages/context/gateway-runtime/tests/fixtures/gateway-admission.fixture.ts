@@ -20,7 +20,7 @@ import LocalCredentials from '@deepseek-ai/dsh-credentials-local'
 import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import * as FrontendStatic from '@deepseek-ai/dsh-host-frontend-static'
 import HttpServer from '@deepseek-ai/dsh-host-webserver'
-import type { GatewayPrincipalClaims, GatewayRuntimeCredential } from '../../src/index.ts'
+import type { GatewayPrincipalClaims, GatewayRuntimeCredential, GatewayRequestPrincipal } from '../../src/index.ts'
 import GatewayRuntime from '../../src/index.ts'
 
 /** One mux/host event source that stays open until the downlink closes. */
@@ -47,13 +47,19 @@ export interface GatewayComposition {
 
 /**
  * Boot the deployed runtime composition under a private credential and port.
+ * @param options - private test transport, renewal pacing and event-admission observer.
  * @returns the composed context, its assertion issuer, and its loopback origin.
  */
-export async function loadGatewayComposition(): Promise<GatewayComposition> {
+export async function loadGatewayComposition(options: {
+  gatewayUrl?: string
+  streamPrincipalRenewal?: GatewayRuntimeCredential['streamPrincipalRenewal']
+  onEvent?: (principal: GatewayRequestPrincipal, signal: AbortSignal) => void
+} = {}): Promise<GatewayComposition> {
   const pair = generateKeyPairSync('ed25519')
   const credential: GatewayRuntimeCredential = {
     version: 1,
-    gatewayUrl: 'http://127.0.0.1:8899',
+    gatewayUrl: options.gatewayUrl ?? 'http://127.0.0.1:8899',
+    ...(options.streamPrincipalRenewal === undefined ? {} : { streamPrincipalRenewal: options.streamPrincipalRenewal }),
     organization: 'acme',
     runtime: { kind: 'user', id: 9, generation: 7 },
     token: 'runtime-secret',
@@ -127,12 +133,11 @@ export async function loadGatewayComposition(): Promise<GatewayComposition> {
       }
     },
   }
-  const apiProxy = {
-    events: {
-      mux: (_request: unknown, signal: AbortSignal) => idle(signal),
-      host: (_request: unknown, signal: AbortSignal) => idle(signal),
-    },
-  } as unknown as ApiProxy
+  const eventSource = (_request: unknown, signal: AbortSignal) => {
+    options.onEvent?.(ctx.gatewayRuntime.requireCurrent(), signal)
+    return idle(signal)
+  }
+  const apiProxy = { events: { mux: eventSource, host: eventSource } } as unknown as ApiProxy
   ctx.provide('apiProxy', apiProxy)
 
   const previousFile = process.env.DSH_GATEWAY_CREDENTIAL_FILE

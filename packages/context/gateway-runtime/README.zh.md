@@ -28,13 +28,14 @@ kind: "package-reference"
 - 启动凭据必须且只能从 `DSH_GATEWAY_CREDENTIAL_FD` 或 `DSH_GATEWAY_CREDENTIAL_FILE` 之一读取。它包含仅限 loopback 的 Gateway origin、运行时 bearer token、运行时 generation、组织和 Ed25519 公钥。
 - 运行时注册 `connection/authenticate` provider，使 Connection 在浏览器令牌交换与 Cookie 之前就向 index、`/api`、通用通道和事件流放行已验证的 principal；经 Gateway 启动的进程绝不单独接受浏览器凭据。受限用途的断言被约束在 HTTP 操作内，绝不能提供 index 或开启事件流——三个钉死用途（`terminal-admin`、`plugin-admin`、`webhook-dispatch`）只能到达其声明的 POST 路由。
 - `connection/request` 监听器要求 `x-dsh-gateway-principal`，验证其签名、有效期、组织、scope、运行时身份和 generation，再通过请求局部的 `current()` / `requireCurrent()` 暴露它。
+- 只有已准入且持有 socket 生命周期信号的 `/api/events.mux` 与 `/api/events.host` upgrade 可以私有续租。服务所有的池只保留一份有界在途批次，按相同身份、权限、scope 和 generation 验证每份替代签名，并且只在上一份签名到期前应用。socket 关闭、服务销毁、拒绝或到期都会中止保留的 principal；晚到响应不能复活它。HTTP 断言仍保持固定到期。
 - `interactive()` 只在认证 HTTP 操作仍活动时暴露该主体。`current()` 标识起始认证分发，并可以沿异步上下文传递；它不会向脱离请求的工作授予交互权限。
 - `request()` 只接受凭据 loopback origin 上的绝对 `/internal/runtime/` 路径，加入私有 bearer token，并且只在调用方明确要求时转发浏览器 principal。
 - 私有 `/api/internal/gateway/readiness` 端点只接受 nonce、由启动 token 和精确运行时身份派生的 HMAC，并返回匹配的响应证明；运行时端口上的任意监听器都不能满足 Gateway 的就绪检查。
 - 凭据和 principal 断言在各自的解析与请求边界失败关闭。运行时 bearer token 不会通过公开服务字段暴露。
 - 读取私有 JSON 响应的 Consumer 使用带领域上限和可选 `AbortSignal` 的 `readGatewayResponseJson()`（或字节级配套函数）；分块 body 超过上限或收到取消信号时会被取消，因此保护不只依赖 `Content-Length`。
 
-`plugin-admin` 用途仅允许已声明的 Profile 管理 HTTP 方法以及 `settings.describe`、`settings.mutate`。设置方法会重新核验当前管理员权限；写入必须携带已读版本，且不能修改账户偏好。此用途不授予原生文档打开器、凭据 API、终端或会话执行权限。
+`plugin-admin` 用途仅允许已声明的 Profile 管理 HTTP 方法（包括聚合读取 `pluginManager/catalog`）以及 `settings.describe`、`settings.mutate`。设置方法会重新核验当前管理员权限；写入必须携带已读版本，且不能修改账户偏好。此用途不授予原生文档打开器、凭据 API、终端或会话执行权限。
 
 ### 执行授权
 
@@ -54,7 +55,7 @@ kind: "package-reference"
 
 - **仅限 Gateway 启动的运行时** — 未提供有效私有启动凭据时加载插件会导致启动失败。
 - **请求上下文不是执行授权** — 保留的 `current()` 主体标识起始分发。后台、委派和恢复工作必须使用 [Execution Authority](../execution-authority/README.zh.md)；先前请求不能证明当前特权。
-- **短期断言** — Gateway 的交付默认值把 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 设为 30 秒。已验证主体会固定其项目 scope 模式直到 `expiresAt`；Session 消费方使用 `ctx.collaboration` 取得当前成员身份与 ACL 决定。代理过期和访问失效处理由 [Gateway](../../../gateway/README.zh.md) 负责。
+- **短期断言** — Gateway 的交付默认值把 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 设为 30 秒。已验证主体会固定其项目 scope 模式；活动事件 socket 只有在 Gateway 重新验证资格后才能取得另一份短期签名。Session 消费方使用 `ctx.collaboration` 取得当前成员身份与 ACL 决定。代理过期和访问失效处理由 [Gateway](../../../gateway/README.zh.md) 负责。
 
 <a id="dev-note"></a>
 ### 开发备注

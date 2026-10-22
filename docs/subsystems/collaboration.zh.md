@@ -49,7 +49,7 @@ interface GatewayPrincipalClaims {
 }
 ```
 
-每次根对话授权和可读会话筛选都会通过 Gateway 查询 PostgreSQL 中的当前组织角色与项目成员身份。因此，移除成员、把 `rw` 改为 `ro` 或取消管理员权限会影响下一次 Session ACL 检查。不带 Session ACL 的操作使用 principal 中捕获的 scope 模式；该模式不会超过 `expiresAt` 继续有效。Gateway 默认有效期为 30 秒，被代理的 HTTP 请求会获得新 principal，长连接 Host 与 Typert stream 会在过期时关闭并重连。
+每次根对话授权和可读会话筛选都会通过 Gateway 查询 PostgreSQL 中的当前组织角色与项目成员身份。因此，移除成员、把 `rw` 改为 `ro` 或取消管理员权限会影响下一次 Session ACL 检查。不带 Session ACL 的操作使用 principal 中捕获的 scope 模式；该模式不会超过 `expiresAt` 继续有效。Gateway 默认有效期为 30 秒，被代理的 HTTP 请求会获得新 principal。已登记的 mux/host 事件 socket 可通过私有资格复核取得另一份短期签名；其他保留操作使用原到期时间。[事件 principal 决策](../../.agents/notes/implemented/architecture/2026-10-23-event-stream-principal-renewal.zh.md) 拥有续租与取消规则。
 
 ## 私有运行时通道
 
@@ -70,6 +70,18 @@ interface ConnectionRequestBoundary {
   pathname?: string
   /** Full request URL as sent by the client; carriers that cannot set headers declare credentials and modes in its query. */
   url?: string
+  /** Socket-owned close/error lifetime on upgrades; absent on carriers without a retained socket. */
+  signal?: AbortSignal
+}
+```
+
+```ts type-equiv
+/** Deployment-owned private renewal pacing; signed expiry always remains authoritative. */
+interface StreamPrincipalRenewalConfig {
+  enabled: true
+  intervalMs: number
+  requestTimeoutMs: number
+  maxBatchSize: number
 }
 ```
 
@@ -82,6 +94,8 @@ interface GatewayRuntimeCredential {
   runtime: GatewayRuntimeIdentity
   token: string
   principalPublicKey: string
+  /** Present only when this managed release enables private event-connection renewal. */
+  streamPrincipalRenewal?: StreamPrincipalRenewalConfig
 }
 ```
 
@@ -92,6 +106,8 @@ interface GatewayRuntimeCredential {
 interface GatewayRequestPrincipal {
   assertion: string
   claims: GatewayPrincipalClaims
+  /** Finite socket authority for a renewable event connection; absent for fixed HTTP assertions. */
+  readonly signal?: AbortSignal
 }
 ```
 
@@ -177,15 +193,15 @@ interface CollaborationSessionCreation {
 
 ## 捕获的 Authority
 
-消费者在认证请求有效时捕获 authority，并在该操作期间保留不可变参与者与提供方生命周期。授权和可读会话筛选会查询 Gateway；签发提供方卸载时，`signal` 会中止。只有首个提交某项审批或问题结果的事务会让 `claimInteraction()` 返回 `true`。
+消费者在认证请求有效时捕获 authority，并在该操作期间保留不可变参与者与提供方生命周期。授权和可读会话筛选会查询 Gateway；签发提供方卸载或其保留事件 socket 结束时，`signal` 会中止。`expiresAt` 暴露当前已验证签名的期限，而不改变参与者权限。只有首个提交某项审批或问题结果的事务会让 `claimInteraction()` 返回 `true`。
 
 ```ts type-equiv
 /** Principal-bound collaboration operations safe to retain for one request or stream lifetime. */
 interface CollaborationAuthority {
   readonly participant: CollaborationParticipant
-  /** Assertion expiry; long-lived streams reconnect no later than this instant. */
+  /** Current signed expiry; only a verified socket-bound renewal may advance it. */
   readonly expiresAt: number
-  /** Aborts when the provider that issued this authority unloads. */
+  /** Aborts on provider disposal or when retained socket authority expires or closes. */
   readonly signal: AbortSignal
 
   /**

@@ -1869,6 +1869,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'After the deployment permits the operation; rejects without permission.',
       },
       {
+        signature: 'authorizeInstall?(spec: ParsedInstallSpec): Promise<void>',
+        description: 'Gate one installable spec by its form before pnpm runs. Present only in deployments that restrict install sources; absent means any spec form is acceptable. The parsed spec, not the raw string, reaches the policy so a URL spelled several ways cannot slip past a host rule.',
+        parameters: [{ name: 'spec', description: 'the parsed install spec.' }],
+        returns: 'After the deployment permits the source; rejects with \'plugin-management/install-source\' otherwise.',
+      },
+      {
         signature: 'readDesiredState?(): Promise<PluginDesiredStateSnapshot>',
         description: 'Read the profile\'s saved desired state. Present only in deployments with a durable state store; standalone profiles manage files directly.',
         parameters: [],
@@ -1942,6 +1948,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'Saved and runtime outcomes, including higher-priority overrides.',
       },
       {
+        signature: '@Remote async describePluginConfig(id: PluginEntryId): Promise<PluginConfigDescription>',
+        description: 'Read one plugin row\'s current config and its schema, when the module declares one. The schema serializes through schemastery `toJSON` for form rendering; modules without a `Config` schema report `schema: undefined`.',
+        parameters: [{ name: 'id', description: 'Loader entry identity returned by listPlugins.' }],
+        returns: 'The entry\'s declared config and its JSON-serialized schema.',
+      },
+      {
+        signature: '@Remote async setPluginConfig(id: PluginEntryId, config: PluginConfigValue | null): Promise<ChangeResult>',
+        description: 'Replace one plugin row\'s config in the profile patch, validated against its schema. `config: null` removes the override so composition defaults apply. The loader rejects a failing schema at reload as well; validating here first reports a readable error instead of a broken reload.',
+        parameters: [{ name: 'id', description: 'Loader entry identity returned by listPlugins.' }, { name: 'config', description: 'JSON-serializable config object, or `null` to clear the override.' }],
+        returns: 'Saved and runtime outcomes.',
+      },
+      {
         signature: '@Remote async setBundleEnabled(name: string, enabled: boolean): Promise<ChangeResult>',
         description: 'Select or remove a bundle layer while retaining installed dependencies.',
         parameters: [{ name: 'name', description: 'Bundle package name.' }, { name: 'enabled', description: 'Whether the bundle contributes its patch layer.' }],
@@ -1976,6 +1994,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Unload and remove a profile-owned bundle dependency through dsh plugin\'s pnpm path.',
         parameters: [{ name: 'name', description: 'Installed dependency name.' }, { name: 'signal', description: 'Cancellation from the calling tool or Remote transport.' }],
         returns: 'Removal diagnostics and the remaining profile state.',
+      },
+    ],
+  },
+  {
+    key: 'pluginManagerCatalog',
+    summary: 'Aggregate the existing profile reads without allocating a second management owner or cache.',
+    description: 'Aggregate the existing profile reads without allocating a second management owner or cache.',
+    methods: [
+      {
+        signature: '@Remote catalog(signal: AbortSignal): Promise<PluginManagementCatalog>',
+        description: 'Read current profile availability, mutation authority, bundles, and entries. Transport authorization precedes invocation, including the administrator assertion. A missing profile reads no files; a refused read publishes no catalog.',
+        parameters: [{ name: 'signal', description: 'cancellation of this request; disposal also cancels publication and drains reads.' }],
+        returns: 'live catalog values, without an atomic profile-revision guarantee.',
       },
     ],
   },
@@ -2214,6 +2245,20 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Audit events visible to the caller, newest first; non-administrators are restricted to events touching their own principal.',
         parameters: [{ name: 'agent', description: 'caller\'s Session address bound for routing.' }, { name: 'request', description: 'optional target and principal filters.' }, { name: 'signal', description: 'request cancellation.' }],
         returns: 'matching audit events.',
+      },
+    ],
+  },
+  {
+    key: 'resourceBudget',
+    summary: 'Provider-owned node budget; standalone compositions may omit this service.',
+    description: 'Provider-owned node budget; standalone compositions may omit this service.',
+    methods: [
+      {
+        signature: 'abstract acquire(request: ResourceRequest): Promise<ResourceLease>',
+        description: 'Wait for one bounded, fairly scheduled reservation before execution.',
+        parameters: [{ name: 'request', description: 'resource, cancellation and optional executing Session.' }],
+        returns: 'a permit retained until the caller proves execution quiescence.',
+        throws: ['when admission is refused, canceled, expired or unavailable.'],
       },
     ],
   },
@@ -5403,7 +5448,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ChangeResult',
-    declaration: 'export interface ChangeResult {\n    changed: boolean;\n    application: \'applied\' | \'restart-required\' | \'overridden\' | \'failed\' | \'cancelled\';\n    restartReason?: RestartReason;\n    stage: \'install\' | \'enable\' | \'remove\';\n    target: string;\n    enabled?: boolean;\n    error?: ManagementError;\n    warnings?: string[];\n    packageResult?: PackageResult;\n    bundle?: string;\n    version?: string;\n    pendingBuilds?: string[];\n    approvedBuilds?: string[];\n    registries?: Registry[];\n    failedAt?: \'registry\' | \'spec-host\';\n}',
+    declaration: 'export interface ChangeResult {\n    changed: boolean;\n    application: \'applied\' | \'restart-required\' | \'overridden\' | \'failed\' | \'cancelled\';\n    restartReason?: RestartReason;\n    stage: \'install\' | \'enable\' | \'remove\' | \'configure\';\n    target: string;\n    enabled?: boolean;\n    error?: ManagementError;\n    warnings?: string[];\n    packageResult?: PackageResult;\n    bundle?: string;\n    version?: string;\n    pendingBuilds?: string[];\n    approvedBuilds?: string[];\n    registries?: Registry[];\n    failedAt?: \'registry\' | \'spec-host\';\n}',
   },
   {
     name: 'ClientArtifactBaseline',
@@ -5991,7 +6036,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GatewayRequestPrincipal',
-    declaration: 'export interface GatewayRequestPrincipal {\n    assertion: string;\n    claims: GatewayPrincipalClaims;\n}',
+    declaration: 'export interface GatewayRequestPrincipal {\n    assertion: string;\n    claims: GatewayPrincipalClaims;\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'GatewayRuntimeIdentity',
@@ -6447,7 +6492,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ManagementError',
-    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'already-installed\' | \'ambiguous-install\' | \'not-bundle\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'incompatible-version\' | \'operation-error\';\n    diagnostic?: string;\n    incompatible?: IncompatiblePlugin[];\n}',
+    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'invalid-config\' | \'already-installed\' | \'ambiguous-install\' | \'not-bundle\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'incompatible-version\' | \'install-source\' | \'operation-error\';\n    diagnostic?: string;\n    incompatible?: IncompatiblePlugin[];\n}',
   },
   {
     name: 'ManualCompactAgentContext',
@@ -6746,6 +6791,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface PaneOpenResult {\n    id: string;\n    isPlaced: boolean;\n    reason?: string;\n}',
   },
   {
+    name: 'ParsedInstallSpec',
+    declaration: 'export type ParsedInstallSpec = {\n    readonly kind: \'registry\';\n    readonly spec: string;\n    readonly name: string;\n    readonly range?: string;\n} | {\n    readonly kind: \'path\';\n    readonly spec: string;\n    readonly path: string;\n} | {\n    readonly kind: \'tarball\';\n    readonly spec: string;\n    readonly path?: string;\n    readonly host?: string;\n} | {\n    readonly kind: \'git\';\n    readonly spec: string;\n    readonly host: string;\n};',
+  },
+  {
     name: 'PendingModule',
     declaration: 'export interface PendingModule {\n    url: string;\n    reason: \'host-module\' | \'unmanaged-plugin\' | \'module-comparison\';\n}',
   },
@@ -6756,6 +6805,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PluginChange',
     declaration: 'export interface PluginChange {\n    readonly reason: \'plugin\' | \'bundle\' | \'install\' | \'remove\' | \'desired-state\';\n}',
+  },
+  {
+    name: 'PluginConfigDescription',
+    declaration: 'export interface PluginConfigDescription {\n    config: PluginConfigValue | null;\n    schema?: PluginConfigValue;\n}',
+  },
+  {
+    name: 'PluginConfigValue',
+    declaration: 'export type PluginConfigValue = null | boolean | number | string | PluginConfigValue[] | {\n    [key: string]: PluginConfigValue;\n};',
   },
   {
     name: 'PluginDesiredEntry',
@@ -6828,6 +6885,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PluginManagementCapability',
     declaration: 'export type PluginManagementCapability = \'read\' | \'manage\';',
+  },
+  {
+    name: 'PluginManagementCatalog',
+    declaration: 'export interface PluginManagementCatalog extends PluginManagementAccess {\n    managementAvailable: boolean;\n    bundles: BundleInfo[];\n    plugins: PluginInfo[];\n}',
   },
   {
     name: 'PluginOptions',
@@ -7212,6 +7273,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResolveUserDocTarget',
     declaration: 'export interface ResolveUserDocTarget {\n    name: string;\n    directoryId?: UserDocDirectoryId;\n}',
+  },
+  {
+    name: 'ResourceKind',
+    declaration: 'export type ResourceKind = \'model\' | \'process\';',
+  },
+  {
+    name: 'ResourceLease',
+    declaration: 'export interface ResourceLease {\n    release(): void;\n    uncertain(): void;\n}',
+  },
+  {
+    name: 'ResourceRequest',
+    declaration: 'export interface ResourceRequest {\n    readonly kind: ResourceKind;\n    readonly signal?: AbortSignal;\n    readonly sessionId?: Branded<\'SessionId\'>;\n}',
   },
   {
     name: 'RestartReason',
@@ -9020,10 +9093,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkflowStopReason',
     declaration: 'export type WorkflowStopReason = \'completed\' | \'cancelled\' | \'error\';',
-  },
-  {
-    name: 'WorkspaceArchiveSnapshot',
-    declaration: 'export interface WorkspaceArchiveSnapshot {\n    readonly revision: number;\n    readonly archivedSessionIds: readonly SessionId[];\n}',
   },
   {
     name: 'WorkspaceChangedFile',

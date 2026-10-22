@@ -64,9 +64,9 @@ export interface CollaborationSessionCreation {
 /** Principal-bound collaboration operations safe to retain for one request or stream lifetime. */
 export interface CollaborationAuthority {
   readonly participant: CollaborationParticipant
-  /** Assertion expiry; long-lived streams reconnect no later than this instant. */
+  /** Current signed expiry; only a verified socket-bound renewal may advance it. */
   readonly expiresAt: number
-  /** Aborts when the provider that issued this authority unloads. */
+  /** Aborts on provider disposal or when retained socket authority expires or closes. */
   readonly signal: AbortSignal
 
   /**

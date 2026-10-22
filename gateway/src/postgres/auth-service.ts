@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { isIP } from 'node:net'
 import type { GatewayConfig } from '../config.ts'
-import type { UserRow } from '../auth.ts'
+import type { StreamSessionQualification, UserRow } from '../auth.ts'
 import { verifyPassword } from '../password.ts'
 import { transaction } from './database.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
@@ -42,7 +42,7 @@ function loginKey(username: string): string {
   return username.toLowerCase()
 }
 
-function userRow(row: PostgresAuthUser): UserRow {
+function userRow(row: Omit<PostgresAuthUser, 'password_hash'>): UserRow {
   return {
     id: publicNumber(row.public_id, 'user'),
     username: row.username,
@@ -172,6 +172,30 @@ export class PostgresAuthService {
         WHERE id=$1`, [row.session_id, now, expiresAt])
       return userRow(row)
     })
+  }
+
+  /**
+   * Read current login eligibility without locking, touching or extending the session.
+   * @param token - original login token retained by an active event socket.
+   * @returns the active user and existing earliest login deadline, or null when ineligible.
+   */
+  async qualifyForStream(token: string): Promise<StreamSessionQualification | null> {
+    const result = await this.context.pool.query<Omit<PostgresAuthUser, 'password_hash'> & { expires_at: Date; absolute_expires_at: Date }>(
+      `SELECT s.expires_at,s.absolute_expires_at,u.public_id::text,u.username::text,
+        u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
+        c.must_change_password,u.auto_review_eligible
+       FROM harness.auth_sessions s
+       JOIN harness.users u ON u.id=s.user_id AND u.organization_id=s.organization_id
+       JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+       JOIN harness.password_credentials c ON c.user_id=u.id
+       WHERE s.organization_id=$1 AND s.token_hash=$2 AND s.revoked_at IS NULL
+         AND s.expires_at>now() AND s.absolute_expires_at>now()`,
+      [this.context.organizationId, tokenHash(token)],
+    )
+    const row = result.rows[0]
+    if (row === undefined || row.status !== 'active' || row.membership_status !== 'active'
+      || row.deleted_at !== null || row.must_change_password) return null
+    return { user: userRow(row), expiresAt: Math.min(row.expires_at.getTime(), row.absolute_expires_at.getTime()) }
   }
 
   async revoke(token: string): Promise<void> {
