@@ -54,7 +54,8 @@ describePg('durable node resource budget', () => {
     await repository.initialize(true)
     await pool.query("UPDATE harness.instances SET observed_state='ready',desired_state='running' WHERE organization_id=$1", [organizationId])
     const config: NodeResourceBudgetConfig = {
-      active: { model: 1, process: 1, worker: 1 }, maxQueued: 16, maxQueuedPerUser: 8,
+      sampleMs: 500, staleMs: 2_000, cpuTarget: 0.85, eventLoopTargetMs: 100, linuxMemoryReserveRatio: 0.1,
+      maxQueued: 16, maxQueuedPerUser: 8,
       maxQueuedPerProject: 8, maxQueuedBytes: 64 * 1024, maxWaitMs: 30_000, ...overrides,
     }
     const budget = new NodeResourceBudget(pool, organizationId, context.nodeId, config)
@@ -114,7 +115,7 @@ describePg('durable node resource budget', () => {
     const request = f.request(0, 1)
     await f.budget.request(f.subjects[0]!, request)
     expect(await f.budget.request(f.subjects[0]!, request)).toEqual({ state: 'active' })
-    await expect(f.budget.request(f.subjects[0]!, { ...request, kind: 'worker' })).rejects.toMatchObject({ status: 409 })
+    await expect(f.budget.request(f.subjects[0]!, { ...request, kind: 'process' })).rejects.toMatchObject({ status: 409 })
     await expect(f.budget.request(f.subjects[0]!, f.request(0, 3))).rejects.toMatchObject({ status: 409 })
     expect((await f.budget.snapshot()).outcomes.admitted).toBe(1)
   })
@@ -166,7 +167,7 @@ describePg('durable node resource budget', () => {
   })
 
   it('holds the same active ceiling through concurrent Gateway coordinators', async () => {
-    const f = await fixture({ active: { model: 2, process: 1, worker: 1 } })
+    const f = await fixture({ maxQueuedPerUser: 2, maxQueuedPerProject: 2 })
     const other = new NodeResourceBudget(pool, f.context.organizationId, f.context.nodeId, f.config)
     const offered = await Promise.all(f.subjects.map((subject, index) => (index % 2 ? other : f.budget).request(subject, f.request(index, 1))))
     expect(offered.filter(item => item.state === 'active')).toHaveLength(2)
