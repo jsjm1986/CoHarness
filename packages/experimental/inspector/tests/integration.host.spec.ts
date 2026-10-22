@@ -2,10 +2,13 @@
 
 import { createServer, type Server } from 'node:http'
 import { createContext, runInContext } from 'node:vm'
+import { Context } from '@deepseek-ai/cordis'
 import WebSocket, { WebSocketServer, type RawData } from 'ws'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { startInspector, type InspectorHandle } from '../src/host/bridge/controller.ts'
 import { InspectorClientFixture } from './fixtures/client-source.host.ts'
+import { inspectorId } from '../src/shared/bridge/ids.ts'
+import { publishCordisTree } from '../src/host/inspection/cordis.ts'
 // A fixture request must retain the test lane's deadline under instrumented CI load.
 const CDP_CALL_TIMEOUT_MS = Math.max(5_000, Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0))
 
@@ -190,12 +193,56 @@ describe('experimental Inspector real Worker', () => {
 
   it('rejects malformed Client selectors before admitting a CDP connection', async () => {
     inspector = await startInspector({ port: 0, captureFetch: false })
-    for (const query of ['clientSourceId=', 'clientSourceId=a&clientSourceId=b']) {
+    for (const query of ['clientSourceId=', 'clientSourceId=a&clientSourceId=b',
+      'sourceScope=client', 'sourceScope=host&sourceScope=host', 'sourceScope=host&clientSourceId=a']) {
       await expect(TestCdpClient.connect(`${inspector.endpoint.webSocketDebuggerUrl}?${query}`))
         .rejects.toThrow('400')
     }
     cdp = await TestCdpClient.connect(inspector.endpoint.webSocketDebuggerUrl)
     expect((await cdp.call('Runtime.enable')).error).toBeUndefined()
+  })
+
+  it('keeps Host-only directories, Runtime, Sources and Cordis views independent of Client names and ids', async (test) => {
+    inspector = await startInspector({ port: 0, captureFetch: false })
+    const host = new Context()
+    const releaseTree = publishCordisTree(host, inspector.source, { maxNodes: 100, maxBytes: 32_768 })
+    test.onTestFinished(async () => { releaseTree(); await host.fiber.dispose() })
+    client = await InspectorClientFixture.start(inspector.endpoint.client, {
+      label: 'Host', sourceId: inspectorId<'InspectorSourceId'>('host', 'sourceId'),
+      sourceCatalog: { sourceText: 'globalThis.hostNamedClient = true', sourceMap: '{}',
+        sourceUrl: 'http://client.test/host.js', sourceMapUrl: 'http://client.test/host.js.map' },
+    })
+    cdp = await TestCdpClient.connect(inspector.endpoint.webSocketDebuggerUrl)
+    await vi.waitFor(async () => {
+      const sources = recordArray((await cdp!.call('DSHInspector.getSources')).result?.sources)
+      expect(sources.some(source => source.kind === 'client' && source.sourceId === 'host')).toBe(true)
+    })
+    const endpoint = new URL(inspector.endpoint.webSocketDebuggerUrl)
+    endpoint.searchParams.set('sourceScope', 'host')
+    secondCdp = await TestCdpClient.connect(endpoint.href)
+    await Promise.all([cdp.call('Runtime.enable'), secondCdp.call('Runtime.enable'),
+      cdp.call('Debugger.enable'), secondCdp.call('Debugger.enable'), secondCdp.call('DSHInspector.enable')])
+    await vi.waitFor(() => { expect(runtimeContexts(cdp!).some(context => context.name === 'Client — Host')).toBe(true) })
+    expect(runtimeContexts(secondCdp).map(context => context.name)).toEqual(['Host'])
+    expect(secondCdp.events.some(event => event.method === 'Debugger.scriptParsed'
+      && event.params?.url === 'http://client.test/host.js')).toBe(false)
+    const sources = recordArray((await secondCdp.call('DSHInspector.getSources')).result?.sources)
+    expect(sources.every(source => source.kind === 'host')).toBe(true)
+    const tree = asRecord((await secondCdp.call('DSHInspector.getCordisTree')).result?.tree)
+    expect(tree.host).not.toBeNull()
+    expect(tree.clients).toEqual([])
+    const root = asRecord((await secondCdp.call('DOM.getDocument', { depth: -1 })).result?.root)
+    const clients = recordArray(root.children).find(node => node.localName === 'clients')!
+    expect(recordArray(clients.children)).toEqual([])
+    const context = runtimeContexts(cdp).find(context => context.name === 'Client — Host')!
+    expect((await secondCdp.call('Runtime.evaluate', { expression: '1', contextId: context.id })).error).toBeDefined()
+    await client.log('client-value', 'host-named-client-console')
+    await vi.waitFor(() => { expect(consoleEvent(cdp!, Number(context.id), 'host-named-client-console')).toBeDefined() })
+    expect(secondCdp.events.some(event => event.method === 'Runtime.consoleAPICalled'
+      && event.params?.executionContextId === context.id)).toBe(false)
+    for (const event of secondCdp.events.filter(event => event.method === 'DSHInspector.sourcesChanged')) {
+      expect(recordArray(event.params?.sources).every(source => source.kind === 'host')).toBe(true)
+    }
   })
 
   it('switches between Host and Client contexts and routes Client RemoteObjects', async () => {

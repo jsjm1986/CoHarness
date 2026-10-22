@@ -234,6 +234,7 @@ export async function startInspector(options: InspectorOptions = {}): Promise<In
     client: {
       endpoint: `ws://${authority}/ingest`,
       protocol: clientProtocol,
+      clientOrigins: spec.clientOrigins,
       maxQueuedRecords: spec.maxQueuedRecords,
       maxQueuedBytes: spec.maxQueuedBytes,
       maxRecordsPerFrame: spec.maxSourceRecordsPerFrame,

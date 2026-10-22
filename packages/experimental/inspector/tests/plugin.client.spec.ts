@@ -4,7 +4,9 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply } from '../src/client/index.ts'
 import { ClientRealmSource } from '../src/client/inspection/realm.ts'
-import type { InspectorClientBootstrap } from '../src/shared/bridge/messages/control.ts'
+import { CordisTreeCollector } from '../src/shared/cordis/collector.ts'
+import { bootstrap } from './fixtures/client-bootstrap.client.ts'
+import { parseInspectorClientBootstrap } from '../src/shared/bridge/control-codec.ts'
 import { INSPECTOR_BOOTSTRAP_ROUTE } from '../src/shared/web.ts'
 
 class FakeWebSocket extends EventTarget {
@@ -47,27 +49,12 @@ class FakeWebSocket extends EventTarget {
   }
 }
 
-const bootstrap: InspectorClientBootstrap = {
-  endpoint: 'ws://127.0.0.1:9230/ingest',
-  protocol: 'dsh-inspector-v0-token',
-  maxQueuedRecords: 16,
-  maxQueuedBytes: 16_384,
-  maxRecordsPerFrame: 8,
-  maxFrameBytes: 32_768,
-  reconnectBaseMs: 10,
-  reconnectMaxMs: 20,
-  queryTimeoutMs: 100,
-  maxRuntimeObjectsPerSession: 100,
-  maxRuntimePropertiesPerResult: 100,
-  maxClientSourceBytes: 1_048_576,
-  maxCordisNodes: 100,
-}
-
 describe('experimental Inspector Client plugin', () => {
   const nativeWebSocket = globalThis.WebSocket
   const nativeFetch = globalThis.fetch
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     FakeWebSocket.sockets.length = 0
@@ -76,6 +63,101 @@ describe('experimental Inspector Client plugin', () => {
     sessionStorage.clear()
     delete globalThis.__DSH_INSPECTOR__
     Reflect.deleteProperty(globalThis, '__DSH_BOOT__')
+  })
+
+  it.each([
+    ['https://harness.example', false],
+    ['http://localhost:4321', true],
+    ['http://127.0.0.1:4321', true],
+    ['http://[::1]:4321', true],
+    ['https://inspector.local.example', true],
+  ] as const)('starts Client inspection only for an admitted origin (%s)', async (origin, admitted) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    vi.stubGlobal('location', new URL(origin))
+    class RefusedWebSocket extends FakeWebSocket {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        super(url, protocols)
+        void Promise.resolve().then(() => { this.close() })
+      }
+    }
+    vi.stubGlobal('WebSocket', RefusedWebSocket)
+    globalThis.__DSH_INSPECTOR__ = { ...bootstrap, reconnectBaseMs: 250, reconnectMaxMs: 5_000,
+      clientOrigins: ['https://inspector.local.example'] }
+    const claimed = vi.spyOn(ClientRealmSource, 'claim')
+    const collected = vi.spyOn(CordisTreeCollector.prototype, 'snapshot')
+    const ctx = new Context()
+    try {
+      await ctx.plugin({ apply }).await()
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(claimed).toHaveBeenCalledTimes(admitted ? 1 : 0)
+      expect(FakeWebSocket.sockets).toHaveLength(admitted ? 8 : 0)
+      expect(vi.getTimerCount()).toBe(admitted ? 1 : 0)
+      if (admitted) expect(collected).toHaveBeenCalled()
+      else expect(collected).not.toHaveBeenCalled()
+    } finally { await ctx.fiber.dispose() }
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('keeps a fetched unsupported bootstrap inactive across resets and page restoration', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    vi.stubGlobal('location', new URL('https://harness.example'))
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const fetch = vi.fn(async () => Response.json(bootstrap))
+    vi.stubGlobal('fetch', fetch)
+    const claimed = vi.spyOn(ClientRealmSource, 'claim')
+    const collected = vi.spyOn(CordisTreeCollector.prototype, 'snapshot')
+    const ctx = new Context()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    try {
+      await ctx.plugin({ apply }).await()
+      ctx.emit('connection/reset')
+      window.dispatchEvent(new Event('pagehide'))
+      window.dispatchEvent(new Event('pageshow'))
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(fetch).toHaveBeenCalledTimes(2)
+      expect(ctx.get('inspector')).toBeUndefined()
+      expect(claimed).not.toHaveBeenCalled()
+      expect(collected).not.toHaveBeenCalled()
+      expect(FakeWebSocket.sockets).toHaveLength(0)
+      expect(vi.getTimerCount()).toBe(0)
+      expect(warn).not.toHaveBeenCalled()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('rechecks admission on reset even when the Worker endpoint and protocol remain unchanged', async () => {
+    const origin = 'https://inspector.local.example'
+    vi.stubGlobal('location', new URL(origin))
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    globalThis.__DSH_INSPECTOR__ = bootstrap
+    let clientOrigins = [origin]
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ...bootstrap, clientOrigins })))
+    const claimed = vi.spyOn(ClientRealmSource, 'claim')
+    const collected = vi.spyOn(CordisTreeCollector.prototype, 'snapshot')
+    const ctx = new Context()
+    try {
+      await ctx.plugin({ apply }).await()
+      expect(ctx.get('inspector')).toBeUndefined()
+      ctx.emit('connection/reset')
+      await vi.waitFor(() => { expect(ctx.get('inspector')).toBeDefined() })
+      expect(FakeWebSocket.sockets).toHaveLength(1)
+      clientOrigins = []
+      ctx.emit('connection/reset')
+      await vi.waitFor(() => { expect(FakeWebSocket.sockets[0]?.readyState).toBe(FakeWebSocket.CLOSED) })
+      expect(ctx.get('inspector')).toBeUndefined()
+      collected.mockClear()
+      await ctx.plugin({ name: 'after-inspection-disabled', apply() {} }).await()
+      expect(collected).not.toHaveBeenCalled()
+      clientOrigins = [origin]
+      ctx.emit('connection/reset')
+      await vi.waitFor(() => { expect(FakeWebSocket.sockets).toHaveLength(2) })
+      expect(claimed).toHaveBeenCalledTimes(2)
+      expect(ctx.get('inspector')).toBeDefined()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it.each([undefined, null, ['http://localhost', 1]])('rejects a malformed Client origin list (%j)', (clientOrigins) => {
+    expect(() => parseInspectorClientBootstrap({ ...bootstrap, clientOrigins })).toThrow('clientOrigins must be strings')
   })
 
   it('removes the source on pagehide and reconnects once when the cached page resumes', async () => {

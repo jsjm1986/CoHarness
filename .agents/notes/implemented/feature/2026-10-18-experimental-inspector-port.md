@@ -14,6 +14,8 @@ All three packages are ported into `packages/experimental/` under upstream names
 
 `inspector` keeps Host and Client compiler faces (`tsconfig.host.json`/`tsconfig.client.json` references); `session-inspector` and `inspector-profile` are Host-face packages. `inspector-profile` is registered in `OPTIONAL_BUNDLES` so the plugin-manager showcase toggles it, and in `apps/cli` dependencies; none enters a shipped default composition.
 
+Browser source eligibility and preserved Host-only debugging follow the [Client origin admission decision](../bug-fix/2026-10-23-inspector-client-origin-admission.md).
+
 ## Alternatives considered
 
 - **Keeping the defer** was rejected: the owner's directive is to sync all upstream plugin functionality, and the mapped seams cover the dependency.

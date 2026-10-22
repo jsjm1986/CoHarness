@@ -67,7 +67,8 @@ describe('experimental Inspector Host plugin', () => {
       socket.destroy()
     }
     authenticated = true
-    for (const query of ['clientSourceId=', 'clientSourceId=a&clientSourceId=b']) {
+    for (const query of ['clientSourceId=', 'clientSourceId=a&clientSourceId=b',
+      'sourceScope=client', 'sourceScope=host&sourceScope=host', 'sourceScope=host&clientSourceId=a']) {
       const socket = new PassThrough()
       await upgrade.handler({ url: `/inspector/devtools/cdp?${query}`, headers: { host: '127.0.0.1', origin: 'http://127.0.0.1' } } as IncomingMessage, socket, Buffer.alloc(0))
       expect(String(socket.read())).toContain('HTTP/1.1 400')

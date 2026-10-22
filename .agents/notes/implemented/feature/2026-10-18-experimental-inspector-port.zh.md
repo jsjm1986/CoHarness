@@ -14,6 +14,8 @@
 
 `inspector` 保留 Host 与 Client 双编译面（`tsconfig.host.json`/`tsconfig.client.json` 引用）；`session-inspector` 与 `inspector-profile` 为 Host 面包。`inspector-profile` 已注册进 `OPTIONAL_BUNDLES`（供插件管理橱窗开关）与 `apps/cli` 依赖；不进入任何出厂默认组成。
 
+浏览器 source 的准入及保留的仅 Host 调试遵循 [Client origin 准入决策](../bug-fix/2026-10-23-inspector-client-origin-admission.zh.md)。
+
 ## 已考虑的替代方案
 
 - **维持延期**被否决：owner 指令为同步全部上游插件功能，映射后的接缝足以承载该依赖。

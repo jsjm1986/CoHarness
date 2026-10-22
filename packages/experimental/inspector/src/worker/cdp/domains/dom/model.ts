@@ -5,6 +5,7 @@ import type { InspectorSourceId } from '../../../../shared/bridge/ids.ts'
 import type { InspectorSourceDescriptor } from '../../../../shared/bridge/messages/observation.ts'
 import type { InspectorObjectReference } from '../../../../shared/cordis/object-reference.ts'
 import type { InspectorRealmDescriptor } from '../../../inspection/realm.ts'
+import { isInspectorSourceSelected, type InspectorClientSelection } from '../../../../shared/web.ts'
 import { cdpNumericId, type CdpBackendNodeId } from '../../ids.ts'
 import type {
   CordisTreeObjectRoute,
@@ -79,9 +80,9 @@ export class CordisDomBackend {
 
   /**
    * @param trees - Shared store; this backend owns only its subscription and projection.
-   * @param clientSourceId - Restrict Clients to this source; omission includes every retained Client.
+   * @param clientSourceId - Selected Client, null for Host only, or omission for every retained Client.
    */
-  constructor(private readonly trees: CordisTreeStore, private readonly clientSourceId?: InspectorSourceId) {
+  constructor(private readonly trees: CordisTreeStore, private readonly clientSourceId?: InspectorClientSelection) {
     this.documentValue = this.build()
     this.unsubscribe = trees.subscribe((event) => {
       const previous = this.documentValue
@@ -95,11 +96,11 @@ export class CordisDomBackend {
   }
 
   /**
-   * Create an independent Host-and-Client projection over the same retained snapshots.
-   * @param sourceId - Client source to include across its reconnect generations.
+   * Create an independent Host projection with an optional Client over the same retained snapshots.
+   * @param sourceId - Client source to include across reconnects, or null for Host only.
    * @returns A new backend whose caller must close; closing it leaves this backend and the store intact.
    */
-  forClient(sourceId: InspectorSourceId): CordisDomBackend {
+  forClient(sourceId: InspectorSourceId | null): CordisDomBackend {
     return new CordisDomBackend(this.trees, sourceId)
   }
 
@@ -153,7 +154,7 @@ export class CordisDomBackend {
   }
 
   private includesSource(source: InspectorSourceDescriptor): boolean {
-    return this.clientSourceId === undefined || source.kind === 'host' || source.sourceId === this.clientSourceId
+    return isInspectorSourceSelected(this.clientSourceId, source)
   }
 
   /**

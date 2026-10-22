@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/inspector/README.md
 document:
-  en: 9856c718e5128b0d655fa5fec39bd89691c78467
-  zh: 66b25ec2cc5cf4f37d6267efa6d2ebe242dd0116
+  en: 0d0ace3858cdce980eb84497bea6b11a77f5486b
+  zh: f599a338f46004e90582328e9c1e3a6278160955
 /:
   en: b5b7ccdfa1cc2907
   zh: d575593a7efa37fd
@@ -18,17 +18,17 @@ document:
   en: 331f844c32631a82
   zh: a9bc365f7d61d9ed
 /deepseek-ai-dsh-experimental-inspector/use-this-package:
-  en: 6d290aabc543f878
-  zh: 7ad283b159ae2c29
+  en: aeb2bc715125ffe0
+  zh: daa7e97a178fa9b4
 /deepseek-ai-dsh-experimental-inspector/runtime-layout:
-  en: 13f495af2fec307d
-  zh: ec4bebf24a87ec54
+  en: 076da63dced9abcb
+  zh: 57827760d40a75c0
 /deepseek-ai-dsh-experimental-inspector/configuration:
   en: d094842893700446
   zh: 7a7f880ba795948f
 /deepseek-ai-dsh-experimental-inspector/observation-api:
-  en: d32f994e6c9d0c4a
-  zh: ac2f35f5799aeae0
+  en: 094530eef04fa971
+  zh: 41e7938df39d3487
 /deepseek-ai-dsh-experimental-inspector/cordis-tree-inspection:
   en: d2a470558b97acbd
   zh: 2a7d0ce6951b7b52
