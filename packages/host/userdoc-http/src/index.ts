@@ -487,11 +487,11 @@ async function responseJson(response: Response): Promise<unknown> {
  * error response as a client disconnect and the request hangs.
  */
 async function* bodyChunks(req: UserDocRequest): AsyncGenerator<unknown, void, undefined> {
-  const iterator = req[Symbol.asyncIterator]()
+  const iterator: AsyncIterator<unknown> = req[Symbol.asyncIterator]()
   for (;;) {
-    const { done, value } = await iterator.next()
-    if (done) return
-    yield value
+    const step = await iterator.next()
+    if (step.done === true) return
+    yield step.value
   }
 }
 
