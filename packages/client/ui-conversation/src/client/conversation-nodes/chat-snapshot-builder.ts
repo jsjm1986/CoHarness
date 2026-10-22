@@ -73,18 +73,63 @@ function sameNavigationItem(left: TurnNavigationItem | undefined, right: TurnNav
 
 class MutableChatTurnNavigationIndex implements ChatTurnNavigationIndex {
   private current: readonly TurnNavigationItem[] = EMPTY_LIST
+  private byTurn = new Map<number, TurnNavigationItem>()
+  private timeline: ConversationTimelineSnapshot | undefined
 
   items(): readonly TurnNavigationItem[] {
     return this.current
   }
 
   rebuild(timeline: ConversationTimelineSnapshot, locations: ChatLocationNodeIndex, nodes: ChatNodeStore): void {
+    const byTurn = new Map<number, TurnNavigationItem>()
     const next = timeline.turnOrder.flatMap((turn) => {
       const item = turnNavigationItem(turn, timeline, locations, nodes)
-      return item === undefined ? [] : [item]
+      if (item === undefined) return []
+      const previous = this.byTurn.get(turn)
+      const retained = previous !== undefined && sameNavigationItem(previous, item) ? previous : item
+      byTurn.set(turn, retained)
+      return [retained]
     })
-    if (next.length === this.current.length && next.every((item, index) => sameNavigationItem(this.current[index], item))) return
-    this.current = next
+    this.byTurn = byTurn
+    this.timeline = timeline
+    if (!sameReferences(this.current, next)) this.current = next
+  }
+
+  apply(
+    changes: readonly { readonly previous: ChatConversationViewNode | undefined; readonly current: ChatConversationViewNode }[],
+    timeline: ConversationTimelineSnapshot,
+    locations: ChatLocationNodeIndex,
+    nodes: ChatNodeStore,
+  ): void {
+    const previousTimeline = this.timeline
+    if (previousTimeline === undefined || previousTimeline.turnOrder !== timeline.turnOrder) {
+      this.rebuild(timeline, locations, nodes)
+      return
+    }
+    const affected = new Set<number>()
+    for (const { previous, current } of changes) {
+      const before = previous === undefined ? undefined : locationCoordinates(previous.location).turn
+      const after = locationCoordinates(current.location).turn
+      if (before !== undefined) affected.add(before)
+      if (after !== undefined) affected.add(after)
+    }
+    if (previousTimeline.turns !== timeline.turns) {
+      for (const turn of timeline.turnOrder) {
+        if (previousTimeline.turns.get(turn) !== timeline.turns.get(turn)) affected.add(turn)
+      }
+    }
+    this.timeline = timeline
+    let changed = false
+    for (const turn of affected) {
+      const item = turnNavigationItem(turn, timeline, locations, nodes)
+      if (sameNavigationItem(this.byTurn.get(turn), item)) continue
+      if (item === undefined) this.byTurn.delete(turn)
+      else this.byTurn.set(turn, item)
+      changed = true
+    }
+    if (changed) {
+      this.current = timeline.turnOrder.flatMap(turn => this.byTurn.get(turn) ?? [])
+    }
   }
 }
 
@@ -803,7 +848,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       this.locations.rebuild(this.order, this.store)
     }
     this.locations.touch(contentOnly)
-    this.navigation.rebuild(input.timeline, this.locations, this.store)
+    this.navigation.apply(changes, input.timeline, this.locations, this.store)
     this.flow.apply(changes, this.order, orderChanged, this.locations, this.store, input.timeline)
     return this.snapshot(input.timeline, this.legacy.apply(upserts, input.timeline))
   }

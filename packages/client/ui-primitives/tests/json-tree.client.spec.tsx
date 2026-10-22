@@ -28,6 +28,37 @@ afterEach(() => {
 })
 
 describe('JsonTree', () => {
+  it('reads only the bounded preview of a collapsed large array', () => {
+    let reads = 0
+    const matches = new Proxy(Array.from({ length: 10_000 }, (_unused, index) => ({
+      path: `src/generated/module-${String(index)}.ts`, line: index + 1,
+      text: `export const value${String(index)} = ${String(index)}`,
+      metadata: { kind: 'source', verified: true },
+    })), {
+      get(target, property, receiver) {
+        if (typeof property === 'string' && /^\d+$/.test(property)) reads += 1
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    })
+    render(<JsonTree data={{ status: 'ok', matches, totals: { files: 10_000, matches: 10_000 } }} />)
+    expect(screen.getByRole('tree').textContent).toContain('module-4.ts')
+    expect(screen.getByRole('tree').textContent).not.toContain('module-5.ts')
+    expect(reads).toBeLessThanOrEqual(6)
+  })
+
+  it('does not read values hidden behind the preview depth limit', () => {
+    let reads = 0
+    const hidden = new Proxy(Array.from({ length: 10_000 }, (_unused, index) => index), {
+      get(target, property, receiver) {
+        if (typeof property === 'string' && /^\d+$/.test(property)) reads += 1
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    })
+    render(<JsonTree data={{ outer: { middle: { hidden } } }} />)
+    expect(screen.getByRole('tree').textContent).toBe('outer:{middle: {hidden: […]}}')
+    expect(reads).toBe(0)
+  })
+
   it('keeps the top level open and renders expandable value previews', () => {
     render(
       <JsonTree

@@ -75,14 +75,21 @@ function isExpandableValue(value: unknown): value is object | unknown[] {
   return typeof value === 'object' && value !== null && !(value instanceof Date)
 }
 
-function entriesOf(value: object | unknown[]): readonly (readonly [string, unknown])[] {
+function entriesOf(value: object | unknown[], limit = Number.POSITIVE_INFINITY): readonly (readonly [string, unknown])[] {
   if (Array.isArray(value)) {
-    return value.map((item, index) => [String(index), item] as const)
+    const visible = limit < value.length ? value.slice(0, limit) : value
+    return visible.map((item, index) => [String(index), item] as const)
   }
-  return Object.keys(value).map(key => [
+  const keys = Object.keys(value)
+  const visible = limit < keys.length ? keys.slice(0, limit) : keys
+  return visible.map(key => [
     key,
     (value as Record<string, unknown>)[key],
   ] as const)
+}
+
+function hasEntries(value: object | unknown[]): boolean {
+  return Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0
 }
 
 function bracketOf(value: object | unknown[]): readonly [string, string] {
@@ -119,8 +126,8 @@ function previewValue(value: unknown, depth: number): ReactNode {
   if (!isExpandableValue(value)) return previewPrimitive(value)
 
   const array = Array.isArray(value)
-  const entries = entriesOf(value)
   const limit = array ? ARRAY_PREVIEW_LIMIT : OBJECT_PREVIEW_LIMIT
+  const entries = depth < PREVIEW_DEPTH_LIMIT ? entriesOf(value, limit + 1) : []
   const visible = entries.slice(0, limit)
   const [open, close] = bracketOf(value)
 
@@ -251,8 +258,8 @@ function JsonTreeNode({
   const [expanded, setExpanded] = useState(initialExpanded)
   const nodeId = pathId(path)
   const container = isExpandableValue(value)
-  const entries = container ? entriesOf(value) : []
-  const expandable = entries.length > 0
+  const entries = container && expanded ? entriesOf(value) : []
+  const expandable = container && (expanded ? entries.length > 0 : hasEntries(value))
 
   const toggle = () => {
     setExpanded(current => !current)
@@ -386,6 +393,7 @@ export interface JsonTreeProps {
 
 /**
  * Render parsed JSON as a compact, keyboard-accessible inspector tree.
+ * Collapsed previews read bounded child values; expansion and copy retain complete data.
  * @param props - Parsed data, accessible label, and display options.
  * @returns A read-only JSON tree with an optionally fixed-open top level.
  */
@@ -399,7 +407,7 @@ export function JsonTree({
 }: JsonTreeProps) {
   const rootEntries = entriesOf(data)
   const firstExpandableIndex = rootEntries.findIndex(([, value]) => (
-    isExpandableValue(value) && entriesOf(value).length > 0
+    isExpandableValue(value) && hasEntries(value)
   ))
   const firstExpandableEntry = rootEntries[firstExpandableIndex]
   const initialTabStopId = expandTopLevel

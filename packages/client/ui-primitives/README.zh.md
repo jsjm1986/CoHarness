@@ -25,6 +25,7 @@ kind: "package-library"
 - [Diff 渲染](#diff-rendering)
 - [搜索结果](#search-results)
 - [Web 检索](#web-retrieval)
+- [JSON 检查](#json-inspection)
 - [兼容性](#compatibility)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
@@ -63,7 +64,7 @@ kind: "package-library"
 <a id="read-rendering"></a>
 ## Read 渲染
 
-`ReadBlock` 将返回的文件窗口渲染为带行号、语法高亮的代码表层：一个粗体路径（或 presenter 提供的标题）横幅加复制控件，其下是内容行，行号槽里是文件自身的行号（窗口化的 read 保留文件本身的编号，因此偏移之后的 read 从大于 1 处起始）。`totalLines` 超过窗口行数时画出 `showing N of M` 提示；超过 `maxLines`（默认 16，与 TerminalBlock 相同的切分算法）时折叠为头部切片加尾部切片，由展开按钮控制。高亮走与 `CodeBlock` 相同的 shiki 路径，并在首次进入视口前延迟。原理：[Web read 卡片笔记](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card.zh.md)。
+`ReadBlock` 将返回的文件窗口渲染为带行号、语法高亮的代码表层：一个粗体路径（或 presenter 提供的标题）横幅加复制控件，其下是内容行，行号槽里是文件自身的行号（窗口化的 read 保留文件本身的编号，因此偏移之后的 read 从大于 1 处起始）。`totalLines` 超过窗口行数时画出 `showing N of M` 提示；超过 `maxLines`（默认 16，与 TerminalBlock 相同的切分算法）时折叠为头部切片加尾部切片，由展开按钮控制。折叠时仅为可见头尾准备行节点；展开与复制使用完整返回窗口。高亮走与 `CodeBlock` 相同的 shiki 路径，在首次进入视口前延迟，并保留跨折叠行的语法上下文。原理：[Web read 卡片笔记](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card.zh.md)。
 
 <a id="diff-rendering"></a>
 ## Diff 渲染
@@ -81,6 +82,11 @@ kind: "package-library"
 ## Web 检索
 
 `WebBlock` 渲染一次已完成的 web 检索，用一个组件绘制 `web` 渲染意图的两种 kind（由 `kind` 判别）。`search` 在有序引用列表上方显示可选的提供方回答（通过 `MarkdownText`）：每个 source 是一个安全外链，以其标题为标签，或以其主机名为标签，当 URL 无法解析或没有主机名（`file:`/`data:` URL）时回退到原始 URL，因此标签绝不为空；其下渲染 snippet 与发布日期。只有 http(s) URL 会成为锚点（设置 `target`/`rel`）——这是 `MarkdownText` 对不受信任链接所用 allowlist 的 http(s) 子集（该 allowlist 还允许 `mailto:`，此处排除）；任何其他 URL 渲染为纯文本。整份列表渲染在一个定高滚动容器里（`max-height: 320px`、`overflow-y: auto`），因此超出该高度的列表在原地纵向滚动，而不是把卡片撑高；`<li value>` 固定每个 source 的引用编号，从 1 起连续，而不依赖 `<ol>` 的隐式计数。当一次 search 合法地返回无 answer 且无 source 时，卡片显示一个明确的空状态提示，而不是空的 `<ol>`（chat 行不呈现原始 result content）。`fetch` 显示一个紧凑摘要：带链接的最终 URL 及其 HTTP 状态。两者都会标记一次被截断的检索。原理：[Web result 卡片笔记](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.zh.md)与[来源滚动笔记](../../../.agents/notes/implemented/feature/2026-08-03-web-search-source-scroll.zh.md)。
+
+<a id="json-inspection"></a>
+## JSON 检查
+
+`JsonTree` 提供只读 JSON、键盘导航，以及值、JSON 与属性路径复制。折叠预览最多显示两层，每层最多四个对象字段或五个数组项；更深的容器以省略号呈现，不读取其子项值。展开容器会显示所有条目，复制始终包含选中值的完整内容，不受预览限制。
 
 <a id="compatibility"></a>
 ## 兼容性
