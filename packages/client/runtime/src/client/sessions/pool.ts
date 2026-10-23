@@ -83,6 +83,7 @@ export class SessionRuntimePool implements ISessions {
   private activeSession: SessionId | undefined
   private accountInvalidated = false
   private baseGeneration = 0
+  private baseTargetEstablished = false
   private baseArchiveRevision = 0
   private readonly provideListeners = new Set<() => void>()
   private currentProvideSnapshot: SessionMaybeProvideInfo
@@ -607,6 +608,7 @@ export class SessionRuntimePool implements ISessions {
     if (this.accountInvalidated) return
     if (description?.runtimeTarget !== undefined) this.setBaseRuntimeTarget(description.runtimeTarget)
     else if (description?.executionAuthorityRequired === true) throw new Error('Gateway runtime did not declare its Session identity')
+    this.baseTargetEstablished = true
     const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
     if (entry !== undefined && description !== undefined) this.connectResources(entry, description)
     this.base.handleConnected()
@@ -714,11 +716,14 @@ export class SessionRuntimePool implements ISessions {
   setBaseRuntimeTarget(target: SessionRuntimeTarget): void {
     const baseEntry = [...this.entries.values()].find(entry => entry.runtime === this.base)
     if (baseEntry === undefined) return
+    const established = this.baseTargetEstablished
+    this.baseTargetEstablished = true
     if (targetKey(baseEntry.target) === targetKey(target)) {
       if (target.kind === 'project' && target.projectName !== undefined) { baseEntry.target = target; this.rebuild() }
       return
     }
-    this.beginNavigation()
+    // The first declaration resolves the bootstrap placeholder; later changes supersede navigation.
+    if (established) this.beginNavigation()
     this.baseGeneration++
     this.baseArchiveRevision = 0
     const collision = this.entries.get(targetKey(target))

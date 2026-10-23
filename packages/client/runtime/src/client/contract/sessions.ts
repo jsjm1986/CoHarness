@@ -251,6 +251,8 @@ export interface ISessions {
    */
   createSession?(target: SessionRuntimeTarget, signal?: AbortSignal): Promise<SessionId>
   /** Reconcile the bootstrap connection with the account's current scope.
+   * The first declaration preserves startup navigation; later target changes supersede it.
+   * Previously cancelled user navigation remains cancelled.
    * @param target - runtime the account scope now resolves to.
    */
   setBaseRuntimeTarget?(target: SessionRuntimeTarget): void

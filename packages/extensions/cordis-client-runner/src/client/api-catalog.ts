@@ -396,10 +396,10 @@ export const EVENT_API: readonly EventApiEntry[] = [
   {
     name: 'connection/reset',
     mode: 'emit',
-    signature: '\'connection/reset\'(): void',
+    signature: '\'connection/reset\'(initialConnection?: boolean): void',
     summary: 'A connection generation was (re-)established.',
     description: 'A connection generation was (re-)established. Wire-derived caches must treat their state as stale and repull (commands directory; the queue mirrors reset themselves through the session resync path).',
-    parameters: [],
+    parameters: [{ name: 'initialConnection', description: 'true only for this runtime\'s first handshake; omitted resets require revalidation.' }],
   },
   {
     name: 'locale/change',

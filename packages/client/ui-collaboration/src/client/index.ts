@@ -95,7 +95,11 @@ export function apply(ctx: ClientContext): void {
       collaboration.dispose()
     }
   }, 'ui-collaboration: account context')
-  ctx.on('connection/reset', () => { collaboration.invalidateContext(); void collaboration.refresh() })
+  ctx.on('connection/reset', (initialConnection) => {
+    if (initialConnection === true && collaboration.getSnapshot().contextVerified) return
+    collaboration.invalidateContext()
+    void collaboration.refresh()
+  })
 
   ctx.on('sessions/prepare-create', async (_options, next): Promise<SessionCreateOptions> => {
     const prepared = await next()

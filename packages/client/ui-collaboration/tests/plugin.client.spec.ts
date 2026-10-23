@@ -87,6 +87,30 @@ async function bench(context: CollaborationContext) {
 }
 
 describe('ui-collaboration apply', () => {
+  it('keeps fresh account proof on the first handshake and withdraws it on reconnect', async () => {
+    const b = await bench(baseContext)
+    try {
+      b.ctx.emit('connection/reset', true)
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBe(baseContext.user.id)
+      expect(b.fetcher).toHaveBeenCalledTimes(1)
+
+      b.fetcher.mockResolvedValueOnce(new Response(null, { status: 401 }))
+      b.ctx.emit('connection/reset', false)
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      await vi.waitFor(() => { expect(b.fetcher).toHaveBeenCalledTimes(2) })
+      await vi.waitFor(() => { expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false) })
+
+      b.ctx.emit('connection/reset', true)
+      await vi.waitFor(() => { expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true) })
+      expect(b.fetcher).toHaveBeenCalledTimes(3)
+    } finally {
+      await b.fiber.dispose()
+      b.restore()
+    }
+  })
+
   it('publishes verified account eligibility and withdraws it on a failed reconnect refresh', async () => {
     const b = await bench({ ...baseContext,
       user: { ...baseContext.user, role: 'admin' }, fullAccess: true, autoReviewEligible: true,

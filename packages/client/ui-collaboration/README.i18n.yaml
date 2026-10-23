@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-collaboration/README.md
 document:
-  en: 1f617aa980f741fff3ac55129507a6cccbcf7e2d
-  zh: 936cef780624ea4ae2025b03037d09d3749423f8
+  en: 6b673cc7598a2db723c6681ea6d57216520c822b
+  zh: 9632af7ec98958810703e6b5608ba0a6e4c64446
 /:
   en: 559f91ef9aa54024
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: 1b6f6aeae6e9088e
   zh: 28f2bc5049e10b31
 /deepseek-ai-dsh-client-ui-collaboration/user-interface-contract:
-  en: e85d0f2ec2e1ed8a
-  zh: 1680b66b88ad755e
+  en: 3f8ee67e5a8c5576
+  zh: 5498ff89603c96a8
 /deepseek-ai-dsh-client-ui-collaboration/model-experience:
   en: 48e765a1bfca16ed
   zh: 3ccd706d7cde0ea7

@@ -257,8 +257,9 @@ declare module '@deepseek-ai/cordis' {
      * treat their state as stale and repull (commands directory; the queue
      * mirrors reset themselves through the session resync path).
      * @mode emit
+     * @param initialConnection - true only for this runtime's first handshake; omitted resets require revalidation.
      */
-    'connection/reset'(): void
+    'connection/reset'(initialConnection?: boolean): void
     /**
      * Open one Session-relative Workspace file in the browser.
      * @param request - owning Session and relative resource address.
@@ -360,6 +361,7 @@ export function apply(ctx: Context): void {
     () => workspaces.startInitialSelection(),
     'runtime: initial Workspace selection',
   )
+  let initialConnection = true
   const loop = connection.start({
     onMuxEnvelope: (envelope) => {
       sessions.handleMuxEnvelope(envelope)
@@ -380,7 +382,9 @@ export function apply(ctx: Context): void {
     onConnected: (description) => {
       // Authority withdrawal can cancel pending navigation, including an
       // unshown saved-history window. Finish it before preparing fresh reads.
-      ctx.emit('connection/reset')
+      const initial = initialConnection
+      initialConnection = false
+      ctx.emit('connection/reset', initial)
       const workspaceBaseline = workspaces.handleConnected()
       sessions.handleConnected(description, workspaceBaseline)
     },

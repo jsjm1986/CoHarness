@@ -1,9 +1,9 @@
-import { clientSessionKey } from '@deepseek-ai/dsh-client-connection/client'
 // @vitest-environment node
 import { Context } from '@deepseek-ai/cordis'
+import { clientSessionKey, installConnection } from '@deepseek-ai/dsh-client-connection/client'
 import { describe, expect, it, vi } from 'vitest'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
 import { SessionRuntime } from '../src/client/sessions/service.ts'
 import { SessionRuntimePool } from '../src/client/sessions/pool.ts'
 import { WorkspaceRuntime } from '../src/client/workspaces/service.ts'
@@ -31,6 +31,133 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
 }
 
 describe('SessionRuntimePool', () => {
+  it('keeps initial Workspace history selection through the first project identity', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const description = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
+    const sessionList = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const workspaceList = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const connected = deferred<undefined>()
+    api.onDescribe = () => description.promise
+    api.onList = () => sessionList.promise
+    api.onWorkspaceList = () => workspaceList.promise
+    installConnection(ctx, { transport: {
+      createApiClient: () => api,
+      rpc: { call: () => Promise.reject(new Error('unexpected rpc')) },
+    } })
+    const handle = ctx.get('connection') as ConnectionHandle | undefined
+    if (handle === undefined) throw new Error('Client connection was not installed')
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false, persistSelection: false })
+    const pool = new SessionRuntimePool(ctx, base, handle, fakeRemote())
+    const workspaces = new WorkspaceRuntime(ctx, handle.api, pool)
+    const stopSelection = workspaces.startInitialSelection()
+    const loop = handle.start({
+      onConnected: (value) => {
+        const baseline = workspaces.handleConnected()
+        pool.handleConnected(value, baseline)
+        connected.resolve(undefined)
+      },
+    })
+    const target = { kind: 'project' as const, projectId: 7 }
+    const id = 'project-history' as SessionId
+    const key = clientSessionKey(target, id)
+    try {
+      description.resolve(ok({ version: 'test', cwd: '/project', home: '/home', attachedSessions: 0, canOpenPath: false,
+        executionAuthorityRequired: true, runtimeTarget: target }))
+      await connected.promise
+      expect(api.callsOf('workspace.list')).toHaveLength(1)
+      expect(api.callsOf('session.list')).toHaveLength(1)
+      sessionList.resolve(ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false, cwd: '/project' }] }))
+      await pool.refresh()
+      expect(workspaces.list.getSnapshot().baselinesReady).toBe(false)
+      expect(pool.list.getSnapshot().current).toBeUndefined()
+      workspaceList.resolve(ok({ items: [{ workspaceId: 'project-workspace' as WorkspaceId, path: '/project', title: 'Project',
+        sessionIds: [id], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }] }))
+      await workspaces.refresh()
+      await vi.waitFor(() => { expect(pool.list.getSnapshot().current).toBe(key) })
+      expect(pool.binding(key)?.session.getSnapshot().openState).toBe('open')
+      expect(api.callsOf('session.history')).toHaveLength(1)
+      expect(api.callsOf('session.create')).toEqual([])
+    } finally {
+      stopSelection()
+      loop.stop()
+      description.resolve(ok({ version: 'test', cwd: '/', home: '/', attachedSessions: 0, canOpenPath: false }))
+      sessionList.resolve(ok({ items: [] }))
+      workspaceList.resolve(ok({ items: [] }))
+      await ctx.fiber.dispose()
+      await vi.waitFor(() => { expect(api.openMuxCount).toBe(0) })
+    }
+  })
+
+  it.each(['clear before identity', 'clear while opening', 'navigate while opening', 'account withdrawal'] as const)(
+    'lets %s supersede project startup selection', async (action) => {
+      const ctx = new Context()
+      const api = new FakeApiClient()
+      const target = { kind: 'project' as const, projectId: 7 }
+      const recent = 'recent-history' as SessionId
+      const manual = 'manual-history' as SessionId
+      const recentKey = clientSessionKey(target, recent)
+      const manualKey = clientSessionKey(target, manual)
+      const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+      const requested = deferred<undefined>()
+      api.onHistory = ({ sessionId }) => {
+        if (sessionId !== recent) return Promise.resolve(ok({ events: [], hasMore: false }))
+        requested.resolve(undefined)
+        return history.promise
+      }
+      api.onList = async () => ok({ items: [recent, manual].map((sessionId, index) => ({
+        sessionId, updatedAt: 2 - index, running: false, blank: false, cwd: '/project',
+      })) })
+      api.onWorkspaceList = async () => ok({ items: [{
+        workspaceId: 'project-workspace' as WorkspaceId, path: '/project', title: 'Project', sessionIds: [recent, manual],
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      }] })
+      const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false, persistSelection: false })
+      const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+      const workspaces = new WorkspaceRuntime(ctx, api, pool)
+      const stopSelection = workspaces.startInitialSelection()
+      try {
+        if (action === 'clear before identity') pool.clear()
+        pool.setBaseRuntimeTarget(target)
+        await Promise.all([pool.refresh(), workspaces.refresh()])
+        expect(workspaces.list.getSnapshot().baselinesReady).toBe(true)
+        if (action === 'clear before identity') {
+          expect(api.callsOf('session.history')).toEqual([])
+        } else {
+          await requested.promise
+          const signal = api.lastHistorySignal
+          if (action === 'account withdrawal') pool.invalidateAccount()
+          else if (action === 'navigate while opening') pool.open(manualKey)
+          else pool.clear()
+          await vi.waitFor(() => { expect(signal?.aborted).toBe(true) })
+          history.resolve(ok({ events: [], hasMore: false }))
+          await vi.waitFor(() => { expect(base.binding(recent)).toBeUndefined() })
+        }
+        expect(pool.list.getSnapshot().current).toBe(action === 'navigate while opening' ? manualKey : undefined)
+        expect(pool.binding(recentKey)).toBeUndefined()
+        if (action === 'account withdrawal') expect(pool.list.getSnapshot().ids).toEqual([])
+      } finally {
+        stopSelection()
+        history.resolve(ok({ events: [], hasMore: false }))
+        await ctx.fiber.dispose()
+      }
+    },
+  )
+
+  it('keeps the personal bootstrap intent and supersedes it on a later target change', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false, persistSelection: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      const initial = pool.beginNavigation()
+      pool.setBaseRuntimeTarget({ kind: 'personal' })
+      expect(initial.aborted).toBe(false)
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 7 })
+      expect(initial.aborted).toBe(true)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('projects current-space failures and withdraws their late retries with the account', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

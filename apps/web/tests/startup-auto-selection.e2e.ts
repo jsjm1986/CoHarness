@@ -197,6 +197,107 @@ describe('web e2e: startup auto-selection', () => {
     expect(await recordedPhases(page)).toEqual(['hero'])
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
+  it('opens existing project history after cold identity and both baselines without a navigation click', async () => {
+    const projectScaffold = await launchWebScaffold({ workbench: true })
+    let projectPage: Page | undefined
+    const describeGate = Promise.withResolvers<undefined>()
+    const describeRequested = Promise.withResolvers<undefined>()
+    const workspaceGate = Promise.withResolvers<undefined>()
+    const workspaceRequested = Promise.withResolvers<undefined>()
+    const historyGate = Promise.withResolvers<undefined>()
+    const historyRequested = Promise.withResolvers<undefined>()
+    try {
+      const id = await seedSession(projectScaffold, savedHistory(), 'project-startup-history')
+      const workspace = await projectScaffold.ctx.workspaceRegistry.create(projectScaffold.workspaceCwd)
+      await workspace.attachSession(id)
+      projectPage = await newEnglishPage(browser)
+      const targetPage = projectPage
+      const targetTripwire = watchConsole(targetPage)
+      const calls: string[] = []
+      targetPage.on('request', (request) => { calls.push(new URL(request.url()).pathname) })
+      await targetPage.addInitScript(() => { localStorage.removeItem('dsh.sessions.current') })
+      // Gateway account/target declarations are external to this real Host composition.
+      await targetPage.route(/\/api\/host\.describe(?:\?.*)?$/, async (route) => {
+        const response = await route.fetch()
+        const body = await response.json() as {
+          result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'project'; projectId: number } } }
+            | { ok: false }
+        }
+        expect(body.result.ok).toBe(true)
+        if (body.result.ok) {
+          body.result.value.executionAuthorityRequired = true
+          body.result.value.runtimeTarget = { kind: 'project', projectId: 7 }
+        }
+        describeRequested.resolve(undefined)
+        await describeGate.promise
+        await route.fulfill({ response, json: body })
+      })
+      await targetPage.route(/\/account\/api\/context(?:\?.*)?$/, route => route.fulfill({ json: {
+        user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
+        scope: { kind: 'project', projectId: 7, projectName: 'Synthetic project', mode: 'rw' },
+        projects: [{ projectId: 7, name: 'Synthetic project', path: projectScaffold.workspaceCwd, mode: 'rw' }],
+      } }))
+      await targetPage.route(/\/account\/api\/workbench\/catalog(?:\?.*)?$/, route => route.fulfill({ json: {
+        personal: { id: 1, name: 'Fixture' }, personalComplete: true,
+        activeRuntime: { kind: 'project', projectId: 7 },
+        projects: [{ projectId: 7, name: 'Synthetic project', path: projectScaffold.workspaceCwd, mode: 'rw' }],
+        items: [{ sessionId: id, runtime: { kind: 'project', projectId: 7, projectName: 'Synthetic project' },
+          visibility: 'project', creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true }],
+      } }))
+      await targetPage.route(/\/api\/workspace\.list(?:\?.*)?$/, async (route) => {
+        const response = await route.fetch()
+        workspaceRequested.resolve(undefined)
+        await workspaceGate.promise
+        await route.fulfill({ response })
+      })
+      let heldHistory = false
+      await targetPage.route(HISTORY_ROUTE, async (route) => {
+        if (heldHistory) { await route.continue(); return }
+        heldHistory = true
+        const response = await route.fetch()
+        expect(response.status()).toBe(200)
+        historyRequested.resolve(undefined)
+        await historyGate.promise
+        await route.fulfill({ response })
+      })
+      await targetPage.goto(projectScaffold.authenticatedUrl, { waitUntil: 'load' })
+      await describeRequested.promise
+      expect(calls.filter(path => path === '/api/session.list' || path === '/api/workspace.list')).toEqual([])
+      const sessionBaseline = targetPage.waitForResponse(response => new URL(response.url()).pathname === '/api/session.list')
+      describeGate.resolve(undefined)
+      await Promise.all([workspaceRequested.promise, sessionBaseline])
+      expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      expect(calls.filter(path => path === '/api/session.history')).toEqual([])
+      // Account verification and both list baselines precede history; the account-pending case covers late viewport restoration.
+      await targetPage.getByRole('button', { name: 'Switch personal or project scope', exact: true })
+        .getByText('Synthetic project', { exact: true }).waitFor({ timeout: 30_000 })
+      workspaceGate.resolve(undefined)
+      await historyRequested.promise
+      expect(calls.filter(path => path === '/api/session.history')).toHaveLength(1)
+      expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      historyGate.resolve(undefined)
+      await targetPage.getByText(SAVED_PROMPT, { exact: true }).waitFor()
+      await targetPage.getByText('The saved conversation is ready.', { exact: true }).waitFor()
+      expect(calls.filter(path => path === '/api/session.create')).toEqual([])
+      expect(projectScaffold.ctx.agents.get(id)).toBeUndefined()
+      const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection/saved-history.expected.md')
+      await compareOrRefreshGolden(expected,
+        await captureStableAria(targetPage, '[data-conversation-scroll]', projectScaffold.workspaceCwd), webSnapshotMode())
+      expect(targetTripwire.pageErrors).toEqual([])
+    } catch (error) {
+      if (projectPage !== undefined) await saveFailureShot(projectPage, 'web-e2e-project-startup-selection')
+      throw error
+    } finally {
+      describeGate.resolve(undefined)
+      workspaceGate.resolve(undefined)
+      historyGate.resolve(undefined)
+      try {
+        await projectPage?.unrouteAll({ behavior: 'wait' })
+        await projectPage?.close()
+      } finally { await projectScaffold.close() }
+    }
+  }, 120_000)
+
   it.each(['local', 'account', 'account pending'] as const)('reads the saved history while the real list response is held, then presents the same opening: %s', async (composition) => {
     const accountScaffold = composition === 'local' ? undefined : await launchWebScaffold({ workbench: true })
     let accountPage: Page | undefined

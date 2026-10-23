@@ -99,6 +99,21 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe('runtime client apply', () => {
+  it('marks only the first connection reset as initial, including for late subscribers', async () => {
+    const bench = await mount()
+    const initial: (boolean | undefined)[] = []
+    const late: (boolean | undefined)[] = []
+    const connected = { version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }
+    try {
+      bench.ctx.on('connection/reset', (value) => { initial.push(value) })
+      bench.sinks?.onConnected?.(connected)
+      bench.ctx.on('connection/reset', (value) => { late.push(value) })
+      bench.sinks?.onConnected?.(connected)
+      expect(initial).toEqual([true, false])
+      expect(late).toEqual([false])
+    } finally { await bench.ctx.fiber.dispose() }
+  })
+
   it('withdraws prior connection state before preparing the saved history and fresh baselines', async () => {
     const storage = new Map([['dsh.sessions.current', JSON.stringify({ sessionId: 'saved' })]])
     vi.stubGlobal('localStorage', {
