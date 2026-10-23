@@ -99,6 +99,40 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe('runtime client apply', () => {
+  it('withdraws prior connection state before preparing the saved history and fresh baselines', async () => {
+    const storage = new Map([['dsh.sessions.current', JSON.stringify({ sessionId: 'saved' })]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    let bench: Bench | undefined
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    try {
+      bench = await mount()
+      const { api, ctx, sinks } = bench
+      api.onList = () => list.promise
+      api.onHistory = () => history.promise
+      const sessions = ctx.get('sessions')!
+      const readsAtReset: number[][] = []
+      ctx.on('connection/reset', () => {
+        readsAtReset.push(['workspace.list', 'session.list', 'session.history'].map(endpoint => api.callsOf(endpoint).length))
+        sessions.beginNavigation()
+      })
+      sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+      expect(readsAtReset).toEqual([[0, 0, 0]])
+      expect(api.callsOf('session.history')).toHaveLength(1)
+      expect(api.lastHistorySignal?.aborted).toBe(false)
+      expect(api.callsOf('session.historyIndex')).toHaveLength(0)
+      expect(sessions.list.getSnapshot().current).toBeUndefined()
+    } finally {
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      try { await bench?.ctx.fiber.dispose() }
+      finally { vi.unstubAllGlobals() }
+    }
+  })
+
   it('retries the shared Workspace baseline on a later connection after refusal', async () => {
     const bench = await mount()
     const id = 'recovered-archive' as never

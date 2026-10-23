@@ -378,9 +378,11 @@ export function apply(ctx: Context): void {
       }
     },
     onConnected: (description) => {
+      // Authority withdrawal can cancel pending navigation, including an
+      // unshown saved-history window. Finish it before preparing fresh reads.
+      ctx.emit('connection/reset')
       const workspaceBaseline = workspaces.handleConnected()
       sessions.handleConnected(description, workspaceBaseline)
-      ctx.emit('connection/reset')
     },
     onFailure: (failure) => { sessions.handleConnectionFailure(failure) },
     onStateChange: (state) => {

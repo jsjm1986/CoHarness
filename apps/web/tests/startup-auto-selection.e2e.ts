@@ -197,60 +197,115 @@ describe('web e2e: startup auto-selection', () => {
     expect(await recordedPhases(page)).toEqual(['hero'])
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
-  it('reads the saved history while the real list response is held, then presents the same opening', async () => {
-    onTestFailed(() => saveFailureShot(page, 'web-e2e-startup-saved-history'))
-    const id = await seedSession(scaffold, savedHistory(), SAVED_ID)
-    const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
-    await workspace.attachSession(id)
-    await page.evaluate((sessionId) => {
-      localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
-    }, id)
-    const listGate = Promise.withResolvers<undefined>()
-    const listReady = Promise.withResolvers<undefined>()
-    let historyCalls = 0
-    let indexCalls = 0
-    const countHistory = (request: import('playwright').Request): void => {
-      const path = new URL(request.url()).pathname
-      if (path === '/api/session.history') historyCalls++
-      if (path === '/api/session.historyIndex') indexCalls++
-    }
-    page.on('request', countHistory)
-    const listRoute = /\/api\/session\.list(?:\?.*)?$/
-    await page.route(listRoute, async (route) => {
-      const response = await route.fetch()
-      listReady.resolve(undefined)
-      await listGate.promise
-      await route.fulfill({ response })
-    })
-    const warningsBefore = tripwire.warnings.length
+  it.each(['local', 'account'] as const)('reads the saved history while the real list response is held, then presents the same opening: %s', async (composition) => {
+    const accountScaffold = composition === 'account' ? await launchWebScaffold({ workbench: true }) : undefined
+    let accountPage: Page | undefined
+    let targetPage = page
     try {
-      const historyReady = page.waitForResponse(response =>
-        new URL(response.url()).pathname === '/api/session.history'
-        && (response.request().postDataJSON() as { payload: { sessionId: string } }).payload.sessionId === id)
-      await page.reload({ waitUntil: 'commit' })
-      await listReady.promise
-      const response = await historyReady
-      expect(response.status()).toBe(200)
-      expect((await response.json() as { result: { ok: boolean } }).result.ok).toBe(true)
-      expect(historyCalls).toBe(1)
-      expect(indexCalls).toBe(0)
-      expect(await page.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
-      expect(await page.locator('textarea').first().isVisible()).toBe(true)
-      expect(scaffold.ctx.agents.get(id)).toBeUndefined()
-      listGate.resolve(undefined)
-      await page.getByText(SAVED_PROMPT, { exact: true }).waitFor()
-      await page.getByText('The saved conversation is ready.', { exact: true }).waitFor()
-      expect(historyCalls).toBe(1)
-      expect(scaffold.ctx.agents.get(id)).toBeUndefined()
-      const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection')
-      await compareOrRefreshGolden(join(expected, 'saved-history.expected.md'),
-        await captureStableAria(page, '[data-conversation-scroll]', scaffold.workspaceCwd), webSnapshotMode())
-      acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
-      expect(tripwire.pageErrors).toEqual([])
+      const targetScaffold = accountScaffold ?? scaffold
+      if (accountScaffold !== undefined) targetPage = accountPage = await newEnglishPage(browser)
+      const targetTripwire = accountScaffold === undefined ? tripwire : watchConsole(targetPage)
+      if (accountScaffold !== undefined) {
+        // The Gateway owns account metadata; Host APIs, both WebSockets and the
+        // complete Workbench/authority/persistence consumers run unchanged.
+        await targetPage.route(/\/api\/host\.describe(?:\?.*)?$/, async (route) => {
+          const response = await route.fetch()
+          const body = await response.json() as {
+            result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'personal' } } } | { ok: false }
+          }
+          expect(body.result.ok).toBe(true)
+          if (body.result.ok) {
+            body.result.value.executionAuthorityRequired = true
+            body.result.value.runtimeTarget = { kind: 'personal' }
+          }
+          await route.fulfill({ response, json: body })
+        })
+        await targetPage.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
+          await route.fulfill({ json: {
+            user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
+            scope: { kind: 'personal' }, projects: [],
+          } })
+        })
+        await targetPage.route(/\/account\/api\/workbench\/catalog(?:\?.*)?$/, async (route) => {
+          await route.fulfill({ json: {
+            personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal' }, projects: [],
+            items: [{ sessionId: SAVED_ID, runtime: { kind: 'personal' }, visibility: 'personal', title: 'Saved fixture',
+              creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true }],
+          } })
+        })
+        await targetPage.goto(accountScaffold.authenticatedUrl, { waitUntil: 'load' })
+        await targetPage.waitForSelector('[class*="frame"]')
+      }
+      const id = await seedSession(targetScaffold, savedHistory(), SAVED_ID)
+      const workspace = await targetScaffold.ctx.workspaceRegistry.create(targetScaffold.workspaceCwd)
+      await workspace.attachSession(id)
+      await targetPage.evaluate((sessionId) => {
+        localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
+      }, id)
+      const listGate = Promise.withResolvers<undefined>()
+      const listReady = Promise.withResolvers<undefined>()
+      let historyCalls = 0
+      let historyResponse: import('playwright').Response | undefined
+      const observeHistory = (response: import('playwright').Response): void => {
+        if (new URL(response.url()).pathname !== '/api/session.history'
+          || (response.request().postDataJSON() as { payload: { sessionId: string } }).payload.sessionId !== id) return
+        historyResponse = response
+      }
+      let indexCalls = 0
+      const countHistory = (request: import('playwright').Request): void => {
+        const path = new URL(request.url()).pathname
+        if (path === '/api/session.history') historyCalls++
+        if (path === '/api/session.historyIndex') indexCalls++
+      }
+      targetPage.on('request', countHistory)
+      targetPage.on('response', observeHistory)
+      const listRoute = /\/api\/session\.list(?:\?.*)?$/
+      const listReads: Promise<void>[] = []
+      await targetPage.route(listRoute, (route) => {
+        const read = (async (): Promise<void> => {
+          const response = await route.fetch()
+          listReady.resolve(undefined)
+          await listGate.promise
+          await route.fulfill({ response })
+        })()
+        listReads.push(read)
+        return read
+      })
+      const warningsBefore = targetTripwire.warnings.length
+      try {
+        await targetPage.reload({ waitUntil: 'commit' })
+        await listReady.promise
+        await expect.poll(() => historyCalls).toBe(1)
+        await expect.poll(() => historyResponse?.status()).toBe(200)
+        expect((await historyResponse!.json() as { result: { ok: boolean } }).result.ok).toBe(true)
+        expect(historyCalls).toBe(1)
+        expect(indexCalls).toBe(0)
+        expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+        expect(await targetPage.locator('textarea').first().isVisible()).toBe(true)
+        expect(targetScaffold.ctx.agents.get(id)).toBeUndefined()
+        listGate.resolve(undefined)
+        await targetPage.getByText(SAVED_PROMPT, { exact: true }).waitFor()
+        await targetPage.getByText('The saved conversation is ready.', { exact: true }).waitFor()
+        expect(historyCalls).toBe(1)
+        expect(targetScaffold.ctx.agents.get(id)).toBeUndefined()
+        const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection')
+        await compareOrRefreshGolden(join(expected, 'saved-history.expected.md'),
+          await captureStableAria(targetPage, '[data-conversation-scroll]', targetScaffold.workspaceCwd), webSnapshotMode())
+        acknowledgeReloadConnectionLoss(targetTripwire, warningsBefore)
+        expect(targetTripwire.pageErrors).toEqual([])
+      } finally {
+        listGate.resolve(undefined)
+        targetPage.off('request', countHistory)
+        targetPage.off('response', observeHistory)
+        await targetPage.unroute(listRoute)
+        await Promise.all(listReads)
+      }
+    } catch (error) {
+      await saveFailureShot(targetPage, `web-e2e-startup-saved-history-${composition}`)
+      throw error
     } finally {
-      listGate.resolve(undefined)
-      page.off('request', countHistory)
-      await page.unroute(listRoute)
+      try { await accountPage?.close() }
+      finally { await accountScaffold?.close() }
     }
   }, 120_000)
 
