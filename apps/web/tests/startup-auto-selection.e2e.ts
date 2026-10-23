@@ -26,11 +26,16 @@
 // Zero model calls: registering a workspace and opening its blank fallback are
 // Host operations with no model involvement. A stray stream would fail loud
 // with NO_ADAPTER.
+import { join } from 'node:path'
+import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import { createUserMessage, createAssistantMessage } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-session-persistence'
+import type {} from '@deepseek-ai/dsh-workspace'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { acknowledgeReloadConnectionLoss, launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { acknowledgeReloadConnectionLoss, captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+import { connectFreshWorkspace, newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
 
 /** Wire path of the history round-trip the conversation root waits out (POST /api/session.history). */
 const HISTORY_ROUTE = /\/api\/session\.history(?:\?.*)?$/
@@ -44,6 +49,29 @@ const ROOT_PHASE = 'div[data-phase]'
 /** Every distinct `data-phase` the conversation root shows, in order, across one page load. */
 function recordedPhases(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as { __conversationPhases: string[] }).__conversationPhases)
+}
+
+const SAVED_ID = 'startup-saved-history'
+const SAVED_PROMPT = 'Show the saved conversation.'
+
+/** A closed synthetic conversation restored without an Agent or model request. */
+function savedHistory(): string {
+  const session = Session.create(SessionId(SAVED_ID))
+  session.append('turn/start', { turn: 1 })
+  session.append('step/start', { turn: 1, step: 1 })
+  session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: SAVED_PROMPT }], source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  session.append('assistant/message', {
+    turn: 1, step: 1, stream: [],
+    message: createAssistantMessage({ source: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      content: [{ type: 'text', text: 'The saved conversation is ready.' }],
+    }),
+  }, { surfaceOp: 'append' })
+  session.append('step/end', { turn: 1, step: 1 })
+  session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+  return [JSON.stringify({ type: 'session', version: SESSION_FORMAT_VERSION, id: '{{sessionId}}', createdAt: 1700000000000,
+    cwd: '{{cwd}}', isSeeded: false, delegationDepth: 0 }), ...session.snapshotEvents().map(event => JSON.stringify(event)), ''].join('\n')
 }
 
 describe('web e2e: startup auto-selection', () => {
@@ -169,4 +197,61 @@ describe('web e2e: startup auto-selection', () => {
     expect(await recordedPhases(page)).toEqual(['hero'])
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
+  it('reads the saved history while the real list response is held, then presents the same opening', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-startup-saved-history'))
+    const id = await seedSession(scaffold, savedHistory(), SAVED_ID)
+    const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
+    await workspace.attachSession(id)
+    await page.evaluate((sessionId) => {
+      localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
+    }, id)
+    const listGate = Promise.withResolvers<undefined>()
+    const listReady = Promise.withResolvers<undefined>()
+    let historyCalls = 0
+    let indexCalls = 0
+    const countHistory = (request: import('playwright').Request): void => {
+      const path = new URL(request.url()).pathname
+      if (path === '/api/session.history') historyCalls++
+      if (path === '/api/session.historyIndex') indexCalls++
+    }
+    page.on('request', countHistory)
+    const listRoute = /\/api\/session\.list(?:\?.*)?$/
+    await page.route(listRoute, async (route) => {
+      const response = await route.fetch()
+      listReady.resolve(undefined)
+      await listGate.promise
+      await route.fulfill({ response })
+    })
+    const warningsBefore = tripwire.warnings.length
+    try {
+      const historyReady = page.waitForResponse(response =>
+        new URL(response.url()).pathname === '/api/session.history'
+        && (response.request().postDataJSON() as { payload: { sessionId: string } }).payload.sessionId === id)
+      await page.reload({ waitUntil: 'commit' })
+      await listReady.promise
+      const response = await historyReady
+      expect(response.status()).toBe(200)
+      expect((await response.json() as { result: { ok: boolean } }).result.ok).toBe(true)
+      expect(historyCalls).toBe(1)
+      expect(indexCalls).toBe(0)
+      expect(await page.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      expect(await page.locator('textarea').first().isVisible()).toBe(true)
+      expect(scaffold.ctx.agents.get(id)).toBeUndefined()
+      listGate.resolve(undefined)
+      await page.getByText(SAVED_PROMPT, { exact: true }).waitFor()
+      await page.getByText('The saved conversation is ready.', { exact: true }).waitFor()
+      expect(historyCalls).toBe(1)
+      expect(scaffold.ctx.agents.get(id)).toBeUndefined()
+      const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection')
+      await compareOrRefreshGolden(join(expected, 'saved-history.expected.md'),
+        await captureStableAria(page, '[data-conversation-scroll]', scaffold.workspaceCwd), webSnapshotMode())
+      acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
+      expect(tripwire.pageErrors).toEqual([])
+    } finally {
+      listGate.resolve(undefined)
+      page.off('request', countHistory)
+      await page.unroute(listRoute)
+    }
+  }, 120_000)
+
 })

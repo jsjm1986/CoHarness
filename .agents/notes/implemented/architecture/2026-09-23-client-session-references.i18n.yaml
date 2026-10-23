@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-client-session-references.md
 document:
-  en: 9e2c9351f891395c7bb4417569f1c91d4e1164d9
-  zh: b5af5c68ce953652252b37afa3539e1ca584ddb0
+  en: c4a71540f6dabc9b30188ebe32cf52f150a60401
+  zh: 8a55dfaa3a83b2923238a0682cfd1eb81dd12bef
 /agent-note-client-session-references:
   en: 0e19b99af6f6266e
   zh: f585ee31c41ec683
@@ -12,8 +12,8 @@ document:
   en: ece03be0454bc401
   zh: cff8ba4474f3cdbd
 /agent-note-client-session-references/decision:
-  en: eb3494c08dcd34d5
-  zh: fb1dabd205f30db6
+  en: 797672a2b72cfb49
+  zh: 5d4061bb5d260880
 /agent-note-client-session-references/alternatives-considered:
   en: 1761c88536676509
   zh: 92380076556fe3a7

@@ -31,6 +31,52 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
 }
 
 describe('SessionRuntimePool', () => {
+  it.each(['account', 'target'] as const)('cancels the unshown saved window on %s withdrawal without adopting its late reply', async (cause) => {
+    const storage = new Map([['dsh.sessions.current', JSON.stringify({ sessionId: 'saved' })]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    api.onList = () => list.promise
+    api.onHistory = () => history.promise
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      pool.handleConnected()
+      const oldSignal = api.lastHistorySignal
+      expect(api.callsOf('session.history')).toHaveLength(1)
+      expect(pool.list.getSnapshot().current).toBeUndefined()
+      if (cause === 'account') pool.invalidateAccount()
+      else pool.setBaseRuntimeTarget({ kind: 'project', projectId: 9 })
+      expect(oldSignal?.aborted).toBe(true)
+      api.onHistory = async () => ok({ events: [], hasMore: false })
+      list.resolve(ok({ items: [{ sessionId: 'saved' as SessionId, updatedAt: 1, running: false, blank: true }] }))
+      await base.refresh()
+      history.resolve(ok({ events: [], hasMore: false }))
+      await history.promise
+      expect(pool.binding(clientSessionKey({ kind: 'personal' }, 'saved' as SessionId))).toBeUndefined()
+      if (cause === 'account') {
+        expect(pool.list.getSnapshot().current).toBeUndefined()
+        expect(pool.list.getSnapshot().ids).toEqual([])
+        expect(api.callsOf('session.history')).toHaveLength(1)
+      } else {
+        const key = clientSessionKey({ kind: 'project', projectId: 9 }, 'saved' as SessionId)
+        expect(pool.list.getSnapshot().current).toBe(key)
+        expect(pool.binding(key)?.session.getSnapshot().openState).toBe('open')
+        expect(api.callsOf('session.history')).toHaveLength(2)
+      }
+    } finally {
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      await ctx.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('merges legacy shared archive facts with frames until a versioned snapshot replaces them', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

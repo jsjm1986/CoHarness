@@ -87,6 +87,8 @@ Each scope carries an object identity distinct from its durable Session id. Scop
 
 `beginNavigation()` supersedes pending view-selection intents and returns their cancellation signal. Asynchronous navigation checks it after loading and before selecting; `open`, `openSubagent`, `clear`, target changes, and explicit access denial invalidate older intents. Supersession leaves completed Host mutations catalogued and preserves the current view and draft. Plugin-owned requests additionally observe plugin disposal.
 
+On the first verified connection, Runtime opens the saved ordinary root Session's conversation tail alongside the Session-list baseline. This single unshown window has no Client scope, reference, history index, or Agent. The catalog and Workspace archive projection still determine selection; the first admitted reference takes over the same opening. Navigation, target or account withdrawal, disconnection, a missing or failed baseline, and root disposal release an unclaimed window. Runtime owns its outstanding read through settlement, and root disposal waits for it. Addressed children keep their catalog-based restore path.
+
 `commitSessionNavigation()` retains the target while its opening attempt settles, requires usable history, and commits only the current intent. The receiving view acquires its own reference before the temporary reference is released. Failed loading preserves the old view; cancellation suppresses both stale commits and stale errors. This does not change `SessionReference.ready`, which reports attempt settlement rather than successful loading.
 
 <a id="workspace-and-session-lists"></a>

@@ -1,0 +1,32 @@
+- text: Show the saved conversation.
+- group "Message time and speed": "2023-11-15 {{clock}}"
+- button "Copy":
+  - img
+- status: Completed
+- "button \"Completed in {{duration}}\" [disabled]"
+- paragraph: The saved conversation is ready.
+- button "Copy":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "2023-11-15 {{clock}}"
+- textbox "Message COHARNESS"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- group "Session statistics":
+  - button "1 turns · 1 steps":
+    - img
+    - text: 1 turns · 1 steps

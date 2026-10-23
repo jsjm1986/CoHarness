@@ -378,8 +378,8 @@ export class SessionManager {
   }
 
   /**
-   * Lazy build: return the existing instance or construct one (no auto-open —
-   * open is triggered by the container's select callback).
+   * Return or construct the resident instance without opening history.
+   * The service owns view acquisitions and a saved root's startup read.
    * @param sessionId - the session to get.
    * @returns the resident instance.
    */

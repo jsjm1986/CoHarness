@@ -378,9 +378,11 @@ export class SessionRuntime implements ISessions {
   private readonly navigation = new NavigationController()
   /** Last selected id retained across a transient list mask on reconnect. */
   private watched: SessionId | undefined
-  /** Scope-fiber teardowns in progress; root disposal waits for every one. */
-  private readonly pendingScopeDisposals = new Set<Promise<void>>()
+  /** Scope cleanup and saved-window reads; root disposal waits for every one. */
+  private readonly disposalWaits = new Set<Promise<void>>()
   private readonly hostDescription: HostDescriptionSource | undefined
+  private restoredHistoryId: SessionId | undefined
+  private restoredHistory: { session: Session; opening: Promise<void> } | undefined
 
   /**
    * @param ctx - client root context (scope fibers mount under it).
@@ -402,6 +404,7 @@ export class SessionRuntime implements ISessions {
       {},
       options.persistSelection === false ? undefined : { persist: { name: 'dsh.sessions.current' } })
     const restored = this.selection.getSnapshot()
+    if (restored.subagentAddress === undefined) this.restoredHistoryId = restored.sessionId
     const conversationEvents = rootCtx.get('conversationEvents')
     const conversationViews = rootCtx.get('conversationViews')
     const conversation = conversationRuntime ?? (
@@ -478,6 +481,7 @@ export class SessionRuntime implements ISessions {
     // Root shutdown invalidates references before draining generation teardown.
     rootCtx.effect(() => async () => {
       this.closed = true
+      this.cancelRestoredHistory()
       this.additionalStaged.clear()
       this.watched = undefined
       this.staged.clear()
@@ -487,13 +491,13 @@ export class SessionRuntime implements ISessions {
         this.publishRetention(id)
         this.scheduleDrop(id, record)
       }
-      while (this.pendingScopeDisposals.size > 0) {
-        const results = await Promise.allSettled([...this.pendingScopeDisposals])
+      while (this.disposalWaits.size > 0) {
+        const results = await Promise.allSettled([...this.disposalWaits])
         const failures = results
           .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
           .map(result => result.reason as unknown)
         if (failures.length > 0) {
-          throw new AggregateError(failures, 'client session scope disposal failed')
+          throw new AggregateError(failures, 'client session disposal failed')
         }
       }
       for (const observer of this.retainObservers.values()) observer.listeners.clear()
@@ -510,6 +514,7 @@ export class SessionRuntime implements ISessions {
    */
   setPresentationKey(key: (id: SessionId) => SessionId, target?: import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget): void {
     if (this.scopes.size !== 0) throw new Error('Cannot change a runtime identity while Session scopes are retained')
+    this.cancelRestoredHistory()
     this.presentationKey = key
     this.runtimeTarget = target
   }
@@ -520,6 +525,7 @@ export class SessionRuntime implements ISessions {
   unboundProvideInfo(): SessionMaybeProvideInfo { return this.provideChannel.maybeInfo }
 
   beginNavigation(): AbortSignal {
+    this.cancelRestoredHistory()
     return this.navigation.begin()
   }
 
@@ -677,6 +683,7 @@ export class SessionRuntime implements ISessions {
    * still own the next selection.
    */
   releaseSelection(): void {
+    this.cancelRestoredHistory()
     this.watched = undefined
     this.manager.clearSelection()
   }
@@ -732,10 +739,38 @@ export class SessionRuntime implements ISessions {
   /** Rebuild the Session baseline and every opened window after connection. */
   handleConnected(): void {
     this.manager.handleConnected()
+    this.prefetchRestoredHistory()
+  }
+
+  /** Read one saved root window without admitting a view or allocating its Client scope. */
+  private prefetchRestoredHistory(): void {
+    const id = this.restoredHistoryId
+    this.restoredHistoryId = undefined
+    if (this.closed || id === undefined || this.selection.getSnapshot().sessionId !== id
+      || this.scopes.has(id)) return
+    const session = this.manager.get(id)
+    const prefetch = { session, opening: session.open() }
+    this.restoredHistory = prefetch
+    this.trackDisposal(id, prefetch.opening)
+    // The baseline still admits the selection. A denied, missing, or failed
+    // baseline releases an unclaimed window after its projection publishes.
+    void this.manager.refreshList().then(() => {
+      if (this.restoredHistory === prefetch) this.cancelRestoredHistory()
+    })
+  }
+
+  /** Cancel only the unclaimed window; a real reference takes over its shared opening. */
+  private cancelRestoredHistory(): void {
+    const prefetch = this.restoredHistory
+    if (prefetch === undefined) return
+    this.restoredHistory = undefined
+    prefetch.session.dispose()
+    this.manager.drop(prefetch.session.sessionId, prefetch.session)
   }
 
   /** Drop generation-scoped live interaction state the moment a connection generation dies. */
   handleDisconnected(): void {
+    this.cancelRestoredHistory()
     this.manager.handleDisconnected()
   }
 
@@ -1009,9 +1044,10 @@ export class SessionRuntime implements ISessions {
 
   /** Materialize one validated local generation for its first reference. */
   private materializeScope(id: SessionId): ScopeRecord {
+    const session = this.manager.get(id)
+    if (this.restoredHistory?.session === session) this.restoredHistory = undefined
     const presentationId = this.presentationKey(id)
     const { fiber, ctx } = createScope(this.rootCtx, id, presentationId)
-    const session = this.manager.get(id)
     // The Session owns its scoped dispatch point (host Agent.loopCtx mirror);
     // mint and bind are one step so a live scope record implies a bound actx.
     session.bindScope(ctx)
@@ -1152,16 +1188,19 @@ export class SessionRuntime implements ISessions {
    * durable truth, a reopen lazily rebuilds and backfills via open().
    */
   private scheduleDrop(id: SessionId, record: ScopeRecord, disposeFiber = true): void {
-    const disposal = this.dropScope(id, record, disposeFiber)
-    this.pendingScopeDisposals.add(disposal)
+    this.trackDisposal(id, this.dropScope(id, record, disposeFiber))
+  }
+
+  private trackDisposal(id: SessionId, disposal: Promise<void>): void {
+    this.disposalWaits.add(disposal)
     // Prunes are triggered from synchronous projection notifications and have
     // no caller to await. Observe failures here; root teardown still awaits
     // the same promise and reports an aggregate failure to its owner.
     void disposal.catch((error: unknown) => {
-      this.rootCtx.logger.error('client session scope disposal failed for "%s"', id)
+      this.rootCtx.logger.error('client session disposal failed for "%s"', id)
       this.rootCtx.logger.error(error)
     }).finally(() => {
-      this.pendingScopeDisposals.delete(disposal)
+      this.disposalWaits.delete(disposal)
     })
   }
 
