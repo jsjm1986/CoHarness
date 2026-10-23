@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-bounded-preview-preparation.md
 document:
-  en: 608859bcc5f984853a5c123ae85306b4982a261c
-  zh: fb1fa6764763825b1b09830fca3fffbb951e125f
+  en: 0c8244483531f148e0c4ba961233f9c5f42dc22f
+  zh: 51ae973e6f47a09dcb5c6f72c8ae93624a649fb2
 /agent-note-bounded-workspace-preview-preparation:
   en: b6157af3336ff35d
   zh: 0ff5fd470c67c7ae
@@ -12,8 +12,8 @@ document:
   en: 3fe6fb80ebf090e1
   zh: ed54d07ffd46380a
 /agent-note-bounded-workspace-preview-preparation/decision:
-  en: e659f3f39738ac3f
-  zh: 4982eca6c520a148
+  en: 732f93e1ea916be6
+  zh: fb483881ea951244
 /agent-note-bounded-workspace-preview-preparation/alternatives-considered:
   en: 697dc402be11a299
   zh: 228f2eb36f6f7d37

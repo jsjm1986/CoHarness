@@ -68,6 +68,7 @@ export const workspaceFilesReadBytesRequestSchema = z.object({
   offset: z.number().int().nonnegative().optional(),
   length: z.number().int().positive().optional(),
   version: z.string().min(1).optional(),
+  maxFileBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
 }) satisfies z.ZodType<Wire<RequestPayload<'workspaceFiles.readBytes'>>>
 
 /** Wire validation for `workspaceFilesReadBytesValueSchema`. */

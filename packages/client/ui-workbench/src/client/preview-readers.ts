@@ -76,23 +76,18 @@ export function createWorkspacePreviewReaders(connection: ConnectionHandle | und
       const tooLarge = (): WorkspaceResourceError =>
         new WorkspaceResourceError('workspace-file/too-large', 'Workspace file exceeds the preview byte limit')
       let version = request.version
-      if (version === undefined) {
-        const stat = await targetConnection.api.workspaceFiles.stat({ sessionId, path }, signal)
-        if (!stat.result.ok) throw new WorkspaceResourceError(stat.result.error.code, stat.result.error.message)
-        if (stat.result.value.type !== 'file') throw new WorkspaceResourceError('workspace-file/not-regular-file', 'Workspace path is not a regular file')
-        if (stat.result.value.bytes !== undefined && stat.result.value.bytes > request.maxBytes) throw tooLarge()
-        version = stat.result.value.version
-      }
       const windows: string[] = []
       let total = 0
       for (;;) {
         signal.throwIfAborted()
         const response = await targetConnection.api.workspaceFiles.readBytes(
-          { sessionId, path, offset: total, version }, signal,
+          { sessionId, path, offset: total, maxFileBytes: request.maxBytes,
+            ...(version === undefined ? {} : { version }) }, signal,
         )
         if (!response.result.ok) throw new WorkspaceResourceError(response.result.error.code, response.result.error.message)
         signal.throwIfAborted()
         const window = response.result.value
+        version ??= window.version
         const binary = atob(window.bytes)
         // The bound covers decoded bytes; an overflowing window never lands.
         if (total + binary.length > request.maxBytes) throw tooLarge()

@@ -13,6 +13,8 @@ The `workspaceFiles.*` methods read Session-relative files after Session authori
 
 Text-page offsets and limits count lines. A final page reports `eof: true` even when it exactly fills the line limit. A full window checks buffered text or advances the provider iterator until the next nonempty chunk or completion; the page loop neither appends nor scans the following line. The byte bound still rejects an oversized selected page rather than truncating it.
 
+`workspaceFiles.readBytes` accepts an optional inclusive `maxFileBytes` guard. A known file size above that cap fails before provider content I/O; the ordinary per-window limit still applies. Complete-file readers can obtain the version from the first byte window and guard subsequent windows without a separate metadata request. They also enforce their accumulated byte cap when a provider reports no size.
+
 `workspaceFiles.renderOffice` reuses file-domain authorization, relative paths, and version checks. A content permission probe precedes conversion-cache lookup; bounded byte-window reads run after admission, and source identity and access are checked again before returning. Results carry a PDF, missing fonts, and converter generation without Host paths or engine diagnostics. The [Office provider](../../document/office-to-pdf/README.md) owns conversion limits.
 
 The existing Host stream carries `host/workspace-file-changed` for authorized Agent observations, not OS filesystem watching. No provider path or `FsTargetKey` crosses this file API. `ApiTransportError.status` preserves HTTP 401/403/429/503 separately from RPC file errors, without consuming error response bodies.

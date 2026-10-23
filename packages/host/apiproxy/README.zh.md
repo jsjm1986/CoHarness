@@ -13,6 +13,8 @@ kind: "package-reference"
 
 文本页的偏移量和上限均按行计数。最后一页即使恰好达到行数上限，也会报告 `eof: true`。行窗口填满后检查已缓冲文本，或推进提供方迭代器，直到遇到下一个非空分块或结束；分页循环既不追加也不扫描下一行。所选页超过字节上限时仍会拒绝，而不是截断。
 
+`workspaceFiles.readBytes` 接受可选的完整文件大小上限 `maxFileBytes`，等于上限时允许读取。已知文件大小超限时，在提供方读取内容前拒绝；单窗口上限仍然生效。完整文件读取器可从首个字节窗口取得版本，再用该版本保护后续窗口，无需单独请求元数据。提供方未报告大小时，读取器仍约束累计字节数。
+
 `workspaceFiles.renderOffice` 复用文件域的授权、相对路径及版本检查。内容权限探测在查询转换缓存前执行；队列准入后进行有界字节窗口读取，返回前再次核验源文件和权限。结果包含 PDF、缺失字体及转换代次，不暴露 Host 路径或引擎诊断。转换限制由 [Office 提供方](../../document/office-to-pdf/README.zh.md)负责。
 
 现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。

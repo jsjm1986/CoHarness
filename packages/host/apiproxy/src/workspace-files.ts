@@ -344,6 +344,11 @@ export function createWorkspaceFilesApi(ctx: Context, options: ReadOptions): Wor
       if (!Number.isSafeInteger(offset) || offset < 0) throw new FileFailure({ code: 'bad-request', message: 'Byte offsets start at 0.', details: { issues: [] } })
       const length = bound(request.payload.length, limits.maxBytes, file.sessionId, file.path)
       if (request.payload.version !== undefined && request.payload.version !== wireVersion(file.info.version)) refuse('workspace-file/stale-version', file.sessionId, file.path)
+      const maxFileBytes = request.payload.maxFileBytes
+      if (maxFileBytes !== undefined && file.info.size !== undefined && file.info.size > maxFileBytes) {
+        throw new FileFailure({ code: 'workspace-file/too-large', message: 'Workspace file exceeds the preview byte limit',
+          details: { sessionId: file.sessionId, path: file.path, limit: maxFileBytes } })
+      }
       const bytes = await file.fs.readByteRange(file.target, { offset, length, expectedVersion: file.info.version }, abort)
       return { path: file.path, offset, bytes: Buffer.from(bytes).toString('base64'),
         eof: file.info.size === undefined ? bytes.length < length : offset >= file.info.size - bytes.length,

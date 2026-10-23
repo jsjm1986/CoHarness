@@ -22,6 +22,7 @@ import { collaborationCapabilities, CollaborationError } from '@deepseek-ai/dsh-
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { environmentForAgent } from '@deepseek-ai/dsh-agent-preset-registry'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+import { workspaceFilesReadBytesRequestSchema } from '../src/api/workspace-files.schema.ts'
 
 const realmEnvironment = vi.hoisted(() => ({ real: undefined as unknown }))
 vi.mock('@deepseek-ai/dsh-agent-preset-registry', async (importOriginal) => {
@@ -36,6 +37,29 @@ afterEach(async () => { for (const dispose of cleanups.splice(0).reverse()) awai
 afterEach(() => { realmFsFor.mockImplementation(realmEnvironment.real as never) })
 
 const request = <P>(payload: P): RpcRequest<P> => ({ rpcId: RpcId('workspace-files-test'), payload })
+
+it('rejects an oversized complete file before reading a byte window and admits the exact cap', async () => {
+  const { api, ctx, root, session } = await harness({ maxBytes: 4 })
+  writeFileSync(join(root, 'bounded.bin'), 'abcdefgh')
+  const read = vi.spyOn(ctx.fs, 'readByteRange')
+  const payload = { sessionId: session.id, path: 'bounded.bin', maxFileBytes: 7 }
+  const rejected = await api.workspaceFiles.readBytes(request(payload), new AbortController().signal)
+  expect(rejected.result).toMatchObject({ ok: false, error: { code: 'workspace-file/too-large' } })
+  expect(read).not.toHaveBeenCalled()
+  const accepted = expectOk(await api.workspaceFiles.readBytes(request({ ...payload, maxFileBytes: 8 }), new AbortController().signal))
+  expect(Buffer.from(accepted.bytes, 'base64').toString()).toBe('abcd')
+  expect(accepted.eof).toBe(false)
+  expect(read).toHaveBeenCalledOnce()
+})
+
+it('validates the optional complete-file byte cap at the wire parser', () => {
+  const payload = { sessionId: 'workspace-files-session', path: 'bounded.bin' }
+  for (const maxFileBytes of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, '8']) {
+    expect(workspaceFilesReadBytesRequestSchema.safeParse({ ...payload, maxFileBytes }).success).toBe(false)
+  }
+  expect(workspaceFilesReadBytesRequestSchema.parse({ ...payload, maxFileBytes: 0 })).toMatchObject({ maxFileBytes: 0 })
+  expect(workspaceFilesReadBytesRequestSchema.parse(payload)).toEqual(payload)
+})
 
 function expectOk<T>(response: { result: { ok: true; value: T } | { ok: false; error: unknown } }): T {
   expect(response.result.ok).toBe(true)
