@@ -73,7 +73,7 @@ function catalog(value: Partial<PluginManagementCatalog> = {}) {
   return ok<PluginManagementCatalog>({ managementAvailable: true, manage: true, bundles: [BUNDLE], plugins: PLUGINS, ...value })
 }
 
-function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}) {
+function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}, callbacks: Omit<ConstructorParameters<typeof PluginManagerController>[0], 'remote'> = {}) {
   const inventory = { list: overrides.inventory ?? vi.fn(() => Promise.resolve(ok({ entries: [], managementAvailable: true }))) }
   const plugins = {
     catalog: vi.fn<(signal?: AbortSignal) => Promise<ReturnType<typeof catalog> | ReturnType<typeof refused>>>(
@@ -96,6 +96,7 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
   const probe = { fastest: overrides.fastest ?? vi.fn(() => Promise.resolve(ok(null))) }
   const ctx = {
     remote: { pluginManager: plugins, pluginInventory: inventory, pluginRegistryProbe: probe },
+    ...callbacks,
   } as never
   const controller = new PluginManagerController(ctx)
   onTestFinished(() => { controller.dispose() })
@@ -118,6 +119,35 @@ beforeEach(() => {
     getItem: (key: string) => storage.get(key) ?? null,
     setItem: (key: string, value: string) => { storage.set(key, value) },
     removeItem: (key: string) => { storage.delete(key) },
+  })
+})
+
+describe('shared Admin catalog acceptance', () => {
+  it('publishes an accepted catalog and reports actual writes without an initial idle notification', async () => {
+    const onCatalog = vi.fn()
+    const onWriteSettled = vi.fn()
+    const { controller, face } = bench({}, { onCatalog, onWriteSettled })
+    await controller.load()
+    expect(onCatalog).toHaveBeenCalledExactlyOnceWith(catalog().value)
+    expect(onWriteSettled).not.toHaveBeenCalled()
+    face.setRowEnabled(ROW_ENTRY, false)
+    await vi.waitFor(() => expect(onWriteSettled).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(onCatalog).toHaveBeenCalledTimes(2))
+  })
+
+  it('does not publish refused catalogs or late catalogs from a disposed generation', async () => {
+    const onCatalog = vi.fn()
+    const gate = deferred<ReturnType<typeof catalog>>()
+    onTestFinished(() => { gate.resolve(catalog()) })
+    const { controller, plugins } = bench({ catalog: vi.fn().mockResolvedValueOnce(refused('plugin-management/forbidden', 'denied')).mockReturnValueOnce(gate.promise) }, { onCatalog })
+    await controller.load()
+    expect(onCatalog).not.toHaveBeenCalled()
+    const loading = controller.load()
+    await vi.waitFor(() => expect(plugins.catalog).toHaveBeenCalledTimes(2))
+    controller.dispose()
+    gate.resolve(catalog())
+    await loading
+    expect(onCatalog).not.toHaveBeenCalled()
   })
 })
 

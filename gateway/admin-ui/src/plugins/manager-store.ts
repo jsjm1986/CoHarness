@@ -24,6 +24,7 @@ import type {
   PluginInstallLogChunk,
   PluginInstallProgress,
   PluginInstallRequestId,
+  PluginManagementCatalog,
   PluginRegistries,
   PluginSpecInspection,
   ReadOnlyReason,
@@ -520,10 +521,14 @@ export class PluginManagerController {
   })
 
   /**
-   * @param ctx - the tab plugin's context, whose `remote.pluginManager` namespace answers.
+   * @param ctx - remote calls plus optional accepted-catalog and settled-write observers; omitted observers leave publication local to this store.
    */
   constructor(
-    private readonly ctx: { remote: PluginManagementRemote },
+    private readonly ctx: {
+      remote: PluginManagementRemote
+      onCatalog?: (catalog: PluginManagementCatalog) => void
+      onWriteSettled?: () => void
+    },
   ) {
     this.store = createSnapshotStore<PluginManagerState>({
       status: 'idle', refreshStatus: 'idle', packages: [], busy: [], notice: null,
@@ -780,6 +785,7 @@ export class PluginManagerController {
             } else this.patch({ status: 'error' })
             continue
           }
+          this.ctx.onCatalog?.(catalog.value)
           if (!catalog.value.managementAvailable) {
             this.hasCachedInventory = false
             this.patch({ status: 'unavailable', packages: [] })
@@ -1088,6 +1094,7 @@ export class PluginManagerController {
       this.patch({ notice: failedNotice(error, subject, ++this.noticeSeq) })
     } finally {
       this.patch({ busy: this.getSnapshot().busy.filter(entry => entry !== key) })
+      if (!this.disposed) this.ctx.onWriteSettled?.()
     }
     await this.load()
   }

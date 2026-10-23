@@ -1,9 +1,12 @@
 /** Scope changes discard private workflow state before the next runtime can answer. */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from 'vitest'
 import * as api from '../api.ts'
 import { pluginManagementRemote } from '../plugins/transport.ts'
+import type { PluginManagementRemote } from '../plugins/transport.ts'
+import type { PluginInfo, PluginManagementCatalog } from '../../../../packages/boot/plugin-manager/src/types.ts'
+import { StrictMode } from 'react'
 import { PluginsPage } from './PluginsPage.tsx'
 
 vi.mock('../api.ts', () => ({
@@ -12,8 +15,9 @@ vi.mock('../api.ts', () => ({
   pluginManagementState: vi.fn(), pluginManagementSaveState: vi.fn(), pluginManagementOverview: vi.fn(async () => []),
 }))
 vi.mock('../plugins/transport.ts', () => ({ pluginManagementRemote: vi.fn() }))
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 const target: api.PluginManagementTarget = { nodeId: 'node-a', target: { kind: 'user', id: 1 }, generation: 3 }
+let remoteFixture: PluginManagementRemote
 const stateView: api.PluginManagementState = {
   revision: '2',
   state: { entries: [], bundles: ['core'] },
@@ -23,13 +27,19 @@ const stateView: api.PluginManagementState = {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  const storage = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value) },
+    removeItem: (key: string) => { storage.delete(key) },
+  })
   vi.mocked(api.listUsers).mockResolvedValue([{ id: 1, displayName: 'Alice' } as api.AdminUser])
   vi.mocked(api.listProjects).mockResolvedValue([{ id: 7, name: 'Shared' } as api.Project])
   vi.mocked(api.pluginManagementTarget).mockImplementation(async (kind, id) => ({ ...target, target: { kind, id } }))
   vi.mocked(api.pluginManagementState).mockResolvedValue(stateView)
   vi.mocked(api.getPluginPolicy).mockImplementation(async (kind, id) => ({ kind, id, enabled: true, revision: '2' }))
   const unused = vi.fn(async () => { throw new Error('unexpected mutation') })
-  vi.mocked(pluginManagementRemote).mockReturnValue({
+  remoteFixture = {
     settings: { describe: vi.fn(async () => ({ ok: true as const, value: { writable: true, hasDocument: false, namespaces: [] } })), mutate: unused },
     pluginInventory: { list: vi.fn(async () => ({ ok: true as const, value: { managementAvailable: true, entries: [] } })) },
     pluginManager: {
@@ -43,7 +53,8 @@ beforeEach(() => {
       waitForInstall: unused,
     },
     pluginRegistryProbe: { fastest: unused },
-  })
+  }
+  vi.mocked(pluginManagementRemote).mockReturnValue(remoteFixture)
 })
 async function chooseUser() {
   const user = userEvent.setup()
@@ -122,4 +133,159 @@ it('rejects a different target before exposing any management action', async () 
   await chooseUser()
   expect(await screen.findByText(/实例与所选范围不一致/)).toBeTruthy()
   expect(pluginManagementRemote).not.toHaveBeenCalled()
+})
+
+const livePlugin = (patchId: string, enabled = true): PluginInfo => ({
+  entryId: `include:${patchId}` as PluginInfo['entryId'], patchId,
+  moduleName: `dsh-${patchId}`, enabled, fiberPhase: 'active',
+})
+const catalogAnswer = (plugins: PluginInfo[] = []) => ({
+  ok: true as const,
+  value: { managementAvailable: true, manage: true, plugins, bundles: [] } satisfies PluginManagementCatalog,
+})
+function pendingCatalog() {
+  const pending = Promise.withResolvers<Awaited<ReturnType<PluginManagementRemote['pluginManager']['catalog']>>>()
+  onTestFinished(async () => {
+    pending.resolve({ ok: false, error: { code: 'fixture-disposed', message: 'fixture disposed' } })
+    await pending.promise
+  })
+  return pending
+}
+
+it('shares one admitted catalog with the advanced matrix without legacy reads or an idle refresh', async () => {
+  const pending = pendingCatalog()
+  vi.mocked(remoteFixture.pluginManager.catalog).mockReturnValueOnce(pending.promise)
+  render(<PluginsPage />)
+  await chooseUser()
+  await waitFor(() => expect(remoteFixture.pluginManager.catalog).toHaveBeenCalledTimes(1))
+  expect({
+    state: vi.mocked(api.pluginManagementState).mock.calls.length,
+    catalog: vi.mocked(remoteFixture.pluginManager.catalog).mock.calls.length,
+    legacyPlugins: vi.mocked(remoteFixture.pluginManager.listPlugins).mock.calls.length,
+    legacyBundles: vi.mocked(remoteFixture.pluginManager.listBundles).mock.calls.length,
+  }).toEqual({ state: 1, catalog: 1, legacyPlugins: 0, legacyBundles: 0 })
+  expect(remoteFixture.settings.describe).not.toHaveBeenCalled()
+  await act(async () => { pending.resolve(catalogAnswer([livePlugin('catalog-entry')])); await pending.promise })
+  expect(await screen.findByLabelText('当前启用 catalog-entry')).toBeTruthy()
+  await waitFor(() => expect(remoteFixture.settings.describe).toHaveBeenCalledTimes(1))
+  expect(api.pluginManagementState).toHaveBeenCalledTimes(1)
+  expect(remoteFixture.pluginManager.listPlugins).not.toHaveBeenCalled()
+  expect(remoteFixture.pluginManager.listBundles).not.toHaveBeenCalled()
+})
+
+it('refreshes the shared catalog and startup state after an advanced live write', async () => {
+  vi.mocked(remoteFixture.pluginManager.catalog).mockResolvedValueOnce(catalogAnswer([livePlugin('advanced')]))
+    .mockResolvedValue(catalogAnswer([livePlugin('advanced', false)]))
+  vi.mocked(remoteFixture.pluginManager.setPluginEnabled).mockResolvedValue({
+    ok: true, value: { changed: true, application: 'applied', stage: 'enable', target: 'advanced' },
+  })
+  render(<PluginsPage />)
+  await chooseUser()
+  fireEvent.click(await screen.findByLabelText('当前启用 advanced'))
+  await waitFor(() => expect(remoteFixture.pluginManager.setPluginEnabled).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(remoteFixture.pluginManager.catalog).toHaveBeenCalledTimes(2))
+  expect(screen.getByLabelText('当前启用 advanced')).toHaveProperty('checked', false)
+  expect(api.pluginManagementState).toHaveBeenCalledTimes(2)
+  expect(remoteFixture.pluginManager.listPlugins).not.toHaveBeenCalled()
+  expect(remoteFixture.pluginManager.listBundles).not.toHaveBeenCalled()
+})
+
+it('ignores an old catalog after a target switch even when the old request succeeds late', async () => {
+  const old = pendingCatalog()
+  vi.mocked(remoteFixture.pluginManager.catalog).mockReturnValueOnce(old.promise)
+    .mockResolvedValue(catalogAnswer([livePlugin('new-target')]))
+  render(<PluginsPage />)
+  const user = await chooseUser()
+  await waitFor(() => expect(remoteFixture.pluginManager.catalog).toHaveBeenCalledTimes(1))
+  const oldSignal = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls[0]![0]!
+  await user.selectOptions(screen.getByLabelText('插件管理对象'), 'project:7')
+  expect(await screen.findByLabelText('当前启用 new-target')).toBeTruthy()
+  expect(oldSignal.aborted).toBe(true)
+  await act(async () => { old.resolve(catalogAnswer([livePlugin('old-target')])); await old.promise })
+  expect(screen.queryByLabelText('当前启用 old-target')).toBeNull()
+  expect(screen.getByLabelText('当前启用 new-target')).toBeTruthy()
+  expect(remoteFixture.pluginManager.listPlugins).not.toHaveBeenCalled()
+})
+
+it('drops a late admitted catalog after unmount or revoked authorization', async () => {
+  const old = pendingCatalog()
+  vi.mocked(remoteFixture.pluginManager.catalog).mockReturnValueOnce(old.promise)
+  const page = render(<PluginsPage />)
+  await chooseUser()
+  await waitFor(() => expect(remoteFixture.pluginManager.catalog).toHaveBeenCalledTimes(1))
+  act(() => { vi.mocked(pluginManagementRemote).mock.calls.forEach(call => call[3]('403 denied')) })
+  expect(screen.getByText('403 denied')).toBeTruthy()
+  const signal = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls[0]![0]!
+  expect(signal.aborted).toBe(true)
+  page.unmount()
+  await act(async () => { old.resolve(catalogAnswer([livePlugin('revoked')])); await old.promise })
+  expect(remoteFixture.settings.describe).not.toHaveBeenCalled()
+  expect(document.querySelector('[data-plugin-panel]')).toBeNull()
+})
+
+it('retries a failed catalog on focus without legacy reads', async () => {
+  vi.mocked(remoteFixture.pluginManager.catalog).mockResolvedValueOnce({ ok: false, error: { code: 'offline', message: 'offline' } })
+    .mockResolvedValue(catalogAnswer([livePlugin('retry')]))
+  render(<PluginsPage />)
+  await chooseUser()
+  await waitFor(() => expect(remoteFixture.pluginManager.catalog).toHaveBeenCalledTimes(1))
+  fireEvent.focus(window)
+  expect(await screen.findByLabelText('当前启用 retry')).toBeTruthy()
+  expect(remoteFixture.pluginManager.listPlugins).not.toHaveBeenCalled()
+  expect(remoteFixture.pluginManager.listBundles).not.toHaveBeenCalled()
+})
+
+it('uses a fresh active catalog lifetime after StrictMode cleanup and aborts it on unmount', async () => {
+  vi.mocked(remoteFixture.pluginManager.catalog).mockResolvedValue(catalogAnswer([livePlugin('strict-owner')]))
+  const page = render(<StrictMode><PluginsPage /></StrictMode>)
+  await chooseUser()
+  expect(await screen.findByLabelText('当前启用 strict-owner')).toBeTruthy()
+  const current = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls.at(-1)![0]!
+  expect(current.aborted).toBe(false)
+  expect(remoteFixture.pluginManager.listPlugins).not.toHaveBeenCalled()
+  expect(remoteFixture.pluginManager.listBundles).not.toHaveBeenCalled()
+  page.unmount()
+  expect(vi.mocked(remoteFixture.pluginManager.catalog).mock.calls.every(([signal]) => signal?.aborted)).toBe(true)
+})
+
+it('does not refresh either owner from a previous target write that settles late', async () => {
+  const applied = { ok: true as const, value: { changed: true, application: 'applied' as const, stage: 'enable' as const, target: 'previous' } }
+  const write = Promise.withResolvers<typeof applied>()
+  onTestFinished(async () => { write.resolve(applied); await write.promise })
+  vi.mocked(remoteFixture.pluginManager.setPluginEnabled).mockReturnValueOnce(write.promise)
+  vi.mocked(remoteFixture.pluginManager.catalog).mockResolvedValueOnce(catalogAnswer([livePlugin('previous')]))
+    .mockResolvedValue(catalogAnswer([livePlugin('replacement')]))
+  render(<PluginsPage />)
+  const user = await chooseUser()
+  fireEvent.click(await screen.findByLabelText('当前启用 previous'))
+  await waitFor(() => expect(remoteFixture.pluginManager.setPluginEnabled).toHaveBeenCalledTimes(1))
+  await user.selectOptions(screen.getByLabelText('插件管理对象'), 'project:7')
+  expect(await screen.findByLabelText('当前启用 replacement')).toBeTruthy()
+  await act(async () => { write.resolve(applied); await write.promise })
+  expect(remoteFixture.pluginManager.catalog).toHaveBeenCalledTimes(2)
+  expect(api.pluginManagementState).toHaveBeenCalledTimes(2)
+  expect(screen.queryByLabelText('当前启用 previous')).toBeNull()
+})
+
+it('keeps the post-write state when the initial state request answers late', async () => {
+  const initial = Promise.withResolvers<api.PluginManagementState>()
+  onTestFinished(async () => { initial.resolve(stateView); await initial.promise })
+  vi.mocked(api.pluginManagementState).mockReturnValueOnce(initial.promise)
+    .mockResolvedValue({ ...stateView, revision: '7', appliedRevision: '7' })
+  vi.mocked(remoteFixture.pluginManager.catalog).mockResolvedValue({ ok: true, value: {
+    managementAvailable: true, manage: true, plugins: [], bundles: [{
+      name: 'state-race', installed: true, optional: false, enabled: true, removable: true, rows: [], overrides: [],
+    }],
+  } })
+  vi.mocked(remoteFixture.pluginManager.setBundleEnabled).mockResolvedValue({
+    ok: true, value: { changed: true, application: 'applied', stage: 'enable', target: 'state-race' },
+  })
+  render(<PluginsPage />)
+  await chooseUser()
+  fireEvent.click(await screen.findByLabelText('启用 state-race'))
+  expect(await screen.findByText(/已存启动配置 · 版本 7/)).toBeTruthy()
+  expect(api.pluginManagementState).toHaveBeenCalledTimes(2)
+  await act(async () => { initial.resolve(stateView); await initial.promise })
+  expect(screen.getByText(/已存启动配置 · 版本 7/)).toBeTruthy()
+  expect(screen.queryByText(/已存启动配置 · 版本 2/)).toBeNull()
 })

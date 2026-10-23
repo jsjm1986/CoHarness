@@ -21,13 +21,14 @@ function Manager({ target, invalidate, composition, t }: { target: PluginManagem
       if (frame.type === 'log') controller.appendLog(frame.chunk)
       else if (frame.type === 'progress') controller.installProgress(frame.progress)
     }, invalidate)
-    const controller = new PluginManagerController({ remote })
+    const controller = new PluginManagerController({ remote, onCatalog: composition.acceptCatalog, onWriteSettled: composition.refresh })
+    const unbindLiveRefresh = composition.bindLiveRefresh(() => controller.load())
     const settings = new ProfileSettingsController(remote.settings)
     setOwner({ controller, settings, abort })
     const refresh = () => { void controller.load() }
     window.addEventListener('focus', refresh)
-    return () => { controller.dispose(); settings.dispose(); abort.abort(); window.removeEventListener('focus', refresh) }
-  }, [target, invalidate])
+    return () => { unbindLiveRefresh(); controller.dispose(); settings.dispose(); abort.abort(); window.removeEventListener('focus', refresh) }
+  }, [target, invalidate, composition.acceptCatalog, composition.bindLiveRefresh, composition.refresh])
   return owner === null ? <LoadingState label={t('pageConnecting')} /> : <ManagerView controller={owner.controller} settings={owner.settings} composition={composition} t={t} />
 }
 function ManagerView({ controller, settings, composition, t }: { controller: PluginManagerController; settings: ProfileSettingsController; composition: PluginComposition; t: Translate }) {
@@ -37,10 +38,6 @@ function ManagerView({ controller, settings, composition, t }: { controller: Plu
   const configuration = useSyncExternalStore(settings.state.subscribe, settings.state.getSnapshot, settings.state.getSnapshot)
   const ledger = useSyncExternalStore(settings.ledger.subscribe, settings.ledger.getSnapshot, settings.ledger.getSnapshot)
   useEffect(() => { if (state.status !== 'idle' && state.status !== 'loading') void settings.load() }, [state.packages, state.status, settings])
-  // A manager-side write moves the same composition the matrix and row controls display.
-  const compositionRef = useRef(composition)
-  useEffect(() => { compositionRef.current = composition })
-  useEffect(() => { if (state.busy.length === 0) compositionRef.current.refresh() }, [state.busy])
   return <><ErrorBanner message={configuration.error} />
     {configuration.error ? <Button onClick={() => { void settings.load() }}>{t('configReload')}</Button> : null}
     {configuration.loading ? <LoadingState label={t('configLoading')} /> : null}

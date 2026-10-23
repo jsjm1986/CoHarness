@@ -12,11 +12,13 @@ The plugin page needs profile availability, mutation authority, bundles, and liv
 
 The existing `pluginManager` Remote namespace owns one aggregate read. The [package reference](../../../../packages/boot/plugin-manager/README.md#use-this-package) defines its response, authorization, and cancellation. The Web bundle mounts a separate read-only entry so the absence of a profile is observable without weakening the managed service's required `profileContext` dependency. The shared base, headless, and SDK compositions retain their existing providers. This reader allocates no second profile owner and no cross-request cache.
 
-Authorization remains owned by [the deployment policy](2026-09-22-gateway-profile-management-authority.md) and the existing transport assertions. The reader checks authority before starting the original reads and before publishing them; bundling values into one response does not make them an atomic profile revision. Existing methods remain usable by the advanced Admin composition matrix, tools, and other consumers.
+Authorization remains owned by [the deployment policy](2026-09-22-gateway-profile-management-authority.md) and the existing transport assertions. The reader checks authority before starting the original reads and before publishing them; bundling values into one response does not make them an atomic profile revision. Existing methods remain usable by tools and other consumers.
 
 The Gateway runtime's signed-purpose HTTP allowlist names `pluginManager/catalog` explicitly. Registering a Remote method does not admit its transport route. Administrator assertions remain restricted to the declared POST paths and retain the profile's authority check.
 
 A catalog request owns one operation until its started reads settle. Cancellation and disposal reject late publication and drain those reads before the owner releases its effect. The current individual readers do not accept cancellation, so the aggregate makes no claim that an aborted request stops synchronous file work. Browser controllers cancel their owned catalog lifetime, retain existing refresh coalescing, and reject responses after disposal; an Admin target replacement owns a new controller and transport generation.
+
+The Admin live controller passes each accepted catalog to the same target's composition matrix. The matrix registers its post-write catalog refresh with that controller; registration cleanup removes only its own callback. Durable startup state remains an independent read. The controller reports settled writes explicitly, so startup refresh does not depend on rendering an intermediate busy state and initial idle does not start a second read. Composition reads and write settlements check their captured target lifetime before publishing or requesting another refresh. A per-owner read sequence also prevents a slow initial state read from replacing a newer post-write result; acknowledged saves retire older reads without starting another request. No settled catalog survives target replacement, and configuration keeps its independent settings read.
 
 ## Alternatives considered
 
@@ -25,6 +27,8 @@ A catalog request owns one operation until its started reads settle. Cancellatio
 **Add profile fields to the global Host description.** Every connection handshake would pay for a feature-specific catalog, and the central transport would acquire profile-management responsibilities. The current Remote service owns these reads.
 
 **Cache a joined catalog between requests.** Profile edits, Loader replacement, and authorization revocation have distinct lifetimes. A cache adds invalidation work and risks stale authority without removing the initial request dependency.
+
+**Keep separate live lists for the Admin matrix.** They repeat the catalog's authenticated plugin and bundle reads within the same mounted target. Publishing the controller's accepted values preserves one freshness owner; the durable startup-state request remains separate because the catalog does not contain it.
 
 **Mount the reader in the shared base.** Current catalog consumers select Web runtimes. A Web-owned row supports unmanaged Web compositions while preserving headless and SDK startup scope.
 
@@ -37,6 +41,8 @@ A controlled completion barrier through the production page controller admits ex
 The plain-Node [built Remote test](../../../../packages/api/remotes/tests/built-lib.e2e.ts) resolves the published entry through the Web bundle's real Loader and exercises generated Client codecs over authenticated HTTP for unmanaged, read-only, refused, and authorized managed catalogs. Provider tests require zero profile reads before admission, final permission rechecks, sibling drain on failure, and joined disposal. Controller and Admin transport tests retain refresh and mutation behavior, reject malformed wire values, cancel the selected target, and ignore a replaced generation's late result.
 
 The assembled [Admin workflow](../../../../apps/web/tests/plugin-administration.e2e.ts) crosses the built CLI's signed `plugin-admin` route before installing a local bundle and enabling it through the actual page. The [runtime admission tests](../../../../packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts) reject unsigned catalog requests; the purpose-method matrix rejects GET and upgrade requests for the same endpoint.
+
+The real Admin page component regression holds its first catalog pending and requires one startup-state read, one catalog request, and zero legacy plugin/bundle list calls. The `180b8a7c261` reference issues two startup reads and four legacy list calls. Follow-up cases retain settings reads, matrix writes, focus retry, StrictMode cleanup/setup, authorization invalidation, target replacement, and late catalog/write fencing. These are request-count and lifecycle checks; the sanitized public capture's request durations do not measure candidate end-to-end improvement.
 
 ## Consequences
 
