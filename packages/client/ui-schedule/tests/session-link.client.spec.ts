@@ -19,6 +19,7 @@ function sessions(ids: SessionId[], rows: SessionId[], archived: SessionId[] = [
     archivedById: Object.fromEntries(archived.map(row => [row, summary(row)] as const)),
     current: undefined,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {},
     jobsBySession: {},
     observedJobs: {},

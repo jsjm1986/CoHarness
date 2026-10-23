@@ -34,6 +34,7 @@ function sessionState(
     archivedById: Object.fromEntries(archived.map(session => [session.id, session])),
     current: undefined,
     phase,
+    state: 'idle', error: null,
     subagentsByParent: {},
     jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,

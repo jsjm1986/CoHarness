@@ -272,6 +272,7 @@ describe('ReadImageRow keyed toolview', () => {
     archivedById: {},
     current: SID,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })

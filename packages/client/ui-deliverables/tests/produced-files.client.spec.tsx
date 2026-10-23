@@ -656,7 +656,8 @@ describe('plugin registration', () => {
 function openProps(controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))) {
   controller.host.set({ name: 'desktop', available: true, fileManager: 'finder' })
   const diffs = new ChangesDiffStore((url, signal) => fetch(url, { signal }))
-  const sessions: SessionListState = { current: undefined, currentAddress: undefined, ids: [], byId: {}, archivedById: {}, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {} }
+  const sessions: SessionListState = { current: undefined, currentAddress: undefined, ids: [], byId: {}, archivedById: {}, phase: 'ready',
+    state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {} }
   return {
     useSessions: <T,>(select: (state: SessionListState) => T): T => select(sessions),
     reloadPresentedHost: vi.fn(() => controller.loadHost()),

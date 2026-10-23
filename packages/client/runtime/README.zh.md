@@ -100,6 +100,8 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 
 Workspace 和 Session 列表各自具有单调的 `pending` → `ready` 基线阶段，也有各自的刷新活动／错误状态。列表请求期间到达的增量插入或更新／移除／顺序帧与一元变更回显会在其响应之上回放。每次成功的 Workspace 基线都会重新建立 Host 持久 Workspace 顺序，因此重连会接纳该客户端离线期间提交的变更。`WorkspaceRuntime.insertBefore` 会立即安装乐观顺序；只有最新一元回声可以替换它，更新的 Host 顺序帧优先于旧回声，而最新请求被拒时会恢复最近一次由 Host 确认的顺序，不会恢复更早且尚未提交的拖拽。已移除的 Workspace id 会保留进程本地删除标记，避免延迟到达的 changed 帧将其复活。Workspace 新近程度只在两条基线都 ready 后派生，且绝不改变 Workspace 列表顺序。
 
+`SessionListState.state` 和 `error` 直接投影 manager 的基线活动与最近失败，独立于 `phase`。池化汇总列表报告已鉴权基础 Runtime 的活动；`currentScopeList` 排除额外工作台目标。`sessions.refresh()` 与 `workspaces.refresh()` 复用各自所有者尚未完成的基线读取，通过既有列表状态发布失败，不因 wire 或传输失败拒绝 Promise。账户授权撤回后的显式 Session 刷新不执行读取。
+
 每一代引导连接在 Workspace 所有者与 Session 池的归档分区之间共用一次 `workspace.list` 基线。共享结果包含 Workspace 帧回放与版本合并后的归档事实；读取失败或取消时不发布结果。断线与销毁会使待完成基线失效，迟到结果不能更新新一代连接或其他目标。并发刷新调用方加入同一项待完成操作，已完成结果不跨连接代次缓存。其他运行时保留各自的基线所有者。
 
 Session 刷新保留已有身份的相对顺序，并将新行放在 Host 基线中紧随其后的最近已知身份之前。索引化的锚点以线性工作量合并替换目录；首次成功基线直接采用 Host 顺序。

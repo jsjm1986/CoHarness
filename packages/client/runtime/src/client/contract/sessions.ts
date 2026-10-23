@@ -89,6 +89,13 @@ export interface ISessions {
   readonly list: ObservableSnapshot<SessionListState>
   /** Current authenticated space list; unlike list, it excludes staged workbench targets. */
   readonly currentScopeList?: ObservableSnapshot<SessionListState>
+  /**
+   * Refresh the authenticated current space's Session baseline, sharing an in-flight pull.
+   * Additional workbench targets are unaffected. Failures remain in list state/error;
+   * the arrival phase and previously received rows stay available.
+   * @returns completion of the current or newly started attempt; account withdrawal completes without a read.
+   */
+  refresh(): Promise<void>
   /** Atomic current-session provide projection (the renderer host's `sessions.provideInfo` feed). */
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
   /** Resolve the standard-props bundle without selecting or staging a Session.

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -43,6 +44,7 @@ const sessionState = (items: readonly SessionSummary[], overrides: Partial<Sessi
   archivedById: {},
   current: undefined,
   phase: 'ready',
+  state: 'idle', error: null,
   subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
   currentAddress: undefined,
   ...overrides,
@@ -93,6 +95,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     actions: store.actions,
     startSession: vi.fn(),
     open: vi.fn(),
+    retryLists: vi.fn(),
     searchSessions: vi.fn(async () => ({ items: [], hasMore: false })),
     searchResultLimit: 20,
     requestSessionRename: controls.rename,
@@ -130,6 +133,217 @@ function rerender(b: ReturnType<typeof mount>, overrides: Partial<WorkspaceBrows
 }
 
 describe('WorkspaceBrowser', () => {
+  it.each(['workspace', 'workspace-tree', 'flat'] as const)(
+    'waits for both real list baselines before showing an empty %s view',
+    async (groupBy) => {
+      const sessions = createSnapshotStore(sessionState([], { phase: 'pending', state: 'loading', error: null }))
+      const workspaces = createSnapshotStore<WorkspaceListState>({
+        ...workspaceState([]), phase: 'pending', state: 'loading', baselinesReady: false,
+      })
+      const sessionResult = Promise.withResolvers<SessionListState>()
+      const workspaceResult = Promise.withResolvers<WorkspaceListState>()
+      const completions = [
+        sessionResult.promise.then((value) => { sessions.set(value) }),
+        workspaceResult.promise.then((value) => { workspaces.set(value) }),
+      ]
+      try {
+        const b = mount({ useSessions: bindSnapshotSelector(sessions), useWorkspaces: bindSnapshotSelector(workspaces) })
+        act(() => { b.store.actions.setGroupBy(groupBy) })
+        expect(screen.queryByText('暂无会话')).toBeNull()
+        expect(within(screen.getByRole('tree')).getByRole('status', { name: commonZh.loading })).toBeTruthy()
+
+        await act(async () => {
+          workspaceResult.resolve(workspaceState([]))
+          await completions[1]
+        })
+        expect(screen.queryByText('暂无会话')).toBeNull()
+        expect(within(screen.getByRole('tree')).getByRole('status', { name: commonZh.loading })).toBeTruthy()
+
+        await act(async () => {
+          sessionResult.resolve(sessionState([], { state: 'idle', error: null }))
+          await completions[0]
+        })
+        expect(screen.getByText('暂无会话')).toBeTruthy()
+        expect(within(screen.getByRole('tree')).queryByRole('status', { name: commonZh.loading })).toBeNull()
+      } finally {
+        await act(async () => {
+          sessionResult.resolve(sessionState([], { state: 'idle', error: null }))
+          workspaceResult.resolve(workspaceState([]))
+          await Promise.allSettled(completions)
+        })
+      }
+    },
+  )
+
+  it.each(['workspace', 'workspace-tree', 'flat'] as const)(
+    'keeps arrived rows available while the other %s baseline is pending',
+    async (groupBy) => {
+      const sessions = createSnapshotStore(sessionState([], { phase: 'pending', state: 'loading', error: null }))
+      const workspaces = createSnapshotStore<WorkspaceListState>({
+        ...workspaceState([]), phase: 'pending', state: 'loading', baselinesReady: false,
+      })
+      const workspaceResult = Promise.withResolvers<WorkspaceListState>()
+      const completion = workspaceResult.promise.then((value) => { workspaces.set(value) })
+      try {
+        const b = mount({ useSessions: bindSnapshotSelector(sessions), useWorkspaces: bindSnapshotSelector(workspaces) })
+        act(() => { b.store.actions.setGroupBy(groupBy) })
+        expect(screen.queryByText('暂无会话')).toBeNull()
+        act(() => { sessions.set(sessionState([summary('Arrived Session', 1)], { state: 'idle', error: null })) })
+        if (groupBy !== 'flat') fireEvent.click(screen.getByText('独立会话'))
+        expect(screen.getByText('Arrived Session')).toBeTruthy()
+        expect(screen.queryByText('暂无会话')).toBeNull()
+        await act(async () => {
+          workspaceResult.resolve(workspaceState([workspace('Arrived Workspace', ['Arrived Session'])]))
+          await completion
+        })
+        expect(screen.queryByText('暂无会话')).toBeNull()
+        if (groupBy !== 'flat') expect(screen.getByText('Arrived Workspace')).toBeTruthy()
+        else expect(screen.getByText('Arrived Session')).toBeTruthy()
+      } finally {
+        await act(async () => {
+          workspaceResult.resolve(workspaceState([]))
+          await completion
+        })
+      }
+    },
+  )
+
+  it.each([
+    { failed: 'sessions', groupBy: 'workspace' },
+    { failed: 'workspaces', groupBy: 'flat' },
+  ] as const)('replaces a failed $failed baseline with an explicit retry in $groupBy view', async ({ failed, groupBy }) => {
+    const failure = { code: 'internal' as const, message: 'synthetic list failure', details: {} }
+    const sessions = createSnapshotStore(sessionState([], failed === 'sessions'
+      ? { phase: 'pending', state: 'error', error: failure }
+      : { state: 'idle', error: null }))
+    const workspaces = createSnapshotStore<WorkspaceListState>(failed === 'workspaces'
+      ? { ...workspaceState([]), phase: 'pending', state: 'error', error: failure, baselinesReady: false }
+      : workspaceState([]))
+    const result = Promise.withResolvers<undefined>()
+    const completion = result.promise.then(() => {
+      sessions.set(sessionState([], { state: 'idle', error: null }))
+      workspaces.set(workspaceState([]))
+    })
+    const retryLists = vi.fn(() => {
+      if (failed === 'sessions') sessions.set(sessionState([], { phase: 'pending', state: 'loading', error: null }))
+      else workspaces.set({ ...workspaceState([]), phase: 'pending', state: 'loading', baselinesReady: false })
+    })
+    try {
+      const b = mount({
+        useSessions: bindSnapshotSelector(sessions), useWorkspaces: bindSnapshotSelector(workspaces), retryLists,
+      })
+      act(() => { b.store.actions.setGroupBy(groupBy) })
+      expect(screen.queryByText('暂无会话')).toBeNull()
+      expect(within(screen.getByRole('tree')).queryByRole('status', { name: commonZh.loading })).toBeNull()
+      const notice = within(screen.getByRole('tree')).getByRole('alert')
+      expect(within(notice).getByText('列表加载失败')).toBeTruthy()
+      fireEvent.click(within(notice).getByRole('button', { name: commonZh.retry }))
+      expect(retryLists).toHaveBeenCalledTimes(1)
+      expect(document.activeElement).toBe(screen.getByRole('tree'))
+      expect(within(screen.getByRole('tree')).getByRole('status', { name: commonZh.loading })).toBeTruthy()
+      expect(within(screen.getByRole('tree')).queryByRole('alert')).toBeNull()
+      expect(screen.queryByText('暂无会话')).toBeNull()
+      await act(async () => { result.resolve(undefined); await completion })
+      expect(screen.getByText('暂无会话')).toBeTruthy()
+      expect(within(screen.getByRole('tree')).queryByRole('status', { name: commonZh.loading })).toBeNull()
+    } finally {
+      await act(async () => { result.resolve(undefined); await completion })
+    }
+  })
+
+  it('keeps current-space rows visible beside a failed refresh notice', () => {
+    const b = mount({ useSessions: hook(sessionState([summary('Retained Session', 1)], {
+      state: 'error', error: { code: 'internal', message: 'synthetic refresh failure', details: {} },
+    })) })
+    act(() => { b.store.actions.setGroupBy('flat') })
+    expect(screen.getByText('Retained Session')).toBeTruthy()
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.queryByText('暂无会话')).toBeNull()
+    expect(within(screen.getByRole('tree')).queryByRole('status', { name: commonZh.loading })).toBeNull()
+  })
+
+  it.each(['workspace', 'workspace-tree', 'flat'] as const)(
+    'keeps retained %s rows focused and retries from a separate notice footer',
+    (groupBy) => {
+      const retained = summary('Retained Session', 1)
+      const sessions = createSnapshotStore(sessionState([retained]))
+      const retryLists = vi.fn(() => {
+        expect(document.activeElement).toBe(screen.getByRole('tree'))
+        sessions.set(sessionState([retained], { state: 'loading' }))
+      })
+      const b = mount({
+        useSessions: bindSnapshotSelector(sessions),
+        useWorkspaces: hook(workspaceState([workspace('Retained Workspace', [retained.id])])),
+        retryLists,
+      })
+      act(() => { b.store.actions.setGroupBy(groupBy) })
+      if (groupBy !== 'flat') fireEvent.click(screen.getByText('Retained Workspace'))
+      const tree = screen.getByRole('tree')
+      const rowAction = screen.getByRole('button', { name: '会话“Retained Session”的操作' })
+      rowAction.focus()
+      tree.scrollTop = 37
+      expect(screen.queryByRole('alert')).toBeNull()
+      expect(screen.queryByRole('button', { name: commonZh.retry })).toBeNull()
+      act(() => { sessions.set(sessionState([retained], {
+        state: 'error', error: { code: 'internal', message: 'synthetic refresh failure', details: {} },
+      })) })
+      expect(document.activeElement).toBe(rowAction)
+      expect(tree.scrollTop).toBe(37)
+      expect(screen.getByText('Retained Session')).toBeTruthy()
+      expect(within(tree).queryByRole('alert')).toBeNull()
+      const notice = screen.getByRole('alert')
+      expect(tree.contains(notice)).toBe(false)
+      fireEvent.click(within(notice).getByRole('button', { name: commonZh.retry }))
+      expect(retryLists).toHaveBeenCalledTimes(1)
+      expect(document.activeElement).toBe(tree)
+      expect(tree.scrollTop).toBe(37)
+      expect(screen.queryByRole('alert')).toBeNull()
+      expect(screen.queryByRole('button', { name: commonZh.retry })).toBeNull()
+      expect(screen.queryByText('暂无会话')).toBeNull()
+      expect(within(tree).queryByRole('status', { name: commonZh.loading })).toBeNull()
+      act(() => { sessions.set(sessionState([retained])) })
+      expect(document.activeElement).toBe(tree)
+      expect(tree.scrollTop).toBe(37)
+    },
+  )
+
+  it('replaces space-local rows immediately and ignores the old source completing after a switch', async () => {
+    const oldSessions = createSnapshotStore(sessionState([summary('Old space Session', 1)]))
+    const nextSessions = createSnapshotStore(sessionState([], { phase: 'pending', state: 'loading' }))
+    const oldResult = Promise.withResolvers<SessionListState>()
+    const nextResult = Promise.withResolvers<SessionListState>()
+    const completions = [
+      oldResult.promise.then((value) => { oldSessions.set(value) }),
+      nextResult.promise.then((value) => { nextSessions.set(value) }),
+    ]
+    try {
+      const b = mount({ useSessions: bindSnapshotSelector(oldSessions) })
+      act(() => { b.store.actions.setGroupBy('flat') })
+      expect(screen.getByText('Old space Session')).toBeTruthy()
+      rerender(b, { useSessions: bindSnapshotSelector(nextSessions) })
+      expect(screen.queryByText('Old space Session')).toBeNull()
+      expect(screen.queryByText('暂无会话')).toBeNull()
+      expect(within(screen.getByRole('tree')).getByRole('status', { name: commonZh.loading })).toBeTruthy()
+      await act(async () => {
+        oldResult.resolve(sessionState([summary('Late old space Session', 2)], {
+          state: 'error', error: { code: 'internal', message: 'old scope failure', details: {} },
+        }))
+        await completions[0]
+      })
+      expect(screen.queryByText('Late old space Session')).toBeNull()
+      expect(within(screen.getByRole('tree')).queryByRole('alert')).toBeNull()
+      expect(within(screen.getByRole('tree')).getByRole('status', { name: commonZh.loading })).toBeTruthy()
+      await act(async () => { nextResult.resolve(sessionState([])); await completions[1] })
+      expect(screen.getByText('暂无会话')).toBeTruthy()
+    } finally {
+      await act(async () => {
+        oldResult.resolve(sessionState([]))
+        nextResult.resolve(sessionState([]))
+        await Promise.allSettled(completions)
+      })
+    }
+  })
+
   it('reconciles a multi-workspace update with one persisted order snapshot', () => {
     const count = 40
     const items = Array.from({ length: count }, (_, i) => summary(`session-${i}`, i))

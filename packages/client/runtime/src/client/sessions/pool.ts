@@ -109,7 +109,7 @@ export class SessionRuntimePool implements ISessions {
       },
     }
     this.list = createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending', state: 'idle', error: null,
       subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     this.currentScopeList = createSnapshotStore<SessionListState>(this.list.getSnapshot())
@@ -246,9 +246,10 @@ export class SessionRuntimePool implements ISessions {
       this.currentProvideSnapshot = nextProvide
       this.notifyProvide()
     }
+    const baseline = this.base.list.getSnapshot()
     this.list.set({
       ids, byId, archivedById, current: current !== undefined && byId[current] !== undefined ? current : undefined,
-      phase: this.base.list.getSnapshot().phase,
+      phase: baseline.phase, state: baseline.state, error: baseline.error,
       subagentsByParent, jobsBySession, observedJobs,
       currentAddress: owner === undefined ? undefined : this.projectEntry(owner).currentAddress,
     })
@@ -523,6 +524,15 @@ export class SessionRuntimePool implements ISessions {
     return this.base.create(options).then(id => clientSessionKey(owner.target, id))
   }
 
+  /**
+   * Refresh the authenticated current space, reusing its in-flight Session baseline.
+   * @returns completion of the baseline attempt, or an immediate completion after account withdrawal.
+   */
+  refresh(): Promise<void> {
+    if (this.accountInvalidated) return Promise.resolve()
+    return this.base.refresh()
+  }
+
   /** Withdraw every visible Session before asynchronous account-change teardown begins. */
   invalidateAccount(): void {
     if (this.accountInvalidated) return
@@ -531,7 +541,8 @@ export class SessionRuntimePool implements ISessions {
     this.activeSession = undefined
     this.currentProvideSnapshot = this.base.unboundProvideInfo()
     const empty: SessionListState = { ids: [], byId: {}, archivedById: {}, current: undefined,
-      phase: 'pending', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
+      phase: 'pending', state: 'idle', error: null,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
     this.list.set(empty)
     this.currentScopeList.set(empty)
     this.notifyProvide()

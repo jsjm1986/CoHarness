@@ -215,6 +215,7 @@ describe('ReadRow keyed toolview', () => {
     archivedById: {},
     current: SID,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
@@ -306,13 +307,15 @@ describe('DetailsPanel Output section (read)', () => {
     const chat = createChatStore().create()
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>(cwd === undefined
-      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
+      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+        state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
       : {
         ids: [SID],
         byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd } },
         archivedById: {},
         current: SID,
         phase: 'ready',
+        state: 'idle', error: null,
         subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
         currentAddress: undefined,
       })

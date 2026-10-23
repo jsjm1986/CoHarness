@@ -19,7 +19,8 @@ afterEach(() => {
 
 function emptySessions() {
   return bindSnapshotSelector(createSnapshotStore<SessionListState>({
-    ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+    ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+    state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   }))
 }
 

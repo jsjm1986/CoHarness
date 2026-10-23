@@ -21,7 +21,8 @@ const list = (...items: SessionSummary[]): SessionListState => ({
   byId: Object.fromEntries(items.map(item => [item.id, item])),
   archivedById: {},
   current: undefined,
-  phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+  phase: 'ready',
+  state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
 })
 /**
  * The pooled runtime's real shape: archived summaries leave `ids`/`byId` for
@@ -32,7 +33,8 @@ const partitionedList = (live: readonly SessionSummary[], archives: readonly Ses
   byId: Object.fromEntries(live.map(item => [item.id, item])),
   archivedById: Object.fromEntries(archives.map(item => [item.id, item])),
   current: undefined,
-  phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+  phase: 'ready',
+  state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
 })
 const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView => ({
   workspaceId: wid(id), path: `/projects/${id}`, title,

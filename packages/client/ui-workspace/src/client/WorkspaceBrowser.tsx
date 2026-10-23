@@ -20,7 +20,7 @@ import {
   Menu, Modal, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
-  SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
+  SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { WorkspaceBrowserProps } from './contract/slots.ts'
@@ -304,6 +304,7 @@ function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }):
 type SessionTreeProps = Pick<
   WorkspaceBrowserProps,
   'useSessions' | 'startSession' | 'insertWorkspaceBefore' | 'insertSessionBefore' | 'renderSlot' | 't' | 'usePanelInfo'
+  | 'retryLists'
 > & {
   open: (sessionId: SessionId) => void
   /** Host account home for POSIX hover-path abbreviation. */
@@ -341,8 +342,56 @@ type SessionTreeProps = Pick<
   orderBy: SessionOrderBy
   /** The Host workspace account has answered; row motion waits for it. */
   workspaceReady: boolean
+  /** Current Workspace baseline activity, including failed initial reads. */
+  workspaceState: WorkspaceListState['state']
   /** The `session.new` catalog row; group `＋` tooltips show its effective keys. */
   newShortcut?: ShortcutCatalogEntry | undefined
+}
+
+type ListLoadState = 'loading' | 'error' | 'ready'
+
+function listLoadState(
+  list: SessionListState,
+  workspaceReady: boolean,
+  workspaceState: WorkspaceListState['state'],
+): ListLoadState {
+  if (list.state === 'error' || workspaceState === 'error') return 'error'
+  if (list.phase === 'pending' || !workspaceReady || list.state === 'loading' || workspaceState === 'loading') return 'loading'
+  return 'ready'
+}
+
+function ListFeedback({ state, populated, retryLists, t }: Pick<WorkspaceBrowserProps, 'retryLists' | 't'> & {
+  state: ListLoadState
+  populated: boolean
+}): ReactNode {
+  if (populated) return null
+  if (state === 'error') return (
+    <div className={clsx(css.listNotice, css.empty)} role="alert" data-row-key="list-feedback">
+      <span>{t('list.failed')}</span>
+      <Button variant="outline" size="sm" className={css.listRetry} onClick={retryLists}>{t('retry')}</Button>
+    </div>
+  )
+  if (state === 'loading') return (
+    <div className={css.listSkeleton} role="status" aria-label={t('loading')} aria-busy="true" data-row-key="list-feedback">
+      {[0, 1, 2, 3].map(index => <span key={index} className={css.listSkeletonRow} aria-hidden="true" />)}
+    </div>
+  )
+  return null
+}
+
+function ListFooter({ state, retryLists, t }: Pick<WorkspaceBrowserProps, 'retryLists' | 't'> & {
+  state: ListLoadState
+}): ReactNode {
+  const failed = state === 'error'
+  return (
+    <div className={css.listFooter} data-workspace-list-footer="">
+      <div className={css.listNotice} role={failed ? 'alert' : undefined}
+        aria-hidden={!failed} inert={!failed} data-visible={failed || undefined}>
+        <span>{t('list.failed')}</span>
+        <Button variant="outline" size="sm" className={css.listRetry} onClick={retryLists}>{t('retry')}</Button>
+      </div>
+    </div>
+  )
 }
 
 /** The list-empty placeholder — a glyph over the text; the archived-only view names its filter and offers the way back. */
@@ -365,11 +414,17 @@ function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreePro
 function SessionTree({
   useSessions, usePanelInfo, startSession, open, workspaces, rowState, onLeaveArchivedOnly, nestWorkspaces,
   onRenameRequest, onDeleteRequest, onSessionRenameRequest, revealSessionId, onSessionRevealed,
-  insertWorkspaceBefore, insertSessionBefore, orderBy, workspaceReady, newShortcut,
+  insertWorkspaceBefore, insertSessionBefore, orderBy, workspaceReady, workspaceState, retryLists, newShortcut,
   groupExpansion, setGroupExpanded,
   sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccounts, setSessionOrder, home, renderSlot, t,
 }: SessionTreeProps) {
   const list = useSessions(s => s)
+  const loadState = listLoadState(list, workspaceReady, workspaceState)
+  const listRoot = useRef<HTMLDivElement>(null)
+  const retryFromList = (): void => {
+    listRoot.current?.querySelector<HTMLElement>('[role="tree"]')?.focus({ preventScroll: true })
+    retryLists()
+  }
   const summaries = useMemo(() => sessionSummaries(list), [list.byId, list.archivedById])
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const current = panelActive ? undefined : list.current
@@ -608,7 +663,7 @@ function SessionTree({
     && workspaceDrag.over.half === 'before'
 
   // Flat DOM-order keys matching the data-row-key attributes the groups emit.
-  const rowKeys: string[] = groups.length === 0 ? ['empty'] : []
+  const rowKeys: string[] = groups.length === 0 ? [loadState === 'ready' ? 'empty' : 'list-feedback'] : []
   const renderGroup = (group: GroupNode, depth: number): ReactNode => {
     const workspaceId = group.workspaceId
     const children = childrenByParent.get(group.key) ?? []
@@ -801,19 +856,24 @@ function SessionTree({
   }
 
   return (
-    <div className={clsx(css.treeBody, css.wide)}>
-      {workspaceDropAtListStart && <span className={css.listTopDropIndicator} aria-hidden="true" />}
-      <AnimatedRows
-        className={clsx(css.list, workspaceDropAtListStart && css.listTopDropActive)}
-        label={t('section.sessions')}
-        rowKeys={rowKeys}
-        ready={list.phase === 'ready' && workspaceReady && !nativeDragActive}
-        resetKey={JSON.stringify([orderBy, watermarkMotionKey])}
-      >
-        {groups.length === 0 && <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />}
-        {rootGroups.map(group => renderGroup(group, 0))}
-      </AnimatedRows>
-      <span className={css.fade} />
+    <div className={clsx(css.treeBody, css.wide)} data-workspace-list-region="" data-workspace-list-state={loadState}>
+      <div className={css.listWrap} ref={listRoot}>
+        {workspaceDropAtListStart && <span className={css.listTopDropIndicator} aria-hidden="true" />}
+        <AnimatedRows
+          className={clsx(css.list, workspaceDropAtListStart && css.listTopDropActive)}
+          label={t('section.sessions')}
+          rowKeys={rowKeys}
+          ready={list.phase === 'ready' && workspaceReady && !nativeDragActive}
+          resetKey={JSON.stringify([orderBy, watermarkMotionKey])}
+        >
+          <ListFeedback state={loadState} populated={groups.length > 0} retryLists={retryFromList} t={t} />
+          {groups.length === 0 && loadState === 'ready'
+            && <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />}
+          {rootGroups.map(group => renderGroup(group, 0))}
+        </AnimatedRows>
+        <span className={css.fade} />
+      </div>
+      {groups.length > 0 && <ListFooter state={loadState} retryLists={retryFromList} t={t} />}
     </div>
   )
 }
@@ -821,7 +881,8 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   useSessions, usePanelInfo, open, onSessionRenameRequest, revealSessionId, onSessionRevealed, rowState,
-  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccounts, setSessionOrder, renderSlot, t,
+  orderBy, workspaceReady, workspaceState, retryLists,
+  sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccounts, setSessionOrder, renderSlot, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessions'
@@ -833,6 +894,8 @@ function FlatList({
   | 'rowState'
   | 'orderBy'
   | 'workspaceReady'
+  | 'workspaceState'
+  | 'retryLists'
   | 'sessionOrderByAccount'
   | 'sessionUpdatedAtByAccount'
   | 'syncSessionOrderAccounts'
@@ -841,6 +904,12 @@ function FlatList({
   | 't'
 >) {
   const list = useSessions(s => s)
+  const loadState = listLoadState(list, workspaceReady, workspaceState)
+  const listRoot = useRef<HTMLDivElement>(null)
+  const retryFromList = (): void => {
+    listRoot.current?.querySelector<HTMLElement>('[role="tree"]')?.focus({ preventScroll: true })
+    retryLists()
+  }
   const summaries = useMemo(() => sessionSummaries(list), [list.byId, list.archivedById])
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const current = panelActive ? undefined : list.current
@@ -894,60 +963,66 @@ function FlatList({
   }
   const now = Date.now()
   return (
-    <div className={clsx(css.treeBody, css.wide)}>
-      <AnimatedRows
-        className={clsx(css.list, css.flatList)}
-        label={t('section.sessions')}
-        rowKeys={rows.length === 0 ? ['empty'] : rows.map(row => `session:${row.id}`)}
-        ready={list.phase === 'ready' && workspaceReady && drag === null}
-        resetKey={orderBy}
-      >
-        {rows.length === 0 && (
-          <div className={css.empty} data-row-key="empty">{t('empty.none')}</div>
-        )}
-        {rows.map((node) => {
-          const active = drag !== null && drag.pinned === node.pinned
-          // Same rule as the grouped list: the New Session row cannot be
-          // dragged and a drop onto it resolves below the placeholder.
-          const normalizeHalf = (half: 'before' | 'after'): 'before' | 'after' =>
-            node.blank ? 'after' : half
-          return (
-            <SessionNodeItem
-              key={node.id}
-              node={node}
-              currentId={current}
-              now={now}
-              onOpen={open}
-              onRenameRequest={onSessionRenameRequest}
-              onReveal={node.id === revealSessionId
-                ? () => { onSessionRevealed(node.id) }
-                : undefined}
-              renderSlot={renderSlot}
-              drag={{
-                start: () => {
-                  dropCommitted.current = false
-                  setDrag({ accountKey: FLAT_SESSION_ORDER_KEY, sessionId: node.id, pinned: node.pinned, over: null })
-                },
-                active,
-                marker: active && drag.over?.id === node.id ? drag.over.half : null,
-                hover: (half) => {
-                  setDrag(current => current === null ? current : { ...current, over: { id: node.id, half: normalizeHalf(half) } })
-                },
-                drop: (half) => {
-                  if (drag !== null) commitDrag(drag, { id: node.id, half: normalizeHalf(half) })
-                },
-                end: () => {
-                  if (drag?.over !== null && drag?.over !== undefined) commitDrag(drag, drag.over)
-                  else setDrag(null)
-                  dropCommitted.current = false
-                },
-              }}
-              t={t}
-            />
-          )
-        })}
-      </AnimatedRows>
-      <span className={css.fade} />
+    <div className={clsx(css.treeBody, css.wide)} data-workspace-list-region="" data-workspace-list-state={loadState}>
+      <div className={css.listWrap} ref={listRoot}>
+        <AnimatedRows
+          className={clsx(css.list, css.flatList)}
+          label={t('section.sessions')}
+          rowKeys={rows.length === 0
+            ? [loadState === 'ready' ? 'empty' : 'list-feedback']
+            : rows.map(row => `session:${row.id}`)}
+          ready={list.phase === 'ready' && workspaceReady && drag === null}
+          resetKey={orderBy}
+        >
+          <ListFeedback state={loadState} populated={rows.length > 0} retryLists={retryFromList} t={t} />
+          {rows.length === 0 && loadState === 'ready' && (
+            <div className={css.empty} data-row-key="empty">{t('empty.none')}</div>
+          )}
+          {rows.map((node) => {
+            const active = drag !== null && drag.pinned === node.pinned
+            // Same rule as the grouped list: the New Session row cannot be
+            // dragged and a drop onto it resolves below the placeholder.
+            const normalizeHalf = (half: 'before' | 'after'): 'before' | 'after' =>
+              node.blank ? 'after' : half
+            return (
+              <SessionNodeItem
+                key={node.id}
+                node={node}
+                currentId={current}
+                now={now}
+                onOpen={open}
+                onRenameRequest={onSessionRenameRequest}
+                onReveal={node.id === revealSessionId
+                  ? () => { onSessionRevealed(node.id) }
+                  : undefined}
+                renderSlot={renderSlot}
+                drag={{
+                  start: () => {
+                    dropCommitted.current = false
+                    setDrag({ accountKey: FLAT_SESSION_ORDER_KEY, sessionId: node.id, pinned: node.pinned, over: null })
+                  },
+                  active,
+                  marker: active && drag.over?.id === node.id ? drag.over.half : null,
+                  hover: (half) => {
+                    setDrag(current => current === null ? current : { ...current, over: { id: node.id, half: normalizeHalf(half) } })
+                  },
+                  drop: (half) => {
+                    if (drag !== null) commitDrag(drag, { id: node.id, half: normalizeHalf(half) })
+                  },
+                  end: () => {
+                    if (drag?.over !== null && drag?.over !== undefined) commitDrag(drag, drag.over)
+                    else setDrag(null)
+                    dropCommitted.current = false
+                  },
+                }}
+                t={t}
+              />
+            )
+          })}
+        </AnimatedRows>
+        <span className={css.fade} />
+      </div>
+      {rows.length > 0 && <ListFooter state={loadState} retryLists={retryFromList} t={t} />}
     </div>
   )
 }
@@ -1061,6 +1136,7 @@ export function WorkspaceBrowser({
   useHostDescription,
   useViewport,
   useCurrentSessions,
+  retryLists,
   useWorkspaceShortcuts,
   useShortcuts,
   renderSlot,
@@ -1124,6 +1200,7 @@ export function WorkspaceBrowser({
   const workbenchMode = viewportMode === 'workbench'
   const workspaces = useWorkspaces(state => state.items)
   const workspacePhase = useWorkspaces(state => state.phase)
+  const workspaceState = useWorkspaces(state => state.state)
   const pinnedSessionIds = useWorkspaces(state => state.pinnedSessionIds)
   // Persisted view blobs written before the archived filter existed rehydrate
   // without the field; they read as the default hide-archived view.
@@ -1533,6 +1610,8 @@ export function WorkspaceBrowser({
                   rowState={rowState}
                   orderBy={orderBy}
                   workspaceReady={workspacePhase === 'ready'}
+                  workspaceState={workspaceState}
+                  retryLists={retryLists}
                   sessionOrderByAccount={sessionOrderByAccount}
                   sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
                   syncSessionOrderAccounts={actions.syncSessionOrderAccounts}
@@ -1562,6 +1641,8 @@ export function WorkspaceBrowser({
                   startSession={startSession}
                   open={guardedOpen}
                   workspaceReady={workspacePhase === 'ready'}
+                  workspaceState={workspaceState}
+                  retryLists={retryLists}
                   insertWorkspaceBefore={insertWorkspaceBefore}
                   insertSessionBefore={insertSessionBefore}
                   orderBy={orderBy}

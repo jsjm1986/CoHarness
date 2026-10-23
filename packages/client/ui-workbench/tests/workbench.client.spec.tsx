@@ -27,6 +27,7 @@ function props() {
     archivedById: {},
     current: SID_A,
     phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: {},
     jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,

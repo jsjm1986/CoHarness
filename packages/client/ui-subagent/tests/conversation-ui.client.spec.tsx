@@ -61,6 +61,7 @@ function props(
     },
     archivedById: {},
     current: PARENT, phase: 'ready',
+    state: 'idle', error: null,
     subagentsByParent: value === undefined ? nested : { [PARENT]: value, ...nested },
     jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,

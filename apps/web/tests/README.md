@@ -52,4 +52,6 @@ The activity scenario changes a shared scope cookie in a second browser tab and 
 
 `frontend-responsiveness.e2e.ts` opens a generated search result through the real Trajectory inspector, expands and collapses its complete JSON array, and checks directory expansion across a file-tree refresh. The scenario uses synthetic data and no model call.
 
+Its list-arrival scenarios hold the real Host's first Session and Workspace baseline responses independently, then compare loading, verified-empty, and failed-list ARIA output. One transport failure per list verifies explicit Retry against the real Host; arrived rows stay visible while the other baseline is held. Populated Workspace and flat lists at 1280 and 390 pixels check row and viewport geometry, scrolling, focus, pointer menus, and the notice footer across a failed generation and explicit Retry. The connection and routes belong to the private scaffold. Every barrier is released before route and scaffold teardown.
+
 `startup-rpc-budget.e2e.ts` checks that the cold boot shares one Workspace baseline and retains the settings mirror's two reads. It waits for the interactive picker, the connection-reset settings read, and completed startup RPCs before checking request counts.

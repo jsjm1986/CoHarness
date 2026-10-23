@@ -47,6 +47,12 @@ export class TestWorkspaces implements IWorkspaces {
     this.stubs.set(method, impl)
   }
 
+  /** Record an explicit baseline refresh; an installed stub owns its completion and state. */
+  async refresh(): Promise<void> {
+    this.calls.push({ method: 'refresh', args: [] })
+    await this.stubs.get('refresh')?.()
+  }
+
   /**
    * Connect a workspace to its reusable/new blank session (recorded) — the
    * reconnection arm; a bare `startSession` mints fresh and never lands here.

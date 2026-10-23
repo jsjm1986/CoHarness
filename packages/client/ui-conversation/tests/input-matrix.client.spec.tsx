@@ -41,6 +41,7 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
     useSession: bindSnapshotSelector(session),
     useSessions: bindSnapshotSelector(createSnapshotStore({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+      state: 'idle', error: null,
       subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore({

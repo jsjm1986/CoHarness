@@ -336,8 +336,16 @@
   padding-left: 0;
 }
 
-/* Relative for the bottom fade overlay. */
 .treeBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* The scroll clip and its fade share a box above the reserved notice footer. */
+.listWrap {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -559,6 +567,49 @@
   padding: var(--dsw-space-4) var(--dsw-space-3);
   color: var(--dsw-alias-label-tertiary);
   font-size: 13px;
+}
+
+.listSkeleton {
+  display: grid;
+  gap: var(--dsw-space-4);
+  padding: var(--dsw-space-3);
+}
+
+.listSkeletonRow {
+  height: var(--dsw-space-3);
+  border-radius: var(--dsw-radius-xs);
+  background: var(--dsw-alias-bg-skeleton);
+}
+
+.listNotice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--dsw-space-2);
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+  color: var(--dsw-alias-state-error-primary);
+  font: var(--dsw-font-xs-13);
+}
+
+.listFooter {
+  flex: none;
+  min-width: 0;
+}
+
+.listFooter > .listNotice:not([data-visible]) {
+  visibility: hidden;
+}
+
+@media (pointer: coarse) {
+  .listRetry {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .listRetry {
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
 }
 
 /* The archived-only empty view's way back to the default list. */

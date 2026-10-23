@@ -1,19 +1,76 @@
-/** Assembled browser coverage for preview continuity and workbench catalog demand. */
+/** Assembled browser coverage for preview continuity, list arrival feedback, and catalog demand. */
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page } from 'playwright'
+import { chromium, type Browser, type Locator, type Page, type WebSocketRoute } from 'playwright'
 import { expect, it } from 'vitest'
 import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { createUserMessage, createAssistantMessage, createToolResultMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-title'
 import { clientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
-import { captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+import {
+  acknowledgeReloadConnectionLoss, captureStableAria, compareOrRefreshGolden, launchWebScaffold,
+  seedSession, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { newEnglishPage } from './support.ts'
 
 const ID = 'frontend-responsiveness'
 const TITLE = 'SYNTHETIC_FRONTEND_RESPONSIVENESS'
 const COUNT = 1000
+
+type BaselineMethod = 'session.list' | 'workspace.list'
+
+function baselineGate() {
+  return {
+    arrived: undefined as boolean | undefined,
+    release: Promise.withResolvers<undefined>(),
+    requests: 0,
+  }
+}
+
+async function listGeometry(region: Locator) {
+  return await region.evaluate((root) => {
+    const tree = root.querySelector<HTMLElement>('[role="tree"]')
+    const footer = root.querySelector<HTMLElement>('[data-workspace-list-footer]')
+    if (tree === null || footer === null) throw new Error('Retained list has no scroll region or reserved footer')
+    const rect = (node: Element) => {
+      const { x, y, width, height } = node.getBoundingClientRect()
+      return { x, y, width, height }
+    }
+    return {
+      tree: rect(tree), footer: rect(footer), scrollTop: tree.scrollTop,
+      rows: Array.from(tree.querySelectorAll('[data-row-key]'), node => ({
+        key: node.getAttribute('data-row-key'), rect: rect(node),
+      })),
+    }
+  })
+}
+
+async function clickVisibleRowMenus(page: Page, tree: Locator): Promise<Locator> {
+  const keys = await tree.evaluate((root) => {
+    const viewport = root.getBoundingClientRect()
+    return Array.from(root.querySelectorAll('[data-row-key^="session:"]')).filter((node) => {
+      const rect = node.getBoundingClientRect()
+      return rect.top >= viewport.top && rect.bottom <= viewport.bottom
+    }).map(node => node.getAttribute('data-row-key'))
+  })
+  expect(keys.length).toBeGreaterThanOrEqual(2)
+  let last: Locator | undefined
+  for (const key of [keys[0], keys.at(-1)]) {
+    if (key === null || key === undefined) throw new Error('Visible Session row has no identity')
+    const row = tree.locator(`[data-row-key="${key}"]`)
+    await row.hover()
+    const action = row.locator('button[aria-label^="Session actions for "]')
+    await action.click()
+    await page.getByRole('menuitem', { name: 'Rename', exact: true }).waitFor()
+    await page.keyboard.press('Escape')
+    await page.getByRole('menuitem', { name: 'Rename', exact: true }).waitFor({ state: 'hidden' })
+    expect(await action.evaluate(node => node === document.activeElement)).toBe(true)
+    last = action
+  }
+  if (last === undefined) throw new Error('Visible row menus were not exercised')
+  return last
+}
 
 /** Capture only this scaffold's synthetic world before browser teardown. */
 async function diagnoseFrontend(page: Page, scaffold: WebScaffold, name: string): Promise<void> {
@@ -259,4 +316,313 @@ it('reads the workbench catalog for chooser demand while ordinary Session switch
     await scaffold.close().catch((error: unknown) => failures.push(error))
   }
   if (failures.length > 0) throw new AggregateError(failures, 'workbench catalog demand journey failed')
+})
+
+it.each(['empty', 'populated', 'session-failure', 'workspace-failure'] as const)(
+  'shows list loading until its real baselines settle: %s',
+  async (outcome) => {
+    const scaffold = await launchWebScaffold({ openInApp: false })
+    let browser: Browser | undefined
+    let page: Page | undefined
+    const gates: Record<BaselineMethod, ReturnType<typeof baselineGate>> = {
+      'session.list': baselineGate(), 'workspace.list': baselineGate(),
+    }
+    const operations = new Set<Promise<void>>()
+    const failures: unknown[] = []
+    try {
+      const title = 'SYNTHETIC_LIST_BASELINE_SESSION'
+      let workspaceId: string | undefined
+      if (outcome === 'populated') {
+        const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
+        workspaceId = workspace.id
+        const id = await seedSession(scaffold, history('list-baseline-session', title, 1),
+          'list-baseline-session', undefined, scaffold.workspaceCwd)
+        await workspace.attachSession(id)
+      }
+      browser = await chromium.launch({ headless: true })
+      page = await newEnglishPage(browser)
+      page.setDefaultTimeout(30_000)
+      const consoleWatch = watchConsole(page)
+      const origin = new URL(scaffold.authenticatedUrl).origin
+      const fault: BaselineMethod | undefined = outcome === 'session-failure' ? 'session.list'
+        : outcome === 'workspace-failure' ? 'workspace.list' : undefined
+      // Delay only this page's first two real Host baselines. Fault cases fail one transport delivery;
+      // explicit Retry reads the real Host again, without a substituted successful catalog.
+      await page.route(url => url.origin === origin
+        && (url.pathname === '/api/session.list' || url.pathname === '/api/workspace.list'), async (route) => {
+        const method = new URL(route.request().url()).pathname.slice('/api/'.length) as BaselineMethod
+        const gate = gates[method]
+        gate.requests++
+        if (gate.requests > 1) { await route.continue(); return }
+        const operation = (async () => {
+          const response = await route.fetch()
+          expect(response.ok()).toBe(true)
+          gate.arrived = true
+          await gate.release.promise
+          if (method === fault) await route.abort('connectionfailed')
+          else await route.fulfill({ response })
+        })()
+        operations.add(operation)
+        try { await operation } catch (error) {
+          failures.push(error)
+          gate.arrived = false
+          await route.abort().catch((abortError: unknown) => { failures.push(abortError) })
+        } finally { operations.delete(operation) }
+      })
+      await page.goto(scaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' })
+      await expect.poll(() => Object.values(gates).map(gate => gate.arrived)).toEqual([true, true])
+      const tree = page.getByRole('tree', { name: 'Sessions', exact: true })
+      await tree.waitFor()
+      expect(await tree.getByText('No sessions yet', { exact: true }).count()).toBe(0)
+      const loading = tree.getByRole('status', { name: 'Loading…', exact: true })
+      await loading.waitFor()
+      const expected = (name: string) => fileURLToPath(new URL(
+        `./expected/frontend-responsiveness/list-${name}.expected.md`, import.meta.url,
+      ))
+      if (outcome === 'empty') {
+        await compareOrRefreshGolden(expected('loading'),
+          await captureStableAria(page, '[role="tree"]', scaffold.workspaceCwd), webSnapshotMode())
+      }
+
+      const first: BaselineMethod = outcome === 'populated' || outcome === 'workspace-failure'
+        ? 'session.list' : 'workspace.list'
+      const last: BaselineMethod = first === 'session.list' ? 'workspace.list' : 'session.list'
+      const firstResponse = page.waitForResponse(response => new URL(response.url()).pathname === `/api/${first}`)
+      gates[first].release.resolve(undefined)
+      await (await firstResponse).finished()
+      if (outcome === 'populated') {
+        const independent = tree.locator('[data-row-key="workspace:"]')
+        if (await independent.getAttribute('aria-expanded') !== 'true') await independent.click()
+        await expect.poll(() => independent.getAttribute('aria-expanded')).toBe('true')
+        const key = clientSessionKey({ kind: 'personal' }, SessionId('list-baseline-session'))
+        await tree.locator(`[data-row-key="session:${key}"]`).waitFor()
+      } else await loading.waitFor()
+      expect(await tree.getByText('No sessions yet', { exact: true }).count()).toBe(0)
+      const lastDelivery = fault === last
+        ? page.waitForEvent('requestfailed', request => new URL(request.url()).pathname === `/api/${last}`)
+        : page.waitForResponse(response => new URL(response.url()).pathname === `/api/${last}`)
+          .then(response => response.finished())
+      gates[last].release.resolve(undefined)
+      await lastDelivery
+
+      if (fault !== undefined) {
+        const notice = tree.getByRole('alert')
+        await notice.getByText('Could not load the list', { exact: true }).waitFor()
+        expect(await loading.count()).toBe(0)
+        expect(await tree.getByText('No sessions yet', { exact: true }).count()).toBe(0)
+        if (outcome === 'session-failure') {
+          await compareOrRefreshGolden(expected('failed'),
+            await captureStableAria(page, '[role="tree"]', scaffold.workspaceCwd), webSnapshotMode())
+        }
+        const retried = page.waitForResponse(response => new URL(response.url()).pathname === `/api/${fault}`)
+        await notice.getByRole('button', { name: 'Retry', exact: true }).click()
+        await (await retried).finished()
+        await expect.poll(() => notice.count()).toBe(0)
+        expect(gates[fault].requests).toBe(2)
+        expect(gates[first].requests).toBe(1)
+      }
+      if (outcome === 'populated') {
+        await page.locator(`[data-row-key="workspace:${workspaceId}"]`).waitFor()
+        await tree.getByText(title, { exact: true }).waitFor()
+        expect(await tree.getByText('No sessions yet', { exact: true }).count()).toBe(0)
+      } else {
+        await tree.getByText('No sessions yet', { exact: true }).waitFor()
+        if (outcome === 'empty') {
+          await compareOrRefreshGolden(expected('empty'),
+            await captureStableAria(page, '[role="tree"]', scaffold.workspaceCwd), webSnapshotMode())
+        }
+      }
+      expect(await loading.count()).toBe(0)
+      expect(consoleWatch.pageErrors).toEqual([])
+      expect(consoleWatch.warnings).toEqual([])
+    } catch (error) {
+      failures.push(error)
+    } finally {
+      for (const gate of Object.values(gates)) gate.release.resolve(undefined)
+      await page?.unrouteAll({ behavior: 'wait' }).catch((error: unknown) => { failures.push(error) })
+      const settled = await Promise.allSettled([...operations])
+      for (const result of settled) if (result.status === 'rejected') failures.push(result.reason)
+      await browser?.close().catch((error: unknown) => { failures.push(error) })
+      await scaffold.close().catch((error: unknown) => { failures.push(error) })
+    }
+    if (failures.length > 0) throw new AggregateError(failures, `list baseline ${outcome} journey failed`)
+  },
+)
+
+it.each([
+  { width: 1280, group: 'workspace' }, { width: 1280, group: 'flat' },
+  { width: 390, group: 'workspace' }, { width: 390, group: 'flat' },
+] as const)('keeps retained list geometry and actions stable at $width in $group view', async ({ width, group }) => {
+  const scaffold = await launchWebScaffold({ openInApp: false })
+  let browser: Browser | undefined
+  let page: Page | undefined
+  const gates: Record<BaselineMethod, ReturnType<typeof baselineGate>> = {
+    'session.list': baselineGate(), 'workspace.list': baselineGate(),
+  }
+  const retryGate = baselineGate()
+  const operations = new Set<Promise<void>>()
+  const sockets: { client: WebSocketRoute; server: WebSocketRoute }[] = []
+  const failures: unknown[] = []
+  try {
+    const directory = join(scaffold.workspaceCwd, 'list-continuity')
+    await mkdir(directory)
+    const workspace = await scaffold.ctx.workspaceRegistry.create(directory)
+    for (let index = 0; index < 24; index++) {
+      const id = `list-continuity-${String(index).padStart(2, '0')}`
+      const session = await seedSession(scaffold, history(id, `LIST_ROW_${String(index).padStart(2, '0')}`, 1),
+        id, undefined, directory)
+      await workspace.attachSession(session)
+    }
+    browser = await chromium.launch({ headless: true })
+    page = await newEnglishPage(browser, 700)
+    const target = page
+    await target.setViewportSize({ width, height: 700 })
+    await target.clock.setFixedTime(Date.UTC(2026, 9, 23, 12))
+    target.setDefaultTimeout(30_000)
+    const tripwire = watchConsole(target)
+    const owner = new URL(scaffold.authenticatedUrl)
+    // This page and ephemeral authority belong to this fixture. No other Host or browser is routed.
+    await target.routeWebSocket(url => url.host === owner.host && url.pathname === '/api/events.host', (client) => {
+      sockets.push({ client, server: client.connectToServer() })
+    })
+    await target.route(url => url.origin === owner.origin
+      && (url.pathname === '/api/session.list' || url.pathname === '/api/workspace.list'), async (route) => {
+      const method = new URL(route.request().url()).pathname.slice('/api/'.length) as BaselineMethod
+      const gate = gates[method]
+      gate.requests++
+      const attempt = gate.requests
+      if (attempt !== 2 && !(method === 'session.list' && attempt === 3)) {
+        await route.continue()
+        return
+      }
+      const operation = (async () => {
+        const response = await route.fetch()
+        expect(response.ok()).toBe(true)
+        const held = attempt === 2 ? gate : retryGate
+        held.arrived = true
+        await held.release.promise
+        if (method === 'session.list' && attempt === 2) await route.abort('connectionfailed')
+        else await route.fulfill({ response })
+      })()
+      operations.add(operation)
+      try { await operation } catch (error) {
+        failures.push(error)
+        gate.arrived = false
+        retryGate.arrived = false
+        await route.abort().catch((abortError: unknown) => { failures.push(abortError) })
+      } finally { operations.delete(operation) }
+    })
+    await Promise.all([
+      target.waitForResponse(response => new URL(response.url()).pathname === '/api/session.list'),
+      target.waitForResponse(response => new URL(response.url()).pathname === '/api/workspace.list'),
+      target.goto(scaffold.authenticatedUrl, { waitUntil: 'load' }),
+    ])
+    const currentTitle = width === 390
+      ? target.locator('[data-mobile-app-header]').getByText('LIST_ROW_23', { exact: true })
+      : target.getByRole('navigation', { name: 'Session hierarchy', exact: true })
+        .getByRole('button', { name: 'LIST_ROW_23', exact: true })
+    await currentTitle.waitFor()
+    await target.locator('textarea:enabled').last().waitFor()
+    await target.locator('[data-model-trigger][aria-busy="false"]').waitFor()
+    if (width === 390) {
+      await target.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+      const drawer = target.locator('[class*="drawer"]').first()
+      await expect.poll(() => drawer.evaluate(node => Math.round(node.getBoundingClientRect().x))).toBe(0)
+    }
+    const tree = target.getByRole('tree', { name: 'Sessions', exact: true })
+    await tree.waitFor()
+    if (group === 'flat') {
+      await target.getByRole('button', { name: 'View options', exact: true }).click()
+      await target.getByRole('menuitem', { name: 'In one list', exact: true }).click()
+    } else {
+      const workspaceRow = target.locator(`[data-row-key="workspace:${workspace.id}"]`)
+      await workspaceRow.waitFor()
+      await expect.poll(() => workspaceRow.getAttribute('aria-expanded')).toBe('true')
+      const more = tree.getByRole('button', { name: /^Show \d+ more sessions$/u })
+      while (await more.count() > 0) {
+        const count = await tree.locator('[data-row-key^="session:"]').count()
+        await more.click()
+        await expect.poll(() => tree.locator('[data-row-key^="session:"]').count()).toBeGreaterThan(count)
+      }
+    }
+    await expect.poll(() => tree.locator('[data-row-key^="session:"]').count()).toBe(24)
+    const region = target.locator('[data-workspace-list-region]')
+    await expect.poll(() => region.getAttribute('data-workspace-list-state')).toBe('ready')
+    expect(await region.getByRole('alert').count()).toBe(0)
+    expect(gates['session.list'].requests).toBe(1)
+    expect(gates['workspace.list'].requests).toBe(1)
+    const socket = sockets.at(-1)
+    if (socket === undefined) throw new Error('The fixture Host stream was not established')
+    const warningStart = tripwire.warnings.length
+    await Promise.all([
+      socket.client.close({ code: 1012, reason: 'Fixture list refresh' }),
+      socket.server.close({ code: 1012, reason: 'Fixture list refresh' }),
+    ])
+    await expect.poll(() => Object.values(gates).map(gate => gate.arrived)).toEqual([true, true])
+    await expect.poll(() => region.getAttribute('data-workspace-list-state')).toBe('loading')
+    const scrollTop = await tree.evaluate((node) => {
+      const scroll = node as HTMLElement
+      scroll.scrollTop = Math.floor((scroll.scrollHeight - scroll.clientHeight) / 2)
+      return scroll.scrollTop
+    })
+    expect(scrollTop).toBeGreaterThan(0)
+    const focusedAction = await clickVisibleRowMenus(target, tree)
+    const before = await listGeometry(region)
+    const workspaceReply = target.waitForResponse(response => new URL(response.url()).pathname === '/api/workspace.list')
+    gates['workspace.list'].release.resolve(undefined)
+    await (await workspaceReply).finished()
+    const failed = target.waitForEvent('requestfailed', request => new URL(request.url()).pathname === '/api/session.list')
+    gates['session.list'].release.resolve(undefined)
+    await failed
+    const notice = region.getByRole('alert')
+    await notice.getByText('Could not load the list', { exact: true }).waitFor()
+    await expect.poll(() => region.getAttribute('data-workspace-list-state')).toBe('error')
+    expect(await focusedAction.evaluate(node => node === document.activeElement)).toBe(true)
+    const during = await listGeometry(region)
+    expect(during).toEqual(before)
+    expect(during.footer.y).toBeGreaterThanOrEqual(during.tree.y + during.tree.height)
+    expect(during.footer.x).toBeGreaterThanOrEqual(0)
+    expect(during.footer.x + during.footer.width).toBeLessThanOrEqual(width)
+    expect(during.footer.y + during.footer.height).toBeLessThanOrEqual(700)
+    await clickVisibleRowMenus(target, tree)
+    expect(await listGeometry(region)).toEqual(before)
+    const golden = fileURLToPath(new URL(
+      './expected/frontend-responsiveness/list-retained-error.expected.md', import.meta.url,
+    ))
+    await compareOrRefreshGolden(golden,
+      await captureStableAria(target, '[data-workspace-list-footer]', scaffold.workspaceCwd), webSnapshotMode())
+    await notice.getByRole('button', { name: 'Retry', exact: true }).click()
+    await expect.poll(() => retryGate.arrived).toBe(true)
+    await expect.poll(() => region.getAttribute('data-workspace-list-state')).toBe('loading')
+    expect(await tree.evaluate(node => node === document.activeElement)).toBe(true)
+    expect(await region.getByRole('alert').count()).toBe(0)
+    expect(await listGeometry(region)).toEqual(before)
+    const retried = target.waitForResponse(response => new URL(response.url()).pathname === '/api/session.list')
+    retryGate.release.resolve(undefined)
+    await (await retried).finished()
+    await expect.poll(() => region.getAttribute('data-workspace-list-state')).toBe('ready')
+    const after = await listGeometry(region)
+    expect(after).toEqual(before)
+    expect(await tree.evaluate(node => node === document.activeElement)).toBe(true)
+    await clickVisibleRowMenus(target, tree)
+    expect(await listGeometry(region)).toEqual(before)
+    expect(gates['session.list'].requests).toBe(3)
+    expect(gates['workspace.list'].requests).toBe(2)
+    console.info('[list-footer-continuity]', JSON.stringify({ width, group, before, during, after }))
+    acknowledgeReloadConnectionLoss(tripwire, warningStart)
+    expect(tripwire.pageErrors).toEqual([])
+    expect(tripwire.warnings).toEqual([])
+  } catch (error) {
+    failures.push(error)
+    if (page !== undefined) await diagnoseFrontend(page, scaffold, `footer-${String(width)}-${group}`)
+      .catch((diagnosticError: unknown) => { failures.push(diagnosticError) })
+  } finally {
+    for (const gate of [...Object.values(gates), retryGate]) gate.release.resolve(undefined)
+    await page?.unrouteAll({ behavior: 'wait' }).catch((error: unknown) => { failures.push(error) })
+    const settled = await Promise.allSettled([...operations])
+    for (const result of settled) if (result.status === 'rejected') failures.push(result.reason)
+    await browser?.close().catch((error: unknown) => { failures.push(error) })
+    await scaffold.close().catch((error: unknown) => { failures.push(error) })
+  }
+  if (failures.length > 0) throw new AggregateError(failures, `Retained list ${String(width)}/${group} journey failed`)
 })

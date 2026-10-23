@@ -211,7 +211,7 @@ export class TestSessions implements ISessions {
   /** Calls observed on the service-level face, newest last. */
   readonly calls: {
     method: 'open' | 'openSubagent' | 'setSubagentCatalogOpen' | 'refreshSubagents' | 'setAdditionalStaged'
-      | 'clear' | 'search' | 'fork' | 'observeJob' | 'killJob'
+      | 'clear' | 'search' | 'fork' | 'observeJob' | 'killJob' | 'refresh'
     args: unknown[]
   }[] = []
 
@@ -228,7 +228,7 @@ export class TestSessions implements ISessions {
   constructor(private readonly stabilize: Stabilizer, private readonly rootCtx: Context) {
     rootCtx.effect(() => () => { this.navigation.dispose() })
     this.list = createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', state: 'idle', error: null,
       subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     this.channel = new SessionProvideChannel({
@@ -536,6 +536,12 @@ export class TestSessions implements ISessions {
   /** Record a catalog refresh; fixture callers drive snapshots explicitly. */
   refreshSubagents(parentSessionId: SessionId): Promise<void> {
     this.calls.push({ method: 'refreshSubagents', args: [parentSessionId] })
+    return Promise.resolve()
+  }
+
+  /** Record an explicit baseline refresh; fixture callers drive its state and rows. */
+  refresh(): Promise<void> {
+    this.calls.push({ method: 'refresh', args: [] })
     return Promise.resolve()
   }
 

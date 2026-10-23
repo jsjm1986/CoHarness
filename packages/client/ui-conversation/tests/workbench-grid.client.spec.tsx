@@ -53,7 +53,8 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     renderFactorySlot={(() => null) as ConversationRootProps['renderFactorySlot']}
     useViewportAvailable={bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} })}
     useSessions={bindSnapshotSelector(createSnapshotStore<SessionListState>(
-      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }))}
+      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
+        state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }))}
     useWorkspaces={bindSnapshotSelector(createSnapshotStore<WorkspaceListState>(
       { items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined }))}
     usePanelInfo={bindSnapshotSelector(createSnapshotStore({ activePanelId: null }))}

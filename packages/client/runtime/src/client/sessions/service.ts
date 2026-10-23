@@ -102,6 +102,10 @@ export interface SessionListState {
   current: SessionId | undefined
   /** Arrival lifecycle projected 1:1 from the manager snapshot (see SessionListPhase): empty-with-ready means "truly no sessions". */
   phase: SessionListPhase
+  /** Current baseline operation, independent of the sticky arrival phase and retained rows. */
+  state: 'idle' | 'loading' | 'error'
+  /** Latest baseline failure; cleared when the next refresh starts. */
+  error: RpcError | null
   /** Direct durable catalogs keyed by their selected parent address. */
   subagentsByParent: Readonly<Record<SessionId, SubagentCatalogSnapshot>>
   /**
@@ -433,7 +437,7 @@ export class SessionRuntime implements ISessions {
       conversation,
     )
     this.list = createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending', state: 'idle', error: null,
       subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     // The manager owns wire truth; the store is its projection. Manager
@@ -700,7 +704,7 @@ export class SessionRuntime implements ISessions {
 
   /**
    * Refresh the real Session baseline, reusing an in-flight pull.
-   * @returns completion of the current or newly started baseline pull.
+   * @returns completion of the current or newly started baseline pull; failures are published through list state/error.
    */
   refresh(): Promise<void> {
     return this.manager.refreshList()
@@ -1081,7 +1085,7 @@ export class SessionRuntime implements ISessions {
   /** Project the manager's list snapshot into the store (title derivation is display-only). */
   private projectList(): void {
     const {
-      items, current, phase, subagentsByParent, jobsBySession, observedJobs, currentAddress,
+      items, current, phase, state, error, subagentsByParent, jobsBySession, observedJobs, currentAddress,
     } = this.manager.getListSnapshot()
     const ids: SessionId[] = []
     const byId: Record<SessionId, SessionSummary> = {}
@@ -1175,7 +1179,7 @@ export class SessionRuntime implements ISessions {
       })
     }
     this.list.set({
-      ids, byId, archivedById: NO_ARCHIVED_SUMMARIES, current, phase, subagentsByParent,
+      ids, byId, archivedById: NO_ARCHIVED_SUMMARIES, current, phase, state, error, subagentsByParent,
       jobsBySession, observedJobs, currentAddress,
     })
   }

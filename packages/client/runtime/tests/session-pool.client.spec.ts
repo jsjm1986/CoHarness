@@ -12,7 +12,7 @@ import { WorkspaceResourceRegistry, workspaceResourceAddress } from '../src/clie
 import { PermissionCatalogDirectory } from '../src/client/permission-catalog.ts'
 import { createSnapshotStore } from '../src/client/contract/store.ts'
 import type { WorkspaceResourceTarget } from '../src/client/workspace-resources.ts'
-import { FakeApiClient, deferred, fakeRemote, ok } from './fake-api.client.ts'
+import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
 
 function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionHandle['start']>[0]) => void): ConnectionHandle {
   return {
@@ -31,6 +31,46 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
 }
 
 describe('SessionRuntimePool', () => {
+  it('projects current-space failures and withdraws their late retries with the account', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const first = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const retry = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    const operations: Promise<void>[] = []
+    const failure = { code: 'internal' as const, message: 'synthetic current-space failure', details: {} }
+    try {
+      expect(pool.currentScopeList.getSnapshot()).toMatchObject({ phase: 'pending', state: 'idle', error: null })
+      api.onList = () => first.promise
+      operations.push(pool.refresh(), pool.refresh())
+      await vi.waitFor(() => {
+        expect(pool.currentScopeList.getSnapshot()).toMatchObject({ state: 'loading', error: null })
+      })
+      expect(api.callsOf('session.list')).toHaveLength(1)
+      first.resolve(err(failure))
+      await Promise.all(operations)
+      expect(pool.currentScopeList.getSnapshot()).toMatchObject({ state: 'error', error: failure })
+      expect(pool.list.getSnapshot()).toMatchObject({ state: 'error', error: failure })
+      api.onList = () => retry.promise
+      operations.push(pool.refresh())
+      pool.invalidateAccount()
+      const withdrawn = pool.currentScopeList.getSnapshot()
+      expect(withdrawn).toMatchObject({ ids: [], byId: {}, phase: 'pending', state: 'idle', error: null })
+      retry.resolve(ok({ items: [{ sessionId: 'late' as SessionId, updatedAt: 1, running: false, blank: false }] }))
+      await Promise.all(operations)
+      expect(pool.currentScopeList.getSnapshot()).toBe(withdrawn)
+      expect(pool.list.getSnapshot()).toEqual(withdrawn)
+      await pool.refresh()
+      expect(api.callsOf('session.list')).toHaveLength(2)
+    } finally {
+      first.resolve(ok({ items: [] }))
+      retry.resolve(ok({ items: [] }))
+      await Promise.allSettled(operations)
+      await ctx.fiber.dispose()
+    }
+  })
+
   it.each(['account', 'target'] as const)('cancels the unshown saved window on %s withdrawal without adopting its late reply', async (cause) => {
     const storage = new Map([['dsh.sessions.current', JSON.stringify({ sessionId: 'saved' })]])
     vi.stubGlobal('localStorage', {

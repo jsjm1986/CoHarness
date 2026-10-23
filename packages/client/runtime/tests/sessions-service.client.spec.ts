@@ -54,6 +54,40 @@ async function feedList(b: Bench, rows: FeedRow[]): Promise<void> {
 }
 
 describe('list store projection', () => {
+  it('projects the existing baseline activity and failure through an explicit retry', async () => {
+    const b = bench()
+    const first = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const retry = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const operations: Promise<void>[] = []
+    const failure = { code: 'internal' as const, message: 'synthetic list failure', details: {} }
+    try {
+      expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'pending', state: 'idle', error: null })
+      b.api.onList = () => first.promise
+      operations.push(b.svc.refresh())
+      await vi.waitFor(() => {
+        expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'pending', state: 'loading', error: null })
+      })
+      first.resolve(err(failure))
+      await operations[0]
+      expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'pending', state: 'error', error: failure })
+
+      b.api.onList = () => retry.promise
+      operations.push(b.svc.refresh(), b.svc.refresh())
+      await vi.waitFor(() => {
+        expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'pending', state: 'loading', error: null })
+      })
+      expect(b.api.callsOf('session.list')).toHaveLength(2)
+      retry.resolve(ok({ items: [] }))
+      await Promise.all(operations)
+      expect(b.svc.list.getSnapshot()).toMatchObject({ phase: 'ready', state: 'idle', error: null, ids: [] })
+    } finally {
+      first.resolve(ok({ items: [] }))
+      retry.resolve(ok({ items: [] }))
+      await Promise.allSettled(operations)
+      await b.ctx.fiber.dispose()
+    }
+  })
+
   it('keeps unrelated summaries stable when one Session changes', async () => {
     const b = bench()
     try {

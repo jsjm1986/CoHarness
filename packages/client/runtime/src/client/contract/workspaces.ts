@@ -2,7 +2,7 @@
  * The outward workspaces-service face — what `ctx.workspaces` exposes to
  * feature packages and the renderer host, and therefore exactly what the
  * test runtime's workspaces double must implement. Wire-pump entry points
- * (handleHostEnvelope/handleConnected/refresh/startInitialSelection) stay on
+ * (handleHostEnvelope/handleConnected/startInitialSelection) stay on
  * the concrete class. Widening this interface is the explicit act of
  * widening what features may do to the workspaces domain.
  */
@@ -28,6 +28,12 @@ export interface StartSessionOptions {
 export interface IWorkspaces {
   /** The useWorkspaces standard feed (read face — writes stay inside the domain). */
   readonly list: ObservableSnapshot<WorkspaceListState>
+  /**
+   * Refresh this space's Workspace baseline, sharing an in-flight pull.
+   * Failures remain in list state/error; cancellation retains the received rows.
+   * @returns completion of the current or newly started baseline attempt.
+   */
+  refresh(): Promise<void>
   /**
    * Connect a Workspace to its reusable or freshly created blank session —
    * the workspace-reconnection arm ({@link openWorkspace} fallback and

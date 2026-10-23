@@ -18,6 +18,8 @@ Catalog reconciliation indexes incoming identities and insertion anchors instead
 
 Each base-connection generation reads its Workspace baseline once through the Workspace manager. The Workspace and Session archive projections share the successfully installed, revision-aware archive result. A disconnect or disposal cancels the pending read and invalidates late delivery; the next generation requests a fresh baseline. Workspace frames still replay over the response, and archive revisions prevent stale results from replacing newer state.
 
+List feedback reads the owners' baseline phase, activity, and failure independently. The Session projection exposes the manager's existing activity and error; it owns no second query state. An empty sidebar shows its skeleton during a pending read and an error with explicit Retry after a failed read. Successful empty baselines alone permit empty-state copy. A populated list reserves the translated notice footer's intrinsic size while healthy, preserving row positions, scroll viewport, and current focus when a failure arrives. Explicit Retry focuses the tree without scrolling before using the current space's existing single-flight refresh operations. It retains arrived rows and creates no background retry or cross-space data cache.
+
 Workspace navigation shares one merged summary lookup per source snapshot and commits reconciled order accounts in one store action. The resulting persisted preference snapshot is complete; no consumer relies on the intermediate per-account writes. React Activity suspends the hidden ordinary directory's effects while preserving its local viewing state in workbench mode. Hidden content search aborts its request and reads the current query again on return. The [workbench decision](2026-09-08-cordis-multi-session-workbench.md) retains authority over layout and Session ownership.
 
 Workbench account-directory reads follow the viewport's pending saved-layout restoration and the user's chooser opening or explicit retry. Each opening reads a fresh authenticated directory; ordinary Session-header mounts with a closed chooser require no directory request once restoration completes. The viewport owns restoration eligibility, including single-session presentation and legacy identities. Cancellation prevents a closed or unmounted chooser's late response from publishing catalog data or restoring panes.
@@ -36,6 +38,8 @@ The Host reports text-page continuation only after observing text beyond the req
 
 **Reuse an account directory indefinitely or omit its restoration read.** The directory verifies the runtime ownership and current access of saved panes. Requests follow restoration demand and explicit chooser use, while each opening receives current account data.
 
+**Infer readiness from missing rows or a presentation timer.** Missing rows can precede a baseline or follow a failed request. The owner already reports these states; a timer or animation flag cannot establish successful emptiness or end a failed load.
+
 **Infer text-page completion in the preview.** The Host owns line-window and EOF semantics for text previews and accumulated Markdown. A shared stream check keeps those consumers consistent; the byte bound remains a failure rather than a truncation signal.
 
 **Rewrite the startup dependency loader.** The shipped page already preloads the relevant application bundles. A synthetic transport waterfall does not establish a cold-start improvement through that production entry path.
@@ -43,6 +47,8 @@ The Host reports text-page continuation only after observing text beyond the req
 ## Consequences
 
 These changes reduce browser work while preserving model requests, durable Session records, pagination, visible ordering, and result completeness. Full history inspection and explicit expansion still cost work proportional to the requested content. Settlement still reconstructs timeline indexes; it does not make every operation constant-time.
+
+List feedback reports existing work and makes failed reads retryable; its presence does not establish a reduction in request execution or public-tunnel loading time. A populated sidebar keeps the compact notice footer's space even when healthy, reducing the list's available height in exchange for a stable viewport during failure and Retry.
 
 An exact line-window boundary can advance the provider iterator through empty chunks to one additional nonempty chunk or completion. The page loop inspects no unrequested line and never materializes the remaining file.
 
