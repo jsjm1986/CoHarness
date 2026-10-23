@@ -209,9 +209,11 @@ it.skipIf(MODE === 'record').each([
   await expect.poll(() => byteReads).toBe(2)
   await expect.poll(() => formula.textContent()).toBe('R1C1')
   if (chinese) {
-    await target.setViewportSize({ width: 260, height: viewport.height })
+    const compactWidth = 200
+    await target.setViewportSize({ width: compactWidth, height: viewport.height })
     const close = preview.getByRole('button', { name: labels.close, exact: true })
     const compactBefore = { body: await sheet.boundingBox(), reload: await reload.boundingBox(), close: await close.boundingBox() }
+    console.info('[preview-continuity-wrapped-actions-before]', JSON.stringify({ width: compactWidth, before: compactBefore }))
     expect(compactBefore.reload).not.toBeNull()
     expect(compactBefore.close).not.toBeNull()
     expect(compactBefore.reload!.y).toBeGreaterThan(compactBefore.close!.y)
@@ -219,10 +221,12 @@ it.skipIf(MODE === 'record').each([
     warningStart = tripwire.warnings.length
     await disconnect()
     const compactDuring = { body: await sheet.boundingBox(), reload: await reload.boundingBox(), close: await close.boundingBox() }
-    console.info('[preview-continuity-wrapped-actions]', JSON.stringify({ width: 260, before: compactBefore, during: compactDuring }))
+    console.info('[preview-continuity-wrapped-actions]', JSON.stringify({
+      width: compactWidth, before: compactBefore, during: compactDuring,
+    }))
     expect(compactDuring).toEqual(compactBefore)
     expect(compactDuring.reload!.x).toBeGreaterThanOrEqual(0)
-    expect(compactDuring.reload!.x + compactDuring.reload!.width).toBeLessThanOrEqual(260)
+    expect(compactDuring.reload!.x + compactDuring.reload!.width).toBeLessThanOrEqual(compactWidth)
     expect(await reload.evaluate(node => node === document.activeElement)).toBe(true)
     expect(byteReads).toBe(2)
     await recover()
@@ -232,7 +236,9 @@ it.skipIf(MODE === 'record').each([
   await target.route(/\/api\/workspaceFiles\.stat(?:\?.*)?$/u, async (route) => {
     const response = await route.fetch()
     const body = await response.json() as Record<string, unknown>
-    body.result = { ok: false, error: { code: 'workspace-file/unknown-session', message: 'Preview access is unavailable' } }
+    body.result = { ok: false, error: {
+      code: 'workspace-file/unknown-session', message: 'Preview access is unavailable', details: { sessionId },
+    } }
     await route.fulfill({ response, json: body })
   })
   await reload.click()
