@@ -325,7 +325,7 @@ describe('ui-sidebar-right apply', () => {
     for (const open of [
       () => { ctx.sidebarRight.openResource(pdf, { kind: 'workspace-file' }) },
       () => { ctx.sidebarRight.openResourceIn(SESSION, pdf, { kind: 'workspace-file' }) },
-      () => { original.tabActions.openResource(pdf, { kind: 'workspace-file' }) },
+      () => { original.tabActions.openResource(pdf) },
     ]) expect(open).toThrow('resource.verifying')
     policy.setVerifiedAccountId(1)
     const restored = Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs).map(tab => tab.contentId)
