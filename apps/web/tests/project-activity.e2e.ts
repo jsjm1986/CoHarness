@@ -87,7 +87,7 @@ async function mockActivityGateway(target: Page): Promise<void> {
 /** Open a fresh conversation so the reveal click visibly switches panes. */
 async function openBlankSession(target: Page): Promise<void> {
   await target.getByRole('button', { name: 'New session' }).first().click()
-  expect(await target.getByText('DONE', { exact: true }).count()).toBe(0)
+  await target.getByText('DONE', { exact: true }).waitFor({ state: 'hidden' })
 }
 
 /** Open the activity tab through the right Sidebar guide capsule. */

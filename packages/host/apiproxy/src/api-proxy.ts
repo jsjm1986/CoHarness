@@ -4528,6 +4528,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (signal?.aborted) {
           return err(request, { code: 'cancelled', message: 'history read was cancelled', details: {} })
         }
+        let detachedRevisionCheck: Promise<PromiseSettledResult<SessionPersistenceRevision | undefined>> | undefined
         try {
           signal?.throwIfAborted()
           if (toolCallId !== undefined) return ok(request, await callHistoryFor(sessionId, toolCallId, signal))
@@ -4581,8 +4582,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               return ok(request, cached)
             }
           }
-          const detachedRevisionAfterPromise = tailRequest && source.kind === 'detached'
-            ? detachedHistoryRevision(sessionId, signal)
+          // The parallel probe is observed immediately and joined even when another read fails.
+          detachedRevisionCheck = tailRequest && source.kind === 'detached'
+            ? detachedHistoryRevision(sessionId, signal).then(
+              value => ({ status: 'fulfilled' as const, value }),
+              (reason: unknown) => ({ status: 'rejected' as const, reason }),
+            )
             : undefined
           // Both awaits happen BEFORE the cut. Ensuring the recorded
           // composition's standing mount is what registers its projection
@@ -4610,7 +4615,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               // lifecycle events landed before the baseline fold could match
               // the window's last seq. Serve the resident log instead — the
               // detached revision pair captured above no longer applies.
-              void detachedRevisionAfterPromise?.then(() => undefined, () => undefined)
               source = { kind: 'attached', session: nowAttached }
               sourceSignature = historySourceSignature(source)
             }
@@ -4624,9 +4628,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           if (tailRequest
             && sourceSignature === historySourceSignature(source)
             && projectionRevision === projectionRevisionOf(ctx)) {
-            const detachedRevisionAfter = source.kind === 'detached'
-              ? await detachedRevisionAfterPromise
-              : undefined
+            const revisionCheck = source.kind === 'detached' ? await detachedRevisionCheck : undefined
+            if (revisionCheck?.status === 'rejected') throw revisionCheck.reason
+            const detachedRevisionAfter = revisionCheck?.value
             writeHistoryTailCache(
               sessionId, source.kind, sourceSignature, normalizedMaxMessages, projectionRevision,
               source.kind === 'detached'
@@ -4676,6 +4680,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             message: `history unavailable for session "${sessionId}"`,
             details: {},
           })
+        } finally {
+          if (detachedRevisionCheck !== undefined) await detachedRevisionCheck
         }
       },
 
