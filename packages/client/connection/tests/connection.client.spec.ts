@@ -8,7 +8,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '../src/client/api.ts'
-import type { ConnectionState } from '../src/client/connection.ts'
+import type { ConnectionFailure, ConnectionState } from '../src/client/connection.ts'
 import { ApiTransportError } from '../src/client/api.ts'
 import { ConnectionController } from '../src/client/connection.ts'
 import { FakeApiClient, deferred, ok } from './fake-api.client.ts'
@@ -21,6 +21,53 @@ function subscribedFrame(lastSeq = 0) {
 }
 
 describe('connection lifecycle', () => {
+  it.each(['eof', 'rejection', 'rpc'] as const)('reports the first stream %s without logging its original error or payload', async (kind) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const api = new FakeApiClient()
+    const privateText = 'private-session/secret?token=do-not-record'
+    const original = new Error(privateText)
+    const connected = deferred<undefined>()
+    const reconnecting = deferred<undefined>()
+    const failure = vi.fn<(value: ConnectionFailure) => void>()
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const controller = new ConnectionController(api, {
+      onConnected: () => { connected.resolve(undefined) },
+      onStateChange: (state) => { if (state === 'reconnecting') reconnecting.resolve(undefined) },
+      onFailure: failure,
+    }, { backoffBaseMs: 10_000, backoffMaxMs: 10_000 })
+    controller.start()
+    try {
+      await connected.promise
+      if (kind === 'eof') api.endStreams()
+      else if (kind === 'rejection') api.failStreams(original)
+      else api.pushMux({ type: 'stream/error', error: { code: 'internal', message: privateText, details: {} } })
+      await reconnecting.promise
+      controller.stop()
+      await vi.runAllTimersAsync()
+      expect(failure).toHaveBeenCalledOnce()
+      const value = failure.mock.calls[0]![0]
+      expect(value.diagnostic).toMatchObject({
+        clientGeneration: 1, source: 'mux', phase: 'connected',
+        cause: kind === 'eof' ? 'stream-eof' : kind === 'rpc' ? 'rpc-error' : 'transport-rejection',
+      })
+      expect(value.diagnostic).not.toHaveProperty('closeCode')
+      if (kind === 'rejection') expect(value.error).toBe(original)
+      if (kind === 'eof') expect(value.error).toMatchObject({ message: 'Connection downlink ended' })
+      if (kind === 'rpc') expect(value).toMatchObject({ kind: 'rpc', error: { code: 'internal', message: privateText, details: {} } })
+      expect(warning).toHaveBeenCalledOnce()
+      const text = warning.mock.calls.flat().join('\n')
+      expect(JSON.parse(text.slice(text.indexOf('{')))).toEqual(value.diagnostic)
+      expect(text).not.toContain(privateText)
+      expect(api.openMuxCount).toBe(0)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      controller.stop()
+      await vi.runAllTimersAsync()
+      warning.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
   it('releases replayed frames only after the readiness callback', async () => {
     const api = new FakeApiClient()
     const describe = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
@@ -193,7 +240,7 @@ describe('connection lifecycle', () => {
       api.pushMux({ type: 'stream/error', error: { code: 'internal', message: 'impl broke', details: {} } })
       await vi.waitFor(() => { expect(connected).toBe(2) }) // treated as loss → reconnect
       expect(muxSeen).toEqual([]) // never forwarded to the business sink
-      expect(failure).toHaveBeenCalledWith({ kind: 'rpc', error: { code: 'internal', message: 'impl broke', details: {} } })
+      expect(failure).toHaveBeenCalledWith(expect.objectContaining({ kind: 'rpc', error: { code: 'internal', message: 'impl broke', details: {} } }))
     } finally {
       controller.stop()
       warnSpy.mockRestore()
@@ -207,7 +254,7 @@ describe('connection lifecycle', () => {
     const controller = new ConnectionController(api, { onFailure: failure }, FAST)
     controller.start()
     try {
-      await vi.waitFor(() => { expect(failure).toHaveBeenCalledWith({ kind: 'transport', error: new ApiTransportError(status, '/api/host.describe') }) })
+      await vi.waitFor(() => { expect(failure).toHaveBeenCalledWith(expect.objectContaining({ kind: 'transport', error: new ApiTransportError(status, '/api/host.describe') })) })
     } finally { controller.stop() }
   })
 

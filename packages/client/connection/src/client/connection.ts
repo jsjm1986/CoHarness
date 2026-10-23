@@ -1,4 +1,5 @@
 import type { HostDescription, IApiClient, HostFrame, MuxFrame, RpcError, RpcRequest } from './api.ts'
+import { StreamTermination } from './stream-termination.ts'
 
 /** Reconnect/backoff tunables (deployment-varying — no hardcoded tunables; these become the
  *  future `ctx.connection` plugin's Config). All fields optional; defaults below. */
@@ -103,9 +104,24 @@ function waitForReadiness<T>(
  *  'reconnecting' the moment the generation fails (covers the whole backoff+retry span). */
 export type ConnectionState = 'connected' | 'reconnecting'
 
-/** Failure category preserved for consumers that must invalidate authorized data. */
-export type ConnectionFailure = { readonly kind: 'rpc'; readonly error: RpcError }
-  | { readonly kind: 'transport'; readonly error: unknown }
+/** Source, cause and timing of the first failure in one Client connection generation. */
+export interface ConnectionFailureDiagnostic {
+  /** Local Controller counter; this does not identify a Host process generation. */
+  readonly clientGeneration: number
+  readonly source: 'mux' | 'host' | 'describe' | 'readiness'
+  readonly cause: 'stream-eof' | 'queue-overflow' | 'rpc-error' | 'transport-rejection'
+  readonly phase: 'opening' | 'connected'
+  readonly elapsedMs: number
+  readonly connectedForMs?: number
+  readonly closeCode?: number
+  readonly wasClean?: boolean
+}
+
+/** Original failure retained for authorization consumers; diagnostics exclude its message and details. */
+export type ConnectionFailure = ({ readonly kind: 'rpc'; readonly error: RpcError }
+  | { readonly kind: 'transport'; readonly error: unknown }) & {
+    readonly diagnostic?: ConnectionFailureDiagnostic
+  }
 
 class HandshakeRpcError extends Error {
   constructor(readonly error: RpcError) { super(`host.describe failed: ${error.code}: ${error.message}`) }
@@ -201,8 +217,11 @@ export class ConnectionController {
   private async loop(token: number): Promise<void> {
     while (this.isRunning(token)) {
       const gen = ++this.generation
+      const startedAt = performance.now()
       const ac = new AbortController()
       this.current = ac
+      let connectedAt: number | undefined
+      let firstFailure: ConnectionFailureDiagnostic | undefined
 
       // Stream carriers can deliver a generation's replay before the unary
       // readiness handshake settles. Keep those frames out of the business
@@ -247,9 +266,22 @@ export class ConnectionController {
         new Promise<void>((resolve) => { hostOpened = resolve }),
       ])
 
-      const reportFailure = (failure: ConnectionFailure): void => {
-        if (!generationLive || !this.isGenerationActive(ac, token)) return
-        this.callSink(() => { this.sinks.onFailure?.(failure) })
+      const reportFailure = (failure: ConnectionFailure, source: ConnectionFailureDiagnostic['source']): void => {
+        if (firstFailure !== undefined || !generationLive || !this.isGenerationActive(ac, token)) return
+        const now = performance.now()
+        const termination = failure.kind === 'transport' && failure.error instanceof StreamTermination ? failure.error : undefined
+        const diagnostic: ConnectionFailureDiagnostic = {
+          clientGeneration: gen, source,
+          cause: failure.kind === 'rpc' ? 'rpc-error' : termination?.kind ?? 'transport-rejection',
+          phase: connectedAt === undefined ? 'opening' : 'connected',
+          elapsedMs: now - startedAt,
+          ...(connectedAt === undefined ? {} : { connectedForMs: now - connectedAt }),
+          ...(termination?.closure === undefined ? {} : {
+            closeCode: termination.closure.closeCode, wasClean: termination.closure.wasClean,
+          }),
+        }
+        firstFailure = diagnostic
+        this.callSink(() => { this.sinks.onFailure?.({ ...failure, diagnostic }) })
       }
       const failed = new Promise<void>((resolve) => {
         const settle = (): void => {
@@ -258,18 +290,26 @@ export class ConnectionController {
           buffered.length = 0
           resolve()
         }
-        void this.pumpStream(this.api.events.mux({}, ac.signal, muxOpened), dispatchMux, settle, reportFailure)
-        void this.pumpStream(this.api.events.host({}, ac.signal, hostOpened), dispatchHost, settle, reportFailure)
+        void this.pumpStream(this.api.events.mux({}, ac.signal, muxOpened), ac.signal, dispatchMux, settle,
+          (failure) => { reportFailure(failure, 'mux') })
+        void this.pumpStream(this.api.events.host({}, ac.signal, hostOpened), ac.signal, dispatchHost, settle,
+          (failure) => { reportFailure(failure, 'host') })
       })
 
+      let readinessFailureSource: 'describe' | 'readiness' = 'describe'
       try {
         // Strict readiness handshake: describe proves unary reachability, onOpen
         // proves each physical stream is established before any frame —
         // only then may onConnected fire, so the resync it triggers cannot outrun the
         // subscribed baseline. The timeout guards against a carrier that never fires onOpen
         // (see ConnectionConfig.streamOpenTimeoutMs).
+        const describe = this.api.host.describe({}, ac.signal).catch((error: unknown) => {
+          readinessFailureSource = 'describe'
+          throw error
+        })
+        readinessFailureSource = 'readiness'
         const handshake = Promise.all([
-          this.api.host.describe({}, ac.signal),
+          describe,
           streamsOpen,
         ])
         void handshake.catch(() => {})
@@ -290,6 +330,7 @@ export class ConnectionController {
         }
         if (ac.signal.aborted) throw new Error('generation aborted during readiness handshake')
         this.attempt = 0
+        connectedAt = performance.now()
         this.emitState('connected')
         // A state sink may synchronously stop this controller. Do not publish
         // a description for a generation that no longer exists afterward.
@@ -314,7 +355,8 @@ export class ConnectionController {
           }
         }
       } catch (error: unknown) {
-        reportFailure(error instanceof HandshakeRpcError ? { kind: 'rpc', error: error.error } : { kind: 'transport', error })
+        reportFailure(error instanceof HandshakeRpcError ? { kind: 'rpc', error: error.error } : { kind: 'transport', error },
+          error instanceof HandshakeRpcError ? 'describe' : readinessFailureSource)
         // Every failure converges on the same generation cancellation and backoff.
         ac.abort()
         generationLive = false
@@ -330,7 +372,7 @@ export class ConnectionController {
       }
       this.emitState('reconnecting')
       this.attempt += 1
-      console.warn(`[web-runtime] connection lost, retry #${this.attempt}`)
+      console.warn(`[web-runtime] connection lost, retry #${this.attempt}${firstFailure === undefined ? '' : ` ${JSON.stringify(firstFailure)}`}`)
       const idle = new AbortController()
       this.backoff = idle
       await sleep(this.backoffDelay(this.attempt), idle.signal)
@@ -347,6 +389,7 @@ export class ConnectionController {
 
   private async pumpStream<F extends MuxFrame | HostFrame>(
     stream: AsyncIterable<RpcRequest<F>>,
+    signal: AbortSignal,
     sink: ((envelope: RpcRequest<F>) => void) | undefined,
     onEnd: () => void,
     reportFailure: (failure: ConnectionFailure) => void,
@@ -359,8 +402,9 @@ export class ConnectionController {
         }
         if (sink !== undefined) this.callSink(() => { sink(envelope) })
       }
+      if (!signal.aborted) reportFailure({ kind: 'transport', error: new StreamTermination('stream-eof') })
     } catch (error: unknown) {
-      reportFailure({ kind: 'transport', error })
+      if (!signal.aborted) reportFailure({ kind: 'transport', error })
     }
     onEnd()
   }

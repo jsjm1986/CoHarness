@@ -626,6 +626,12 @@ describe('SessionRuntimePool Workspace resources', () => {
       await vi.waitFor(() => { expect(pool.list.getSnapshot().ids).toEqual([key]) })
       pool.open(key)
       expect(pool.binding(key)).toBeDefined()
+      pool.handleConnectionFailure({ kind: 'transport', error: new Error('Connection downlink ended'), diagnostic: {
+        clientGeneration: 1, source: 'mux', cause: 'stream-eof', phase: 'connected', elapsedMs: 100,
+      } })
+      expect(pool.binding(key)).toBeDefined()
+      expect(pool.list.getSnapshot().ids).toEqual([key])
+      expect(invalidate).not.toHaveBeenCalled()
       pool.handleConnectionFailure({ kind: 'transport', error: Object.assign(new Error('temporary'), { status: 503 }) })
       pool.handleDisconnected()
       expect(pool.binding(key)).toBeDefined()
@@ -675,6 +681,14 @@ describe('SessionRuntimePool Workspace resources', () => {
     const release = registry.pin(request)
     const source = registry.source(request)
     await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('live') })
+    const retained = source.getSnapshot()
+    sinks.onFailure?.({ kind: 'transport', error: new Error('Connection downlink ended'), diagnostic: {
+      clientGeneration: 1, source: 'host', cause: 'stream-eof', phase: 'connected', elapsedMs: 100,
+      closeCode: 1000, wasClean: true,
+    } })
+    expect(source.getSnapshot()).toBe(retained)
+    expect(registry.hasProvider(target)).toBe(true)
+    expect(pool.list.getSnapshot().ids).toContain(key)
 
     sinks.onHostEnvelope?.({ rpcId: 'frame-1' as never, payload: { type: 'host/workspace-file-changed', sessionId, path: 'a.txt', present: true, version: 'v9' } })
     expect(source.getSnapshot()).toMatchObject({ value: { changed: true } })

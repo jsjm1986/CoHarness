@@ -22,9 +22,15 @@ Host 按配置的 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打�
 
 浏览器 abort 或 socket close 会取消对应的 host 流；插件 teardown 还会等待该 source iterator 完成清理。host 流中途抛错时，载体发送一个现有的 `stream/error` frame 后关闭 socket；客户端把该 frame 收敛为连接丢失，不投递给业务 sink。每条 WebSocket 独立报告 open，既有 readiness handshake 仍等待 mux、host 都 open 且 `host.describe` HTTP 调用成功后才发布 connected。
 
+connection Controller 只在既有 generation 内归因首次非预期终结。伴随 socket 的关闭属于取消，不是第二次独立故障；已停止或已替换的 generation 不得发布迟到原因。普通 EOF 经由同一 failure 通道报告不带 HTTP 状态的固定 transport error，RPC 与 transport failure 则保留原始错误供权限消费者使用。因此，干净关闭不会被解释为访问拒绝或 Host 重启。
+
+重试诊断只包含固定来源／原因分类、本地尝试计数、单调相对耗时，以及可取得的数字关闭码和干净握手标记。远端关闭原因、错误文本、URL、query、frame 和 Session ID 可能携带私有数据，因此不进入诊断。诊断不增加连接寿命或恢复策略；TLS 故障仍需原生浏览器证据，Client 尝试计数也不能证明 Host 进程代次变化。
+
 ## Verification
 
 webserver 约定测试钉住 upgrade pathname 分发、重复注册拒绝、资源释放与 teardown；connection 的真实网络测试钉住两条 WebSocket 各自的信任检查、open、schema 信封、frame 顺序、流错误与关闭时取消；客户端测试同时证明下行创建 `ws:`／`wss:` URL，而 unary 与 `respond` 仍调用 HTTP `fetch`。组装后的 keyless 浏览器回放继续覆盖 Chromium、真实 host、HTTP 上行与 WebSocket 下行整链。
+
+受控 Client 测试区分 mux／host 关闭、普通 EOF、transport rejection 与 RPC failure，将伴随关闭延迟到下一代连接之后，保留正常取消行为，并断言诊断字段白名单。Runtime 消费者测试验证 EOF 保留已授权的 base 与 target 资源，而明确撤权仍会将其撤下。
 
 ## Alternatives considered
 

@@ -9,6 +9,8 @@ import type { RpcMessage, SessionId } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
 import { FixtureApiClient } from '../src/client/fixture.ts'
 import { WebApiClient } from '../src/client/web-api-client.ts'
+import { ConnectionController, type ConnectionFailure } from '../src/client/connection.ts'
+import { deferred } from './fake-api.client.ts'
 
 type Win = { location?: { hostname: string; search: string; origin?: string } }
 type WebSocketGlobal = { WebSocket?: typeof WebSocket }
@@ -17,6 +19,7 @@ const originalWebSocket = globalThis.WebSocket
 const sockets: FakeWebSocket[] = []
 
 class FakeWebSocket extends EventTarget {
+  static autoOpen = true
   static readonly CONNECTING = 0
   static readonly OPEN = 1
   static readonly CLOSING = 2
@@ -24,22 +27,30 @@ class FakeWebSocket extends EventTarget {
 
   readonly url: string
   readyState = FakeWebSocket.CONNECTING
+  holdClose = false
+  closeCalls = 0
 
   constructor(url: string | URL) {
     super()
     this.url = String(url)
     sockets.push(this)
     queueMicrotask(() => {
-      if (this.readyState !== FakeWebSocket.CONNECTING) return
+      if (!FakeWebSocket.autoOpen || this.readyState !== FakeWebSocket.CONNECTING) return
       this.readyState = FakeWebSocket.OPEN
       this.dispatchEvent(new Event('open'))
     })
   }
 
   close(): void {
+    this.closeCalls++
     if (this.readyState === FakeWebSocket.CLOSED) return
+    if (this.holdClose) { this.readyState = FakeWebSocket.CLOSING; return }
+    this.remoteClose(1000, true)
+  }
+
+  remoteClose(code: number, wasClean: boolean, reason = ''): void {
     this.readyState = FakeWebSocket.CLOSED
-    this.dispatchEvent(new Event('close'))
+    this.dispatchEvent(Object.assign(new Event('close'), { code, wasClean, reason }))
   }
 
   receive(data: unknown): void {
@@ -52,8 +63,157 @@ afterEach(async () => {
   for (const ctx of mountedContexts.splice(0).reverse()) await ctx.fiber.dispose()
   delete (globalThis as Win).location
   sockets.length = 0
+  FakeWebSocket.autoOpen = true
   if (originalWebSocket === undefined) delete (globalThis as WebSocketGlobal).WebSocket
   else globalThis.WebSocket = originalWebSocket
+})
+
+describe('connection termination diagnostics', () => {
+  const privateText = 'private-session/private?token=do-not-record'
+  const config = { backoffBaseMs: 10_000, backoffMaxMs: 10_000 }
+
+  function response(init?: RequestInit): Response {
+    const request = JSON.parse(init?.body as string) as { rpcId: string }
+    return Response.json({ type: 'server-response', rpcId: request.rpcId, result: { ok: true, value: {
+      version: 'test', cwd: '/private', home: '/private', attachedSessions: 0, canOpenPath: false,
+    } } })
+  }
+
+  it.each([
+    { source: 'mux', code: 1012, wasClean: true },
+    { source: 'host', code: 1006, wasClean: false },
+  ] as const)('reports only the first $source close and excludes the companion abort', async ({ source, code, wasClean }) => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '', origin: 'http://localhost:3080' }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    let clock = 100
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => { clock = Math.max(clock, 120); return response(init) })
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const connected = deferred<undefined>()
+    const nextConnected = deferred<undefined>()
+    let connections = 0
+    const reconnecting = deferred<undefined>()
+    const failure = vi.fn<(value: ConnectionFailure) => void>()
+    const controller = new ConnectionController(new WebApiClient(), {
+      onConnected: () => { if (++connections === 1) connected.resolve(undefined); else nextConnected.resolve(undefined) },
+      onStateChange: (state) => { if (state === 'reconnecting') reconnecting.resolve(undefined) },
+      onFailure: failure,
+    }, config)
+    controller.start()
+    try {
+      await connected.promise
+      const first = sockets.find(socket => new URL(socket.url).pathname === `/api/events.${source}`)!
+      const companion = sockets.find(socket => socket !== first)!
+      companion.holdClose = true
+      clock = 165
+      first.remoteClose(code, wasClean, privateText)
+      await reconnecting.promise
+      expect(failure).toHaveBeenCalledOnce()
+      expect(failure.mock.calls[0]![0]).toMatchObject({ kind: 'transport', diagnostic: {
+        clientGeneration: 1, source, cause: 'stream-eof', phase: 'connected',
+        elapsedMs: 65, connectedForMs: 45, closeCode: code, wasClean,
+      } })
+      expect(companion.readyState).toBe(FakeWebSocket.CLOSING)
+      expect(companion.closeCalls).toBe(1)
+      await vi.advanceTimersByTimeAsync(10_000)
+      await nextConnected.promise
+      companion.remoteClose(1000, true, privateText)
+      controller.stop()
+      await vi.runAllTimersAsync()
+      expect(failure).toHaveBeenCalledOnce()
+      expect(warning).toHaveBeenCalledOnce()
+      const text = warning.mock.calls.flat().join('\n')
+      expect(text).toContain(`"source":"${source}"`)
+      expect(text).toContain(`"closeCode":${String(code)}`)
+      expect(text).not.toContain(privateText)
+      expect(text).not.toContain('localhost')
+      expect(text).not.toContain('/private')
+      expect(JSON.parse(text.slice(text.indexOf('{')))).toEqual(failure.mock.calls[0]![0].diagnostic)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      controller.stop()
+      for (const socket of sockets) if (socket.readyState !== FakeWebSocket.CLOSED) socket.remoteClose(1000, true)
+      await vi.runAllTimersAsync()
+      warning.mockRestore(); fetch.mockRestore(); now.mockRestore()
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('attributes a rejected describe to opening and preserves its error without logging its text', async () => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '', origin: 'http://localhost:3080' }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.autoOpen = false
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const error = new TypeError(privateText)
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(error)
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const reconnecting = deferred<undefined>()
+    const failure = vi.fn<(value: ConnectionFailure) => void>()
+    const controller = new ConnectionController(new WebApiClient(), {
+      onFailure: failure,
+      onStateChange: (state) => { if (state === 'reconnecting') reconnecting.resolve(undefined) },
+    }, config)
+    controller.start()
+    try {
+      await reconnecting.promise
+      controller.stop()
+      await vi.runAllTimersAsync()
+      expect(failure).toHaveBeenCalledOnce()
+      expect(failure.mock.calls[0]![0].error).toBe(error)
+      expect(failure.mock.calls[0]![0].diagnostic).toMatchObject({
+        clientGeneration: 1, source: 'describe', cause: 'transport-rejection', phase: 'opening',
+      })
+      expect(failure.mock.calls[0]![0].diagnostic).not.toHaveProperty('connectedForMs')
+      expect(failure.mock.calls[0]![0].diagnostic).not.toHaveProperty('closeCode')
+      expect(sockets).toHaveLength(2)
+      expect(sockets.every(socket => socket.readyState === FakeWebSocket.CLOSED)).toBe(true)
+      expect(warning).toHaveBeenCalledOnce()
+      expect(warning.mock.calls.flat().join('\n')).not.toContain(privateText)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      controller.stop()
+      await vi.runAllTimersAsync()
+      warning.mockRestore(); fetch.mockRestore()
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each([false, true])('treats stop as client cancellation without a failure or retry (ready=%s)', async (ready) => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '', origin: 'http://localhost:3080' }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const reply = deferred<Response>()
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => ready ? response(init) : reply.promise)
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const connected = deferred<undefined>()
+    const failure = vi.fn()
+    const controller = new ConnectionController(new WebApiClient(), {
+      onFailure: failure, onConnected: () => { connected.resolve(undefined) },
+    }, config)
+    controller.start()
+    try {
+      if (ready) await connected.promise
+      else await Promise.resolve()
+      expect(sockets).toHaveLength(2)
+      controller.stop()
+      reply.resolve(Response.json({}))
+      await vi.runAllTimersAsync()
+      expect(failure).not.toHaveBeenCalled()
+      expect(warning).not.toHaveBeenCalled()
+      expect(fetch).toHaveBeenCalledOnce()
+      expect(sockets.every(socket => socket.readyState === FakeWebSocket.CLOSED)).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      controller.stop(); reply.resolve(Response.json({}))
+      await vi.runAllTimersAsync()
+      warning.mockRestore(); fetch.mockRestore()
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 async function mount(): Promise<ConnectionHandle> {
@@ -307,15 +467,7 @@ describe('connection client apply', () => {
     sockets[0]!.receive(frame)
     await expect(first).resolves.toMatchObject({ value: { payload: { type: 'session/subscribed' } } })
     for (let index = 0; index < 1_100; index += 1) sockets[0]!.receive(frame)
-    let ended = false
-    for (let index = 0; index < 1_100; index += 1) {
-      const next = await iterator.next()
-      if (next.done) {
-        ended = true
-        break
-      }
-    }
-    expect(ended).toBe(true)
+    await expect(iterator.next()).rejects.toMatchObject({ kind: 'queue-overflow' })
     expect(sockets[0]?.readyState).toBe(FakeWebSocket.CLOSED)
     expect(errors).toHaveBeenCalledWith(expect.stringContaining('downlink queue exceeded'))
     abort.abort()

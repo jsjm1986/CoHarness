@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.md
 document:
-  en: f59e2c50b948fb8c93d698668571dff66a025cb5
-  zh: e261626de7700b8bd135b731d1b2eff612079250
+  en: 3c0296aeb0ff10564bd33bb3ebe1edfd7508a3e0
+  zh: fdc8fb2af00fadf323aa90036d2ef0889963f99a
 /agent-note-websocket-carrier-for-browser-downlinks:
   en: 046870d865e35244
   zh: 1eb4ba8c53ccede6
@@ -15,11 +15,11 @@ document:
   en: 240db651954235f7
   zh: 424aec92a61fd73e
 /agent-note-websocket-carrier-for-browser-downlinks/upgrade-and-lifecycle-boundaries:
-  en: f0fa6eb6836ba213
-  zh: ee3eb84292c479d6
+  en: 727ebfb46ba00a0b
+  zh: 7b492491e3ec3b9c
 /agent-note-websocket-carrier-for-browser-downlinks/verification:
-  en: 6e75aef8602cb826
-  zh: 7306181da4cc277e
+  en: 4b36f772baf14d22
+  zh: 9d1950e6237a72cc
 /agent-note-websocket-carrier-for-browser-downlinks/alternatives-considered:
   en: 10cc02022e989928
   zh: 0d29f780e246fac3

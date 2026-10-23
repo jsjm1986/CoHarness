@@ -57,6 +57,8 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 
 `/api/events.mux` 与 `/api/events.host` 各接受一条 WebSocket upgrade，并只向浏览器发送对应的 `ServerRequest` 文本消息；客户端不会在这些 socket 上发送业务数据。任一 socket 结束都会使当前 connection generation 失败并重建两条流，连接就绪仍要求两条 socket 均已打开且 `host.describe` HTTP 调用成功。Host teardown 会终止两条 socket、中止各自的 source，并等待 source 清理完成后再返回。普通网络 GET 这些路径会返回 426，不保留 SSE（Server-Sent Events）回退；`toFetchHandler` 的 SSE 编解码只服务进程内同构载体。
 
+`onFailure` 保留原始 `kind` 和 `error`，并为首次非预期终结附加可选 `diagnostic` 元数据：来源、固定原因分类、opening／connected 阶段、相对耗时，以及可取得的 WebSocket `closeCode`／`wasClean`。普通流 EOF 会报告不带 HTTP 状态的固定 transport error；正常 Client 取消不报告故障。重试 warning 只包含这份元数据，不包含 URL、query、关闭原因文本、错误文本、payload 或 Session ID。`clientGeneration` 仅统计当前 Controller 的连接尝试，不代表 Host 进程代次；关闭码本身不能定位 TLS、代理或服务端故障。首次故障归因的理由见[载体决策](../../../.agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.zh.md)。
+
 `connection/request` 是 Host 侧包围每个已通过浏览器信任栅栏请求的 waterfall。它接收请求进入时的 Node header，以及取值为 `http` 或 `upgrade` 的 `kind`，并在 RPC 分发或事件流开启前完成。认证与请求上下文监听器必须将 header 视为不可变值，并调用 `next()` 让独立插件组合；不委托会阻止后续监听器与载体处理器运行。 upgrade 分发还提供由 socket 所有的 `signal`，在关闭或错误时中止；保留事件流权限的监听器必须使用该信号作为生命周期，而不能使用 waterfall 完成时间。
 
 <a id="model-experience"></a>
