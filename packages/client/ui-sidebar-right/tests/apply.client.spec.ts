@@ -299,6 +299,59 @@ describe('ui-sidebar-right apply', () => {
     await fiber.dispose()
   })
 
+  it('rejects resource opening during account verification before same-account restoration can discard it', async () => {
+    const values = layoutStorage()
+    const { ctx, seat, description, policy, fiber } = await boot()
+    description.set({ executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(1)
+    ctx.sidebarRightTabs.register({ id: 'workspace-file', kind: 'workspace-file', patterns: ['dsh-resource://file/**'], title: () => 'Synthetic file' })
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    const html = `dsh-resource://file/session/${SESSION}/existing.html`
+    const pdf = `dsh-resource://file/session/${SESSION}/broken.pdf`
+    ctx.sidebarRight.openSessionResource(SESSION, html, { kind: 'workspace-file' })
+    const original = ctx.sidebarRight.tabDomain.occurrence(SESSION, ctx.sidebarRight.tabsIn(SESSION)[0]!)
+    const saved = [...values.entries()]
+    expect(saved).toHaveLength(1)
+    policy.setVerifiedAccountId(undefined)
+    const unverified = instance.getSnapshot()
+    expect(unverified.bySession).toEqual({})
+    let refusal: unknown
+    try { ctx.sidebarRight.openSessionResource(SESSION, pdf, { kind: 'workspace-file' }) }
+    catch (error) { refusal = error }
+    const afterOpen = instance.getSnapshot()
+    const opened = Object.values(afterOpen.bySession[SESSION]?.layout.tabs ?? {}).find(tab => tab.contentId === pdf)
+    const occurrence = opened === undefined ? undefined : ctx.sidebarRight.tabDomain.occurrence(SESSION, opened)
+    for (const open of [
+      () => { ctx.sidebarRight.openResource(pdf, { kind: 'workspace-file' }) },
+      () => { ctx.sidebarRight.openResourceIn(SESSION, pdf, { kind: 'workspace-file' }) },
+      () => { original.tabActions.openResource(pdf, { kind: 'workspace-file' }) },
+    ]) expect(open).toThrow('resource.verifying')
+    policy.setVerifiedAccountId(1)
+    const restored = Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs).map(tab => tab.contentId)
+    expect([...values.entries()]).toEqual(saved)
+    expect({
+      rejected: refusal instanceof Error,
+      openedWhileUnverified: opened?.contentId,
+      openedOccurrenceAborted: occurrence?.signal.aborted,
+      restored,
+    }).toEqual({ rejected: true, openedWhileUnverified: undefined, openedOccurrenceAborted: undefined, restored: [html] })
+    expect(afterOpen).toBe(unverified)
+    expect(refusal).toMatchObject({ message: 'resource.verifying' })
+    ctx.sidebarRight.openSessionResource(SESSION, pdf, { kind: 'workspace-file' })
+    expect(ctx.sidebarRight.active()?.contentId).toBe(pdf)
+    expect(ctx.sidebarRight.tabsIn(SESSION).map(tab => tab.contentId)).toEqual([html, pdf])
+    ctx.sidebarRight.openResource(html, { kind: 'workspace-file' })
+    expect(ctx.sidebarRight.active()?.contentId).toBe(html)
+    policy.setVerifiedAccountId(2)
+    expect(instance.getSnapshot().bySession).toEqual({})
+    expect(ctx.sidebarRight.openTabs.getSnapshot()).toEqual([])
+    expect(values.size).toBe(1)
+    policy.setVerifiedAccountId(1)
+    expect(ctx.sidebarRight.tabsIn(SESSION).map(tab => tab.contentId)).toEqual([html, pdf])
+    await fiber.dispose()
+  })
+
   it('ends old occurrences when two verified accounts restore the same tab id directly', async () => {
     const { ctx, seat, description, policy, fiber } = await boot()
     description.set({ executionAuthorityRequired: true })

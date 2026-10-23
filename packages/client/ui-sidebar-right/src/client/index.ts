@@ -132,6 +132,8 @@ export function apply(ctx: ClientContext): void {
     const target = parseWorkspaceResourceAddress(address) ?? parseToolAddress(address)
     const owner = target?.sessionId ?? tabs.get(tabs.claim(address).kind)?.resourceSession?.(address)
     if (owner !== sessionId) throw new Error('Sidebar resource does not belong to this Session')
+    if (sessionPersistenceKey(ctx.sessions, sessionId, connection.hostDescription.getSnapshot()?.executionAuthorityRequired,
+      ctx.projectUiPolicy.getSnapshot().verifiedAccountId) === undefined) throw new Error(t('resource.verifying'))
   }
   const layout: ILayout = ctx.layout
   const { controller, adopt, forget, show, measure } = createSidebarRightController(

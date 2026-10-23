@@ -115,6 +115,7 @@
     "tests/subagent-interrupt-ui.e2e.ts",
     "tests/sidebar-subagent-activity.e2e.ts",
     "tests/sidebar-browser.e2e.ts",
+    "tests/sidebar-verification.e2e.ts",
     "tests/tool-details.e2e.ts",
     "tests/workspace-review.e2e.ts",
     "tests/historical-jsonl.e2e.ts",

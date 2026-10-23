@@ -216,6 +216,7 @@ export interface ISidebarRight {
    * because content the user cannot see is not opened.
    * @param address - a `dsh-resource://<type>/…` address.
    * @param options - placement, the opening type, and navigation parameters.
+   * @throws when the resource owner is unverified; no placement is committed.
    */
   openResource(address: string, options?: SidebarRightOpenResourceOptions): void
   /**
@@ -363,6 +364,7 @@ export class SidebarRightController implements ISidebarRight {
    * @param sessionId - exact authorized Session receiving the resource.
    * @param address - resource owned by that Session.
    * @param options - viewer, placement, and navigation parameters.
+   * @throws when the resource owner is unverified; no placement is committed.
    */
   openSessionResource(sessionId: SessionId, address: string, options: SidebarRightOpenResourceOptions = {}): void {
     const actions = this.actionsFor(sessionId)
@@ -377,6 +379,7 @@ export class SidebarRightController implements ISidebarRight {
    * @param sessionId - the session the acting tab is in.
    * @param address - a `dsh-resource://<type>/…` address.
    * @param options - placement, the opening type, and navigation parameters.
+   * @throws when the resource owner is unverified; no placement is committed.
    */
   openResourceIn(sessionId: SessionId, address: string, options: SidebarRightOpenResourceOptions = {}): void {
     const actions = this.actionsFor(sessionId)
