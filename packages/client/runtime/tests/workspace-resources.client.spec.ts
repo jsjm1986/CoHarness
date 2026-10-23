@@ -174,6 +174,53 @@ describe('Workspace resource lifetime', () => {
     release()
   })
 
+  it.each(['subscribe', 'pin'] as const)('revalidates an idle disconnected resource when %s retains it after recovery', async (retention) => {
+    const registry = new WorkspaceResourceRegistry()
+    const stat = vi.fn(async () => value())
+    const dispose = registry.register(base, { stat }, 10)
+    const request = resource()
+    const source = registry.source(request)
+    await source.reload()
+    registry.disconnect(base)
+    registry.connected(base)
+    expect(stat).toHaveBeenCalledTimes(1)
+    expect(source.getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'connection-unavailable' } })
+    const pending = deferred<WorkspaceResourceValue>()
+    stat.mockImplementationOnce(() => pending.promise)
+    const release = retention === 'subscribe' ? source.subscribe(vi.fn()) : registry.pin(request)
+    try {
+      expect(source.getSnapshot()).toMatchObject({ status: 'loading', value: { version: 'v1' } })
+      const settled = source.reload()
+      pending.resolve(value('v2'))
+      await settled
+      expect(stat).toHaveBeenCalledTimes(2)
+      expect(source.getSnapshot()).toMatchObject({ status: 'live', value: { version: 'v2', changed: true } })
+      expect(source.getSnapshot().error).toBeUndefined()
+    } finally {
+      release()
+      dispose()
+    }
+  })
+
+  it.each(['subscribe', 'pin'] as const)('keeps access denial and ordinary failures explicit when %s retains metadata', async (retention) => {
+    for (const failure of [new WorkspaceResourceError('collaboration-forbidden', 'denied'), new Error('read failed')]) {
+      const registry = new WorkspaceResourceRegistry()
+      const stat = vi.fn(async () => { throw failure })
+      const dispose = registry.register(base, { stat }, 10)
+      const request = resource()
+      const source = registry.source(request)
+      await source.reload()
+      const release = retention === 'subscribe' ? source.subscribe(vi.fn()) : registry.pin(request)
+      try {
+        expect(stat).toHaveBeenCalledTimes(1)
+        expect(source.getSnapshot()).toMatchObject({ status: 'failed', error: failure })
+      } finally {
+        release()
+        dispose()
+      }
+    }
+  })
+
   it('evicts idle metadata while old source handles can subscribe again', async () => {
     const registry = new WorkspaceResourceRegistry()
     const stat = vi.fn(async () => value())

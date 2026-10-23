@@ -41,7 +41,8 @@ it.skipIf(MODE === 'record').each([
   const csv = Array.from({ length: 80 }, (_row, row) =>
     Array.from({ length: 8 }, (_column, column) => `R${String(row + 1)}C${String(column + 1)}`).join(',')).join('\n')
   await writeFile(join(scaffold.workspaceCwd, 'continuity.csv'), csv)
-  const source = (await readFile(SEED, 'utf8')).replace('"text":"DONE"', '"text":"[Open CSV](continuity.csv)"')
+  await writeFile(join(scaffold.workspaceCwd, 'readiness.md'), 'Ready after reconnect')
+  const source = (await readFile(SEED, 'utf8')).replace('"text":"DONE"', '"text":"[Open CSV](continuity.csv) [Open readiness](readiness.md)"')
   const sessionId = await seedSession(scaffold, source, `preview-reconnect-${viewport.name}`)
   const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
   await workspace.attachSession(sessionId)
@@ -134,7 +135,7 @@ it.skipIf(MODE === 'record').each([
   expect(byteReadTargets).toEqual(['project:7'])
   await reload.focus()
   let warningStart = tripwire.warnings.length
-  const disconnect = async (): Promise<void> => {
+  const disconnect = async (outageAlert = alert): Promise<void> => {
     const established = socket
     if (established === undefined) throw new Error('Host stream was not established')
     recovery = Promise.withResolvers<undefined>()
@@ -142,7 +143,7 @@ it.skipIf(MODE === 'record').each([
     releaseConnection = () => { recovery?.resolve(undefined) }
     await established.client.close({ code: 1012, reason: 'Fixture workspace outage' })
     await established.server.close({ code: 1012, reason: 'Fixture workspace outage' })
-    await alert.waitFor().catch(async (error: unknown) => {
+    await outageAlert.waitFor().catch(async (error: unknown) => {
       console.info('[preview-continuity-outage-failure]', JSON.stringify({
         viewport, previewCount: await preview.count(), alerts: await target.getByRole('alert').allTextContents(),
         heldDescribe, hostSocketOpens, warnings: tripwire.warnings, errors: tripwire.pageErrors,
@@ -150,15 +151,15 @@ it.skipIf(MODE === 'record').each([
       await saveFailureShot(target, `workspace-preview-reconnect-${viewport.name}`)
       throw error
     })
-    expect(await alert.textContent()).toBe('Workspace connection is reconnecting')
+    expect(await outageAlert.textContent()).toBe('Workspace connection is reconnecting')
     await retryRequested.promise
   }
-  const recover = async (): Promise<void> => {
+  const recover = async (outageAlert = alert): Promise<void> => {
     const pending = recovery
     recovery = undefined
     releaseConnection = undefined
     pending?.resolve(undefined)
-    await alert.waitFor({ state: 'hidden' })
+    await outageAlert.waitFor({ state: 'hidden' })
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     expect(tripwire.warnings).toEqual([])
   }
@@ -232,6 +233,24 @@ it.skipIf(MODE === 'record').each([
     await recover()
     await target.setViewportSize({ width: viewport.width, height: viewport.height })
   }
+  await preview.getByRole('button', { name: labels.close, exact: true }).click()
+  await preview.waitFor({ state: 'hidden' })
+  await target.getByRole('button', { name: 'Open readiness', exact: true }).click()
+  const readiness = target.getByRole('region', { name: 'readiness.md', exact: true })
+  await readiness.getByText('Ready after reconnect', { exact: true }).waitFor()
+  const readinessAlert = readiness.locator(':scope > [role="alert"]')
+  warningStart = tripwire.warnings.length
+  await disconnect(readinessAlert)
+  await recover(readinessAlert)
+  await readiness.getByRole('button', { name: labels.close, exact: true }).click()
+  await readiness.waitFor({ state: 'hidden' })
+  await target.getByRole('button', { name: 'Open CSV', exact: true }).click()
+  await sheet.waitFor()
+  await alert.waitFor({ state: 'hidden' })
+  await expect.poll(() => formula.textContent()).toBe('R1C1')
+  expect(byteReads).toBe(3)
+  await compareOrRefreshGolden(fileURLToPath(new URL(chinese ? 'idle-reopened-zh.expected.md' : 'idle-reopened.expected.md', EXPECTED)),
+    await captureStableAria(target, 'section[aria-label="continuity.csv"] > div:first-child', host.workspaceCwd), MODE)
   // The fixture injects one real wire-level denial; the ordinary reader and UI must discard the body.
   await target.route(/\/api\/workspaceFiles\.stat(?:\?.*)?$/u, async (route) => {
     const response = await route.fetch()
@@ -246,7 +265,7 @@ it.skipIf(MODE === 'record').each([
   await expect.poll(() => sheet.count()).toBe(0)
   expect(await reload.isDisabled()).toBe(true)
   expect(await reload.getAttribute('data-workspace-preview-reconnecting')).toBeNull()
-  expect(byteReadTargets).toEqual(['project:7', 'project:7'])
+  expect(byteReadTargets).toEqual(['project:7', 'project:7', 'project:7'])
   expect(await target.locator('[data-slot-error]').count()).toBe(0)
   expect(tripwire.pageErrors).toEqual([])
   expect(tripwire.warnings).toEqual([])

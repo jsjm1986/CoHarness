@@ -219,7 +219,7 @@ export class WorkspaceResourceRegistry {
         // One registration per subscription, even when two callers pass the same callback.
         const notify = (): void => { listener() }
         record.subscribers.add(notify)
-        if (record.state.status === 'none') void this.reload(key, record)
+        this.loadRetained(key, record)
         let released = false
         return () => {
           if (released) return
@@ -249,7 +249,7 @@ export class WorkspaceResourceRegistry {
     const record = this.retain(key, request.address, source)
     if (record === undefined) return () => {}
     record.pins += 1
-    if (record.state.status === 'none') void this.reload(key, record)
+    this.loadRetained(key, record)
     let released = false
     const release = (): void => {
       if (released) return
@@ -346,6 +346,12 @@ export class WorkspaceResourceRegistry {
     const record: ResourceRecord = { address, source, state: EMPTY, subscribers: new Set(), pins: 0 }
     owner.records.set(address, record)
     return record
+  }
+
+  private loadRetained(key: string, record: ResourceRecord): void {
+    const revalidate = record.state.status === 'failed' && record.state.error instanceof WorkspaceResourceError
+      && record.state.error.code === 'connection-unavailable'
+    if (record.state.status === 'none' || revalidate) void this.reload(key, record, revalidate)
   }
 
   private async reload(key: string, record: ResourceRecord, revalidate = false): Promise<void> {

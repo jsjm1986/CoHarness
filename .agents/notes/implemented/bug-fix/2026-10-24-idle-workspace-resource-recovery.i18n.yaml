@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-idle-workspace-resource-recovery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-idle-workspace-resource-recovery.md
+document:
+  en: 5707b0d92475b6607b61f818ef5942ba1cc7d1b4
+  zh: 6c05240363b883d4c79ac0280ab81ee23278e867
+/agent-note-recover-idle-workspace-metadata-when-a-view-returns:
+  en: bfb935897a654e1c
+  zh: 3dfd12bdec108fa8
+/agent-note-recover-idle-workspace-metadata-when-a-view-returns/problem:
+  en: be789a18c9bf6a84
+  zh: fdb3a1d8d155c72e
+/agent-note-recover-idle-workspace-metadata-when-a-view-returns/decision:
+  en: d033f6f0f1e11cc8
+  zh: b8a4fb6c13f8bab1
+/agent-note-recover-idle-workspace-metadata-when-a-view-returns/alternatives-considered:
+  en: 4fa69eebed22135e
+  zh: e3528bb7533e8d67
+/agent-note-recover-idle-workspace-metadata-when-a-view-returns/consequences:
+  en: 6abfd479e3771bfb
+  zh: cbc691ef7a192817
+/agent-note-recover-idle-workspace-metadata-when-a-view-returns/verification:
+  en: d5c55fde662f02e2
+  zh: 7065dacf8eec4c6d
