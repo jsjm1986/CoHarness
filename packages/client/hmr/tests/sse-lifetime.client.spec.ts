@@ -23,21 +23,12 @@ async function composition() {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   ctx.baseUrl = new URL('./', import.meta.url).href
   await ctx.plugin(Loader).await()
-  const plugins = new Map<string, unknown>([
-    ['fixture-webserver', WebServer],
-    ['fixture-client-modules', ClientModules],
-    ['fixture-hmr', Hmr],
-  ])
-  ctx.loader.internal = {
-    version: 'v2',
-    async import(specifier: string) {
-      if (!plugins.has(specifier)) throw new Error(`unexpected fixture module: ${specifier}`)
-      return plugins.get(specifier)
-    },
-  } as NonNullable<typeof ctx.loader.internal>
-  await ctx.loader.create({ name: 'fixture-webserver', config: { host: '127.0.0.1', port: 0 } })
-  await ctx.loader.create({ name: 'fixture-client-modules' })
-  const id = await ctx.loader.create({ name: 'fixture-hmr', config: { watchArtifacts: false } })
+  ctx.loader.builtins['fixture-webserver'] = WebServer
+  ctx.loader.builtins['fixture-client-modules'] = ClientModules
+  ctx.loader.builtins['fixture-hmr'] = Hmr
+  await ctx.loader.create({ name: 'cordis:fixture-webserver', config: { host: '127.0.0.1', port: 0 } })
+  await ctx.loader.create({ name: 'cordis:fixture-client-modules' })
+  const id = await ctx.loader.create({ name: 'cordis:fixture-hmr', config: { watchArtifacts: false } })
   await ctx.loader.await()
   expect([...ctx.loader.entries()].map(entry => entry.fiber?.state)).toEqual([2, 2, 2])
   const warnings = vi.spyOn(ctx.logger, 'warn')
