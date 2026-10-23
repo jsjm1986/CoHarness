@@ -113,6 +113,91 @@ describe('workspaceFiles RPC', () => {
     expect(limited.truncated).toBe(true)
   })
 
+  it.each([
+    { name: 'terminated final line', chunks: ['first\nsecond\n'], eof: true, consumed: 1 },
+    { name: 'unterminated final line', chunks: ['first\nsecond'], eof: true, consumed: 1 },
+    { name: 'split final newline and empty chunks', chunks: ['first\nsec', '', 'ond', '\n', ''], eof: true, consumed: 5 },
+    { name: 'following line in the same chunk', chunks: ['first\nsecond\nthird\n', 'unread'], eof: false, consumed: 1 },
+    { name: 'following line after empty chunks', chunks: ['first\nsecond\n', '', 'third\n', 'unread'], eof: false, consumed: 3 },
+    { name: 'following empty line', chunks: ['first\nsecond\n', '\n', 'unread'], eof: false, consumed: 2 },
+  ])('reports text-page EOF for $name without including the next line', async ({ chunks, eof, consumed }) => {
+    const { api, ctx, root, session } = await harness({ maxLines: 2 })
+    writeFileSync(join(root, 'lines.txt'), chunks.join(''))
+    let reads = 0
+    const closed = vi.fn()
+    vi.spyOn(ctx.fs, 'streamText').mockImplementation(async () => (async function* () {
+      try {
+        for (const chunk of chunks) { reads += 1; yield chunk }
+      } finally { closed() }
+    })())
+    const page = expectOk(await api.workspaceFiles.read(
+      request({ sessionId: session.id, path: 'lines.txt' }), new AbortController().signal))
+    expect(page).toMatchObject({ offset: 1, limit: 2, eof })
+    expect(page.text).toBe(chunks.join('').endsWith('second') ? 'first\nsecond' : 'first\nsecond\n')
+    expect(reads).toBeLessThanOrEqual(consumed)
+    expect(closed).toHaveBeenCalledOnce()
+  })
+
+  it('reports EOF for an exact terminal text page starting after line one', async () => {
+    const { api, root, session } = await harness({ maxLines: 2 })
+    writeFileSync(join(root, 'lines.txt'), 'first\nsecond\nthird\nfourth\n')
+    const page = expectOk(await api.workspaceFiles.read(
+      request({ sessionId: session.id, path: 'lines.txt', offset: 3 }), new AbortController().signal))
+    expect(page).toMatchObject({ offset: 3, limit: 2, text: 'third\nfourth\n', eof: true })
+  })
+
+  it('does not count or validate the unrequested line used to detect text-page continuation', async () => {
+    const { api, ctx, root, session } = await harness({ maxBytes: 2, maxLines: 1 })
+    writeFileSync(join(root, 'lines.txt'), 'a\n\0outside')
+    vi.spyOn(ctx.fs, 'streamText').mockImplementation(async () => (async function* () {
+      yield 'a\n'
+      yield '\0outside'
+      throw new Error('the remaining unrequested file must not be read')
+    })())
+    const page = expectOk(await api.workspaceFiles.read(
+      request({ sessionId: session.id, path: 'lines.txt' }), new AbortController().signal))
+    expect(page).toMatchObject({ text: 'a\n', limit: 1, eof: false })
+  })
+
+  it('cancels text-page continuation detection and closes the provider iterator', async () => {
+    const { api, ctx, root, session } = await harness({ maxLines: 2 })
+    writeFileSync(join(root, 'lines.txt'), 'first\nsecond\nthird\n')
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const controller = new AbortController()
+    const closed = vi.fn()
+    vi.spyOn(ctx.fs, 'streamText').mockImplementation(async () => (async function* () {
+      try {
+        yield 'first\nsecond\n'
+        entered.resolve(undefined)
+        await release.promise
+        yield 'third\n'
+      } finally { closed() }
+    })())
+    const pending = api.workspaceFiles.read(request({ sessionId: session.id, path: 'lines.txt' }), controller.signal)
+    cleanups.push(async () => { controller.abort(); release.resolve(undefined); await pending })
+    await entered.promise
+    controller.abort()
+    release.resolve(undefined)
+    expect((await pending).result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+    expect(closed).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a version change observed during text-page continuation detection', async () => {
+    const { api, ctx, root, session } = await harness({ maxLines: 2 })
+    const path = join(root, 'lines.txt')
+    writeFileSync(path, 'first\nsecond\nthird\n')
+    const payload = { sessionId: session.id, path: 'lines.txt' }
+    const metadata = expectOk(await api.workspaceFiles.stat(request(payload)))
+    vi.spyOn(ctx.fs, 'streamText').mockImplementation(async () => (async function* () {
+      yield 'first\nsecond\n'
+      writeFileSync(path, 'changed\n')
+      yield 'third\n'
+    })())
+    const result = await api.workspaceFiles.read(request({ ...payload, version: metadata.version }), new AbortController().signal)
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'workspace-file/stale-version' } })
+  })
+
   it('authorizes and reads a project in provider coordinates without resolving its path on the Host', async () => {
     const workspace = '/execution-only/project'
     const { api, ctx, root, session } = await harness({ authority: authority('ro'), workspace })

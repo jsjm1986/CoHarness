@@ -20,7 +20,11 @@ Each base-connection generation reads its Workspace baseline once through the Wo
 
 Workspace navigation shares one merged summary lookup per source snapshot and commits reconciled order accounts in one store action. The resulting persisted preference snapshot is complete; no consumer relies on the intermediate per-account writes. React Activity suspends the hidden ordinary directory's effects while preserving its local viewing state in workbench mode. Hidden content search aborts its request and reads the current query again on return. The [workbench decision](2026-09-08-cordis-multi-session-workbench.md) retains authority over layout and Session ownership.
 
+Workbench account-directory reads follow the viewport's pending saved-layout restoration and the user's chooser opening or explicit retry. Each opening reads a fresh authenticated directory; ordinary Session-header mounts with a closed chooser require no directory request once restoration completes. The viewport owns restoration eligibility, including single-session presentation and legacy identities. Cancellation prevents a closed or unmounted chooser's late response from publishing catalog data or restoring panes.
+
 JSON previews read only the values within their existing item and depth limits. Explicit expansion and copy still access the complete value. Read cards construct rows for the visible slice and defer full plain-text concatenation until copy. File-tree stores retain an unchanged listing by comparing all declared navigation and freshness fields; changed metadata and recovered errors still publish. Display sorting follows each directory's entry identity.
+
+The Host reports text-page continuation only after observing text beyond the requested line window. Stream exhaustion marks a complete final page, including a page ending exactly at the line limit. The preview therefore keeps the final content visible with Next disabled. Version, cancellation, authorization, and selected-page byte checks retain their existing ownership.
 
 ## Alternatives considered
 
@@ -30,10 +34,16 @@ JSON previews read only the values within their existing item and depth limits. 
 
 **Cache by identifier alone.** Identifiers do not encode changed metadata, source versions, timeline boundaries, or owning runtime descriptors. Reuse follows immutable source identities or compares the complete declared listing fields.
 
+**Reuse an account directory indefinitely or omit its restoration read.** The directory verifies the runtime ownership and current access of saved panes. Requests follow restoration demand and explicit chooser use, while each opening receives current account data.
+
+**Infer text-page completion in the preview.** The Host owns line-window and EOF semantics for text previews and accumulated Markdown. A shared stream check keeps those consumers consistent; the byte bound remains a failure rather than a truncation signal.
+
 **Rewrite the startup dependency loader.** The shipped page already preloads the relevant application bundles. A synthetic transport waterfall does not establish a cold-start improvement through that production entry path.
 
 ## Consequences
 
 These changes reduce browser work while preserving model requests, durable Session records, pagination, visible ordering, and result completeness. Full history inspection and explicit expansion still cost work proportional to the requested content. Settlement still reconstructs timeline indexes; it does not make every operation constant-time.
+
+An exact line-window boundary can advance the provider iterator through empty chunks to one additional nonempty chunk or completion. The page loop inspects no unrequested line and never materializes the remaining file.
 
 Owning regressions compare incremental output with replacement, preserve unrelated references, exercise moved and hidden nodes, verify refresh freshness and error recovery, and prove hidden-view cleanup and reactivation. Work-count negative controls reproduce the original repeated work. Browser replay exercises the shipped composition with synthetic long history, real input during output, navigation, JSON expansion, and file refresh. Component work counts and local loopback timings are distinct evidence; neither establishes public-tunnel latency or model-provider response time.

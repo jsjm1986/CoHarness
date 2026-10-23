@@ -31,6 +31,7 @@ export interface WorkspaceFileTextPage {
   offset: number
   limit: number
   text: string
+  /** True when no text follows this page, including an exact line-limit boundary. */
   eof: boolean
   version: string
 }

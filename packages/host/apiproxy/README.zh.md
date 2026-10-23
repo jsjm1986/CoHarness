@@ -11,6 +11,8 @@ kind: "package-reference"
 
 `workspaceFiles.*` 在 Session 授权、canonical containment、符号链接检查和已组合的 `workspace-files/authorize` 目录策略通过后，读取 Session 相对文件。冷读取只加载 header。Host 在返回相对元数据、UTF-8 文本页或 Base64 窗口前复核文件身份与权限；可选版本保护拒绝混合版本分页。`host.describe.workspaceFiles` 声明支持情况与配置上限：默认每页／窗口 2 MiB、5,000 行、2,000 个目录项和 512 条 Client 元数据记录。Agent 工具继续拥有写入、CAS 与审计语义。
 
+文本页的偏移量和上限均按行计数。最后一页即使恰好达到行数上限，也会报告 `eof: true`。行窗口填满后检查已缓冲文本，或推进提供方迭代器，直到遇到下一个非空分块或结束；分页循环既不追加也不扫描下一行。所选页超过字节上限时仍会拒绝，而不是截断。
+
 `workspaceFiles.renderOffice` 复用文件域的授权、相对路径及版本检查。内容权限探测在查询转换缓存前执行；队列准入后进行有界字节窗口读取，返回前再次核验源文件和权限。结果包含 PDF、缺失字体及转换代次，不暴露 Host 路径或引擎诊断。转换限制由 [Office 提供方](../../document/office-to-pdf/README.zh.md)负责。
 
 现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。

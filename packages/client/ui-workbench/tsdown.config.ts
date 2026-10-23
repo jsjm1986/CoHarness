@@ -22,7 +22,7 @@ function excelLicenseBanner(): string {
   const xlsRoot = dirname(require.resolve('xlsx'))
   const xls = readdirSync(xlsRoot).filter(name => /^(LICENSE|NOTICE)(\.|$)/u.test(name)).sort()
     .map(name => readFileSync(join(xlsRoot, name), 'utf8')).join('\n')
-  return ['//! Bundled spreadsheet license notices', ...`${fortune}\n${excel}\n${xml}\n${csv}\n${zip}\n${xls}`.trimEnd().split('\n').map(line => `// ${line}`)].join('\n')
+  return ['//! Bundled spreadsheet license notices', ...`${fortune}\n${excel}\n${xml}\n${csv}\n${zip}\n${xls}`.trimEnd().split('\n').map(line => `//! ${line}`)].join('\n')
 }
 
 /** License files for PDF.js and the data embedded beside its runtime. */
@@ -39,7 +39,7 @@ function pdfLicenseBanner(): string {
   const notice = pdfLicenseFiles(root).map(name =>
     `${name}\n\n${readFileSync(join(root, name), 'utf8').trimEnd()}`,
   ).join('\n\n')
-  return ['//! Bundled PDF.js license notices', ...notice.split('\n').map(line => `// ${line}`)].join('\n')
+  return ['//! Bundled PDF.js license notices', ...notice.split('\n').map(line => `//! ${line}`)].join('\n')
 }
 
 /** Preserve every same-version resource in its data-only lazy group. */

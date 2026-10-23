@@ -36,11 +36,13 @@ function props() {
   const policy = createSnapshotStore<ProjectUiPolicySnapshot>({
     scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'standard',
   })
+  const catalogRestore = createSnapshotStore(true)
   return {
-    sessionsStore: sessions, workspacesStore: workspaces,
+    sessionsStore: sessions, workspacesStore: workspaces, catalogRestoreStore: catalogRestore,
     useStore: bindSnapshotSelector(store), actions: store.actions,
     useSessions: bindSnapshotSelector(sessions), useWorkspaces: bindSnapshotSelector(workspaces),
     useProjectPolicy: bindSnapshotSelector(policy),
+    useCatalogRestore: bindSnapshotSelector(catalogRestore),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
   }
 }
@@ -217,6 +219,93 @@ describe('workbench account targets and asynchronous chooser', () => {
     return { ...p, ...actions, view }
   }
 
+  it('opens ordinary Sessions A, B, A without reading the account catalog after layout restoration', () => {
+    const fetcher = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', fetcher)
+    const p = props()
+    p.catalogRestoreStore.set(false)
+    for (const current of [SID_A, SID_B, SID_A]) {
+      p.sessionsStore.set({ ...p.sessionsStore.getSnapshot(), current })
+      const view = render(<WorkbenchToolbar {...p} inline t={t} tabbed={false}
+        viewport={{ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }}
+        chooseSession={vi.fn()} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} />)
+      expect(screen.getByRole('button', { name: '选择工作台' })).toBeTruthy()
+      view.unmount()
+    }
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('reads a saved layout when its owner requests restoration and stops when that restoration completes', async () => {
+    const pending = Promise.withResolvers<Response>()
+    const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
+    vi.stubGlobal('fetch', fetcher)
+    const required = createSnapshotStore(false)
+    const hydrateCatalog = vi.fn(async () => { required.set(false) })
+    toolbar({ useCatalogRestore: bindSnapshotSelector(required), hydrateCatalog,
+      viewport: { mode: 'single', paneIds: [SID_A], paneRatios: [1], collapsedIds: [] } })
+    expect(fetcher).not.toHaveBeenCalled()
+    act(() => { required.set(true) })
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect(hydrateCatalog).not.toHaveBeenCalled()
+    await act(async () => { pending.resolve(new Response(JSON.stringify(directory))); await pending.promise })
+    await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledWith(expect.any(Object), [SID_A]) })
+    expect(fetcher).toHaveBeenCalledOnce()
+  })
+
+  it('reads fresh choices on each open and does not read when the picker closes', async () => {
+    let reads = 0
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify({
+      ...directory, items: [{ ...directory.items[0], title: `Catalog round ${String(++reads)}` }],
+    })))
+    vi.stubGlobal('fetch', fetcher)
+    toolbar({ useCatalogRestore: bindSnapshotSelector(createSnapshotStore(false)) })
+    expect(fetcher).not.toHaveBeenCalled()
+    for (const round of [1, 2]) {
+      fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+      await screen.findByRole('button', { name: `Catalog round ${String(round)}` })
+      expect(fetcher).toHaveBeenCalledTimes(round)
+      if (round === 2) expect(screen.queryByRole('button', { name: 'Catalog round 1' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: '关闭选择器' }))
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(fetcher).toHaveBeenCalledTimes(round)
+    }
+  })
+
+  it('discards a closed picker response and reads again on reopening', async () => {
+    const pending = Promise.withResolvers<Response>()
+    const fetcher = vi.fn<typeof fetch>().mockReturnValueOnce(pending.promise)
+      .mockImplementation(async () => new Response(JSON.stringify({
+        ...directory, items: [{ ...directory.items[0], title: 'Fresh choice' }],
+      })))
+    vi.stubGlobal('fetch', fetcher)
+    toolbar({ useCatalogRestore: bindSnapshotSelector(createSnapshotStore(false)) })
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    expect(fetcher).toHaveBeenCalledOnce()
+    const signal = fetcher.mock.calls[0]?.[1]?.signal
+    fireEvent.click(screen.getByRole('button', { name: '关闭选择器' }))
+    expect(signal?.aborted).toBe(true)
+    await act(async () => { pending.resolve(new Response(JSON.stringify(directory))); await pending.promise })
+    expect(fetcher).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await screen.findByRole('button', { name: 'Fresh choice' })
+    expect(screen.queryByRole('button', { name: 'Project conversation' })).toBeNull()
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  it('honors an explicit directory retry after automatic restoration demand clears', async () => {
+    serve()
+    const required = createSnapshotStore(false)
+    toolbar({ useCatalogRestore: bindSnapshotSelector(required),
+      viewport: { mode: 'workbench', pendingIdentity: true, paneIds: [], paneRatios: [], collapsedIds: [] } })
+    expect(fetch).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '重新读取目录' }))
+    await waitFor(() => { expect(fetch).toHaveBeenCalledOnce() })
+    act(() => { required.set(true) })
+    await waitFor(() => { expect(fetch).toHaveBeenCalledTimes(2) })
+    act(() => { required.set(false) })
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps the layout menu open when the same root controls move from the Hero to the session header', () => {
     const p = props()
     const switchWorkbench = vi.fn()
@@ -324,10 +413,12 @@ describe('workbench account targets and asynchronous chooser', () => {
 
   it('ignores catalog completion after unmount and reports a failed catalog separately', async () => {
     const pending = Promise.withResolvers<Response>()
-    vi.stubGlobal('fetch', vi.fn(() => pending.promise))
+    const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
+    vi.stubGlobal('fetch', fetcher)
     const hydrateCatalog = vi.fn(async () => {})
     const first = toolbar({ hydrateCatalog })
     first.view.unmount()
+    expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
     await act(async () => { pending.resolve(new Response(JSON.stringify(directory))) })
     expect(hydrateCatalog).not.toHaveBeenCalled()
     const ready = vi.fn()

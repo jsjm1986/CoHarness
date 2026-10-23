@@ -85,6 +85,21 @@ describe('WorkspaceFilePreview', () => {
     expect(read).toHaveBeenCalledWith(expect.objectContaining({ offset: 1, version: 'v2' }), expect.any(AbortSignal))
   })
 
+  it('keeps the last line reachable and disables Next for a complete 5000-line page', async () => {
+    const lines = Array.from({ length: 5000 }, (_unused, index) =>
+      index === 4999 ? 'Line05000 SYNTHETIC_LONG_END' : `Line${String(index + 1).padStart(5, '0')} synthetic text`)
+    const text = `${lines.join('\n')}\n`
+    const read = vi.fn(async () => ({ path: request.path, offset: 1, limit: 5000, text, eof: true, version: 'v1' }))
+    const view = renderPreview(read)
+    await waitFor(() => { expect(view.container.querySelector('[data-workspace-file-preview]')?.textContent).toContain('SYNTHETIC_LONG_END') })
+    expect(view.container.querySelector('[data-workspace-file-preview]')?.textContent?.startsWith('Line00001')).toBe(true)
+    const next = view.getByRole('button', { name: 'Next' }) as HTMLButtonElement
+    expect(next.disabled).toBe(true)
+    expect((view.getByRole('button', { name: 'Previous' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(next)
+    expect(read).toHaveBeenCalledOnce()
+  })
+
   it('marks an observation stale without replacing visible text', async () => {
     const read = vi.fn(async ({ version }: { version: string }) => ({
       path: request.path, offset: 1, limit: 2, text: version, eof: true, version,

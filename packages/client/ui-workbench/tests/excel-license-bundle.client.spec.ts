@@ -45,10 +45,10 @@ describe('published spreadsheet licenses', () => {
       expect(packed.files.map(entry => entry.path)).not.toContain('lib/client.LazyExcelBody.js')
       const client = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.js'], packageRoot, task.timeout)
       const excel = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.excel.js'], packageRoot, task.timeout)
-      expect([...client.matchAll(/require\.async\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]))
+      expect([...client.matchAll(/require\.async\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]))
         .toEqual(expect.arrayContaining(['./client.pdf.js', './client.excel.js']))
-      expect(client).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
-      expect(excel).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
+      expect(client).not.toMatch(/\brequire\((["'`])\.\/client[^"'`/]*\.js\1\)/u)
+      expect(excel).not.toMatch(/\brequire\((["'`])\.\/client[^"'`/]*\.js\1\)/u)
       expect(client).not.toContain('FortuneSheet')
       expect(excel).toContain('//! Bundled spreadsheet license notices')
       expect(excel).toContain('Copyright (c) 2022 Suzhou Ruilisi Technology Co., Ltd')
@@ -56,7 +56,7 @@ describe('published spreadsheet licenses', () => {
       for (const dependency of ['xlsx', 'papaparse']) {
         const root = dirname(require.resolve(dependency === 'xlsx' ? dependency : `${dependency}/package.json`))
         const license = readFileSync(join(root, 'LICENSE'), 'utf8').trimEnd()
-        expect(excel).toContain(license.split('\n').map(line => `// ${line}`).join('\n'))
+        expect(excel).toContain(license.split('\n').map(line => `//! ${line}`).join('\n'))
       }
       let initialized = false
       runInNewContext(excel, { window: { __ModuleLoader__: { load: (registration: {

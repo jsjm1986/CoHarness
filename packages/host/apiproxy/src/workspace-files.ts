@@ -321,6 +321,8 @@ export function createWorkspaceFilesApi(ctx: Context, options: ReadOptions): Wor
         abort.throwIfAborted()
         let start = 0
         while (start < chunk.length) {
+          // Only text after the requested lines proves another page exists.
+          if (line - offset >= limit) { eof = false; break outer }
           const newline = chunk.indexOf('\n', start)
           const end = newline < 0 ? chunk.length : newline + 1
           if (line >= offset) {
@@ -332,7 +334,6 @@ export function createWorkspaceFilesApi(ctx: Context, options: ReadOptions): Wor
           }
           start = end
           if (newline >= 0) line += 1
-          if (line - offset >= limit) { eof = false; break outer }
         }
       }
       return { path: file.path, offset, limit, text: parts.join(''), eof, version: wireVersion(file.info.version) }

@@ -64,12 +64,12 @@ describe('published PDF.js licenses', () => {
 
       const client = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.js'], packageRoot, task.timeout)
       const pdf = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.pdf.js'], packageRoot, task.timeout)
-      expect([...client.matchAll(/require\.async\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]).sort())
+      expect([...client.matchAll(/require\.async\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]).sort())
         .toEqual(['./client.excel.js', './client.frontmatter-fields.js', './client.pdf.js'])
-      expect(client).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
-      expect([...pdf.matchAll(/require\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]))
+      expect(client).not.toMatch(/\brequire\((["'`])\.\/client[^"'`/]*\.js\1\)/u)
+      expect([...pdf.matchAll(/require\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]))
         .toEqual([])
-      expect([...pdf.matchAll(/require\.async\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]).sort())
+      expect([...pdf.matchAll(/require\.async\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]).sort())
         .toEqual(resourceGroups.map(group => `./${group.file}`).sort())
       expect(client).not.toContain('//! Bundled PDF.js license notices')
       expect(client).not.toContain('/pdfjs-dist/')
@@ -77,7 +77,7 @@ describe('published PDF.js licenses', () => {
       const pdfRoot = dirname(require.resolve('pdfjs-dist/package.json'))
       for (const name of licenseNames) {
         const source = readFileSync(join(pdfRoot, name), 'utf8').trimEnd()
-        const commented = [`// ${name}`, '// ', ...source.split('\n').map(line => `// ${line}`)].join('\n')
+        const commented = [`//! ${name}`, '//! ', ...source.split('\n').map(line => `//! ${line}`)].join('\n')
         expect(pdf, `${name} must be visible in package/lib/client.pdf.js`).toContain(commented)
       }
       for (const group of resourceGroups) {

@@ -18,6 +18,8 @@ HTML asset batches derive their width from the existing per-asset and total-byte
 
 The spreadsheet import points directly to the licensed renderer/parser chunk. Its small loading surface belongs to the main bundle; a separate forwarding chunk performs no independent work and adds a request dependency. The [spreadsheet preview decision](../feature/2026-10-01-workbench-spreadsheet-preview.md) continues to own parser fidelity, limits, and read-only presentation.
 
+Embedded PDF and spreadsheet notices use preservation-marked line comments. Ordinary comments can be discarded during code compaction; marking only a heading leaves the notice body unprotected. The published lazy chunks retain complete notice text.
+
 ## Alternatives considered
 
 **Import only after content completes.** This avoids downloading viewer code for a failed read, but serializes independent work on every cold document open. Starting a Worker or executing document bytes early remains excluded: code preparation does not authorize content.

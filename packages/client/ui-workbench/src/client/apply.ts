@@ -5,7 +5,7 @@ import type { ClientContext, ConversationViewport, ProjectUiPolicySnapshot, Sess
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { WorkbenchCatalog } from './catalog.ts'
@@ -70,6 +70,11 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle | undefined
   const config = Config((globalThis as { __DSH_WORKBENCH_CONFIG__?: unknown }).__DSH_WORKBENCH_CONFIG__ ?? {})
   const chooser = createWorkbenchStore()
+  const catalogRestore: HostObservable<boolean> = {
+    // Viewport providers without restoration demand retain eager validation.
+    getSnapshot: () => (viewport as WorkbenchViewport).needsCatalogRestore?.() ?? true,
+    subscribe: listener => viewport.snapshot.subscribe(listener),
+  }
   const lifetime = new AbortController()
   let disposed = false
   const isDisposed = (): boolean => disposed
@@ -208,6 +213,7 @@ export function apply(ctx: ClientContext): void {
     inject: () => {
       const wb = viewport as WorkbenchViewport
       return {
+        hooks: { catalogRestore },
         listWorkbenches: () => wb.listWorkbenches?.() ?? [],
         currentWorkbench: () => wb.currentWorkbench?.(),
         createWorkbench: (name: string) => wb.createWorkbench?.(name) ?? '',

@@ -1,7 +1,7 @@
 import { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 /** Workbench controls, Workspace/session chooser, and compact pane tabs. */
-import { useEffect, useState } from 'react'
-import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import { useEffect, useRef, useState } from 'react'
+import type { HostObservable, InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconFolderOpenOutline16, IconLogoutOutline16,
   IconPlusOutline16, IconSplitPanesOutline16, IconTrashOutline16, IconWarningOutline16, Menu, Modal, relativeTime, StateDot,
@@ -15,6 +15,11 @@ import { loadWorkbenchCatalog, type WorkbenchCatalog, type WorkbenchConversation
 import { ScopeTile } from './ScopeTile.tsx'
 import css from './Workbench.module.css'
 import { WorkspaceFileBrowser, type ListWorkspaceDirectory, type OpenWorkspaceResource } from './WorkspaceFileBrowser.tsx'
+
+/** Viewport-owned demand for authenticated saved-layout restoration. */
+export interface WorkbenchToolbarInjected {
+  hooks: { catalogRestore: HostObservable<boolean> }
+}
 
 interface Actions {
   listWorkbenches?: () => readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
@@ -38,7 +43,7 @@ interface Actions {
   openFiles?: (() => void) | undefined
 }
 type Props = PropsRuntime<'conversation.workbench.toolbar'> & PropsLocale<typeof NS>
-  & PropsStore<ReturnType<typeof createWorkbenchStore>> & Actions
+  & PropsStore<ReturnType<typeof createWorkbenchStore>> & Actions & InjectFace<WorkbenchToolbarInjected>
 
 function conversationDisplayName(item: WorkbenchConversation, untitled: string): string {
   const title = item.title?.trim()
@@ -54,7 +59,7 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
  * @returns the toolbar and its controlled picker dialog.
  */
 export function WorkbenchToolbar({
-  viewport, tabbed, inline = false, layout, onSelectLayout, useStore, actions, useSessions, useWorkspaces,
+  viewport, tabbed, inline = false, layout, onSelectLayout, useStore, actions, useSessions, useWorkspaces, useCatalogRestore,
   chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
@@ -63,6 +68,8 @@ export function WorkbenchToolbar({
   const { pickerOpen, replace, browser, workbenchMenuOpen } = useStore(state => state)
   const sessions = useSessions(s => s)
   const workspaces = useWorkspaces(s => s)
+  const restoreCatalog = useCatalogRestore(required => required)
+  const catalogRequired = pickerOpen || restoreCatalog
   const [query, setQuery] = useState('')
   const [workspace, setWorkspace] = useState('')
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
@@ -78,16 +85,20 @@ export function WorkbenchToolbar({
   const [workbenchName, setWorkbenchName] = useState('')
   const [catalog, setCatalog] = useState<WorkbenchCatalog | undefined>()
   const [catalogAttempt, setCatalogAttempt] = useState(0)
+  const handledCatalogAttempt = useRef(0)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | undefined>()
   useEffect(() => {
+    const retry = catalogAttempt !== handledCatalogAttempt.current
+    handledCatalogAttempt.current = catalogAttempt
+    if (!catalogRequired && !retry) return
     const abort = new AbortController()
     void loadWorkbenchCatalog(abort.signal).then((next) => {
       if (abort.signal.aborted) return
       setCatalog(next)
     }, () => { if (!abort.signal.aborted) catalogUnavailable?.() })
     return () => { abort.abort() }
-  }, [pickerOpen, catalogAttempt])
+  }, [pickerOpen, catalogRequired, catalogAttempt])
   const restoredPanes = JSON.stringify(viewport.paneIds)
   useEffect(() => {
     if (catalog === undefined || hydrateCatalog === undefined) return

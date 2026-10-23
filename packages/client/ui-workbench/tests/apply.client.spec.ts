@@ -12,6 +12,7 @@ import { createWorkspacePreviewReaders } from '../src/client/preview-readers.ts'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { Config, apply as nodeApply } from '../src/index.ts'
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
+import type { WorkbenchToolbarInjected } from '../src/client/components/WorkbenchToolbar.tsx'
 
 const A = 'a' as SessionId
 const item: WorkbenchConversation = { sessionId: A, runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }
@@ -90,7 +91,7 @@ async function harness(services: HarnessServices = {}) {
     'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
   } } as never, () => null)
   const fiber = await ctx.plugin({ inject, apply }).await()
-  const actions = (slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => {
+  const actions = (slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => WorkbenchToolbarInjected & {
     chooseSession(item: WorkbenchConversation, replace: boolean): Promise<unknown>
     createSession(target: WorkbenchConversation['runtime'], replace: boolean): Promise<unknown>
     hydrateCatalog(catalog: WorkbenchCatalog, ids: SessionId[]): Promise<void>
@@ -118,6 +119,27 @@ async function harness(services: HarnessServices = {}) {
 }
 
 describe('workbench navigation lifecycle', () => {
+  it('reads catalog restoration demand from the viewport owner and keeps its hook source stable', async () => {
+    const h = await harness()
+    try {
+      const source = h.actions.hooks.catalogRestore
+      expect(source.getSnapshot()).toBe(true)
+      const needsCatalogRestore = vi.fn(() => false)
+      Object.assign(h.viewport, { needsCatalogRestore })
+      expect(source.getSnapshot()).toBe(false)
+      const changed = vi.fn()
+      const stop = source.subscribe(changed)
+      try {
+        needsCatalogRestore.mockReturnValue(true)
+        h.snapshot.set({ ...h.snapshot.getSnapshot(), pendingIdentity: true })
+        expect(changed).toHaveBeenCalledOnce()
+        expect(source.getSnapshot()).toBe(true)
+        const injected = (h.slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => WorkbenchToolbarInjected)()
+        expect(injected.hooks.catalogRestore).toBe(source)
+      } finally { stop() }
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
   it('rejects missing viewport configuration at application', () => {
     expect(() => { apply(new Context()) }).toThrow('requires the conversation viewport')
   })
