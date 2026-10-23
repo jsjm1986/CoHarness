@@ -7,12 +7,14 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-office-to-pdf'
 import { realOfficeBytes } from './office-fixture.ts'
+import { pdfResourceFixture } from '../../../packages/client/ui-workbench/tests/pdf-resource-fixture.ts'
 import { launchWebScaffold, seedSession, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
 import { expectPdfResolution, hideDocumentZoom, newEnglishPage, revealDocumentZoom, saveFailureShot } from './support.ts'
 
 const FORMATS = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'] as const
 // Workbooks take the read-only browser-parsed sheet surface, not Office→PDF.
 const SPREADSHEETS: ReadonlySet<string> = new Set(['xlsx', 'xls'])
+const PDF_RESOURCES = ['vector', 'standard', 'cjk', 'jpx', 'jbig2'] as const
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const GOLDEN = fileURLToPath(new URL('./snapshots/workspace-office/pdf.expected.md', import.meta.url))
 
@@ -20,21 +22,60 @@ describe('web e2e: authorized Office preview', () => {
   let scaffold: WebScaffold | undefined
   let browser: Browser | undefined
   let page: Page
+  const resourceRequests: string[] = []
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ workbench: true })
     expect(scaffold.ctx.get('officeToPdf')).toBeDefined()
     for (const extension of FORMATS) await writeFile(join(scaffold.workspaceCwd, `preview.${extension}`), realOfficeBytes(extension))
+    for (const kind of PDF_RESOURCES) await writeFile(join(scaffold.workspaceCwd, `resource-${kind}.pdf`), pdfResourceFixture(kind))
     await writeFile(join(scaffold.workspaceCwd, 'broken.docx'), 'This is not an Office archive.')
-    const links = [...FORMATS.map(extension => `[Preview ${extension}](preview.${extension})`), '[Broken document](broken.docx)'].join('\n\n')
+    const links = [
+      ...FORMATS.map(extension => `[Preview ${extension}](preview.${extension})`),
+      ...PDF_RESOURCES.map(kind => `[Resource ${kind}](resource-${kind}.pdf)`), '[Broken document](broken.docx)',
+    ].join('\n\n')
     const source = (await readFile(SEED, 'utf8')).replace('"text":"DONE"', `"text":${JSON.stringify(links)}`)
     const history = await seedSession(scaffold, source, 'workspace-office-history')
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
     await workspace.attachSession(history)
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
+    page.on('request', (request) => {
+      const path = new URL(request.url()).pathname
+      if (/\/client\.(?:cmaps|fonts|wasm)\.js$/u.test(path)) resourceRequests.push(path)
+    })
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   }, 120_000)
   afterAll(async () => { try { await browser?.close() } finally { await scaffold?.close() } })
+
+  it('loads binary groups only for real PDFs that need them and reuses the loaded decoder group', async () => {
+    const tripwire = watchConsole(page)
+    for (const kind of PDF_RESOURCES) {
+      await page.getByRole('button', { name: `Resource ${kind}`, exact: true }).click()
+      const preview = page.getByRole('region', { name: `resource-${kind}.pdf`, exact: true })
+      const canvas = preview.locator('canvas').first()
+      await canvas.waitFor({ state: 'visible' })
+      await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) => element.width)).toBeGreaterThan(0)
+      await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) => {
+        const context = element.getContext('2d')!
+        const data = context.getImageData(0, 0, element.width, element.height).data
+        return data.some((value, index) => index % 4 === 3 && value > 200
+          && (data[index - 3]! < 200 || data[index - 2]! < 200 || data[index - 1]! < 200))
+      })).toBe(true)
+      if (kind === 'vector') expect(resourceRequests).toEqual([])
+      if (kind === 'standard') expect(resourceRequests.filter(path => path.endsWith('/client.fonts.js'))).toHaveLength(1)
+      if (kind === 'cjk') {
+        await preview.locator('[data-pdf-text]').getByText('日本語', { exact: false }).waitFor()
+        expect(resourceRequests.filter(path => path.endsWith('/client.cmaps.js'))).toHaveLength(1)
+      }
+      if (kind === 'jpx' || kind === 'jbig2') {
+        expect(resourceRequests.filter(path => path.endsWith('/client.wasm.js'))).toHaveLength(1)
+      }
+      await preview.getByRole('button', { name: 'Close preview', exact: true }).click()
+      await expect.poll(() => preview.count()).toBe(0)
+    }
+    expect(resourceRequests).toHaveLength(3)
+    expect(tripwire.pageErrors).toEqual([])
+  })
 
   it.each(FORMATS)('previews %s with the installed surface and selectable content', async (extension) => {
     if (scaffold === undefined) throw new Error('Web scaffold is unavailable')

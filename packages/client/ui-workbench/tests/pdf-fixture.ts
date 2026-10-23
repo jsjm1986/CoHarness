@@ -20,7 +20,8 @@ export function pdfFixture(userUnit = 1, rotation = 0): Uint8Array {
   return pdfObjects(objects)
 }
 
-function pdfObjects(objects: readonly string[]): Uint8Array {
+/** @param objects - ASCII PDF objects with explicit references. @returns complete bytes with deterministic offsets. */
+export function pdfObjects(objects: readonly string[]): Uint8Array {
   let text = '%PDF-1.7\n'
   const offsets = [0]
   objects.forEach((object, index) => {

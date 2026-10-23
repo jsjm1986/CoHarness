@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-bounded-preview-preparation.md
 document:
-  en: 774d5fb885d84261e0b3f8651a4417c183951dd1
-  zh: 83cfd6f18c82255c5f6acf3340d551718194105b
+  en: c3e51e469f07e6b3279820f153e73d7bb1b4de10
+  zh: 758153a4ef6cacc8de327ea7e9126ae7de1478d6
 /agent-note-bounded-workspace-preview-preparation:
   en: b6157af3336ff35d
   zh: 0ff5fd470c67c7ae
@@ -12,14 +12,14 @@ document:
   en: 3fe6fb80ebf090e1
   zh: ed54d07ffd46380a
 /agent-note-bounded-workspace-preview-preparation/decision:
-  en: 4d9bb80672af16c2
-  zh: 0a3aea83f94e8fce
+  en: 5cfbc5abcac250bf
+  zh: 8a9d0c780798d741
 /agent-note-bounded-workspace-preview-preparation/alternatives-considered:
-  en: 768a13415f43da84
-  zh: 6bf1b20b5e02d805
+  en: 697dc402be11a299
+  zh: 228f2eb36f6f7d37
 /agent-note-bounded-workspace-preview-preparation/verification:
-  en: 95048923f0ad2b0d
-  zh: 2ad2f648a8985aa5
+  en: a6b869b7917bf7b2
+  zh: 2d3cb057725f0d11
 /agent-note-bounded-workspace-preview-preparation/consequences:
   en: c0ef48674e601011
   zh: 305ff9f472baeabc

@@ -67,7 +67,7 @@ export function openPdf(data: Uint8Array<ArrayBuffer>, signal: AbortSignal, repo
 
   const initialize = async () => {
     stopped.throwIfAborted()
-    const BinaryDataFactory = createPdfBinaryDataFactory()
+    const BinaryDataFactory = createPdfBinaryDataFactory(stopped)
     const bytes = data.slice()
     url = URL.createObjectURL(new Blob([
       workerSource,

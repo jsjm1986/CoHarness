@@ -382,6 +382,12 @@ it('publishes the Workbench viewer chunks while rejecting unrestricted and unuse
   expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
   expect(expectedDshPackageFiles(manifest)).toContain('lib/client.pdf.js')
   expect(expectedDshPackageFiles(manifest)).toContain('lib/client.excel.js')
+  for (const kind of ['cmaps', 'fonts', 'wasm']) {
+    expect(expectedDshPackageFiles(manifest)).toContain(`lib/client.${kind}.js`)
+    expect(checkWorkspaceManifest({ dir, manifest: {
+      ...manifest, files: manifest.files!.filter(file => file !== `lib/client.${kind}.js`),
+    } })).toContainEqual(expect.stringContaining('package.json files must be'))
+  }
   expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: [...manifest.files!, 'lib/client.LazyExcelBody.js'] } }))
     .toContainEqual(expect.stringContaining('package.json files must be'))
   expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.map(file => file === 'lib/client.pdf.js' ? 'lib/client.*.js' : file) } }))

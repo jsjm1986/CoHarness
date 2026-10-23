@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 const packageRoot = resolve(import.meta.dirname, '..')
@@ -21,6 +22,12 @@ const licenseNames = [
   'wasm/LICENSE_PDFJS_QCMS',
   'wasm/LICENSE_QCMS',
 ] as const
+const resourceGroups = [
+  { file: 'client.cmaps.js', field: 'cMaps', dir: 'cmaps' },
+  { file: 'client.fonts.js', field: 'fonts', dir: 'standard_fonts' },
+  { file: 'client.wasm.js', field: 'wasm', dir: 'wasm' },
+] as const
+type ResourceModule = Record<string, Readonly<Record<string, string>>>
 
 function run(command: string, args: string[], cwd: string, timeout: number): string {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout })
@@ -51,6 +58,7 @@ describe('published PDF.js licenses', () => {
       ], packageRoot, task.timeout)) as { filename: string; files: { path: string }[] }
       expect(packed.files.map(file => file.path)).toContain('lib/client.js')
       expect(packed.files.map(file => file.path)).toContain('lib/client.pdf.js')
+      for (const group of resourceGroups) expect(packed.files.map(file => file.path)).toContain(`lib/${group.file}`)
       expect(packed.files.map(file => file.path)).toContain('lib/client.frontmatter-fields.js')
       expect(packed.files.some(file => file.path.endsWith('pdfjs-NOTICES.txt'))).toBe(false)
 
@@ -61,6 +69,8 @@ describe('published PDF.js licenses', () => {
       expect(client).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
       expect([...pdf.matchAll(/require\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]))
         .toEqual([])
+      expect([...pdf.matchAll(/require\.async\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]).sort())
+        .toEqual(resourceGroups.map(group => `./${group.file}`).sort())
       expect(client).not.toContain('//! Bundled PDF.js license notices')
       expect(client).not.toContain('/pdfjs-dist/')
       expect(pdf).toContain('//! Bundled PDF.js license notices')
@@ -69,6 +79,24 @@ describe('published PDF.js licenses', () => {
         const source = readFileSync(join(pdfRoot, name), 'utf8').trimEnd()
         const commented = [`// ${name}`, '// ', ...source.split('\n').map(line => `// ${line}`)].join('\n')
         expect(pdf, `${name} must be visible in package/lib/client.pdf.js`).toContain(commented)
+      }
+      for (const group of resourceGroups) {
+        const source = run('tar', ['-xOf', resolve(packageRoot, packed.filename), `package/lib/${group.file}`], packageRoot, task.timeout)
+        expect(source).not.toMatch(/\brequire(?:\.async)?\(/u)
+        const registrations: Array<{ factory: (require: (specifier: string) => never) => ResourceModule }> = []
+        runInNewContext(source, { window: { __ModuleLoader__: {
+          load(value: (typeof registrations)[number]) { registrations.push(value) },
+        } } })
+        expect(registrations).toHaveLength(1)
+        const registered = registrations[0]!
+        const data = registered.factory((specifier) => { throw new Error(`Data-only chunk imported ${specifier}`) })[group.field]!
+        const names = readdirSync(join(pdfRoot, group.dir)).filter(name => !name.startsWith('LICENSE')).sort()
+        expect(Object.keys(data).sort()).toEqual(names)
+        for (const name of names) {
+          const bytes = readFileSync(join(pdfRoot, group.dir, name))
+          expect(Buffer.from(data[name]!, 'base64').equals(bytes), `${group.dir}/${name} bytes`).toBe(true)
+          expect(pdf.includes(bytes.toString('base64')), `${group.dir}/${name} must stay outside the core viewer`).toBe(false)
+        }
       }
     } finally {
       rmSync(output, { recursive: true, force: true })

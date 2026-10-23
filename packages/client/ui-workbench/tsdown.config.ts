@@ -42,15 +42,13 @@ function pdfLicenseBanner(): string {
   return ['//! Bundled PDF.js license notices', ...notice.split('\n').map(line => `// ${line}`)].join('\n')
 }
 
-/** Keep font mappings and image decoders in the same artifact as their PDF.js runtime. */
-function pdfAssets(): string {
+/** Preserve every same-version resource in its data-only lazy group. */
+function pdfAssets(directory: 'cmaps' | 'standard_fonts' | 'wasm'): string {
   const root = dirname(require.resolve('pdfjs-dist/package.json'))
-  return JSON.stringify(Object.fromEntries([
-    ['cMapUrl', 'cmaps'], ['standardFontDataUrl', 'standard_fonts'], ['wasmUrl', 'wasm'],
-  ].map(([kind, directory]) => [kind, Object.fromEntries(
-    readdirSync(join(root, directory!)).filter(name => !name.startsWith('LICENSE')).sort()
-      .map(name => [name, readFileSync(join(root, directory!, name)).toString('base64')]),
-  )])))
+  return JSON.stringify(Object.fromEntries(
+    readdirSync(join(root, directory)).filter(name => !name.startsWith('LICENSE')).sort()
+      .map(name => [name, readFileSync(join(root, directory, name)).toString('base64')]),
+  ))
 }
 
 /** The dynamic client factory has no module URL from which to resolve a Worker file. */
@@ -105,6 +103,11 @@ export default (options: Parameters<typeof bundle>[0]): UserConfig[] => bundle(o
       resolve: { ...config.inputOptions?.resolve, mainFields: ['browser', 'module', 'main'], aliasFields: [['browser']] },
     },
     plugins: [config.plugins, pdfWorker, excelWorker],
-    define: { ...config.define, __DSH_PDFJS_ASSETS__: pdfAssets() },
+    define: {
+      ...config.define,
+      __DSH_PDFJS_CMAPS__: pdfAssets('cmaps'),
+      __DSH_PDFJS_FONTS__: pdfAssets('standard_fonts'),
+      __DSH_PDFJS_WASM__: pdfAssets('wasm'),
+    },
   } : config,
 )
