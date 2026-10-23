@@ -56,6 +56,8 @@ Client 在申请 source 或启动 collector 之前，按 Worker 的规则检查�
 
 源码树遵循这些执行环境：`client/` 与 `host/` 提供镜像的适配器 entry path，`worker/` 只包含 Worker thread orchestration 与 Chrome protocol 状态，`shared/` 包含与环境无关的 Cordis 和 network model、规范化 realm 后端接口及内部 bridge protocol。Worker 侧 Client 与 Host 适配器镜像放在 `worker/realms/` 下；其中的 Client 适配器仍然在 Worker 中执行。
 
+Client 启动使用的 bootstrap、准入判断与异步加载的底部面板 source 选择逻辑分别导入。两条 Client 入口不经过合并的 Host/Worker 导出模块；[准入决策](../../../.agents/notes/implemented/bug-fix/2026-10-23-inspector-client-origin-admission.zh.md)说明 bundle 加载约束。
+
 Host 与 Client producer 发送内部观测记录，不发送 CDP 消息。记录包含 source generation、sequence、source 时钟时间、topic 和 JSON payload。Worker 验证每个进程或网络帧，独占 source 状态与保留历史，并把已识别 topic 转换成标准 CDP domain。
 
 Client source 声明类型化 Runtime、Console 和只读 Sources 能力。`Runtime.enable` 只发布默认 Host execution context，并为此 DevTools 连接范围内的每个已连接 Client 发布一个 synthetic context；不列出 Node internal 和额外 VM context。选择 Client context 后，求值、属性读取、函数调用、Promise await 和对象释放都会路由到该浏览器 realm。Client Console argument 使用同一份会话本地 object table；`Debugger.enable` 发布构建后的 `lib/client.js` catalog，`Debugger.getScriptSource` 读取有界 content chunk。Source map 地址来自已加载脚本末尾的 `sourceMappingURL`，保留 combo URL 和部署前缀。Client script 断点、step 和 call frame 仍不支持；target-wide pause 与 resume 只控制 Host debugger。

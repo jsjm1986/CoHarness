@@ -3,7 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { InspectorClientBootstrap } from '../shared/bridge/messages/control.ts'
-import { INSPECTOR_BOOTSTRAP_ROUTE, isInspectorClientOriginAllowed } from '../shared/web.ts'
+import { INSPECTOR_BOOTSTRAP_ROUTE, isInspectorClientOriginAllowed } from '../shared/client-bootstrap.ts'
 import { parseInspectorClientBootstrap } from '../shared/bridge/control-codec.ts'
 import { createInspectorService, type InspectorService as SharedInspectorService } from '../shared/service.ts'
 import { publishCordisTree } from './inspection/cordis.ts'

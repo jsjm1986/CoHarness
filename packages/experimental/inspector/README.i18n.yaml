@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/inspector/README.md
 document:
-  en: 0d0ace3858cdce980eb84497bea6b11a77f5486b
-  zh: f599a338f46004e90582328e9c1e3a6278160955
+  en: 027937ab3dfb0d9dee8c8c90babaa028b5716ff1
+  zh: 2d1e84a5399a98fa955551e96d3edaf03529233d
 /:
   en: b5b7ccdfa1cc2907
   zh: d575593a7efa37fd
@@ -21,8 +21,8 @@ document:
   en: aeb2bc715125ffe0
   zh: daa7e97a178fa9b4
 /deepseek-ai-dsh-experimental-inspector/runtime-layout:
-  en: 076da63dced9abcb
-  zh: 57827760d40a75c0
+  en: 4387fa28e2af9f17
+  zh: 7bee573db5fb98a0
 /deepseek-ai-dsh-experimental-inspector/configuration:
   en: d094842893700446
   zh: 7a7f880ba795948f

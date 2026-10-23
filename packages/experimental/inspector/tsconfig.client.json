@@ -90,6 +90,8 @@
     "src/shared/network/observation.ts",
     "src/shared/service.ts",
     "src/shared/validation.ts",
+    "src/shared/client-bootstrap.ts",
+    "src/shared/source-selection.ts",
     "src/shared/web.ts"
   ],
   "references": [

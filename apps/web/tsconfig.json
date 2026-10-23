@@ -27,6 +27,7 @@
     "tests/server-restart.e2e.ts",
     "tests/default-product-isolation.e2e.ts",
     "tests/scaffold.ts",
+    "tests/inspector-boot.e2e.ts",
     "tests/expected.ts",
     "tests/scaffold-hermetic.e2e.ts",
     "tests/startup-rpc-budget.e2e.ts",

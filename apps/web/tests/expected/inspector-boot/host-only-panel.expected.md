@@ -1,0 +1,6 @@
+- region "NodeJS Inspector · Host only":
+  - separator "Resize NodeJS Inspector panel"
+  - text: NodeJS Inspector · Host only
+  - button "Collapse":
+    - img
+  - iframe
