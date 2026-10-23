@@ -114,6 +114,7 @@
     "apps/web/tests/sidebar-subagent-activity.e2e.ts",
     "apps/web/tests/sidebar-browser.e2e.ts",
     "apps/web/tests/sidebar-verification.e2e.ts",
+    "apps/web/tests/workspace-preview-reconnect.e2e.ts",
     "apps/web/tests/tool-details.e2e.ts",
     "apps/web/tests/workspace-review.e2e.ts",
     "apps/web/tests/historical-jsonl.e2e.ts",

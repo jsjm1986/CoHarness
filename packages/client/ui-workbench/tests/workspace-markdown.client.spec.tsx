@@ -30,7 +30,7 @@ function harness(read: ReadWorkspacePreview) {
   const view = render(<PreviewResourceBinding resources={resources} request={request}>{resource =>
     <WorkspaceMarkdownPreview request={request} resource={resource} read={read}
       markdownT={makeTranslate(en)} close={close}
-      labels={{ close: 'Close', reload: 'Reload', loading: 'Reading', changed: 'File changed' }} />
+      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', loading: 'Reading', changed: 'File changed' }} />
   }</PreviewResourceBinding>)
   return { ...view, resources, close, change() {
     version = 'v2'

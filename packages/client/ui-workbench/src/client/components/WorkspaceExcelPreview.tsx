@@ -29,7 +29,7 @@ export function WorkspaceExcelPreview({ request, resource, read, excelT, limits,
   excelT: PropsLocale<'sidebarExcel'>['t']
   limits: ExcelLimits
   close: () => void
-  labels: { close: string; reload: string; changed: string }
+  labels: { close: string; reload: string; reconnecting: string; changed: string }
 }) {
   const input = useMemo(() => {
     const version = resource.metadata.value?.version

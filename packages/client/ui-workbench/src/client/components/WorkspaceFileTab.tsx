@@ -121,7 +121,7 @@ export function WorkspaceFileTab(props:
   const line = params !== undefined && 'line' in params ? params.line : undefined
   if (!tab.visible) return null
   const key = `${request.address}:${String(tab.navigation.revision)}`
-  const actions = { close: t('previewClose'), reload: t('previewReload'), changed: t('previewChanged') }
+  const actions = { close: t('previewClose'), reload: t('previewReload'), reconnecting: t('previewReloadReconnecting'), changed: t('previewChanged') }
   if (isWorkspaceSpreadsheet(request.path)) return <WorkspaceExcelPreview
     key={key} request={request} resource={resource} read={readFileBytes} excelT={excelT} limits={excelLimits}
     close={() => { tab.actions.close() }} labels={actions} />
@@ -138,6 +138,6 @@ export function WorkspaceFileTab(props:
   return <WorkspaceFilePreview key={key} request={request} initialLine={line} read={readPreview} readBytes={readBytesPreview}
     resource={resource} close={() => { tab.actions.close() }} zoomLabels={zoomLabels} view={fileView}
     nativeOpen={nativeOpenAvailable() ? () => openNativePath(request) : undefined}
-    labels={{ close: t('previewClose'), reload: t('previewReload'), previous: t('previewPrevious'), next: t('previewNext'), loading: t('previewLoading'), changed: t('previewChanged'), binary: t('previewBinary'),
+    labels={{ ...actions, previous: t('previewPrevious'), next: t('previewNext'), loading: t('previewLoading'), binary: t('previewBinary'),
       openNative: t('previewOpenNative'), imageAlt: name => t('previewImage', { name }), imageFailed: t('previewImageFailed') }} />
 }

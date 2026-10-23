@@ -33,7 +33,7 @@ describe('WorkspaceMarkdownPreview frontmatter chunk failure', () => {
     const view = render(<PreviewResourceBinding resources={resources} request={request}>{resource =>
       <WorkspaceMarkdownPreview request={request} resource={resource} read={read}
         markdownT={makeTranslate(en)} close={() => {}}
-        labels={{ close: 'Close', reload: 'Reload', loading: 'Reading', changed: 'File changed' }} />
+        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', loading: 'Reading', changed: 'File changed' }} />
     }</PreviewResourceBinding>)
     await vi.waitFor(() => { expect(view.container.querySelector('[data-workspace-frontmatter] pre')?.textContent).toBe('name: pdf') })
     await new Promise(resolve => setTimeout(resolve, 20))

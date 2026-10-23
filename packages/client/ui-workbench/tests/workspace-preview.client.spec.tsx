@@ -23,7 +23,7 @@ const extensionlessRequest: WorkspaceResourceOpenRequest = {
   ...request, path: 'README', address: workspaceResourceAddress(sessionId, 'README'),
 }
 const labels = {
-  close: 'Close', reload: 'Reload', previous: 'Previous', next: 'Next', loading: 'Loading',
+  close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', previous: 'Previous', next: 'Next', loading: 'Loading',
   changed: 'Changed; reload', binary: 'Binary (Base64)', openNative: 'Open in default app',
   imageAlt: (name: string) => `Image preview: ${name}`, imageFailed: 'This image could not be displayed.',
 }
@@ -109,6 +109,42 @@ describe('WorkspaceFilePreview', () => {
     view.resources.handleChange({ kind: 'base' }, { sessionId, path: request.path, version: 'v2' })
     await waitFor(() => { expect(view.getByText('Changed; reload')).toBeTruthy() })
     expect(view.getByText('v1')).toBeTruthy()
+  })
+
+  it('retains the text page and focus without another read during transient connection recovery', async () => {
+    const read = vi.fn(async () => ({ path: request.path, offset: 1, limit: 2, text: 'Retained text', eof: true, version: 'v1' }))
+    const view = renderPreview(read)
+    await waitFor(() => { expect(view.getByText('Retained text')).toBeTruthy() })
+    const text = view.getByText('Retained text')
+    const reload = view.getByRole('button', { name: 'Reload' })
+    reload.focus()
+    act(() => { view.resources.disconnect(request.runtimeTarget) })
+    expect(view.getByText('Retained text')).toBe(text)
+    expect(document.activeElement).toBe(reload)
+    expect(reload.getAttribute('data-workspace-preview-reconnecting')).toBe('true')
+    expect(view.getByRole('alert').textContent).toBe('Workspace connection is reconnecting')
+    expect(reload.getAttribute('aria-describedby')).toBe(view.getByRole('alert').id)
+    expect(read).toHaveBeenCalledOnce()
+    act(() => { view.resources.connected(request.runtimeTarget) })
+    await waitFor(() => { expect(view.queryByRole('alert')).toBeNull() })
+    expect(view.getByText('Retained text')).toBe(text)
+    expect(read).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a page-read failure visible when a later metadata connection failure also retains the page', async () => {
+    const read = vi.fn(async ({ offset }: { offset: number }) => {
+      if (offset > 1) throw new Error('Next page read failed')
+      return { path: request.path, offset, limit: 2, text: 'Retained text', eof: false, version: 'v1' }
+    })
+    const view = renderPreview(read)
+    await waitFor(() => { expect(view.getByText('Retained text')).toBeTruthy() })
+    fireEvent.click(view.getByRole('button', { name: 'Next' }))
+    await waitFor(() => { expect(view.getByRole('alert').textContent).toBe('Next page read failed') })
+    act(() => { view.resources.disconnect(request.runtimeTarget) })
+    expect(view.getByText('Retained text')).toBeTruthy()
+    expect(view.getByRole('alert').textContent).toBe('Next page read failed')
+    expect(view.getByRole('button', { name: 'Reload' }).hasAttribute('data-workspace-preview-reconnecting')).toBe(false)
+    expect(read).toHaveBeenCalledTimes(2)
   })
 
   it('retains the displayed page across a changed revalidation and re-reads the new size on reload', async () => {

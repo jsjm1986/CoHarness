@@ -136,6 +136,7 @@
     "workspace-history-entry.e2e.ts": "documents",
     "workspace-management.e2e.ts": "documents",
     "workspace-office.e2e.ts": "documents",
+    "workspace-preview-reconnect.e2e.ts": "workbench",
     "workspace-review.e2e.ts": "conversation"
   },
   "sharedInputs": {

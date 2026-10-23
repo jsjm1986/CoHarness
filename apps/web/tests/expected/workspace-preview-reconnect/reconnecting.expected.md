@@ -1,0 +1,2 @@
+- button "Reload"
+- alert: Workspace connection is reconnecting

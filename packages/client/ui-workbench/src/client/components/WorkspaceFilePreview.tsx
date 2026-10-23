@@ -7,6 +7,7 @@ import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runti
 import { ZoomViewport, zoomSurfaceClass } from '../contract/zoom/ZoomViewport.tsx'
 import { FIT_WIDTH, type ZoomLabels, type ZoomPreference } from '../contract/zoom/types.ts'
 import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import { WorkspacePreviewActions } from './WorkspacePreviewActions.tsx'
 import css from './Workbench.module.css'
 
 /** Read one versioned page from the resource's explicit runtime. */
@@ -49,6 +50,7 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
   labels: {
     close: string
     reload: string
+    reconnecting: string
     previous: string
     next: string
     loading: string
@@ -166,10 +168,9 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
   const zoomSection = image ? ` ${css.filePreviewZoom ?? ''}` : ''
   return (
     <section aria-label={request.path} className={previewClass + zoomSection}>
-      <div className={css.filePreviewActions}>
-        <Button size="sm" onClick={close}>{labels.close}</Button>
-        <Button size="sm" disabled={pending || metadata.status === 'loading' || denied || reloading}
-          onClick={() => { void reload() }}>{labels.reload}</Button>
+      <WorkspacePreviewActions close={close} reload={reload}
+        disabled={pending || metadata.status === 'loading' || denied || reloading} denied={denied}
+        hasContent={page !== undefined || rawBytes !== undefined} failure={error ?? metadata.error} message={message} labels={labels}>
         {page !== undefined && (
           <>
             <Button size="sm" disabled={pending || changed || denied || offset <= 1}
@@ -182,8 +183,7 @@ export function WorkspaceFilePreview({ request, read, readBytes, resource, close
             </Button>
           </>
         )}
-      </div>
-      {message !== undefined && <p role="alert">{message}</p>}
+      </WorkspacePreviewActions>
       {changed && !denied && <p role="status" data-workspace-file-changed>{labels.changed}</p>}
       {(pending || metadata.status === 'loading') && page === undefined && <p role="status">{labels.loading}</p>}
       {image && (

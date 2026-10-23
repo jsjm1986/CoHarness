@@ -66,7 +66,7 @@ export function WorkspaceHtmlPreview({ request, resource, read, htmlT, renderHtm
   renderHtml: RenderWorkspaceHtml
   htmlT: PropsLocale<'sidebarHtml'>['t']
   close: () => void
-  labels: { close: string; reload: string; changed: string }
+  labels: { close: string; reload: string; reconnecting: string; changed: string }
 }) {
   const input = useMemo(() => resource.metadata.value?.version, [resource.metadata.value?.version])
   const readFile = useMemo(() => (version: string, signal: AbortSignal) =>

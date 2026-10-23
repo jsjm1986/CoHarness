@@ -30,7 +30,7 @@ function harness(read: ReadWorkspaceFileData, path = request.path) {
   const view = render(<PreviewResourceBinding resources={resources} request={target}>{resource =>
     <WorkspaceExcelPreview request={target} resource={resource} read={read}
       excelT={makeTranslate(en)} limits={Config({}).excel} close={close}
-      labels={{ close: 'Close', reload: 'Reload', changed: 'File changed' }} />
+      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed' }} />
   }</PreviewResourceBinding>)
   return { ...view, resources, close, change() {
     version = 'v2'
@@ -81,4 +81,32 @@ it('reports a failed byte read without contacting the renderer', async () => {
   const h = harness(read)
   await waitFor(() => { expect(h.getByRole('alert').textContent).toBe('File exceeds the limit') })
   expect(h.queryByTestId('excel')).toBeNull()
+})
+
+it('retains the workbook and its resource-local reload action through transient reconnection', async () => {
+  const read = vi.fn<ReadWorkspaceFileData>(async () => ({ bytes: btoa('retained cells'), version: 'v1' }))
+  const h = harness(read, 'data.csv')
+  await waitFor(() => { expect(h.getByTestId('excel').textContent).toBe('data.csv:retained cells') })
+  const workbook = h.getByTestId('excel')
+  const reload = h.getByRole('button', { name: 'Reload' })
+  reload.focus()
+  act(() => { h.resources.disconnect(request.runtimeTarget) })
+  expect(h.getByTestId('excel')).toBe(workbook)
+  expect(document.activeElement).toBe(reload)
+  expect(h.getByRole('alert').textContent).toBe('Workspace connection is reconnecting')
+  expect(reload.getAttribute('aria-describedby')).toBe(h.getByRole('alert').id)
+  expect(reload.getAttribute('data-workspace-preview-reconnecting')).toBe('true')
+  expect(read).toHaveBeenCalledOnce()
+  act(() => { h.resources.connected(request.runtimeTarget) })
+  await waitFor(() => { expect(h.queryByRole('alert')).toBeNull() })
+  expect(h.getByTestId('excel')).toBe(workbook)
+  expect(read).toHaveBeenCalledOnce()
+  fireEvent.click(reload)
+  await waitFor(() => { expect(read).toHaveBeenCalledTimes(2) })
+  await waitFor(() => { expect(h.getByTestId('excel')).toBeTruthy() })
+  act(() => { h.resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', 'Access revoked')) })
+  expect(h.queryByTestId('excel')).toBeNull()
+  expect(h.getByRole('alert').textContent).toBe('Access revoked')
+  expect(reload.hasAttribute('data-workspace-preview-reconnecting')).toBe(false)
+  expect(reload.hasAttribute('disabled')).toBe(true)
 })

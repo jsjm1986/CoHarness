@@ -41,7 +41,7 @@ export function WorkspaceMarkdownPreview({ request, read, resource, markdownT, c
   resource: WorkspacePreviewResource
   markdownT: PropsLocale<'sidebarMarkdown'>['t']
   close: () => void
-  labels: { close: string; reload: string; loading: string; changed: string }
+  labels: { close: string; reload: string; reconnecting: string; loading: string; changed: string }
 }) {
   const input = useMemo(() => resource.metadata.value?.version, [resource.metadata.value?.version])
   const readAll = useMemo(() => async (version: string, signal: AbortSignal): Promise<MarkdownResult> => {

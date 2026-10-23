@@ -40,7 +40,7 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
   officeT: PropsLocale<'sidebarOffice'>['t']
   close: () => void
   view: { page: number; zoom?: ZoomPreference }
-  labels: { close: string; reload: string; changed: string }
+  labels: { close: string; reload: string; reconnecting: string; changed: string }
 }) {
   const input = useMemo((): DocumentRead | undefined => {
     const value = resource.metadata.value

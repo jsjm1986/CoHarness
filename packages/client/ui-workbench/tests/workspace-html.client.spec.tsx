@@ -58,7 +58,7 @@ function harness(read: ReadWorkspaceFileData, initialRenderer: RenderWorkspaceHt
   const mount = (renderer: RenderWorkspaceHtml) => <PreviewResourceBinding resources={resources} request={request}>{resource =>
     <WorkspaceHtmlPreview request={request} resource={resource} read={read}
       renderHtml={renderer} htmlT={htmlT} close={close}
-      labels={{ close: 'Close', reload: 'Reload', changed: 'File changed' }} />
+      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed' }} />
   }</PreviewResourceBinding>
   const view = render(mount(initialRenderer))
   return { ...view, resources, close, change() {
