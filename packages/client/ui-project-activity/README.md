@@ -11,6 +11,8 @@ Project activity plugin, browser half: a right-Sidebar tab type (`activity`) tha
 
 The tab type registers only while `projectUiPolicy` reports project scope: the apply body subscribes to the policy snapshot and mounts or disposes the `sidebarRightTabs` definition on each transition, so the guide capsule and any open tab leave with the scope. The keyed `sidebar.right.pane.tab` body and `sidebar.right.pane.tab.title` seats stay mounted permanently — without a live type they dispatch nothing. View state (pages, mode, member filter, journal page) lives in a session-scoped store declared on the body registration; the inject face carries `refresh`, `loadMore(before)`, `generate`, and `reveal` over `ctx`'s viewport service. A `400`/`404` on the progress route renders as a feature-off page rather than a transport failure, so deployments without the journal service degrade quietly. The Host half is inert: the plugin mounts through the Client loader only.
 
+Conversation markers use the shared theme palette to identify conversations; their colors do not indicate task status.
+
 The `/client` exports are the plugin body (`apply`/`inject`), the feed wire types, the store factory and state types, and the injected face.
 
 ## Summary

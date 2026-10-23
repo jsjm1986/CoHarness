@@ -132,7 +132,7 @@
 }
 
 .toneBlue { background: var(--dsw-static-blue-600); }
-.toneGreen { background: var(--dsw-static-green-600); }
+.toneGreen { background: var(--dsw-static-green-500); }
 .toneAmber { background: var(--dsw-static-amber-600); }
 .toneRed { background: var(--dsw-static-red-600); }
 .toneDeep { background: var(--dsw-static-deepseek-600); }

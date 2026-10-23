@@ -11,6 +11,8 @@ kind: "package-reference"
 
 标签类型只在 `projectUiPolicy` 报告项目空间时注册：apply 体订阅策略快照，每次切换都挂载或释放 `sidebarRightTabs` 定义，Guide 胶囊与已打开的标签随空间一同来去。带 key 的 `sidebar.right.pane.tab` 正文与 `sidebar.right.pane.tab.title` 座常驻挂载——没有存活的类型时它们不派发任何内容。视图状态（分页、档位、成员筛选、纪要页面）保存在正文注册声明的会话级 store 中；inject 面携带 `refresh`、`loadMore(before)`、`generate` 与经 `ctx` viewport 服务的 `reveal`。进展路由返回 `400`/`404` 时渲染为「功能未启用」页而非传输失败，未挂载纪要服务的部署安静降级。Host 半是惰性的：插件只经 Client 加载器挂载。
 
+会话标记使用共享主题调色板来区分会话；颜色不表示任务状态。
+
 `/client` 导出插件体（`apply`/`inject`）、Feed 线路类型、store 工厂与状态类型、注入面类型。
 
 ## 概述
