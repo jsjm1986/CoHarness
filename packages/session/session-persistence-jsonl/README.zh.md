@@ -74,7 +74,8 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - **崩溃恢复：保留有效尾部工作。**`load` 验证每个完整压缩 frame，并扫描解压 JSONL。最后 frame 结构不完整时，读取器保留其完整解码记录，从 frame 开头截断，并使用共享[持久化约定](../../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.zh.md) 需要的合成工具、步骤和轮次 closer 重新编码这些记录。原始 mode 从第一个不完整行截断。已经存在却没有完整 header frame 的压缩工件、完整 frame 中的 checksum/解压失败，或位于最后已提交的 `turn/end` 处或之前的缺陷都属于损坏，会被拒绝。
 - **非修改式检查。**`inspect()` 返回带精确继承切点的不可变、平衡逻辑视图，并可在内存中合成恢复 closer，但不会截断不完整尾部或更改轻量修订。`readFrom(id, fromOffset)` 接受 `SessionLogOffset`，解析整个工件后向前跳过，把后缀与同一切点一起返回；仅读 header 的列表暴露 `isSeeded`，无需读取事件体。
 - **连续 seq。**`append` 拒绝第一个 `seq` 不继续已存储日志的批次，并拒绝无法 JSON 序列化的 `event.data`，同时命名违规事件类型。
-- **轻量修订。**`revision(id, signal?)` 只解析指定产物，并使用 device、inode、size 和纳秒时间戳标识它，不解析日志；`listSnapshots(signal?)` 对每个已发现产物使用同一身份。该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 也使用同一身份校验保留的 preparation。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
+- **单会话元数据。**`readHeader(id, signal?)`、`revision(id, signal?)` 和 `readRevision(id, signal?)` 使用 `stat(id, { signal })`：在项目目录中查找请求的 id，只校验其选定代次的文件头，并返回与 `stat` 相同的待物化创建元数据或 `undefined` 结果。代次、身份、编码和文件头解码错误从 `stat` 原样传播；最高代次不受支持时绝不回退到前代。根目录编码准入仍检查所配置的根目录。不保留跨请求的文件头缓存，元数据读取不检查事件正文。[存储身份决策](../../../.agents/notes/implemented/bug-fix/2026-07-20-jsonl-storage-identity.zh.md)说明单会话发现与拒绝规则。
+- **轻量修订。**源身份包含 device、inode、size 和纳秒时间戳；历史代次还包含 corpus revision，因此其查找仍会发现并读取整个根目录所选代次的文件状态。`listSnapshots(signal?)` 对每个已发现产物使用同一身份。该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 也使用同一身份校验保留的 preparation。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
 
 <a id="write-path"></a>
 ## 写入路径
