@@ -80,15 +80,20 @@
 .text {
   box-sizing: border-box;
   width: 100%;
-  height: auto;
-  min-height: 100%;
   margin: 0;
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-1);
 }
 
+.frame {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .text {
+  height: auto;
+  min-height: 100%;
   padding: var(--dsw-space-3);
   overflow: visible;
   color: var(--dsw-alias-label-primary);
@@ -114,7 +119,6 @@
   }
 
   .image,
-  .frame,
   .text {
     max-height: none;
     height: min(100%, calc(var(--dsw-viewport-height, 100vh) - 8rem - var(--dsw-safe-top) - var(--dsw-safe-bottom)));

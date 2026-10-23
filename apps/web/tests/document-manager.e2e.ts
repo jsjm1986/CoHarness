@@ -9,6 +9,8 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import type { UserDocRef } from '@deepseek-ai/dsh-userdoc'
+import { pdfFixture } from '../../../packages/client/ui-workbench/tests/pdf-fixture.ts'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
@@ -76,10 +78,15 @@ describe('web e2e: document manager', () => {
   let scaffold: WebScaffold
   let browser: Browser
   let page: Page
+  let previewDocument: UserDocRef
   let tripwire: ReturnType<typeof watchConsole> = { warnings: [], pageErrors: [] }
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
+    const target = await scaffold.ctx.userDocs.resolveTarget({ name: 'preview-layout.pdf' })
+    previewDocument = await scaffold.ctx.userDocs.save(target, new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(pdfFixture()); controller.close() },
+    }))
     browser = await chromium.launch()
   }, 120_000)
 
@@ -97,6 +104,63 @@ describe('web e2e: document manager', () => {
     await scaffold?.close().catch((error: unknown) => failures.push(error))
     if (failures.length === 1) throw failures[0]
     if (failures.length > 1) throw new AggregateError(failures, 'document manager e2e cleanup failed')
+  })
+
+  it.each([
+    { label: 'desktop', width: 1280, height: 800 },
+    { label: 'compact', width: 390, height: 844 },
+  ])('$label: PDF preview fills its available body and releases the iframe on close', async ({ label, width, height }) => {
+    const compact = width < 768
+    page = await browser.newPage({
+      viewport: { width, height }, locale: 'en-US', reducedMotion: 'reduce',
+      ...(compact ? { hasTouch: true, isMobile: true } : {}),
+    })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, `web-e2e-document-preview-${label}`))
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    if (compact) await page.getByRole('button', { name: 'Open sidebar' }).click()
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+    await manager.getByText(previewDocument.name, { exact: true }).waitFor()
+    const initialFrames = page.frames().length
+    const response = page.waitForResponse((reply) => {
+      const url = new URL(reply.url())
+      return url.pathname === '/api/documents/content' && url.searchParams.get('id') === previewDocument.docId
+    })
+    if (compact) {
+      await manager.getByRole('button', { name: `More actions: ${previewDocument.name}`, exact: true }).click()
+      await page.locator('[data-documents-sheet="document-actions"]').getByRole('button', { name: 'Preview', exact: true }).click()
+    } else {
+      await manager.getByRole('button', { name: `Preview ${previewDocument.name}`, exact: true }).click()
+    }
+    expect([200, 206]).toContain((await response).status())
+    const preview = page.getByRole('dialog', { name: `Preview: ${previewDocument.name}`, exact: true })
+    const frame = preview.locator('iframe')
+    await frame.waitFor({ state: 'visible' })
+    const geometry = await frame.evaluate((element) => {
+      const body = element.parentElement!, dialog = element.closest('[role="dialog"]')!
+      const box = (node: Element) => {
+        const rect = node.getBoundingClientRect()
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom }
+      }
+      return { frame: box(element), body: box(body), dialog: box(dialog), scrollWidth: dialog.scrollWidth, clientWidth: dialog.clientWidth }
+    })
+    expect(geometry.body.height).toBeGreaterThan(300)
+    expect(geometry.frame.height, JSON.stringify(geometry)).toBeGreaterThanOrEqual(geometry.body.height - 2)
+    expect(geometry.frame.bottom).toBeLessThanOrEqual(geometry.body.bottom + 1)
+    expect(geometry.dialog.x).toBeGreaterThanOrEqual(-1)
+    expect(geometry.dialog.y).toBeGreaterThanOrEqual(-1)
+    expect(geometry.dialog.right).toBeLessThanOrEqual(width + 1)
+    expect(geometry.dialog.bottom).toBeLessThanOrEqual(height + 1)
+    expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1)
+    const close = preview.getByRole('button', { name: 'Close', exact: true })
+    await close.waitFor({ state: 'visible' })
+    if (compact) await close.click()
+    else await page.keyboard.press('Escape')
+    await preview.waitFor({ state: 'detached' })
+    expect(await page.locator('iframe').count()).toBe(0)
+    await expect.poll(() => page.frames().length).toBe(initialFrames)
+    expect(await manager.count()).toBe(1)
   })
 
   it('desktop: lists folders and date groups with named row actions in a centered dialog', async () => {

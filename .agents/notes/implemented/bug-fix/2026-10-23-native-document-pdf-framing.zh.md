@@ -16,6 +16,8 @@ CSP `sandbox` 指令仍不带许可项。Chromium 的[原生 PDF 测试](https:/
 
 存储服务根据文件名推导媒体类型，不验证文档结构。因此 `nosniff`、声明的 PDF 响应类型和原生阅读器的 PDF 解析器需要共同保留：改名的 HTML 文件进入 PDF 阅读器的失败状态，不进入应用的 HTML DOM。Chromium 的[安全指导](https://chromium.googlesource.com/chromium/src/+/main/content/SECURITY.md#mitigating-factors)另外说明 PDF 渲染器隔离；响应 CSP sandbox 与浏览器进程沙箱不是同一机制。
 
+弹窗通过最小和最大高度分配空间，百分比最小高度无法可靠地替代 iframe 的固有高度。PDF iframe 作为 flex 子项在可用正文区域内伸缩，与按内容定高的文本和图片预览分别处理。[UI 参考](../../../../packages/client/ui-documents/README.zh.md#usage)拥有预览尺寸行为。
+
 ## 考虑过的替代方案
 
 **移除响应 CSP 或放宽全部内联类型。** 这会给无关上传标记内容授予原生 PDF 路径不需要的权限。
@@ -29,6 +31,8 @@ CSP `sandbox` 指令仍不带许可项。Chromium 的[原生 PDF 测试](https:/
 [可运行 fixture](../../../../packages/host/userdoc-http/tests/native-preview-fixture.ts)只在临时根目录创建合成文档，并在随机回环端口挂载生产 Connection、文件系统存储与文档 HTTP 所有者。另一个端口提供不同源的父页面。原生 Chrome 显示有效 PDF，通过 `frame-ancestors 'self'` 拒绝该不同源嵌入，将改名的 HTML 文件判为无效 PDF，并继续阻止 HTML/SVG frame，脚本执行哨兵保持不变。
 
 完整 Host 快照固定 PDF、改名 PDF、HTML、SVG、文本、HEAD、未认证访问、完整流式字节和 attachment 下载行为。Gateway 转发矩阵将 lease 保留到流结束，并检查不支持的 MIME 值。本地 broker 测试还从另一个账户请求同一文档 id，确认没有文档字节返回；缺少协作授权或不是项目成员时，在读取之前拒绝。
+
+[完整文档管理器](../../../../apps/web/tests/document-manager.e2e.ts)在隔离的真实存储中保存自造 PDF，并在桌面和 390px 宽度下测量 iframe 与可用正文区域的矩形。关闭按钮和 Escape 会移除 iframe 及其浏览器 frame，同时保留管理器。
 
 ## 影响
 
