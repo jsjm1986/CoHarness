@@ -325,7 +325,7 @@ export function ConversationContent({
 
   const heroWorkspaceRow = (
     <div className={css.heroWorkspaceRow}>
-      {headerLeading}
+      {initialSelectionPending ? null : headerLeading}
       <WorkspaceChip
         buttonRef={pickerAnchor}
         label={chipTitle}
@@ -500,6 +500,9 @@ export function ConversationContent({
       data-phase={phase}
       data-chat-fill={displaySettings.chatFullWidth || undefined}
     >
+      {initialSelectionPending && headerLeading !== undefined && (
+        <header className={css.header}><div className={css.titleRow}>{headerLeading}</div></header>
+      )}
       {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
       <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
         {initialSelectionPending && <div className={css.initialLoading} role="status" aria-label={t('hero.loadingWorkspace')}>
