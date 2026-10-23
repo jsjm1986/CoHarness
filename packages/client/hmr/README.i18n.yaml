@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/hmr/README.md
 document:
-  en: f09a8308c90ed5903acf1cab1e080ece8e74a2d9
-  zh: 1648630d8dc7625653271eb1642ebe827add677e
+  en: dd5d2e5844e7eafb8b5a4a26b204ed4af9efc9b1
+  zh: aa878881d769633bf536045c9310c8309adfbbc9
 /:
   en: dbe480205dbca85a
   zh: 850b3210c588960c
@@ -27,8 +27,8 @@ document:
   en: 8835f00e568d077b
   zh: 8bae850c66684ecf
 /deepseek-ai-dsh-client-hmr/use-this-package/configuration:
-  en: 9ab268aecb89dbc2
-  zh: 7b288dcb5992ab31
+  en: 9ae9152490d52873
+  zh: aad48b8c0db163dd
 /deepseek-ai-dsh-client-hmr/use-this-package/observing-success:
   en: 751c7ff7f8a4e70d
   zh: 34da8830a069f7f5

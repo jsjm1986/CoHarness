@@ -10,9 +10,11 @@ Polling every client bundle adds recurring filesystem work when no development b
 
 ## Decision
 
-The Web Bundle always mounts the graph transport. Its `watchArtifacts` configuration enables the stat poll only when the launch environment contains the exact value `DSH_CLIENT_HMR=1`. A development launch sets that variable alongside `pnpm run dev:web`. Graph changes and reconnect snapshots remain event-driven in ordinary launches; no artifact baseline reads or polling timer are acquired there.
+The Web Bundle always mounts the graph transport. Its `watchArtifacts` configuration enables the stat poll only when the launch environment contains the exact value `DSH_CLIENT_HMR=1`. A development launch sets that variable alongside `pnpm run dev:web`. Graph changes and reconnect snapshots remain event-driven in ordinary launches; no artifact baseline reads or artifact-polling timer are acquired there.
 
 The package default preserves artifact watching for custom compositions. The shipped Web composition owns its production setting, and the static composition check rejects both disabled graph delivery and unconditional artifact polling. Page reconciliation belongs to the [shared ClientEntries controller](2026-09-23-page-owned-client-entries.md).
+
+Quiet graph streams send configurable keepalive comments using the [SSE authoring recommendation](https://html.spec.whatwg.org/multipage/server-sent-events.html#authoring-notes). These comments preserve transport activity without artifact reads, graph publication, plugin replacement, or authority renewal. Captured public streams ended after approximately 125 seconds without response bytes, matching Cloudflare's documented [proxy read timeout](https://developers.cloudflare.com/fundamentals/reference/connection-limits/); this timing supports an idle-timeout inference, not an explanation for immediate connection closures or later WebSocket failures.
 
 ## Alternatives considered
 
@@ -25,3 +27,5 @@ The package default preserves artifact watching for custom compositions. The shi
 ## Consequences
 
 Ordinary launches own an SSE channel and browser transport entry, but no artifact poller. Client source changes require the explicit development switch and builder or the normal build and refresh flow. Host configuration reload and page-local graph reconciliation stay independent of artifact polling. Tests prove graph delivery and cleanup with polling disabled, and source-edit acceptance covers the enabled path.
+
+Keepalive comments skip backpressured responses. Plugin disposal stops new writes and joins each admitted response's actual close, including failed responses already being destroyed. Reconnecting with an unchanged graph preserves active entries while retaining failed-entry retries; connection recovery remains owned by the runtime transport.

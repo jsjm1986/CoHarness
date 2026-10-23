@@ -512,7 +512,7 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-client-connection`
 
 - `inject`: `credentials`
-- `source`: [`packages/client/connection/src/index.ts:110`](../packages/client/connection/src/index.ts)
+- `source`: [`packages/client/connection/src/index.ts:112`](../packages/client/connection/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment's non-loopback serving authorities. */
@@ -561,7 +561,7 @@ export interface ConnectionConfig {
 ## `@deepseek-ai/dsh-client-hmr`
 
 - `inject`: `clientModules` · `webServer`
-- `source`: [`packages/client/hmr/src/index.ts:30`](../packages/client/hmr/src/index.ts)
+- `source`: [`packages/client/hmr/src/index.ts:31`](../packages/client/hmr/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config, validated by the same-named schemastery schema. */
@@ -570,6 +570,8 @@ export interface Config {
   watchArtifacts?: boolean
   /** Bundle stat-poll interval in milliseconds (default 500, the build-side watcher's polling default). */
   pollIntervalMs?: number
+  /** Interval between graph-stream keepalive comments in milliseconds (default 15000, positive timer integer). */
+  keepAliveIntervalMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-hmr -->

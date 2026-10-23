@@ -41,6 +41,9 @@ kind: "package-reference"
 |---|---|---|
 | `watchArtifacts` | `true` | 轮询产物文件以发现重建；false 时清单传输仍保持启用 |
 | `pollIntervalMs` | `500` | bundle stat 轮询间隔，单位为毫秒 |
+| `keepAliveIntervalMs` | `15000` | 图流注释间隔，单位毫秒；1 至 2147483647 的整数 |
+
+图流的保活注释独立于产物监视。注释不发布图变化或触发重载；响应需要排空时跳过注释。全部已打开响应共用一个不阻止进程退出的计时器，最后一个响应关闭后停止；插件清理先清除计时器，再等待响应关闭。
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-client-hmr)是所有受支持字段及其 JSDoc 的完整真源。
 
