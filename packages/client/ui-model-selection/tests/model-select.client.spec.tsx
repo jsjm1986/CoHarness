@@ -3,8 +3,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { InProcessApiClient } from '@deepseek-ai/dsh-host-apiproxy/client'
 import type { ComponentProps } from 'react'
-import type { ModelDirectoryState } from '../src/client/directory.ts'
+import { ModelDirectory, type ModelDirectoryState } from '../src/client/directory.ts'
 import { ModelSelect } from '../src/client/ModelSelect.tsx'
 import { zh } from '../src/client/locales.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -594,6 +595,46 @@ describe('ModelSelect keyboard walk', () => {
 })
 
 describe('ModelSelect mount-load resilience', () => {
+  it('retries a transport rejection through the actual model directory', async () => {
+    vi.useFakeTimers()
+    const value = state()
+    let calls = 0
+    const client = new InProcessApiClient({ fetch: async (_url, init) => {
+      calls += 1
+      if (calls === 1) throw new TypeError('Synthetic failed model delivery')
+      if (typeof init?.body !== 'string') throw new Error('Expected a JSON request body')
+      const request = JSON.parse(init.body) as { rpcId: string }
+      return Response.json({ type: 'server-response', rpcId: request.rpcId, result: { ok: true,
+        value: { current: value.current, routable: true, groups: value.groups, failures: [] },
+      } })
+    } })
+    const directory = new ModelDirectory(client.sessions, 'synthetic-model-retry' as never, () => true)
+    const requests: Promise<unknown>[] = []
+    const load = (): void => { requests.push(directory.load().catch((error: unknown) => error)) }
+    try {
+      render(<ModelSelect locked={false} available directory={directory.store} load={load}
+        select={vi.fn().mockResolvedValue(false)} t={t} />)
+      await act(async () => { await requests[0] })
+      expect(directory.store.getSnapshot().status).toBe('error')
+      expect(calls).toBe(1)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000)
+        await requests[1]
+      })
+      expect(calls).toBe(2)
+      expect(directory.store.getSnapshot().status).toBe('ready')
+      const trigger = screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High' })
+      expect(trigger.getAttribute('aria-busy')).toBe('false')
+      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+      await act(async () => { await vi.advanceTimersByTimeAsync(12_000) })
+      expect(calls).toBe(2)
+    } finally {
+      directory.dispose()
+      await Promise.all(requests)
+      vi.useRealTimers()
+    }
+  })
+
   it('labels a loading trigger instead of the bare fallback', () => {
     const directory = createSnapshotStore(state({ current: null, status: 'loading' }))
     render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={vi.fn().mockResolvedValue(true)} t={t} />)

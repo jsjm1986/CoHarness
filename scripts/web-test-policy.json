@@ -70,6 +70,7 @@
     "minimal-preset.snapshot.ts": "shell",
     "mobile-density.e2e.ts": "mobile",
     "models-settings.e2e.ts": "settings",
+    "model-transport-recovery.e2e.ts": "lifecycle",
     "navigation-panes.e2e.ts": "workbench",
     "onboarding-deepseek-config.e2e.ts": "settings",
     "onboarding-usable-provider.e2e.ts": "settings",
@@ -140,6 +141,10 @@
     "workspace-review.e2e.ts": "conversation"
   },
   "sharedInputs": {
+    "apps/web/tests/default-model.overlay.yml": [
+      "default-model.e2e.ts",
+      "model-transport-recovery.e2e.ts"
+    ],
     "examples/acp-agent/tests/snapshots/cancel-tool-calls/session.v6.jsonl": [
       "bash-abort-row.e2e.ts"
     ],

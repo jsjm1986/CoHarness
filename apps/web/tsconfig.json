@@ -55,6 +55,7 @@
     "tests/compact-chrome-visual-audit.e2e.ts",
     "tests/models-settings.e2e.ts",
     "tests/default-model.e2e.ts",
+    "tests/model-transport-recovery.e2e.ts",
     "tests/declared-reasoning.e2e.ts",
     "tests/onboarding-deepseek-config.e2e.ts",
     "tests/onboarding-usable-provider.e2e.ts",

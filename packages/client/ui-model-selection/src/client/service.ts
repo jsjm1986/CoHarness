@@ -48,6 +48,7 @@ export class ModelDirectoryResolver extends Service {
     modelName: string,
     capability: ModelInputCapability | undefined,
   ) => string) | undefined
+  private readonly formatTransportError: ((operation: 'load' | 'select') => string) | undefined
 
   /**
    * @param ctx - owning root context (the service registers itself as `models`).
@@ -61,10 +62,12 @@ export class ModelDirectoryResolver extends Service {
       modelName: string,
       capability: ModelInputCapability | undefined,
     ) => string
+    formatTransportError?: (operation: 'load' | 'select') => string
   }) {
     super(ctx, 'modelDirectories')
     this.blockReason = config.blockReason
     this.formatSelectionError = config.formatSelectionError
+    this.formatTransportError = config.formatTransportError
     ctx.on('connection/reset', () => {
       for (const directory of this.live.directories.values()) directory.resetConnected()
     })
@@ -103,6 +106,7 @@ export class ModelDirectoryResolver extends Service {
       sessionId,
       () => sessions.subagentAddress(sessionId) === undefined,
       this.formatSelectionError,
+      this.formatTransportError,
     )
     live.directories.set(sessionId, directory)
     // The composer cannot read this plugin (the dependency runs one way), so
