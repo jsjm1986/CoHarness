@@ -1,0 +1,17 @@
+- dialog "Add conversation":
+  - heading "Add conversation" [level=2]
+  - button "Close picker":
+    - img
+  - textbox "Search conversations or paths"
+  - button "Workspace":
+    - text: All spaces
+    - img
+  - text: Conversation history 2
+  - button "SYNTHETIC_CATALOG_DEMAND_A catalog 2":
+    - strong: SYNTHETIC_CATALOG_DEMAND_A catalog 2
+    - text: Personal space 1min
+  - button "SYNTHETIC_CATALOG_DEMAND_B catalog 2":
+    - strong: SYNTHETIC_CATALOG_DEMAND_B catalog 2
+    - text: Personal space 1min
+  - text: Select a personal or project space to create a conversation
+  - button "New conversation" [disabled]
