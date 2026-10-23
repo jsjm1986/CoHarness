@@ -1114,8 +1114,17 @@ describe('DocumentsModal', () => {
       limits,
       scope: { kind: 'project' as const, label: 'Compiler' },
     })
-    client.browse.mockImplementation(async (id = '' as UserDocDirectoryIdType) => listing(id))
-    client.browseScope.mockImplementation(async (_scope, id) => listing(id))
+    const restoredListing = Promise.withResolvers<ReturnType<typeof listing>>()
+    const restoredListingRequested = Promise.withResolvers<undefined>()
+    const browse = async (id: UserDocDirectoryIdType) => {
+      if (restored && id === 'reports') {
+        restoredListingRequested.resolve(undefined)
+        return await restoredListing.promise
+      }
+      return listing(id)
+    }
+    client.browse.mockImplementation(async (id = '' as UserDocDirectoryIdType) => await browse(id))
+    client.browseScope.mockImplementation(async (_scope, id) => await browse(id))
     const trashDocument: UserDocTrashRef = {
       ...restoredDocument, docId: restoredDocument.docId as UserDocIdType,
       directoryId: 'reports' as UserDocDirectoryIdType,
@@ -1173,11 +1182,50 @@ describe('DocumentsModal', () => {
     expect(client.browse).toHaveBeenCalledTimes(before.local)
     expect(client.browseScope).toHaveBeenCalledTimes(before.remote)
     fireEvent.click(within(secondTrash).getByRole('button', { name: t('trash.back') }))
+    try {
+      await restoredListingRequested.promise
+      expect(screen.getAllByRole('status').filter(node => node.textContent === t('modal.loading'))).toHaveLength(1)
+      expect(screen.queryByText(t('modal.empty'))).toBeNull()
+      expect(screen.queryByText(t('modal.count', { count: '0' }))).toBeNull()
+      expect(screen.queryByText(t('modal.refreshing'))).toBeNull()
+      expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true)
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compact ? 'action.more' : 'trash.button') }))
+    } finally { restoredListing.resolve(listing('reports' as UserDocDirectoryIdType)) }
     await screen.findByText('restored.txt')
     expect(client.browse).toHaveBeenCalledTimes(before.local + (target === 'personal' ? 1 : 0))
     expect(client.browseScope).toHaveBeenCalledTimes(before.remote + (target === 'project' ? 1 : 0))
     expect(context).toHaveBeenCalledTimes(1)
     expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compact ? 'action.more' : 'trash.button') }))
+  })
+
+  it.each(['success', 'failure'] as const)('shows loading instead of an empty result until an empty-folder refresh settles: %s', async (outcome) => {
+    const client = makeClient()
+    const empty = { directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits }
+    const refresh = Promise.withResolvers<typeof empty>()
+    const requested = Promise.withResolvers<undefined>()
+    client.browse.mockResolvedValueOnce(empty).mockImplementationOnce(async () => {
+      requested.resolve(undefined)
+      return await refresh.promise
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText(t('modal.empty'))
+    fireEvent.click(screen.getByRole('button', { name: t('modal.refresh') }))
+    try {
+      await requested.promise
+      expect(screen.getAllByRole('status').filter(node => node.textContent === t('modal.loading'))).toHaveLength(1)
+      expect(screen.queryByText(t('modal.empty'))).toBeNull()
+      expect(screen.queryByText(t('modal.count', { count: '0' }))).toBeNull()
+      expect(screen.queryByText(t('modal.refreshing'))).toBeNull()
+    } finally {
+      if (outcome === 'success') refresh.resolve(empty)
+      else refresh.reject(new Error('metadata unavailable'))
+    }
+    await screen.findByText(t('modal.empty'))
+    expect(screen.getByText(t('modal.count', { count: '0' }))).toBeTruthy()
+    expect(screen.queryByText(t('modal.loading'))).toBeNull()
+    expect(client.browse).toHaveBeenCalledTimes(2)
+    if (outcome === 'failure') expect(screen.getByRole('alert').textContent).toContain('metadata unavailable')
   })
 
   it('keeps the cached folder after a failed restore and retains the trash document', async () => {

@@ -30,6 +30,7 @@ const COMPACT_OVERVIEW_EXPECTED = join(SNAPSHOT_DIR, 'compact-overview.expected.
 const PAGED_EXPECTED = join(SNAPSHOT_DIR, 'desktop-paged.expected.md')
 const EXPECTED_DIR = fileURLToPath(new URL('./expected/document-manager', import.meta.url))
 const TRASH_HEADER_EXPECTED = join(EXPECTED_DIR, 'trash-header.expected.md')
+const LOADING_EXPECTED = join(EXPECTED_DIR, 'loading.expected.md')
 const MODE = webSnapshotMode()
 
 const LIMITS = {
@@ -236,6 +237,20 @@ describe('web e2e: document manager', () => {
     })
     let projectRestored = false
     let restoreWrites = 0
+    let holdRestoredListing = false
+    const restoredListingRequested = Promise.withResolvers<undefined>()
+    const releaseRestoredListing = Promise.withResolvers<undefined>()
+    if (target === 'personal') {
+      await page.route(url => url.origin === origin && url.pathname === '/api/documents'
+        && url.searchParams.get('directory') === directoryId, async (route) => {
+        const response = await route.fetch()
+        if (holdRestoredListing) {
+          restoredListingRequested.resolve(undefined)
+          await releaseRestoredListing.promise
+        }
+        await route.fulfill({ response })
+      })
+    }
     if (target === 'project') {
       await page.route(url => url.origin === origin && [
         '/api/documents/scope', '/api/documents/scope/trash', '/api/documents/scope/restore',
@@ -245,6 +260,10 @@ describe('web e2e: document manager', () => {
         if (url.pathname === '/api/documents/scope') {
           const directory = url.searchParams.get('directory') ?? ''
           expect(['', 'reports']).toContain(directory)
+          if (holdRestoredListing && directory === directoryId) {
+            restoredListingRequested.resolve(undefined)
+            await releaseRestoredListing.promise
+          }
           await route.fulfill({ json: {
             version: 1, scope: { kind: 'project', label: 'Compiler' }, directoryId: directory,
             directories: directory === '' ? [{ directoryId: 'reports', name: 'reports' }] : [],
@@ -343,26 +362,45 @@ describe('web e2e: document manager', () => {
     expect(reads).toEqual(before)
     expect(restoreWrites).toBe(1)
     const restoredBack = restoredTrash.getByRole('button', { name: 'Back to documents', exact: true })
-    if (compact) await restoredBack.tap()
-    else await restoredBack.click()
-    await restoredTrash.waitFor({ state: 'detached' })
-    await manager.locator('[data-documents-list]').getByText(restoredFile.name, { exact: true }).waitFor()
-    expect(reads.slice(before.length)).toEqual([{
-      path: target === 'personal' ? '/api/documents' : '/api/documents/scope',
-      scope: target === 'personal' ? null : 'project:41', directory: directoryId,
-    }])
-    expect(await breadcrumb.getAttribute('aria-current')).toBe('page')
-    expect(await returnTarget.evaluate(node => node === document.activeElement)).toBe(true)
-    expect(await manager.count()).toBe(1)
-    if (target === 'project') await manager.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor()
-    else {
-      expect((await scaffold.ctx.userDocs.listDirectory(UserDocDirectoryId(directoryId))).documents
-        .some(row => row.docId === restoredFile.docId)).toBe(true)
-      const stored = await scaffold.ctx.userDocs.read(UserDocId(restoredFile.docId))
-      expect(new TextDecoder().decode(stored.data)).toBe('real Host restore\n')
+    holdRestoredListing = true
+    try {
+      if (compact) await restoredBack.tap()
+      else await restoredBack.click()
+      await restoredTrash.waitFor({ state: 'detached' })
+      await restoredListingRequested.promise
+      const loadingSelector = '[data-documents-panel] > [role="status"][aria-live="polite"]'
+      const loading = manager.locator(loadingSelector)
+      await loading.waitFor({ state: 'visible' })
+      expect(await loading.count()).toBe(1)
+      expect(await loading.innerText()).toBe('Loading documents')
+      expect(await manager.getByText('No documents uploaded yet', { exact: true }).count()).toBe(0)
+      expect(await manager.getByText('0 documents', { exact: true }).count()).toBe(0)
+      expect(await breadcrumb.getAttribute('aria-current')).toBe('page')
+      expect(await returnTarget.evaluate(node => node === document.activeElement)).toBe(true)
+      await compareOrRefreshGolden(LOADING_EXPECTED, await captureStableAria(page, loadingSelector, scaffold.workspaceCwd), MODE)
+      releaseRestoredListing.resolve(undefined)
+      await manager.locator('[data-documents-list]').getByText(restoredFile.name, { exact: true }).waitFor()
+      expect(await loading.count()).toBe(0)
+      expect(reads.slice(before.length)).toEqual([{
+        path: target === 'personal' ? '/api/documents' : '/api/documents/scope',
+        scope: target === 'personal' ? null : 'project:41', directory: directoryId,
+      }])
+      expect(await breadcrumb.getAttribute('aria-current')).toBe('page')
+      expect(await returnTarget.evaluate(node => node === document.activeElement)).toBe(true)
+      expect(await manager.count()).toBe(1)
+      if (target === 'project') await manager.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor()
+      else {
+        expect((await scaffold.ctx.userDocs.listDirectory(UserDocDirectoryId(directoryId))).documents
+          .some(row => row.docId === restoredFile.docId)).toBe(true)
+        const stored = await scaffold.ctx.userDocs.read(UserDocId(restoredFile.docId))
+        expect(new TextDecoder().decode(stored.data)).toBe('real Host restore\n')
+      }
+      console.info('[document-trash-return]', JSON.stringify({ label, target, before, after: reads, restoreWrites }))
+      expect(tripwire.warnings).toEqual([])
+    } finally {
+      releaseRestoredListing.resolve(undefined)
+      await page.unrouteAll({ behavior: 'wait' })
     }
-    console.info('[document-trash-return]', JSON.stringify({ label, target, before, after: reads, restoreWrites }))
-    expect(tripwire.warnings).toEqual([])
   })
 
   it('desktop: pages a 21-file list and shows the oldest file on page two', async () => {
@@ -797,6 +835,6 @@ describe('web e2e: document manager', () => {
   })
 
   it('commits exactly the document-manager ARIA expected-output inventory', async () => {
-    await assertFixtureInventory(EXPECTED_DIR, ['trash-header.expected.md'])
+    await assertFixtureInventory(EXPECTED_DIR, ['trash-header.expected.md', 'loading.expected.md'])
   })
 })

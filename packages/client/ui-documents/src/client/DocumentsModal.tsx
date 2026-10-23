@@ -2796,6 +2796,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     : filtered.length > PAGE_SIZE
   const hasEntries = directories.length > 0 || documents.length > 0
     || (serverPaging && (serverTotalDocuments ?? 0) > 0)
+  const emptyReadPending = !hasEntries && (loading || refreshing)
   const hasVisibleEntries = filteredDirectories.length > 0 || filtered.length > 0
     || (serverPaging && (serverTotalDocuments ?? 0) > 0)
   const moveOptions = [
@@ -3738,9 +3739,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       </label>
                     )}
                     <span>{visibleScope}</span>
-                    {refreshing && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
+                    {refreshing && !emptyReadPending && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
                   </span>
-                  {!loading && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
+                  {!loading && !emptyReadPending && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
                 </div>
 
               </div>
@@ -3802,7 +3803,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 </div>
               )}
 
-              {loading && !listingReadyRef.current ? (
+              {emptyReadPending ? (
                 <div className={css.loadingState} role="status" aria-live="polite">
                   <span className={css.visuallyHidden}>{t('modal.loading')}</span>
                   {[0, 1, 2].map(index => <span key={index} className={css.loadingRow} aria-hidden="true" />)}
