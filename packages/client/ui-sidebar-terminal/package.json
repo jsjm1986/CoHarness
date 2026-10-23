@@ -32,7 +32,8 @@
         "@deepseek-ai/dsh-api-terminal-controller",
         "@deepseek-ai/dsh-client-ui-sidebar-right",
         "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-ui-theme"
+        "@deepseek-ai/dsh-client-ui-theme",
+        "@deepseek-ai/dsh-client-runtime"
       ],
       "platform": "web"
     }
@@ -46,6 +47,7 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-api-terminal-controller": "workspace:*",
     "@deepseek-ai/dsh-client-locale": "workspace:*",
+    "@deepseek-ai/dsh-client-runtime": "workspace:*",
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:*",
     "@deepseek-ai/dsh-client-ui-layout": "workspace:*",
     "@deepseek-ai/dsh-client-ui-renderer": "workspace:*",

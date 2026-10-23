@@ -3,6 +3,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { WebTerminalId } from '@deepseek-ai/dsh-api-terminal-controller/types'
 import type { SidebarRightTabParamsMap, TabId } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-api-terminal-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -19,7 +22,7 @@ import type { TerminalBodyInjected, TerminalInjected } from './face.ts'
 import { en, zh } from './locales.ts'
 
 /** Services needed by the terminal's two sidebar seats. */
-export const inject = ['slots', 'locale', 'sidebarRight', 'sidebarRightTabs', 'webTerminals', 'theme']
+export const inject = ['slots', 'locale', 'sidebarRight', 'sidebarRightTabs', 'webTerminals', 'theme', 'sessions', 'connection', 'projectUiPolicy']
 
 /**
  * Register the terminal type, observable views and background process cleanup.
@@ -27,7 +30,8 @@ export const inject = ['slots', 'locale', 'sidebarRight', 'sidebarRightTabs', 'w
  */
 export function apply(ctx: Context): void {
   let disposed = false
-  const recovered = new Map<SessionId, Promise<void>>()
+  const recovered = new Map<SessionId, { owner: string; consumers: Set<AbortSignal>; promise: Promise<void> }>()
+  const connection = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => () => { disposed = true; recovered.clear() }, 'ui-sidebar-terminal.lifetime')
   ctx.effect(() => {
     const sync = (): void => { ctx.webTerminals.retainTabs(ctx.sidebarRight.openTabs.getSnapshot().filter(tab => tab.kind === 'terminal')) }
@@ -84,24 +88,48 @@ export function apply(ctx: Context): void {
   )), 'ui-sidebar-terminal.title')
   ctx.effect(() => ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
     name: 'conversation.input.left', id, locale: namespace,
-    inject: (sessionId): TerminalRecoveryInjected => ({
-      restore: () => {
-        let pending = recovered.get(sessionId)
-        if (pending === undefined) {
-          for (const tab of ctx.sidebarRight.tabsIn(sessionId)) {
-            if (tab.kind === 'terminal') view(sessionId, tab.id)
+    inject: (sessionId): TerminalRecoveryInjected => {
+      const ownership: HostObservable<string | undefined> = {
+        getSnapshot: () => disposed ? undefined : sessionPersistenceKey(ctx.sessions, sessionId,
+          connection.hostDescription.getSnapshot()?.executionAuthorityRequired, ctx.projectUiPolicy.getSnapshot().verifiedAccountId),
+        subscribe: (listener) => {
+          const changed = (): void => {
+            const pending = recovered.get(sessionId)
+            if (pending !== undefined && pending.owner !== ownership.getSnapshot()) recovered.delete(sessionId)
+            listener()
           }
-          pending = ctx.webTerminals.recover(sessionId).then((terminals) => {
-            if (disposed) return
+          const releases = [ctx.sessions.list.subscribe(changed), connection.hostDescription.subscribe(changed),
+            ctx.projectUiPolicy.subscribe(changed)]
+          return () => { for (const release of releases) release() }
+        },
+      }
+      return { hooks: { ownership }, restore: (signal) => {
+        if (signal.aborted) return Promise.resolve()
+        const owner = ownership.getSnapshot()
+        if (owner === undefined) return Promise.resolve()
+        let pending = recovered.get(sessionId)
+        if (pending === undefined || pending.owner !== owner || [...pending.consumers].every(consumer => consumer.aborted)) {
+          const consumers = new Set([signal])
+          const canPublish = (): boolean => ownership.getSnapshot() === owner && recovered.get(sessionId)?.promise === promise
+            && [...consumers].some(consumer => !consumer.aborted)
+          const promise: Promise<void> = (async () => {
+            for (const tab of ctx.sidebarRight.tabsIn(sessionId)) {
+              if (tab.kind === 'terminal') view(sessionId, tab.id)
+            }
+            const terminals = await ctx.webTerminals.recover(sessionId)
+            if (!canPublish()) return
             for (const info of terminals) ctx.sidebarRight.openTabIn(sessionId, 'terminal', {
               params: { terminalId: info.id },
             })
-          }).finally(() => { recovered.delete(sessionId) })
+          })().catch((error: unknown) => { if (canPublish()) throw error })
+            .finally(() => { if (recovered.get(sessionId)?.promise === promise) recovered.delete(sessionId) })
+          pending = { owner, consumers, promise }
           recovered.set(sessionId, pending)
         }
-        return pending
-      },
-    }),
+        pending.consumers.add(signal)
+        return pending.promise
+      } }
+    },
   }, TerminalRecovery)), 'ui-sidebar-terminal.recovery')
   ctx.effect(() => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id, locale: namespace,

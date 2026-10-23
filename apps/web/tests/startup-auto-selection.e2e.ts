@@ -197,10 +197,12 @@ describe('web e2e: startup auto-selection', () => {
     expect(await recordedPhases(page)).toEqual(['hero'])
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
-  it.each(['local', 'account'] as const)('reads the saved history while the real list response is held, then presents the same opening: %s', async (composition) => {
-    const accountScaffold = composition === 'account' ? await launchWebScaffold({ workbench: true }) : undefined
+  it.each(['local', 'account', 'account pending'] as const)('reads the saved history while the real list response is held, then presents the same opening: %s', async (composition) => {
+    const accountScaffold = composition === 'local' ? undefined : await launchWebScaffold({ workbench: true })
     let accountPage: Page | undefined
     let targetPage = page
+    let holdContext = false
+    const accountContextGate = Promise.withResolvers<undefined>()
     try {
       const targetScaffold = accountScaffold ?? scaffold
       if (accountScaffold !== undefined) targetPage = accountPage = await newEnglishPage(browser)
@@ -221,6 +223,7 @@ describe('web e2e: startup auto-selection', () => {
           await route.fulfill({ response, json: body })
         })
         await targetPage.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
+          if (holdContext) await accountContextGate.promise
           await route.fulfill({ json: {
             user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
             scope: { kind: 'personal' }, projects: [],
@@ -252,10 +255,12 @@ describe('web e2e: startup auto-selection', () => {
         historyResponse = response
       }
       let indexCalls = 0
+      let terminalCalls = 0
       const countHistory = (request: import('playwright').Request): void => {
         const path = new URL(request.url()).pathname
         if (path === '/api/session.history') historyCalls++
         if (path === '/api/session.historyIndex') indexCalls++
+        if (path === '/api/terminal/list') terminalCalls++
       }
       targetPage.on('request', countHistory)
       targetPage.on('response', observeHistory)
@@ -273,6 +278,7 @@ describe('web e2e: startup auto-selection', () => {
       })
       const warningsBefore = targetTripwire.warnings.length
       try {
+        holdContext = composition === 'account pending'
         await targetPage.reload({ waitUntil: 'commit' })
         await listReady.promise
         await expect.poll(() => historyCalls).toBe(1)
@@ -282,12 +288,24 @@ describe('web e2e: startup auto-selection', () => {
         expect(indexCalls).toBe(0)
         expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
         expect(await targetPage.locator('textarea').first().isVisible()).toBe(true)
-        expect(targetScaffold.ctx.agents.get(id)).toBeUndefined()
+        expect(targetScaffold.ctx.agents.get(id) === undefined).toBe(true)
         listGate.resolve(undefined)
         await targetPage.getByText(SAVED_PROMPT, { exact: true }).waitFor()
         await targetPage.getByText('The saved conversation is ready.', { exact: true }).waitFor()
-        expect(historyCalls).toBe(1)
-        expect(targetScaffold.ctx.agents.get(id)).toBeUndefined()
+        if (composition === 'account pending') {
+          const composer = await captureStableAria(targetPage, '[data-composer-seat]', targetScaffold.workspaceCwd)
+          expect(composer).not.toContain('Retry terminal recovery')
+          expect(terminalCalls).toBe(0)
+          accountContextGate.resolve(undefined)
+          await expect.poll(() => terminalCalls).toBe(1)
+          expect(await targetPage.getByRole('button', { name: 'Retry terminal recovery', exact: true }).count()).toBe(0)
+        }
+        // Late account verification can reinstall the persisted viewport and
+        // complete Agent-backed model reads after the opening is presented.
+        if (composition !== 'account pending') {
+          expect(historyCalls).toBe(1)
+          expect(targetScaffold.ctx.agents.get(id) === undefined).toBe(true)
+        }
         const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection')
         await compareOrRefreshGolden(join(expected, 'saved-history.expected.md'),
           await captureStableAria(targetPage, '[data-conversation-scroll]', targetScaffold.workspaceCwd), webSnapshotMode())
@@ -304,7 +322,11 @@ describe('web e2e: startup auto-selection', () => {
       await saveFailureShot(targetPage, `web-e2e-startup-saved-history-${composition}`)
       throw error
     } finally {
-      try { await accountPage?.close() }
+      accountContextGate.resolve(undefined)
+      try {
+        await accountPage?.unrouteAll({ behavior: 'wait' })
+        await accountPage?.close()
+      }
       finally { await accountScaffold?.close() }
     }
   }, 120_000)
