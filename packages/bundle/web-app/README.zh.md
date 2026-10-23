@@ -11,6 +11,8 @@ dsh 浏览器表层组合包。[`cordis.patch.yml`](cordis.patch.yml) 叠加在 
 
 Web patch 独立于 profile 管理挂载[插件管理目录](../../boot/plugin-manager/README.zh.md#use-this-package)，使未托管的 Host 能答复页面可用性而不暴露变更方法。该行只属于 Web，不加入共享 base 或 headless 组合。
 
+Web 把[连接](../../client/connection/README.zh.md)的历史页目标设为 262,144 字节的未压缩 JSON。较大的页可减少完整消息的串行往返，代价是首次响应更大。该软目标保留不可分割的消息组和连接的响应体拒绝上限；部署方可在补丁中覆盖 `connection.config.historyPageTargetBytes`。
+
 ## 概述
 
 运行 `dsh --profile web`，打开提供聊天、模型与设置管理以及会话历史的浏览器 GUI。它使用与其他 dsh 表层相同的模型访问、工具与安全默认值。启动时会打印带认证信息的 URL，通常还会打开默认浏览器；SSH 会话和 `--no-open` 需要你手动打开。更改端口、允许额外 authority、绑定一个具体的本机 IP，并用自己提供的证书直接提供 HTTPS；通配地址会被拒绝。跨机访问使用剥离前缀代理后公告的 HTTP(S) URL、监听器 TLS，或非 loopback bind 上的明文 HTTP。一次性的命令行任务应使用 `dsh-headless`。

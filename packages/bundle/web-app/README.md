@@ -11,6 +11,8 @@ The dsh browser-surface bundle. [`cordis.patch.yml`](cordis.patch.yml) rides ove
 
 The Web patch mounts the [Plugin Manager catalog](../../boot/plugin-manager/README.md#use-this-package) independently of profile management, so unmanaged Hosts can answer page availability without exposing mutation methods. This Web-only row is not added to the shared base or headless composition.
 
+Web sets the [connection](../../client/connection/README.md) history-page target to 262,144 uncompressed JSON bytes. Larger pages reduce serial round trips for complete messages at the cost of a larger initial response. This soft target preserves indivisible message groups and the connection's response-body rejection limit; deployments can override `connection.config.historyPageTargetBytes` in their patch.
+
 ## Summary
 
 Run `dsh --profile web` to open a browser GUI with chat, model and settings management, and session history. It uses the same model access, tools, and safety defaults as other dsh surfaces. Startup prints an authenticated URL and normally opens the default browser; SSH sessions and `--no-open` require manual opening. Change the port, allow extra authorities, bind one concrete local IP, and serve HTTPS from a certificate you supply; wildcard addresses are rejected. Remote access uses an advertised HTTP(S) URL behind a prefix-stripping proxy, listener TLS, or plain HTTP on a non-loopback bind. Use `dsh-headless` for one-shot command-line tasks.

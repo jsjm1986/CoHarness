@@ -18,9 +18,11 @@ Status: implemented
 
 `dsh-client-connection` 持有 `historyPageTargetBytes`（默认 131,072）。该值是目标，不是硬拒绝上限。持久化、`SESSION_FORMAT_VERSION` 与 Conversation 组装保持不变。
 
+随附的 Web bundle 把该目标设为 262,144 字节。一段含 157,649 字节 `request/header` 的公网单轮对话，在 131,072 字节目标下需要三次串行历史响应。包含相同事件类别及 157,333 字节请求头的生产编解码器合成 fixture，在 131,072 下分三页，在 262,144 下分一页；两者重建出相同的完整响应、记录和投影。较大目标以更大的首次响应和 fold 换取更少的网络往返，不改变库默认值或 16 MiB 响应体拒绝上限。
+
 ### 验证
 
-聚焦的编解码、Fetch 载体、schema 与 Host 插件测试钉住重建、恰好放下 / 少一字节的截断、超大消息组前进、畸形记录拒绝，以及未知事件透传。无密钥组装 Web 场景 `apps/web/tests/lossless-history-wire.e2e.ts` 植入少于 50 条追加来源消息，经生产 Host 桥接行使默认 131,072 字节目标，并记录 conversation 档 Chat golden 以及 Trajectory `detail: 'full'` 补全之后的结果。浏览器 Chat 首次打开不再展开全部历史打包 chunk；该下载档见 [两档会话历史传输](2026-08-18-conversation-history-tier.zh.md)。
+聚焦的编解码、Fetch 载体、schema 与 Host 插件测试钉住重建、恰好放下 / 少一字节的截断、超大消息组前进、畸形记录拒绝，以及未知事件透传。无密钥组装 Web 场景 `apps/web/tests/lossless-history-wire.e2e.ts` 植入少于 50 条追加来源消息，经生产 Host 桥接行使随附 Web bundle 的 262,144 字节目标，并记录 conversation 档 Chat golden 以及 Trajectory `detail: 'full'` 补全之后的结果。浏览器 Chat 首次打开不再展开全部历史打包 chunk；该下载档见 [两档会话历史传输](2026-08-18-conversation-history-tier.zh.md)。
 
 ## 考虑过的替代方案
 
