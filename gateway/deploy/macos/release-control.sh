@@ -81,13 +81,16 @@ validate_release() {
     # required at first session lock, not at boot; require the host platform's
     # payloads so an incomplete release is refused before it goes live. Legacy
     # source releases predate the addon and stay exempt below.
-    local -a native_paths=()
+    local -a native_paths=(
+      native/system/packages/entry/lib/index.js
+      native/system/packages/entry/lib/flock.js
+    )
     case "$(uname -s)-$(uname -m)" in
-      Darwin-arm64)         native_paths=(native/system/packages/darwin-arm64/bin/system.node) ;;
-      Darwin-x86_64)        native_paths=(native/system/packages/darwin-x64/bin/system.node) ;;
-      Linux-x86_64)         native_paths=(native/system/packages/linux-x64/bin/landlock-run native/system/packages/linux-x64/bin/glibc/system.node native/system/packages/linux-x64/bin/musl/system.node) ;;
+      Darwin-arm64)         native_paths+=(native/system/packages/darwin-arm64/bin/system.node) ;;
+      Darwin-x86_64)        native_paths+=(native/system/packages/darwin-x64/bin/system.node) ;;
+      Linux-x86_64)         native_paths+=(native/system/packages/linux-x64/bin/landlock-run native/system/packages/linux-x64/bin/glibc/system.node native/system/packages/linux-x64/bin/musl/system.node) ;;
       Linux-aarch64|Linux-arm64)
-                            native_paths=(native/system/packages/linux-arm64/bin/landlock-run native/system/packages/linux-arm64/bin/glibc/system.node native/system/packages/linux-arm64/bin/musl/system.node) ;;
+                            native_paths+=(native/system/packages/linux-arm64/bin/landlock-run native/system/packages/linux-arm64/bin/glibc/system.node native/system/packages/linux-arm64/bin/musl/system.node) ;;
       *) fail "unsupported host for native-artifact check: $(uname -s)/$(uname -m)" ;;
     esac
     for required in "${native_paths[@]}"; do

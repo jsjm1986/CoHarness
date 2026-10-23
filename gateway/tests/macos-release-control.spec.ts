@@ -78,6 +78,8 @@ function release(root: string, name: string): string {
     'plugins/dsh-model-governance/cordis.patch.yml',
     'plugins/dsh-steward-tools/lib/index.js',
     'plugins/dsh-steward-tools/cordis.patch.yml',
+    'native/system/packages/entry/lib/index.js',
+    'native/system/packages/entry/lib/flock.js',
     ...hostNativePaths(),
   ]) {
     const file = join(directory, path)
@@ -308,14 +310,16 @@ printf '%s\n' "$*" > "$CAPTURE"
     expect(existsSync(join(root, '.activation.lock'))).toBe(false)
   })
 
-  it('rejects a compiled release missing the host native addon before switching current', () => {
+  it.each([
+    ...hostNativePaths().slice(0, 1),
+    'native/system/packages/entry/lib/index.js',
+    'native/system/packages/entry/lib/flock.js',
+  ])('rejects a compiled release missing native payload %s before switching current', (missing) => {
     const root = mkdtempSync(join(tmpdir(), 'hgw-release-native-'))
     const previous = release(root, 'release-one')
     const candidate = release(root, 'release-two')
     pointCurrent(root, previous)
-    const missing = hostNativePaths()[0]
-    expect(missing).toBeDefined()
-    unlinkSync(join(candidate, missing as string))
+    unlinkSync(join(candidate, missing))
     const envFile = environmentFile(root)
     const state = join(root, 'state')
     const bin = fakeTools(root, state)
@@ -334,7 +338,7 @@ printf '%s\n' "$*" > "$CAPTURE"
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain(`release payload is missing or empty`)
-    expect(result.stderr).toContain(missing as string)
+    expect(result.stderr).toContain(missing)
     expect(realpathSync(join(root, 'current'))).toBe(realpathSync(previous))
     expect(existsSync(join(root, '.activation.lock'))).toBe(false)
   })

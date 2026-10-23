@@ -16,6 +16,8 @@ macOS 部署把 `gateway/deploy/macos/release-control.sh` 安装到所有 releas
 
 存在 `HGW_RELEASE_ROOT` 时，Gateway 配置会验证正在运行的 Gateway 目录属于该 release，从中派生已构建 CLI 命令和 release 自有插件路径，并拒绝冲突的覆盖值。`/healthz` 把不可变目录名作为 `release` 返回，但不暴露宿主机绝对路径。
 
+原生产物校验要求同时具备 `landlock-run` 和 `flock` 的编译后 JavaScript 入口及宿主平台二进制。指向[原生入口包](../../../../native/system/packages/entry/package.json)的链接能够解析，不代表其导出的文件存在。Gateway 健康不能证明 Runtime 能导入 Session 持久化或沙箱；release 验证包含启动完整 Runtime 并通过真实 API 创建 Session。
+
 release 激活过程校验必需的生产产物，持有一个文件系统锁，原子替换 `current` 符号链接，并强制重启 launchd。只有 launchd 取得不同的 PID、该 PID 的 cwd 指向目标 Gateway 目录，且 `/healthz` 报告目标 release 时，控制器才接受目标。失败时，默认恢复上一个 release；`--rollback-target <directory>` 可选择另一个恢复 release。控制器再次重启 launchd，并在返回错误前验证选定的 release。
 
 显式恢复目标在进程操作之前固定，必须解析为 releases 根目录下包含完整编译产物的直属 release。控制器在规范路径解析之前拒绝可变的 `current` 名称，也拒绝解析为候选目录的别名。上一个 PID 和子进程清理始终跟随真实运行的 release，与恢复目标选择相互独立。如果选定的恢复目标不健康或报告其他 release 身份，控制器会返回错误，不再尝试可能不兼容的上一个 release。
