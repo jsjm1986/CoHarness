@@ -83,6 +83,8 @@ Ordinary installed libraries remain `dependencies`: a dynamic build may bundle a
 
 **Enable semantic compression or identifier mangling for dynamic bundles.** Both widen the behavior that needs compatibility evidence. Format-only output already removes repeated whitespace and documentation while retaining names used by Cordis; further compression needs separate reflection, lazy-loading, and assembled-application validation.
 
+**Instrument declarations with `keepNames`.** When both an entry and its lazy chunk declare named functions or classes, Rolldown extracts the name helper into a synchronously required runtime chunk. The module table cannot materialize an unregistered private chunk through synchronous `require`. Disabled compression and mangling preserve the ordinary bundle's reflection names without that helper; the real preset fixture compares entry and lazy names against unformatted output and rejects additional synchronous chunk requests.
+
 ## Consequences
 
 Bundle contents stay stable when an npm dependency moves between peer and development sections, because each build face declares externality directly. Static libraries remain host-assembled, while dynamic packages retain uniform artifacts and lifecycle governance.

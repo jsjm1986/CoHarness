@@ -1,5 +1,5 @@
 /** Exercises the dynamic Client preset through emitted JavaScript and the production module table. */
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createContext, runInContext } from 'node:vm'
@@ -19,6 +19,13 @@ const ENTRY_SOURCE = [
   'export const NamedArrow = () => "arrow"',
   'export const names = [NamedPlugin.name, NamedService.name, NamedArrow.name]',
   'export const lazy = () => import("./lazy.js")',
+].join('\n')
+const LAZY_SOURCE = [
+  'export function LazyPlugin() { return "lazy-plugin" }',
+  'export class LazyService { value() { return "lazy-service" } }',
+  'export const LazyArrow = () => "lazy-arrow"',
+  'export const names = [LazyPlugin.name, LazyService.name, LazyArrow.name]',
+  'export const marker = "lazy-loaded"',
 ].join('\n')
 
 async function emitSource(root: string, name: string, source: string): Promise<void> {
@@ -80,10 +87,19 @@ describe('dynamic Client output formatting', () => {
     try {
       await writeFile(join(root, 'package.json'), '{"type":"module"}')
       await emitSource(root, 'index', ENTRY_SOURCE)
-      await emitSource(root, 'lazy', 'export const marker = "lazy-loaded"\n')
+      await emitSource(root, 'lazy', LAZY_SOURCE)
       const preset = clientConfig()
       expect(preset.minify).toEqual({ compress: false, mangle: false })
-      const original = await bundle(root, { ...preset, minify: false }, 'original')
+      if (typeof preset.outputOptions !== 'object' || preset.outputOptions === null) {
+        throw new Error('Client output settings missing')
+      }
+      const originalOutput = { ...preset.outputOptions }
+      delete originalOutput.keepNames
+      delete originalOutput.minifyInternalExports
+      delete originalOutput.comments
+      const originalPreset = { ...preset, outputOptions: originalOutput }
+      delete originalPreset.minify
+      const original = await bundle(root, originalPreset, 'original')
       const generatedImports: string[] = []
       if (!Array.isArray(preset.plugins)) throw new Error('Client preset plugins missing')
       const formatted = await bundle(root, {
@@ -114,41 +130,50 @@ describe('dynamic Client output formatting', () => {
       expect(map.sources.some(source => source.includes('/lib/types/'))).toBe(false)
       expect(map.mappings).not.toBe('')
 
-      const requested: string[] = []
-      const target: ClientModuleLoaderTarget = {
-        mode: 'queue',
-        pendingQueue: [],
-        load(registration) { this.pendingQueue.push(registration) },
-        create() { throw new Error('fixture constructs its module table directly') },
+      for (const directory of ['original', 'formatted']) {
+        const scripts = (await readdir(join(root, directory))).filter(file => file.endsWith('.js')).sort()
+        expect(scripts).toEqual(['client.js', 'client.lazy.js'])
+        for (const file of scripts) {
+          expect(await readFile(join(root, directory, file), 'utf8')).not.toMatch(/\brequire\(["'`]\.\/client\./)
+        }
+        const requested: string[] = []
+        const target: ClientModuleLoaderTarget = {
+          mode: 'queue',
+          pendingQueue: [],
+          load(registration) { this.pendingQueue.push(registration) },
+          create() { throw new Error('fixture constructs its module table directly') },
+        }
+        const realm = createContext({ window: { __ModuleLoader__: target } })
+        const url = `plugins/??${PACKAGE_ID}/client.js&rev=fixture`
+        const modules = new ClientModuleSystem({
+          manifest: parseBootManifest({
+            rev: 'fixture',
+            entries: [{ id: PACKAGE_ID, url, rev: 'fixture' }],
+            batches: [{ phase: 'application', url, rev: 'fixture', entries: [PACKAGE_ID] }],
+          }),
+          staticModules: {},
+          registrationTarget: target,
+          bootstrapModule: { id: '@fixture/bootstrap', exports: {} },
+          async loadBundle(request) {
+            requested.push(request)
+            const file = request === url ? 'client.js' : new URL(request, 'https://fixture.invalid/').pathname.split('/').at(-1)!
+            const source = await readFile(join(root, directory, file), 'utf8')
+            runInContext(source, realm, { filename: file })
+          },
+        })
+        const entry = await modules.import(PACKAGE_ID) as {
+          names: string[]
+          lazy: () => Promise<{ marker: string; names: string[] }>
+        }
+        expect([...entry.names]).toEqual(['NamedPlugin', 'NamedService', 'NamedArrow'])
+        expect(requested).toEqual([url])
+        const lazy = await entry.lazy()
+        expect(lazy.marker).toBe('lazy-loaded')
+        expect([...lazy.names]).toEqual(['LazyPlugin', 'LazyService', 'LazyArrow'])
+        expect(requested).toEqual([url, `plugins/${PACKAGE_ID}/client.lazy.js?rev=fixture`])
+        await entry.lazy()
+        expect(requested).toHaveLength(2)
       }
-      const realm = createContext({ window: { __ModuleLoader__: target } })
-      const url = `plugins/??${PACKAGE_ID}/client.js&rev=fixture`
-      const modules = new ClientModuleSystem({
-        manifest: parseBootManifest({
-          rev: 'fixture',
-          entries: [{ id: PACKAGE_ID, url, rev: 'fixture' }],
-          batches: [{ phase: 'application', url, rev: 'fixture', entries: [PACKAGE_ID] }],
-        }),
-        staticModules: {},
-        registrationTarget: target,
-        bootstrapModule: { id: '@fixture/bootstrap', exports: {} },
-        async loadBundle(request) {
-          requested.push(request)
-          const file = request === url ? 'client.js' : new URL(request, 'https://fixture.invalid/').pathname.split('/').at(-1)!
-          const source = await readFile(join(root, 'formatted', file), 'utf8')
-          runInContext(source, realm, { filename: file })
-        },
-      })
-      const entry = await modules.import(PACKAGE_ID) as {
-        names: string[]
-        lazy: () => Promise<{ marker: string }>
-      }
-      expect([...entry.names]).toEqual(['NamedPlugin', 'NamedService', 'NamedArrow'])
-      expect(requested).toEqual([url])
-      expect((await entry.lazy()).marker).toBe('lazy-loaded')
-      expect(requested).toEqual([url, `plugins/${PACKAGE_ID}/client.lazy.js?rev=fixture`])
-      await entry.lazy()
-      expect(requested).toHaveLength(2)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

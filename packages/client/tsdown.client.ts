@@ -656,7 +656,6 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
     }],
     outputOptions: {
       entryFileNames: 'client.js',
-      keepNames: true,
       minifyInternalExports: false,
       comments: { legal: true, annotation: true, jsdoc: false },
       // The imported source basename becomes the published chunk name; package
