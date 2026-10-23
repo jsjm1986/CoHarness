@@ -2,7 +2,6 @@
 
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { join } from 'node:path'
 import type { Browser, BrowserContext, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
@@ -18,7 +17,7 @@ const MESSAGE_TEXT = 'Pinned the migration checklist to the top of the plan.'
 const ANSWER_TEXT = 'Proceed with the staged rollout'
 const QUESTION_TEXT = 'Roll out to production now or stage first?'
 const OTHER_PROJECT_TEXT = 'Unrelated project activity'
-const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/project-activity', import.meta.url))
+const UI_EXPECTED = fileURLToPath(new URL('./expected/project-activity/ui.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
 
 let scaffold: WebScaffold
@@ -133,6 +132,8 @@ describe('project activity tab', () => {
   it('keeps project activity pinned after another tab changes scope, then reveals the conversation row', async () => {
     context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'UTC' })
     page = await context.newPage()
+    // Own relative-day labels while network and UI timers keep advancing.
+    await page.clock.setFixedTime(new Date('2026-10-23T12:00:00.000Z'))
     tripwire = watchConsole(page)
     await mockActivityGateway(page)
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-activity'))
@@ -149,6 +150,7 @@ describe('project activity tab', () => {
     await feed.getByText(ANSWER_TEXT, { exact: true }).waitFor()
     await feed.getByText('Zhou', { exact: true }).waitFor()
     await feed.getByText('chose', { exact: true }).waitFor()
+    await feed.getByRole('button', { name: 'Today Zhou · Lin 2', exact: true }).waitFor()
 
     // The folded line expands to the detail card; the question shows there.
     await feed.getByText(ANSWER_TEXT, { exact: true }).click()
@@ -171,7 +173,7 @@ describe('project activity tab', () => {
     await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor()
     expect(await feed.getByText(OTHER_PROJECT_TEXT, { exact: true }).count()).toBe(0)
     const snapshot = await captureStableAria(page, '[class*="feed"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'ui.expected.md'), snapshot, MODE)
+    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
 
     const seeded = page.getByText('DONE', { exact: true })
     await feed.getByText('Jump to conversation', { exact: true }).click()

@@ -5,8 +5,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
 - img
 - text: plan Plan mode on. Use /plan off to leave.
 - button "System prompt":
@@ -31,10 +29,6 @@
 - paragraph: DONE
 - 'button "Open plan: Add `--greeting` flag to CLI"': "Add `--greeting` flag to CLI Plan · Markdown Open"
 - button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
   - img
 - button "Branch into a new conversation":
   - img
