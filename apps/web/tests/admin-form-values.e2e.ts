@@ -13,7 +13,8 @@ import { UserService } from '../../../gateway/src/users.ts'
 import { ProjectService } from '../../../gateway/src/projects.ts'
 import { AuditService } from '../../../gateway/src/audit.ts'
 import { InstanceManager } from '../../../gateway/src/instances.ts'
-import { ModelGovernanceService } from '../../../gateway/src/model-governance.ts'
+import { ModelGovernanceService, type OrganizationModelSettingsView } from '../../../gateway/src/model-governance.ts'
+import { organizationModelSettingsSchema } from '../../../gateway/src/organization-model-settings.ts'
 import { createGatewayServer, type GatewayDeps } from '../../../gateway/src/server.ts'
 import { createProxyHandlers } from '../../../gateway/src/proxy.ts'
 import { createAdminApiHandler } from '../../../gateway/src/admin-api.ts'
@@ -58,6 +59,12 @@ it('preserves stored values through built forms and keeps every mobile destinati
       record: async () => { throw new Error('This form scenario does not capture data') }, setVerified: async () => { throw new Error('No backup selected') } }
     deps.memoryAccess = { get: async owner => ({ ...owner, enabled: false, revision: '0' }),
       set: async (owner, enabled) => ({ ...owner, enabled: enabled === true, revision: '1' }) }
+    deps.progress = {
+      digestModelSettings: async () => ({ model: null, candidates: [] }),
+      progressForUser: async () => { throw new Error('This form scenario does not read project progress') },
+      generateNow: async () => { throw new Error('This form scenario does not generate project progress') },
+      setDigestModel: async () => { throw new Error('This form scenario does not change the digest model') },
+    }
     const runtimeActions: unknown[] = []
     const stopInstance = deps.instances.stop.bind(deps.instances)
     deps.instances.stop = async (target, reason) => {
@@ -81,7 +88,15 @@ it('preserves stored values through built forms and keeps every mobile destinati
         if (kind === 'project') return
         boundSetQuota(kind, id, tokens, cost)
       },
-      describeOrganizationModelSettings: () => ({ writable: false, hasDocument: false, namespaces: [] }),
+      // Read-only organization editors still require the mounted pi-ai namespace.
+      describeOrganizationModelSettings: (): OrganizationModelSettingsView => ({
+        writable: false, hasDocument: false,
+        namespaces: [{
+          ns: 'llm-pi-ai', schema: organizationModelSettingsSchema(),
+          value: { providers: {} }, base: { providers: {} }, user: { providers: {} },
+          applies: 'live', secrets: [], revision: 0,
+        }],
+      }),
       describeOrganizationCredentials: () => ({}),
     })
     const model = { provider: 'org-fixture', model: 'model-a', displayName: 'Price fixture A', enabled: false,
@@ -141,7 +156,11 @@ it('preserves stored values through built forms and keeps every mobile destinati
       ...proxy,
       adminRoot: resolve('gateway/public/admin'),
       admin: async (req, res, user, path, body) => {
-        if (req.method === 'GET') adminReads.set(path, (adminReads.get(path) ?? 0) + 1)
+        if (req.method === 'GET') {
+          const owner = typeof req.headers.referer === 'string' ? new URL(req.headers.referer).pathname : ''
+          const key = `${owner} ${path}`
+          adminReads.set(key, (adminReads.get(key) ?? 0) + 1)
+        }
         const documentValue = path === '/admin/api/documents' ? { documents: [personalDocument] }
           : path === `/admin/api/documents/${personalDocument.catalogId}` ? { document: personalDocument, history: [], copies: [] }
             : path === '/admin/api/documents/metrics' ? { total: 1, active: 1, deleted: 0, personal: 1, project: 0, bytes: 7, operations24h: 0, failures24h: 0 }
@@ -226,13 +245,15 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await quotaDialog.getByRole('button', { name: '保存额度', exact: true }).click()
     await expect.poll(() => quotaWrites).toEqual([{ kind: 'project', id: String(project.id), tokens: 12345, cost: 8500000 }])
 
-    for (const path of ['/admin/api/usage/overview', '/admin/api/users', '/admin/api/usage/health']) adminReads.set(path, 0)
     await page.goto(`${base}/admin/usage`)
     await page.locator('.usageTable').waitFor({ state: 'visible' })
     await page.getByRole('button', { name: '配置额度', exact: true }).click()
     const usageQuota = page.getByRole('dialog', { name: '配置月度额度', exact: true })
     await expect.poll(async () => usageQuota.getByRole('button', { name: '保存额度', exact: true }).isEnabled()).toBe(true)
-    for (const path of ['/admin/api/usage/overview', '/admin/api/users', '/admin/api/usage/health']) expect(adminReads.get(path)).toBe(1)
+    // A previous page's post-quota refresh does not belong to this page's reads.
+    for (const path of ['/admin/api/usage/overview', '/admin/api/users', '/admin/api/usage/health']) {
+      expect(adminReads.get(`/admin/usage ${path}`), `Usage initial GET ${path}`).toBe(1)
+    }
     const roleTokens = usageQuota.locator('fieldset', { hasText: 'Token 额度' })
     const roleCost = usageQuota.locator('fieldset', { hasText: '公司成本额度' })
     await roleTokens.getByRole('combobox', { name: '额度模式' }).selectOption('custom')
@@ -308,10 +329,9 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await configurationDialog.waitFor({ state: 'hidden' })
     expect((await nodeConfiguration.view()).operation).toMatchObject({ status: 'pending', revision: 2, writeEpoch: '1' })
 
-    adminReads.set('/admin/api/projects', 0)
     await page.goto(`${base}/admin/ssh`)
     await page.getByRole('option', { name: /Renamed fixture/u }).waitFor({ state: 'attached' })
-    expect(adminReads.get('/admin/api/projects')).toBe(1)
+    expect(adminReads.get('/admin/ssh /admin/api/projects')).toBe(1)
     await page.getByRole('button', { name: '编辑', exact: true }).click()
     const sshDialog = page.getByRole('dialog', { name: '编辑 SSH fixture', exact: true })
     const reference = sshDialog.getByLabel('密码凭据引用', { exact: false })
@@ -320,10 +340,9 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await sshDialog.getByRole('button', { name: '保存', exact: true }).click()
     await expect.poll(() => sshWrites).toMatchObject([{ targetId: 1, revision: '1', fields: { passwordRef: 'SSH_FIXTURE_PASSWORD' } }])
 
-    adminReads.set('/admin/api/model-settings', 0)
     await page.goto(`${base}/admin/models`)
     await page.locator('.organizationModelsEditor').getByText('当前部署的设置文档为只读。', { exact: true }).waitFor()
-    expect(adminReads.get('/admin/api/model-settings')).toBe(1)
+    expect(adminReads.get('/admin/models /admin/api/model-settings')).toBe(1)
     await page.getByRole('button', { name: '权限与计价', exact: true }).click()
     await page.getByRole('button', { name: '配置模型治理', exact: true }).first().click()
     const priceDialog = page.getByRole('dialog', { name: '配置模型治理', exact: true })
@@ -352,10 +371,10 @@ it('preserves stored values through built forms and keeps every mobile destinati
     expect(await page.evaluate(() => document.cookie.includes('hgw_lang=en'))).toBe(true)
     await page.getByRole('button', { name: 'More administration features', exact: true }).click()
     const moreEn = page.getByRole('dialog', { name: 'More administration features', exact: true })
-    adminReads.set('/admin/api/projects', 0)
     await moreEn.getByRole('link', { name: 'Terminals', exact: true }).click()
-    await page.getByRole('option', { name: /Renamed fixture/u }).waitFor({ state: 'attached' })
-    expect(adminReads.get('/admin/api/projects')).toBe(1)
+    await page.getByRole('combobox', { name: 'Terminal scope', exact: true })
+      .getByRole('option', { name: /Renamed fixture/u }).waitFor({ state: 'attached' })
+    expect(adminReads.get('/admin/terminals /admin/api/projects')).toBe(1)
     await page.getByRole('heading', { name: 'Terminals', exact: true }).waitFor()
     await page.getByRole('button', { name: 'More administration features', exact: true }).click()
     await page.getByRole('dialog', { name: 'More administration features', exact: true })

@@ -66,7 +66,9 @@ export function findUnavailableRepositoryReferences(file: string, source: string
 }
 
 function trackedFiles(repoRoot: string): string[] {
-  return execFileSync('git', ['ls-files', '-z'], { cwd: repoRoot, encoding: 'utf8' })
+  return execFileSync('git', ['ls-files', '-z'], {
+    cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+  })
     .split('\0')
     .filter(file => file !== '')
 }
