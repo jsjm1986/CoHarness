@@ -1364,8 +1364,91 @@ describe('startInitialSelection', () => {
     const api = new FakeApiClient()
     const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
-    return { api, sessions, workspaces }
+    return { api, sessions, workspaces, ctx }
   }
+
+  it('reports initial selection pending through both baselines and the held historical open', async () => {
+    const b = bench()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('recent', [sid('s-history')])] as never[] }))
+    b.api.onList = () => Promise.resolve(ok({ items: [
+      { sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, cwd: '/w/recent' },
+    ] as never[] }))
+    b.api.onHistory = () => history.promise
+    const stop = b.workspaces.startInitialSelection()
+    try {
+      expect(b.workspaces.list.getSnapshot()).toMatchObject({ initialSelectionPending: true })
+      await b.workspaces.refresh()
+      expect(b.workspaces.list.getSnapshot()).toMatchObject({ initialSelectionPending: true })
+      await b.sessions.refresh()
+      await vi.waitFor(() => { expect(b.api.callsOf('session.history')).toHaveLength(1) })
+      expect(b.workspaces.list.getSnapshot()).toMatchObject({ baselinesReady: true, initialSelectionPending: true })
+      history.resolve(ok({ events: [], hasMore: false }))
+      await vi.waitFor(() => { expect(b.sessions.list.getSnapshot().current).toBe('s-history') })
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
+    } finally {
+      stop()
+      history.resolve(ok({ events: [], hasMore: false }))
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it('ends pending feedback on a failed Workspace baseline and resumes it during an explicit retry', async () => {
+    const b = bench()
+    const recovery = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    b.api.onWorkspaceList = () => Promise.resolve(err({ code: 'internal', message: 'unavailable', details: {} }))
+    const stop = b.workspaces.startInitialSelection()
+    try {
+      await b.workspaces.refresh()
+      expect(b.workspaces.list.getSnapshot().state).toBe('error')
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
+      await b.sessions.refresh()
+      expect(b.api.callsOf('session.create')).toHaveLength(0)
+      b.api.onWorkspaceList = () => recovery.promise
+      const retry = b.workspaces.refresh()
+      await vi.waitFor(() => { expect(b.workspaces.list.getSnapshot().initialSelectionPending).toBe(true) })
+      recovery.resolve(ok({ items: [] }))
+      await retry
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
+      expect(b.sessions.list.getSnapshot().current).toBeUndefined()
+    } finally {
+      stop()
+      recovery.resolve(ok({ items: [] }))
+      await b.ctx.fiber.dispose()
+    }
+  })
+
+  it('cancels only the startup navigation wait on disposal while another history owner completes', async () => {
+    const b = bench()
+    const retain = vi.spyOn(b.sessions, 'retain')
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('recent', [sid('s-history')])] as never[] }))
+    b.api.onList = () => Promise.resolve(ok({ items: [
+      { sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, cwd: '/w/recent' },
+    ] as never[] }))
+    b.api.onHistory = () => history.promise
+    const stop = b.workspaces.startInitialSelection()
+    let witness: ReturnType<typeof b.sessions.retain> | undefined
+    try {
+      await b.workspaces.refresh()
+      await b.sessions.refresh()
+      await vi.waitFor(() => { expect(b.api.callsOf('session.history')).toHaveLength(1) })
+      const initialSignal = retain.mock.calls.find(([, options]) => options?.source === 'controllerOperation')?.[1]?.signal
+      if (initialSignal === undefined) throw new Error('Initial selection did not retain its navigation signal')
+      witness = b.sessions.retain(sid('s-history'), { source: 'controllerOperation' })
+      stop()
+      expect(initialSignal.aborted).toBe(true)
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
+      history.resolve(ok({ events: [], hasMore: false }))
+      expect((await witness.ready).session.getSnapshot().openState).toBe('open')
+      expect(b.sessions.list.getSnapshot().current).toBeUndefined()
+    } finally {
+      stop()
+      history.resolve(ok({ events: [], hasMore: false }))
+      witness?.release()
+      await b.ctx.fiber.dispose()
+    }
+  })
 
   it('opens the recent Workspace history once baselines are ready', async () => {
     const b = bench()
@@ -1443,6 +1526,7 @@ describe('startInitialSelection', () => {
     await withCurrent.workspaces.refresh()
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(withCurrent.api.callsOf('session.create')).toHaveLength(0)
+    expect(withCurrent.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
     stopCurrent()
 
     const noRecent = bench()
@@ -1451,6 +1535,7 @@ describe('startInitialSelection', () => {
     await noRecent.sessions.refresh()
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(noRecent.api.callsOf('session.create')).toHaveLength(0)
+    expect(noRecent.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
     expect(() => noRecent.workspaces.startInitialSelection()).toThrow(/already started/)
     stopEmpty()
   })
@@ -1515,6 +1600,7 @@ describe('startInitialSelection', () => {
       await Promise.all([b.workspaces.refresh(), b.sessions.refresh()])
       await vi.waitFor(() => { expect(b.api.callsOf('session.create')).toHaveLength(1) })
       b.sessions.clear()
+      expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
       creating.resolve(ok({ sessionId: sid('late-initial') }))
       await vi.waitFor(() => { expect(b.sessions.list.getSnapshot().ids).toContain('late-initial') })
       expect(b.sessions.list.getSnapshot().current).toBeUndefined()
@@ -1565,6 +1651,7 @@ describe('startInitialSelection', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(b.api.callsOf('session.create')).toHaveLength(1)
     expect(b.sessions.list.getSnapshot().current).toBeUndefined()
+    expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
 
     // Recovery: the next workspace-list change re-runs the reconcile.
     b.api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-retry') }))
@@ -1572,6 +1659,7 @@ describe('startInitialSelection', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(b.api.callsOf('session.create')).toHaveLength(2)
     expect(b.sessions.list.getSnapshot().current).toBe('s-retry')
+    expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true)
     stop()
   })
 })

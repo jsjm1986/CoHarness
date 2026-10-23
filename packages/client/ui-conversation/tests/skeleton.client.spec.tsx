@@ -126,6 +126,8 @@ function mount(
     viewTabs?: ViewTab[]
     /** Pane session id override — encoded client keys carry their runtime target. */
     sessionId?: SessionId
+    /** An empty pane waiting for the Runtime's first default selection. */
+    noSession?: boolean
   } = {},
 ) {
   const root = sid('root')
@@ -142,7 +144,7 @@ function mount(
     ids: listed ? [root, SID] : [root],
     byId: { [root]: rootRow, ...listed && { [SID]: childRow } },
     archivedById: {},
-    current: SID,
+    current: options.noSession === true ? undefined : SID,
     phase: 'ready',
     state: 'idle', error: null, subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
@@ -283,7 +285,7 @@ function mount(
   )) as ConversationPaneProps['renderSlotChain']
   const paneSessionId = options.sessionId ?? SID
   const props = {
-    sessionId: paneSessionId,
+    sessionId: options.noSession === true ? undefined : paneSessionId,
     SessionProvider: ({ children }: { children: (id: SessionId) => ReactNode }) => children(paneSessionId),
     useSession,
     useSessions: bindSnapshotSelector(sessions),
@@ -313,7 +315,7 @@ function mount(
   } as ConversationRootProps
   const view = render(<ConversationRoot {...props} />)
   return {
-    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings,
+    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings, workspaces,
     pickerOwner: () => pickerOwner,
     rerender: () => { view.rerender(<ConversationRoot {...props} />) },
   }
@@ -802,10 +804,28 @@ describe('ConversationRoot resident composer', () => {
     )
     // The summary already proves the outcome, so the settling hide would only
     // blank the column for the history round-trip.
+    act(() => { b.workspaces.set({ ...b.workspaces.getSnapshot(), initialSelectionPending: true }) })
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('hero')
     expect(b.view.getByText('COHARNESS')).toBeTruthy()
     expect(b.view.getByRole('textbox')).toBeTruthy()
+    expect(b.view.queryByRole('status', { name: '正在加载工作区' })).toBeNull()
+  })
+
+  it('shows loading for an unresolved initial selection while retaining the empty composer nodes', () => {
+    const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true }), undefined, undefined, { noSession: true })
+    const textarea = b.view.getByRole('textbox')
+    act(() => { b.workspaces.set({ ...b.workspaces.getSnapshot(), initialSelectionPending: true }) })
+    expect(b.view.getByRole('status', { name: '正在加载工作区' })).toBeTruthy()
+    expect(b.view.queryByRole('textbox')).toBeNull()
+    expect(b.view.container.querySelector('textarea')).toBe(textarea)
+    act(() => {
+      const state = { ...b.workspaces.getSnapshot() }
+      delete state.initialSelectionPending
+      b.workspaces.set(state)
+    })
+    expect(b.view.queryByRole('status', { name: '正在加载工作区' })).toBeNull()
+    expect(b.view.getByRole('textbox')).toBe(textarea)
   })
 
   it('same textarea DOM node survives the hero → active flip into the sticky scrollport', () => {

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-bootstrap-runtime-initial-selection.md
 document:
-  en: 5d6a9bf064e02e5166f0e443d7a453188aabf6b5
-  zh: 46b137a9d186efd7962a88748101896338c6fb75
+  en: d721db619a383065327d8dd7e92803d713723f98
+  zh: 9a392782684399ca48be61524d66fbf283d9b9f0
 /agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity:
   en: 03b87c6842325239
   zh: fa1c83c00c54c596
@@ -12,8 +12,8 @@ document:
   en: 643b386117ff32c0
   zh: 39da15d9fcf65e31
 /agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity/decision:
-  en: c7827a3c0cfdaf8f
-  zh: e56aa0752d507275
+  en: 770fcdcdf0791ea5
+  zh: 26d41f6cbf6d38de
 /agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity/alternatives-considered:
   en: 6ab39db7a1ce0e22
   zh: f9bbc442c6765f5f
@@ -21,5 +21,5 @@ document:
   en: b4cdddcecaab92d4
   zh: 7eeb0ddd01399fad
 /agent-note-preserve-initial-workspace-selection-through-bootstrap-runtime-identity/verification:
-  en: a551264435ae453f
-  zh: a65707c2b87bcecf
+  en: 94e96574d64fee3c
+  zh: c168c68a71f491b1

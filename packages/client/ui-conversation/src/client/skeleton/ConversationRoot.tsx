@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconLoadingOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { parseClientSessionKey, SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationContentProps, ConversationSlotProps, ConversationViewsProps, InputZone, WorkbenchLayoutPreset,
@@ -296,17 +296,11 @@ export function ConversationContent({
     }
   }, [activeWorkspace?.workspaceId, discardWorkspace, discardWorkspaceId, pendingWorkspace, pendingWorkspaceId, workspaces.phase])
 
-  // While a session is still replaying (loading + blank) the hero/docked
-  // choice is unknowable — render the composer hidden instead of flashing
-  // the centered hero and snapping to the docked bar (or vice versa).
-  // Exemption: a session the list summary already proves blank can only
-  // land on the hero, so hiding would blank the column for the whole
-  // history round-trip (the startup auto-selection flash) for nothing.
-  // The exemption is deliberately open-state-wide, not loading-only: a
-  // summary-blank session is the hero before its open starts (`cold`) and
-  // after one fails (`error`) for the same reason — there is no history.
-  const settling = sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
-    && summaryBlank !== true
+  // Initial navigation and unread history retain the mounted composer until its layout is known.
+  // A current summary-proven blank Session keeps its Hero while history opens.
+  const initialSelectionPending = sessionId === undefined && workspaces.initialSelectionPending === true
+  const settling = initialSelectionPending || (sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
+    && summaryBlank !== true)
   const hero = sessionId === undefined
     || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))
   const zone: InputZone | undefined =
@@ -413,7 +407,8 @@ export function ConversationContent({
   // on the fallback alone would leave Question/Approval panels at the content
   // end off-screen when the user is not pinned to the floor.
   const composerSeat = (
-    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer">
+    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer"
+      aria-hidden={initialSelectionPending || undefined}>
       {composer}
     </div>
   )
@@ -507,7 +502,10 @@ export function ConversationContent({
     >
       {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
       <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
-        <div className={css.scrollBody} data-conversation-scroll="">
+        {initialSelectionPending && <div className={css.initialLoading} role="status" aria-label={t('hero.loadingWorkspace')}>
+          <span aria-hidden="true"><IconLoadingOutline16 size={24} className={css.initialLoadingIcon} /></span>
+        </div>}
+        <div className={css.scrollBody} data-conversation-scroll="" aria-busy={initialSelectionPending || undefined}>
           {sessionId === undefined ? null : <Views compact={compact} />}
           {composerSeat}
         </div>

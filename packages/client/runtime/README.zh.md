@@ -96,6 +96,8 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 <a id="workspace-and-session-lists"></a>
 ## Workspace 与 Session 列表
 
+`WorkspaceRuntime.startInitialSelection()` 在等待首次列表基线及准备好的 Session 时，通过工作区列表发布可选标记 `initialSelectionPending`。完成、被新导航取代、工作区基线读取失败、准备失败或释放都会移除标记。释放只取消本次导航等待，不影响其他历史读取者；失败后仅在权威列表输入变化时重试。
+
 未变化的 Session 行在 runtime 和账号池中保留相同的 `SessionSummary` 引用，因此选择器可用 `Object.is` 比较行。manager 行或所属 runtime 描述变化时会产生新摘要；项目标签、可见性和项目归属均参与失效判断。[投影决策](../../../.agents/notes/implemented/architecture/2026-10-23-client-list-projection-reuse.zh.md)记录了身份与缓存生命周期规则。
 
 Workspace 和 Session 列表各自具有单调的 `pending` → `ready` 基线阶段，也有各自的刷新活动／错误状态。列表请求期间到达的增量插入或更新／移除／顺序帧与一元变更回显会在其响应之上回放。每次成功的 Workspace 基线都会重新建立 Host 持久 Workspace 顺序，因此重连会接纳该客户端离线期间提交的变更。`WorkspaceRuntime.insertBefore` 会立即安装乐观顺序；只有最新一元回声可以替换它，更新的 Host 顺序帧优先于旧回声，而最新请求被拒时会恢复最近一次由 Host 确认的顺序，不会恢复更早且尚未提交的拖拽。已移除的 Workspace id 会保留进程本地删除标记，避免延迟到达的 changed 帧将其复活。Workspace 新近程度只在两条基线都 ready 后派生，且绝不改变 Workspace 列表顺序。

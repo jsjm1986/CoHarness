@@ -1,31 +1,8 @@
-// Web e2e scenario: startup auto-selection keeps the hero on screen.
-//
-// A page load with a workspace already registered runs
-// `WorkspaceRuntime.startInitialSelection`: it opens the most recent
-// workspace's history, falling back to its blank session when no history
-// exists. `openState` flips to `loading` the
-// moment `open()` lands; driving `data-phase=settling` on the conversation
-// root from that flip would hide the composer seat and the header
-// (`visibility:hidden`) for the whole `session.history` round-trip — the
-// center column blanks and repaints like a full-page refresh on every launch.
-//
-// The unit spec pins the phase condition over hand-built stores. What only the
-// assembled application can show is that the path a user actually takes
-// reaches it: the real selection service, the real client session opening over
-// the real /api transport, and a real browser deciding what is painted.
-// The initial Workspace pick also records the resident Hero/composer nodes and
-// proves that opening the first blank Session fallback fills the strict outlets
-// without replacing those nodes.
-//
-// The round-trip against a loopback host is far too fast to observe, so this
-// scenario HOLDS the `session.history` response open in the browser's network
-// handler and asserts the visible frame while it is in flight. That wait is
-// what makes the assertions non-vacuous: without the phase exemption, the held
-// window is exactly when `settling` would be painted and the composer hidden.
-//
-// Zero model calls: registering a workspace and opening its blank fallback are
-// Host operations with no model involvement. A stray stream would fail loud
-// with NO_ADAPTER.
+// Built web startup selection over independently held network responses.
+// Initial baselines and historical preparation show one loading status while
+// no Session is current. The resident Hero and composer nodes survive default
+// selection; a known-current blank retains its Hero during its own history read.
+// These Host-only scenarios make no model requests.
 import { join } from 'node:path'
 import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { createUserMessage, createAssistantMessage } from '@deepseek-ai/dsh-llm'
@@ -143,18 +120,21 @@ describe('web e2e: startup auto-selection', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
 
-  it('keeps the hero and the composer on screen while the auto-selected blank session opens', async () => {
+  it('retains the composer nodes behind loading while an unselected blank fallback opens', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-startup-auto-selection'))
     // Runs before any page script on the reload below, so the first phase the
     // root ever renders is recorded, not just the ones after a listener attaches.
     await page.addInitScript(() => {
       const phases: string[] = []
       ;(window as unknown as { __conversationPhases: string[] }).__conversationPhases = phases
-      setInterval(() => {
+      const remember = (): void => {
         const phase = document.querySelector('div[data-phase]')?.getAttribute('data-phase')
         if (phase === null || phase === undefined) return
         if (phases[phases.length - 1] !== phase) phases.push(phase)
-      }, 8)
+      }
+      const observer = new MutationObserver(remember)
+      observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-phase'] })
+      window.addEventListener('pagehide', () => { observer.disconnect() }, { once: true })
     })
 
     let releaseHistory = (): void => {}
@@ -173,30 +153,91 @@ describe('web e2e: startup auto-selection', () => {
     })
 
     const warningsBefore = tripwire.warnings.length
+    await page.evaluate(() => { localStorage.removeItem('dsh.sessions.current') })
     await page.reload({ waitUntil: 'commit' })
     await historyInFlight
 
-    // The frame a user sees while the session is still opening: hero phase, the
-    // hero title, and a composer that is actually painted (`settling` hides the
-    // seat with `visibility:hidden`, which Playwright reports as not visible).
     await page.waitForSelector(ROOT_PHASE, { timeout: 15_000 })
-    expect(await page.locator(ROOT_PHASE).first().getAttribute('data-phase')).toBe('hero')
-    expect(await page.locator('[data-phase]').getByText('COHARNESS').isVisible()).toBe(true)
-    expect(await page.locator('textarea').first().isVisible()).toBe(true)
+    expect(await page.locator(ROOT_PHASE).first().getAttribute('data-phase')).toBe('settling')
+    expect(await page.getByRole('status', { name: 'Loading workspace', exact: true }).count()).toBe(1)
+    expect(await page.locator('textarea').first().isVisible()).toBe(false)
+    await page.evaluate(() => {
+      ;(window as unknown as { __pendingComposer: Element | null }).__pendingComposer = document.querySelector('textarea')
+    })
 
     releaseHistory()
-    // The auto-selected blank session parks the composer on its workspace
-    // prompt until a workspace is chosen; waiting for that stable state
-    // proves the composer resolved instead of hanging on the open.
-    await page.locator('textarea[placeholder="Choose a workspace to start"]')
+    await page.locator('textarea:enabled[placeholder="Describe what you want to build"]')
       .waitFor({ timeout: 15_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
 
-    // Settling is not merely absent from the frame sampled above: the root
-    // never entered it at any point of the load.
-    expect(await recordedPhases(page)).toEqual(['hero'])
+    await page.getByRole('status', { name: 'Loading workspace', exact: true }).waitFor({ state: 'hidden' })
+    expect(await page.locator('textarea').first().isVisible()).toBe(true)
+    expect(await page.evaluate(() => document.querySelector('textarea')
+      === (window as unknown as { __pendingComposer: Element | null }).__pendingComposer)).toBe(true)
+    expect(await recordedPhases(page)).toEqual(['settling', 'hero'])
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
+  it('ends the initial spinner on a failed Workspace baseline and shows it again during Retry', async () => {
+    const retryScaffold = await launchWebScaffold({})
+    let retryPage: Page | undefined
+    const failedBaseline = Promise.withResolvers<undefined>()
+    const retryBaseline = Promise.withResolvers<undefined>()
+    let listCalls = 0
+    let createCalls = 0
+    try {
+      retryPage = await newEnglishPage(browser)
+      const targetPage = retryPage
+      const logs = watchConsole(targetPage)
+      targetPage.on('request', (request) => {
+        if (new URL(request.url()).pathname === '/api/session.create') createCalls++
+      })
+      await targetPage.route(/\/api\/workspace\.list(?:\?.*)?$/, async (route) => {
+        const response = await route.fetch()
+        const call = ++listCalls
+        if (call === 1) {
+          await failedBaseline.promise
+          const body = await response.json() as { result: unknown }
+          body.result = { ok: false, error: { code: 'internal', message: 'Synthetic list failure', details: {} } }
+          await route.fulfill({ response, json: body })
+        } else {
+          if (call === 2) await retryBaseline.promise
+          await route.fulfill({ response })
+        }
+      })
+      await targetPage.goto(retryScaffold.authenticatedUrl, { waitUntil: 'load' })
+      const loading = targetPage.getByRole('status', { name: 'Loading workspace', exact: true })
+      await loading.waitFor()
+      failedBaseline.resolve(undefined)
+      const error = targetPage.getByRole('alert').filter({ hasText: 'Could not load the list' })
+      await error.waitFor()
+      await loading.waitFor({ state: 'hidden' })
+      await targetPage.getByRole('textbox', { name: 'Choose workspace', exact: true }).waitFor()
+      const expected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection/baseline-failed.expected.md')
+      await compareOrRefreshGolden(expected,
+        await captureStableAria(targetPage, '[data-row-key="list-feedback"]', retryScaffold.workspaceCwd), webSnapshotMode())
+      await error.getByRole('button', { name: 'Retry', exact: true }).click()
+      await loading.waitFor()
+      expect(await targetPage.getByRole('textbox', { name: 'Choose workspace', exact: true }).count()).toBe(0)
+      retryBaseline.resolve(undefined)
+      await loading.waitFor({ state: 'hidden' })
+      await targetPage.getByRole('textbox', { name: 'Choose workspace', exact: true }).waitFor()
+      expect(await targetPage.getByRole('alert').count()).toBe(0)
+      expect(listCalls).toBe(2)
+      expect(createCalls).toBe(0)
+      expect(logs.pageErrors).toEqual([])
+    } catch (error) {
+      if (retryPage !== undefined) await saveFailureShot(retryPage, 'web-e2e-startup-baseline-retry')
+      throw error
+    } finally {
+      failedBaseline.resolve(undefined)
+      retryBaseline.resolve(undefined)
+      try {
+        await retryPage?.unrouteAll({ behavior: 'wait' })
+        await retryPage?.close()
+      } finally { await retryScaffold.close() }
+    }
+  }, 120_000)
+
   it('opens existing project history after cold identity and both baselines without a navigation click', async () => {
     const projectScaffold = await launchWebScaffold({ workbench: true })
     let projectPage: Page | undefined
@@ -271,10 +312,16 @@ describe('web e2e: startup auto-selection', () => {
       // Account verification and both list baselines precede history; the account-pending case covers late viewport restoration.
       await targetPage.getByRole('button', { name: 'Switch personal or project scope', exact: true })
         .getByText('Synthetic project', { exact: true }).waitFor({ timeout: 30_000 })
+      expect(await targetPage.getByRole('status', { name: 'Loading workspace', exact: true }).count()).toBe(1)
+      expect(await targetPage.locator('textarea[placeholder="Choose a workspace to start"]').isVisible()).toBe(false)
+      const loadingExpected = join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection/initial-loading.expected.md')
+      await compareOrRefreshGolden(loadingExpected,
+        await captureStableAria(targetPage, '[data-conversation-region="chat"]', projectScaffold.workspaceCwd), webSnapshotMode())
       workspaceGate.resolve(undefined)
       await historyRequested.promise
       expect(calls.filter(path => path === '/api/session.history')).toHaveLength(1)
       expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      expect(await targetPage.getByRole('status', { name: 'Loading workspace', exact: true }).count()).toBe(1)
       historyGate.resolve(undefined)
       await targetPage.getByText(SAVED_PROMPT, { exact: true }).waitFor()
       await targetPage.getByText('The saved conversation is ready.', { exact: true }).waitFor()
@@ -388,7 +435,9 @@ describe('web e2e: startup auto-selection', () => {
         expect(historyCalls).toBe(1)
         expect(indexCalls).toBe(0)
         expect(await targetPage.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
-        expect(await targetPage.locator('textarea').first().isVisible()).toBe(true)
+        expect(await targetPage.getByRole('status', { name: 'Loading workspace', exact: true }).count()).toBe(1)
+        expect(await targetPage.getByRole('textbox', { name: 'Choose workspace', exact: true }).count()).toBe(0)
+        expect(await targetPage.locator('textarea').first().isVisible()).toBe(false)
         expect(targetScaffold.ctx.agents.get(id) === undefined).toBe(true)
         listGate.resolve(undefined)
         await targetPage.getByText(SAVED_PROMPT, { exact: true }).waitFor()
