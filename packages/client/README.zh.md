@@ -54,6 +54,10 @@ dsh web GUI 的浏览器侧：shell 启动、浏览器与宿主通信、共享 U
 
 子系统参考是 [client-modules.md](../../docs/subsystems/client-modules.zh.md)；[slot 系统标准](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.zh.md)是权威 slot 模型，[web 客户端架构 Agent Note](../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.zh.md)拥有加载链与对象层。
 
+## Bundle 输出
+
+共享 [Client 构建预设](tsdown.client.ts)会移除动态 `client.js` 入口及其惰性 chunk 的空白和普通文档注释，并关闭语义压缩与标识符改名。函数和类名、模块表请求、许可证声明以及包含原始源码的 source map 均保留。Node 和静态链接库产物继续使用各自的构建设置；[构建分层决策](../../.agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.zh.md)解释了这一适用范围。
+
 ## 概述
 
 `client/` 组提供 dsh web GUI 的浏览器体验，包括对话、导航、设置、批准、文件访问及其他交互功能。添加浏览器中可见的行为时，请选择本系列中的包；服务端页面交付与宿主集成则使用 [`host/`](../host/README.zh.md)。本系列同时涵盖共享浏览器基础与专门的 UI 功能，各子包 README 拥有其配置与行为说明。编写规则见 [AGENTS.md](AGENTS.md)，下方相关文档解释跨包组合方式。

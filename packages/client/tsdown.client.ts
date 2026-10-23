@@ -525,6 +525,8 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
     // Plugin code is fetched outside Vite's module graph, so its own bundle
     // must carry the TS/TSX mapping consumed by browser profiling tools.
     sourcemap: true,
+    // Cordis registration reads function names; only remove output formatting.
+    minify: { compress: false, mangle: false },
     clean: false,
     deps: {
       neverBundle: isRequested,
@@ -654,6 +656,9 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
     }],
     outputOptions: {
       entryFileNames: 'client.js',
+      keepNames: true,
+      minifyInternalExports: false,
+      comments: { legal: true, annotation: true, jsdoc: false },
       // The imported source basename becomes the published chunk name; package
       // files lists and artifact tests pin every intentional chunk.
       chunkFileNames: 'client.[name].js',

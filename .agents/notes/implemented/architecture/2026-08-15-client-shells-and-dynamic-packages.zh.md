@@ -30,6 +30,12 @@ Client npm 依赖区段描述安装和开发关系，但不能可靠描述 bundl
 
 `staticLinked` 预设让 `lib/index.js` 中每个 bare specifier 保持 external import，并在旁边输出相对 CSS 资产。Vite 宿主负责解析和去重这些 import，并决定最终 chunk 边界。静态库不会把宿主打包策略复制进自身产物。
 
+### 动态输出格式
+
+动态 Client 入口和惰性 chunk 只压缩格式：使用 `compress: false`、`mangle: false`，保留函数与类名，并保持内部 export 名称。JavaScript 保留许可证和优化器注解；普通文档仍可通过串联 source map 中的原始源码查看。Node 与 `staticLinked` 构建形态各自保留独立输出设置。
+
+该策略减少每个冷浏览器需要接收的字节，不改变私有依赖的归属或共享模块身份。Cordis 在注册时使用函数名，包内惰性 import 必须保留模块表的异步加载操作。编译器的 `renderChunk` 阶段会先把生成的带引号 import 改写为 `require.async`，随后压缩器才选择最终字面量的写法；真实预设夹具验证此顺序，并通过 `ClientModuleSystem` 执行惰性 chunk。编译器升级若改变这一顺序，必须保留异步改写和 source map 串联。
+
 ### 共享模块请求
 
 动态浏览器 bundle 会隐式 external 统一基座：`PLATFORM_MODULES` 命名由外壳播种的 React、Cordis 和静态 UI 身份，`PRELOADED_CLIENT_EXTERNALS` 命名由 HTML parser 预载的 runtime 动态身份。包只在精确请求基座外实体时使用 `dsh.client.external`。纯类型 import 会被擦除，不产生请求；允许的第三方实现库保留为 bundle 私有内容。
@@ -75,6 +81,8 @@ Modules Node 半按以下顺序向实际返回的 HTML 注入启动协议：
 
 **在 `apps/web/index.html` 中硬编码预载 URL。** URL 与 `rev` 属于 host 当前 graph。改写实际返回的 HTML 才能让 queue、bundle URL 和 manifest 使用同一 graph revision。
 
+**对动态 bundle 启用语义压缩或标识符改名。** 两者都会扩大需要兼容性证据的行为范围。仅格式压缩已能移除重复空白和文档，同时保留 Cordis 使用的名称；进一步压缩需要单独验证反射、惰性加载和组装应用。
+
 ## Consequences
 
 Npm 依赖在 peer 与开发区段间移动时，bundle 内容保持稳定，因为每个构建 face 都直接声明 external。静态库继续由宿主装配，动态包则保留统一产物与生命周期治理。
@@ -82,5 +90,7 @@ Npm 依赖在 peer 与开发区段间移动时，bundle 内容保持稳定，因
 启动协议依赖 modules 和 runtime 的 package id，modules 还必须保持运行期自包含。缺少 bootstrap registration 会在 Cordis 启动前失败；后续插件 import、apply 与 service 等待失败仍由启动页的 ACTIVE 扫描呈现。
 
 外壳消费已构建 `lib/` 产品，因此在相关 build 或 watcher 运行前，源码与浏览器产物可能漂移。仅源码 typecheck 通过不能证明实际服务的应用使用同一份代码。
+
+输出格式压缩会减少传输字节，但每个消费者 bundle 仍各自保留私有依赖副本。仅字节数不能证明工作台更快可用；发布验证还覆盖最终压缩响应、模块启动、惰性页面及浏览器完成端点。
 
 两个静态 UI 库仍是明确例外。把其中任一项转换为动态包时，必须在同一变更中把全部实体消费者迁移到 service 或 slot，并从静态 seed 删除对应身份。
