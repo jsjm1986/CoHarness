@@ -502,6 +502,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const overviewRequestGeneration = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const headerCheckRef = useRef<HTMLInputElement>(null)
+  const trashReturnFocusPending = useRef(false)
   const dragDepth = useRef(0)
   const loadGeneration = useRef(0)
   const userDocs = useRef(createUserDocClient(privateResourceUrl))
@@ -1773,6 +1774,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       const restored = remoteScopeView
         ? await userDocs.current.restoreInScope(selectedScope, document.docId)
         : await userDocs.current.restore(document.docId)
+      listingCache.current.clear()
+      serverPages.current.clear()
+      serverLoadedKey.current = null
       setTrashDocuments(previous => previous.filter(item => item.docId !== document.docId))
       setError('')
       void restored
@@ -1857,6 +1861,23 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         finishListingRequest(listingRequest.controller)
       }
     })
+  }
+
+  const returnFromTrash = (): void => {
+    trashReturnFocusPending.current = true
+    setTrashMode(false)
+    setMobileSheet(null)
+    navigate(currentDirectoryId)
+  }
+
+  const focusTrashReturn = (element: HTMLDivElement | null): void => {
+    if (trashMode || !trashReturnFocusPending.current || element === null) return
+    const target = element.querySelector<HTMLButtonElement>(phone
+      ? '[data-documents-toolbar-more]'
+      : '[data-documents-trash-toggle]')
+    if (target === null) return
+    trashReturnFocusPending.current = false
+    target.focus({ preventScroll: true })
   }
 
   const openCreateDirectory = () => {
@@ -3134,7 +3155,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         type="button"
         variant="ghost"
         disabled={busy || trashLoading}
-        onClick={() => { closeMobileSheet(); void (trashMode ? load(ROOT_DIRECTORY_ID) : openTrash()) }}
+        onClick={() => { if (trashMode) returnFromTrash(); else { closeMobileSheet(); void openTrash() } }}
       >
         {trashMode ? t('trash.back') : t('trash.button')}
       </Button>
@@ -3494,11 +3515,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               )}
               {trashMode && (
                 <section className={css.trash} aria-label={t('trash.title')}>
-                  <header className={css.trashHeader}>
+                  <header className={css.trashHeader} data-documents-trash-header="">
                     <div><h2>{t('trash.title')}</h2><p>{visibleScope}</p></div>
-                    <Button type="button" variant="ghost" disabled={busy || trashLoading} onClick={() => { void openTrash() }}>
-                      {t('modal.refresh')}
-                    </Button>
+                    <div className={css.trashActions}>
+                      <Button type="button" variant="outline" disabled={busy || trashLoading} onClick={returnFromTrash}>
+                        {t('trash.back')}
+                      </Button>
+                      <Button type="button" variant="ghost" disabled={busy || trashLoading} onClick={() => { void openTrash() }}>
+                        {t('modal.refresh')}
+                      </Button>
+                    </div>
                   </header>
                   {trashLoading ? <p className={css.status}>{t('modal.loading')}</p> : trashDocuments.length === 0 ? <p className={css.empty}>{t('trash.empty')}</p> : (
                     <div className={css.trashList} role="list">
@@ -3585,7 +3611,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
 
                 <div className={css.toolbar}>
                   <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>{filterControls}</div>
-                  <div className={`${css.actionGroup}${phone ? ` ${css.mobileActionGroup}` : ''}`} role="group" aria-label={t('modal.actions')}>
+                  <div
+                    className={`${css.actionGroup}${phone ? ` ${css.mobileActionGroup}` : ''}`}
+                    ref={focusTrashReturn}
+                    role="group"
+                    aria-label={t('modal.actions')}
+                  >
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -3605,7 +3636,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                             type="button"
                             variant="outline"
                             disabled={busy || trashLoading}
-                            onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+                            onClick={returnFromTrash}
                           >
                             {t('trash.back')}
                           </Button>
@@ -3629,10 +3660,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       <>
                         <Button
                           className={css.trashToggle}
+                          data-documents-trash-toggle=""
                           type="button"
                           variant="outline"
                           disabled={busy || trashLoading}
-                          onClick={() => { void (trashMode ? load(ROOT_DIRECTORY_ID) : openTrash()) }}
+                          onClick={() => { if (trashMode) returnFromTrash(); else void openTrash() }}
                         >
                           {trashMode ? t('trash.back') : t('trash.button')}
                         </Button>

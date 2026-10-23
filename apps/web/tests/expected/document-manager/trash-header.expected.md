@@ -1,0 +1,4 @@
+- heading "Trash" [level=2]
+- paragraph: Visible only to you
+- button "Back to documents"
+- button "Refresh"

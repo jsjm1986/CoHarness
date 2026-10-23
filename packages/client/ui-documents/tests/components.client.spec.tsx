@@ -1097,6 +1097,117 @@ describe('DocumentsModal', () => {
     await waitFor(() => { expect(client.restore).toHaveBeenCalledWith('2026-08-17/report.pdf') })
   })
 
+  it.each([
+    { compact: false, target: 'personal' }, { compact: false, target: 'project' },
+    { compact: true, target: 'personal' }, { compact: true, target: 'project' },
+  ] as const)('returns from $target trash to its cached folder and restores focus (compact=$compact)', async ({ compact, target }) => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 23, 12))
+    if (compact) stubPhoneMedia()
+    const client = makeClient()
+    let restored = false
+    const restoredDocument = doc({ docId: 'reports/restored.txt', name: 'restored.txt', mediaType: 'text/plain' })
+    const listing = (directoryId: UserDocDirectoryIdType) => ({
+      version: 1 as const,
+      directoryId,
+      directories: directoryId === '' ? [directory('reports')] : [],
+      documents: directoryId === 'reports' && restored ? [restoredDocument] : [],
+      limits,
+      scope: { kind: 'project' as const, label: 'Compiler' },
+    })
+    client.browse.mockImplementation(async (id = '' as UserDocDirectoryIdType) => listing(id))
+    client.browseScope.mockImplementation(async (_scope, id) => listing(id))
+    const trashDocument: UserDocTrashRef = {
+      ...restoredDocument, docId: restoredDocument.docId as UserDocIdType,
+      directoryId: 'reports' as UserDocDirectoryIdType,
+      trashedAt: 1, purgeAfter: Date.now() + 86_400_000,
+    }
+    client.listTrash.mockResolvedValue({ version: 1, documents: [trashDocument] })
+    client.listTrashInScope.mockResolvedValue({ version: 1, documents: [trashDocument] })
+    client.restore.mockImplementation(async () => { restored = true; return restoredDocument })
+    client.restoreInScope.mockImplementation(async () => { restored = true; return restoredDocument })
+    const context = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      }),
+    }))
+    vi.stubGlobal('fetch', context)
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByRole('button', { name: t('folder.openNamed', { name: 'reports' }) })
+    if (target === 'project') {
+      if (compact) {
+        fireEvent.click(screen.getByTestId('documents-scope-trigger'))
+        const scopes = await screen.findByRole('dialog', { name: t('scope.switch.title') })
+        fireEvent.click(within(scopes).getByRole('option', { name: /Compiler/ }))
+      } else fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
+      await waitFor(() => { expect(client.browseScope).toHaveBeenCalledTimes(1) })
+      await screen.findAllByText(t('scope.upload.target', { name: 'Compiler' }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: t('folder.openNamed', { name: 'reports' }) }))
+    const navigation = screen.getByRole('navigation', { name: t('breadcrumb.label') })
+    await waitFor(() => { expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true) })
+    const before = { local: client.browse.mock.calls.length, remote: client.browseScope.mock.calls.length }
+    const enterTrash = async () => {
+      if (compact) {
+        fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+        const more = await screen.findByRole('dialog', { name: t('action.more') })
+        fireEvent.click(within(more).getByRole('button', { name: t('trash.button') }))
+      } else fireEvent.click(screen.getByRole('button', { name: t('trash.button') }))
+      return await screen.findByRole('region', { name: t('trash.title') })
+    }
+    const firstTrash = await enterTrash()
+    const back = within(firstTrash).getByRole('button', { name: t('trash.back') })
+    back.focus()
+    fireEvent.click(back)
+    await waitFor(() => { expect(screen.queryByRole('region', { name: t('trash.title') })).toBeNull() })
+    const returnTarget = screen.getByRole('button', { name: t(compact ? 'action.more' : 'trash.button') })
+    expect(document.activeElement).toBe(returnTarget)
+    expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true)
+    expect(client.browse).toHaveBeenCalledTimes(before.local)
+    expect(client.browseScope).toHaveBeenCalledTimes(before.remote)
+    if (target === 'project') expect(screen.getAllByText(t('scope.upload.target', { name: 'Compiler' })).length).toBeGreaterThan(0)
+    const secondTrash = await enterTrash()
+    fireEvent.click(within(secondTrash).getByRole('button', { name: t('trash.restoreNamed', { name: 'restored.txt' }) }))
+    await waitFor(() => { expect(within(secondTrash).queryByRole('button', { name: t('trash.restoreNamed', { name: 'restored.txt' }) })).toBeNull() })
+    expect(client.browse).toHaveBeenCalledTimes(before.local)
+    expect(client.browseScope).toHaveBeenCalledTimes(before.remote)
+    fireEvent.click(within(secondTrash).getByRole('button', { name: t('trash.back') }))
+    await screen.findByText('restored.txt')
+    expect(client.browse).toHaveBeenCalledTimes(before.local + (target === 'personal' ? 1 : 0))
+    expect(client.browseScope).toHaveBeenCalledTimes(before.remote + (target === 'project' ? 1 : 0))
+    expect(context).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compact ? 'action.more' : 'trash.button') }))
+  })
+
+  it('keeps the cached folder after a failed restore and retains the trash document', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 23, 12))
+    const client = makeClient()
+    client.browse.mockResolvedValue({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits })
+    client.listTrash.mockResolvedValue({
+      version: 1,
+      documents: [{
+        ...doc(), docId: '2026-08-17/report.pdf' as UserDocIdType, directoryId: '' as UserDocDirectoryIdType,
+        trashedAt: 1, purgeAfter: Date.now() + 86_400_000,
+      }],
+    })
+    client.restore.mockRejectedValue(new Error('restore unavailable'))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ scope: { kind: 'personal' } }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByRole('button', { name: t('trash.button') })
+    await waitFor(() => { expect(client.browse).toHaveBeenCalledOnce() })
+    fireEvent.click(screen.getByRole('button', { name: t('trash.button') }))
+    const trash = await screen.findByRole('region', { name: t('trash.title') })
+    const restore = within(trash).getByRole('button', { name: t('trash.restoreNamed', { name: 'report.pdf' }) })
+    fireEvent.click(restore)
+    await screen.findByRole('alert')
+    expect(within(trash).getByRole('button', { name: t('trash.restoreNamed', { name: 'report.pdf' }) })).toBe(restore)
+    fireEvent.click(within(trash).getByRole('button', { name: t('trash.back') }))
+    await waitFor(() => { expect(screen.queryByRole('region', { name: t('trash.title') })).toBeNull() })
+    expect(client.browse).toHaveBeenCalledOnce()
+  })
+
   it('reports a delete failure', async () => {
     const client = makeClient()
     client.trash.mockRejectedValue(new Error('del'))
