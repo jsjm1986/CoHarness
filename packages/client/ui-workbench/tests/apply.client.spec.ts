@@ -72,7 +72,7 @@ async function harness(services: HarnessServices = {}) {
     list: { getSnapshot: () => ({ current: A as SessionId | undefined }) },
   }
   const sidebarRight = { openSessionResource: vi.fn() }
-  const layout = { focusRightbar: vi.fn() }
+  const layout = { focusRightbar: vi.fn(), selectPanel: vi.fn() }
   const tabTypes: { canOpen(address: string): boolean; title(address: string): string }[] = []
   ctx.provide('sidebarRight', sidebarRight as never)
   ctx.provide('sidebarRightTabs', { register: (spec: never) => { tabTypes.push(spec); return () => {} } } as never)
@@ -119,6 +119,50 @@ async function harness(services: HarnessServices = {}) {
 }
 
 describe('workbench navigation lifecycle', () => {
+  it.each([
+    { entry: 'toolbar', target: A, selection: 'same-current pane' },
+    { entry: 'toolbar', target: 'q' as SessionId, selection: 'another pane' },
+    { entry: 'sidebar', target: A, selection: 'same-current pane' },
+    { entry: 'sidebar', target: 'q' as SessionId, selection: 'another pane' },
+  ])('explicit Conversation navigation reveals $selection through the $entry entry', async ({ entry, target }) => {
+    const h = await harness()
+    try {
+      h.snapshot.set({ mode: 'workbench', paneIds: [A, 'q' as SessionId], activePaneId: A,
+        paneRatios: [0.5, 0.5], collapsedIds: [] })
+      expect(h.sessions.list.getSnapshot().current).toBe(A)
+      if (entry === 'toolbar') h.actions.focusSession(target)
+      else {
+        const face = (h.slots.entries('sidebar.workspaces.workbench')[0]!.inject as unknown as () => {
+          focusPane(id: SessionId): void
+        })()
+        face.focusPane(target)
+      }
+      expect(h.viewport.focus).toHaveBeenCalledExactlyOnceWith(target)
+      expect(h.layout.selectPanel).toHaveBeenCalledExactlyOnceWith(null)
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('explicit Conversation navigation reveals the existing single view when leaving the workbench sidebar', async () => {
+    const h = await harness()
+    try {
+      h.snapshot.set({ mode: 'workbench', paneIds: [A], activePaneId: A, paneRatios: [1], collapsedIds: [] })
+      const face = (h.slots.entries('sidebar.workspaces.workbench')[0]!.inject as unknown as () => {
+        exitWorkbench(): void
+      })()
+      face.exitWorkbench()
+      expect(h.viewport.setMode).toHaveBeenCalledExactlyOnceWith('single')
+      expect(h.layout.selectPanel).toHaveBeenCalledExactlyOnceWith(null)
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
   it('reads catalog restoration demand from the viewport owner and keeps its hook source stable', async () => {
     const h = await harness()
     try {

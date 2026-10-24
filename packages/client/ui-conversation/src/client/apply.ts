@@ -497,11 +497,16 @@ export function apply(ctx: Context): void {
       onViewportCollapse: (id, collapsed) => { viewport.setCollapsed(id, collapsed) },
       onViewportSolo: (id) => { viewport.soloPane(id) },
       onViewportMaximize: (_id, maximized) => { if (maximized) layout.closeDetails() },
-      onViewportEnabled: (enabled) => { viewport.setEnabled(enabled) },
     }),
   }, ConversationRoot)
 
   const viewport = new ConversationViewportController(sessions, slots.bindStore(viewportStore), workspaces)
+  ctx.effect(() => {
+    const sync = (): void => { viewport.setEnabled(viewportAvailable.getSnapshot()) }
+    const stop = viewportAvailable.subscribe(sync)
+    sync()
+    return () => { stop(); viewport.setEnabled(false) }
+  }, 'ui-conversation: workbench contribution availability')
   ctx.inject(['projectUiPolicy'], inner => inner.effect(() => {
     const sync = (): void => {
       const required = connection.hostDescription.getSnapshot()?.executionAuthorityRequired

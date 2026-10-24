@@ -982,7 +982,6 @@ export interface ConversationViewportInjected {
   /** Collapse every pane except one, or restore all when soloed. */
   onViewportSolo: (sessionId: SessionId) => void
   onViewportMaximize: (sessionId: SessionId, maximized: boolean) => void
-  onViewportEnabled: (enabled: boolean) => void
   hooks: { viewportAvailable: ObservableSnapshot<boolean> }
 }
 

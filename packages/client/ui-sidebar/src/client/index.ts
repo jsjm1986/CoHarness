@@ -60,7 +60,10 @@ export function apply(ctx: ClientContext): void {
       viewport: ctx.get('conversationViewport')?.snapshot ?? { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }), subscribe: () => () => {} },
       panels,
     },
-    exitWorkbench: () => { ctx.get('conversationViewport')?.setMode('single') },
+    exitWorkbench: () => {
+      ctx.layout.selectPanel(null)
+      ctx.get('conversationViewport')?.setMode('single')
+    },
     // The shell's New Session button rides the runtime's shared action
     // (current Session Workspace, then recent Workspace). The Conversation
     // reset cannot ride the session-list subscription — the no-workspace

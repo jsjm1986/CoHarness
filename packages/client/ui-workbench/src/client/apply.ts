@@ -206,6 +206,10 @@ export function apply(ctx: ClientContext): void {
       ? (snap.activePaneId ?? snap.paneIds[0])
       : ctx.sessions.list.getSnapshot().current
   }
+  const focusConversation = (sessionId: SessionId): void => {
+    ctx.layout.selectPanel(null)
+    viewport.focus(sessionId)
+  }
   ctx.slots.inject('conversation.workbench.toolbar', () => ctx.slots.register({
     name: 'conversation.workbench.toolbar',
     locale: NS,
@@ -222,7 +226,7 @@ export function apply(ctx: ClientContext): void {
         deleteWorkbench: (id: string) => { wb.deleteWorkbench?.(id) },
         switchWorkbench: (id: string) => { wb.switchWorkbench?.(id) },
         chooseSession,
-        focusSession: (id: SessionId) => { viewport.focus(id) },
+        focusSession: focusConversation,
         createSession: async (target: SessionRuntimeTarget, replace: boolean) => {
           if (viewport.snapshot.getSnapshot().pendingIdentity === true) return { ok: false as const, reason: 'unknown' as const }
           // Enforce capacity before creating a Session; recheck after the async
@@ -351,10 +355,13 @@ export function apply(ctx: ClientContext): void {
         // Row tiles resolve the same per-pane steward tone as the pane header.
         projectPolicy: ctx.get('projectUiPolicy') ?? ABSENT_PROJECT_POLICY,
       },
-      focusPane: (sessionId) => { viewport.focus(sessionId) },
+      focusPane: focusConversation,
       removePane: (sessionId) => { viewport.remove(sessionId) },
       setPaneRatios: (ratios) => { viewport.setPaneRatios(ratios) },
-      exitWorkbench: () => { viewport.setMode('single') },
+      exitWorkbench: () => {
+        ctx.layout.selectPanel(null)
+        viewport.setMode('single')
+      },
     }),
   }, WorkbenchSidebar))
   ctx.slots.inject('conversation.workbench.pane.header', () => ctx.slots.register({

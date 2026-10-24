@@ -179,14 +179,22 @@ export class ConversationViewportController implements ConversationViewport {
     this.sessions.setAdditionalStaged([])
   }
 
-  /** Enable retained windows only while the workbench contribution is mounted.
-   * @param enabled - whether the optional controls are mounted.
+  /** Retain windows while the Workbench contribution is registered,
+   * including while another main panel is visible.
+   * @param enabled - whether the optional Workbench contribution is available.
    */
   setEnabled(enabled: boolean): void {
-    if (this.enabled === enabled) return
+    if (this.disposed || this.enabled === enabled) return
     this.enabled = enabled
-    this.syncStaged()
     const state = this.store.getSnapshot()
+    if (state.mode === 'workbench') {
+      if (enabled) this.prepareWorkbenchRestore(state.paneIds)
+      else if (state.paneIds.length > 0) {
+        this.catalogReady = false
+        this.restorationPending = true
+      }
+    }
+    this.syncStaged()
     if (enabled && state.mode === 'workbench' && state.activePaneId !== undefined
       && validSession(this.sessions, state.activePaneId, this.workspaces)) this.select(state.activePaneId)
   }
@@ -595,7 +603,7 @@ export class ConversationViewportController implements ConversationViewport {
     const firstBaseline = !this.baselineReady
     this.baselineReady = true
     const state = this.store.getSnapshot()
-    if (state.mode === 'single') { this.syncStaged(); return }
+    if (!this.enabled || state.mode === 'single') { this.syncStaged(); return }
     for (const id of this.unavailablePanes) if (validSession(this.sessions, id, this.workspaces)) this.unavailablePanes.delete(id)
     const valid = state.paneIds.filter(id => validSession(this.sessions, id, this.workspaces)
       || this.unavailablePanes.has(id)
@@ -615,7 +623,7 @@ export class ConversationViewportController implements ConversationViewport {
       })
     }
     this.syncStaged()
-    if (firstBaseline && this.enabled && active !== undefined
+    if (firstBaseline && active !== undefined
       && validSession(this.sessions, active, this.workspaces)) this.select(active)
   }
 

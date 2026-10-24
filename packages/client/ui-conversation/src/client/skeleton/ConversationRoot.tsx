@@ -558,10 +558,6 @@ export function ConversationContent({
 export function ConversationRoot(props: ConversationRootProps) {
   const viewport = props.useStore(snapshot => snapshot)
   const available = props.useViewportAvailable(value => value)
-  useEffect(() => {
-    props.onViewportEnabled(available)
-    return () => { props.onViewportEnabled(false) }
-  }, [available, props.onViewportEnabled])
   const [maximizedId, setMaximizedId] = useState<SessionId | undefined>()
   const [width, setWidth] = useState<number | undefined>()
   /** Single-pane tab presentation chosen from the layout preset menu. */

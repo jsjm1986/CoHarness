@@ -2,7 +2,7 @@
 import { createServer, request } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { Socket } from 'node:net'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
@@ -19,6 +19,7 @@ const LEGACY_PENDING = fileURLToPath(new URL('./snapshots/runtime-identity/legac
 const ARCHIVE_READS = fileURLToPath(new URL('./expected/runtime-identity/archive-reads.expected.md', import.meta.url))
 const DOCUMENT_SCOPES = fileURLToPath(new URL('./expected/runtime-identity/', import.meta.url))
 const RESTORED_BINDINGS = fileURLToPath(new URL('./expected/runtime-identity/restored-bindings.expected.md', import.meta.url))
+const PLUGINS_NAVIGATION = fileURLToPath(new URL('./expected/runtime-identity/plugins-navigation/', import.meta.url))
 
 it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)(
   'keeps identical Session IDs independent through histories, uploads and restoration from a %s bootstrap', async (bootstrap) => {
@@ -31,6 +32,7 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
     let releaseList: (() => void) | undefined
     let personalComplete = true
     const workspaceReads = new Map<string, number>()
+    const sessionCalls = new Map<string, number>()
     try {
       const seed = await readFile(SEED, 'utf8')
       const id = SessionId('same-durable-session')
@@ -52,6 +54,10 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
         if (pathname === '/api/workspace.list') {
           const owner = selected(req.url)
           workspaceReads.set(owner, (workspaceReads.get(owner) ?? 0) + 1)
+        }
+        if (/^\/api\/session\.(?:history|historyIndex|create|prompt|cancel)$/.test(pathname)) {
+          const key = `${selected(req.url)}${pathname}`
+          sessionCalls.set(key, (sessionCalls.get(key) ?? 0) + 1)
         }
         if (pathname === '/account/api/context' || pathname === '/account/api/workbench/catalog') {
           const scope = bootstrap === 'personal' ? { kind: 'personal' }
@@ -239,6 +245,73 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       expect(await page.locator('[data-session-pane][data-active]').getAttribute('data-session-pane')).toBe(projectKey)
       await compareOrRefreshGolden(RESTORED_BINDINGS,
         `Restored editable panes: ${editable.filter(Boolean).length}\nUnavailable panes: ${unavailable}`, webSnapshotMode())
+      // Empty input leaves the logical Workbench as the foreign Runtime's
+      // owner; an unsent draft would independently keep that Runtime alive.
+      expect(await Promise.all([first, second].map(pane => pane.locator('textarea').inputValue()))).toEqual(['', ''])
+      const caption = toolbar.getByRole('button', { name: 'Select workbench', exact: true })
+      await caption.click()
+      await page.getByRole('menuitem', { name: 'Duplicate workbench', exact: true }).click()
+      const duplicate = page.getByRole('dialog', { name: 'Duplicate workbench', exact: true })
+      await duplicate.getByRole('textbox', { name: 'Workbench name', exact: true }).fill('Navigation B')
+      await duplicate.getByRole('button', { name: 'Confirm', exact: true }).click()
+      await duplicate.waitFor({ state: 'hidden' })
+      await caption.click()
+      await page.getByRole('menuitem', { name: 'My workbench · 2/4', exact: true }).click()
+      const savedMembers = () => page.evaluate(() => {
+        const raw = localStorage.getItem('dsh.conversation.workbenches.v3.local')
+        if (raw === null) throw new Error('Private Runtime fixture has no saved Workbench record')
+        const record = JSON.parse(raw) as { workbenches: { name: string; paneIds: string[] }[] }
+        return record.workbenches.map(row => ({ name: row.name, paneIds: row.paneIds }))
+      })
+      const members = [{ name: '', paneIds: [personalKey, projectKey] }, { name: 'Navigation B', paneIds: [personalKey, projectKey] }]
+      expect(await savedMembers()).toEqual(members)
+      if (webSnapshotMode() === 'refresh') await mkdir(PLUGINS_NAVIGATION, { recursive: true })
+      for (const [focusIndex, pane] of [first, second].entries()) {
+        const focusedKey = focusIndex === 0 ? personalKey : projectKey
+        await pane.locator('textarea').click()
+        expect(await pane.getAttribute('data-active')).toBe('true')
+        const callsBefore = [...sessionCalls]
+        expect(callsBefore.some(([method, count]) => method.endsWith('/api/session.history') && count > 0)).toBe(true)
+        await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+        // Membership precedes panel readiness: retiring a focused foreign
+        // Runtime may select the bootstrap Session and close Plugins itself.
+        expect(await savedMembers()).toEqual(members)
+        const sidebar = page.getByRole('region', { name: 'Workbench', exact: true })
+        expect(await sidebar.getByRole('listitem').count()).toBe(2)
+        const selectedRow = sidebar.getByRole('listitem').nth(focusIndex).getByRole('button').first()
+        expect(await selectedRow.getAttribute('aria-current')).toBe('true')
+        await page.locator('[data-plugin-panel]').waitFor()
+        expect(await page.locator('[data-session-pane]').count()).toBe(0)
+        await selectedRow.click()
+        await expect.poll(() => page.locator('[data-session-pane]').evaluateAll(nodes =>
+          nodes.map(node => node.getAttribute('data-session-pane')))).toEqual([personalKey, projectKey])
+        expect(await page.locator('[data-session-pane][data-active]').getAttribute('data-session-pane')).toBe(focusedKey)
+        expect(await Promise.all([first, second].map(candidate => candidate.locator('textarea').isEditable())))
+          .toEqual([true, true])
+        expect([...sessionCalls]).toEqual(callsBefore)
+        expect(await savedMembers()).toEqual(members)
+        console.info('[runtime-identity-plugins-navigation]', JSON.stringify({
+          bootstrap, focusedRealm: focusIndex === 0 ? 'personal' : 'project',
+          before: callsBefore, after: [...sessionCalls], namedMembersUnchanged: true,
+        }))
+        await caption.click()
+        await page.getByRole('menuitem', { name: 'My workbench · 2/4', exact: true }).waitFor()
+        await page.getByRole('menuitem', { name: 'Navigation B · 2/4', exact: true }).waitFor()
+        const focusName = focusIndex === 0 ? 'personal' : 'project'
+        await compareOrRefreshGolden(`${PLUGINS_NAVIGATION}${bootstrap}-${focusName}.expected.md`,
+          await captureStableAria(page, '[role="menu"]', personal.workspaceCwd), webSnapshotMode())
+        await page.keyboard.press('Escape')
+      }
+      // Restore this fixture's original single named layout before its
+      // document-scope and legacy-identity scenarios continue.
+      await caption.click()
+      await page.getByRole('menuitem', { name: 'Navigation B · 2/4', exact: true }).click()
+      await caption.click()
+      await page.getByRole('menuitem', { name: 'Delete workbench', exact: true }).click()
+      const deleteWorkbench = page.getByRole('dialog', { name: 'Delete workbench', exact: true })
+      await deleteWorkbench.getByRole('button', { name: 'Confirm', exact: true }).click()
+      await deleteWorkbench.waitFor({ state: 'hidden' })
+      expect(await savedMembers()).toEqual(members.slice(0, 1))
       const documentNames = ['personal-scope.txt', 'project-scope.txt']
       for (const [index, runtime] of runtimes.entries()) {
         const target = await runtime.ctx.userDocs.resolveTarget({ name: documentNames[index]! })
@@ -329,3 +402,10 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
     }
   }, 180_000,
 )
+
+it('owns the four Runtime Plugins navigation goldens', async () => {
+  expect((await readdir(PLUGINS_NAVIGATION)).sort()).toEqual([
+    'personal-personal.expected.md', 'personal-project.expected.md',
+    'project-personal.expected.md', 'project-project.expected.md',
+  ])
+})

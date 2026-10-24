@@ -67,6 +67,8 @@ Desktop uses equal or ratio-adjusted columns, with two rows when four columns ca
 
 In tabbed mode, the Workbench title and primary actions share the first toolbar row. Conversation tabs occupy a separate full-width second row, which scrolls horizontally when the tabs exceed its width.
 
+Choosing a pane from the Workbench toolbar or sidebar reveals Conversation, including when that pane is already active. Exiting the sidebar Workbench returns to the existing single-session view without creating a Session.
+
 The conversation chooser excludes archived roots and inactive blank drafts. Personal rows use the same `workspace.list.archivedSessionIds` snapshot as the sidebar; project rows exclude archive-index entries, and opening a target rechecks its live Workspace archive set. An account catalog response is authoritative and is never supplemented with excluded local rows.
 
 The catalog’s `personalComplete` flag distinguishes a verified personal directory from a temporarily unavailable one. Incomplete personal results preserve saved personal metadata without requesting the missing runtime; project membership rows remain authoritative. Legacy raw-ID migration waits for completeness across all possible owners. Layout edits and conversation creation from that layout remain disabled with an explanation and an explicit directory retry; ordinary single-conversation use and Workspace startup remain available. A failed account catalog never proves absence; only an explicitly independent Host may restore from its local directory.

@@ -28,7 +28,7 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
   })
   const calls = {
     focus: vi.fn(), remove: vi.fn(), ratios: vi.fn(), reorder: vi.fn(),
-    collapse: vi.fn(), solo: vi.fn(), maximize: vi.fn(), enabled: vi.fn(),
+    collapse: vi.fn(), solo: vi.fn(), maximize: vi.fn(),
   }
   // Header owner shares arrive in pane order; the session scope binds the id
   // outside the owner share, so the harness aligns capture order to paneIds.
@@ -65,7 +65,6 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     onViewportCollapse={calls.collapse}
     onViewportSolo={calls.solo}
     onViewportMaximize={calls.maximize}
-    onViewportEnabled={calls.enabled}
     t={t}
   />)
   const headers = (): Record<string, unknown>[] => headerOwners.slice(-store.getSnapshot().paneIds.length)

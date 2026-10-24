@@ -40,7 +40,9 @@ describe('assembled workbench', () => {
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
     runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
-    runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
+    runtime.provide('layout', {
+      openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn(), selectPanel: vi.fn(),
+    })
     runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
     runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
     runtime.provide('shortcuts', {
@@ -112,7 +114,10 @@ describe('assembled workbench sidebar panel', () => {
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
     runtime.provide('settingsScope', { bind: () => scope.scope, developerTools: stubDeveloperTools().preference } as never)
-    runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
+    const selectPanel = vi.fn()
+    runtime.provide('layout', {
+      openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn(), selectPanel,
+    })
     runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
     runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
     runtime.provide('shortcuts', {
@@ -166,6 +171,7 @@ describe('assembled workbench sidebar panel', () => {
     expect(beta.getAttribute('aria-current')).toBe('true')
     fireEvent.click(panel.getByRole('button', { name: /Alpha.*就绪.*个人空间 · Alpha/ }))
     expect(viewport.snapshot.getSnapshot().activePaneId).toBe(A)
+    expect(selectPanel).toHaveBeenLastCalledWith(null)
     // Equalize writes equal weights through the viewport capability.
     fireEvent.click(panel.getByRole('button', { name: '等宽' }))
     expect(viewport.snapshot.getSnapshot().paneRatios).toEqual([0.5, 0.5])
@@ -180,6 +186,7 @@ describe('assembled workbench sidebar panel', () => {
     fireEvent.click(view.getByRole('button', { name: '关闭选择器' }))
     // Exit restores the single-conversation surface and the session list.
     fireEvent.click(panel.getByRole('button', { name: '退出工作台' }))
+    expect(selectPanel).toHaveBeenLastCalledWith(null)
     await waitFor(() => { expect(viewport.snapshot.getSnapshot().mode).toBe('single') })
     await waitFor(() => { expect(view.queryByRole('region', { name: '工作台' })).toBeNull() })
     await runtime.dispose()
