@@ -1104,7 +1104,7 @@ describe('DocumentsModal', () => {
         docId: `root-${String(index + 1).padStart(2, '0')}.txt`,
         name: `root-${String(index + 1).padStart(2, '0')}.txt`, mediaType: 'text/plain',
       }))
-      client.browse.mockImplementation(async (directoryId, _signal, query) => ({
+      client.browse.mockImplementation(async (directoryId = '' as UserDocDirectoryIdType, _signal, query) => ({
         directoryId, directories: [], limits, totalDocuments: documents.length,
         documents: query?.cursor === 'next-page' ? documents.slice(20) : documents.slice(0, 20),
         ...(query?.cursor === undefined ? { nextCursor: 'next-page' } : {}),
