@@ -2245,39 +2245,46 @@ export function createDocumentTransferPlanHandler(
       }
       targetSummaries.push({ kind: 'project', label: membership.name })
     }
-    const wanted = new Set(input.documents.map(document => document.docId))
+    const sourceDirectories = new Map<string, Set<string>>()
+    for (const { docId } of input.documents) {
+      const directory = docId.split('/').slice(0, -1).join('/')
+      const wanted = sourceDirectories.get(directory) ?? new Set<string>()
+      wanted.add(docId)
+      sourceDirectories.set(directory, wanted)
+    }
     const found = new Map<string, DocumentTransferTargetRef>()
     let sourceSummary: DocumentTransferScopeSummary | undefined
-    let cursor: string | undefined
-    const seenCursors = new Set<string>()
     let pages = 0
-    do {
-      if (cursor !== undefined) {
-        if (seenCursors.has(cursor) || pages >= 500) {
+    for (const [directory, remaining] of sourceDirectories) {
+      let cursor: string | undefined
+      const seenCursors = new Set<string>()
+      do {
+        if (pages >= 500 || (cursor !== undefined && seenCursors.has(cursor))) {
           throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime returned a repeating document cursor.')
         }
-        seenCursors.add(cursor)
+        if (cursor !== undefined) seenCursors.add(cursor)
+        pages += 1
+        const listed = await list({
+          subject,
+          principal,
+          signal,
+          payload: {
+            version: 1,
+            scope: input.source,
+            directory,
+            limit: 100,
+            ...(cursor === undefined ? {} : { cursor }),
+          },
+        })
+        sourceSummary = listed.scope
+        for (const document of listed.documents) {
+          if (remaining.delete(document.docId)) found.set(document.docId, document)
+        }
+        cursor = listed.nextCursor
+      } while (cursor !== undefined && remaining.size > 0)
+      if (remaining.size > 0) {
+        throw new DocumentTransferError('DOCUMENT_NOT_FOUND', 404, 'One or more source documents are unavailable.')
       }
-      pages += 1
-      const listed = await list({
-        subject,
-        principal,
-        signal,
-        payload: {
-          version: 1,
-          scope: input.source,
-          limit: 100,
-          ...(cursor === undefined ? {} : { cursor }),
-        },
-      })
-      sourceSummary = listed.scope
-      for (const document of listed.documents) {
-        if (wanted.has(document.docId)) found.set(document.docId, document)
-      }
-      cursor = listed.nextCursor
-    } while (cursor !== undefined && found.size < wanted.size)
-    if (found.size !== wanted.size) {
-      throw new DocumentTransferError('DOCUMENT_NOT_FOUND', 404, 'One or more source documents are unavailable.')
     }
     const documents = input.documents.map(document => found.get(document.docId)!)
     const now = Date.now()
