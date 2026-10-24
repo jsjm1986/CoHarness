@@ -421,7 +421,7 @@ async function uploadChunkWithRetry(request: ChunkRequest): Promise<void> {
 }
 
 /**
- * Upload one browser file through the shared resumable protocol.
+ * Upload one browser file through the shared resumable protocol, checking verification status immediately.
  * @param file - browser file to stream in bounded chunks.
  * @param directoryId - destination document directory.
  * @param signal - aborts the active request while retaining the session.
@@ -522,6 +522,7 @@ export async function resumableUpload(
   ), file, options.responseError, directoryId)
   onProgress?.(file.size, file.size, 'verifying')
   const verifyDeadline = Math.min(current.expiresAt, Date.now() + MAX_VERIFY_WAIT_MS)
+  let firstVerificationRead = true
   while (current.state === 'verifying') {
     const remaining = verifyDeadline - Date.now()
     if (remaining <= 0) {
@@ -531,7 +532,9 @@ export async function resumableUpload(
         code: 'DOCUMENT_UPLOAD_VERIFY_TIMEOUT',
       })
     }
-    await delay(Math.min(500, remaining), signal)
+    if (firstVerificationRead) signal?.throwIfAborted()
+    else await delay(Math.min(500, remaining), signal)
+    firstVerificationRead = false
     current = checkedSession(await options.requestJson<UserDocUploadSession>(
       endpoint(root, `/uploads/${encodeURIComponent(String(session.uploadId))}`, query),
       signal === undefined ? {} : { signal },
