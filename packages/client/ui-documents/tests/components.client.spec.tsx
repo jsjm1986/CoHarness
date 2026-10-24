@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DocumentsButton } from '../src/client/DocumentsButton.tsx'
+import { DocumentsOverlay } from '../src/client/DocumentsOverlay.tsx'
 import buttonCss from '../src/client/DocumentsButton.module.css'
 import { DocumentsModal } from '../src/client/DocumentsModal.tsx'
 import modalCss from '../src/client/DocumentsModal.module.css'
@@ -158,6 +159,17 @@ function renderModal() {
   return render(<DocumentsModal open onClose={() => {}} t={t} />)
 }
 
+function renderPickerButton() {
+  const runtime = {
+    t: t as never, useSessions: useNoCurrentSession as never,
+    useWorkspaces: undefined as never, usePanelInfo: undefined as never,
+  }
+  return render(<>
+    <DocumentsButton {...runtime} wide={false} />
+    <DocumentsOverlay {...runtime} />
+  </>)
+}
+
 function stubPhoneMedia(): void {
   const listeners = new Set<() => void>()
   vi.stubGlobal('matchMedia', vi.fn(() => ({
@@ -189,10 +201,7 @@ describe('DocumentsModal', () => {
 
   it('renders a button with the document label, opens the modal on click, and closes on Escape', () => {
     createUserDocClient.mockReturnValue(makeClient())
-    render(<DocumentsButton
-      t={t as never} wide={false} useSessions={useNoCurrentSession as never}
-      useWorkspaces={undefined as never} usePanelInfo={undefined as never}
-    />)
+    renderPickerButton()
     expect(screen.getByRole('button', { name: '文档' }).className.split(/\s+/)).toContain(buttonCss.rail)
     fireEvent.click(screen.getByRole('button', { name: '文档' }))
     expect(screen.getByRole('dialog', { name: '文档管理' })).toBeTruthy()
@@ -226,10 +235,7 @@ describe('DocumentsModal', () => {
       return { ok: true, json: async () => ({}) }
     }))
     createUserDocClient.mockReturnValue(client)
-    render(<DocumentsButton
-      t={t as never} wide={false} useSessions={useNoCurrentSession as never}
-      useWorkspaces={undefined as never} usePanelInfo={undefined as never}
-    />)
+    renderPickerButton()
     fireEvent.click(screen.getByRole('button', { name: '文档' }))
     expect(await screen.findByRole('dialog', { name: t('modal.title.project', { name: 'Compiler' }) })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })

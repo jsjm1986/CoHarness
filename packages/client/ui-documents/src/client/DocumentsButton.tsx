@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import { DocumentsModal } from './DocumentsModal.tsx'
 import type { UserDocRef, UserDocScope } from './documents-client.ts'
 import { NS } from './locales.ts'
 import css from './DocumentsButton.module.css'
@@ -13,7 +12,7 @@ export interface DocumentsButtonInjected {
   documentScopeFor?: ((sessionId: SessionId) => UserDocScope | undefined) | undefined
   /** Bind private resource navigation to the verified account. */
   privateResourceUrl?: ((url: string) => string) | undefined
-  /** Add a durable document to the current conversation composer. */
+  /** Add a durable document to the captured conversation composer. */
   attachDocument?: ((document: UserDocRef, sessionId?: SessionId) => boolean) | undefined
 }
 
@@ -23,67 +22,31 @@ export type DocumentsButtonProps =
   & DocumentsButtonInjected
 
 /**
- * Render the sidebar Documents trigger and its manager modal.
+ * Render the sidebar Documents trigger for the root picker host.
  * @param props.t - localized documents dictionary.
  * @param props.wide - when true, the expanded sidebar shows the Documents label beside the icon.
- * @returns the footer trigger and, while open, the document manager dialog.
+ * @returns the footer trigger.
  */
-export function DocumentsButton({
-  t, wide, attachDocument, useSessions, privateResourceUrl, documentScopeFor,
-}: DocumentsButtonProps) {
+export function DocumentsButton({ t, wide, useSessions }: DocumentsButtonProps) {
   const currentSessionId = useSessions(snapshot => snapshot.current)
-  const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'manage' | 'select'>('manage')
-  const [targetSessionId, setTargetSessionId] = useState<SessionId | undefined>()
-  const [attachmentScope, setAttachmentScope] = useState<UserDocScope | undefined>()
   const handleOpen = useCallback(() => {
-    setMode('manage')
-    setTargetSessionId(currentSessionId)
-    setAttachmentScope(currentSessionId === undefined ? undefined : documentScopeFor?.(currentSessionId))
-    setOpen(true)
-  }, [currentSessionId, documentScopeFor])
-  const handleClose = useCallback(() => { setOpen(false) }, [])
-
-  useEffect(() => {
     if (typeof window === 'undefined') return
-    const openPicker = (event: Event): void => {
-      const detail = event instanceof CustomEvent && typeof event.detail === 'object' && event.detail !== null
-        ? event.detail as { mode?: unknown; sessionId?: unknown }
-        : undefined
-      setMode(detail?.mode === 'select' ? 'select' : 'manage')
-      const target = typeof detail?.sessionId === 'string' ? detail.sessionId as SessionId : currentSessionId
-      setTargetSessionId(target)
-      setAttachmentScope(target === undefined ? undefined : documentScopeFor?.(target))
-      setOpen(true)
-    }
-    window.addEventListener('dsh-documents-open-picker', openPicker)
-    return () => { window.removeEventListener('dsh-documents-open-picker', openPicker) }
-  }, [currentSessionId, documentScopeFor])
+    window.dispatchEvent(new CustomEvent('dsh-documents-open-picker', {
+      detail: { mode: 'manage', sessionId: currentSessionId },
+    }))
+  }, [currentSessionId])
 
   return (
-    <>
-      <Tooltip label={t('button.label')} side="right" delayMs={500} disabled={wide}>
-        <button
-          type="button"
-          className={wide ? css.trigger : `${css.trigger} ${css.rail}`}
-          aria-label={t('button.label')}
-          onClick={handleOpen}
-        >
-          <IconBrowseOutline16 size={16} />
-          {wide && <span className={css.label}>{t('button.label')}</span>}
-        </button>
-      </Tooltip>
-      <DocumentsModal
-        open={open}
-        onClose={handleClose}
-        t={t}
-        mode={mode}
-        privateResourceUrl={privateResourceUrl}
-        attachmentScope={attachmentScope}
-        {...(attachDocument === undefined ? {} : {
-          onAttachDocument: (document: UserDocRef) => targetSessionId === undefined ? false : attachDocument(document, targetSessionId),
-        })}
-      />
-    </>
+    <Tooltip label={t('button.label')} side="right" delayMs={500} disabled={wide}>
+      <button
+        type="button"
+        className={wide ? css.trigger : `${css.trigger} ${css.rail}`}
+        aria-label={t('button.label')}
+        onClick={handleOpen}
+      >
+        <IconBrowseOutline16 size={16} />
+        {wide && <span className={css.label}>{t('button.label')}</span>}
+      </button>
+    </Tooltip>
   )
 }

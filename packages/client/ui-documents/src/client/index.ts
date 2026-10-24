@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { DocumentsButton } from './DocumentsButton.tsx'
 import type { DocumentsButtonInjected } from './DocumentsButton.tsx'
+import { DocumentsOverlay } from './DocumentsOverlay.tsx'
 import { DocumentsModal } from './DocumentsModal.tsx'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { NS, en, zh } from './locales.ts'
@@ -45,12 +46,18 @@ export function apply(ctx: ClientContext): void {
     },
   })
 
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'documents.picker',
+    locale: NS,
+    inject: injected,
+  }, DocumentsOverlay))
+
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     id: 'documents',
     order: -10,
     locale: NS,
-    inject: injected,
   }, DocumentsButton))
 }
 

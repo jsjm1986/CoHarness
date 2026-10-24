@@ -9,7 +9,7 @@ Workspace document manager for the CoHarness Web UI. Organize, preview, upload, 
 
 English | [中文](README.zh.md)
 
-Opening the document picker captures its destination Session. Switching panes while the dialog is open does not change which composer receives a selected document.
+The composer's **Choose from Documents** action opens the library in both single-conversation and Workbench views. Opening the picker captures its destination Session. Switching panes while the dialog is open does not change which composer receives a selected document.
 
 Private image, PDF and download URLs carry the Connection’s confirmed account and runtime, including native iframe and anchor requests. The picker captures its destination runtime separately from its browsing scope: an attachment from another runtime is copied through the authorized transfer service before the new reference reaches the composer. Resumable upload chunks carry the same account and runtime conditions as their metadata requests.
 

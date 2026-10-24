@@ -123,6 +123,118 @@ describe('web: Cordis Workspace workbench', () => {
     await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'selection-restored.expected.md'), await captureStableAria(page, '[data-workbench-toolbar]', scaffold.workspaceCwd), MODE)
   })
 
+  it.skipIf(MODE === 'record')('selects a stored document into its restored workbench pane across view changes', async () => {
+    scaffold = await launchWebScaffold({
+      workbench: true, openInApp: false, replayFixture: PROVIDERS, replayProvidersOnly: true,
+    })
+    const runtime = scaffold
+    const seed = await readFile(SEED, 'utf8')
+    const names = ['picker-alpha', 'picker-beta']
+    for (const name of names) {
+      const path = join(runtime.workspaceCwd, name)
+      await mkdir(path)
+      await mkdir(join(path, 'workspace'))
+      const workspace = await runtime.ctx.workspaceRegistry.create(path)
+      const session = await seedSession(runtime, seed, name, undefined, path)
+      await workspace.attachSession(session)
+      await runtime.ctx.agents.resume({
+        resumeSessionId: session,
+        setup: agentCtx => runtime.ctx.agentPresets.mount(agentCtx).then(() => undefined),
+      })
+    }
+    const content = 'Workbench library selection fixture'.padEnd(47, '.') + '\n'
+    const bytes = new TextEncoder().encode(content)
+    expect(bytes).toHaveLength(48)
+    const target = await runtime.ctx.userDocs.resolveTarget({ name: 'workbench-library.txt' })
+    const stored = await runtime.ctx.userDocs.save(target, new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(bytes); controller.close() },
+    }))
+    expect(stored.bytes).toBe(48)
+    browser = await chromium.launch()
+    page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+    const tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'workbench-document-picker'))
+    await page.goto(runtime.authenticatedUrl, { waitUntil: 'load' })
+    await page.locator('[class*="titleRow"] [data-workbench-toolbar]').waitFor({ timeout: 30_000 })
+    const toolbar = page.locator('[data-workbench-toolbar]')
+    const caption = toolbar.getByRole('button', { name: 'Select workbench', exact: true })
+    await caption.click()
+    await page.getByRole('menuitem', { name: 'New workbench', exact: true }).click()
+    const create = page.getByRole('dialog', { name: 'New workbench', exact: true })
+    await create.getByRole('textbox', { name: 'Workbench name', exact: true }).fill('Picker A')
+    await create.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await create.waitFor({ state: 'hidden' })
+    for (const name of names) {
+      await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
+      const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
+      await picker.locator('button').filter({ hasText: name }).first().click()
+      await picker.waitFor({ state: 'hidden' })
+    }
+    await page.reload({ waitUntil: 'load' })
+    const panes = page.locator('[data-session-pane]')
+    await expect.poll(() => panes.count(), { timeout: 30_000 }).toBe(2)
+    await expect.poll(() => panes.evaluateAll(nodes => nodes.filter((node) => {
+      const input = node.querySelector('textarea')
+      return input !== null && !input.disabled && !input.readOnly
+    }).length), { timeout: 30_000 }).toBe(2)
+    const [pKey, qKey] = await panes.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-session-pane')!))
+    const p = page.locator(`[data-session-pane="${pKey}"]`)
+    const q = page.locator(`[data-session-pane="${qKey}"]`)
+    expect((await caption.innerText()).trim()).toBe('Picker A')
+    expect(await page.getByRole('button', { name: 'Documents', exact: true }).count()).toBe(0)
+    await q.locator('textarea').click()
+    await p.getByRole('button', { name: 'Choose from Documents', exact: true }).click()
+    const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+    await manager.waitFor({ state: 'visible', timeout: 10_000 })
+    await manager.getByText(stored.name, { exact: true }).waitFor()
+    const output = [await manager.getByRole('heading', { name: 'Document Manager', exact: true }).ariaSnapshot()]
+    await manager.getByRole('button', { name: `Preview ${stored.name}`, exact: true }).click()
+    const preview = page.getByRole('dialog', { name: `Preview: ${stored.name}`, exact: true })
+    await expect.poll(() => preview.locator('pre').textContent()).toBe(content)
+    output.push(await captureStableAria(page, '[role="dialog"]:has(pre)', runtime.workspaceCwd))
+    await preview.getByRole('button', { name: 'Close', exact: true }).click()
+    await preview.waitFor({ state: 'hidden' })
+    await manager.getByRole('button', { name: `Add ${stored.name} to conversation`, exact: true }).click()
+    await manager.waitFor({ state: 'hidden' })
+    const remove = p.getByRole('button', { name: `Remove document ${stored.name}`, exact: true })
+    await remove.waitFor()
+    await p.locator('[data-document-status="ready"]').waitFor()
+    expect(await q.getByRole('button', { name: `Remove document ${stored.name}`, exact: true }).count()).toBe(0)
+    output.push(await captureStableAria(
+      page, `[data-session-pane="${pKey}"] [data-document-status="ready"]`, runtime.workspaceCwd,
+    ))
+    await q.locator('textarea').click()
+    expect(await q.getByRole('button', { name: `Remove document ${stored.name}`, exact: true }).count()).toBe(0)
+    await p.locator('textarea').click()
+    await remove.click()
+    await remove.waitFor({ state: 'hidden' })
+    await expect.poll(() => p.getByRole('button', { name: 'Send message', exact: true }).isDisabled()).toBe(true)
+    expect(new TextDecoder().decode((await runtime.ctx.userDocs.read(stored.docId)).data)).toBe(content)
+
+    await caption.click()
+    await page.getByRole('menuitem', { name: 'Exit workbench', exact: true }).click()
+    await expect.poll(() => panes.count()).toBe(0)
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    await manager.getByText(stored.name, { exact: true }).waitFor()
+    await page.keyboard.press('Escape')
+    await manager.waitFor({ state: 'hidden' })
+    await page.getByRole('button', { name: 'Choose from Documents', exact: true }).click()
+    await manager.getByText(stored.name, { exact: true }).waitFor()
+    await page.keyboard.press('Escape')
+    await manager.waitFor({ state: 'hidden' })
+    await caption.click()
+    await page.getByRole('menuitem', { name: 'Picker A · 2/4', exact: true }).click()
+    await page.getByRole('menu').waitFor({ state: 'hidden' })
+    await expect.poll(() => p.locator('textarea').isEditable()).toBe(true)
+    await p.getByRole('button', { name: 'Choose from Documents', exact: true }).click()
+    await manager.getByText(stored.name, { exact: true }).waitFor()
+    await page.keyboard.press('Escape')
+    await manager.waitFor({ state: 'hidden' })
+    expect(tripwire.pageErrors).toEqual([])
+    if (MODE === 'refresh') await mkdir(SELECTION_EXPECTED_DIR, { recursive: true })
+    await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'document-picker.expected.md'), output.join('\n\n'), MODE)
+  })
+
   it.skipIf(MODE === 'record')('isolates four panes, concurrent streams, approval, draft recovery, and background completion', async () => {
     scaffold = await launchWebScaffold({
       workbench: true,

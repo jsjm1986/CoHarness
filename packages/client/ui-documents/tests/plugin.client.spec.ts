@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
-import { describe, expect, it, vi } from 'vitest'
+import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { UserDocRef } from '@deepseek-ai/dsh-userdoc'
 import { DocumentsButton } from '../src/client/DocumentsButton.tsx'
+import type { DocumentsButtonInjected } from '../src/client/DocumentsButton.tsx'
+import { DocumentsOverlay } from '../src/client/DocumentsOverlay.tsx'
 import { apply, inject } from '../src/client/index.ts'
 
 describe('ui-documents apply', () => {
@@ -11,8 +14,9 @@ describe('ui-documents apply', () => {
     expect(inject).toEqual(['slots', 'locale', 'sessions', 'conversation', 'connection'])
   })
 
-  it('registers the documents entry in the sidebar footer action slot', async () => {
+  it('registers the footer trigger and one independent picker overlay', async () => {
     const ctx = new Context()
+    onTestFinished(async () => { await ctx.fiber.dispose() })
     await ctx.plugin(SlotRegistry).await()
     ctx.provide('locale', { register: vi.fn(() => () => {}) })
     const attachDocument = vi.fn(() => true)
@@ -25,6 +29,7 @@ describe('ui-documents apply', () => {
       name: 'root',
       children: {
         'sidebar.footer.action': { kind: 'list', scope: 'root' },
+        'shell.overlay': { kind: 'list', scope: 'root' },
       },
     } as never, () => null)
 
@@ -35,13 +40,22 @@ describe('ui-documents apply', () => {
     const docEntry = entries.find(entry => entry.component === DocumentsButton)!
     expect(docEntry).toBeDefined()
     expect(docEntry.options).toMatchObject({ id: 'documents', order: -10 })
+    expect(docEntry.inject).toBeUndefined()
+    const overlays = ctx.slots.entries('shell.overlay')
+    expect(overlays).toHaveLength(1)
+    expect(overlays[0]?.component).toBe(DocumentsOverlay)
+    expect(overlays[0]?.options).toMatchObject({ id: 'documents.picker' })
     const ref = {
       docId: 'folder/report.pdf', path: '/documents/folder/report.pdf', name: 'report.pdf',
       bytes: 10, mediaType: 'application/pdf', modifiedAt: 1,
     } as UserDocRef
-    const injected = (docEntry.inject as unknown as () => { attachDocument?: (document: UserDocRef) => boolean })()
+    const injected = overlays[0]!.inject!() as DocumentsButtonInjected
     expect(injected.attachDocument?.(ref)).toBe(true)
     expect(attachDocument).toHaveBeenCalledWith('session-1', ref)
-    void fiber.dispose()
+    expect(injected.attachDocument?.(ref, 'session-2' as SessionId)).toBe(true)
+    expect(attachDocument).toHaveBeenLastCalledWith('session-2', ref)
+    await fiber.dispose()
+    expect(ctx.slots.entries('sidebar.footer.action')).toHaveLength(0)
+    expect(ctx.slots.entries('shell.overlay')).toHaveLength(0)
   })
 })
