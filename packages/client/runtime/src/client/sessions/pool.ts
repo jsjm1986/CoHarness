@@ -184,7 +184,7 @@ export class SessionRuntimePool implements ISessions {
   }
 
   private indexEntry(entry: RuntimeEntry): void {
-    const ids = new Set((Object.keys(entry.runtime.list.getSnapshot().byId) as SessionId[])
+    const ids = new Set<SessionId>((Object.keys(entry.runtime.list.getSnapshot().byId) as SessionId[])
       .map(id => clientSessionKey(entry.target, id)))
     let changed = false
     for (const [id, owner] of this.sessionOwners) {
