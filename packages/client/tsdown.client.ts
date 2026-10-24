@@ -11,7 +11,7 @@
  * Non-experimental client outputs reject experimental module and stylesheet
  * inputs, including origins recorded by chained source maps.
  */
-import { readFile, stat, utimes } from 'node:fs/promises'
+import { readFile, stat, utimes, writeFile } from 'node:fs/promises'
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import { createRequire, isBuiltin } from 'node:module'
 import { basename, dirname, extname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 import { Rolldown, type TsdownPlugin, type UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 import { optionalStringArray } from './modules/src/client/manifest.ts'
+import { stampClientArtifact } from './modules/src/artifact-revision.ts'
 import { PLATFORM_MODULES, PRELOADED_CLIENT_EXTERNALS } from './web/src/platform.ts'
 import { clientBuildEnvironmentDefines } from '../../scripts/client-build-environment.ts'
 import { BundleInputIsolation, physicalBundleInput } from '../../scripts/bundle-input-isolation.ts'
@@ -499,8 +500,15 @@ function asyncChunkRequirePlugin(): TsdownPlugin {
     },
     async writeBundle(outputOptions, bundle) {
       const entry = Object.values(bundle).find(output => output.type === 'chunk' && output.isEntry)
-      if (entry === undefined || outputOptions.dir === undefined) return
-      const entryPath = resolvePath(outputOptions.dir, entry.fileName)
+      const directory = outputOptions.dir
+      if (entry === undefined || directory === undefined) return
+      const entryPath = resolvePath(directory, entry.fileName)
+      const chunks = await Promise.all(Object.values(bundle).flatMap(output =>
+        output.type === 'chunk' && !output.isEntry
+          ? [readFile(resolvePath(directory, output.fileName), 'utf8').then(code => ({ fileName: output.fileName, code }))]
+          : [],
+      ))
+      await writeFile(entryPath, stampClientArtifact(await readFile(entryPath, 'utf8'), chunks))
       const current = await stat(entryPath)
       const completedAt = new Date(Math.max(Date.now(), current.mtimeMs + 1))
       await utimes(entryPath, current.atime, completedAt)

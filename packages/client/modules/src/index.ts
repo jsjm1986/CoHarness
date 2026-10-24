@@ -24,6 +24,7 @@
  */
 
 import { createHash } from 'node:crypto'
+import { clientContentRevision } from './artifact-revision.ts'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
@@ -210,9 +211,10 @@ function framedHash(domain: string, parts: readonly string[]): string {
   return hash.digest('hex').slice(0, HASH_REVISION_LENGTH)
 }
 
-/** Identify an entry's build from filesystem metadata without hashing its contents. */
-function artifactRevision(baseline: ClientArtifactBaseline): string {
-  return framedHash('plugin-artifact', [String(baseline.mtimeMs), String(baseline.ctimeMs), String(baseline.size)])
+/** Marked compiler output uses content identity; unmarked packages retain filesystem revisions. */
+function artifactRevision(baseline: ClientArtifactBaseline, bundle: Buffer): string {
+  return clientContentRevision(bundle)
+    ?? framedHash('plugin-artifact', [String(baseline.mtimeMs), String(baseline.ctimeMs), String(baseline.size)])
 }
 
 /**
@@ -693,6 +695,7 @@ export class ClientModuleRegistry extends Service {
    * Publish one completed bundle generation (the HMR watch's registration
    * hook — the only entry point through which build changes reach the graph).
    * Unchanged mtime, ctime and size preserve the graph without reading the bundle.
+   * Marked entries also preserve it when filesystem metadata changes without changing content.
    * @param id - entry id (package name).
    * @returns the current artifact rev, or undefined for an unknown id.
    */
@@ -700,10 +703,12 @@ export class ClientModuleRegistry extends Service {
     const record = this.table.get(id)
     if (record === undefined) return undefined
     const baseline = this.captureArtifactBaseline(record.meta.clientPath)
-    const rev = artifactRevision(baseline)
-    if (rev === record.entry.rev) return rev
+    if (baseline.mtimeMs === record.baseline.mtimeMs && baseline.ctimeMs === record.baseline.ctimeMs
+      && baseline.size === record.baseline.size) return record.entry.rev
     const bundle = readFileSync(record.meta.clientPath)
+    const rev = artifactRevision(baseline, bundle)
     record.baseline = baseline
+    if (rev === record.entry.rev) return rev
     record.entry = graphRow(id, rev, record.meta)
     record.bundle = bundle
     this.composed = this.compose()
@@ -721,7 +726,7 @@ export class ClientModuleRegistry extends Service {
   }
 
   /**
-   * Subscribe to bundle rebuilds; fires only when artifact metadata changes the rev.
+   * Subscribe to bundle rebuilds; fires only when the published artifact revision changes.
    * @param listener - receives the entry id and its new bundle rev.
    * @returns the unsubscriber.
    */
@@ -1025,7 +1030,7 @@ export class ClientModuleRegistry extends Service {
     if (this.table.get(packageName)?.sourceKey === source.sourceKey) return false
     // Startup and HMR share revisions so unchanged artifacts survive a server restart.
     const snapshot = this.initialBundleSnapshot(packageName, source.meta.clientPath)
-    const rev = artifactRevision(snapshot.baseline)
+    const rev = artifactRevision(snapshot.baseline, snapshot.bundle)
     this.table.set(packageName, {
       entry: graphRow(packageName, rev, source.meta),
       loaderName: source.loaderName,

@@ -7,9 +7,71 @@ import { chromium, type Page } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { launchWebScaffold, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode } from './scaffold.ts'
 import { saveFailureShot, ZH_BROWSER_LOCALE } from './support.ts'
+import { stampClientArtifact } from '../../../packages/client/modules/src/artifact-revision.ts'
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/plugins/fixture-live-client', import.meta.url))
 const EXPECTED = fileURLToPath(new URL('./expected/client-plugin-live', import.meta.url))
+
+it('reuses a content-stamped plugin after a filesystem generation and preserves drafts through a real code rebuild', async () => {
+  const fixture = await mkdtemp(join(tmpdir(), 'dsh-client-content-cache-'))
+  onTestFinished(() => rm(fixture, { recursive: true, force: true }))
+  await cp(FIXTURE, fixture, { recursive: true })
+  const file = join(fixture, 'client.js')
+  const source = await readFile(file, 'utf8')
+  await writeFile(file, stampClientArtifact(source, []))
+  const scaffold = await launchWebScaffold({ extraInstallAnchors: [join(fixture, 'package.json')] })
+  onTestFinished(() => scaffold.close())
+  await scaffold.ctx.loader.create({ name: '@fixture/live-client' })
+  const browser = await chromium.launch()
+  onTestFinished(async () => { await browser.close() })
+  const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
+  onTestFailed(() => saveFailureShot(page, 'web-e2e-client-content-cache'))
+  const console = watchConsole(page)
+  await openPluginSettings(page, scaffold.authenticatedUrl)
+  await page.locator('[data-live-client]').waitFor()
+  const graph = scaffold.ctx.clientModules.graph()
+  const row = graph.entries.find(row => row.id === '@fixture/live-client')!
+  const batch = graph.batches.find(batch => batch.entries.includes(row.id))!
+  const resourceUrl = new URL(batch.url, page.url()).href
+  const transfer = (url: string) => page.evaluate(url => performance.getEntriesByName(url, 'resource')
+    .map(entry => (entry as PerformanceResourceTiming).transferSize).at(-1), url)
+  const initialTransfer = await transfer(resourceUrl)
+  expect(initialTransfer).toBeGreaterThan(0)
+  const original = await stat(file)
+  await utimes(file, original.atime, new Date(original.mtimeMs + 10_000))
+  const touchedRevision = scaffold.ctx.clientModules.rebuilt('@fixture/live-client')
+  const afterTouch = scaffold.ctx.clientModules.graph()
+  const currentBatch = afterTouch.batches.find(batch => batch.entries.includes(row.id))!
+  const reloadResourceUrl = new URL(currentBatch.url, page.url()).href
+
+  const reloadStarted = performance.now()
+  await page.reload({ waitUntil: 'load' })
+  await page.locator('[data-live-client]').waitFor()
+  const reloadVisibleMs = performance.now() - reloadStarted
+  const reloadedTransfer = await transfer(reloadResourceUrl)
+  process.stdout.write(`client-content-cache ${JSON.stringify({
+    initialTransfer, reloadedTransfer, reloadVisibleMs,
+    resourceUrlStable: reloadResourceUrl === resourceUrl, graphRetained: afterTouch === graph,
+  })}\n`)
+  expect(touchedRevision).toBe(row.rev)
+  expect(afterTouch).toBe(graph)
+  expect(reloadedTransfer).toBe(0)
+  await compareOrRefreshGolden(join(EXPECTED, 'enabled.expected.md'), await captureStableAria(page, '[data-live-client]', scaffold.workspaceCwd), webSnapshotMode())
+  const settings = await openPluginSettings(page, page.url())
+  const draft = settings.getByLabel('命令超时（毫秒）')
+  await draft.fill('123456')
+  const changed = source.replace('动态插件已启用', '动态插件内容更新已启用').replace('Live plugin enabled', 'Live plugin content updated')
+  expect(changed).not.toBe(source)
+  await writeFile(file, stampClientArtifact(changed, []))
+  const updated = await stat(file)
+  await utimes(file, updated.atime, new Date(updated.mtimeMs + 20_000))
+  expect(scaffold.ctx.clientModules.rebuilt('@fixture/live-client')).not.toBe(row.rev)
+  await page.getByText('动态插件内容更新已启用', { exact: true }).waitFor()
+  expect(await draft.inputValue()).toBe('123456')
+  expect(await page.evaluate(() => document.documentElement.dataset.liveMounts)).toBe('2')
+  await compareOrRefreshGolden(join(EXPECTED, 'content-rebuilt.expected.md'), await captureStableAria(page, '[data-live-client]', scaffold.workspaceCwd), webSnapshotMode())
+  expect(console.pageErrors).toEqual([])
+}, 90_000)
 
 /** Open the sidebar Plugins panel — it owns this page's module-sync diagnostics. */
 async function openPluginsPanel(page: Page, url: string) {
@@ -204,17 +266,23 @@ it('reports bootstrap rebuilds without remounting the settings page or navigatin
     const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
     const console = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-client-bootstrap-rebuild'))
+    const publication = Promise.withResolvers<undefined>()
+    onTestFinished(() => { publication.resolve(undefined) })
+    await page.route('**/plugins/events', async (route) => {
+      await publication.promise
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: `data: ${JSON.stringify({ type: 'rebuilt', id: '@deepseek-ai/dsh-client-modules', rev: 'fixture-changed-bootstrap' })}\n\n`,
+      })
+    })
     const settings = await openPluginSettings(page, scaffold.authenticatedUrl)
     const draft = settings.getByLabel('命令超时（毫秒）')
     await draft.fill('123456')
     const originalInput = await draft.elementHandle()
     let navigations = 0
     page.on('framenavigated', () => { navigations++ })
-    const clientPath = scaffold.ctx.clientModules.clientPath('@deepseek-ai/dsh-client-modules')!
-    const originalStat = await stat(clientPath)
-    onTestFinished(() => utimes(clientPath, originalStat.atime, originalStat.mtime))
-    await utimes(clientPath, originalStat.atime, new Date(originalStat.mtimeMs + 1_000))
-    scaffold.ctx.clientModules.rebuilt('@deepseek-ai/dsh-client-modules')
+    publication.resolve(undefined)
     const failure = page.locator('[data-client-sync-failure]')
     await failure.getByText(/replacing bootstrap module .* requires a page reload/).waitFor()
     // The banner sits above the panel's item page, so the retry clicks directly.

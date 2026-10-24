@@ -46,7 +46,7 @@ vendored Loader 经其 `internal` 约定消费模块系统——唯一调用点�
 
 共享 tsdown 预设为每个插件产出 `client.js.map`，并把第一方源码路径重写成浏览器可识别的仓库形状 `/packages/<group>/<package>/src/...`。内联进 bundle 的其他 workspace 源码同样回到其 `packages/` 归属，依赖包路径保持原样；`sourcesContent` 承载源码，因此 host 只需在 `/plugins/<id>/client.js.map` 供给 map，无需开放源码路由。Vite 壳也产出 sourcemap，使壳代码与图外插件都能从 stack 和性能 profile 回到 TypeScript/TSX。
 
-`rev` 继续作为脚本 URL 的查询参数和内容一致性锚点，bundle 与 map 都以 `no-cache` 供给。外部脚本的 `error` 事件不给响应状态与正文，因此失败诊断只报告 URL；同源 host 供给与构建期写入的 registration id 是身份边界，`load` 后的工厂存在性检查负责拒绝未登记预期 id 的产物。
+`rev` 继续作为脚本 URL 的查询参数和内容一致性锚点，bundle 与 map 都以 immutable 缓存供给。外部脚本的 `error` 事件不给响应状态与正文，因此失败诊断只报告 URL；同源 host 供给与构建期写入的 registration id 是身份边界，`load` 后的工厂存在性检查负责拒绝未登记预期 id 的产物。
 
 ### 装载流程，端到端
 
@@ -56,7 +56,7 @@ vendored Loader 经其 `internal` 约定消费模块系统——唯一调用点�
 
 1. 负责组合的 app（`apps/cli`）把名册作为普通行放进它的 `cordis.yml` 配置树——client 插件包与每个 host 插件一样是 entry 行，包括无条件挂载的 `client-hmr` 行。名册行 import 失败由 `assertEntriesLoaded` 捕获；fiber reject 的行则由 `assertEntriesActivated` 报告原始 stack（[host boot 决策](2026-07-24-web-config-tree-boot-and-transport-layering.zh.md)）。
 2. `dsh-client-modules` 的 node 半（该包是双面的：浏览器半就是模块表）扫描 loader entry 的 package.json `dsh.client` 声明，组合出 `window.__DSH_BOOT__`：`{ rev, entries: [{ id, url, rev, inject?, immediately?, external? }] }`。三个可选字段都来自 manifest，永不人肉抄写。组合会把被请求的动态图 row 排到消费者之前，并拒绝同步请求环。它会拒绝没有已构建 `./client` bundle 的已声明插件，并把它们的 package/path 行归到一条源码构建要求下；畸形声明字段同样会让激活失败，host 检查会从 FAILED fiber 报告这两类错误。
-3. 扫描是单包增量——不存在全量重扫代码路径。每次 cordis `internal/plugin` 发射把该 fiber 的 entry 名标脏（无 entry 的 fiber O(1) 丢弃）；微任务 flush 把每个脏名对账 live loader entries，包元数据（含「非 client 包」的否定结论）按 Loader specifier 与所属 tree base URL 缓存至重启，bundle 重哈希只经 `rebuilt(id)` 可达。激活趟从当前 entries 灌同一脏集合并同步 flush，初扫与稳态共享一条实现。首次发布与 `rebuilt(id)` 都从入口的 mtime、ctime 和大小派生行 `rev`，不读取产物字节；ctime 区分保留 mtime 和大小的重写，因此 Host 重启时未变的产物保持全部行 revision，SSE 重连不会替换浏览器插件，行集合哈希进 `graph.rev`，每一行都公告一个文档相对的 `plugins/??<id>/client.js&rev=…` 引用，并按对应的绝对路径供给脚本资源，sourcemap 位于同一路径加 `.map`。图类型单源在 modules 包的 `./client` 出口——webserver 对图一无所知（它是朴素路由注册插件；bundle 路由和 index 渲染 tap 都由 modules 自己注册）。
+3. 扫描是单包增量——不存在全量重扫代码路径。每次 cordis `internal/plugin` 发射把该 fiber 的 entry 名标脏（无 entry 的 fiber O(1) 丢弃）；微任务 flush 把每个脏名对账 live loader entries，包元数据（含「非 client 包」的否定结论）按 Loader specifier 与所属 tree base URL 缓存至重启，bundle 重哈希只经 `rebuilt(id)` 可达。激活趟从当前 entries 灌同一脏集合并同步 flush，初扫与稳态共享一条实现。首次发布与 `rebuilt(id)` 使用[内容稳定的产物策略](../bug-fix/2026-10-24-content-stable-client-artifact-revisions.zh.md)，带标记的相同输出跨复制与重建保持 revision，无需 Host 扫描兄弟文件；行集合哈希进 `graph.rev`，每一行都公告一个文档相对的 `plugins/??<id>/client.js&rev=…` 引用，并按对应的绝对路径供给脚本资源，sourcemap 位于同一路径加 `.map`。图类型单源在 modules 包的 `./client` 出口——webserver 对图一无所知（它是朴素路由注册插件；bundle 路由和 index 渲染 tap 都由 modules 自己注册）。
 
 为什么名册是 yml 行而不是扫描？因为哪些插件组合进一次部署是组合决策，不是包属性——一个在仓库中声明了 dsh.client 的包，不代表这次部署要挂载它，扫描发现无从替人做这个决定；node 半只扫描配置树实际挂载了的东西。
 
@@ -74,7 +74,7 @@ vendored Loader 经其 `internal` 约定消费模块系统——唯一调用点�
 
 热重载是一项组合决策：web 组合包无条件挂载 `client-hmr` 行（一个常规的插件包），其 node 半带来 bundle 监视与 SSE（Server-Sent Events）通道；没有重建 watcher 改写客户端 bundle 时链路保持空闲。不应暴露它的组合可以禁用该行。
 
-重建好的 bundle 怎么变成重载信号？hmr 的 node 半自己观察——没有构建器来通知它。模块 host 在读取每份启动快照前捕获入口 stat 基线，并通过 `ctx.clientModules.artifactBaseline(id)` 暴露它。HMR 自持的单个定时器把当前图的每个 row 与这份基线比较：未变化的 row 直接开始监视，不读取内容也不求哈希；基线捕获后的写入已经形成 stat 差异，只有该 row 会进入 `rebuilt(id)`。这既避免安装 watcher 时重复读取，也避开 `fs.watchFile` 以异步首次 stat 建立基线、可能静默吸收构造期重建的问题。监视集合的成员随 `onGraphChanged` 更新；消失的 row 撤下监视，轮询时缺失的入口则让对应 row 保持标脏状态，文件重现时即使 mtime 和大小与基线相同也重试发布。共享 tsdown 预设会在每个 sibling 输出写完后标记 `client.js`；入口 mtime、ctime 或大小变化、或 row 处于标脏状态时，`rebuilt(id)` 从这三个元数据值派生 revision。只有 revision 变化时，它才读取新的 bundle 快照。只修改 chunk 因此也会更换 revision；部分写入之后的完成标记还会提供一次更晚的 stat 变化以完成自愈。`rev` 变化时，node 半在 `GET /plugins/events` 上广播 `rebuilt` 帧——这是一条系统级 SSE 通道，连接即发全量图，变更时发 `rebuilt` 帧，仅供呈现的 wire，永不进会话日志。轮询是刻意选择：inotify 在 weka 网络挂载上不触发，构建侧监视器需要 `--poll` 也是同一原因；每个 row 每个间隔只需一次入口 stat，轮询间隔是一个经校验的配置字段（默认 500ms），dispose（资源释放）会清掉那一个定时器。重建产物的进程必须使用共享 Client tsdown 预设；`scripts/dev-web.ts` 仍作为 watch 构建入口保留，其包清单在启动时扫描 `packages/*/*/package.json` 按 dsh.client 发现，构建器与 host 之间没有通知协议。
+重建好的 bundle 怎么变成重载信号？hmr 的 node 半自己观察——没有构建器来通知它。模块 host 在读取每份启动快照前捕获入口 stat 基线，并通过 `ctx.clientModules.artifactBaseline(id)` 暴露它。HMR 自持的单个定时器把当前图的每个 row 与这份基线比较：未变化的 row 直接开始监视，不读取内容也不求哈希；基线捕获后的写入已经形成 stat 差异，只有该 row 会进入 `rebuilt(id)`。这既避免安装 watcher 时重复读取，也避开 `fs.watchFile` 以异步首次 stat 建立基线、可能静默吸收构造期重建的问题。监视集合的成员随 `onGraphChanged` 更新；消失的 row 撤下监视，轮询时缺失的入口则让对应 row 保持标脏状态，文件重现时即使 mtime 和大小与基线相同也重试发布。共享预设在每个兄弟输出写完后附加内容标记并更新入口 mtime。stat 变化或标脏的 row 进入 `rebuilt(id)`；它刷新入口快照，仅在产物 revision 变化时发布。只修改 chunk 代码会更新标记，相同输出只刷新 stat 基线。部分写入之后的完整写入仍可被检测。`rev` 变化时，node 半在 `GET /plugins/events` 上广播 `rebuilt` 帧——这是一条系统级 SSE 通道，连接即发全量图，变更时发 `rebuilt` 帧，仅供呈现的 wire，永不进会话日志。轮询是刻意选择：inotify 在 weka 网络挂载上不触发，构建侧监视器需要 `--poll` 也是同一原因；每个 row 每个间隔只需一次入口 stat，轮询间隔是一个经校验的配置字段（默认 500ms），dispose（资源释放）会清掉那一个定时器。重建产物的进程必须使用共享 Client tsdown 预设；`scripts/dev-web.ts` 仍作为 watch 构建入口保留，其包清单在启动时扫描 `packages/*/*/package.json` 按 dsh.client 发现，构建器与 host 之间没有通知协议。
 
 浏览器侧，驱动插件每帧重载一个插件，串行执行：
 

@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { clientBundle, staticLinked } from '../packages/client/tsdown.client.ts'
 import { ClientModuleSystem } from '../packages/client/modules/src/client/system.ts'
 import { parseBootManifest, type ClientModuleLoaderTarget } from '../packages/client/modules/src/client/manifest.ts'
+import { clientContentRevision, stampClientArtifact } from '../packages/client/modules/src/artifact-revision.ts'
 
 const PACKAGE_ID = '@deepseek-ai/dsh-client-ui-conversation'
 const ENTRY_SOURCE = [
@@ -70,6 +71,27 @@ async function bundle(root: string, config: UserConfig, directory: string): Prom
 }
 
 describe('dynamic Client output formatting', () => {
+  it('keeps repeated builds content-identical and revises the entry for a lazy-only edit', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-client-identity-'))
+    try {
+      await writeFile(join(root, 'package.json'), '{"type":"module"}')
+      await emitSource(root, 'index', ENTRY_SOURCE)
+      await emitSource(root, 'lazy', LAZY_SOURCE)
+      const original = await bundle(root, clientConfig(), 'first')
+      const repeated = await bundle(root, clientConfig(), 'second')
+      expect(repeated).toBe(original)
+      const lazy = await readFile(join(root, 'first/client.lazy.js'), 'utf8')
+      expect(stampClientArtifact(original, [{ fileName: 'client.lazy.js', code: lazy }])).toBe(original)
+      await emitSource(root, 'lazy', LAZY_SOURCE.replace('lazy-loaded', 'lazy-updated'))
+      const changed = await bundle(root, clientConfig(), 'changed')
+      const stripStamp = (source: string) => source.replace(/^\/\/# dsh-client-artifact=.*\n/gmu, '')
+      expect(stripStamp(changed)).toBe(stripStamp(original))
+      expect(clientContentRevision(Buffer.from(changed))).not.toBe(clientContentRevision(Buffer.from(original)))
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('keeps Node and statically linked output settings independent', () => {
     const configs = clientBundle(PACKAGE_ID, ['lib/types/index.js'])({ env: {} })
     const node = configs.find(config => config.platform === 'node')

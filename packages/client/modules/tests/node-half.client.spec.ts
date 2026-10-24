@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderIndexInjections, type WebServer, type WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import * as modulesClient from '../src/client/index.ts'
 import { ClientModuleRegistry, bootInjections, orderByModuleGraph } from '../src/index.ts'
+import { stampClientArtifact } from '../src/artifact-revision.ts'
 import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '../src/client/index.ts'
 
 const MODULES_ID = '@deepseek-ai/dsh-client-modules'
@@ -110,10 +111,11 @@ function writePackage(
 }
 
 /** Create a built package with the supplied client declaration. */
-function writeBuiltPackage(packageName: string, client: Record<string, unknown>): void {
+function writeBuiltPackage(packageName: string, client: Record<string, unknown> = {}): string {
   const clientPath = writePackage(packageName, { dsh: { client: { platform: 'web', ...client } } })
   mkdirSync(dirname(clientPath), { recursive: true })
   writeFileSync(clientPath, 'module.exports = {}\n')
+  return clientPath
 }
 
 /** Construct the node-half service and capture its plugin-bundle route. */
@@ -709,6 +711,63 @@ describe('client bundle activation', () => {
     expect(service.artifactBaseline('@fixture/unknown')).toBeUndefined()
   })
 
+  it('keeps content-marked revisions stable across filesystem generations', () => {
+    const packageName = '@fixture/content-marked-revision'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    const bundle = stampClientArtifact('module.exports = {}\n', [])
+    writeFileSync(clientPath, bundle)
+    const initialTime = new Date(1_700_000_000_000)
+    utimesSync(clientPath, initialTime, initialTime)
+    const first = construct([packageName]).graph()
+
+    writeFileSync(clientPath, bundle)
+    const copiedTime = new Date(initialTime.getTime() + 10_000)
+    utimesSync(clientPath, copiedTime, copiedTime)
+    const copied = construct([packageName]).graph()
+    expect(copied.entries[0]!.rev).toBe(first.entries[0]!.rev)
+    expect(copied.batches).toEqual(first.batches)
+  })
+
+  it('keeps graph, subscriptions and response bytes when a marked entry is copied or touched', async () => {
+    const packageName = '@fixture/content-marked-rebuild'
+    const clientPath = writeBuiltPackage(packageName)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', []))
+    const service = construct([packageName])
+    const before = service.graph()
+    const changed = vi.fn()
+    const rebuilt = vi.fn()
+    service.onGraphChanged(changed)
+    service.onRebuilt(rebuilt)
+    const url = 'https://fixture.invalid/' + before.entries[0]!.url
+    const response = await service.fetchBundle(new Request(url))
+    const body = await response.text()
+    const original = statSync(clientPath)
+    utimesSync(clientPath, original.atime, new Date(original.mtimeMs + 10_000))
+    expect(service.rebuilt(packageName)).toBe(before.entries[0]!.rev)
+    expect(service.graph()).toBe(before)
+    expect(changed).not.toHaveBeenCalled()
+    expect(rebuilt).not.toHaveBeenCalled()
+    expect(await (await service.fetchBundle(new Request(url))).text()).toBe(body)
+    expect(service.artifactBaseline(packageName)!.mtimeMs).toBe(statSync(clientPath).mtimeMs)
+  })
+
+  it('invalidates marked entries for changed lazy content and agrees with a fresh registry', () => {
+    const packageName = '@fixture/content-marked-lazy-rebuild'
+    const clientPath = writeBuiltPackage(packageName)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName: 'client.lazy.js', code: 'exports.value = 1\n' }]))
+    const service = construct([packageName])
+    const before = service.graph()
+    const changed = vi.fn()
+    service.onGraphChanged(changed)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName: 'client.lazy.js', code: 'exports.value = 2\n' }]))
+    const original = statSync(clientPath)
+    utimesSync(clientPath, original.atime, new Date(original.mtimeMs + 10_000))
+    expect(service.rebuilt(packageName)).not.toBe(before.entries[0]!.rev)
+    expect(changed).toHaveBeenCalledOnce()
+    expect(service.graph()).toEqual(construct([packageName]).graph())
+  })
+
   it('keeps the initial graph and subscribers unchanged when a rebuild has identical artifacts', () => {
     const packageName = '@fixture/unchanged-rebuild'
     writeBuiltPackage(packageName, {})
@@ -725,7 +784,7 @@ describe('client bundle activation', () => {
     expect(onGraphChanged).not.toHaveBeenCalled()
   })
 
-  it('hashes only metadata when publishing initial and rebuilt artifact revisions', () => {
+  it('hashes only metadata when publishing legacy initial and rebuilt artifact revisions', () => {
     const packageName = '@fixture/metadata-revision'
     const clientPath = writePackage(packageName)
     mkdirSync(dirname(clientPath), { recursive: true })
