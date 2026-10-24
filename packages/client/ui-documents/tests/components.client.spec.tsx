@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DocumentsButton } from '../src/client/DocumentsButton.tsx'
 import buttonCss from '../src/client/DocumentsButton.module.css'
@@ -20,6 +20,7 @@ vi.mock('../src/client/documents-client.ts', async (importOriginal) => {
 import { UserDocHttpError, UserDocServiceUnavailableError } from '../src/client/documents-client.ts'
 import type {
   UserDocDirectoryIdType, UserDocDirectoryRef, UserDocIdType, UserDocLimits, UserDocListQuery, UserDocScope, UserDocTrashRef,
+  UserDocUploadPhase,
 } from '../src/client/documents-client.ts'
 
 function t(key: DocumentsKey, params?: Record<string, string>): string {
@@ -82,14 +83,14 @@ function makeClient() {
       _file: File,
       _directoryId?: string,
       _signal?: AbortSignal,
-      _onProgress?: (loaded: number, total: number) => void,
+      _onProgress?: (loaded: number, total: number, phase?: UserDocUploadPhase) => void,
     ) => doc()),
     uploadToScope: vi.fn(async (
       _scope: { kind: 'personal' } | { kind: 'project'; projectId: number },
       _file: File,
       _directoryId?: string,
       _signal?: AbortSignal,
-      _onProgress?: (loaded: number, total: number) => void,
+      _onProgress?: (loaded: number, total: number, phase?: UserDocUploadPhase) => void,
     ) => doc()),
     createDirectory: vi.fn(async (_parentDirectoryId?: string, name: string = '') => ({
       directoryId: name,
@@ -953,6 +954,332 @@ describe('DocumentsModal', () => {
     fireEvent.change(input)
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain(t('modal.upload.error'))
+  })
+
+  it('reports published upload batch files without claiming an empty folder', async () => {
+    const client = makeClient()
+    const committed: ReturnType<typeof doc>[] = []
+    const release = Promise.withResolvers<undefined>()
+    client.browse.mockImplementation(async () => ({
+      directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [...committed], limits,
+    }))
+    client.upload.mockImplementation(async (file, _directory, _signal, report) => {
+      if (file.name === 'b.txt') {
+        report?.(1, 1, 'verifying')
+        await release.promise
+      }
+      const stored = doc({ docId: file.name, name: file.name, mediaType: 'text/plain' })
+      committed.push(stored)
+      return stored
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText(t('modal.empty'))
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      fireEvent.change(input, { target: { files: [new File(['a'], 'a.txt'), new File(['b'], 'b.txt')] } })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(2) })
+      expect(screen.getByText('已上传 1 / 2 个文件')).toBeTruthy()
+      expect(screen.queryByText(t('modal.empty'))).toBeNull()
+      expect(screen.queryByText(t('modal.count', { count: '0' }))).toBeNull()
+      expect(input.disabled).toBe(true)
+      expect(client.browse).toHaveBeenCalledOnce()
+      expect(screen.queryByText('已上传 2 / 2 个文件')).toBeNull()
+    } finally {
+      await act(async () => { release.resolve(undefined); await release.promise })
+    }
+    await screen.findByText('b.txt')
+    expect(client.browse).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes a published upload batch prefix and names failed and unstarted files', async () => {
+    const client = makeClient()
+    const committed: ReturnType<typeof doc>[] = []
+    const listing = () => ({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [...committed], limits })
+    const refresh = Promise.withResolvers<ReturnType<typeof listing>>()
+    let refreshEntered = false
+    client.browse.mockImplementation(async () => {
+      if (committed.length > 0) { refreshEntered = true; return await refresh.promise }
+      return listing()
+    })
+    client.upload.mockImplementation(async (file) => {
+      if (file.name === 'b.txt') throw new Error('synthetic second file failure')
+      const stored = doc({ docId: file.name, name: file.name, mediaType: 'text/plain' })
+      committed.push(stored)
+      return stored
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText(t('modal.empty'))
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      fireEvent.change(input, { target: { files: ['a', 'b', 'c'].map(name => new File([name], `${name}.txt`)) } })
+      await waitFor(() => { expect(refreshEntered).toBe(true) })
+      expect(input.disabled).toBe(true)
+      expect(screen.getByText('已上传 1 / 3 个文件')).toBeTruthy()
+      expect(client.upload).toHaveBeenCalledTimes(2)
+    } finally {
+      await act(async () => { refresh.resolve(listing()); await refresh.promise })
+    }
+    await screen.findByText('a.txt')
+    const alert = screen.getByRole('alert')
+    expect(alert.textContent).toContain('b.txt')
+    expect(alert.textContent).toContain('1 个文件未开始')
+    expect(screen.getByText('已上传 1 / 3 个文件')).toBeTruthy()
+    expect(input.disabled).toBe(false)
+    expect(client.browse).toHaveBeenCalledTimes(2)
+    expect(client.remove).not.toHaveBeenCalled()
+  })
+
+  it('accepts one upload batch across same-tick drop and input events', async () => {
+    const client = makeClient()
+    const release = Promise.withResolvers<undefined>()
+    client.upload.mockImplementation(async (file) => { await release.promise; return doc({ docId: file.name, name: file.name }) })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    const panel = document.querySelector<HTMLElement>('[data-documents-panel]')!
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      act(() => {
+        fireEvent.drop(panel, { dataTransfer: { files: [new File(['1'], 'first.txt')] } })
+        fireEvent.drop(panel, { dataTransfer: { files: [new File(['2'], 'second.txt')] } })
+        fireEvent.change(input, { target: { files: [new File(['3'], 'third.txt')] } })
+      })
+      expect(client.upload).toHaveBeenCalledTimes(1)
+      expect(input.disabled).toBe(true)
+    } finally {
+      await act(async () => { release.resolve(undefined); await release.promise })
+    }
+    await waitFor(() => { expect(input.disabled).toBe(false) })
+  })
+
+  it('keeps a closed upload batch on its captured folder without republishing its old view', async () => {
+    const client = makeClient()
+    const releases = [Promise.withResolvers<undefined>(), Promise.withResolvers<undefined>()]
+    client.browse.mockImplementation(async (directoryId = '' as UserDocDirectoryIdType) => ({
+      directoryId, directories: directoryId === '' ? [directory('reports')] : [],
+      documents: [doc({ docId: `${directoryId || 'root'}/marker.txt`, name: directoryId === '' ? 'root-marker.txt' : 'folder-marker.txt' })],
+      limits,
+    }))
+    client.upload.mockImplementation(async (file) => {
+      await releases[file.name === 'a.txt' ? 0 : 1]!.promise
+      return doc({ docId: `reports/${file.name}`, name: file.name })
+    })
+    createUserDocClient.mockReturnValue(client)
+    const view = renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: t('folder.openNamed', { name: 'reports' }) }))
+    await screen.findByText('folder-marker.txt')
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      fireEvent.change(input, { target: { files: [new File(['a'], 'a.txt'), new File(['b'], 'b.txt')] } })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(1) })
+      view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+      view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+      await screen.findByText('root-marker.txt')
+      const readsAfterReopen = client.browse.mock.calls.length
+      await act(async () => { releases[0]!.resolve(undefined); await releases[0]!.promise })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(2) })
+      expect(client.upload.mock.calls.map(call => call[1])).toEqual(['reports', 'reports'])
+      expect(screen.queryByRole('progressbar')).toBeNull()
+      expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
+      await act(async () => { releases[1]!.resolve(undefined); await releases[1]!.promise })
+      expect(screen.getByText('root-marker.txt')).toBeTruthy()
+      expect(screen.queryByText('folder-marker.txt')).toBeNull()
+      expect(client.browse).toHaveBeenCalledTimes(readsAfterReopen)
+    } finally {
+      await act(async () => {
+        for (const release of releases) release.resolve(undefined)
+        await Promise.all(releases.map(release => release.promise))
+      })
+    }
+  })
+
+  it.each(['ready', 'pending'] as const)(
+    'keeps the reopened paged view navigable after an old upload batch completes with %s scope', async (scopeState) => {
+      const client = makeClient()
+      const releaseUpload = Promise.withResolvers<undefined>()
+      const releaseScope = Promise.withResolvers<undefined>()
+      const documents = Array.from({ length: 21 }, (_, index) => doc({
+        docId: `root-${String(index + 1).padStart(2, '0')}.txt`,
+        name: `root-${String(index + 1).padStart(2, '0')}.txt`, mediaType: 'text/plain',
+      }))
+      client.browse.mockImplementation(async (directoryId, _signal, query) => ({
+        directoryId, directories: [], limits, totalDocuments: documents.length,
+        documents: query?.cursor === 'next-page' ? documents.slice(20) : documents.slice(0, 20),
+        ...(query?.cursor === undefined ? { nextCursor: 'next-page' } : {}),
+      }))
+      client.upload.mockImplementation(async (file) => {
+        await releaseUpload.promise
+        return doc({ docId: file.name, name: file.name })
+      })
+      let scopeReads = 0
+      vi.stubGlobal('fetch', vi.fn(async () => {
+        scopeReads += 1
+        if (scopeState === 'pending') await releaseScope.promise
+        return { ok: true, json: async () => ({
+          scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+        }) }
+      }))
+      createUserDocClient.mockReturnValue(client)
+      const view = renderModal()
+      try {
+        await screen.findByText('root-01.txt')
+        if (scopeState === 'ready') await screen.findByRole('button', { name: /Compiler/ })
+        const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+        fireEvent.change(input, { target: { files: [new File(['old'], 'old-upload.txt')] } })
+        expect(client.upload).toHaveBeenCalledOnce()
+        view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+        view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+        await screen.findByText('root-01.txt')
+        await waitFor(() => { expect(scopeReads).toBe(2) })
+        const reopenedInput = document.querySelector<HTMLInputElement>('input[type=file]')!
+        const readsAfterReopen = client.browse.mock.calls.length
+        await act(async () => { releaseUpload.resolve(undefined); await releaseUpload.promise })
+        await waitFor(() => { expect(reopenedInput.disabled).toBe(false) })
+        await act(async () => { releaseScope.resolve(undefined); await releaseScope.promise })
+        await screen.findByRole('button', { name: /Compiler/ })
+        expect(screen.queryByText('old-upload.txt')).toBeNull()
+        expect(screen.queryByRole('progressbar')).toBeNull()
+        expect(client.browse).toHaveBeenCalledTimes(readsAfterReopen)
+        fireEvent.click(screen.getByRole('button', { name: t('pager.next') }))
+        expect(client.browse.mock.calls.slice(readsAfterReopen).map(call => call[2]?.cursor)).toEqual(['next-page'])
+        await screen.findByText('root-21.txt')
+        const readsAfterNext = client.browse.mock.calls.length
+        fireEvent.click(screen.getByRole('button', { name: t('pager.prev') }))
+        expect(client.browse.mock.calls.slice(readsAfterNext).map(call => call[2]?.cursor)).toEqual([undefined])
+        await screen.findByText('root-01.txt')
+        expect(scopeReads).toBe(2)
+        expect(client.upload.mock.calls[0]?.[1]).toBe('')
+      } finally {
+        await act(async () => {
+          releaseUpload.resolve(undefined)
+          releaseScope.resolve(undefined)
+          await Promise.all([releaseUpload.promise, releaseScope.promise])
+        })
+      }
+    },
+  )
+
+  it('keeps a published upload batch summary when its authoritative listing fails', async () => {
+    const client = makeClient()
+    let published = false
+    client.browse.mockImplementation(async () => {
+      if (published) throw new Error('synthetic listing failure')
+      return { directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits }
+    })
+    client.upload.mockImplementation(async (file) => { published = true; return doc({ docId: file.name, name: file.name }) })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText(t('modal.empty'))
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    fireEvent.change(input, { target: { files: [new File(['a'], 'a.txt')] } })
+    await screen.findByRole('alert')
+    expect(screen.getByText('已上传 1 / 1 个文件')).toBeTruthy()
+    expect(screen.queryByText(t('modal.empty'))).toBeNull()
+    expect(screen.queryByText(t('modal.count', { count: '0' }))).toBeNull()
+    expect(input.disabled).toBe(false)
+    expect(client.browse).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores completed upload batch callbacks while the next batch owns progress', async () => {
+    const client = makeClient()
+    const releases = [Promise.withResolvers<undefined>(), Promise.withResolvers<undefined>()]
+    const callbacks: Array<((loaded: number, total: number, phase?: UserDocUploadPhase) => void) | undefined> = []
+    client.upload.mockImplementation(async (file, _directory, _signal, report) => {
+      const index = callbacks.length
+      callbacks.push(report)
+      await releases[index]!.promise
+      return doc({ docId: file.name, name: file.name })
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    try {
+      fireEvent.change(input, { target: { files: [new File(['a'], 'a.txt')] } })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(1) })
+      await act(async () => { releases[0]!.resolve(undefined); await releases[0]!.promise })
+      await waitFor(() => { expect(input.disabled).toBe(false) })
+      fireEvent.change(input, { target: { files: [new File(['b'], 'b.txt')] } })
+      await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(2) })
+      act(() => { callbacks[0]?.(90, 100) })
+      expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('0')
+      expect(input.disabled).toBe(true)
+    } finally {
+      await act(async () => {
+        for (const release of releases) release.resolve(undefined)
+        await Promise.all(releases.map(release => release.promise))
+      })
+    }
+  })
+
+  it('reconciles an upload batch through the selected project without returning to personal', async () => {
+    const client = makeClient()
+    let published = false
+    client.browseScope.mockImplementation(async (_scope, directoryId) => ({
+      version: 1, scope: { kind: 'project' as const, label: 'Compiler' }, directoryId, directories: [],
+      documents: published ? [doc({ docId: 'project/a.txt', name: 'a.txt' })] : [],
+    }))
+    client.uploadToScope.mockImplementation(async (_scope, file) => {
+      if (file.name === 'b.txt') throw new Error('synthetic project failure')
+      published = true
+      return doc({ docId: `project/${file.name}`, name: file.name })
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+    }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: /Compiler/ }))
+    await screen.findByText(t('scope.upload.target', { name: 'Compiler' }), { selector: 'strong' })
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    fireEvent.change(input, { target: { files: ['a', 'b', 'c'].map(name => new File([name], `${name}.txt`)) } })
+    await screen.findByText('a.txt')
+    expect(screen.getByRole('alert').textContent).toContain('b.txt')
+    expect(client.upload).not.toHaveBeenCalled()
+    expect(client.browse).toHaveBeenCalledOnce()
+    expect(client.browseScope).toHaveBeenCalledTimes(2)
+    expect(client.browseScope.mock.calls.every(call => call[0].kind === 'project' && call[0].projectId === 41)).toBe(true)
+    expect(screen.getByText(t('scope.upload.target', { name: 'Compiler' }), { selector: 'strong' })).toBeTruthy()
+  })
+
+  it('keeps upload batch reconciliation on the filtered server page without inserting upload refs', async () => {
+    const client = makeClient()
+    const documents = Array.from({ length: 21 }, (_, index) => doc({
+      docId: `keep-${String(index + 1).padStart(2, '0')}.txt`,
+      name: `keep-${String(index + 1).padStart(2, '0')}.txt`, mediaType: 'text/plain',
+    }))
+    client.browse.mockImplementation(async (_directory, _signal, request) => ({
+      directoryId: '' as UserDocDirectoryIdType, directories: [],
+      documents: request?.cursor === 'next-page' ? documents.slice(20) : documents.slice(0, 20), limits,
+      totalDocuments: 21, ...(request?.cursor === undefined ? { nextCursor: 'next-page' } : {}),
+    }))
+    client.upload.mockImplementation(async file => doc({ docId: file.name, name: file.name, mediaType: 'text/plain' }))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ scope: { kind: 'personal' } }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('keep-01.txt')
+    fireEvent.change(screen.getByPlaceholderText(t('modal.search')), { target: { value: 'keep' } })
+    fireEvent.change(screen.getByRole('combobox', { name: t('modal.type') }), { target: { value: 'text' } })
+    fireEvent.change(screen.getByRole('combobox', { name: t('modal.sort') }), { target: { value: 'name:asc' } })
+    await waitFor(() => { expect(client.browse.mock.lastCall?.[2]).toMatchObject({ query: 'keep', type: 'text', sort: 'name-asc' }) })
+    await waitFor(() => { expect(screen.queryByText(t('modal.refreshing'))).toBeNull() })
+    fireEvent.click(screen.getByRole('button', { name: t('pager.next') }))
+    await screen.findByText('keep-21.txt')
+    const before = client.browse.mock.calls.length
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')!
+    fireEvent.change(input, { target: { files: [new File(['new'], 'outside-filter.txt')] } })
+    await waitFor(() => { expect(client.browse.mock.calls.length).toBe(before + 2) })
+    await waitFor(() => { expect(input.disabled).toBe(false) })
+    expect(screen.getByText('keep-21.txt')).toBeTruthy()
+    expect(screen.getByText(t('pager.status', { page: '2', pages: '2' }))).toBeTruthy()
+    expect(screen.queryByText('outside-filter.txt')).toBeNull()
+    expect(screen.getByPlaceholderText(t('modal.search')).getAttribute('value')).toBe('keep')
+    expect(client.browse.mock.calls.slice(before).map(call => call[2])).toEqual([
+      expect.objectContaining({ query: 'keep', type: 'text', sort: 'name-asc' }),
+      expect.objectContaining({ query: 'keep', type: 'text', sort: 'name-asc', cursor: 'next-page' }),
+    ])
   })
 
   it('uploads dropped files', async () => {

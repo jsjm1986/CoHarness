@@ -16,6 +16,10 @@ The protocol keeps file bytes in runtime-owned directories and does not add a da
 
 The conversation composer and document manager consume one shared browser uploader package. The Gateway document-copy broker uses the same session protocol instead of forwarding a whole source response into one request. Chunk and status requests are omitted from per-request API audit rows; upload lifecycle outcomes remain observable without flooding the audit log.
 
+The first verification status read starts immediately; subsequent reads retain the polling delay, expiry and deadline. Small files can finish verification before the completion response reaches the browser, so an initial delay adds no protection against sustained polling. The document manager owns one sequential batch at a time and captures its destination. Published counts describe durable results without merging returned references into filtered directory pages. A failure retains published files, stops unstarted siblings and revalidates the visible listing; progress and list responses from an older view cannot replace the current view.
+
+Publication after a view change marks metadata stale while retaining the current view's continuation pages and pending scope confirmation. Dropping a visible page's predecessor without replacing its listing would leave a working Next control with no cursor to request.
+
 The nullable per-file admission default and connection-interruption wording remain governed by the [unlimited-upload decision](../bug-fix/2026-08-22-unlimited-document-upload.md).
 
 ## Alternatives considered
@@ -25,6 +29,8 @@ The nullable per-file admission default and connection-interruption wording rema
 **Store document bytes in R2/S3.** Object storage would provide a separate scalable transport, but it would add credentials, signed URL ownership, lifecycle policy, and a second durable storage model. Runtime-owned files are an existing product contract and remain the provider boundary.
 
 **Keep separate composer and manager upload implementations.** Two state machines would drift in retry, checksum, and resume behavior. A browser-only shared package keeps the wire protocol and recovery behavior identical while each UI supplies its own HTTP error adapter.
+
+**Refresh or append directory rows after every file.** Repeated reads multiply batch traffic, while appending references bypasses server filters and cursor ordering. A published-count summary exposes completed work; one authoritative reconciliation settles the listing.
 
 **Keep the legacy one-request endpoint indefinitely.** A permanent second write path would preserve the same ingress failure and double the security and test surface. The release performs an explicit protocol cutover; a mismatched cached client receives a refreshable protocol error.
 

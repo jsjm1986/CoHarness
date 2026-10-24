@@ -73,6 +73,27 @@ interface UploadProgress {
   phase?: UserDocUploadPhase
 }
 
+/** Sequential writes keep their destination after the browsing view changes or closes. */
+interface UploadBatch {
+  readonly viewKey: string
+  generation: number
+  readonly directoryId: UserDocDirectoryIdType
+  readonly scope: UserDocScope | undefined
+  readonly listingScope: UserDocScope
+  readonly page: number
+  readonly total: number
+  published: number
+}
+
+interface UploadBatchFeedback {
+  readonly viewKey: string
+  readonly generation: number
+  readonly published: number
+  readonly total: number
+  readonly reconciling: boolean
+  readonly reconciled: boolean
+}
+
 function uploadErrorMessage(error: unknown, t: (key: DocumentsKey) => string): string {
   if (!(error instanceof UserDocHttpError)) return t('modal.upload.error')
   if (error.code === 'DOCUMENT_UPLOAD_STORAGE') return t('modal.upload.error.storage')
@@ -430,6 +451,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const [selectedRecords, setSelectedRecords] = useState<Map<string, UserDocRef>>(() => new Map())
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
+  const [uploadFeedback, setUploadFeedback] = useState<UploadBatchFeedback | null>(null)
+  const uploadBatch = useRef<UploadBatch | null>(null)
   const [dropActive, setDropActive] = useState(false)
   const [deleteTargets, setDeleteTargets] = useState<UserDocRef[] | null>(null)
   const [folderEditor, setFolderEditor] = useState<FolderEditor | null>(null)
@@ -644,6 +667,24 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       }
       if (pages.size === 0) serverPages.current.delete(key)
     }
+  }
+
+  /** Expire freshness without discarding visible or scope-pending continuation chains. */
+  const markDocumentCachesStale = (): void => {
+    const staleAt = Date.now() - DOCUMENT_LISTING_FRESH_TTL_MS - 1
+    const stale = <T extends { readonly cachedAt?: number }>(record: T): T => ({
+      ...record, cachedAt: Math.min(record.cachedAt ?? staleAt, staleAt),
+    })
+    for (const [key, record] of listingCache.current) listingCache.current.set(key, stale(record))
+    for (const pages of serverPages.current.values()) {
+      for (const [number, record] of pages) pages.set(number, stale(record))
+    }
+    const pending = pendingRuntimePages.current
+    if (pending !== null) {
+      for (const [number, record] of pending.pages) pending.pages.set(number, stale(record))
+    }
+    const legacy = pendingRuntimeLegacy.current
+    if (legacy !== null) pendingRuntimeLegacy.current = { ...legacy, listing: stale(legacy.listing) }
   }
 
   const pendingRuntimePageMatches = (
@@ -1532,6 +1573,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     const controller = new AbortController()
     void load(ROOT_DIRECTORY_ID, controller.signal, { refreshScope: true })
     return () => {
+      loadGeneration.current += 1
       controller.abort()
       listingController.current?.abort()
       listingController.current = null
@@ -1692,16 +1734,42 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   }, [headerState])
 
   const uploadFiles = async (list: FileList | readonly File[]) => {
-    if (overviewMode || alternateSource !== null
+    if (!open || uploadBatch.current !== null || uploading || overviewMode || alternateSource !== null
       || (scopeView !== null ? !scopeView.canUpload : scope.kind === 'project' && scope.mode === 'ro')) return
     const files = fileListOf(list)
     if (files.length === 0) return
+    const batch: UploadBatch = {
+      viewKey: uploadView.current.key,
+      generation: loadGeneration.current,
+      directoryId: currentDirectoryId,
+      scope: scopeView?.scope,
+      listingScope: selectedScope,
+      page,
+      total: files.length,
+      published: 0,
+    }
+    uploadBatch.current = batch
+    const client = userDocs.current
+    const input = fileInputRef.current
+    const ownsView = (): boolean => uploadBatch.current === batch && uploadView.current.open
+      && loadGeneration.current === batch.generation && uploadView.current.key === batch.viewKey
+    const publishFeedback = (reconciling = false, reconciled = false): void => {
+      if (ownsView()) setUploadFeedback({
+        viewKey: batch.viewKey, generation: batch.generation, published: batch.published,
+        total: batch.total, reconciling, reconciled,
+      })
+    }
     setUploading(true)
     setError('')
     setProgress({ current: 0, total: files.length, percent: 0 })
+    publishFeedback()
+    let failure = ''
+    let currentFileName = ''
     try {
       for (const [index, file] of files.entries()) {
+        currentFileName = file.name
         const report = (loaded: number, total: number, phase?: UserDocUploadPhase): void => {
+          if (!ownsView() || index !== batch.published) return
           setProgress({
             current: index + 1,
             total: files.length,
@@ -1709,20 +1777,84 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             ...(phase === undefined ? {} : { phase }),
           })
         }
-        if (scopeView !== null) {
-          await userDocs.current.uploadToScope(scopeView.scope, file, currentDirectoryId, undefined, report)
+        if (batch.scope !== undefined) {
+          await client.uploadToScope(batch.scope, file, batch.directoryId, undefined, report)
         } else {
-          await userDocs.current.upload(file, currentDirectoryId, undefined, report)
+          await client.upload(file, batch.directoryId, undefined, report)
         }
+        batch.published += 1
+        publishFeedback()
       }
-      /* v8 ignore next -- the hidden input stays mounted for the modal lifetime */
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      await refreshDisplayed()
     } catch (cause) {
-      setError(uploadErrorMessage(cause, t))
+      failure = `${uploadErrorMessage(cause, t)} ${t('modal.upload.incomplete', {
+        name: currentFileName, remaining: String(files.length - batch.published - 1),
+      })}`
     } finally {
-      setUploading(false)
-      setProgress(null)
+      let reconciled = batch.published === 0
+      let listingError = ''
+      if (batch.published > 0) {
+        overviewCache.current = null
+        if (ownsView()) {
+          discardPendingRuntimePages()
+          listingCache.current.clear()
+          serverPages.current.clear()
+          serverLoadedKey.current = null
+          batch.generation = ++loadGeneration.current
+          serverRequestGeneration.current += 1
+          const request = beginListingRequest()
+          setRefreshing(true)
+          publishFeedback(true)
+          try {
+            const key = listingKeyFor(batch.listingScope, batch.directoryId)
+            let cursor: string | undefined
+            for (let number = 1; number <= batch.page; number++) {
+              const response = await fetchListingPage(batch.directoryId, queryForPage(cursor), request.signal) as ScopeListingResponse
+              if (!ownsView() || request.signal.aborted) break
+              const paged = isServerPage(response)
+              const record = serverPageRecordFrom(response, {
+                documents: batch.scope === undefined ? response.documents as readonly UserDocRef[]
+                  : response.documents.map(document => ({ ...document, path: '' })),
+                directories: response.directories?.map(normalizeDirectoryRef) ?? [],
+                directoryId: response.directoryId ?? batch.directoryId,
+              })
+              if (paged) rememberServerPage(key, number, record)
+              else rememberLegacyListing(key, record)
+              if (!paged || number === batch.page || response.nextCursor === undefined) {
+                applyServerPage(record)
+                setTotalDocuments(record.totalDocuments ?? record.documents.length)
+                setPage(paged ? number : batch.page)
+                setServerPaging(paged)
+                serverPagingRef.current = paged
+                if (!paged) {
+                  setServerTotalDocuments(null)
+                  setServerNextCursor(undefined)
+                }
+                serverLoadedKey.current = key
+                listingReadyRef.current = true
+                reconciled = true
+                break
+              }
+              cursor = response.nextCursor
+            }
+          } catch (cause) {
+            if (ownsView() && !isAbortError(cause, request.signal)) listingError = documentErrorMessage(cause, t)
+          } finally {
+            if (ownsView()) setRefreshing(false)
+            finishListingRequest(request.controller)
+          }
+        } else markDocumentCachesStale()
+      }
+      if (ownsView()) {
+        setError([failure, listingError].filter(Boolean).join(' '))
+        if (failure === '' && reconciled) setUploadFeedback(null)
+        else publishFeedback(false, reconciled)
+      }
+      if (input !== null) input.value = ''
+      if (uploadBatch.current === batch) {
+        uploadBatch.current = null
+        setUploading(false)
+        setProgress(null)
+      }
     }
   }
 
@@ -2697,6 +2829,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const writeLocked = overviewMode || selectedScopeMode === 'ro'
   const uploadLocked = overviewMode || selectedScopeMode === 'ro'
   const remoteScopeView = scopeView !== null || alternateSource !== null
+  const uploadView = useRef({ open, key: '' })
+  uploadView.current = {
+    open,
+    key: JSON.stringify([listingKeyFor(selectedScope, currentDirectoryId), page, overviewMode, trashMode]),
+  }
+  const visibleUploadFeedback = open && uploadFeedback !== null
+    && uploadFeedback.generation === loadGeneration.current && uploadFeedback.viewKey === uploadView.current.key
+    ? uploadFeedback : null
   const selectedScopeUrl = remoteScopeView ? selectedScope : undefined
   const documentContentUrl = (docId: UserDocIdType, inline = false): string => {
     const url = selectedScopeUrl === undefined ? userDocs.current.contentUrl(docId, inline)
@@ -2728,7 +2868,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const onDragEnter = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     dragDepth.current += 1
-    setDropActive(true)
+    if (uploadBatch.current === null && !uploading) setDropActive(true)
   }
 
   const onDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -2752,13 +2892,15 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   }
 
   const busy = uploading
-  const uploadLabel = progress !== null && uploading
-    ? t(progress.phase === 'verifying' ? 'modal.upload.verifyingCount' : 'modal.upload.progressCount', {
-      current: String(progress.current),
-      total: String(progress.total),
-      percent: String(progress.percent),
-    })
-    : t('modal.upload')
+  const displayedProgress = uploadBatch.current === null || visibleUploadFeedback !== null ? progress : null
+  const uploadLabel = visibleUploadFeedback?.reconciling === true ? t('modal.refreshing')
+    : displayedProgress !== null && uploading
+      ? t(displayedProgress.phase === 'verifying' ? 'modal.upload.verifyingCount' : 'modal.upload.progressCount', {
+        current: String(displayedProgress.current),
+        total: String(displayedProgress.total),
+        percent: String(displayedProgress.percent),
+      })
+      : t('modal.upload')
 
   const uploadButton = (
     <Button
@@ -2797,6 +2939,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const hasEntries = directories.length > 0 || documents.length > 0
     || (serverPaging && (serverTotalDocuments ?? 0) > 0)
   const emptyReadPending = !hasEntries && (loading || refreshing)
+  const emptyUploadPending = !hasEntries && visibleUploadFeedback !== null && !visibleUploadFeedback.reconciled
   const hasVisibleEntries = filteredDirectories.length > 0 || filtered.length > 0
     || (serverPaging && (serverTotalDocuments ?? 0) > 0)
   const moveOptions = [
@@ -3623,6 +3766,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       type="file"
                       multiple
                       hidden
+                      disabled={busy || uploadLocked}
                       onChange={(event) => {
                         const files = event.currentTarget.files
                         /* v8 ignore next -- the file input always exposes a FileList */
@@ -3738,10 +3882,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                         />
                       </label>
                     )}
-                    <span>{visibleScope}</span>
-                    {refreshing && !emptyReadPending && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
+                    {visibleUploadFeedback === null ? <span>{visibleScope}</span> : (
+                      <span role="status" aria-live="polite">{t('modal.upload.published', {
+                        published: String(visibleUploadFeedback.published), total: String(visibleUploadFeedback.total),
+                      })}</span>
+                    )}
+                    {refreshing && !emptyReadPending && visibleUploadFeedback === null && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
                   </span>
-                  {!loading && !emptyReadPending && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
+                  {!loading && !emptyReadPending && !emptyUploadPending && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
                 </div>
 
               </div>
@@ -3790,20 +3938,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 </div>
               )}
 
-              {progress !== null && (
+              {displayedProgress !== null && (
                 <div
                   className={css.progress}
                   role="progressbar"
                   aria-label={uploadLabel}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuenow={progress.percent}
+                  aria-valuenow={displayedProgress.percent}
                 >
-                  <span style={{ width: `${String(progress.percent)}%` }} />
+                  <span style={{ width: `${String(displayedProgress.percent)}%` }} />
                 </div>
               )}
 
-              {emptyReadPending ? (
+              {emptyUploadPending ? null : emptyReadPending ? (
                 <div className={css.loadingState} role="status" aria-live="polite">
                   <span className={css.visuallyHidden}>{t('modal.loading')}</span>
                   {[0, 1, 2].map(index => <span key={index} className={css.loadingRow} aria-hidden="true" />)}
@@ -3814,7 +3962,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                   <p className={css.empty}>{t('modal.empty')}</p>
                   {!uploadLocked && (
                     <div className={css.emptyActions}>
-                      <Button type="button" variant="primary" aria-label={t('modal.upload')} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
+                      <Button type="button" variant="primary" aria-label={t('modal.upload')} disabled={busy} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
                         {phone ? t('modal.upload.compact') : t('modal.upload')}
                       </Button>
                       <Button type="button" variant="outline" aria-label={t('folder.create')} disabled={busy} icon={<IconFolderClose16 size={16} />} onClick={openCreateDirectory}>

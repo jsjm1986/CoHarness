@@ -2,7 +2,8 @@
  * Document manager chrome through the shipped Web composition: desktop list
  * dialog, compact bottom sheet, target-scope upload, and a paged 21-file list.
  * Keyless: chrome cases use fixture document lists. Trash navigation exercises
- * real personal Host storage and a controlled project broker; no model turns
+ * real personal Host storage and a controlled project broker. Upload batches
+ * use real Host requests with one completion delivery held; no model turns
  * are required.
  */
 import { fileURLToPath } from 'node:url'
@@ -31,6 +32,8 @@ const PAGED_EXPECTED = join(SNAPSHOT_DIR, 'desktop-paged.expected.md')
 const EXPECTED_DIR = fileURLToPath(new URL('./expected/document-manager', import.meta.url))
 const TRASH_HEADER_EXPECTED = join(EXPECTED_DIR, 'trash-header.expected.md')
 const LOADING_EXPECTED = join(EXPECTED_DIR, 'loading.expected.md')
+const UPLOAD_PUBLISHED_EXPECTED = join(EXPECTED_DIR, 'upload-published.expected.md')
+const UPLOAD_PARTIAL_EXPECTED = join(EXPECTED_DIR, 'upload-partial.expected.md')
 const MODE = webSnapshotMode()
 
 const LIMITS = {
@@ -509,6 +512,147 @@ describe('web e2e: document manager', () => {
     expect(page.url()).toBe(beforeUrl)
   }, 60_000)
 
+  it.each(['success', 'partial-failure'] as const)(
+    'desktop: shows real upload batch publication through a held completion: %s',
+    async (outcome) => {
+      const folderName = `u01-upload-${outcome}`
+      const folder = await scaffold.ctx.userDocs.createDirectory(UserDocDirectoryId(''), folderName)
+      onTestFinished(async () => {
+        for (const document of (await scaffold.ctx.userDocs.listDirectory(folder.directoryId)).documents) {
+          await scaffold.ctx.userDocs.trash(document.docId)
+        }
+        for (const document of await scaffold.ctx.userDocs.listTrash()) {
+          if (document.directoryId === folder.directoryId) await scaffold.ctx.userDocs.purge(document.docId)
+        }
+        await scaffold.ctx.userDocs.removeDirectory(folder.directoryId)
+        expect((await scaffold.ctx.userDocs.listDirectory(UserDocDirectoryId(''))).directories
+          .some(directory => directory.directoryId === folder.directoryId)).toBe(false)
+        console.info('[upload-batch-cleanup]', JSON.stringify({ outcome, removed: true }))
+      })
+      page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US', reducedMotion: 'reduce' })
+      await page.clock.setFixedTime(Date.UTC(2026, 9, 24, 12))
+      tripwire = watchConsole(page)
+      onTestFailed(() => saveFailureShot(page, `web-e2e-document-upload-batch-${outcome}`))
+      const origin = new URL(scaffold.authenticatedUrl).origin
+      const release = Promise.withResolvers<undefined>()
+      let secondHeld = false
+      let completions = 0
+      let directoryReads = 0
+      const startedFiles: string[] = []
+      const pending = new Set<Promise<void>>()
+      const failures: unknown[] = []
+      page.on('request', (request) => {
+        const url = new URL(request.url())
+        if (url.origin !== origin) return
+        if (request.method() === 'GET' && url.pathname === '/api/documents'
+          && url.searchParams.get('directory') === folder.directoryId) directoryReads++
+        if (request.method() === 'POST' && url.pathname === '/api/documents/uploads') {
+          startedFiles.push((request.postDataJSON() as { name: string }).name)
+        }
+      })
+      // Only the second completion request is delayed or rejected. All metadata, chunks,
+      // verification polling, publication, and the final list use the real private Host.
+      const isCompletion = (url: URL): boolean => url.origin === origin
+        && /^\/api\/documents\/uploads\/[^/]+\/complete$/u.test(url.pathname)
+      await page.route(isCompletion, async (route) => {
+        const operation = (async () => {
+          if (route.request().method() !== 'POST') { await route.continue(); return }
+          completions++
+          if (completions !== 2) { await route.continue(); return }
+          secondHeld = true
+          await release.promise
+          if (outcome === 'partial-failure') {
+            await route.fulfill({ status: 500, json: { code: 'DOCUMENT_UPLOAD_STORAGE', error: 'Synthetic completion failure' } })
+          } else await route.continue()
+        })()
+        pending.add(operation)
+        try { await operation } catch (error) {
+          failures.push(error)
+          await route.abort().catch((abortError: unknown) => { failures.push(abortError) })
+        } finally { pending.delete(operation) }
+      })
+      try {
+        await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+        await page.getByRole('button', { name: 'Documents', exact: true }).click()
+        const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+        await manager.getByRole('button', { name: `Open folder ${folderName}`, exact: true }).click()
+        await manager.getByText('No documents uploaded yet', { exact: true }).waitFor()
+        const input = manager.locator('input[type="file"]')
+        const files = ['a', 'b', 'c'].map(name => ({
+          name: `u01-${name}.txt`, mimeType: 'text/plain',
+          buffer: Buffer.from(`U01 ${name} synthetic fixture\n`.padEnd(48, ' ')),
+        }))
+        const readsBefore = directoryReads
+        await input.setInputFiles(files)
+        await expect.poll(() => secondHeld, { timeout: 30_000 }).toBe(true)
+        await manager.getByRole('progressbar', { name: /2\/3/u }).waitFor()
+        const firstPublished = await scaffold.ctx.userDocs.listDirectory(folder.directoryId)
+        expect(firstPublished.documents.map(document => document.name)).toEqual(['u01-a.txt'])
+        expect(startedFiles).toEqual(['u01-a.txt', 'u01-b.txt'])
+        expect(completions).toBe(2)
+        expect(directoryReads).toBe(readsBefore)
+        expect(await manager.getByText('Uploaded 1 of 3 files', { exact: true }).count()).toBe(1)
+        expect(await manager.getByText('No documents uploaded yet', { exact: true }).count()).toBe(0)
+        expect(await manager.getByText('0 documents', { exact: true }).count()).toBe(0)
+        expect(await input.isDisabled()).toBe(true)
+        expect(await manager.getByText('Uploaded 3 of 3 files', { exact: true }).count()).toBe(0)
+        if (MODE === 'refresh') await mkdir(EXPECTED_DIR, { recursive: true })
+        await compareOrRefreshGolden(UPLOAD_PUBLISHED_EXPECTED,
+          await captureStableAria(page, '[data-documents-panel] [role="status"]', scaffold.workspaceCwd), MODE)
+        release.resolve(undefined)
+        const rows = manager.locator('[data-documents-list]')
+        await rows.getByText('u01-a.txt', { exact: true }).waitFor()
+        if (outcome === 'partial-failure') {
+          const alert = manager.getByRole('alert')
+          await alert.waitFor()
+          expect(await alert.textContent()).toContain('u01-b.txt')
+          expect(await alert.textContent()).toContain('1 files were not started')
+          expect(startedFiles).toEqual(['u01-a.txt', 'u01-b.txt'])
+          expect(await rows.getByText('u01-b.txt', { exact: true }).count()).toBe(0)
+          expect(await manager.getByText('Uploaded 1 of 3 files', { exact: true }).count()).toBe(1)
+          await compareOrRefreshGolden(UPLOAD_PARTIAL_EXPECTED,
+            await captureStableAria(page, '[data-documents-panel] [role="alert"]', scaffold.workspaceCwd), MODE)
+        } else {
+          await rows.getByText('u01-c.txt', { exact: true }).waitFor()
+          expect(startedFiles).toEqual(files.map(file => file.name))
+          expect(await manager.getByRole('alert').count()).toBe(0)
+        }
+        await expect.poll(() => input.isDisabled()).toBe(false)
+        expect(directoryReads).toBe(readsBefore + 1)
+        expect(await manager.getByRole('navigation', { name: 'Document path', exact: true })
+          .getByRole('button', { name: folderName, exact: true }).getAttribute('aria-current')).toBe('page')
+        const published = await scaffold.ctx.userDocs.listDirectory(folder.directoryId)
+        expect(published.documents.length).toBe(outcome === 'success' ? 3 : 1)
+        for (const document of published.documents) {
+          const expected = files.find(file => file.name === document.name)
+          if (expected === undefined) throw new Error('Unexpected document in upload fixture directory')
+          expect(Buffer.from((await scaffold.ctx.userDocs.read(document.docId)).data)).toEqual(expected.buffer)
+        }
+        expect(tripwire.warnings).toEqual([])
+        expect(tripwire.pageErrors).toEqual([])
+        console.info('[upload-batch-publication]', JSON.stringify({
+          outcome, secondHeld, completions, startedFiles, directoryReads,
+          publishedNames: published.documents.map(document => document.name),
+        }))
+      } catch (error) {
+        failures.push(error)
+      } finally {
+        release.resolve(undefined)
+        const settled = await Promise.allSettled([...pending])
+        for (const result of settled) if (result.status === 'rejected') failures.push(result.reason)
+        if (secondHeld) {
+          const storedCount = async (): Promise<number> => (await scaffold.ctx.userDocs.listDirectory(folder.directoryId)).documents.length
+          await expect.poll(storedCount, { timeout: 30_000 })
+            .toBe(outcome === 'success' ? 3 : 1).catch((error: unknown) => { failures.push(error) })
+          await expect.poll(() => page.getByRole('progressbar').count(), { timeout: 30_000 }).toBe(0)
+            .catch((error: unknown) => { failures.push(error) })
+        }
+        await page.unrouteAll({ behavior: 'wait' }).catch((error: unknown) => { failures.push(error) })
+      }
+      if (failures.length > 0) throw new AggregateError(failures, `Real upload batch ${outcome} journey failed`)
+    },
+  )
+
   it('compact: uses a scope trigger, upload primary, and one row action sheet', async () => {
     page = await browser.newPage({
       viewport: { width: 390, height: 844 },
@@ -845,6 +989,8 @@ describe('web e2e: document manager', () => {
   })
 
   it('commits exactly the document-manager ARIA expected-output inventory', async () => {
-    await assertFixtureInventory(EXPECTED_DIR, ['trash-header.expected.md', 'loading.expected.md'])
+    await assertFixtureInventory(EXPECTED_DIR, [
+      'trash-header.expected.md', 'loading.expected.md', 'upload-published.expected.md', 'upload-partial.expected.md',
+    ])
   })
 })

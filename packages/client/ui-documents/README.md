@@ -63,6 +63,8 @@ Documents are filtered by name and type (image, PDF, text, other), sorted by dat
 
 Uploads use one resumable session protocol on desktop and mobile. Small files use one chunk; larger files use 8 MiB chunks with per-chunk and final SHA-256 verification. A network interruption does not discard completed chunks: selecting the same file again resumes the session while it is retained by the runtime. The browser stores only opaque session metadata, never document bytes.
 
+The manager accepts one upload batch at a time and uploads its files in order. Its published count advances only after the server returns a completed document reference, independently of the current file's byte progress. A failed file stops the remaining files; completed files remain stored. When the same view remains open, the manager refreshes the authoritative directory with its existing filters, sort, and page, retaining the published count and error if that read fails. Closing the manager or navigating elsewhere does not redirect accepted writes, and their callbacks cannot replace another view's rows or progress. Completed writes invalidate cached directory metadata for the next read. Retry the failed and unstarted files explicitly; completed files are not uploaded again automatically.
+
 <a id="scope-isolation"></a>
 ## Scope isolation
 
