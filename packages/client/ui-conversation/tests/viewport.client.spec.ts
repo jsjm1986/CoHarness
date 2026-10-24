@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSnapshotStore, NavigationController, type ISessions, type SessionId, type SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { ConversationViewportController, createConversationViewportStore } from '../src/client/viewport.ts'
+import { readWorkbenchRecord, writeWorkbenchRecord } from '../src/client/workbench-persistence.ts'
 
 const id = (value: string) => value as SessionId
 
@@ -217,6 +218,63 @@ describe('ConversationViewportController', () => {
     viewport.deleteWorkbench?.(created)
     expect(viewport.currentWorkbench?.().id).not.toBe(created)
     viewport.dispose()
+  })
+
+  it('persists a workbench selection when its panes, focus, and ratios are unchanged', async () => {
+    const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+    const h = harness()
+    const personal = clientSessionKey({ kind: 'personal' }, id('a'))
+    const project = clientSessionKey({ kind: 'project', projectId: 7 }, id('b'))
+    h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+    h.list.set({
+      ...h.list.getSnapshot(), ids: [personal, project], current: personal,
+      byId: Object.fromEntries([personal, project].map(key => [key, {
+        id: key, displayTitle: key, running: false, blank: false, updatedAt: 1,
+      }])),
+    })
+    writeWorkbenchRecord('account:7', {
+      version: 3, mode: 'workbench', activeId: 'B',
+      workbenches: ['A', 'B'].map(name => ({
+        id: name, name, paneIds: [personal, project], activePaneId: personal, paneRatios: [0.5, 0.5], updatedAt: 1,
+      })),
+    })
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    const changed = vi.fn()
+    const stop = viewport.snapshot.subscribe(changed)
+    try {
+      viewport.setPersistenceScope('account:7')
+      viewport.setEnabled(true)
+      expect(viewport.currentWorkbench().id).toBe('B')
+      const before = viewport.snapshot.getSnapshot()
+      changed.mockClear()
+      viewport.switchWorkbench('A')
+      expect(viewport.currentWorkbench().id).toBe('A')
+      expect(viewport.snapshot.getSnapshot()).toBe(before)
+      expect(changed).not.toHaveBeenCalled()
+      expect(readWorkbenchRecord('account:7')?.activeId).toBe('A')
+    } finally {
+      stop()
+      viewport.dispose()
+    }
+    const restored = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      restored.setPersistenceScope('account:7')
+      expect(restored.currentWorkbench()).toMatchObject({
+        id: 'A', paneIds: [personal, project], activePaneId: personal, paneRatios: [0.5, 0.5],
+      })
+    } finally { restored.dispose() }
+  })
+
+  it('does not rewrite persistence for the current or an unknown workbench', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('local')
+      const write = vi.spyOn(Storage.prototype, 'setItem')
+      viewport.switchWorkbench(viewport.currentWorkbench().id)
+      viewport.switchWorkbench('missing')
+      expect(write).not.toHaveBeenCalled()
+    } finally { viewport.dispose() }
   })
 
   it('keeps the persisted active pane when the saved workbench restores its pane set', () => {

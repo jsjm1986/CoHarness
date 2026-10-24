@@ -18,6 +18,7 @@ import { saveFailureShot } from './support.ts'
 const APPROVAL = fileURLToPath(new URL('./snapshots/approval-composer/session.jsonl', import.meta.url))
 const REPLY = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
+const PROVIDERS = fileURLToPath(new URL('./snapshots/plan-narrow-viewport/session.jsonl', import.meta.url))
 const SNAPSHOTS = fileURLToPath(new URL('./snapshots/workbench', import.meta.url))
 const MODE = webSnapshotMode()
 
@@ -40,6 +41,84 @@ describe('web: Cordis Workspace workbench', () => {
     await scaffold?.close()
     browser = undefined
     scaffold = undefined
+  })
+
+  it.skipIf(MODE === 'record')('restores the selected named workbench after reloading identical pane layouts', async () => {
+    scaffold = await launchWebScaffold({
+      workbench: true, openInApp: false, replayFixture: PROVIDERS, replayProvidersOnly: true,
+    })
+    const runtime = scaffold
+    const seed = await readFile(SEED, 'utf8')
+    const names = ['selection-alpha', 'selection-beta']
+    for (const name of names) {
+      const path = join(scaffold.workspaceCwd, name)
+      await mkdir(path)
+      await mkdir(join(path, 'workspace'))
+      const workspace = await scaffold.ctx.workspaceRegistry.create(path)
+      const session = await seedSession(scaffold, seed, name, undefined, path)
+      await workspace.attachSession(session)
+      await scaffold.ctx.agents.resume({
+        resumeSessionId: session,
+        setup: agentCtx => runtime.ctx.agentPresets.mount(agentCtx).then(() => undefined),
+      })
+    }
+    browser = await chromium.launch()
+    page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+    const tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'workbench-selection-reload'))
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    const toolbar = page.locator('[data-workbench-toolbar]')
+    await page.locator('[class*="titleRow"] [data-workbench-toolbar]').waitFor({ timeout: 30_000 })
+    const caption = toolbar.getByRole('button', { name: 'Select workbench', exact: true })
+    await caption.click()
+    await page.getByRole('menuitem', { name: 'New workbench', exact: true }).click()
+    const create = page.getByRole('dialog', { name: 'New workbench', exact: true })
+    await create.getByRole('textbox', { name: 'Workbench name', exact: true }).fill('Selection A')
+    await create.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await create.waitFor({ state: 'hidden' })
+    for (const name of names) {
+      await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
+      const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
+      await picker.locator('button').filter({ hasText: name }).first().click()
+      await picker.waitFor({ state: 'hidden' })
+    }
+    const panes = page.locator('[data-session-pane]')
+    await expect.poll(() => panes.count()).toBe(2)
+    await panes.first().locator('textarea').first().click()
+    await expect.poll(() => panes.first().getAttribute('data-active')).toBe('true')
+    const layout = await panes.evaluateAll(nodes => nodes.map(node => ({
+      id: node.getAttribute('data-session-pane'), active: node.getAttribute('data-active'),
+    })))
+    const ratios = await page.locator('[data-session-pane] [role="separator"]').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-valuenow')))
+    expect(ratios).toEqual(['50'])
+    await caption.click()
+    await page.getByRole('menuitem', { name: 'Duplicate workbench', exact: true }).click()
+    const duplicate = page.getByRole('dialog', { name: 'Duplicate workbench', exact: true })
+    await duplicate.getByRole('textbox', { name: 'Workbench name', exact: true }).fill('Selection B')
+    await duplicate.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await duplicate.waitFor({ state: 'hidden' })
+    expect((await caption.innerText()).trim()).toBe('Selection B')
+    expect(await panes.evaluateAll(nodes => nodes.map(node => ({
+      id: node.getAttribute('data-session-pane'), active: node.getAttribute('data-active'),
+    })))).toEqual(layout)
+    expect(await page.locator('[data-session-pane] [role="separator"]').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-valuenow')))).toEqual(ratios)
+    await caption.click()
+    await page.getByRole('menuitem', { name: 'Selection A · 2/4', exact: true }).click()
+    await page.getByRole('menu').waitFor({ state: 'hidden' })
+    expect((await caption.innerText()).trim()).toBe('Selection A')
+    await page.reload({ waitUntil: 'load' })
+    await expect.poll(() => panes.count(), { timeout: 30_000 }).toBe(2)
+    await expect.poll(() => panes.evaluateAll(nodes => nodes.filter((node) => {
+      const input = node.querySelector('textarea')
+      return input !== null && !input.disabled && !input.readOnly
+    }).length), { timeout: 30_000 }).toBe(2)
+    expect((await caption.innerText()).trim()).toBe('Selection A')
+    expect(await panes.evaluateAll(nodes => nodes.map(node => ({
+      id: node.getAttribute('data-session-pane'), active: node.getAttribute('data-active'),
+    })))).toEqual(layout)
+    expect(await page.locator('[data-session-pane] [role="separator"]').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-valuenow')))).toEqual(ratios)
+    expect(tripwire.pageErrors).toEqual([])
+    await compareOrRefreshGolden(join(SNAPSHOTS, 'selection-restored.expected.md'), await captureStableAria(page, '[data-workbench-toolbar]', scaffold.workspaceCwd), MODE)
   })
 
   it.skipIf(MODE === 'record')('isolates four panes, concurrent streams, approval, draft recovery, and background completion', async () => {

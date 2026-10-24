@@ -461,6 +461,7 @@ export class ConversationViewportController implements ConversationViewport {
       draft.paneRatios = normalizedRatios(draft.paneIds.length, target.paneRatios)
     })
     this.reconcileSessions()
+    this.persistWorkbenches()
   }
   createWorkbench(name: string): string {
     this.assertEditable()
