@@ -20,6 +20,7 @@ const REPLY = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const PROVIDERS = fileURLToPath(new URL('./snapshots/plan-narrow-viewport/session.jsonl', import.meta.url))
 const SNAPSHOTS = fileURLToPath(new URL('./snapshots/workbench', import.meta.url))
+const SELECTION_EXPECTED_DIR = fileURLToPath(new URL('./expected/workbench', import.meta.url))
 const MODE = webSnapshotMode()
 
 /** Submit through one explicit pane's existing composer. */
@@ -118,7 +119,8 @@ describe('web: Cordis Workspace workbench', () => {
     })))).toEqual(layout)
     expect(await page.locator('[data-session-pane] [role="separator"]').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-valuenow')))).toEqual(ratios)
     expect(tripwire.pageErrors).toEqual([])
-    await compareOrRefreshGolden(join(SNAPSHOTS, 'selection-restored.expected.md'), await captureStableAria(page, '[data-workbench-toolbar]', scaffold.workspaceCwd), MODE)
+    if (MODE === 'refresh') await mkdir(SELECTION_EXPECTED_DIR, { recursive: true })
+    await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'selection-restored.expected.md'), await captureStableAria(page, '[data-workbench-toolbar]', scaffold.workspaceCwd), MODE)
   })
 
   it.skipIf(MODE === 'record')('isolates four panes, concurrent streams, approval, draft recovery, and background completion', async () => {
