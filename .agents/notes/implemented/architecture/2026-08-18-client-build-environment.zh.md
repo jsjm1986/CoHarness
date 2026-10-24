@@ -20,6 +20,8 @@ Vite 配置与动态 client bundle 的共享 tsdown preset 使用同一 define �
 
 根构建包装脚本向两个 bundler 提供同一份精确的公开环境。每次完整构建都会把源码 Git HEAD 的七位前缀派生为 `DSH_CLIENT_COMMIT_HASH`；没有仓库元数据的构建环境可显式提供该值。除此之外，`pnpm run build` 继承调用方的 `DSH_CLIENT_*` 值，`pnpm run build:official` 则不依赖特定 shell 的环境变量语法，直接选择仓库的官方产物 profile，并设置 `DSH_CLIENT_BUILD_PROFILE=official` 供部署专属业务注册使用。完整构建成功后会写入精确的公开环境，以及覆盖 Vite 输出和所有动态 client bundle 的摘要；局部构建命令不会替换该记录。
 
+modules 包的 Node 构建只替换精确的 `process.env.DSH_CLIENT_COMMIT_HASH` 读取，因此即使启动环境省略或改变该值，Host boot graph 仍标识构建时的 release。未携带提交号的本地构建只发布包版本。Node 的其他环境变量读取仍是运行时配置；浏览器对 `process.env` 的空对象替换不得应用到该 Node 产物。TypeScript 源码启动仍读取启动环境。
+
 ## Alternatives considered
 
 **只在 Vite 中替换。** 动态插件的 `lib/client.js` 作为独立脚本由浏览器加载，不进入 Vite 模块图，表达式会残留到无 `process` 的浏览器。

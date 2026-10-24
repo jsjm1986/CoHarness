@@ -44,7 +44,7 @@ application combo 脚本只携带每个插件的 `client.js` 入口，并在启�
 <a id="host-release-changes"></a>
 ### Host release 变化
 
-每个图都以 `release` 携带 Host 的 release 身份：本包的 `version`（各包发布时与 CLI 共用同一版本号），以及 client 构建固化进 Host 构建产物的源码 `commit`。两个字段都相等才算同一个 release。只有当前连接的 Host 提供的是页面启动时的 release，页面才应用图和 rebuilt 帧，因此页面运行的每个模块都属于这个 release；Host 回到该 release 时，照常按 revision 对比，只替换变化了的模块。Host 提供另一个 release 期间，页面不应用它的任何内容，当前插件继续运行，并通过 `ctx.modules.entries.releaseChange` 发布页面启动时的 release、Host 之前的 release 和当前的 release；只有刷新页面才会加载另一个 release。`dismissRelease()` 撤回提示，并在出现其他 release 之前不再为该 Host release 提示；它只在页面内存里记住最近一次撤回的 release。在侧边栏「插件」页重试失败的插件也不会加载另一个 release：重试请求的是启动 release 的产物，而提供另一个 release 的 Host 已经没有这些产物，所以会以下载失败结束。
+每个图都以 `release` 携带 Host 的 release 身份：本包的 `version`（各包发布时与 CLI 共用同一版本号），以及 Node 构建固化进 Host 构建产物、独立于启动环境的源码 `commit`。两个字段都相等才算同一个 release。只有当前连接的 Host 提供的是页面启动时的 release，页面才应用图和 rebuilt 帧，因此页面运行的每个模块都属于这个 release；Host 回到该 release 时，照常按 revision 对比，只替换变化了的模块。Host 提供另一个 release 期间，页面不应用它的任何内容，当前插件继续运行，并通过 `ctx.modules.entries.releaseChange` 发布页面启动时的 release、Host 之前的 release 和当前的 release；只有刷新页面才会加载另一个 release。`dismissRelease()` 撤回提示，并在出现其他 release 之前不再为该 Host release 提示；它只在页面内存里记住最近一次撤回的 release。在侧边栏「插件」页重试失败的插件也不会加载另一个 release：重试请求的是启动 release 的产物，而提供另一个 release 的 Host 已经没有这些产物，所以会以下载失败结束。
 
 ### 共享模块
 
