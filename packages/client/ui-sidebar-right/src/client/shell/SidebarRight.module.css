@@ -11,9 +11,8 @@
  *
  * Hidden, docked Grid items translate off the frame's right edge rather than
  * unmounted, so showing and hiding are one slide in both presentations. The
- * transform rides the same variables as the frame's track transition (ui-theme
- * base.css); while squeezing, the panel's left edge and the conversation's right
- * edge therefore travel together. Visibility flips after the slide so the box
+ * transform uses the theme's motion duration and easing. The frame allocates
+ * its column without interpolating the conversation's width. Visibility flips after the slide so the box
  * is out of reach once off-edge, and flips back before the slide starts.
  *
  * The normal panel is below frame overlays (20); fullscreen (40) covers the

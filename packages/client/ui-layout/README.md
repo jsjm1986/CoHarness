@@ -7,7 +7,7 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The shell owns one three-column AppFrame, resize geometry, and narrow-screen drawers. Its root declares `sidebar`, `conversation`, `rightbar`, the floating layer, and mobile header actions. The four-session Workbench remains the sole center conversation container; [ui-sidebar-right](../ui-sidebar-right/README.md) owns auxiliary tabs, splits, and visibility, while the frame consumes its presentation reports and allocates space. The theme presenter owns color scheme, alias tokens, font sizes, font lists, and document metadata.
+The shell owns one three-column AppFrame, resize geometry, and narrow-screen drawers. Its root declares `sidebar`, `conversation`, `rightbar`, the floating layer, and mobile header actions. The four-session Workbench remains the sole center conversation container; [ui-sidebar-right](../ui-sidebar-right/README.md) owns auxiliary tabs, splits, and visibility, while the frame consumes its presentation reports and allocates space. Column widths and resize strips take their final positions immediately, so restoring a panel does not reflow conversation text through intermediate widths. The theme presenter owns color scheme, alias tokens, font sizes, font lists, and document metadata.
 
 The frame publishes `data-viewport` and `--dsw-viewport-height` for narrow panes and on-screen keyboards. Medium mode keeps the navigation rail and overlays the auxiliary panel; compact mode uses a left drawer and fullscreen auxiliary panel. Scrim and Escape dismissal delegate to the tab owner instead of maintaining another visibility state. Closing the navigation drawer restores focus to its topbar control. Frame widths are transient; the sidebar owns Session-tab restoration.
 
