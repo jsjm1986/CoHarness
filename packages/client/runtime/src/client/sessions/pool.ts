@@ -78,6 +78,7 @@ export class SessionRuntimePool implements ISessions {
   readonly list: SnapshotStore<SessionListState>
   readonly currentScopeList: SnapshotStore<SessionListState>
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  readonly provideInfoRevision: HostObservable<number>
   private readonly entries = new Map<string, RuntimeEntry>()
   private readonly archivedByTarget = new Map<string, ReadonlySet<SessionId>>()
   private readonly sessionOwners = new Map<SessionId, RuntimeEntry>()
@@ -94,6 +95,8 @@ export class SessionRuntimePool implements ISessions {
   private baseArchiveRevision = 0
   private readonly provideListeners = new Set<() => void>()
   private currentProvideSnapshot: SessionMaybeProvideInfo
+  private provideRevision = 0
+  private readonly revisionListeners = new Set<() => void>()
 
   constructor(
     private readonly rootCtx: Context,
@@ -114,6 +117,13 @@ export class SessionRuntimePool implements ISessions {
       subscribe: (listener) => {
         this.provideListeners.add(listener)
         return () => { this.provideListeners.delete(listener) }
+      },
+    }
+    this.provideInfoRevision = {
+      getSnapshot: () => this.provideRevision,
+      subscribe: (listener) => {
+        this.revisionListeners.add(listener)
+        return () => { this.revisionListeners.delete(listener) }
       },
     }
     this.list = createSnapshotStore<SessionListState>({
@@ -165,15 +175,29 @@ export class SessionRuntimePool implements ISessions {
       this.currentProvideSnapshot = entry.runtime.currentProvideInfo.getSnapshot()
       this.notifyProvide()
     })
-    entry.stopSubscriptions = () => { stopList(); stopProvide() }
+    const stopRevision = entry.runtime.provideInfoRevision.subscribe(() => {
+      if (this.accountInvalidated || this.entries.get(entry.key) !== entry) return
+      this.publishProvideRevision()
+    })
+    entry.stopSubscriptions = () => { stopList(); stopProvide(); stopRevision() }
     this.indexEntry(entry)
   }
 
   private indexEntry(entry: RuntimeEntry): void {
-    for (const [id, owner] of this.sessionOwners) if (owner.key === entry.key) this.sessionOwners.delete(id)
-    for (const id of Object.keys(entry.runtime.list.getSnapshot().byId) as SessionId[]) {
-      this.sessionOwners.set(clientSessionKey(entry.target, id), entry)
+    const ids = new Set((Object.keys(entry.runtime.list.getSnapshot().byId) as SessionId[])
+      .map(id => clientSessionKey(entry.target, id)))
+    let changed = false
+    for (const [id, owner] of this.sessionOwners) {
+      if (owner !== entry || ids.has(id)) continue
+      this.sessionOwners.delete(id)
+      changed = true
     }
+    for (const id of ids) {
+      if (this.sessionOwners.get(id) === entry) continue
+      this.sessionOwners.set(id, entry)
+      changed = true
+    }
+    if (changed) this.publishProvideRevision()
   }
 
   private ownerFor(id: SessionId): RuntimeEntry | undefined {
@@ -212,6 +236,13 @@ export class SessionRuntimePool implements ISessions {
   private notifyProvide(): void {
     for (const listener of [...this.provideListeners]) {
       try { listener() } catch (error) { console.error('[web-runtime] pooled provide listener failed:', error) }
+    }
+  }
+
+  private publishProvideRevision(): void {
+    this.provideRevision++
+    for (const listener of [...this.revisionListeners]) {
+      try { listener() } catch (error) { console.error('[web-runtime] pooled provide revision listener failed:', error) }
     }
   }
 
@@ -614,6 +645,7 @@ export class SessionRuntimePool implements ISessions {
     this.list.set(empty)
     this.currentScopeList.set(empty)
     this.notifyProvide()
+    this.publishProvideRevision()
     this.beginNavigation()
     this.lifetime.abort(new Error('Client account identity was invalidated'))
     for (const entry of this.entries.values()) {
@@ -967,6 +999,7 @@ export class SessionRuntimePool implements ISessions {
     this.archivedByTarget.delete(entry.key)
     for (const [id, owner] of this.sessionOwners) if (owner === entry) this.sessionOwners.delete(id)
     this.rebuild()
+    this.publishProvideRevision()
     entry.stop?.()
     entry.stopSubscriptions?.()
     entry.stopResources?.()

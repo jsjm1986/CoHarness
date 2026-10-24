@@ -21,17 +21,18 @@ function observable<T>(initial: T) {
     getSnapshot: () => value,
     subscribe: (fn: () => void) => { subs.add(fn); return () => { subs.delete(fn) } },
     set: (next: T) => { value = next; for (const fn of [...subs]) fn() },
+    subscriberCount: () => subs.size,
   }
 }
 
 /**
- * Minimal host: SessionProvider only reads sessions.provideInfo, but it must
- * render inside the renderer tree (HostContext), so the harness mounts a real
- * root entry whose body is the test's render-prop provider.
+ * Bare bundle sources beneath a real renderer root exercise SessionProvider
+ * without importing its internal React context.
  */
 function makeHost(bodies: { root: (rp: (key: string, owner: object) => React.ReactNode) => React.ReactNode }) {
   const absentInfo: SessionMaybeProvideInfo = { sessionId: undefined, hooks: { session: undefined }, props: {} }
   const provide = observable<SessionMaybeProvideInfo>(absentInfo)
+  const revision = observable(0)
   let currentId: string | undefined
   const infos = new Map<string, SessionProvideInfo>()
   const sessionEntries: StoredEntry[] = []
@@ -63,6 +64,7 @@ function makeHost(bodies: { root: (rp: (key: string, owner: object) => React.Rea
       list: observable<unknown>({ ids: [] }),
       provideInfo: provide,
       provideInfoFor: (id: string) => infos.get(id),
+      provideInfoRevision: revision,
     },
     getRootRevision: () => 0,
     subscribeRootRevision: () => () => {},
@@ -71,6 +73,7 @@ function makeHost(bodies: { root: (rp: (key: string, owner: object) => React.Rea
   }
   return {
     host,
+    revision,
     // Driver surface: set(id) publishes the resolved bundle (or the absent
     // projection) through the provide source.
     current: {
@@ -87,13 +90,19 @@ function makeHost(bodies: { root: (rp: (key: string, owner: object) => React.Rea
         props: {},
       }
       infos.set(id, info)
+      revision.set(revision.getSnapshot() + 1)
       if (currentId === id) provide.set(info)
       return info
     },
     /** Swap one session's bundle in place (roster-change stand-in); republish when current. */
     replaceSession: (info: SessionProvideInfo) => {
       infos.set(info.sessionId, info)
+      revision.set(revision.getSnapshot() + 1)
       if (currentId === info.sessionId) provide.set(info)
+    },
+    removeSession: (id: string) => {
+      infos.delete(id)
+      revision.set(revision.getSnapshot() + 1)
     },
     registerSession: (entry: StoredEntry) => { sessionEntries.push(entry) },
   }
@@ -137,6 +146,62 @@ describe('SessionProvider', () => {
     h.addSession('s2')
     const view = render(<>{createSlotRenderer().renderRoot(h.host, {})}</>)
     expect(view.container.textContent).toBe('s2')
+  })
+
+  it('shows a late explicit binding while the current bundle stays unchanged', () => {
+    const h = makeHost({
+      root: () => <SessionProvider sessionId="late" empty={() => <span>not loaded</span>}>
+        {id => <b>{id}</b>}
+      </SessionProvider>,
+    })
+    h.addSession('current')
+    h.current.set('current')
+    const current = h.host.sessions.provideInfo.getSnapshot()
+    const view = render(<>{createSlotRenderer().renderRoot(h.host, {})}</>)
+    expect(view.container.textContent).toBe('not loaded')
+    act(() => { h.addSession('late') })
+    expect(view.container.textContent).toBe('late')
+    expect(h.host.sessions.provideInfo.getSnapshot()).toBe(current)
+    view.unmount()
+    expect(h.revision.subscriberCount()).toBe(0)
+  })
+
+  it('updates and withdraws an explicit binding independently of current selection', () => {
+    const h = makeHost({
+      root: renderSlot => <SessionProvider sessionId="pane" empty={() => <span>not loaded</span>}>
+        {() => renderSlot('k.session', {})}
+      </SessionProvider>,
+    })
+    h.addSession('current')
+    const pane = h.addSession('pane')
+    h.current.set('current')
+    h.registerSession({ component: (props: { feature?: string }) => <b>{props.feature ?? 'original'}</b>, options: {} })
+    const current = h.host.sessions.provideInfo.getSnapshot()
+    const view = render(<>{createSlotRenderer().renderRoot(h.host, {})}</>)
+    expect(view.container.textContent).toBe('original')
+    act(() => { h.replaceSession({ ...pane, props: { feature: 'available' } }) })
+    expect(view.container.textContent).toBe('available')
+    act(() => { h.removeSession('pane') })
+    expect(view.container.textContent).toBe('not loaded')
+    expect(h.host.sessions.provideInfo.getSnapshot()).toBe(current)
+  })
+
+  it('uses current-bundle notifications for explicit bindings on a host without a lifecycle revision', () => {
+    const h = makeHost({
+      root: renderSlot => <SessionProvider sessionId="pane">
+        {() => renderSlot('k.session', {})}
+      </SessionProvider>,
+    })
+    delete h.host.sessions.provideInfoRevision
+    const current = h.addSession('current')
+    const pane = h.addSession('pane')
+    h.current.set('current')
+    h.registerSession({ component: (props: { feature?: string }) => <b>{props.feature ?? 'original'}</b>, options: {} })
+    const view = render(<>{createSlotRenderer().renderRoot(h.host, {})}</>)
+    act(() => { h.replaceSession({ ...pane, props: { feature: 'replacement' } }) })
+    expect(view.container.textContent).toBe('original')
+    act(() => { h.replaceSession({ ...current, props: { feature: 'current replacement' } }) })
+    expect(view.container.textContent).toBe('replacement')
   })
 
   it('remounts the body on session switch (key semantics) but not on unrelated re-renders', () => {

@@ -357,6 +357,7 @@ export class SessionRuntime implements ISessions {
    * current id republishes the bundle instead of stranding mounted entries.
    */
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  readonly provideInfoRevision: HostObservable<number>
 
   /**
    * Persisted selection cell (the durable half of `list.current`). Private on
@@ -463,6 +464,7 @@ export class SessionRuntime implements ISessions {
       resolveCurrent: () => this.maybeProvideInfo(this.list.getSnapshot().current),
     })
     this.currentProvideInfo = this.provideChannel.currentProvideInfo
+    this.provideInfoRevision = this.provideChannel.provideInfoRevision
     let registryRebuildQueued = false
     const scheduleRegistryRebuild = (): void => {
       if (registryRebuildQueued) return
@@ -489,12 +491,14 @@ export class SessionRuntime implements ISessions {
       this.additionalStaged.clear()
       this.watched = undefined
       this.staged.clear()
+      const withdrewBundles = this.scopes.size > 0
       for (const [id, record] of this.scopes) {
         record.ended.abort(new Error(`Session generation "${id}" is disposed`))
         this.scopes.delete(id)
         this.publishRetention(id)
         this.scheduleDrop(id, record)
       }
+      if (withdrewBundles) this.provideChannel.publishRevision()
       while (this.disposalWaits.size > 0) {
         const results = await Promise.allSettled([...this.disposalWaits])
         const failures = results
@@ -943,8 +947,8 @@ export class SessionRuntime implements ISessions {
 
   /**
    * Resolve one session's render-layer standard-props bundle (ctx never
-   * enters the render layer; the renderer subscribes to
-   * {@link SessionRuntime.currentProvideInfo}). Pure resolution — render-safe:
+   * enters the render layer; explicit selectors observe
+   * {@link SessionRuntime.provideInfoRevision}). Pure resolution — render-safe:
    * no staging, no window side effects (StrictMode double-invokes and
    * concurrent discarded passes must stay free).
    */
@@ -1019,6 +1023,7 @@ export class SessionRuntime implements ISessions {
       else this.publishRetention(id)
     })
     this.publishRetention(id)
+    if (previous.referenceCount === 0) this.provideChannel.publishRevision()
     return reference
   }
 
@@ -1039,11 +1044,13 @@ export class SessionRuntime implements ISessions {
   private retireScope(id: SessionId, record: ScopeRecord, disposeFiber = true): void {
     if (record.ended.signal.aborted) return
     record.ended.abort(new Error(`Session generation "${id}" is disposed`))
-    if (this.scopes.get(id) === record) this.scopes.delete(id)
+    const removed = this.scopes.get(id) === record
+    if (removed) this.scopes.delete(id)
     record.session.unbindScope()
     this.scheduleDrop(id, record, disposeFiber)
     if (!this.closed) this.projectList()
     this.publishRetention(id)
+    if (removed) this.provideChannel.publishRevision()
   }
 
   /** Materialize one validated local generation for its first reference. */

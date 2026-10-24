@@ -14,6 +14,8 @@ Web 客户端只展示一个当前 Session，但运行时已经能够接收并�
 
 现有 `conversation` slot 仍是唯一的渲染所有者。它声明显式的 `conversation.pane` 子 slot，以及工作台工具栏、空状态和面板头子 slot。每个面板都通过 renderer 的显式 SessionProvider 绑定渲染，因此无需在插件之间导入展示实现，就能复用现有 conversation slots 和 session-scoped stores。
 
+显式 SessionProvider 观察 `provideInfoRevision`；该修订在 bundle 安装、移除或提供方 roster 替换完成后发布。运行时池转发每个被持有 runtime 的生命周期变化。各选择器解析自身身份稳定的 bundle；迟到的绑定无需切换焦点即可显示，其他 bundle 和当前选择保持不变。修订仅用于通知，不作为绑定或缓存身份。
+
 `SessionRuntime` 同时保留当前 Session stage 和额外的 staged 集合。进入集合的 Session 会打开有界历史窗口并接收现有流式更新；移除面板只释放浏览器窗口，不会取消对应 Session。当前选择被列表暂时遮挡时仍保持 staged，直到选择移动或用户主动清除。
 
 独立的 `@deepseek-ai/dsh-client-ui-workbench` 包只消费 Cordis service 并贡献 slot entry。它的本地状态只包含 Session id、模式、活动 id 和比例，保存在 `dsh.conversation.workbench.v1`；恢复时先与当前 Session 列表校验，再进入 staged 集合。
@@ -31,6 +33,8 @@ Gateway 提供账户级目录，其中包含当前认证用户个人空间和按
 **每个 Workspace 创建一条 Gateway 连接，或聚合账户项目作用域。** 账户目录只返回经过 ACL 过滤的元数据。面板选中项目会按需启动一条目标传输连接，继续使用该运行时的 principal、sandbox、approval 和事件流，不能把外部 Session 合并进当前运行时。
 
 **只保留当前 Session staged，聚焦面板时重新加载。** 这样会丢失实时更新，并重复工作台要消除的历史打开开销。staged 集合保留四个有界窗口，同时继续使用每个 Session 原有的历史保留限制。
+
+**替换当前 provide bundle 来刷新另一个窗格。** 这会在数据未变时仍使跟随当前选择的消费方失效。显式选择器观察生命周期发布，并保留自身未变 bundle 的引用。
 
 **使用模块单例或 window 全局保存面板状态。** 这会让状态脱离 Cordis plugin fiber 生命周期，并破坏 reload 隔离。提供方使用实例级可观察状态，并沿用仓库已有的有界本地持久化行为。
 

@@ -18,6 +18,7 @@ const NOT_LOADED = fileURLToPath(new URL('./snapshots/runtime-identity/not-loade
 const LEGACY_PENDING = fileURLToPath(new URL('./snapshots/runtime-identity/legacy-pending.expected.md', import.meta.url))
 const ARCHIVE_READS = fileURLToPath(new URL('./expected/runtime-identity/archive-reads.expected.md', import.meta.url))
 const DOCUMENT_SCOPES = fileURLToPath(new URL('./expected/runtime-identity/', import.meta.url))
+const RESTORED_BINDINGS = fileURLToPath(new URL('./expected/runtime-identity/restored-bindings.expected.md', import.meta.url))
 
 it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)(
   'keeps identical Session IDs independent through histories, uploads and restoration from a %s bootstrap', async (bootstrap) => {
@@ -230,6 +231,14 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       expect(archiveReads).toBe(1)
       await compareOrRefreshGolden(ARCHIVE_READS,
         `Alternate Runtime Workspace reads during restoration: ${archiveReads}\nRestored panes: 2`, webSnapshotMode())
+      await Promise.all([first.locator('textarea').waitFor(), second.locator('textarea').waitFor()])
+      const editable = await Promise.all([first.locator('textarea').isEditable(), second.locator('textarea').isEditable()])
+      expect(editable).toEqual([true, true])
+      const unavailable = await page.locator('[data-session-pane]').getByText('This conversation is not loaded. Start and open its workspace, then try again.', { exact: true }).count()
+      expect(unavailable).toBe(0)
+      expect(await page.locator('[data-session-pane][data-active]').getAttribute('data-session-pane')).toBe(projectKey)
+      await compareOrRefreshGolden(RESTORED_BINDINGS,
+        `Restored editable panes: ${editable.filter(Boolean).length}\nUnavailable panes: ${unavailable}`, webSnapshotMode())
       const documentNames = ['personal-scope.txt', 'project-scope.txt']
       for (const [index, runtime] of runtimes.entries()) {
         const target = await runtime.ctx.userDocs.resolveTarget({ name: documentNames[index]! })

@@ -87,6 +87,8 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 
 `binding()`、`scope()` 和 `provideInfoFor()` 只借用仍被持有的代次。`retainInfo(id)` 观察不可变的来源计数，不创建 scope 或读取历史；同 ID 重建后，观察源身份仍稳定。会话选择与 Workbench 适配器共用这一分配器。输入草稿和正在提交的操作分别持有引用，使切换视图不会丢失输入。目录移除不释放这些所有者；明确撤权仍必须销毁所属运行时。
 
+`provideInfoRevision` 通知 provide bundle 的安装、退役或重建，也覆盖运行时池中的非当前 Session。其数字快照不含历史或绑定对象。显式渲染选择器随该数据源变化解析自身 bundle；`currentProvideInfo` 保持由当前选择确定的身份。
+
 每个 scope 的对象身份独立于持久 Session id。作用域事件分发与 `sessionOf()` 必须匹配确切代次，因此异步清理不会把旧 context 路由到替代对象。详见[所有权决策](../../../.agents/notes/implemented/architecture/2026-09-23-client-session-references.zh.md)。
 
 `beginNavigation()` 取代尚未完成的视图选择意图，并返回取消信号。异步导航在加载完成后、选择视图前检查信号；`open`、`openSubagent`、`clear`、目标切换与明确拒绝访问都会使旧意图失效。被取代的请求仍将已完成的 Host 操作保留在目录中，并保留当前视图和草稿。插件发起的请求还须响应插件销毁。

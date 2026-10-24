@@ -1,4 +1,4 @@
-/** Internal React bindings for the renderer host and active session provide bundle. */
+/** Internal React bindings for the renderer host and current or explicit Session bundles. */
 import { createContext, useContext, type ReactNode } from 'react'
 import type {
   HostObservable, KeyedStandardSource, MaybeSnapshotSelectorHook, SessionMaybeProvideInfo, SessionProvideInfo,
@@ -171,20 +171,20 @@ export interface SessionProviderProps {
 }
 
 /**
- * Framework-wired session area: subscribes to the host's current provide
- * source and remounts the body under `key={sessionId}` so a session switch
- * rebuilds the session subtree. This dependency-inverted layer uses plain
- * string ids; `PropsRuntime` applies the branded type at the component
- * boundary.
+ * Bind current selection or an explicit Session's bundle lifecycle and remount
+ * the body under `key={sessionId}` when its identity changes. Explicit bindings
+ * use the lifecycle revision when supplied, otherwise current-bundle notifications.
+ * This layer uses plain string ids; `PropsRuntime` applies the branded type.
  */
 export function SessionProvider({ empty, children, sessionId }: SessionProviderProps) {
   const host = useHost()
-  const currentInfo = observableHook(host.sessions.provideInfo)(s => s)
-  const info = sessionId === undefined
-    ? currentInfo
-    : host.sessions.provideInfoFor?.(sessionId) ?? { ...currentInfo, sessionId: undefined }
+  const currentInfo = observableHook(host.sessions.provideInfo)(info => sessionId === undefined ? info : undefined)
+  const explicitInfo = observableHook<unknown>(host.sessions.provideInfoRevision ?? host.sessions.provideInfo)(
+    () => sessionId === undefined ? undefined : host.sessions.provideInfoFor?.(sessionId),
+  )
+  const info = sessionId === undefined ? currentInfo : explicitInfo
+  if (info?.sessionId === undefined) return <>{empty?.() ?? null}</>
   const id = info.sessionId
-  if (id === undefined) return <>{empty?.() ?? null}</>
   return (
     <BindingContext.Provider value={info} key={id}>
       {children(id)}

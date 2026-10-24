@@ -85,6 +85,8 @@ The callback returns one synchronous disposer or an iterable of disposers. A gen
 
 `binding()`, `scope()`, and `provideInfoFor()` borrow only live retained generations. `retainInfo(id)` observes immutable source counts without creating a scope or reading history; its source identity survives same-id recreation. The selection and Workbench adapters use the same allocator. Composer drafts and active submission attempts own separate references so view switches preserve input. Catalog removal does not release those owners; explicit authorization loss still requires disposing the owning runtime.
 
+`provideInfoRevision` announces installed, retired or rebuilt provide bundles, including non-current Sessions in pooled runtimes. Its numeric snapshots contain no history or binding objects. Explicit renderer selectors resolve their own bundle on that source; `currentProvideInfo` keeps its selection-owned identity.
+
 Each scope carries an object identity distinct from its durable Session id. Scoped event dispatch and `sessionOf()` require that exact generation, so asynchronous teardown cannot route an old context into a replacement. See the [ownership decision](../../../.agents/notes/implemented/architecture/2026-09-23-client-session-references.md).
 
 `beginNavigation()` supersedes pending view-selection intents and returns their cancellation signal. Asynchronous navigation checks it after loading and before selecting; `open`, `openSubagent`, `clear`, target changes, and explicit access denial invalidate older intents. Supersession leaves completed Host mutations catalogued and preserves the current view and draft. Plugin-owned requests additionally observe plugin disposal.

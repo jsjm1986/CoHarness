@@ -98,6 +98,12 @@ export interface ISessions {
   refresh(): Promise<void>
   /** Atomic current-session provide projection (the renderer host's `sessions.provideInfo` feed). */
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  /**
+   * Monotonic revision after bundle acquisition, final release, provider-roster changes,
+   * or runtime ownership changes. Explicit Session selectors reread `provideInfoFor`
+   * and retain an unchanged bundle's identity. Older hosts may omit this source.
+   */
+  readonly provideInfoRevision?: HostObservable<number>
   /** Resolve the standard-props bundle without selecting or staging a Session.
    * @param id - listed or retained Session identity.
    * @returns the bundle, or undefined when the identity cannot be resolved.
