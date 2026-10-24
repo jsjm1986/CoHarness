@@ -107,11 +107,17 @@ it.skipIf(MODE === 'record').each([
   const preview = target.getByRole('region', { name: 'continuity.csv', exact: true })
   const sheet = preview.locator('[data-excel-preview]')
   await sheet.waitFor()
+  // Cell selection schedules input focus after its address is painted.
+  const cellInput = sheet.locator('.luckysheet-cell-input')
+  const waitForCellFocus = async (): Promise<void> => {
+    await expect.poll(() => cellInput.evaluate(node => node === document.activeElement)).toBe(true)
+  }
   const selectedAddress = sheet.locator('.fortune-name-box')
   const formula = sheet.locator('#luckysheet-functionbox-cell')
   await expect.poll(() => formula.textContent()).toBe('R1C1')
   expect(await selectedAddress.textContent()).toBe('A1')
   await sheet.locator('.fortune-cell-area').click({ position: { x: 10, y: 10 } })
+  await waitForCellFocus()
   const selection = sheet.locator('.luckysheet-cell-selected')
   await expect.poll(async () => {
     const bounds = await selection.boundingBox()
@@ -123,8 +129,10 @@ it.skipIf(MODE === 'record').each([
   await target.mouse.click(c2.x, c2.y)
   await expect.poll(() => selectedAddress.textContent()).toBe('C2')
   await expect.poll(() => formula.textContent()).toBe('R2C3')
+  await waitForCellFocus()
   await target.mouse.click(a1.x + a1.width / 2, a1.y + a1.height / 2)
   await expect.poll(() => selectedAddress.textContent()).toBe('A1')
+  await waitForCellFocus()
   const reload = preview.getByRole('button', { name: labels.reload, exact: true })
   const scroll = sheet.locator('.luckysheet-scrollbar-y')
   const alert = preview.locator(':scope > [role="alert"]')
@@ -188,6 +196,7 @@ it.skipIf(MODE === 'record').each([
   await target.mouse.click(c2.x, c2.y)
   await expect.poll(() => selectedAddress.textContent()).toBe('C2')
   await expect.poll(() => formula.textContent()).toBe('R2C3')
+  await waitForCellFocus()
   await target.mouse.move(c2.x, c2.y)
   await target.mouse.wheel(0, 400)
   await expect.poll(() => scroll.evaluate(node => node.scrollTop)).toBeGreaterThan(0)
