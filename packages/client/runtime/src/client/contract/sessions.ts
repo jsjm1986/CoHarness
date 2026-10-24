@@ -238,9 +238,10 @@ export interface ISessions {
    */
   usingRuntime?<T>(target: SessionRuntimeTarget, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T>
   /** Discover an account-visible Session in its target runtime before retaining history.
+   * Concurrent verification shares a pending Workspace read; later calls repull after settlement.
    * @param target - account runtime that owns the session's workbench binding.
    * @param id - listed session identity to materialize.
-   * @param signal - cancels discovery without releasing other consumers of the runtime.
+   * @param signal - cancels only this discovery; absent callers use the runtime lifetime.
    * @returns true for a listed, unarchived Session; metadata or authorization failures reject.
    */
   ensureSession?(target: SessionRuntimeTarget, id: SessionId, signal?: AbortSignal): Promise<boolean>

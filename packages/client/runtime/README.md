@@ -25,6 +25,8 @@ Pooled browser Session keys encode the owning runtime and original Host ID. List
 
 `usingRuntime` retains a target through discovery, asynchronous work and adoption of continuing Session references. It grants no authorization. Consumers combine their navigation and owner lifetimes; cancellation releases the operation’s hold without releasing other consumers. Both bootstrap and alternate targets await their own initial Session-list baseline.
 
+Concurrent `ensureSession` callers for one runtime share only its pending Workspace archive read, including the alternate runtime's initial archive synchronization. A settled read is discarded; later verification repulls. Each caller can cancel independently, the final caller cancels an unfinished read, and reconnect, target release, account withdrawal, or disposal prevents a late reply from installing archive facts. Versioned archive frames outrank older replies.
+
 Explicit bootstrap authorization loss withdraws every pooled Session before the Connection-owned document cleanup and reload. An alternate runtime’s denial withdraws that runtime only. Ordinary reconnect failures retain the current account’s authorized caches.
 
 Session permission catalogs require a current owner. Withdrawing a runtime removes its Session-list ownership before connection teardown can publish further catalog changes. An unresolved or revoked Session has no catalog and never falls back to another runtime’s options; in-flight reads recheck ownership before returning.

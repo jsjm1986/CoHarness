@@ -281,6 +281,7 @@ export class FakeApiClient implements IApiClient {
   onWorkspaceList: (payload: unknown) => Promise<RpcResponse<{
     items: WorkspaceView[]
     archivedSessionIds?: SessionId[]
+    archiveRevision?: number
     pinnedSessionIds?: SessionId[]
   }>> =
     () => Promise.resolve(ok({ items: [] }))

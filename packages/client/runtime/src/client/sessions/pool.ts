@@ -46,6 +46,13 @@ interface RuntimeEntry {
   stopResources?: (() => void) | undefined
   ready?: Promise<void>
   rejectReady?: (error: unknown) => void
+  generation?: number
+  archiveRevision?: number
+  archiveRead?: {
+    controller: AbortController
+    waiters: number
+    completion: Promise<void>
+  } | undefined
 }
 
 function runtimeScope(): void {}
@@ -138,6 +145,7 @@ export class SessionRuntimePool implements ISessions {
       stopRuntime?.()
       stopTargets?.()
       for (const entry of this.entries.values()) {
+        this.cancelArchiveRead(entry, new Error('Client runtime disposed'))
         entry.stop?.()
         entry.stopSubscriptions?.()
         entry.stopResources?.()
@@ -351,8 +359,7 @@ export class SessionRuntimePool implements ISessions {
           runtime.handleHostEnvelope(envelope)
           const frame = envelope.payload
           if (frame.type === 'host/archived-sessions-changed') {
-            this.archivedByTarget.set(establishedEntry.key, new Set(frame.archivedSessionIds))
-            this.rebuild()
+            this.installArchive(establishedEntry, frame)
           }
           if (frame.type === 'host/remote-event') {
             this.dispatchRemoteEvent(frame.event, frame.args, establishedEntry.target)
@@ -371,23 +378,28 @@ export class SessionRuntimePool implements ISessions {
             return
           }
           this.connectResources(establishedEntry, description)
+          const generation = establishedEntry.generation = (establishedEntry.generation ?? 0) + 1
+          this.cancelArchiveRead(establishedEntry, new Error('Target runtime connection changed'))
+          establishedEntry.archiveRevision = 0
           runtime.handleConnected()
           void runtime.refresh().then(() => {
+            if (this.entries.get(establishedEntry.key) !== establishedEntry || establishedEntry.generation !== generation) return
             if (runtime.list.getSnapshot().phase === 'ready') resolveReady()
             else rejectReady(new Error('target runtime session list unavailable'))
-            return connection.api.workspace.list({})
-          }).then(({ result }) => {
-            if (result.ok && this.entries.get(establishedEntry.key) === establishedEntry) {
-              this.archivedByTarget.set(establishedEntry.key, new Set(result.value.archivedSessionIds))
-              this.rebuild()
+            return this.refreshArchive(establishedEntry, this.lifetime.signal)
+          }).catch((error: unknown) => {
+            if (this.entries.get(establishedEntry.key) === establishedEntry && establishedEntry.generation === generation) {
+              rejectReady(error)
             }
-          }, rejectReady)
+          })
         },
         onFailure: (failure) => {
           if (this.entries.get(establishedEntry.key) === establishedEntry) this.resourceFailure(establishedEntry.target, failure)
         },
         onStateChange: (state: 'connected' | 'reconnecting') => {
           if (state !== 'reconnecting' || this.accountInvalidated || this.entries.get(establishedEntry.key) !== establishedEntry) return
+          establishedEntry.generation = (establishedEntry.generation ?? 0) + 1
+          this.cancelArchiveRead(establishedEntry, new Error('Target runtime disconnected'))
           this.rootCtx.get('workspaceResources')?.disconnect(establishedEntry.target)
           runtime.handleDisconnected()
         },
@@ -468,18 +480,73 @@ export class SessionRuntimePool implements ISessions {
     if (entry === undefined || entry.connection === undefined) throw new Error('target runtime unavailable for Session verification')
     const original = id
     if (!entry.runtime.list.getSnapshot().ids.includes(original)) return false
-    const { result } = await entry.connection.api.workspace.list({}, active)
+    await this.refreshArchive(entry, active)
     active.throwIfAborted()
+    if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during Session verification')
+    return this.archivedByTarget.get(entry.key)?.has(original) !== true
+  }
+
+  /** Share only an outstanding archive repull; each caller owns its cancellation. */
+  private async refreshArchive(entry: RuntimeEntry, signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted()
+    let read = entry.archiveRead
+    if (read === undefined) {
+      const controller = new AbortController()
+      read = { controller, waiters: 0, completion: this.pullArchive(entry, controller.signal) }
+      entry.archiveRead = read
+      const pending = read
+      const clear = (): void => { if (entry.archiveRead === pending) entry.archiveRead = undefined }
+      void read.completion.then(clear, clear)
+    }
+    read.waiters++
+    const active = AbortSignal.any([signal, read.controller.signal, this.lifetime.signal])
+    let abort: (() => void) | undefined
+    try {
+      await new Promise<void>((resolve, reject) => {
+        abort = () => {
+          reject(active.reason instanceof Error ? active.reason : new Error('Workspace archive verification cancelled', { cause: active.reason }))
+        }
+        active.addEventListener('abort', abort, { once: true })
+        void read.completion.then(resolve, reject)
+        if (active.aborted) abort()
+      })
+      active.throwIfAborted()
+    } finally {
+      if (abort !== undefined) active.removeEventListener('abort', abort)
+      if (--read.waiters === 0) {
+        if (entry.archiveRead === read) entry.archiveRead = undefined
+        read.controller.abort(new Error('Workspace archive read has no remaining callers'))
+      }
+    }
+  }
+
+  private async pullArchive(entry: RuntimeEntry, signal: AbortSignal): Promise<void> {
+    if (entry.connection === undefined) throw new Error('Target runtime has no Workspace transport')
+    const { result } = await entry.connection.api.workspace.list({}, AbortSignal.any([signal, this.lifetime.signal]))
+    signal.throwIfAborted()
+    this.lifetime.signal.throwIfAborted()
+    if (this.entries.get(entry.key) !== entry) throw new Error('Target runtime was released during Workspace read')
     if (!result.ok) {
       if (result.error.code === 'collaboration-forbidden') throw new WorkspaceResourceError('access-revoked', result.error.message)
       throw new Error(result.error.message)
     }
-    if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during Session verification')
-    // The repull is also the freshest archive set for this target; folding it
-    // keeps list.ids/byId correct when a change lands between push frames.
-    this.archivedByTarget.set(entry.key, new Set(result.value.archivedSessionIds))
+    this.installArchive(entry, result.value)
+  }
+
+  private cancelArchiveRead(entry: RuntimeEntry, reason: Error): void {
+    const read = entry.archiveRead
+    entry.archiveRead = undefined
+    read?.controller.abort(reason)
+  }
+
+  private installArchive(entry: RuntimeEntry, snapshot: WorkspaceArchiveSnapshot): void {
+    if (entry.runtime === this.base) { this.installBaseArchive(entry.key, snapshot); return }
+    const revision = snapshot.archiveRevision
+    const current = entry.archiveRevision ?? 0
+    if (revision === undefined && current > 0 || revision !== undefined && revision < current) return
+    this.archivedByTarget.set(entry.key, new Set(snapshot.archivedSessionIds))
+    if (revision !== undefined) entry.archiveRevision = revision
     this.rebuild()
-    return !result.value.archivedSessionIds.includes(original)
   }
 
   /** Create a Session in the target runtime and index its owner. */
@@ -610,6 +677,7 @@ export class SessionRuntimePool implements ISessions {
     else if (description?.executionAuthorityRequired === true) throw new Error('Gateway runtime did not declare its Session identity')
     this.baseTargetEstablished = true
     const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
+    if (entry !== undefined) this.cancelArchiveRead(entry, new Error('Base runtime connection changed'))
     if (entry !== undefined && description !== undefined) this.connectResources(entry, description)
     this.base.handleConnected()
     const generation = ++this.baseGeneration
@@ -636,6 +704,8 @@ export class SessionRuntimePool implements ISessions {
   /** Mark the base runtime connection as unavailable. */
   handleDisconnected(): void {
     this.baseGeneration++
+    const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
+    if (entry !== undefined) this.cancelArchiveRead(entry, new Error('Base runtime disconnected'))
     this.rootCtx.get('workspaceResources')?.disconnect({ kind: 'base' })
     this.base.handleDisconnected()
   }
@@ -724,6 +794,7 @@ export class SessionRuntimePool implements ISessions {
     }
     // The first declaration resolves the bootstrap placeholder; later changes supersede navigation.
     if (established) this.beginNavigation()
+    this.cancelArchiveRead(baseEntry, new Error('Base runtime target changed'))
     this.baseGeneration++
     this.baseArchiveRevision = 0
     const collision = this.entries.get(targetKey(target))
@@ -892,6 +963,7 @@ export class SessionRuntimePool implements ISessions {
   private releaseEntry(entry: RuntimeEntry, failure = new Error('target runtime was released before it became ready')): void {
     if (entry.runtime === this.base || this.entries.get(entry.key) !== entry) return
     this.entries.delete(entry.key)
+    this.cancelArchiveRead(entry, failure)
     this.archivedByTarget.delete(entry.key)
     for (const [id, owner] of this.sessionOwners) if (owner === entry) this.sessionOwners.delete(id)
     this.rebuild()

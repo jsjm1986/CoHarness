@@ -16,6 +16,8 @@ Client archive projections govern presentation, not write admission: a mounted p
 
 **The executor owns archive admission.** `session.prompt` and the edit/steer actions of `session.updateQueue` consult `archivedInputError` before Agent resolution and again after asynchronous content conversion or execution stamping, rejecting archived targets with `session-archived` at the final synchronous admission before input insertion. Queue removal and cancellation remain available; compositions without `workspaceRegistry` have no archive set. `readableArchivedSessionSet` captures one `archiveSnapshot()` before asynchronous ACL filtering and returns that snapshot's revision with its filtered ids in `workspace.list`, `workspace.archiveSession`, and `workspace.unarchiveSession` replies.
 
+**Share pending repulls within one runtime entry.** Initial archive synchronization and concurrent `ensureSession` calls use one outstanding Workspace read. Each waiter owns its cancellation; the last waiter aborts an unfinished request. Settlement removes the read instead of caching authorization or archive facts for future verification. Reconnect, target release, account withdrawal, and disposal cancel the read, and aborted responses cannot install facts. Archive revisions prevent an older reply from replacing a newer pushed snapshot. Workbench pane restoration and conversation selection consume this same path.
+
 ## Files
 
 - `packages/client/runtime/src/client/sessions/pool.ts` — archive frame/repull sync into `archivedByTarget`, multi-target `search` fan-out and re-keying.
@@ -26,6 +28,8 @@ Client archive projections govern presentation, not write admission: a mounted p
 - `packages/client/ui-schedule/src/client/session-link.ts`, `ui-conversation/src/client/{apply,viewport}.ts`, `ui-settings-unarchive-sessions/src/client/ArchivedSessionsSection.tsx`, `ui-workbench/src/client/components/WorkbenchToolbar.tsx` — union archive reads.
 
 ## Alternatives considered
+
+**Retain settled Workspace responses.** A retained response would avoid later reads but could admit a newly archived Session or conceal changed access. Sharing only pending work reduces duplicate reads without adding a freshness interval or replacing Host admission.
 
 **Frontend-only or initial-only refusal.** Neither protects direct callers or requests suspended before insertion; the final synchronous executor check enforces the registry's current archive membership.
 

@@ -16,6 +16,7 @@ const REPLY = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl
 const SNAPSHOT = fileURLToPath(new URL('./snapshots/runtime-identity/panes.expected.md', import.meta.url))
 const NOT_LOADED = fileURLToPath(new URL('./snapshots/runtime-identity/not-loaded.expected.md', import.meta.url))
 const LEGACY_PENDING = fileURLToPath(new URL('./snapshots/runtime-identity/legacy-pending.expected.md', import.meta.url))
+const ARCHIVE_READS = fileURLToPath(new URL('./expected/runtime-identity/archive-reads.expected.md', import.meta.url))
 
 it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)(
   'keeps identical Session IDs independent through histories, uploads and restoration from a %s bootstrap', async (bootstrap) => {
@@ -27,6 +28,7 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
     let heldList: { baseUrl: string; arrived: () => void; release: Promise<undefined> } | undefined
     let releaseList: (() => void) | undefined
     let personalComplete = true
+    const workspaceReads = new Map<string, number>()
     try {
       const seed = await readFile(SEED, 'utf8')
       const id = SessionId('same-durable-session')
@@ -44,6 +46,10 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       }
       server = createServer((req, res) => {
         const pathname = new URL(req.url ?? '/', 'http://fixture').pathname
+        if (pathname === '/api/workspace.list') {
+          const owner = selected(req.url)
+          workspaceReads.set(owner, (workspaceReads.get(owner) ?? 0) + 1)
+        }
         if (pathname === '/account/api/context' || pathname === '/account/api/workbench/catalog') {
           const scope = bootstrap === 'personal' ? { kind: 'personal' }
             : { kind: 'project', projectId: 7, projectName: 'Project realm', mode: 'rw' }
@@ -196,6 +202,8 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
         baseUrl: bootstrap === 'personal' ? project.baseUrl : personal.baseUrl,
         arrived: () => { discovery.resolve(undefined) }, release: released.promise,
       }
+      const alternate = heldList.baseUrl
+      const archiveReadsBefore = workspaceReads.get(alternate) ?? 0
       const reload = Promise.all([listed('personal'), listed('project:7'), page.reload({ waitUntil: 'load' })])
         .then(() => undefined, (error: unknown) => error)
       await discovery.promise
@@ -208,6 +216,10 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       if (reloadFailure !== undefined) throw reloadFailure
       await page.waitForLoadState('networkidle')
       expect(await page.locator('[data-session-pane]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-session-pane')))).toEqual([personalKey, projectKey])
+      const archiveReads = (workspaceReads.get(alternate) ?? 0) - archiveReadsBefore
+      expect(archiveReads).toBe(1)
+      await compareOrRefreshGolden(ARCHIVE_READS,
+        `Alternate Runtime Workspace reads during restoration: ${archiveReads}\nRestored panes: 2`, webSnapshotMode())
       await toolbar.getByRole('button', { name: 'Select workbench' }).click()
       await page.getByRole('menuitem', { name: 'Exit workbench', exact: true }).click()
       await expect.poll(() => page.locator('[data-session-pane]').count()).toBe(0)
