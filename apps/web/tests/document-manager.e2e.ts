@@ -526,18 +526,28 @@ describe('web e2e: document manager', () => {
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
     await dialog.waitFor({ timeout: 10_000 })
 
-    const dialogBox = await dialog.boundingBox()
-    const searchBox = await dialog.getByPlaceholder('Search document name').boundingBox()
-    const uploadBox = await dialog.getByRole('button', { name: 'Upload Document' }).boundingBox()
-    const scopeTrigger = dialog.locator('[data-documents-scope-trigger]')
-    const more = dialog.locator('[data-documents-toolbar-more]')
-    const scopeBox = await scopeTrigger.boundingBox()
-    const moreBox = await more.boundingBox()
     const rowMore = dialog.getByRole('button', { name: 'More actions: brief.txt' })
     const name = dialog.getByText('brief.txt', { exact: true })
+    await Promise.all([
+      name.waitFor(),
+      dialog.getByRole('status').getByText('Project scopes could not be refreshed; showing the last result', { exact: true }).waitFor(),
+    ])
     await name.scrollIntoViewIfNeeded()
-    const nameBox = await name.boundingBox()
-    const rowMoreBox = await rowMore.boundingBox()
+    const { dialogBox, searchBox, uploadBox, scopeBox, moreBox, nameBox, rowMoreBox } = await dialog.evaluate((root) => {
+      const box = (element: Element | null) => {
+        const rect = element?.getBoundingClientRect()
+        return rect === undefined ? null : { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      }
+      return {
+        dialogBox: box(root),
+        searchBox: box(root.querySelector('input[placeholder="Search document name"]')),
+        uploadBox: box(root.querySelector('button[aria-label="Upload Document"]')),
+        scopeBox: box(root.querySelector('[data-documents-scope-trigger]')),
+        moreBox: box(root.querySelector('[data-documents-toolbar-more]')),
+        nameBox: box(root.querySelector('[title="brief.txt"]')),
+        rowMoreBox: box(root.querySelector('button[aria-label="More actions: brief.txt"]')),
+      }
+    })
     if (dialogBox === null
       || searchBox === null
       || uploadBox === null
