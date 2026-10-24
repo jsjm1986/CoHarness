@@ -121,13 +121,7 @@ export function apply(ctx: ClientContext): void {
   // selection changes; the root below drives `select` through the frame's
   // target prop so a pinned `targetSessionId` wins over current selection.
   const views = new SidebarSessionViews(ctx.sessions)
-  const current = ctx.sessions.list
-  ctx.effect(() => {
-    const sync = (): void => { views.select(current.getSnapshot().current) }
-    const unsubscribe = current.subscribe(sync)
-    sync()
-    return () => { unsubscribe(); views.dispose() }
-  }, 'ui-sidebar-right: retained Session views')
+  ctx.effect(() => () => { views.dispose() }, 'ui-sidebar-right: retained Session views')
   const validateResource = (sessionId: SessionId, address: string): void => {
     const target = parseWorkspaceResourceAddress(address) ?? parseToolAddress(address)
     const owner = target?.sessionId ?? tabs.get(tabs.claim(address).kind)?.resourceSession?.(address)

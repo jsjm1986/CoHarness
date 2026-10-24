@@ -690,6 +690,8 @@ export function ConversationRoot(props: ConversationRootProps) {
             const ratios = row.map((_, index) => viewport.paneRatios[ratioStart + index] ?? 1)
             const total = ratios.reduce((sum, ratio) => sum + ratio, 0)
             const expandedInRow = row.filter(id => !collapsed.has(id)).length
+            const expandedWeight = row.reduce((sum, id, column) =>
+              sum + (collapsed.has(id) ? 0 : ratios[column] ?? 1), 0)
             return (
               <div
                 key={rowIndex}
@@ -697,7 +699,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                 data-workbench-row=""
                 style={{ gridTemplateColumns: row.map((id, column) => collapsed.has(id)
                   ? '46px'
-                  : `minmax(${expandedInRow > 1 ? 360 : 0}px, ${ratios[column] ?? 1}fr)`).join(' ') }}
+                  : `minmax(${expandedInRow > 1 ? 360 : 0}px, ${(ratios[column] ?? 1) / expandedWeight * expandedInRow}fr)`).join(' ') }}
               >
                 {row.map((id, column) => {
                   const index = ratioStart + column

@@ -60,6 +60,8 @@ kind: "package-reference"
 
 `rightbar` 根作用域入口通过独立的 `rightbar.session` 子树渲染所选 Session 及已初始化 `keepMounted` 正文的后台 Session。每个 View 持有自己的 Session 引用。只有前台会话上报框架轨道并绑定公开导航；其它子树保持隐藏而不删除 tab 状态。辅助栏目标可以不同于工作台的活动面板。桌面会话标题栏和手机顶栏控件共用同一份 Session 状态，不各自持有布局。
 
+已挂载的根入口从框架固定的 Session 选择前台 View；没有固定目标时才跟随当前 Session。切换工作台活动面板或发布其 Session 列表时，固定的文档保持可见。取消固定后恢复选择当前 Session；两个目标均为空时释放前台 View。
+
 <a id="state"></a>
 ## 状态
 

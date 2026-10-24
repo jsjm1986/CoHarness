@@ -20,6 +20,8 @@ Each behavior landed on the local session-store model instead of upstream's cont
 
 ## Alternatives considered
 
+**A current-Session listener selecting the Sidebar foreground.** Rejected: the frame can pin a different Session for an open document. A second selection writer can hide that document and collapse its frame track while the pin remains unchanged. `RightbarRoot` owns foreground selection from the resolved frame target; the View collection owns reference retention and disposal.
+
 **Adopt upstream's `session-view.ts` retention verbatim.** Rejected: it is written against the controller `SessionReferenceSourceMap`, which the fork does not carry; `SidebarSessionViews` preserves the same retention semantics over the runtime object layer.
 
 **Keep `StateDot` status indicators beside the preparing branch.** Rejected: upstream's fix keeps the tool glyph for every status and reports failure through the error summary, so the indicator duplicated the same fact in two elements.
