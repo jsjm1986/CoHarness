@@ -17,6 +17,7 @@ const SNAPSHOT = fileURLToPath(new URL('./snapshots/runtime-identity/panes.expec
 const NOT_LOADED = fileURLToPath(new URL('./snapshots/runtime-identity/not-loaded.expected.md', import.meta.url))
 const LEGACY_PENDING = fileURLToPath(new URL('./snapshots/runtime-identity/legacy-pending.expected.md', import.meta.url))
 const ARCHIVE_READS = fileURLToPath(new URL('./expected/runtime-identity/archive-reads.expected.md', import.meta.url))
+const DOCUMENT_SCOPES = fileURLToPath(new URL('./expected/runtime-identity/', import.meta.url))
 
 it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)(
   'keeps identical Session IDs independent through histories, uploads and restoration from a %s bootstrap', async (bootstrap) => {
@@ -41,7 +42,8 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       const personal = runtimes[0]!, project = runtimes[1]!
       const sessionCookies = new Map<string, string>()
       const selected = (url: string | undefined): string => {
-        const target = new URL(url ?? '/', 'http://fixture').searchParams.get('dshTarget')
+        const params = new URL(url ?? '/', 'http://fixture').searchParams
+        const target = params.get('scope') ?? params.get('dshTarget')
         return target === 'project:7' || (target === null && bootstrap === 'project') ? project.baseUrl : personal.baseUrl
       }
       server = createServer((req, res) => {
@@ -71,7 +73,10 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
           cookie: sessionCookies.get(selected(req.url)) ?? '',
           ...(pathname === '/api/host.describe' ? { 'accept-encoding': 'identity' } : {}),
         }
-        const upstream = request(new URL(req.url ?? '/', selected(req.url)), { method: req.method, headers }, (response) => {
+        const upstreamUrl = new URL(req.url ?? '/', selected(req.url))
+        // This fixture supplies only Gateway routing; each Host owns its document bytes and listing.
+        if (pathname === '/api/documents/scope') upstreamUrl.pathname = '/api/documents'
+        const upstream = request(upstreamUrl, { method: req.method, headers }, (response) => {
           if (pathname === '/api/host.describe') {
           // Independent Hosts supply real APIs; the router owns their fixed browser runtime aliases, not Gateway authorization.
             response.setEncoding('utf8')
@@ -135,6 +140,11 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
         sessionCookies.set(runtime.baseUrl, setCookie.split(';', 1)[0] ?? '')
       }
       const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+      await page.route('**/api/documents/transfer/directories', async (route) => {
+        const body = route.request().postDataJSON() as { scope: { kind: 'personal' | 'project' } }
+        const owner = body.scope.kind === 'project' ? project : personal
+        await route.fulfill({ json: { version: 1, directories: await owner.ctx.userDocs.listDirectories() } })
+      })
       const tripwire = watchConsole(page)
       const listed = async (target: string): Promise<void> => {
         const response = await page.waitForResponse((response) => {
@@ -220,9 +230,53 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       expect(archiveReads).toBe(1)
       await compareOrRefreshGolden(ARCHIVE_READS,
         `Alternate Runtime Workspace reads during restoration: ${archiveReads}\nRestored panes: 2`, webSnapshotMode())
+      const documentNames = ['personal-scope.txt', 'project-scope.txt']
+      for (const [index, runtime] of runtimes.entries()) {
+        const target = await runtime.ctx.userDocs.resolveTarget({ name: documentNames[index]! })
+        await runtime.ctx.userDocs.save(target, new ReadableStream<Uint8Array>({
+          start(controller) { controller.enqueue(new TextEncoder().encode(`scope ${index}`)); controller.close() },
+        }))
+      }
+      const alternatePane = bootstrap === 'personal' ? second : first
+      await alternatePane.locator('textarea').click()
       await toolbar.getByRole('button', { name: 'Select workbench' }).click()
       await page.getByRole('menuitem', { name: 'Exit workbench', exact: true }).click()
       await expect.poll(() => page.locator('[data-session-pane]').count()).toBe(0)
+      await page.getByRole('button', { name: 'Documents', exact: true }).click()
+      const manager = page.getByRole('dialog', { name: bootstrap === 'personal' ? 'Document Manager' : 'Project Documents: Project realm', exact: true })
+      const runtimeIndex = bootstrap === 'personal' ? 0 : 1
+      const targetIndex = 1 - runtimeIndex
+      await manager.getByText(documentNames[runtimeIndex]!, { exact: true }).waitFor()
+      const targetLabel = bootstrap === 'personal' ? 'Project realm' : 'Personal documents'
+      const documentCheckbox = manager.getByRole('checkbox', { name: documentNames[runtimeIndex]!, exact: true })
+      await documentCheckbox.check()
+      await manager.getByRole('button', { name: 'Copy to another scope', exact: true }).click()
+      const copyDialog = page.getByRole('dialog', { name: 'Copy Document Snapshots', exact: true })
+      const choices = copyDialog.getByRole('combobox', { name: 'Target scope', exact: true })
+      expect(await choices.locator('option').evaluateAll(options => options.map(option => option.getAttribute('value'))))
+        .toEqual([bootstrap === 'personal' ? 'project:7' : 'personal'])
+      const copyDestination = await choices.locator('option').innerText()
+      await copyDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await documentCheckbox.uncheck()
+      const [alternateRead] = await Promise.all([
+        page.waitForResponse((response) => {
+          const url = new URL(response.url())
+          return url.pathname === '/api/documents/scope'
+            && url.searchParams.get('scope') === (bootstrap === 'personal' ? 'project:7' : 'personal')
+        }),
+        manager.getByRole('button', { name: new RegExp(targetLabel) }).click(),
+      ])
+      expect(alternateRead.status()).toBe(200)
+      await manager.getByText(documentNames[targetIndex]!, { exact: true }).waitFor()
+      const viewing = manager.getByRole('status').getByText(`Upload target: ${targetLabel}`, { exact: true })
+      await viewing.waitFor()
+      await compareOrRefreshGolden(`${DOCUMENT_SCOPES}${bootstrap}-documents.expected.md`,
+        `Copy destination: ${copyDestination}\n${await viewing.innerText()}\n${await manager.getByRole('button', { name: `Preview ${documentNames[targetIndex]!}`, exact: true }).getAttribute('aria-label')}`,
+        webSnapshotMode())
+      await manager.getByRole('button', { name: new RegExp(bootstrap === 'personal' ? 'Personal documents' : 'Project realm') }).click()
+      await manager.getByText(documentNames[runtimeIndex]!, { exact: true }).waitFor()
+      expect(await manager.getByText(documentNames[targetIndex]!, { exact: true }).count()).toBe(0)
+      await manager.getByRole('button', { name: 'Close', exact: true }).click()
       await toolbar.getByRole('button', { name: 'Select workbench' }).click()
       await page.getByRole('menuitem', { name: /My workbench/ }).click()
       await page.waitForLoadState('networkidle')

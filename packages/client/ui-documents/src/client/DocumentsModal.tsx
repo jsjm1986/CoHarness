@@ -1394,7 +1394,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     overviewLoadedKey.current = null
     const generation = loadGeneration.current + 1
     loadGeneration.current = generation
-    const current = currentScopeDescriptor()
+    const current = runtimeScope()
     if (target.kind === current.kind && (target.kind === 'personal'
       || (current.kind === 'project' && target.projectId === current.projectId))) {
       await load(ROOT_DIRECTORY_ID)
@@ -2079,7 +2079,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
 
   const openCopy = (targets: UserDocRef[]) => {
     if (targets.length === 0) return
-    const source = scopeView?.scope ?? alternateSource?.scope ?? currentScopeDescriptor()
+    const source = listingScope()
     const current = currentScopeDescriptor()
     const options: CopyTargetOption[] = (scope.projects ?? [])
       .filter(project => project.mode === 'rw' && !(source.kind === 'project' && source.projectId === project.projectId)

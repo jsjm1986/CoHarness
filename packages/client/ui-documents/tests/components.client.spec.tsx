@@ -142,7 +142,7 @@ function makeClient() {
       version: 1,
       directoryId,
       directories: [] as UserDocDirectoryRef[],
-      scope: { kind: 'project' as const, label: 'Compiler' },
+      scope: { kind: 'project', label: 'Compiler' },
       documents: [{
         docId: 'project/report.pdf', name: 'report.pdf', bytes: 2048,
         mediaType: 'application/pdf', modifiedAt: 1,
@@ -258,6 +258,57 @@ describe('DocumentsModal', () => {
     expect(screen.getByText(t('scope.viewing', { name: 'Compiler' }))).toBeTruthy()
     expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeTruthy()
+  })
+
+  it.each([
+    { mode: 'manage', runtime: 'personal' },
+    { mode: 'select', runtime: 'personal' },
+    { mode: 'manage', runtime: 'project' },
+    { mode: 'select', runtime: 'project' },
+  ] as const)('browses the captured attachment scope independently from the $runtime runtime in $mode mode', async ({ mode, runtime }) => {
+    const client = makeClient()
+    const attachmentScope: UserDocScope = runtime === 'personal'
+      ? { kind: 'project', projectId: 41 }
+      : { kind: 'personal' }
+    const targetLabel = runtime === 'personal' ? 'Compiler' : t('copy.target.personal')
+    const runtimeLabel = runtime === 'personal' ? t('copy.target.personal') : 'Compiler'
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: runtime === 'personal' ? { kind: 'personal' } : { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'rw' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      }),
+    })))
+    client.browseScope.mockImplementation(async (_scope, directoryId) => ({
+      version: 1,
+      directoryId,
+      directories: [],
+      scope: { kind: runtime === 'personal' ? 'project' : 'personal', label: targetLabel },
+      documents: [doc({ docId: 'alternate.txt', name: 'alternate.txt' })],
+    }))
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} mode={mode} attachmentScope={attachmentScope} />)
+    await screen.findByText('report.pdf')
+    const initialReads = client.browse.mock.calls.length
+    const manager = screen.getByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(targetLabel) }))
+    await screen.findByText('alternate.txt')
+    expect(client.browseScope).toHaveBeenCalledWith(attachmentScope, '', expect.any(AbortSignal), expect.objectContaining({ limit: 20 }))
+    expect(client.browse).toHaveBeenCalledTimes(initialReads)
+    expect(screen.getAllByText(t('scope.upload.target', { name: targetLabel })).length).toBeGreaterThan(0)
+    expect(screen.getByRole('dialog')).toBe(manager)
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(runtimeLabel) }))
+    await screen.findByText('report.pdf')
+    expect(screen.queryByText('alternate.txt')).toBeNull()
+    expect(client.browseScope).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'report.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: t('selection.copy') }))
+    const copyDialog = await screen.findByRole('dialog', { name: t('copy.title') })
+    const choices = within(copyDialog).getByRole('combobox', { name: t('copy.target') })
+    expect(within(choices).getAllByRole('option').map(option => option.getAttribute('value')))
+      .toEqual([attachmentScope.kind === 'personal' ? 'personal' : 'project:41'])
+    fireEvent.click(within(copyDialog).getByRole('button', { name: t('modal.cancel') }))
+    expect(client.transfer).not.toHaveBeenCalled()
   })
 
   it('returns to the parent directory through an explicit navigation action', async () => {
