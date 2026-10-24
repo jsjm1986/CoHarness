@@ -252,7 +252,10 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       await page.getByRole('menuitem', { name: 'Exit workbench', exact: true }).click()
       await expect.poll(() => page.locator('[data-session-pane]').count()).toBe(0)
       await page.getByRole('button', { name: 'Documents', exact: true }).click()
-      const manager = page.getByRole('dialog', { name: bootstrap === 'personal' ? 'Document Manager' : 'Project Documents: Project realm', exact: true })
+      const manager = page.getByRole('dialog', { name: /^(?:Document Manager|Project Documents: Project realm)$/ })
+      await manager.getByRole('heading', {
+        name: bootstrap === 'personal' ? 'Document Manager' : 'Project Documents: Project realm', exact: true,
+      }).waitFor()
       const runtimeIndex = bootstrap === 'personal' ? 0 : 1
       const targetIndex = 1 - runtimeIndex
       await manager.getByText(documentNames[runtimeIndex]!, { exact: true }).waitFor()
