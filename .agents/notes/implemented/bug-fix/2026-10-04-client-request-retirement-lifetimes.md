@@ -14,6 +14,8 @@ Publication eligibility and completion ownership are distinct. `AccountPreferenc
 
 The account mirror accepts equal- or newer-revision write responses as immediately ready, retires the old request slot, and never regresses its held revision.
 
+Account scope binding starts the shared initial read. An explicitly initial connection reset joins that request or accepts its ready result; it retries when no usable result remains. Later or unmarked resets, window focus, and visible-document notifications force a fresh read. Account requests already belong to the authenticated browser document, so its first Runtime handshake does not establish a newer account preference revision. The independent Host settings mirror retains its first-reset read to close its stream-subscription gap.
+
 An obsolete project GET caller prefers the pending successor, then held full data; without either, it rejects without starting another GET. A current full GET may refresh permissions at an equal revision. Equal- or older-revision partial responses and mutation echoes cannot restore a revoked writable policy.
 
 `ProjectModelsBridge` leaves writes admitted to project transport without a bridge-disposal abort signal so callers receive the real acknowledgement. Reads, credential-description requests, and discovery requests use lifetime aborts and call `requireLive` immediately before transport. Compatibility update/replace calls recheck liveness after the namespace read. Disposed owners suppress publication and follow-up refresh.
@@ -30,6 +32,8 @@ The independent [Host settings mirror](../architecture/2026-08-17-settings-descr
 
 **Treat abort as quiescence.** A carrier may ignore its abort signal; only actual settlement establishes completion.
 
+**Replace an account read on the first connection reset.** Replacing a pending authenticated read or repulling its ready result adds work without identifying a newer preference revision. Explicit freshness signals still force reads.
+
 **Cancel every request during disposal.** Cancelling a write already admitted to transport can discard its real acknowledgement even when the mutation commits.
 
 **Treat mutation echoes as fresh permission authority.** Equal or lower revisions do not establish fresh authorization and cannot restore revoked writable policy.
@@ -43,5 +47,7 @@ Teardown may wait for abort-ignoring carriers. Stale work cannot publish, admitt
 ## Verification
 
 [Account specifications](../../../../packages/client/ui-settings/tests/account-scope.client.spec.ts), [project specifications](../../../../packages/client/ui-settings-models/tests/project-store.client.spec.ts), and [context specifications](../../../../packages/client/ui-collaboration/tests/collaboration-client.client.spec.ts) pin request ownership, revision and permission publication, disposal admission, and the separate context/detail refresh strategies.
+
+[Account reset specifications](../../../../packages/client/ui-settings/tests/account-reset.client.spec.ts) cover pending and ready initial reads, subsequent reset and document invalidations, and disposal through the settings plugin. The [assembled account startup scenario](../../../../apps/web/tests/account-preferences-startup.e2e.ts) holds an admitted account response across the real initial handshake and records its adopted Appearance preference without model calls.
 
 [Web-search lifecycle specifications](../../../../packages/client/ui-settings-plugins/tests/web-search-lifecycle.client.spec.ts) cover deferred activation, three unchanged scope projections, invalidation during an older read, and teardown with unfinished reads or writes. The unopened-page zero-read assertion rejects the unmodified eager controller in an isolated negative control. The [assembled plugin-settings scenario](../../../../apps/web/tests/plugin-config.e2e.ts) records visible pending, unavailable, and recovered hints through the real browser composition and a held RPC response, without model requests.

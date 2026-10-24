@@ -31,6 +31,7 @@
     "tests/expected.ts",
     "tests/scaffold-hermetic.e2e.ts",
     "tests/startup-rpc-budget.e2e.ts",
+    "tests/account-preferences-startup.e2e.ts",
     "tests/frontend-responsiveness.e2e.ts",
     "tests/minimal-preset.snapshot.ts",
     "tests/cold-inbox.snapshot.ts",

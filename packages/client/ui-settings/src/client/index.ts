@@ -65,7 +65,7 @@ export function apply(ctx: ClientContext): void {
     const disposers = [
       (ctx.get('remote') as ClientContext['remote']).$on('settings/document-updated', () => { void mirror.load() }),
       ctx.on('connection/reset', () => { void mirror.load() }),
-      ctx.on('connection/reset', () => { void accountMirror.load(true) }),
+      ctx.on('connection/reset', (initial) => { void (initial === true ? accountMirror.ensure() : accountMirror.load(true)) }),
     ]
     // The first connection also emits connection/reset, so startup normally
     // costs two reads (budgeted in startup-rpc-budget.e2e.ts). The in-flight
@@ -73,7 +73,7 @@ export function apply(ctx: ClientContext): void {
     // read at a time and that no invalidation arriving mid-read is lost.
     void mirror.ensure()
     // Account invalidations must read the post-change answer, not join a read
-    // issued before the change — focus, visibility, and resets force a read.
+    // issued before the change — focus, visibility, and later resets force a read.
     const onFocus = (): void => { void accountMirror.load(true) }
     const onVisibility = (): void => {
       if (typeof document === 'undefined' || document.visibilityState === 'visible') onFocus()

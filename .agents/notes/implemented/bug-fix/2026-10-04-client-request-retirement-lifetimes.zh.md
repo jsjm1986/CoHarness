@@ -14,6 +14,8 @@ Status: implemented
 
 账户镜像把 revision 相等或更高的写入响应立即接受为 ready，退役旧请求 slot，并且绝不降低已持有的 revision。
 
+账户 scope 绑定会启动共享的首次读取。明确标记为首次连接的 reset 共享该请求或接受其 ready 结果；没有可用结果时会重试。后续或未标记的 reset、窗口获得焦点以及文档可见通知都会强制发起新读取。账户请求已经属于经过认证的浏览器文档，因此首次 Runtime 握手不代表账户偏好出现了更新的 revision。独立的 Host 设置镜像仍保留首连 reset 读取，以关闭其流订阅间隙。
+
 陈旧项目 GET 的调用方优先等待尚未完成的后继请求，其次使用已持有的完整数据；两者都没有时直接拒绝，不发起新的 GET。当前完整 GET 可以在 revision 相等时刷新权限。revision 相等或更低的部分响应与变更回显不能恢复已撤销的可写策略。
 
 `ProjectModelsBridge` 不给已进入项目传输的写入附加随桥接器资源释放而取消的信号，调用方因此仍能收到真实回执。读取、凭据描述请求与发现请求使用生命周期取消信号，并在传输前立即调用 `requireLive`。兼容 update/replace 调用在读取命名空间后再次检查存活状态。已释放的所有者不发布状态，也不触发后续刷新。
@@ -30,6 +32,8 @@ Status: implemented
 
 **把取消视为完全停稳。** 传输载体可能忽略取消信号；只有实际完成才能确认工作已经结束。
 
+**在首次连接 reset 时替换账户读取。** 替换待完成的认证读取，或重新获取其 ready 结果，并不能确认偏好 revision 更新，只会增加工作。明确的新鲜度信号仍强制触发读取。
+
 **资源释放时取消所有请求。** 取消已进入传输的写入可能丢失真实回执，即使变更已经提交。
 
 **把变更回显作为新鲜权限依据。** 相等或更低的 revision 不能证明授权是新鲜的，也不能恢复已撤销的可写策略。
@@ -43,5 +47,7 @@ Status: implemented
 ## 验证
 
 [账户规格](../../../../packages/client/ui-settings/tests/account-scope.client.spec.ts)、[项目规格](../../../../packages/client/ui-settings-models/tests/project-store.client.spec.ts)与[上下文规格](../../../../packages/client/ui-collaboration/tests/collaboration-client.client.spec.ts)约束请求责任、revision 与权限发布、资源释放时的请求准入，以及上下文与详情各自的刷新策略。
+
+[账户 reset 规格](../../../../packages/client/ui-settings/tests/account-reset.client.spec.ts)通过设置插件覆盖待完成和已 ready 的首次读取、后续 reset 与文档失效，以及资源释放。[组装后的账户启动场景](../../../../apps/web/tests/account-preferences-startup.e2e.ts)让已准入的账户响应跨越真实首次握手，并记录采用后的外观偏好，不发起模型请求。
 
 [网页搜索生命周期规格](../../../../packages/client/ui-settings-plugins/tests/web-search-lifecycle.client.spec.ts)覆盖延后激活、三个引用未变的 scope 投影、旧读取尚未完成时的失效，以及带有未完成读写的销毁。未打开页面时零读取的断言在隔离负控中拒绝原版主动查询控制器。[组装后的插件设置场景](../../../../apps/web/tests/plugin-config.e2e.ts)通过真实浏览器组装与暂缓返回的 RPC 响应，记录查询中、状态不可用及恢复后的可见状态，不发起模型请求。

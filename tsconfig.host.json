@@ -29,6 +29,7 @@
     "apps/web/tests/support.ts",
     "apps/web/tests/scaffold-hermetic.e2e.ts",
     "apps/web/tests/startup-rpc-budget.e2e.ts",
+    "apps/web/tests/account-preferences-startup.e2e.ts",
     "apps/web/tests/frontend-responsiveness.e2e.ts",
     "apps/web/tests/minimal-preset.snapshot.ts",
     "apps/web/tests/cold-inbox.snapshot.ts",
