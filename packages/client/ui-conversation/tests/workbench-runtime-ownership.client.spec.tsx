@@ -19,6 +19,7 @@ import { FakeApiClient, fakeRemote, ok } from '../../runtime/tests/fake-api.clie
 import { apply, inject } from '../src/client/apply.ts'
 import type { ConversationViewportController } from '../src/client/viewport.ts'
 import { readWorkbenchRecord } from '../src/client/workbench-persistence.ts'
+import type { IConversation } from '../src/client/service.ts'
 
 usePinnedBrowserLanguages('en-US')
 
@@ -177,6 +178,44 @@ async function bench(focused: 'personal' | 'project' = 'personal') {
 const MEMBERS = [{ name: 'A', paneIds: [P, Q] }, { name: 'B', paneIds: [P, Q] }]
 
 describe('logical Workbench Runtime ownership', () => {
+  it.each(['personal', 'project'] as const)(
+    'persists an accepted %s draft while the conversation is hidden', async (focused) => {
+      const h = await bench(focused)
+      const id = focused === 'personal' ? P : Q
+      const api = focused === 'personal' ? h.personalApi : h.projectApi
+      const admission = Promise.withResolvers<Awaited<ReturnType<typeof api.onPrompt>>>()
+      api.onPrompt = () => admission.promise
+      try {
+        const scope = h.pool.scope(id)
+        if (scope === undefined) throw new Error('Expected the retained Session scope')
+        const conversation = h.ctx.get('conversation') as IConversation
+        const input = conversation.input.for(scope)
+        const text = `Accepted hidden ${focused} prompt`
+        const key = `dsh.conversation.chat.${id}`
+        act(() => {
+          input.setDraft(text)
+          input.submit()
+        })
+        await waitFor(() => { expect(api.callsOf('session.prompt')).toHaveLength(1) })
+        expect(input.state.getSnapshot().phase).toBe('submitting')
+        expect(JSON.parse(localStorage.getItem(key) ?? 'null')).toMatchObject({ draft: text })
+        fireEvent.click(h.view.getByRole('button', { name: /^Plugins$/ }))
+        expect(h.view.container.querySelectorAll('textarea')).toHaveLength(0)
+        await act(async () => { admission.resolve(ok({ accepted: true as const })); await admission.promise })
+        await waitFor(() => { expect(input.state.getSnapshot().draft).toBe('') })
+        expect(JSON.parse(localStorage.getItem(key) ?? 'null')).toMatchObject({ draft: '' })
+        fireEvent.click(h.view.getByRole('button', { name: /^Conversation$/ }))
+        await waitFor(() => {
+          expect([...h.view.container.querySelectorAll('textarea')].map(area => area.value)).toEqual(['', ''])
+        })
+        expect(h.namedMembers()).toEqual(MEMBERS)
+        expect(api.callsOf('session.prompt')).toHaveLength(1)
+      } finally {
+        await act(async () => { admission.resolve(ok({ accepted: true as const })); await admission.promise })
+      }
+    },
+  )
+
   it.each(['personal', 'project'] as const)(
     'keeps both Runtime panes when a global panel replaces the %s-focused conversation', async (focused) => {
       const h = await bench(focused)

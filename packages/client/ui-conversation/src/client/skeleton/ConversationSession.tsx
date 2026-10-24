@@ -230,10 +230,9 @@ export function ConversationSession({
   const inspect = useStore(s => s.inspect ?? null)
 
   useEffect(() => {
-    const unmirror = bindDraftMirror(actions.setDraft, storedDraft)
-    return () => { unmirror() }
+    bindDraftMirror(actions.setDraft, storedDraft)
     // Mount-only (deps pinned to inputActions): later store writes come from
-    // the machine mirror, not this seed effect.
+    // the Session-owned mirror, including while this view is unmounted.
   }, [inputActions])
 
   useEffect(() => () => {

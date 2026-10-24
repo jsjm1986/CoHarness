@@ -16,6 +16,8 @@ Conversation 聊天 store 持久化带版本、独立于编辑器的 `DraftSnaps
 
 该快照扩展了 [Workspace 草稿转移表示](../feature/2026-10-18-rc2-client-surface-parity.zh.md)。[草稿初始化](2026-10-17-session-draft-initialization.zh.md)仍负责导航提交、显式清空与提交期间的拒绝。
 
+首次 Conversation 挂载后，Session 输入拥有聊天 store 的镜像。替换主面板只移除 DOM，不释放该写入器：Host 准入可在视图隐藏时完成，清空或保留的草稿必须在刷新前写入浏览器存储。输入销毁先释放写入器，再取消待处理工作。写入器只捕获作用域 store 操作，不捕获视图局部状态。
+
 ## 备选方案
 
 **只存储规范剪贴板文字。** 否决：文字可以发送，但不能保留展示引用的身份与编辑行为。

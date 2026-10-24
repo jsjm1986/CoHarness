@@ -16,6 +16,8 @@ Command callbacks are not persisted. A restored leading command remains text unt
 
 The snapshot extends the [Workspace draft-transfer representation](../feature/2026-10-18-rc2-client-surface-parity.md). [Draft initialization](2026-10-17-session-draft-initialization.md) remains responsible for navigation commit, explicit clearing, and refusal during submission.
 
+The Session input owns the chat-store mirror after the first Conversation mount. Replacing the main panel removes its DOM, not that writer: Host admission can settle while the view is hidden, and its cleared or retained draft must reach browser storage before a reload. Input disposal releases the writer before cancelling pending work. The writer captures only scoped store actions, never view-local state.
+
 ## Alternatives considered
 
 **Store only canonical clipboard text.** Rejected: the text can be sent but does not preserve the displayed reference's identity and edit behavior.

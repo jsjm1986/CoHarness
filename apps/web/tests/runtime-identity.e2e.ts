@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net'
 import type { Socket } from 'node:net'
 import { mkdir, readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+import { chromium, type Route } from 'playwright'
 import { expect, it } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-client-connection'
@@ -20,6 +20,7 @@ const ARCHIVE_READS = fileURLToPath(new URL('./expected/runtime-identity/archive
 const DOCUMENT_SCOPES = fileURLToPath(new URL('./expected/runtime-identity/', import.meta.url))
 const RESTORED_BINDINGS = fileURLToPath(new URL('./expected/runtime-identity/restored-bindings.expected.md', import.meta.url))
 const PLUGINS_NAVIGATION = fileURLToPath(new URL('./expected/runtime-identity/plugins-navigation/', import.meta.url))
+const HIDDEN_SUBMISSIONS = fileURLToPath(new URL('./expected/runtime-identity/hidden-submissions/', import.meta.url))
 
 it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)(
   'keeps identical Session IDs independent through histories, uploads and restoration from a %s bootstrap', async (bootstrap) => {
@@ -30,6 +31,8 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
     let server: ReturnType<typeof createServer> | undefined
     let heldList: { baseUrl: string; arrived: () => void; release: Promise<undefined> } | undefined
     let releaseList: (() => void) | undefined
+    let releasePrompt: (() => void) | undefined
+    let promptDelivery: Promise<void> | undefined
     let personalComplete = true
     const workspaceReads = new Map<string, number>()
     const sessionCalls = new Map<string, number>()
@@ -302,6 +305,67 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
           await captureStableAria(page, '[role="menu"]', personal.workspaceCwd), webSnapshotMode())
         await page.keyboard.press('Escape')
       }
+      const sender = bootstrap === 'personal' ? first : second
+      const other = bootstrap === 'personal' ? second : first
+      const senderKey = bootstrap === 'personal' ? personalKey! : projectKey!
+      const senderIndex = bootstrap === 'personal' ? 0 : 1
+      const admission = Promise.withResolvers<undefined>()
+      const deliveryGate = Promise.withResolvers<undefined>()
+      releasePrompt = () => { deliveryGate.resolve(undefined) }
+      const promptRoute = /\/api\/session\.prompt(?:\?|$)/
+      const holdAdmission = (route: Route): Promise<void> => {
+        const pending = (async () => {
+          const response = await route.fetch()
+          try {
+            expect(response.status()).toBe(200)
+            admission.resolve(undefined)
+            await deliveryGate.promise
+            await route.fulfill({ response })
+          } finally {
+            await response.dispose()
+          }
+        })()
+        promptDelivery = pending
+        void pending.catch((error: unknown) => { admission.reject(error) })
+        return pending
+      }
+      await page.route(promptRoute, holdAdmission)
+      const otherDraft = `Unsent ${bootstrap === 'personal' ? 'project' : 'personal'} draft stays separate`
+      await other.locator('textarea').fill(otherDraft)
+      await sender.locator('textarea').fill(prompt)
+      const settled = runtimes[senderIndex]!.whenTurnSettled()
+      await sender.locator('textarea').press('Enter')
+      await admission.promise
+      const storedDraft = () => page.evaluate((key) => {
+        const value = localStorage.getItem(`dsh.conversation.chat.${key}`)
+        if (value === null) throw new Error('Expected the sender draft store')
+        return (JSON.parse(value) as { draft: unknown }).draft
+      }, senderKey)
+      expect(await storedDraft()).toBe(prompt)
+      await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+      await page.locator('[data-plugin-panel]').waitFor()
+      expect(await page.locator('[data-session-pane]').count()).toBe(0)
+      deliveryGate.resolve(undefined)
+      await promptDelivery
+      expect(await settled).toBe(id)
+      await expect.poll(storedDraft).toBe('')
+      expect(await savedMembers()).toEqual(members)
+      await page.unroute(promptRoute, holdAdmission)
+      releasePrompt = undefined
+      await page.reload({ waitUntil: 'load' })
+      const senderRow = page.getByRole('region', { name: 'Workbench', exact: true })
+        .getByRole('listitem').nth(senderIndex).getByRole('button').first()
+      await senderRow.click()
+      await expect.poll(() => page.locator('[data-session-pane]').count()).toBe(2)
+      await expect.poll(() => sender.locator('textarea').inputValue()).toBe('')
+      expect(await other.locator('textarea').inputValue()).toBe(otherDraft)
+      expect(await savedMembers()).toEqual(members)
+      if (webSnapshotMode() === 'refresh') await mkdir(HIDDEN_SUBMISSIONS, { recursive: true })
+      await compareOrRefreshGolden(`${HIDDEN_SUBMISSIONS}${bootstrap}.expected.md`,
+        `Accepted sender after reload:\n${await captureStableAria(page, `[data-session-pane="${senderKey}"] textarea`, personal.workspaceCwd)}\n` +
+        `Other unsent draft:\n${await captureStableAria(page, `[data-session-pane="${bootstrap === 'personal' ? projectKey! : personalKey!}"] textarea`, personal.workspaceCwd)}`,
+        webSnapshotMode())
+      await other.locator('textarea').fill('')
       // Restore this fixture's original single named layout before its
       // document-scope and legacy-identity scenarios continue.
       await caption.click()
@@ -392,6 +456,8 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       expect(tripwire.pageErrors).toEqual([])
     } finally {
       releaseList?.()
+      releasePrompt?.()
+      const deliveryResults = await Promise.allSettled(promptDelivery === undefined ? [] : [promptDelivery])
       await browser.close()
       for (const upstream of requests) upstream.destroy()
       for (const socket of sockets) socket.destroy()
@@ -399,13 +465,15 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
         server!.close((error) => { if (error) reject(error); else resolve() })
       })
       for (const runtime of runtimes.reverse()) await runtime.close()
+      if (deliveryResults[0]?.status === 'rejected') throw deliveryResults[0].reason
     }
   }, 180_000,
 )
 
-it('owns the four Runtime Plugins navigation goldens', async () => {
+it('owns the Runtime Plugins navigation and hidden-submission goldens', async () => {
   expect((await readdir(PLUGINS_NAVIGATION)).sort()).toEqual([
     'personal-personal.expected.md', 'personal-project.expected.md',
     'project-personal.expected.md', 'project-project.expected.md',
   ])
+  expect((await readdir(HIDDEN_SUBMISSIONS)).sort()).toEqual(['personal.expected.md', 'project.expected.md'])
 })
