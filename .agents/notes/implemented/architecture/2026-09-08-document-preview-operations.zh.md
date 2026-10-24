@@ -18,6 +18,8 @@ Status: implemented
 
 [工作台文件标签](../../../../packages/client/ui-workbench/README.zh.md) 负责格式选择和加载策略：`WorkspaceFileTab` 按扩展名把打开请求路由到固定正文——分页文本、累计 Markdown、打包 HTML 或 PDF/Office 文档正文——在同一授权标签内完成，不经过渲染器注册表。正文接收同一个 `WorkspaceResourceOpenRequest`、共享 `useTabInfo` 钩子与注入读取器：`readPreview` 读文本分页、`readFileBytes` 读完整字节、`readBytesPreview` 提供有界二进制回退、`readDocument` 做授权 Office 转换。刷新仍按 tab 独立进行，不引入资源 reload、共享 `changed` 确认、额外资源包装层或内容 Session。打包与累计规则由[工作台 HTML/Markdown 预览 note](../feature/2026-09-25-workbench-html-markdown-previews.zh.md) 记录。
 
+打开文件会在显示辅助侧栏前，明确选中已经验证并暂存的来源 Session。即使激活操作之前没有 DOM 焦点或指针事件，这次选择仍由请求中的 Session 决定，因此响应式标签布局会显示来源对话。该导航不会新增暂存 Session，也不会让已有预览标签跟随后续的分栏选择。
+
 临时连接反馈属于被寻址的资源。引导连接的指示器不能代表所有项目 runtime 或窄布局。因此，保留内容的文档在现有重新加载控件中报告已识别的连接中断，在不遮盖正文、不预留提示行的情况下保持交互坐标、选区和滚动位置。有效的内容读取失败优先于 metadata 失败，避免把无关读取错误隐藏为重连状态。访问被拒绝时仍移除正文，重新加载仍执行资源本身的读取操作。
 
 Markdown 通过累积的分页文本复用增量渲染原语。HTML 与 PDF 读取完整 `Uint8Array` 数据；Host 传输保持 base64。发布后的缓冲区只读借用，绝不持久化进布局或 Session JSON。PDF.js 在自有 Worker 中运行，字体和解码数据以相同版本随包发布，转移输入前先复制，以保留 Preview 的缓冲区。HTML 在 Blob iframe 中运行，仅设 `sandbox="allow-scripts"`，不授予同源、弹窗、表单、下载或顶层导航权限；替换或卸载预览即吊销外层 Blob URL。浏览器保持正常的外部网络规则。有上限的静态本地 JS/CSS 读取由父页面负责；不透明源 iframe 创建自己的资源 Blob，因为它不能加载父源创建的 Blob。PNG、JPEG、GIF、WebP、AVIF 和 SVG 经 `data:` URL 在 `<img>` 静态图片上下文中渲染，SVG 标记因此绝不进入应用 DOM，其脚本保持不可执行。

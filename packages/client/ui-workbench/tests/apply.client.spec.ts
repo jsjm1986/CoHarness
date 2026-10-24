@@ -615,6 +615,44 @@ describe('workspace file serving', () => {
     } finally { await h.ctx.fiber.dispose() }
   })
 
+  it.each(['md', 'pdf', 'docx', 'xlsx'])('selects the originating pane before opening its %s preview', async (extension) => {
+    const h = await harness({ connection: connection(), workspaceResources: { hasProvider: () => true } })
+    const origin = 'second' as SessionId
+    const path = `report.${extension}`
+    const request = { ...openRequest, sessionId: origin, path, address: workspaceResourceAddress(origin, path) }
+    h.snapshot.set({ mode: 'workbench', paneIds: [A, origin], activePaneId: A,
+      paneRatios: [0.5, 0.5], collapsedIds: [] })
+    h.sidebarRight.openSessionResource.mockImplementation(() => {
+      expect(h.viewport.focus).toHaveBeenCalledExactlyOnceWith(origin)
+    })
+    try {
+      expect(h.ctx.bail('workspace/resource-open', request)).toBe(true)
+      expect(h.sidebarRight.openSessionResource).toHaveBeenCalledExactlyOnceWith(origin, request.address, { kind: 'workspace-file' })
+      expect(h.layout.focusRightbar).toHaveBeenCalledExactlyOnceWith(origin)
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each([
+    { name: 'single-session view', mode: 'single' as const, included: true, pendingIdentity: false },
+    { name: 'unstaged Session', mode: 'workbench' as const, included: false, pendingIdentity: false },
+    { name: 'unverified restored layout', mode: 'workbench' as const, included: true, pendingIdentity: true },
+  ])('opens a preview without changing pane selection for a $name', async ({ mode, included, pendingIdentity }) => {
+    const h = await harness({ connection: connection(), workspaceResources: { hasProvider: () => true } })
+    const origin = 'second' as SessionId
+    const request = { ...openRequest, sessionId: origin, address: workspaceResourceAddress(origin, openRequest.path) }
+    h.snapshot.set({ mode, paneIds: included ? [A, origin] : [A], activePaneId: A,
+      paneRatios: included ? [0.5, 0.5] : [1], collapsedIds: [], ...(pendingIdentity ? { pendingIdentity: true as const } : {}) })
+    try {
+      expect(h.ctx.bail('workspace/resource-open', request)).toBe(true)
+      expect(h.viewport.focus).not.toHaveBeenCalled()
+      expect(h.sidebarRight.openSessionResource).toHaveBeenCalledExactlyOnceWith(origin, request.address, { kind: 'workspace-file' })
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
   it('refuses a resource open when the session runtime moved to another project and forwards a target line', async () => {
     const conn = connection()
     const h = await harness({ connection: conn })

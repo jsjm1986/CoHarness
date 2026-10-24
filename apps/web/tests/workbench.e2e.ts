@@ -633,6 +633,87 @@ describe('web: Cordis Workspace workbench', () => {
     await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'selection-restored.expected.md'), await captureStableAria(page, '[data-workbench-toolbar]', scaffold.workspaceCwd), MODE)
   })
 
+  it.skipIf(MODE === 'record')('keeps the originating conversation selected when its document preview narrows the workbench', async () => {
+    scaffold = await launchWebScaffold({
+      workbench: true, remoteAuthority: 'app.localhost', openInApp: false,
+      replayFixture: PROVIDERS, replayProvidersOnly: true,
+    })
+    const runtime = scaffold
+    const reply = 'DONE\n\n[Open Markdown](report.md)\n\n[Open PDF](preview.pdf)'
+    const seed = (await readFile(SEED, 'utf8')).replace('"text":"DONE"', `"text":${JSON.stringify(reply)}`)
+    const names = ['preview-origin-alpha', 'preview-origin-beta'] as const
+    for (const name of names) {
+      const path = join(runtime.workspaceCwd, name)
+      await mkdir(path)
+      await mkdir(join(path, 'workspace'))
+      await writeFile(join(path, 'report.md'), `# ${name}\n\nDocument owned by ${name}.\n`)
+      if (name === names[1]) await writeFile(join(path, 'preview.pdf'), pdfResourceFixture('vector'))
+      const workspace = await runtime.ctx.workspaceRegistry.create(path)
+      const session = await seedSession(runtime, seed, name, undefined, path)
+      await workspace.attachSession(session)
+      await runtime.ctx.agents.resume({
+        resumeSessionId: session,
+        setup: agentCtx => runtime.ctx.agentPresets.mount(agentCtx).then(() => undefined),
+      })
+    }
+    browser = await chromium.launch()
+    page = await browser.newPage({ viewport: { width: 1567, height: 1000 }, locale: 'en-US', reducedMotion: 'reduce' })
+    const tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'workbench-preview-origin'))
+    await page.goto(runtime.authenticatedUrl, { waitUntil: 'load' })
+    const toolbar = page.locator('[data-workbench-toolbar]')
+    await toolbar.waitFor({ timeout: 30_000 })
+    await toolbar.getByRole('button', { name: 'Select workbench', exact: true }).click()
+    await page.getByRole('menuitem', { name: /My workbench/u }).click()
+    for (const name of names) {
+      await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
+      const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
+      await picker.locator('button').filter({ hasText: name }).first().click()
+      await picker.waitFor({ state: 'hidden' })
+    }
+    const root = page.locator('[data-workbench]')
+    const panes = root.locator('[data-session-pane]')
+    await expect.poll(() => panes.count()).toBe(2)
+    const identities = await panes.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-session-pane')))
+    const drafts = ['Alpha unsent draft', 'Beta unsent draft']
+    await panes.first().locator('textarea').first().fill(drafts[0]!)
+    await panes.last().locator('textarea').first().fill(drafts[1]!)
+    const output: string[] = []
+    for (const activation of ['without-focus-event', 'pointer', 'keyboard'] as const) {
+      for (const format of ['Markdown', 'PDF'] as const) {
+        await panes.first().locator('textarea').first().click()
+        await expect.poll(() => panes.first().getAttribute('data-active')).toBe('true')
+        const link = panes.last().getByRole('button', { name: `Open ${format}`, exact: true })
+        if (activation === 'without-focus-event') await link.dispatchEvent('click')
+        else if (activation === 'keyboard') { await link.focus(); await link.press('Enter') }
+        else await link.click()
+        await expect.poll(() => root.getAttribute('data-tabbed')).toBe('true')
+        await expect.poll(() => panes.count()).toBe(1)
+        await expect.poll(() => panes.getAttribute('data-session-pane')).toBe(identities[1])
+        await expect.poll(() => panes.locator('textarea').first().inputValue()).toBe(drafts[1])
+        const preview = page.getByRole('region', { name: format === 'Markdown' ? 'report.md' : 'preview.pdf', exact: true })
+        if (format === 'Markdown') {
+          await preview.getByRole('heading', { name: names[1], exact: true }).waitFor()
+        } else {
+          const canvas = preview.locator('canvas').first()
+          await canvas.waitFor()
+          await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) => element.width)).toBeGreaterThan(0)
+        }
+        output.push(`${activation} / ${format}\n${await captureStableAria(page, '[data-workbench-toolbar]', runtime.workspaceCwd)}`)
+        await preview.getByRole('button', { name: 'Close preview', exact: true }).click()
+        await preview.waitFor({ state: 'hidden' })
+        await expect.poll(() => root.getAttribute('data-tabbed')).toBeNull()
+        await expect.poll(() => panes.count()).toBe(2)
+        expect(await panes.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-session-pane')))).toEqual(identities)
+        expect(await panes.first().locator('textarea').first().inputValue()).toBe(drafts[0])
+        expect(await panes.last().locator('textarea').first().inputValue()).toBe(drafts[1])
+      }
+    }
+    expect(tripwire.pageErrors).toEqual([])
+    if (MODE === 'refresh') await mkdir(SELECTION_EXPECTED_DIR, { recursive: true })
+    await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'preview-origin.expected.md'), output.join('\n\n'), MODE)
+  })
+
   it.skipIf(MODE === 'record')('selects a stored document into its restored workbench pane across view changes', async () => {
     scaffold = await launchWebScaffold({
       workbench: true, openInApp: false, replayFixture: PROVIDERS, replayProvidersOnly: true,

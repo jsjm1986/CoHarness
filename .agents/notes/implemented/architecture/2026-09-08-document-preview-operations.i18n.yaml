@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-08-document-preview-operations.md
 document:
-  en: e92e65f720a949f1c5d0804aa4a3db8550114ead
-  zh: 422e60bb66105647828e7cbc96d7991b38f4409b
+  en: c2a515b3f72381c5c15da82c47d52d9ff89abd89
+  zh: 806c68c9e9659662b11967ed8c15603eaad43f40
 /agent-note-document-preview-and-file-addresses:
   en: fffa621b7586f221
   zh: d9c7e9bea55fc11f
@@ -12,8 +12,8 @@ document:
   en: a35075e6babe3f7a
   zh: 3a64ac57761e1009
 /agent-note-document-preview-and-file-addresses/decision:
-  en: 6bc0c78aec05288c
-  zh: a92ffcbe130ea982
+  en: 64db2057235fdbd3
+  zh: 6b99733a7ef95ac4
 /agent-note-document-preview-and-file-addresses/alternatives-considered:
   en: d01c1b81484dc839
   zh: e0c01333b1c7c2d4

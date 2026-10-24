@@ -90,6 +90,10 @@ export function apply(ctx: ClientContext): void {
     if (target.kind !== request.runtimeTarget.kind || (target.kind === 'project' && request.runtimeTarget.kind === 'project' && target.projectId !== request.runtimeTarget.projectId)) {
       throw new WorkspaceResourceError('access-revoked', 'Workspace resource runtime no longer owns this Session')
     }
+    const current = viewport.snapshot.getSnapshot()
+    if (current.mode === 'workbench' && current.pendingIdentity !== true && current.paneIds.includes(request.sessionId)) {
+      viewport.focus(request.sessionId)
+    }
     ctx.sidebarRight.openSessionResource(request.sessionId, request.address, {
       kind: 'workspace-file', ...(request.line === undefined ? {} : { params: { line: request.line } }),
     })
