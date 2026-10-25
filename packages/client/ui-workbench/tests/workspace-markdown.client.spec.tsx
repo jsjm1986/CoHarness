@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { WorkspaceResourceRegistry, WorkspaceResourceError, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import { ApiTransportError, type SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type { WorkspaceFileTextPage } from '@deepseek-ai/dsh-api-remotes/client'
 import { WorkspaceMarkdownPreview, isWorkspaceMarkdown } from '../src/client/components/WorkspaceMarkdownPreview.tsx'
 import type { ReadWorkspacePreview } from '../src/client/components/WorkspaceFilePreview.tsx'
 import { en } from '../src/client/markdown/locales.ts'
-import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
+import { previewRecoveryLabels, PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 afterEach(cleanup)
 const id = 'markdown-session' as SessionId
@@ -23,22 +23,86 @@ const page = (offset: number, text: string, eof: boolean, version = 'v1'): Works
 function harness(read: ReadWorkspacePreview) {
   const resources = new WorkspaceResourceRegistry()
   let version = 'v1'
+  let statFailure: Error | undefined
   resources.register(request.runtimeTarget, {
-    stat: async () => ({ sessionId: id, path: request.path, type: 'file', version, bytes: 10, changed: false }),
+    stat: async () => {
+      if (statFailure !== undefined) throw statFailure
+      return { sessionId: id, path: request.path, type: 'file', version, bytes: 10, changed: false }
+    },
   }, 5)
   const close = vi.fn()
   const view = render(<PreviewResourceBinding resources={resources} request={request}>{resource =>
     <WorkspaceMarkdownPreview request={request} resource={resource} read={read}
       markdownT={makeTranslate(en)} close={close}
-      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', loading: 'Reading', changed: 'File changed' }} />
+      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, loading: 'Reading', changed: 'File changed' }} />
   }</PreviewResourceBinding>)
-  return { ...view, resources, close, change() {
+  return { ...view, resources, close, failStat(error: Error | undefined) { statFailure = error }, change() {
     version = 'v2'
     resources.handleChange(request.runtimeTarget, { sessionId: id, path: request.path, version })
   } }
 }
 
 describe('WorkspaceMarkdownPreview', () => {
+  it('keeps the document when reload metadata fails without starting a doomed content read', async () => {
+    const read = vi.fn<ReadWorkspacePreview>(async () => page(1, '# Retained', true))
+    const view = harness(read)
+    const heading = await view.findByRole('heading', { name: 'Retained' })
+    view.failStat(new WorkspaceResourceError('request-unavailable', 'Request unavailable'))
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(view.getByRole('alert').textContent).toBe(previewRecoveryLabels.requestFailedRetained) })
+    expect(view.getByRole('heading', { name: 'Retained' })).toBe(heading)
+    expect(read).toHaveBeenCalledOnce()
+    view.failStat(undefined)
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(read).toHaveBeenCalledTimes(2) })
+    expect(view.queryByRole('alert')).toBeNull()
+  })
+
+  it('keeps the document when refreshed metadata succeeds but the content request fails', async () => {
+    const read = vi.fn<ReadWorkspacePreview>().mockResolvedValueOnce(page(1, '# Retained', true))
+      .mockRejectedValueOnce(new WorkspaceResourceError('request-unavailable', 'Request unavailable'))
+      .mockResolvedValueOnce(page(1, '# Updated', true))
+    const view = harness(read)
+    const heading = await view.findByRole('heading', { name: 'Retained' })
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(view.getByRole('alert').textContent).toBe(previewRecoveryLabels.requestFailedRetained) })
+    expect(view.getByRole('heading', { name: 'Retained' })).toBe(heading)
+    expect(read).toHaveBeenCalledTimes(2)
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await view.findByRole('heading', { name: 'Updated' })
+    expect(read).toHaveBeenCalledTimes(3)
+    expect(view.queryByRole('alert')).toBeNull()
+  })
+
+  it('marks the retained revision as changed after a failed new-version read and withdraws it on access denial', async () => {
+    const read = vi.fn<ReadWorkspacePreview>().mockResolvedValueOnce(page(1, '# Retained', true))
+      .mockRejectedValueOnce(new WorkspaceResourceError('request-unavailable', 'Request unavailable'))
+    const view = harness(read)
+    await view.findByRole('heading', { name: 'Retained' })
+    act(() => { view.change() })
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(view.getByRole('alert').textContent).toBe(previewRecoveryLabels.requestFailedRetained) })
+    expect(view.getByRole('heading', { name: 'Retained' })).toBeTruthy()
+    expect(view.getByText('File changed')).toBeTruthy()
+    expect(read.mock.calls.at(-1)?.[0].version).toBe('v2')
+    act(() => { view.resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', 'Access revoked')) })
+    expect(view.queryByRole('heading')).toBeNull()
+    expect(view.getByRole('button', { name: 'Reload' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it.each(['stat', 'read'] as const)('withdraws the previous document when HTTP authorization denies the reload %s', async (operation) => {
+    const read = vi.fn<ReadWorkspacePreview>(async () => page(1, '# Private', true))
+    const view = harness(read)
+    await view.findByRole('heading', { name: 'Private' })
+    const denied = new ApiTransportError(403, `/api/workspaceFiles.${operation}`)
+    if (operation === 'stat') view.failStat(denied)
+    else read.mockRejectedValueOnce(denied)
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(view.getByRole('alert').textContent).toBe(denied.message) })
+    expect(view.queryByRole('heading')).toBeNull()
+    expect(view.getByRole('button', { name: 'Reload' }).hasAttribute('disabled')).toBe(true)
+  })
+
   it('accumulates paged reads into one rendered document with localized chrome', async () => {
     const read = vi.fn<ReadWorkspacePreview>(async ({ offset, version: v }) => (
       offset === 1 ? page(1, '# Title\n\nfirst\n', false, v) : page(6, 'second **bold**\n', true, v)
@@ -165,8 +229,10 @@ describe('WorkspaceMarkdownPreview', () => {
     expect(view.getByText('Tail')).toBeDefined()
     read.mockImplementation(async () => page(1, '---\nname: pdf', true))
     fireEvent.click(view.getByRole('button', { name: 'Reload' }))
-    await waitFor(() => { expect(view.container.querySelector('hr')).not.toBeNull() })
-    expect(view.container.querySelector('[data-workspace-frontmatter]')).toBeNull()
+    await waitFor(() => {
+      expect(view.container.querySelector('hr')).not.toBeNull()
+      expect(view.container.querySelector('[data-workspace-frontmatter]')).toBeNull()
+    })
   })
 
   it.each([

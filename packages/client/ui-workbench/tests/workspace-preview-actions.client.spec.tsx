@@ -2,6 +2,7 @@
 /** Resource-local recovery preserves the loaded body, effective failure and retry action. */
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { previewRecoveryLabels } from './workspace-preview-resource.fixture.tsx'
 import { workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { WorkspacePreviewChrome } from '../src/client/components/WorkspacePreviewChrome.tsx'
@@ -11,15 +12,16 @@ import type { WorkspacePreviewResource } from '../src/client/contract/preview/us
 afterEach(cleanup)
 const sessionId = 'preview-recovery' as SessionId
 const request = { sessionId, path: 'data.csv', runtimeTarget: { kind: 'base' as const }, address: workspaceResourceAddress(sessionId, 'data.csv') }
-const labels = { close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed', loading: 'Loading' }
+const labels = { close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'File changed', loading: 'Loading' }
 const failure = { code: 'connection-unavailable', message: 'Workspace connection is reconnecting' }
 const value = { sessionId, path: request.path, type: 'file' as const, version: 'v1', changed: false }
 
 function preview(options: { hasContent: boolean; denied?: boolean; error?: Error; code?: string }) {
-  const reload = vi.fn(async () => {})
+  const reload = vi.fn(async () => true)
   const close = vi.fn()
   const state: WorkspacePreviewChromeState = {
-    pending: false, reloading: false, denied: options.denied === true, error: options.error, reload,
+    pending: false, reloading: false, changed: false, denied: options.denied === true, error: options.error,
+    reload: async () => { await reload() },
   }
   const resource: WorkspacePreviewResource = {
     metadata: { status: 'failed', value, accessDenied: state.denied, error: { ...failure, code: options.code ?? failure.code } },
@@ -51,6 +53,19 @@ it('announces the full connection failure beside the existing resource reload ac
   expect(h.reload).toHaveBeenCalledOnce()
   fireEvent.click(view.getByRole('button', { name: 'Close' }))
   expect(h.close).toHaveBeenCalledOnce()
+})
+
+it('reports an HTTP request failure beside retained content without claiming automatic stream recovery', () => {
+  const h = preview({ hasContent: true, code: 'request-unavailable' })
+  const view = render(h.element)
+  const button = view.getByRole('button', { name: 'Reload' })
+  expect(view.getByText('Loaded cells')).toBeTruthy()
+  expect(view.getByRole('alert').textContent).toBe(labels.requestFailedRetained)
+  expect(button.getAttribute('data-workspace-preview-request-failed')).toBe('true')
+  expect(button.hasAttribute('data-workspace-preview-reconnecting')).toBe(false)
+  expect(button.textContent).toContain(labels.reloadFailed)
+  expect(button.getAttribute('aria-describedby')).toBe(view.getByRole('alert').id)
+  expect(h.reload).not.toHaveBeenCalled()
 })
 
 it.each([

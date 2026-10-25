@@ -143,7 +143,11 @@ export function apply(ctx: ClientContext): void {
         excelT: ctx.locale.bind('sidebarExcel'),
         excelLimits: config.excel,
         keyedHooks: { workspaceResource: sourceFor },
-        reloadResource: request => ctx.workspaceResources.source(request).reload(),
+        reloadResource: async (request) => {
+          const source = ctx.workspaceResources.source(request)
+          await source.reload()
+          return source.getSnapshot().status === 'live'
+        },
         revokeResource: (request, message) => {
           ctx.workspaceResources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
         },

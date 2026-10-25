@@ -1,6 +1,6 @@
 /** Workspace preview contributed to the shared auxiliary tab system. */
 import { useMemo } from 'react'
-import { isWorkspaceAccessFailure, parseWorkspaceResourceAddress, workspaceResourceAddress, WorkspaceResourceError } from '@deepseek-ai/dsh-client-runtime/client'
+import { isWorkspaceAccessFailure, parseWorkspaceResourceAddress, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceSource, WorkspaceResourceState, WorkspaceResourceTarget, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -26,8 +26,8 @@ export interface WorkspaceFileTabInjected {
     workspaceResource: (address: string) => WorkspaceResourceSource | undefined
   }
   runtimeTarget: () => WorkspaceResourceTarget
-  /** Reload the request's resource metadata through its existing source. */
-  reloadResource: (request: WorkspaceResourceOpenRequest) => Promise<void>
+  /** Reload the request's metadata; false leaves the failed source and its retained value visible. */
+  reloadResource: (request: WorkspaceResourceOpenRequest) => Promise<boolean>
   /** Discard retained metadata and reads after an access failure. */
   revokeResource: (request: WorkspaceResourceOpenRequest, message: string) => void
   /**
@@ -57,9 +57,10 @@ function selectPreviewMetadata(
   state: WorkspaceResourceState | undefined,
 ): WorkspacePreviewResource['metadata'] | undefined {
   if (state === undefined) return undefined
+  const code = state.error !== undefined && 'code' in state.error && typeof state.error.code === 'string' ? state.error.code : undefined
   const failure = state.error === undefined ? undefined : {
     message: state.error.message,
-    ...state.error instanceof WorkspaceResourceError ? { code: state.error.code } : {},
+    ...code === undefined ? {} : { code },
   }
   return {
     status: state.status,
@@ -121,7 +122,9 @@ export function WorkspaceFileTab(props:
   const line = params !== undefined && 'line' in params ? params.line : undefined
   if (!tab.visible) return null
   const key = `${request.address}:${String(tab.navigation.revision)}`
-  const actions = { close: t('previewClose'), reload: t('previewReload'), reconnecting: t('previewReloadReconnecting'), changed: t('previewChanged') }
+  const actions = { close: t('previewClose'), reload: t('previewReload'), reconnecting: t('previewReloadReconnecting'),
+    reloadFailed: t('previewReloadFailed'), requestFailed: t('previewRequestFailed'), requestFailedRetained: t('previewRequestFailedRetained'),
+    changed: t('previewChanged') }
   if (isWorkspaceSpreadsheet(request.path)) return <WorkspaceExcelPreview
     key={key} request={request} resource={resource} read={readFileBytes} excelT={excelT} limits={excelLimits}
     close={() => { tab.actions.close() }} labels={actions} />

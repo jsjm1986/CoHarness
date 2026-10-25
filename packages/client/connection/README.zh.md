@@ -19,6 +19,8 @@ kind: "package-reference"
 
 解码后的 Host 描述先固定页面的引导 runtime，再开放依赖作用域的请求与 socket。未显式指定 runtime 的请求使用该固定目标，包括项目活动分页；其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；公共链接保持不变。
 
+fetch 包装把原生请求拒绝标识为 `ApiTransportError`，状态为 `0`、代码为 `request-unavailable`；它保留原因且不重试。这只标识未收到 HTTP 响应，不表示已诊断为断网或已知服务端结果。已取消的请求保留 signal 的原因；身份失败和响应解码缺陷不归类为网络失败。HTTP 与 RPC 失败语义见 [fetch 传输器](../../host/apiproxy/README.zh.md)。
+
 ## 概述
 
 本包承载浏览器到 Host 的 Remote 调用、精确 Fetch 响应与 connection generation。Client 插件挂载 `ctx.connection`，其中包含当前页面的 loopback 状态、通用 RPC、当前 generation 及其 Host 信息、可观察的恢复状态、立即重连命令，以及单一 generation source 的注册点。source 报告 ready 后 generation 才可见；source 结束、失败、被撤回或显式 stop 都会清空它，再由 `ConnectionController` 执行重试策略。

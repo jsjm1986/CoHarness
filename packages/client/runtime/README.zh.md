@@ -67,7 +67,7 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 
 `WorkspaceResourceRegistry` 按明确的 runtime 目标和 Session 相对资源地址保留元数据。启动连接使用独立的 `base` 身份；各项目连接在 Host 握手声明支持文件后，以自己的 API client 注册 `workspaceResourceProvider(api)`。文件请求不从当前焦点面板推导目标。Host 的 `workspaceFileMaxResources` 配置限制每个 runtime 保留的记录数；空闲记录按使用顺序淘汰，全部记录活跃时拒绝超限接入。
 
-订阅与 pin 共用元数据读取，最后一个持有者释放时取消未完成读取。文件变化由现有 Host 流交付，打开更多文件不会增加流。重连取消旧代次请求并复核活跃元数据；空闲资源若保留连接不可用的失败，在连接恢复后再次被订阅或 pin 时复核。版本不同则标记 changed，直到显式重新加载。临时失败保留元数据，权限拒绝、provider 移除或 runtime 移除会清除它。预览内容只保存在视图中，通过有界且带版本保护的 RPC 读取。
+订阅与 pin 共用元数据读取，最后一个持有者释放时取消未完成读取。文件变化由现有 Host 流交付，打开更多文件不会增加流。重连取消旧代次请求并复核活跃元数据；空闲资源若保留连接不可用的失败，在连接恢复后再次被订阅或 pin 时复核。版本不同则标记 changed，直到显式重新加载。临时失败保留元数据，权限拒绝、provider 移除或 runtime 移除会清除它。权限失败使用稳定错误代码，包括 HTTP 401/403 对应的 `access-revoked`；未收到 HTTP 响应的请求不能授权另一次读取。预览内容只保存在视图中，通过有界且带版本保护的 RPC 读取。
 
 `source(request)` 暴露原生 `getSnapshot`/`subscribe` 快照协议，消费方通过渲染器的 `keyedHooks` 机制绑定它，而不直接持有 registry。
 

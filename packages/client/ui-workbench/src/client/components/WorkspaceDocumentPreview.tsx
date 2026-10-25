@@ -9,7 +9,7 @@ import { ZoomViewport, zoomSurfaceClass } from '../contract/zoom/ZoomViewport.ts
 import type { ZoomPreference } from '../contract/zoom/types.ts'
 import { useWorkspacePreviewRead } from '../contract/preview/use-preview-read.ts'
 import { usePreviewViewer } from '../contract/preview/use-preview-viewer.ts'
-import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import type { WorkspacePreviewActionLabels, WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import { WorkspacePreviewChrome } from './WorkspacePreviewChrome.tsx'
 import css from './Workbench.module.css'
 
@@ -40,7 +40,7 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
   officeT: PropsLocale<'sidebarOffice'>['t']
   close: () => void
   view: { page: number; zoom?: ZoomPreference }
-  labels: { close: string; reload: string; reconnecting: string; changed: string }
+  labels: WorkspacePreviewActionLabels & { changed: string }
 }) {
   const input = useMemo((): DocumentRead | undefined => {
     const value = resource.metadata.value

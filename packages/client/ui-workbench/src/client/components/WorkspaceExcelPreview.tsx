@@ -10,7 +10,7 @@ import { excelFormat } from '../excel/format.ts'
 import type {} from '../excel/locales.ts'
 import { useWorkspacePreviewRead } from '../contract/preview/use-preview-read.ts'
 import { usePreviewViewer } from '../contract/preview/use-preview-viewer.ts'
-import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import type { WorkspacePreviewActionLabels, WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import { WorkspacePreviewChrome } from './WorkspacePreviewChrome.tsx'
 import excelLoadingCss from '../excel/ExcelLoading.module.css'
 import css from './Workbench.module.css'
@@ -29,7 +29,7 @@ export function WorkspaceExcelPreview({ request, resource, read, excelT, limits,
   excelT: PropsLocale<'sidebarExcel'>['t']
   limits: ExcelLimits
   close: () => void
-  labels: { close: string; reload: string; reconnecting: string; changed: string }
+  labels: WorkspacePreviewActionLabels & { changed: string }
 }) {
   const input = useMemo(() => {
     const version = resource.metadata.value?.version

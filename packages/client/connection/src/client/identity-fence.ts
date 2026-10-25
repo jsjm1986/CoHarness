@@ -1,5 +1,6 @@
 /** One browser document's authenticated Gateway identity and request lifetime. */
 import type { ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { ApiTransportError } from './api.ts'
 
 const RESPONSE_ID = 'x-dsh-principal-id'
 const EXPECTED_ID = 'x-dsh-expected-principal-id'
@@ -93,7 +94,13 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
     const originalUrl = url.toString()
     pinRuntime(url)
     const target = url.toString() === originalUrl ? input : request === undefined ? url : new Request(url, request)
-    const response = await fetcher(target, { ...init, headers, signal })
+    let response: Response
+    try {
+      response = await fetcher(target, { ...init, headers, signal })
+    } catch (cause: unknown) {
+      signal.throwIfAborted()
+      throw new ApiTransportError(0, url.pathname, { cause })
+    }
     lifetime.signal.throwIfAborted()
     const identity = response.headers.get(RESPONSE_ID)
     if (identity !== null) {

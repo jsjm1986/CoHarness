@@ -1,13 +1,13 @@
 /** The action row, failure and change notices, and loading placeholder every workspace preview renders. */
 import type { ReactNode } from 'react'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
+import type { WorkspacePreviewActionLabels, WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import { WorkspacePreviewActions } from './WorkspacePreviewActions.tsx'
 
 /** The read-lifecycle facts the chrome renders; everything else stays in the preview body. */
 export type WorkspacePreviewChromeState = Pick<
   import('../contract/preview/use-preview-read.ts').WorkspacePreviewRead<unknown>,
-  'pending' | 'reloading' | 'denied' | 'reload' | 'error'
+  'pending' | 'reloading' | 'denied' | 'reload' | 'error' | 'changed'
 >
 
 /** Render the preview section's shared chrome around the variant's body.
@@ -26,7 +26,7 @@ export function WorkspacePreviewChrome({ request, resource, state, className, me
   hasContent: boolean
   close: () => void
   /** Localized action and notice labels. */
-  labels: { close: string; reload: string; reconnecting: string; changed: string; loading: string }
+  labels: WorkspacePreviewActionLabels & { changed: string; loading: string }
   children: ReactNode
 }): ReactNode {
   const metadata = resource.metadata
@@ -34,7 +34,7 @@ export function WorkspacePreviewChrome({ request, resource, state, className, me
     <WorkspacePreviewActions close={close} reload={state.reload}
       disabled={state.pending || state.denied || state.reloading || metadata.status === 'loading'}
       denied={state.denied} hasContent={hasContent} failure={state.error ?? metadata.error} message={message} labels={labels} />
-    {!state.denied && metadata.value?.changed === true && <p role="status">{labels.changed}</p>}
+    {!state.denied && (state.changed || metadata.value?.changed === true) && <p role="status">{labels.changed}</p>}
     {children}
     {!state.denied && !hasContent && (state.pending || metadata.status === 'loading') &&
       <p role="status">{labels.loading}</p>}

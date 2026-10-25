@@ -10,7 +10,7 @@ import { WorkspaceExcelPreview, isWorkspaceSpreadsheet } from '../src/client/com
 import type { ReadWorkspaceFileData } from '../src/client/contract/html/read-relative.ts'
 import { Config } from '../src/config.ts'
 import { en } from '../src/client/excel/locales.ts'
-import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
+import { previewRecoveryLabels, PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/excel/excel.tsx', () => ({
   ExcelBody: ({ data, path, format }: { data: Uint8Array; path: string; format: string }) =>
@@ -30,7 +30,7 @@ function harness(read: ReadWorkspaceFileData, path = request.path) {
   const view = render(<PreviewResourceBinding resources={resources} request={target}>{resource =>
     <WorkspaceExcelPreview request={target} resource={resource} read={read}
       excelT={makeTranslate(en)} limits={Config({}).excel} close={close}
-      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed' }} />
+      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'File changed' }} />
   }</PreviewResourceBinding>)
   return { ...view, resources, close, change() {
     version = 'v2'

@@ -9,7 +9,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import { WorkspaceMarkdownPreview } from '../src/client/components/WorkspaceMarkdownPreview.tsx'
 import type { ReadWorkspacePreview } from '../src/client/components/WorkspaceFilePreview.tsx'
 import { en } from '../src/client/markdown/locales.ts'
-import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
+import { previewRecoveryLabels, PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/markdown/frontmatter-fields.tsx', () => {
   throw new Error('chunk unavailable')
@@ -33,7 +33,7 @@ describe('WorkspaceMarkdownPreview frontmatter chunk failure', () => {
     const view = render(<PreviewResourceBinding resources={resources} request={request}>{resource =>
       <WorkspaceMarkdownPreview request={request} resource={resource} read={read}
         markdownT={makeTranslate(en)} close={() => {}}
-        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', loading: 'Reading', changed: 'File changed' }} />
+        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, loading: 'Reading', changed: 'File changed' }} />
     }</PreviewResourceBinding>)
     await vi.waitFor(() => { expect(view.container.querySelector('[data-workspace-frontmatter] pre')?.textContent).toBe('name: pdf') })
     await new Promise(resolve => setTimeout(resolve, 20))

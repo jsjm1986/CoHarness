@@ -9,7 +9,7 @@ import {
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { WorkspaceFilePreview } from '../src/client/components/WorkspaceFilePreview.tsx'
 import type { ZoomPreference } from '../src/client/contract/zoom/types.ts'
-import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
+import { previewRecoveryLabels, PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const sessionId = 'preview-session' as SessionId
@@ -23,7 +23,7 @@ const extensionlessRequest: WorkspaceResourceOpenRequest = {
   ...request, path: 'README', address: workspaceResourceAddress(sessionId, 'README'),
 }
 const labels = {
-  close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', previous: 'Previous', next: 'Next', loading: 'Loading',
+  close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, previous: 'Previous', next: 'Next', loading: 'Loading',
   changed: 'Changed; reload', binary: 'Binary (Base64)', openNative: 'Open in default app',
   imageAlt: (name: string) => `Image preview: ${name}`, imageFailed: 'This image could not be displayed.',
 }

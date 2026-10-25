@@ -11,7 +11,7 @@ import type { ReadWorkspaceDocument } from '../src/client/components/WorkspaceDo
 import { createWorkspacePreviewReaders } from '../src/client/preview-readers.ts'
 import { en as pdfEn } from '../src/client/pdf/locales.ts'
 import { en as officeEn } from '../src/client/office/locales.ts'
-import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
+import { previewRecoveryLabels, PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/pdf/pdf.tsx', () => ({ PdfBody: ({ data }: { data: Uint8Array }) => <pre data-testid="pdf">{new TextDecoder().decode(data)}</pre> }))
 afterEach(cleanup)
@@ -29,7 +29,7 @@ function harness(read: ReadWorkspaceDocument) {
   const view = render(<PreviewResourceBinding resources={resources} request={request}>{resource =>
     <WorkspaceDocumentPreview request={request} resource={resource} read={read}
       pdfT={makeTranslate(pdfEn)} officeT={makeTranslate(officeEn)} close={close} view={{ page: 1 }}
-      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed' }} />
+      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'File changed' }} />
   }</PreviewResourceBinding>)
   return { ...view, resources, close, change() {
     version = 'v2'

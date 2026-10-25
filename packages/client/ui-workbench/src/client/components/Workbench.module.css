@@ -216,7 +216,7 @@
 .previewReloadLabels { display: grid; grid-template-columns: max-content; white-space: nowrap; }
 .previewReloadLabels > span { grid-area: 1 / 1; }
 .previewReloadSize { visibility: hidden; }
-.previewReload[data-workspace-preview-reconnecting] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
+.previewReload[data-workspace-preview-reconnecting], .previewReload[data-workspace-preview-request-failed] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
 
 .filePreviewText {
   max-height: 65vh;

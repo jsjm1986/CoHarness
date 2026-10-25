@@ -19,6 +19,8 @@ One document pins its verified Gateway account. Its fetch wrapper covers only sa
 
 The decoded Host description fixes the document’s bootstrap runtime before scope-sensitive requests and sockets open. Requests without an explicit runtime use that fixed target, including project activity pages, so another tab’s scope cookie cannot redirect them. Application-generated private preview and download URLs use `privateResourceUrl` to carry the same account and runtime checks through native navigation; public links remain unchanged.
 
+The fetch wrapper identifies a native request rejection as `ApiTransportError` with status `0` and code `request-unavailable`; it preserves the cause and makes no retry. This identifies failure to receive an HTTP response, not an offline diagnosis or a known server outcome. An aborted request keeps its signal reason; identity failures and response-decoding defects are not classified as network failures. See the [fetch carrier](../../host/apiproxy/README.md) for HTTP and RPC failure semantics.
+
 ## Summary
 
 The package carries browser-to-Host Remote calls, exact Fetch responses, and connection generations. The Client plugin mounts `ctx.connection` with current-page loopback state, generic RPC, the active generation and its Host facts, observable recovery state, an immediate reconnect command, and the registration point for one generation source. A generation becomes visible when its source reports ready; source completion, failure, withdrawal, or an explicit stop clears it before `ConnectionController` applies its retry policy.

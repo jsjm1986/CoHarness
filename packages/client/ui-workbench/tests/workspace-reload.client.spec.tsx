@@ -20,7 +20,7 @@ import { en as officeEn } from '../src/client/office/locales.ts'
 import { en as markdownEn } from '../src/client/markdown/locales.ts'
 import { en as htmlEn } from '../src/client/html/locales.ts'
 import { en as excelEn } from '../src/client/excel/locales.ts'
-import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
+import { previewRecoveryLabels, PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/pdf/pdf.tsx', () => ({ PdfBody: ({ data }: { data: Uint8Array }) => <pre data-testid="pdf">{new TextDecoder().decode(data)}</pre> }))
 vi.mock('../src/client/excel/excel.tsx', () => ({
@@ -34,7 +34,7 @@ const fileRequest = (path: string): WorkspaceResourceOpenRequest => ({
   sessionId: id, runtimeTarget: { kind: 'base' }, path, address: workspaceResourceAddress(id, path),
 })
 const labels = {
-  close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', previous: 'Previous', next: 'Next', loading: 'Loading',
+  close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, previous: 'Previous', next: 'Next', loading: 'Loading',
   changed: 'Changed; reload', binary: 'Binary (Base64)', openNative: 'Open in default app',
   imageAlt: (name: string) => `Image preview: ${name}`, imageFailed: 'This image could not be displayed.',
 }
@@ -86,7 +86,7 @@ describe('explicit reload under a held metadata stat', () => {
     const view = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
       <WorkspaceDocumentPreview request={request} resource={resource} read={read}
         pdfT={makeTranslate(pdfEn)} officeT={makeTranslate(officeEn)} close={vi.fn()} view={{ page: 1 }}
-        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed' }} />
+        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'File changed' }} />
     }</PreviewResourceBinding>)
     try {
       await waitFor(() => { expect(view.getByTestId('pdf').textContent).toBe('PDF v1') })
@@ -187,7 +187,7 @@ describe('explicit reload under a held metadata stat', () => {
     const view = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
       <WorkspaceMarkdownPreview request={request} resource={resource} read={read}
         markdownT={makeTranslate(markdownEn)} close={vi.fn()}
-        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', loading: 'Reading', changed: 'File changed' }} />
+        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, loading: 'Reading', changed: 'File changed' }} />
     }</PreviewResourceBinding>)
     try {
       await waitFor(() => { expect(view.getByRole('heading').textContent).toBe('v1') })
@@ -228,7 +228,7 @@ describe('explicit reload under a held metadata stat', () => {
     const renderHtml = vi.fn(async () => '<title>frame</title>')
     const view = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
       <WorkspaceHtmlPreview request={request} resource={resource} read={read} renderHtml={renderHtml}
-        htmlT={htmlT} close={vi.fn()} labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed' }} />
+        htmlT={htmlT} close={vi.fn()} labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'File changed' }} />
     }</PreviewResourceBinding>)
     try {
       await waitFor(() => { expect(view.container.querySelector('iframe')?.getAttribute('src')).toBe('blob:frame-1') })
@@ -259,7 +259,7 @@ describe('explicit reload under a held metadata stat', () => {
     const view = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
       <WorkspaceExcelPreview request={request} resource={resource} read={read}
         excelT={makeTranslate(excelEn)} limits={Config({}).excel} close={vi.fn()}
-        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed' }} />
+        labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'File changed' }} />
     }</PreviewResourceBinding>)
     try {
       await waitFor(() => { expect(view.getByTestId('excel').textContent).toBe('budget.xlsx:xlsx v1') })

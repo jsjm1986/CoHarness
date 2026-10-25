@@ -58,7 +58,7 @@ export class WorkspaceResourceError extends Error {
  * @returns whether to discard metadata and content.
  */
 export function isWorkspaceAccessFailure(error: unknown): error is WorkspaceResourceError {
-  if (!(error instanceof WorkspaceResourceError)) return false
+  if (!(error instanceof Error) || !('code' in error) || typeof error.code !== 'string') return false
   return ['collaboration-forbidden', 'session-not-found', 'workspace-file/unknown-session', 'access-revoked'].includes(error.code)
 }
 /**

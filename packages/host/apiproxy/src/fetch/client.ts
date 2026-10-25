@@ -352,11 +352,15 @@ function requestSignalLease(
 }
 
 /** URL base for in-process handler injection (fake authority, opencode precedent). */
-/** HTTP failure before an RPC envelope is received; response bodies remain unread. */
+/** Transport failure before an RPC envelope; HTTP error bodies remain unread. Status zero means no response and unknown server effects. */
 export class ApiTransportError extends Error {
-  constructor(readonly status: number, path: string) {
-    super(`transport failure for ${path}: HTTP ${String(status)}`)
+  /** Request loss and explicit HTTP authorization denial remain distinct machine-readable failures. */
+  readonly code: 'request-unavailable' | 'access-revoked' | undefined
+
+  constructor(readonly status: number, path: string, options?: ErrorOptions) {
+    super(status === 0 ? `transport failure for ${path}: no HTTP response` : `transport failure for ${path}: HTTP ${String(status)}`, options)
     this.name = 'ApiTransportError'
+    this.code = status === 0 ? 'request-unavailable' : status === 401 || status === 403 ? 'access-revoked' : undefined
   }
 }
 

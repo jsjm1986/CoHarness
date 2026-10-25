@@ -2,6 +2,7 @@
 /** Viewer downloads and authorized file reads have independent lifetimes. */
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { previewRecoveryLabels } from './workspace-preview-resource.fixture.tsx'
 import { Component, Suspense } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
@@ -38,13 +39,13 @@ it('starts only the selected viewer while its authorized read is pending and dis
   const request = (path: string): WorkspaceResourceOpenRequest => ({ sessionId, path, address: workspaceResourceAddress(sessionId, path), runtimeTarget: { kind: 'base' } })
   const resource: WorkspacePreviewResource = {
     metadata: { status: 'live', accessDenied: false, value: { sessionId, path: 'report.docx', version: 'v1', bytes: 12, changed: false, type: 'file' } },
-    reload: async () => {}, revoke: vi.fn(),
+    reload: async () => true, revoke: vi.fn(),
   }
   const documentBytes = Promise.withResolvers<WorkspaceDocumentBytes>()
   const excelBytes = Promise.withResolvers<{ bytes: string; version: string }>()
   const readDocument = vi.fn(() => documentBytes.promise)
   const readExcel = vi.fn(() => excelBytes.promise)
-  const labels = { close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'Changed' }
+  const labels = { close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'Changed' }
   const pdf = render(<WorkspaceDocumentPreview request={request('report.docx')} resource={resource} read={readDocument}
     pdfT={makeTranslate(pdfEn)} officeT={makeTranslate(officeEn)} close={vi.fn()} view={{ page: 1 }} labels={labels} />)
   try {

@@ -3,6 +3,14 @@ import { useMemo, useSyncExternalStore } from 'react'
 import { isWorkspaceAccessFailure, WorkspaceResourceError, parseWorkspaceResourceAddress, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest, WorkspaceResourceRegistry, WorkspaceResourceSource, WorkspaceResourceTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspacePreviewResource } from '../src/client/contract/preview/use-preview-read.ts'
+import { en } from '../src/client/locales.ts'
+
+/** Recovery copy shared by test preview variants, from the owning locale. */
+export const previewRecoveryLabels = {
+  reloadFailed: en.previewReloadFailed,
+  requestFailed: en.previewRequestFailed,
+  requestFailedRetained: en.previewRequestFailedRetained,
+}
 
 /** Rebuild a request whose runtime target comes from the test's owning resolver. */
 export function previewRequest(
@@ -23,15 +31,16 @@ function usePreviewResource(
   const source = useMemo<WorkspaceResourceSource>(() => resources.source(request), [resources, request])
   const state = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot)
   const callbacks = useMemo(() => ({
-    reload: () => source.reload(),
+    reload: async () => { await source.reload(); return source.getSnapshot().status === 'live' },
     revoke: (message: string) => {
       resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
     },
   }), [source, resources, request])
   return useMemo(() => {
+    const code = state.error !== undefined && 'code' in state.error && typeof state.error.code === 'string' ? state.error.code : undefined
     const failure = state.error === undefined ? undefined : {
       message: state.error.message,
-      ...state.error instanceof WorkspaceResourceError ? { code: state.error.code } : {},
+      ...code === undefined ? {} : { code },
     }
     return {
       metadata: {

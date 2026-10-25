@@ -32,7 +32,7 @@ kind: "package-reference"
 
 `apply()` 等待 `conversationViewport`，通过 `ctx.slots.inject()` 注册工作台控件。侧栏面板列出已暂存的面板并提供聚焦与关闭操作，Add 与等宽操作绑定同一个选择器 store 和 viewport 能力，可退出回单会话模式，并声明由 ui-conversation 以紧凑显示偏好行填充的 `conversation.workbench.display` 孔位。提供方拥有有界 Session stage 集合；卸载工作台会释放额外历史窗口，保留普通当前会话视图。Gateway 返回经过 ACL 过滤的账户级目录，选中的项目运行时使用独立的目标传输和 principal assertion。在云端 Web 中，`workspace/resource-open` 请求预览消费方接收明确绑定 runtime 的文件。工具栏按目录读取 Workspace 文件，并在统一右侧栏中打开文件，绑定发起操作的 Session 和 runtime。标签经注入的 `keyedHooks.workspaceResource` 源订阅资源元数据；各预览接收普通的 `WorkspacePreviewResource` face——不可变 `{status, value, error, accessDenied}` 元数据加绑定的 `reload`/`revoke` 回调——从不持有 registry。读取通过带版本保护的 `workspaceFiles.read` 分页；二进制内容使用有界 Base64 窗口，该回退界面在所属基础 loopback 连接声明原生打开能力时，还会经 `host.openPath` 提供默认应用打开操作。隐藏标签不持有订阅或内容读取器；关闭标签释放对应实例。文件变化需要重新加载，临时重连保留内容，权限拒绝则隐藏内容。Session JSONL、持久化格式和 Collaboration 授权语义保持不变。
 
-已加载的预览通过现有的重新加载操作提示 Workspace 临时连接失败，不移动文档。该操作保留完整可访问告警，标签在恢复状态之间保持尺寸。其他失败仍完整显示在原位，访问被拒绝时清空正文。重新加载通过资源所属 runtime 再次读取。
+已加载的预览在元数据重载或非权限失败期间保留上次成功内容。元数据重载失败时不发起正文请求；成功后只授权一次带版本保护的新读取。新版本读取失败时，在旧内容旁保留文件变化提示。流恢复与 HTTP 请求失败使用不同的本地化重新加载标签，不移动文档；该操作保留完整可访问告警。HTTP 失败本身不安排重试，也不声称正在自动重连。访问被拒绝时清空正文，隐藏或关闭标签释放内容。重新加载始终使用资源所属 runtime。
 
 Markdown 文件链接在现有鉴权文件标签中打开，并从请求的首行开始显示。再次打开同一文件的不同行号只更新导航，不创建第二个资源。链接目标不会改变文件系统权限。
 

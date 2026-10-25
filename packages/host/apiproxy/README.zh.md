@@ -17,7 +17,7 @@ kind: "package-reference"
 
 `workspaceFiles.renderOffice` 复用文件域的授权、相对路径及版本检查。内容权限探测在查询转换缓存前执行；队列准入后进行有界字节窗口读取，返回前再次核验源文件和权限。结果包含 PDF、缺失字体及转换代次，不暴露 Host 路径或引擎诊断。转换限制由 [Office 提供方](../../document/office-to-pdf/README.zh.md)负责。
 
-现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。
+现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。浏览器原生 fetch 失败使用状态 `0` 和代码 `request-unavailable`，并保留原始原因；没有 HTTP 响应意味着服务端产生的影响未知。取消和身份失效保留原有错误。传输器不重试失败操作。
 
 `session.history` 和 `subagent.history` 接受 `toolCallId`，独立读取调用所属的完整轮次。查询复用现有 Session 观察所有者，不激活 Agent 或计算投影；子会话读取保留目录及父子会话授权检查。该参数不能与分页选择或仅对话详情组合。Fetch 传输压缩轮次但不裁掉前缀；客户端响应大小限制仍会拒绝超大响应。调用不存在时返回空结果，授权、持久化与取消失败仍是错误。
 

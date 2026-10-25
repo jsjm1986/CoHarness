@@ -13,7 +13,7 @@ import { MAX_ASSET_BYTES, MAX_TOTAL_BYTES, packHtml } from '../src/client/contra
 import { createHtmlDocument } from '../src/client/html/bootstrap.ts'
 import { createWorkspacePreviewReaders } from '../src/client/preview-readers.ts'
 import { en } from '../src/client/html/locales.ts'
-import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
+import { previewRecoveryLabels, PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 const translations: ReadonlyMap<string, string> = new Map(Object.entries(en))
 const htmlT = (key: string): string => translations.get(key) ?? key
@@ -58,7 +58,7 @@ function harness(read: ReadWorkspaceFileData, initialRenderer: RenderWorkspaceHt
   const mount = (renderer: RenderWorkspaceHtml) => <PreviewResourceBinding resources={resources} request={request}>{resource =>
     <WorkspaceHtmlPreview request={request} resource={resource} read={read}
       renderHtml={renderer} htmlT={htmlT} close={close}
-      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', changed: 'File changed' }} />
+      labels={{ close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'File changed' }} />
   }</PreviewResourceBinding>
   const view = render(mount(initialRenderer))
   return { ...view, resources, close, change() {

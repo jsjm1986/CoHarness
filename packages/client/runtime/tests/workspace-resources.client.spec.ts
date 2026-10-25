@@ -4,7 +4,7 @@ import {
   workspaceResourceAddress, workspacePathForResource, workspaceResourceProvider,
 } from '../src/client/workspace-resources.ts'
 import type { WorkspaceResourceOpenRequest, WorkspaceResourceValue } from '../src/client/workspace-resources.ts'
-import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import { ApiTransportError, type SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import { FakeApiClient, err } from './fake-api.client.ts'
 
 const sessionId = 'session-1' as SessionId
@@ -150,6 +150,33 @@ describe('Workspace resource lifetime', () => {
     await source.reload()
     expect(source.getSnapshot()).toMatchObject({ status: 'failed' })
     expect(source.getSnapshot().value).toBeUndefined()
+  })
+
+  it.each([401, 403])('clears retained metadata after an HTTP %s authorization failure', async (status) => {
+    const registry = new WorkspaceResourceRegistry()
+    const stat = vi.fn(async () => value())
+    const dispose = registry.register(base, { stat }, 10)
+    const source = registry.source(resource())
+    try {
+      await source.reload()
+      stat.mockRejectedValueOnce(new ApiTransportError(status, '/api/workspaceFiles.stat'))
+      await source.reload()
+      expect(source.getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } })
+      expect(source.getSnapshot().value).toBeUndefined()
+    } finally { dispose() }
+  })
+
+  it.each([0, 429, 503])('retains metadata when the transport reports status %s', async (status) => {
+    const registry = new WorkspaceResourceRegistry()
+    const stat = vi.fn(async () => value())
+    const dispose = registry.register(base, { stat }, 10)
+    const source = registry.source(resource())
+    try {
+      await source.reload()
+      stat.mockRejectedValueOnce(new ApiTransportError(status, '/api/workspaceFiles.stat'))
+      await source.reload()
+      expect(source.getSnapshot()).toMatchObject({ status: 'failed', value: { version: 'v1' } })
+    } finally { dispose() }
   })
 
   it('ignores old-generation completion and revalidates without clearing retained content', async () => {

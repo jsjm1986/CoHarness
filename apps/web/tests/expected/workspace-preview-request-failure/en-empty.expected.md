@@ -1,0 +1,4 @@
+- region "unopened.md":
+  - button "Close preview"
+  - button "Reload"
+  - alert: Could not load the preview. Check the connection and reload.
