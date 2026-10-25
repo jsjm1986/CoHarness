@@ -43,8 +43,12 @@ Linux WASM 部署需要 kit 默认目录或 `fontDirectories` 中存在可用字
 | `maxOutputBytes` | `104857600` | 最大完整 PDF 字节数。 |
 | `maxImageResolution` | `192` | 最大光栅图像 DPI；覆盖 kit 的默认值 `144`。 |
 | `fontFallbacks` | kit 默认值 | 有序字体族优先组；每组至少包含两个含非空白字符的名称。 |
+| `fontMetadataCacheDirectory` | kit 默认值 | 字体派生元数据缓存的绝对目录；`false` 禁用磁盘复用。 |
+| `maxFontMetadataCacheBytes` | `33554432` | 持久化与可复用的单文件字体元数据最大字节数。 |
 
 [配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-office-to-pdf)定义全部字体、归档和图像设置。`fontDirectories` 接受绝对目录；省略时使用 kit 的平台默认值。显式 `fontFallbacks` 替换 kit 的默认分组。已安装的请求字体仍优先使用，缺失字形仍可由其他系统字体提供。原生引擎可能在应用这些优先规则前选中已安装的度量兼容字体。
+
+kit 在复用派生元数据前重新枚举字体来源并校验物理文件标识；缓存不包含原始字体字节或文档内容。缓存缺失或不可用时回到源文件检查。仅在操作系统权限相同的进程间共享显式目录；不同系统用户保留各自缓存。[本机运行时决策](../../../.agents/notes/implemented/architecture/2026-10-26-local-runtime-office-font-metadata.zh.md)定义 Gateway 的装配方式。
 
 [有界转换决策](../../../.agents/notes/implemented/architecture/2026-09-15-bounded-office-conversion.zh.md)说明队列准入、缓存限额与共享取消的设计依据。
 
@@ -67,6 +71,8 @@ Linux WASM 部署需要 kit 默认目录或 `fontDirectories` 中存在可用字
 每个并发槽按需创建并复用一个 kit 转换器。提供方将已授权输入写入私有临时目录，读取有大小上限的普通 PDF 文件，并在完成前删除目录。取消已准入的读取方不会阻塞后续排队工作。读取方取消只会释放该读取方；最后一个读取方和提供方卸载会取消共享工作。卸载向未完成读取方报告 `unavailable`，并等待转换及转换器清理结束。活跃操作和临时目录清理由同一生命周期负责。
 
 ApiProxy 文件读取器负责请求授权与取消；转换器负责已准入读取、转换、缓存及引擎清理。源读取失败直接传递，转换失败仅暴露分类原因，不暴露引擎诊断。
+
+完成生产构建后，在仓库根目录运行 `node node_modules/tsx/dist/cli.mjs packages/document/office-to-pdf/tests/font-metadata.perf.ts`，比较新建独立主目录与共享派生元数据目录。串行诊断使用全新 plain-Node 进程和固定的合成拉丁文／中文 DOCX，报告转换及收尾耗时与 Node RSS，不包括认证、网络、浏览器渲染和原生子进程内存，也不设置计时门限。
 
 </details>
 

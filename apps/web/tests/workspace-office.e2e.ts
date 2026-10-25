@@ -1,5 +1,6 @@
 /** Real Office conversion and PDF rendering through the shipped authorized Workspace preview. */
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser, type Page } from 'playwright'
@@ -22,9 +23,17 @@ describe('web e2e: authorized Office preview', () => {
   let scaffold: WebScaffold | undefined
   let browser: Browser | undefined
   let page: Page
+  let metadataRoot: string | undefined
   const resourceRequests: string[] = []
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({ workbench: true })
+    metadataRoot = await mkdtemp(join(tmpdir(), 'dsh-office-metadata-web-'))
+    const metadata = join(metadataRoot, 'metadata')
+    await mkdir(metadata, { mode: 0o700 })
+    await writeFile(join(metadata, 'font-metadata.json'), '{invalid', { flag: 'wx', mode: 0o600 })
+    const overlay = join(metadataRoot, 'cordis.patch.yml')
+    await writeFile(overlay, `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(metadata)}\n`,
+      { flag: 'wx', mode: 0o600 })
+    scaffold = await launchWebScaffold({ workbench: true, extraOverlayPath: overlay })
     expect(scaffold.ctx.get('officeToPdf')).toBeDefined()
     for (const extension of FORMATS) await writeFile(join(scaffold.workspaceCwd, `preview.${extension}`), realOfficeBytes(extension))
     for (const kind of PDF_RESOURCES) await writeFile(join(scaffold.workspaceCwd, `resource-${kind}.pdf`), pdfResourceFixture(kind))
@@ -45,7 +54,13 @@ describe('web e2e: authorized Office preview', () => {
     })
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   }, 120_000)
-  afterAll(async () => { try { await browser?.close() } finally { await scaffold?.close() } })
+  afterAll(async () => {
+    try { await browser?.close() }
+    finally {
+      try { await scaffold?.close() }
+      finally { if (metadataRoot !== undefined) await rm(metadataRoot, { recursive: true, force: true }) }
+    }
+  })
 
   it('loads binary groups only for real PDFs that need them and reuses the loaded decoder group', async () => {
     const tripwire = watchConsole(page)
@@ -101,6 +116,13 @@ describe('web e2e: authorized Office preview', () => {
       return bytes.some((value, index) => index % 4 !== 3 && value < 200)
     })).toBe(true)
     if (extension === 'docx') {
+      if (metadataRoot === undefined) throw new Error('Metadata fixture is unavailable')
+      const metadata = JSON.parse(await readFile(join(metadataRoot, 'metadata/font-metadata.json'), 'utf8')) as {
+        format: number
+        records: unknown[]
+      }
+      expect(metadata.format).toBe(1)
+      expect(metadata.records.length).toBeGreaterThan(0)
       const snapshot = await captureStableAria(page, '[data-pdf-preview]', scaffold.workspaceCwd)
       await compareOrRefreshGolden(GOLDEN, snapshot, webSnapshotMode())
       const zoomControls = preview.locator('[data-document-zoom-controls]')

@@ -856,6 +856,9 @@ export class InstanceManager {
       }
       patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
       patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
+      if (this.cfg.officeFontMetadataCacheDirectory !== undefined) {
+        patchText += `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(this.cfg.officeFontMetadataCacheDirectory)}\n`
+      }
       // Remote-desktop providers share the gateway's administration files so
       // grants and endpoints managed in /admin take effect in every runtime.
       patchText += `- id: remote-desktop-vnc

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/document/office-to-pdf/README.md
 document:
-  en: eaf47558dc6cfc951ddc96bf640aa0c78633a7ae
-  zh: e18e1f9198455614aedb5c38fd99eca4ff4992b3
+  en: f5e8ecad450fd45750bb6a642357645d6e062f6e
+  zh: a8684bc024a2abaaac1a96af2464a776a58e355f
 /:
   en: c3e6e5964cf9df7d
   zh: a3874301c5f7745f
@@ -18,11 +18,11 @@ document:
   en: d152484eb41ac6b4
   zh: a134331a31395608
 /deepseek-ai-dsh-office-to-pdf/use-this-package:
-  en: bdcdf620b7227639
-  zh: 3b182608a64e425f
+  en: 0c9825eb294b712d
+  zh: ea42bf40548f191e
 /deepseek-ai-dsh-office-to-pdf/understand-the-implementation:
-  en: 6a07d22c11a541b2
-  zh: d28d73b86b8a25e0
+  en: 07d5d8ffe3c65956
+  zh: 0f134f260e404560
 /deepseek-ai-dsh-office-to-pdf/further-exploration:
   en: 0d434e47492bd444
   zh: b61f0df6bbe375d1

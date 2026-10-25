@@ -3,7 +3,7 @@ import type { RuntimeCapacityConfig } from './runtime-capacity.ts'
 import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { basename, join, posix, resolve } from 'node:path'
+import { basename, isAbsolute, join, posix, resolve } from 'node:path'
 import { DEFAULT_DESKTOP_COORDINATOR_CONFIG, type DesktopCoordinatorConfig } from './desktop-coordinator.ts'
 import { DEFAULT_PROGRESS_CONFIG, type ProgressConfig } from './postgres/progress-service.ts'
 import { DEFAULT_RUNTIME_LOG_CAP_BYTES } from './runtime-log.ts'
@@ -124,6 +124,8 @@ export interface GatewayConfig {
   secureCookies: boolean
   /** Instance launch backend: `local` child process (dev) or `systemd` (Linux prod). */
   launcher: 'local' | 'systemd'
+  /** Derived font metadata shared by local runtimes; undefined retains each runtime's kit cache. */
+  officeFontMetadataCacheDirectory?: string
   /** systemd MemoryMax per instance (systemd launcher only). */
   memoryMax: string
   /** systemd CPUQuota per instance (systemd launcher only). */
@@ -444,6 +446,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const cloudflaredBin = env.HGW_CLOUDFLARED === undefined || env.HGW_CLOUDFLARED === ''
     ? undefined : normalizedAbsolutePath(env.HGW_CLOUDFLARED)
   const launcher = env.HGW_LAUNCHER === 'systemd' ? 'systemd' : 'local'
+  const configuredFontMetadataCache = env.HGW_OFFICE_FONT_METADATA_CACHE_DIR
+  if (launcher !== 'local' && configuredFontMetadataCache !== undefined && configuredFontMetadataCache !== 'off') {
+    throw new Error('HGW_OFFICE_FONT_METADATA_CACHE_DIR requires HGW_LAUNCHER=local')
+  }
+  const officeFontMetadataCacheDirectory = launcher === 'local' && configuredFontMetadataCache !== 'off'
+    ? configuredFontMetadataCache ?? resolve(stateRoot, 'cache', 'office-font-metadata')
+    : undefined
+  if (officeFontMetadataCacheDirectory !== undefined
+    && (!isAbsolute(officeFontMetadataCacheDirectory) || officeFontMetadataCacheDirectory.includes('\0'))) {
+    throw new Error('HGW_OFFICE_FONT_METADATA_CACHE_DIR must be an absolute path or off')
+  }
   const configuredProjectPathRoots = projectPathRoots(env.HGW_PROJECT_PATH_ROOTS)
   if (launcher === 'systemd' && configuredProjectPathRoots.length === 0) {
     throw new Error('HGW_PROJECT_PATH_ROOTS is required when HGW_LAUNCHER=systemd')
@@ -803,6 +816,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     sessionAbsoluteTtlMs,
     secureCookies: publicOrigins.some(o => o.startsWith('https://')),
     launcher,
+    ...(officeFontMetadataCacheDirectory === undefined ? {} : {
+      officeFontMetadataCacheDirectory: normalizedAbsolutePath(officeFontMetadataCacheDirectory),
+    }),
     memoryMax,
     cpuQuota,
     gatewayDir,

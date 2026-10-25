@@ -2333,6 +2333,10 @@ export interface Config {
   maxUncompressedBytes: number
   /** Absolute font roots; omission uses the kit's platform defaults. */
   fontDirectories?: string[]
+  /** Absolute derived font metadata cache directory; omission keeps kit defaults, false disables disk reuse. */
+  fontMetadataCacheDirectory?: string | false
+  /** Maximum persisted and reusable per-file font metadata bytes. */
+  maxFontMetadataCacheBytes: number
   /** Ordered font-family preference groups; omission retains the kit defaults. */
   fontFallbacks?: string[][]
   /** Maximum physical font files indexed by each converter. */

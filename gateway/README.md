@@ -68,6 +68,7 @@ Fixtures that create users, projects, runtime files or deployment state use `tes
 | `HGW_UPSTREAM_TIMEOUT_MS` | 30 s | Maximum time one HTTP/WebSocket proxy operation or forwarded selected-scope document metadata request waits for a runtime upstream; at most 2,147,483,647 ms |
 | `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` | 64 MiB | Maximum runtime response bytes the Gateway retains or forwards |
 | `HGW_LAUNCHER` | `local` | Instance launch driver: `local` (macOS dev subprocess) / `systemd` (Linux production per-user units) |
+| `HGW_OFFICE_FONT_METADATA_CACHE_DIR` | `<state-root>/cache/office-font-metadata` for `local`; unset for `systemd` | Absolute shared Office font metadata directory for local runtimes; `off` retains each runtime's kit cache. An explicit directory with `systemd` is rejected. |
 | `HGW_SYSTEMD_UNIT_DIR` | `/etc/systemd/system` | Unit directory the systemd driver writes per-user unit files into |
 | `HGW_GUARD_PATCH` | `<repo>/plugins/dsh-directory-guard/cordis.patch.yml` | directory-guard bundle patch materialized into every instance; release mode pins it inside `HGW_RELEASE_ROOT`, while `off` disables it |
 | `HGW_MODEL_GOVERNANCE_PACKAGE` | `<repo>/plugins/dsh-model-governance` | Tree-external per-instance authorization and usage plugin; release mode pins it inside `HGW_RELEASE_ROOT` |

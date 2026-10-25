@@ -10,6 +10,21 @@ import {
 } from '../src/config.ts'
 
 describe('loadConfig', () => {
+  it('shares font metadata only among local runtimes and accepts an explicit opt-out', () => {
+    const cfg = loadConfig({})
+    expect(cfg.officeFontMetadataCacheDirectory).toBe(resolve(cfg.stateRoot, 'cache', 'office-font-metadata'))
+    expect(loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: '/private/fonts/cache' }).officeFontMetadataCacheDirectory)
+      .toBe('/private/fonts/cache')
+    expect(loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: 'off' }).officeFontMetadataCacheDirectory).toBeUndefined()
+    const systemd = { HGW_LAUNCHER: 'systemd', HGW_PROJECT_PATH_ROOTS: '/srv/projects' }
+    expect(loadConfig(systemd).officeFontMetadataCacheDirectory).toBeUndefined()
+    expect(() => loadConfig({ ...systemd, HGW_OFFICE_FONT_METADATA_CACHE_DIR: '/private/fonts/cache' }))
+      .toThrow('HGW_OFFICE_FONT_METADATA_CACHE_DIR requires HGW_LAUNCHER=local')
+    for (const path of ['', 'relative/cache', '/cache\0invalid']) {
+      expect(() => loadConfig({ HGW_OFFICE_FONT_METADATA_CACHE_DIR: path })).toThrow('HGW_OFFICE_FONT_METADATA_CACHE_DIR')
+    }
+  })
+
   it('validates bounded private event principal renewal settings', () => {
     expect(loadConfig({}).streamPrincipalRenewal).toEqual({ enabled: true, intervalMs: 10000, requestTimeoutMs: 5000, maxBatchSize: 64 })
     expect(loadConfig({ HGW_STREAM_PRINCIPAL_RENEWAL_ENABLED: 'false' }).streamPrincipalRenewal.enabled).toBe(false)

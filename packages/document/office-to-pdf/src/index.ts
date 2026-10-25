@@ -55,6 +55,10 @@ export interface Config {
   maxUncompressedBytes: number
   /** Absolute font roots; omission uses the kit's platform defaults. */
   fontDirectories?: string[]
+  /** Absolute derived font metadata cache directory; omission keeps kit defaults, false disables disk reuse. */
+  fontMetadataCacheDirectory?: string | false
+  /** Maximum persisted and reusable per-file font metadata bytes. */
+  maxFontMetadataCacheBytes: number
   /** Ordered font-family preference groups; omission retains the kit defaults. */
   fontFallbacks?: string[][]
   /** Maximum physical font files indexed by each converter. */
@@ -82,6 +86,8 @@ export const Config: z<Partial<Config>, Config> = z.object({
   maxArchiveEntries: z.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(10_000),
   maxUncompressedBytes: z.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(250 * 1024 * 1024),
   fontDirectories: z.array(z.string().min(1)).extra('default', undefined),
+  fontMetadataCacheDirectory: z.union([z.string().min(1), z.const(false)]).extra('default', undefined),
+  maxFontMetadataCacheBytes: z.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(32 * 1024 * 1024),
   fontFallbacks: z.array(z.array(z.string().pattern(/\S/)).min(2)).extra('default', undefined),
   maxFontFiles: z.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(20_000),
   maxFontFileBytes: z.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(256 * 1024 * 1024),
@@ -109,12 +115,18 @@ export class OfficeToPdf extends Service {
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'officeToPdf')
     if (config.fontDirectories?.some(path => !isAbsolute(path))) throw new Error('fontDirectories must contain absolute paths.')
+    if (typeof config.fontMetadataCacheDirectory === 'string'
+      && (!isAbsolute(config.fontMetadataCacheDirectory) || config.fontMetadataCacheDirectory.includes('\0'))) {
+      throw new Error('fontMetadataCacheDirectory must be an absolute path or false.')
+    }
     if (config.maxSourceBytes < config.maxInputBytes) throw new Error('maxSourceBytes must be at least maxInputBytes.')
-    const { fontDirectories, fontFallbacks, timeoutMs, maxInputBytes, maxOutputBytes, maxImageResolution,
+    const { fontDirectories, fontMetadataCacheDirectory, maxFontMetadataCacheBytes, fontFallbacks,
+      timeoutMs, maxInputBytes, maxOutputBytes, maxImageResolution,
       maxArchiveEntries, maxUncompressedBytes, maxFontFiles, maxFontFileBytes, maxLoadedFontBytes } = config
     this.options = { timeoutMs, maxInputBytes, maxOutputBytes, maxImageResolution, maxArchiveEntries, maxUncompressedBytes,
-      maxFontFiles, maxFontFileBytes, maxLoadedFontBytes,
+      maxFontFiles, maxFontFileBytes, maxLoadedFontBytes, maxFontMetadataCacheBytes,
       ...(fontDirectories === undefined ? {} : { fontDirectories }),
+      ...(fontMetadataCacheDirectory === undefined ? {} : { fontMetadataCacheDirectory }),
       ...(fontFallbacks === undefined ? {} : { fontFallbacks }),
     }
     this.queue = new ConversionQueue(config, this.generation, (bytes, extension, signal) => this.convertBytes(bytes, extension, signal))
