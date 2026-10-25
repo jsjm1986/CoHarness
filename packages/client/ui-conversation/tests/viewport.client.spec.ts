@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSnapshotStore, NavigationController, type ISessions, type SessionId, type SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { clientSessionKey, createSnapshotStore, NavigationController, type ISessions, type SessionId, type SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { ConversationViewportController, createConversationViewportStore } from '../src/client/viewport.ts'
 import { readWorkbenchRecord, writeWorkbenchRecord } from '../src/client/workbench-persistence.ts'
 
@@ -119,6 +119,61 @@ describe('ConversationViewportController', () => {
     expect(viewport.snapshot.getSnapshot().activePaneId).toBe(id('a'))
     expect(h.opened.at(-1)).toBe(id('a'))
     viewport.dispose()
+  })
+
+  it.each(['single', 'workbench'] as const)('restores empty version-3 layouts without account directory demand: %s', (mode) => {
+    writeWorkbenchRecord('account:7', {
+      version: 3, mode, activeId: 'default', workbenches: [
+        { id: 'default', name: 'Empty layout', paneIds: [], paneRatios: [], updatedAt: 1 },
+        { id: 'another', name: 'Another empty layout', paneIds: [], paneRatios: [], updatedAt: 2 },
+      ],
+    })
+    const h = harness()
+    h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('account:7')
+      viewport.setEnabled(true)
+      expect(viewport.needsCatalogRestore()).toBe(false)
+      expect(viewport.snapshot.getSnapshot()).toMatchObject({ mode, paneIds: [] })
+      expect(viewport.listWorkbenches().map(row => row.name)).toEqual(['Empty layout', 'Another empty layout'])
+      expect(h.opened).toEqual([])
+      expect(h.staged.flat()).toEqual([])
+    } finally { viewport.dispose() }
+  })
+
+  it('keeps directory verification for a nonempty inactive layout beside an empty active layout', () => {
+    const saved = clientSessionKey({ kind: 'personal' }, id('not-loaded'))
+    writeWorkbenchRecord('account:7', {
+      version: 3, mode: 'single', activeId: 'default', workbenches: [
+        { id: 'default', name: 'Empty layout', paneIds: [], paneRatios: [], updatedAt: 1 },
+        { id: 'another', name: 'Saved layout', paneIds: [saved], paneRatios: [1], updatedAt: 2 },
+      ],
+    })
+    const h = harness()
+    h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('account:7')
+      viewport.setEnabled(true)
+      expect(viewport.needsCatalogRestore()).toBe(true)
+      expect(viewport.listWorkbenches()[1]?.paneIds).toEqual([saved])
+      expect(h.opened).toEqual([])
+    } finally { viewport.dispose() }
+  })
+
+  it('keeps version-2 restoration pending even when its layout is empty', () => {
+    writeWorkbenchRecord('account:7', { version: 2, mode: 'workbench', activeId: 'default', workbenches: [
+      { id: 'default', name: 'Legacy layout', paneIds: [], paneRatios: [], updatedAt: 1 },
+    ] })
+    const h = harness()
+    h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('account:7')
+      expect(viewport.needsCatalogRestore()).toBe(true)
+      expect(viewport.snapshot.getSnapshot().pendingIdentity).toBe(true)
+    } finally { viewport.dispose() }
   })
 
   it('drops stale persisted ids when the list baseline changes', () => {

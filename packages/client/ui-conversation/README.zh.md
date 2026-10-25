@@ -27,7 +27,7 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 
 文档上传、完成后的引用和草稿删除都跟随所寻址 Session 的 runtime。可恢复上传的全部 HTTP 与 XHR 请求携带同一个已验证账号和 runtime，恢复元数据按该归属隔离。Session 所有者失效时，不能回退到页面引导 runtime 的文档存储。
 
-根作用域的 `conversation` 入口声明 `conversation.content`（允许当前 Session 缺席的 Component Factory，其 `views` 局部位置默认渲染 `conversation.session`），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。已注册的工作台控件在其他主面板显示时仍持有这些窗口。单会话模式、贡献卸载和已验证身份撤销会释放额外窗口；保存的具名成员保留，不随传输撤销而删除，恢复前须重新通过目录验证。具名工作台的选择独立于面板变化持久化，即使两个布局的面板、焦点和比例完全相同也会保存选择。切换布局会选中其中已验证的活动 Session；复制时保留活动面板及其比例。旧布局等待完整身份验证时发布 `pendingIdentity`，在对账完成前拒绝布局编辑，不会把未保存的改动报告为成功。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
+根作用域的 `conversation` 入口声明 `conversation.content`（允许当前 Session 缺席的 Component Factory，其 `views` 局部位置默认渲染 `conversation.session`），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。已注册的工作台控件在其他主面板显示时仍持有这些窗口。单会话模式、贡献卸载和已验证身份撤销会释放额外窗口；保存的具名成员保留，不随传输撤销而删除，恢复前须重新通过目录验证。若第 3 版记录的所有具名布局均无面板，则恢复时无需读取账户目录。具名工作台的选择独立于面板变化持久化，即使两个布局的面板、焦点和比例完全相同也会保存选择。切换布局会选中其中已验证的活动 Session；复制时保留活动面板及其比例。旧布局等待完整身份验证时发布 `pendingIdentity`，在对账完成前拒绝布局编辑，不会把未保存的改动报告为成功。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
 
 在 Workbench 的标签和堆叠布局中，每个包含展开面板的行都会填满可用宽度。一个展开面板与 46px 折叠身份细条并排时也如此。这些呈现方式保留已保存的面板比例，面板回到更宽的一行时按该比例分配相对宽度。
 

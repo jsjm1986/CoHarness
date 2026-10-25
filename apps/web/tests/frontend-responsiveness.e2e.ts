@@ -281,6 +281,31 @@ it('reads the workbench catalog for chooser demand while ordinary Session switch
     await page.locator('textarea:enabled').last().waitFor()
     await page.locator('[data-model-trigger][aria-busy="false"]').waitFor()
     expect(catalogRequests).toBe(0)
+    expect(await page.evaluate(() => {
+      const raw = localStorage.getItem('dsh.conversation.workbenches.v3.local')
+      return raw === null ? undefined : JSON.parse(raw) as { version: number; workbenches: { paneIds: string[] }[] }
+    })).toMatchObject({ version: 3, workbenches: [{ paneIds: [] }] })
+    const emptyRestores: string[] = []
+    const reloadEmptyLayout = async (mode: 'single' | 'workbench'): Promise<void> => {
+      const warningsBefore = consoleWatch.warnings.length
+      const [sessionList, workspaceList] = await Promise.all([
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/session.list'),
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/workspace.list'),
+        page.reload({ waitUntil: 'commit' }),
+      ])
+      expect(await sessionList.finished()).toBeNull()
+      expect(await workspaceList.finished()).toBeNull()
+      if (mode === 'single') {
+        await expect.poll(() => row(entries[0].id).getAttribute('aria-selected')).toBe('true')
+        await page.locator('textarea:enabled').last().waitFor()
+        await page.locator('[data-model-trigger][aria-busy="false"]').waitFor()
+      } else await page.locator('[data-workbench-empty-content]').waitFor()
+      expect(catalogRequests).toBe(0)
+      emptyRestores.push(`## Restored empty layout: ${mode}\n\n${await captureStableAria(page,
+        mode === 'single' ? '[data-workbench-toolbar]' : '[data-workbench-empty-content]', scaffold.workspaceCwd)}`)
+      acknowledgeReloadConnectionLoss(consoleWatch, warningsBefore)
+    }
+    await reloadEmptyLayout('single')
     for (const entry of [entries[1], entries[0], entries[1], entries[0]]) {
       await Promise.all([
         modelResponse(entry.id),
@@ -295,6 +320,7 @@ it('reads the workbench catalog for chooser demand while ordinary Session switch
     await page.getByRole('menuitem', { name: /My workbench/u }).click()
     await page.locator('[data-workbench-empty-content]').waitFor()
     expect(catalogRequests).toBe(0)
+    await reloadEmptyLayout('workbench')
     for (const round of [1, 2]) {
       await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
       const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
@@ -302,7 +328,8 @@ it('reads the workbench catalog for chooser demand while ordinary Session switch
       expect(catalogRequests).toBe(round)
       if (round === 2) {
         const golden = fileURLToPath(new URL('./expected/frontend-responsiveness/catalog-demand.expected.md', import.meta.url))
-        await compareOrRefreshGolden(golden, await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
+        await compareOrRefreshGolden(golden, `${emptyRestores.join('\n\n')}\n\n## Fresh chooser\n\n${
+          await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)}`, webSnapshotMode())
       }
       await picker.getByRole('button', { name: 'Close picker', exact: true }).click()
       await picker.waitFor({ state: 'hidden' })

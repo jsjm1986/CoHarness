@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-client-interaction-work.md
 document:
-  en: f7b31d6281d4a0d73996bfce30949f9661d6bf28
-  zh: b45fcdbc8187e94004f3629ec3c472646de0f7a2
+  en: 135bb7ce0ec414304e715d99671bad06482f1c24
+  zh: 61b35a40add2aba80d37ce86bb48f290d644c30a
 /agent-note-keep-client-update-work-proportional-to-the-visible-change:
   en: 301117c0f7cf3bda
   zh: d81b27e1ec38c83a
@@ -12,8 +12,8 @@ document:
   en: 786517ec3557c416
   zh: 9e558d6449d3caa2
 /agent-note-keep-client-update-work-proportional-to-the-visible-change/decision:
-  en: b6bd0f2179676eab
-  zh: 8d83e62adca8d45d
+  en: 1d7b27ada8f5673b
+  zh: d62d72eec6e93ad8
 /agent-note-keep-client-update-work-proportional-to-the-visible-change/alternatives-considered:
   en: 8344d29fffd09a90
   zh: bf0b31dec2a60dd9

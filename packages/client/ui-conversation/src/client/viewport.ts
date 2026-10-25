@@ -573,6 +573,7 @@ export class ConversationViewportController implements ConversationViewport {
 
   private restoreWorkbenches(record: WorkbenchRecord | undefined): void {
     this.restorationPending = record !== undefined
+      && (record.version === 2 || record.workbenches.some(row => row.paneIds.length > 0))
     this.keyVersion = record?.version ?? (this.sessions.keyFor === undefined ? 2 : 3)
     this.workbenches.clear()
     this.activeWorkbenchId = record?.activeId ?? 'default'
