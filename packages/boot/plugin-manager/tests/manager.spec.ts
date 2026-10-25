@@ -18,6 +18,7 @@ import {
 import PluginManager, { type Config, type PluginChange, type PluginDesiredState, type PluginInstallFrame, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
+import type { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
 import Hmr from '@deepseek-ai/dsh-hmr'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -308,6 +309,17 @@ it('lists bundle versions and current-profile plugin targets', async () => {
       rows: [{ rowId: 'managed', moduleName: pathToFileURL(join(dir, 'node_modules', 'extra', 'plugin.mjs')).href, entryId: 'include:managed' }], overrides: [],
     },
   ])
+})
+
+it('lists current-profile targets independently of preset composition reads', async () => {
+  const { manager, ctx } = await fixture('startup')
+  const compositionInventory = vi.fn(async () => { throw new Error('preset composition unavailable') })
+  ctx.provide('agentPresets', { compositionInventory } as Partial<AgentPresetRegistry> as never)
+
+  await expect(manager.listPlugins()).resolves.toEqual(expect.arrayContaining([
+    expect.objectContaining({ entryId: 'include:managed', patchId: 'managed', enabled: true }),
+  ]))
+  expect(compositionInventory).not.toHaveBeenCalled()
 })
 
 it('describes a bundle by its manifest and patch: one-liner, rows without a live entry, and the built-in rows it changes', async () => {

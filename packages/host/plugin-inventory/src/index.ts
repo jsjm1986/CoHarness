@@ -76,11 +76,11 @@ export class PluginInventoryGateway extends TypertRemoteService {
 
 export default PluginInventoryGateway
 
-/** Read current Loader entries and optional preset compositions.
+/** Read current non-group Loader entries without discovering or inspecting agent presets.
  * @param ctx Context with the Loader service.
- * @returns Current inventory with optional display metadata and no separate runtime cache.
+ * @returns Current runtime entries in Loader order, with optional display metadata and no separate cache.
  */
-export async function readPluginInventory(ctx: Context): Promise<PluginInventorySnapshot> {
+export function readRuntimePluginEntries(ctx: Context): PluginInventoryEntry[] {
   const entries: PluginInventoryEntry[] = []
   const packages = ctx.get('pluginPackages')
   for (const entry of ctx.loader.entries()) {
@@ -100,6 +100,16 @@ export async function readPluginInventory(ctx: Context): Promise<PluginInventory
       ...meta === undefined ? {} : { meta },
     })
   }
+  return entries
+}
+
+/** Read current Loader entries and optional preset compositions.
+ * @param ctx Context with the Loader service.
+ * @returns Current inventory with optional display metadata and no separate runtime cache.
+ */
+export async function readPluginInventory(ctx: Context): Promise<PluginInventorySnapshot> {
+  const entries = readRuntimePluginEntries(ctx)
+  const packages = ctx.get('pluginPackages')
   const presets = ctx.get('agentPresets')
   const management = ctx.get('pluginManager') === undefined ? {} : { managementAvailable: true }
   if (presets === undefined) return { entries, ...management }

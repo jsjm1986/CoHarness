@@ -25,7 +25,7 @@ Clients can call `pluginInventory/list` to display the host’s current plugins 
 <a id="use-this-package"></a>
 ## Use this package
 
-Call `pluginInventory/list` when a client or settings page needs to show what is currently composed in the host — which plugins are loaded, enabled, and alive, and what each agent preset would give a session. The Remote is the only entry point: the service is Remote-only and deliberately declares no same-process Cordis `Context` merge.
+Call `pluginInventory/list` when a client or settings page needs to show what is currently composed in the host — which plugins are loaded, enabled, and alive, and what each agent preset would give a session. The service is Remote-only and deliberately declares no same-process Cordis `Context` merge. Same-process consumers use `readPluginInventory(ctx)` for that complete snapshot or synchronous `readRuntimePluginEntries(ctx)` for current Loader entries alone; the latter performs no preset discovery, composition reads, or disabled-expression evaluation.
 
 ### What a snapshot contains
 

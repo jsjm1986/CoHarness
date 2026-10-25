@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-plugin-management-catalog.md
 document:
-  en: 2aeb12a4fbccf06553c2b23e260d0fdfd24506f3
-  zh: e14b85f96a4cd1693ecbcfdb52093bd44e03d38b
+  en: 307636afa0baae309a241b7ad348fe2ecc63c2f0
+  zh: 1559d88494995acff8cbca0fc85ee6e197048361
 /agent-note-one-authorized-plugin-management-catalog:
   en: 41f4ce880cc9a4f1
   zh: e6384e36ca345613
@@ -12,14 +12,14 @@ document:
   en: 31ef4568de6896f9
   zh: 3bafc655c1d56d4f
 /agent-note-one-authorized-plugin-management-catalog/decision:
-  en: 510389892255303c
-  zh: b1e2a209c0b8a370
+  en: f7c76aa563b039fc
+  zh: c752721a4bfb4384
 /agent-note-one-authorized-plugin-management-catalog/alternatives-considered:
-  en: 263d4936c3706f82
-  zh: 5d7c9d4f27a37158
+  en: 5032b1432317651d
+  zh: 90ba3ae9109dd328
 /agent-note-one-authorized-plugin-management-catalog/verification:
-  en: d5d583e13b64fa85
-  zh: a2cda063ddea0602
+  en: 89cc0461ac1201e7
+  zh: 8afbb3fe8a9c2aaa
 /agent-note-one-authorized-plugin-management-catalog/consequences:
   en: 74ad367956da14b1
   zh: 99587d6c264977b2

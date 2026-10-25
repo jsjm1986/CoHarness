@@ -352,6 +352,7 @@ describe('web e2e: plugin configuration section', () => {
     await openItem('网页搜索')
     expect(await toggle.getAttribute('aria-checked')).toBe('true')
     expect(await endpoint.inputValue()).toBe('https://search-api.test/api/v1/tools')
+    await panel.getByText('已配置密钥。', { exact: true }).waitFor()
     const snapshot = await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search.expected.md'), snapshot, MODE)
     await panel.getByRole('button', { name: '恢复默认', exact: true }).click()
