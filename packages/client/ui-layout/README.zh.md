@@ -13,7 +13,7 @@ kind: "package-reference"
 
 `/client` 导出表层包含插件主体（`apply`／`inject`）、`LayoutController` 和 owner-share 接口（包括 `MobileHeaderActionOwnerProps`）。AppFrame、面板 store 与让步求解器仍属于包内部。
 
-`layout.openDetails(sessionId, target)` 把工具调用交给唯一的辅助栏所有者；`target.callId` 明确指定调用，标签不依赖聊天中当前选中的调用。`layout.focusRightbar(sessionId)` 只切换辅助栏目标，不改变中间窗格选择。辅助栏向框架报告是否显示、是否占轨道以及是否全屏；折叠不会结束 Host Session。
+`layout.openDetails(sessionId, target)` 把工具调用交给唯一的辅助栏所有者；`target.callId` 明确指定调用，标签不依赖聊天中当前选中的调用。`layout.focusRightbar(sessionId)` 只切换辅助栏目标，不改变中间窗格选择。该 Session 被选中后，再离开它会释放框架目标，侧栏随之显示新选中对话保留的标签。辅助栏向框架报告是否显示、是否占轨道以及是否全屏；折叠不会结束 Host Session。
 
 ## 概述
 

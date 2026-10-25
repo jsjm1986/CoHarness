@@ -231,12 +231,13 @@ export function apply(ctx: ClientContext): void {
     }, AppFrame)
     const disposePanels = ctx.slots.subscribe('main', retainMainPanels)
     retainMainPanels()
-    // A Session arriving on the selection returns the center to the
-    // Conversation regardless of which surface opened it.
+    // Session selection restores the Conversation and releases the departed
+    // owner's auxiliary target; its retained tabs keep their resource addresses.
     let lastCurrent = ctx.sessions.list.getSnapshot().current
     const stopSessions = ctx.sessions.list.subscribe(() => {
       const current = ctx.sessions.list.getSnapshot().current
       if (current === lastCurrent) return
+      if (lastCurrent !== undefined) instance.actions.releaseRightbar(lastCurrent)
       lastCurrent = current
       if (instance.getSnapshot().panelInfo.activePanelId !== null) layout.selectPanel(null)
     })

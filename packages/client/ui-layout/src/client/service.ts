@@ -153,7 +153,7 @@ export class LayoutController implements ILayout {
     return () => { if (this.#rightbar === owner) this.#rightbar = undefined }
   }
 
-  /** Bind the frame to the Session that initiated a panel action. */
+  /** Target a Session until selection leaves that owner. */
   focusRightbar(sessionId: SessionId): void { this.panels.focusRightbar(sessionId) }
   /** Report visible geometry from the tab owner. */
   openRightbar(track: boolean, fullscreen: boolean): void { this.panels.openRightbar(track, fullscreen) }

@@ -469,6 +469,7 @@ export class ConversationViewportController implements ConversationViewport {
       draft.paneRatios = normalizedRatios(draft.paneIds.length, target.paneRatios)
     })
     this.reconcileSessions()
+    this.selectWorkbenchFocus()
     this.persistWorkbenches()
   }
   createWorkbench(name: string): string {
@@ -496,6 +497,7 @@ export class ConversationViewportController implements ConversationViewport {
       name: name.trim(),
       paneIds: source === undefined ? [] : [...source.paneIds],
       paneRatios: source === undefined ? [] : [...source.paneRatios],
+      ...(source?.activePaneId === undefined ? {} : { activePaneId: source.activePaneId }),
       updatedAt: Date.now(),
     }
     this.workbenches.set(nextId, target)
@@ -510,6 +512,8 @@ export class ConversationViewportController implements ConversationViewport {
       if (active === undefined) delete draft.activePaneId
       else draft.activePaneId = active
     })
+    this.reconcileSessions()
+    this.selectWorkbenchFocus()
     this.persistWorkbenches()
     return nextId
   }
@@ -637,6 +641,13 @@ export class ConversationViewportController implements ConversationViewport {
     if (ids.length === this.stagedIds.length && ids.every((id, index) => id === this.stagedIds[index])) return
     this.stagedIds = ids
     this.sessions.setAdditionalStaged(ids)
+  }
+
+  private selectWorkbenchFocus(): void {
+    const state = this.store.getSnapshot()
+    if (this.enabled && state.mode === 'workbench' && state.pendingIdentity !== true
+      && state.activePaneId !== undefined
+      && validSession(this.sessions, state.activePaneId, this.workspaces)) this.select(state.activePaneId)
   }
 
   private select(sessionId: SessionId): void {

@@ -7,7 +7,8 @@
 import { Context } from '@deepseek-ai/cordis'
 import { stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotRegistry, createSnapshotStore, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as themeApply, inject as themeInject, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { apply, inject, LayoutController } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -22,7 +23,9 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-async function bench() {
+async function bench(list: HostObservable<{ current: SessionId | undefined }> = {
+  getSnapshot: () => ({ current: undefined }), subscribe: () => () => {},
+}) {
   const ctx = new Context()
   const slotsFiber = ctx.plugin(SlotRegistry)
   // Theme registers its Appearance settings row and requires the connection
@@ -33,11 +36,7 @@ async function bench() {
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)
   ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
-  // ui-layout watches ctx.sessions.list for selection changes that return the
-  // center to the Conversation; a static empty list satisfies the wiring.
-  ctx.provide('sessions', {
-    list: { getSnapshot: () => ({ current: undefined }), subscribe: () => () => {} },
-  } as never)
+  ctx.provide('sessions', { list } as never)
   await ctx.plugin({ inject: themeInject, apply: themeApply }).await()
   await slotsFiber.await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry }
@@ -96,6 +95,33 @@ describe('ui-layout client apply', () => {
     layout.toggleSidebar()
     expect(instance.getSnapshot().sidebar).not.toBe(before)
     await fiber.dispose()
+  })
+
+  it('releases a preview binding when selection leaves its owner and removes the observer on disposal', async () => {
+    const a = 'preview-a' as SessionId
+    const b = 'preview-b' as SessionId
+    const list = createSnapshotStore<{ current: SessionId | undefined }>({ current: undefined })
+    const { ctx, slots } = await bench(list)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const instance = (slots.entries('root')[0]!.store as ReturnType<typeof createLayoutStore>).create()
+    const layout = ctx.get('layout') as LayoutController
+    try {
+      layout.focusRightbar(a)
+      list.set({ current: b })
+      expect(instance.getSnapshot().detailsSessionId).toBe(a)
+      list.set({ current: a })
+      expect(instance.getSnapshot().detailsSessionId).toBe(a)
+      list.set({ current: a })
+      expect(instance.getSnapshot().detailsSessionId).toBe(a)
+      list.set({ current: b })
+      expect(instance.getSnapshot()).not.toHaveProperty('detailsSessionId')
+      layout.focusRightbar(a)
+      await fiber.dispose()
+      list.set({ current: a })
+      list.set({ current: b })
+      expect(instance.getSnapshot().detailsSessionId).toBe(a)
+    } finally { await fiber.dispose() }
   })
 
   it('theme presenter applies the initial snapshot, follows theme/change, and unwinds on dispose', async () => {

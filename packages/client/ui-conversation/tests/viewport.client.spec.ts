@@ -220,6 +220,30 @@ describe('ConversationViewportController', () => {
     viewport.dispose()
   })
 
+  it('duplicates the selected pane and ratios without moving focus to the first pane', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    try {
+      viewport.setPersistenceScope('local')
+      viewport.setEnabled(true)
+      const original = viewport.createWorkbench('Preview')
+      viewport.add(id('a'))
+      viewport.add(id('b'))
+      viewport.setPaneRatios([1, 2])
+      viewport.focus(id('b'))
+      const copy = viewport.duplicateWorkbench(original, 'Preview copy')
+      expect(viewport.currentWorkbench().id).toBe(copy)
+      expect(viewport.snapshot.getSnapshot()).toMatchObject({
+        paneIds: [id('a'), id('b')], activePaneId: id('b'), paneRatios: [1 / 3, 2 / 3],
+      })
+      expect(h.list.getSnapshot().current).toBe(id('b'))
+      viewport.focus(id('a'))
+      viewport.switchWorkbench(original)
+      expect(viewport.snapshot.getSnapshot().activePaneId).toBe(id('b'))
+      expect(h.list.getSnapshot().current).toBe(id('b'))
+    } finally { viewport.dispose() }
+  })
+
   it('persists a workbench selection when its panes, focus, and ratios are unchanged', async () => {
     const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
     const h = harness()

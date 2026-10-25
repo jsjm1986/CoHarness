@@ -13,7 +13,7 @@ The frame publishes `data-viewport` and `--dsw-viewport-height` for narrow panes
 
 The `/client` exports are the plugin body (`apply`/`inject`), `LayoutController`, and the owner-share interfaces, including `MobileHeaderActionOwnerProps`. AppFrame, the panel store, and the concession solver remain package-internal.
 
-`layout.openDetails(sessionId, target)` delegates a tool call to the sole auxiliary-panel owner; `target.callId` fixes the call independently of chat selection. `layout.focusRightbar(sessionId)` changes only the auxiliary target, preserving the center pane selection. The panel reports visibility, track reservation, and fullscreen presentation to the frame; collapsing it does not end a Host Session.
+`layout.openDetails(sessionId, target)` delegates a tool call to the sole auxiliary-panel owner; `target.callId` fixes the call independently of chat selection. `layout.focusRightbar(sessionId)` changes only the auxiliary target, preserving the center pane selection. Leaving that Session after it is selected releases the frame target; the sidebar then shows the newly selected conversation's retained tabs. The panel reports visibility, track reservation, and fullscreen presentation to the frame; collapsing it does not end a Host Session.
 
 ## Summary
 

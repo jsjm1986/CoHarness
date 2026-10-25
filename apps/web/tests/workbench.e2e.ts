@@ -432,6 +432,20 @@ describe('web: Cordis Workspace workbench', () => {
         await expect.poll(() => input.isEditable(), { timeout: 30_000 }).toBe(true)
         await input.fill(drafts[index]!)
       }
+      if (scenario === 'preview-width') {
+        const roster = page.getByRole('region', { name: 'Workbench', exact: true })
+        await roster.getByRole('listitem').last().getByRole('button').first().click()
+        await toolbar.getByRole('button', { name: 'Workspace files', exact: true }).click()
+        const files = page.getByRole('dialog', { name: 'Workspace files', exact: true })
+        await files.getByRole('treeitem', { name: 'preview.pdf', exact: true }).click()
+        await files.waitFor({ state: 'hidden' })
+        const canvas = page.getByRole('region', { name: 'preview.pdf', exact: true }).locator('canvas').first()
+        await canvas.waitFor()
+        await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) => element.width)).toBeGreaterThan(0)
+        await roster.getByRole('listitem').first().getByRole('button').first().click()
+        await expect.poll(() => panes.count()).toBe(2)
+        await expect.poll(() => root.getAttribute('data-tabbed')).toBeNull()
+      }
       await panes.first().locator('textarea').first().click()
       await expect.poll(() => panes.first().getAttribute('data-active')).toBe('true')
       const desktopBefore = await panes.evaluateAll(nodes => nodes.map(node => ({
@@ -473,6 +487,10 @@ describe('web: Cordis Workspace workbench', () => {
         await expect.poll(() => panes.first().getAttribute('data-session-pane')).toBe(ids[1])
         await expect.poll(() => panes.first().locator('textarea').first().inputValue()).toBe(drafts[1])
         expect(await toolbar.getByRole('tab').last().getAttribute('aria-selected')).toBe('true')
+        if (scenario === 'preview-width') {
+          const foreground = page.locator('[data-sidebar-right-session]:not([data-sidebar-right-panel]):not([hidden])')
+          await expect.poll(() => foreground.getAttribute('data-sidebar-right-session')).toBe(ids[1])
+        }
         await trace.mark('Q-pane-ready')
         await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
         const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
@@ -772,6 +790,42 @@ describe('web: Cordis Workspace workbench', () => {
       await page.unroute(workspaceRoute)
       page.off('request', countPreview)
     }
+
+    const roster = page.getByRole('region', { name: 'Workbench', exact: true })
+    const foreground = page.locator('[data-sidebar-right-session]:not([data-sidebar-right-panel]):not([hidden])')
+    const preview = page.getByRole('region', { name: 'report.md', exact: true })
+    await panes.getByRole('button', { name: 'Open Markdown', exact: true }).click()
+    const selection: string[] = []
+    for (const index of [0, 1] as const) {
+      await roster.getByRole('listitem').nth(index).getByRole('button').first().click()
+      await expect.poll(() => panes.getAttribute('data-session-pane')).toBe(identities[index])
+      await expect.poll(() => foreground.getAttribute('data-sidebar-right-session')).toBe(identities[index])
+      await preview.getByRole('heading', { name: names[index], exact: true }).waitFor()
+      expect(await panes.locator('textarea').first().inputValue()).toBe(drafts[index])
+      selection.push(`Selected pane ${String(index + 1)}\n${await captureStableAria(page, '[data-workspace-markdown]', runtime.workspaceCwd)}`)
+    }
+    const caption = toolbar.getByRole('button', { name: 'Select workbench', exact: true })
+    await caption.click()
+    await page.getByRole('menuitem', { name: 'Duplicate workbench', exact: true }).click()
+    const duplicate = page.getByRole('dialog', { name: 'Duplicate workbench', exact: true })
+    await duplicate.getByRole('textbox', { name: 'Workbench name', exact: true }).fill('Preview copy')
+    await duplicate.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await duplicate.waitFor({ state: 'hidden' })
+    await expect.poll(() => panes.getAttribute('data-session-pane')).toBe(identities[1])
+    await preview.getByRole('heading', { name: names[1], exact: true }).waitFor()
+    selection.push(`Duplicated workbench\n${await captureStableAria(page, '[data-workspace-markdown]', runtime.workspaceCwd)}`)
+    await roster.getByRole('listitem').first().getByRole('button').first().click()
+    await preview.getByRole('heading', { name: names[0], exact: true }).waitFor()
+    await caption.click()
+    await page.getByRole('menuitem', { name: 'My workbench · 2/4', exact: true }).click()
+    await page.getByRole('menu').waitFor({ state: 'hidden' })
+    await expect.poll(() => panes.getAttribute('data-session-pane')).toBe(identities[1])
+    await expect.poll(() => foreground.getAttribute('data-sidebar-right-session')).toBe(identities[1])
+    await preview.getByRole('heading', { name: names[1], exact: true }).waitFor()
+    expect(await panes.locator('textarea').first().inputValue()).toBe(drafts[1])
+    selection.push(`Restored original workbench\n${await captureStableAria(page, '[data-workspace-markdown]', runtime.workspaceCwd)}`)
+    await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'preview-selection.expected.md'), selection.join('\n\n'), MODE)
+    expect(tripwire.pageErrors).toEqual([])
   })
 
   it.skipIf(MODE === 'record')('selects a stored document into its restored workbench pane across view changes', async () => {
