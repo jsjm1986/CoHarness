@@ -19,7 +19,7 @@ import type { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { clientSessionKey, createSnapshotStore, ProjectUiPolicyRuntime, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewportSnapshot, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '../src/client/index.ts'
 import type { GuideInjected, SidebarRightInjected } from '../src/client/index.ts'
 import { apply as hostApply } from '../src/index.ts'
@@ -96,6 +96,9 @@ async function boot(sessionId = SESSION, runtime: SessionRuntimeTarget = { kind:
     }),
   }
   ctx.provide('sessions', sessions as never)
+  ctx.provide('conversationViewport', {
+    snapshot: createSnapshotStore<ConversationViewportSnapshot>({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }),
+  } as never)
   const policy = new ProjectUiPolicyRuntime()
   const description = createSnapshotStore({ executionAuthorityRequired: false })
   ctx.provide('projectUiPolicy', policy)
@@ -130,6 +133,7 @@ function mountRoot(booted: Awaited<ReturnType<typeof boot>>, targetSessionId: Se
     useWorkspaces: vi.fn() as never,
     usePanelInfo: vi.fn() as never,
     useViews: bindSnapshotSelector(root.hooks.views),
+    useViewport: bindSnapshotSelector(root.hooks.viewport),
     mountView: root.mountView,
     selectView: root.selectView,
     width: 713, viewportWidth: 1567, canShow: true,

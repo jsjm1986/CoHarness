@@ -60,7 +60,7 @@ The panel takes the conversation's ground colour and content font sizes rather t
 
 The root-scoped `rightbar` entry renders the selected Session and background Sessions with initialized `keepMounted` bodies through separate `rightbar.session` subtrees. Each View owns its Session reference. Only the foreground Conversation reports a frame track and binds public navigation; other subtrees stay hidden without deleting tab state. The selected auxiliary target can differ from the active Workbench pane. Desktop header and compact topbar controls share the same Session store; neither owns a second layout.
 
-The mounted root selects the foreground View from the frame's pinned Session, or from the current Session when no pin exists. Changing the active Workbench pane or publishing its Session list keeps a pinned document visible. Clearing the pin resumes selection of the current Session; clearing both targets releases the foreground View.
+The mounted root selects the foreground View from the frame's pinned Session. Without a pin, it follows the current Session after that selection agrees with the active Workbench pane; unverified saved identities leave automatic previews hidden. The plugin consumes the conversation viewport capability for this selection. Changing the active Workbench pane or publishing its Session list keeps a pinned document visible. Clearing both targets releases the foreground View, while retained background bodies remain inactive.
 
 <a id="state"></a>
 ## State

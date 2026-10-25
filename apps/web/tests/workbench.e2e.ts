@@ -4,7 +4,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Browser, Page, Locator } from 'playwright'
+import type { Browser, Page, Locator, Request } from 'playwright'
 import { chromium } from 'playwright'
 import { afterEach, describe, expect, it, onTestFailed } from 'vitest'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
@@ -712,6 +712,66 @@ describe('web: Cordis Workspace workbench', () => {
     expect(tripwire.pageErrors).toEqual([])
     if (MODE === 'refresh') await mkdir(SELECTION_EXPECTED_DIR, { recursive: true })
     await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'preview-origin.expected.md'), output.join('\n\n'), MODE)
+
+    for (const [index, name] of names.entries()) {
+      await page.getByRole('region', { name: 'Workbench', exact: true }).getByRole('listitem').nth(index).getByRole('button').first().click()
+      await expect.poll(() => page.locator(`[data-session-pane="${identities[index]}"]`).getAttribute('data-active')).toBe('true')
+      await page.locator(`[data-session-pane="${identities[index]}"]`).getByRole('button', { name: 'Open Markdown', exact: true }).click()
+      await page.getByRole('region', { name: 'report.md', exact: true }).getByRole('heading', { name, exact: true }).waitFor()
+    }
+    const workspaceGate = Promise.withResolvers<undefined>()
+    const workspaceFinished = Promise.withResolvers<undefined>()
+    const workspaceRoute = /\/api\/workspace\.list(?:\?.*)?$/
+    let workspaceIntercepted = false
+    const bodyReads = [0, 0]
+    const countPreview = (request: Request): void => {
+      if (new URL(request.url()).pathname !== '/api/workspaceFiles.read') return
+      const index = names.findIndex(name => request.postData()?.includes(name))
+      if (index !== -1) bodyReads[index] = (bodyReads[index] ?? 0) + 1
+    }
+    page.on('request', countPreview)
+    await page.route(workspaceRoute, async (route) => {
+      workspaceIntercepted = true
+      try {
+        const response = await route.fetch()
+        await workspaceGate.promise
+        await route.fulfill({ response })
+      } finally { workspaceFinished.resolve(undefined) }
+    })
+    try {
+      // Single-session selection and the named workbench are independent saved preferences.
+      await page.evaluate((id) => {
+        localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId: id }))
+      }, names[0])
+      await Promise.all([
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/session.list').then(response => response.finished()),
+        page.waitForRequest(workspaceRoute),
+        page.reload({ waitUntil: 'load' }),
+      ])
+      await toolbar.waitFor()
+      const roster = page.getByRole('region', { name: 'Workbench', exact: true })
+      await expect.poll(() => roster.getByRole('listitem').nth(1).getByRole('button').first().getAttribute('aria-current')).toBe('true')
+      const foreground = page.locator('[data-sidebar-right-session]:not([data-sidebar-right-panel]):not([hidden])')
+      expect({ foreground: await foreground.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-sidebar-right-session'))), firstPaneBodyReads: bodyReads[0] })
+        .toEqual({ foreground: [], firstPaneBodyReads: 0 })
+      const startup = [`Workspace baseline pending\nVisible document sidebars: ${await foreground.count()}\nFirst-pane body reads: ${bodyReads[0]}`]
+      workspaceGate.resolve(undefined)
+      await workspaceFinished.promise
+      const preview = page.getByRole('region', { name: 'report.md', exact: true })
+      await preview.getByRole('heading', { name: names[1], exact: true }).waitFor()
+      expect(await foreground.getAttribute('data-sidebar-right-session')).toBe(identities[1])
+      expect(await panes.locator('textarea').first().inputValue()).toBe(drafts[1])
+      expect(bodyReads[0]).toBe(0)
+      expect(bodyReads[1]).toBeGreaterThan(0)
+      startup.push(`Restored document\n${await captureStableAria(page, '[data-workspace-markdown]', runtime.workspaceCwd)}`)
+      expect(tripwire.pageErrors).toEqual([])
+      await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'preview-startup.expected.md'), startup.join('\n\n'), MODE)
+    } finally {
+      workspaceGate.resolve(undefined)
+      if (workspaceIntercepted) await workspaceFinished.promise
+      await page.unroute(workspaceRoute)
+      page.off('request', countPreview)
+    }
   })
 
   it.skipIf(MODE === 'record')('selects a stored document into its restored workbench pane across view changes', async () => {

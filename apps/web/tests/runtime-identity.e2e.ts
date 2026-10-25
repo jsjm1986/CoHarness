@@ -21,6 +21,7 @@ const DOCUMENT_SCOPES = fileURLToPath(new URL('./expected/runtime-identity/', im
 const RESTORED_BINDINGS = fileURLToPath(new URL('./expected/runtime-identity/restored-bindings.expected.md', import.meta.url))
 const PLUGINS_NAVIGATION = fileURLToPath(new URL('./expected/runtime-identity/plugins-navigation/', import.meta.url))
 const HIDDEN_SUBMISSIONS = fileURLToPath(new URL('./expected/runtime-identity/hidden-submissions/', import.meta.url))
+const SIDEBAR_STARTUP = fileURLToPath(new URL('./expected/runtime-identity/sidebar-startup/', import.meta.url))
 
 it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)(
   'keeps identical Session IDs independent through histories, uploads and restoration from a %s bootstrap', async (bootstrap) => {
@@ -230,11 +231,19 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       const unloaded = `[data-session-pane="${bootstrap === 'personal' ? projectKey : personalKey}"] [role="status"]`
       await page.locator(unloaded).waitFor()
       await compareOrRefreshGolden(NOT_LOADED, await captureStableAria(page, unloaded, personal.workspaceCwd), webSnapshotMode())
+      const foregroundSidebar = page.locator('[data-sidebar-right-session]:not([data-sidebar-right-panel]):not([hidden])')
+      const pendingOwners = bootstrap === 'personal' ? [] : [projectKey]
+      await expect.poll(() => foregroundSidebar.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-sidebar-right-session')))).toEqual(pendingOwners)
+      const sidebarStartup = [`Foreign Runtime list held\nSelected sidebar Session views: ${pendingOwners.length}\nWrong first-pane sidebar: false`]
       heldList = undefined
       releaseList()
       const reloadFailure = await reload
       if (reloadFailure !== undefined) throw reloadFailure
       await page.waitForLoadState('networkidle')
+      expect(await foregroundSidebar.getAttribute('data-sidebar-right-session')).toBe(projectKey)
+      sidebarStartup.push('Restored Runtime selection\nSidebar Session: Project collision')
+      if (webSnapshotMode() === 'refresh') await mkdir(SIDEBAR_STARTUP, { recursive: true })
+      await compareOrRefreshGolden(`${SIDEBAR_STARTUP}${bootstrap}.expected.md`, sidebarStartup.join('\n\n'), webSnapshotMode())
       expect(await page.locator('[data-session-pane]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-session-pane')))).toEqual([personalKey, projectKey])
       const archiveReads = (workspaceReads.get(alternate) ?? 0) - archiveReadsBefore
       expect(archiveReads).toBe(1)
@@ -476,4 +485,5 @@ it('owns the Runtime Plugins navigation and hidden-submission goldens', async ()
     'project-personal.expected.md', 'project-project.expected.md',
   ])
   expect((await readdir(HIDDEN_SUBMISSIONS)).sort()).toEqual(['personal.expected.md', 'project.expected.md'])
+  expect((await readdir(SIDEBAR_STARTUP)).sort()).toEqual(['personal.expected.md', 'project.expected.md'])
 })

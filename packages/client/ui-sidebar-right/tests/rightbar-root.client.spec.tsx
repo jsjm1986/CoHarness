@@ -39,6 +39,7 @@ function mounted(views: readonly SidebarSessionViewSnapshot[], props: Partial<Pa
     useWorkspaces={vi.fn() as never}
     usePanelInfo={vi.fn() as never}
     useViews={(<T,>(selector: (views: readonly SidebarSessionViewSnapshot[]) => T): T => selector(views))}
+    useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })}
     mountView={mountView}
     selectView={selectView}
     width={320} viewportWidth={1280} canShow {...props} />)
@@ -75,5 +76,38 @@ describe('RightbarRoot', () => {
   it('renders nothing while the pool publishes no view', () => {
     const { root } = mounted([])
     expect(root.container.querySelector('[data-sidebar-right-session]')).toBeNull()
+  })
+
+  it('keeps a provisional current view inactive until the workbench selection agrees', () => {
+    const { root, selectView, renderSlot, mountView } = mounted([view(OTHER, true)], {
+      useViewport: selector => selector({ mode: 'workbench', paneIds: [OTHER, SESSION], activePaneId: SESSION, paneRatios: [0.5, 0.5], collapsedIds: [] }),
+    })
+    expect(selectView).toHaveBeenCalledWith(undefined)
+    expect(root.container.querySelector<HTMLElement>('[data-sidebar-right-session]')?.hidden).toBe(true)
+    expect(renderSlot).toHaveBeenCalledWith('rightbar.session', expect.objectContaining({ active: false }))
+    expect(mountView).toHaveBeenCalledTimes(1)
+  })
+
+  it('follows the restored workbench pane after it becomes current', () => {
+    const { selectView } = mounted([view(OTHER, true)], {
+      useViewport: selector => selector({ mode: 'workbench', paneIds: [SESSION, OTHER], activePaneId: OTHER, paneRatios: [0.5, 0.5], collapsedIds: [] }),
+    })
+    expect(selectView).toHaveBeenCalledWith(OTHER)
+  })
+
+  it('keeps automatic selection empty while saved workbench identities are unverified', () => {
+    const { selectView } = mounted([view(OTHER, true)], {
+      useViewport: selector => selector({ mode: 'workbench', pendingIdentity: true, paneIds: [], paneRatios: [], collapsedIds: [] }),
+    })
+    expect(selectView).toHaveBeenCalledWith(undefined)
+  })
+
+  it('preserves an explicit document pin while another workbench pane becomes current', () => {
+    const { root, selectView } = mounted([view(SESSION, true)], {
+      targetSessionId: SESSION,
+      useViewport: selector => selector({ mode: 'workbench', paneIds: [SESSION, OTHER], activePaneId: OTHER, paneRatios: [0.5, 0.5], collapsedIds: [] }),
+    })
+    expect(selectView).toHaveBeenCalledWith(SESSION)
+    expect(root.container.querySelector<HTMLElement>('[data-sidebar-right-session]')?.hidden).toBe(false)
   })
 })
