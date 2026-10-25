@@ -23,7 +23,7 @@ Source = "https://github.com/deepseek-ai/deepseek-harness"
 
 [dependency-groups]
 quality = [
-    "ruff==0.16.8",
+    "ruff==0.16.9",
 ]
 test = ["pytest>=8.0", "Pillow==12.3.0"]
 
