@@ -14,7 +14,7 @@ The Host ApiProxy keeps a bounded per-runtime LRU of Web `detail: 'conversation'
 
 The projection registry exposes a monotone registration-set revision. It changes only when a projection key enters or leaves the registry, so a cached history block cannot outlive the set of keys that can appear in that block.
 
-The Gateway context endpoint reads the project catalog once and maps the already-authorized membership rows to owner flags. Legacy in-process catalog rows that omit owner metadata retain a detail fallback; production rows include it and stay on the one-read path. `projectForUser` applies the requested project id inside its PostgreSQL query instead of scanning every project authority row. Authorization output, membership semantics, and scope cookies remain unchanged.
+The Gateway context endpoint reuses the selected scope resolved at request dispatch, so that request's project membership and detail reads run once. Proxy admission and stream renewal retain their own current-authority checks. The endpoint reads the project catalog once and maps the already-authorized membership rows to owner flags. Legacy in-process catalog rows that omit owner metadata retain a detail fallback; production rows include it and stay on the one-read path. `projectForUser` applies the requested project id inside its PostgreSQL query instead of scanning every project authority row. Authorization output, membership semantics, and scope cookies remain unchanged.
 
 The frontend static server marks Vite-style hashed files under `/assets/` as immutable for one year. The HTML entry and non-hashed files keep their existing response headers, so release selection and index injection remain unchanged.
 

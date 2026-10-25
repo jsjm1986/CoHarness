@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.md
 document:
-  en: 62754c3cd22e8a637a47d7d2619475671bac3210
-  zh: 49e52a79c1d865ca721176e12a41d8f7b7bb3c0c
+  en: d6eec75a03f99dc1d68454bae4e8b9e5f3e9734c
+  zh: 42f5f2a72d4638b6dd47a2e876aa22304ee2f700
 /agent-note-keep-repeated-project-scope-reloads-cheap:
   en: 8a6fbf587db16e7c
   zh: 627743b9104fce15
@@ -12,8 +12,8 @@ document:
   en: adbaadfc2ae162d3
   zh: 583f4fc900665b03
 /agent-note-keep-repeated-project-scope-reloads-cheap/decision:
-  en: 2efbd22bb465704f
-  zh: 95ba0ed0227237ad
+  en: 1186dfffb62cf979
+  zh: d16b44a6bf1dfed9
 /agent-note-keep-repeated-project-scope-reloads-cheap/alternatives-considered:
   en: a255a5d983e471c5
   zh: 6bef0f0ef4c2ca3c
