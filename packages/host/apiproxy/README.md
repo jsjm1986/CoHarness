@@ -133,6 +133,8 @@ Direct `SessionsApi` / `SubagentsApi` and `IApiClient` history results stay expa
 
 The `inbox` projection reconstructs pending input from Session-owned durable splices without restoring an Agent. Gateway authorization still governs history reads; cold queue mutations retain the live-Agent requirement.
 
+`toFetchHandler(api, { serverTiming: true })` adds the numeric `dsh_rpc` duration to validated unary envelopes, including business refusals and handler crashes. Timing ends when the response is constructed; it does not consume its body. Carrier rejections before unary dispatch, event streams and downloads have no unary metric. The option defaults to `false`; [Connection](../../client/connection/README.md) owns the physical request span and deployment configuration.
+
 <a id="model-experience"></a>
 ## Model Experience
 

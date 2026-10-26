@@ -515,6 +515,8 @@ export type Config = LocalConfig
 ```ts config-catalog
 /** Plugin config: the deployment's non-loopback serving authorities. */
 export interface ConnectionConfig {
+  /** Include runtime dispatch and unary processing durations in Server-Timing; disabled by default. */
+  serverTiming?: boolean
   /** Browser generation recovery timing delivered through the served index. */
   recovery?: {
     /** First retry delay cap in milliseconds. */

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-26-runtime-unary-timing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-26-runtime-unary-timing.md
+document:
+  en: b18bc6abb3cde8f05e17109acf6fa151368f7925
+  zh: 7bea92944d75b217ab479757bad4f09cf3b5de78
+/agent-note-runtime-unary-response-timing:
+  en: 3b3ab06321d09ad5
+  zh: d6a000a9ad30b6e4
+/agent-note-runtime-unary-response-timing/problem:
+  en: 641bf76076ce8d26
+  zh: c900040af4098611
+/agent-note-runtime-unary-response-timing/decision:
+  en: 6f474155c0973ef0
+  zh: ce21ffd96748c203
+/agent-note-runtime-unary-response-timing/alternatives-considered:
+  en: 8af02fe005f80081
+  zh: 6826d653a4362494
+/agent-note-runtime-unary-response-timing/consequences:
+  en: ffda3ac94fc1a25d
+  zh: 7d0eb7b01d5827e4

@@ -63,6 +63,8 @@ Each browser downlink keeps a head-indexed queue capped at 1,024 frames and 8 Mi
 
 `connection/request` is the Host-side waterfall around every request accepted by the browser-trust fence. It receives the entry-time Node request headers and a `kind` of `http` or `upgrade`, then completes before RPC dispatch or event-stream opening. Authentication and request-context listeners must treat the headers as immutable and call `next()` so independent plugins compose; returning without delegation prevents later listeners and the carrier handler from running. Upgrade dispatch also supplies a socket-owned `signal`, aborted on close or error; listeners that retain stream authority must use this signal rather than the waterfall completion as its lifetime.
 
+Host profile option `serverTiming: true` adds fixed numeric `Server-Timing` metrics to ApiProxy fallback POST replies; the default is `false`. `dsh_conn` measures the accepted runtime request through the request-context waterfall, body intake and response construction, and `dsh_rpc` measures unary payload validation, invocation and JSON construction. Browser-trust refusals before the waterfall, Gateway processing, network transfer, response-body consumption, GET streams/downloads and registered Remote routes are outside these spans. No request identifiers, paths or contents enter the header. Gateway supplies this option from `HGW_PERFORMANCE_ENABLED`; the [timing decision](../../../.agents/notes/implemented/architecture/2026-10-26-runtime-unary-timing.md) defines interpretation.
+
 <a id="model-experience"></a>
 ## Model Experience
 

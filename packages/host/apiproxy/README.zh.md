@@ -133,6 +133,8 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-preset-registry`](
 
 `inbox` 投影从 Session 自有的持久化 splice 重建待处理输入，不恢复 Agent。历史读取仍由 Gateway 授权控制；冷队列修改继续要求 live Agent。
 
+`toFetchHandler(api, { serverTiming: true })` 为已校验的一元信封添加数值 `dsh_rpc` 耗时，包括业务拒绝和处理器异常。计时在响应构造完成时结束，不消费响应体。一元分发前的载体拒绝、事件流和下载没有一元指标。该选项默认为 `false`；[Connection](../../client/connection/README.zh.md)定义物理请求计时和部署配置。
+
 <a id="model-experience"></a>
 ## 模型体验
 

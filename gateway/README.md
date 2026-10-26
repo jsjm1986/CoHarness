@@ -63,7 +63,7 @@ Fixtures that create users, projects, runtime files or deployment state use `tes
 | `HGW_RUNTIME_MAX_RESIDENT` | 8 | Resident and starting Runtime process reservations |
 | `HGW_RUNTIME_MAX_QUEUED` | 32 | Pending cold Runtime admissions |
 | `HGW_RUNTIME_QUEUE_WAIT_MS` | 30 s | Maximum cold Runtime admission wait |
-| `HGW_PERFORMANCE_ENABLED` | `true` | Enable bounded cumulative request and process diagnostics; accepts only `true` or `false` |
+| `HGW_PERFORMANCE_ENABLED` | `true` | Enable bounded cumulative request/process diagnostics and managed Runtime unary response timings; accepts only `true` or `false` |
 | `HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS` | 20 ms | Native event-loop delay sampling interval |
 | `HGW_UPSTREAM_TIMEOUT_MS` | 30 s | Maximum time one HTTP/WebSocket proxy operation or forwarded selected-scope document metadata request waits for a runtime upstream; at most 2,147,483,647 ms |
 | `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` | 64 MiB | Maximum runtime response bytes the Gateway retains or forwards |

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/connection/README.md
 document:
-  en: dc52e5109e2e3525a21de30925a059cd175ebda0
-  zh: 80c14e8038516656483a34a87cd8d0dac6de1552
+  en: 65bd28c3e8d8786ad59c318dfde111479351163f
+  zh: 9a702baf7a1c85518ab546f5b82aa1ff34c0dd8d
 /:
   en: 4a0ddd1fb131c25a
   zh: 61495d48365178df
@@ -24,8 +24,8 @@ document:
   en: 390ffe5458b41f74
   zh: fffe8ab0bb6322f8
 /deepseek-ai-dsh-client-connection/api-websocket-downlinks:
-  en: 163866743f607d3e
-  zh: ad30ef31bc70b379
+  en: d7d50509d2d5c25a
+  zh: 5b902c17688af088
 /deepseek-ai-dsh-client-connection/model-experience:
   en: 88bbc33fe9ae9df8
   zh: bfbab6d51b4abd40

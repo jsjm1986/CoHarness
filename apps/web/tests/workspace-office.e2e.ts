@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page } from 'playwright'
+import { chromium, type Browser, type Page, type Response } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-office-to-pdf'
@@ -31,7 +31,7 @@ describe('web e2e: authorized Office preview', () => {
     await mkdir(metadata, { mode: 0o700 })
     await writeFile(join(metadata, 'font-metadata.json'), '{invalid', { flag: 'wx', mode: 0o600 })
     const overlay = join(metadataRoot, 'cordis.patch.yml')
-    await writeFile(overlay, `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(metadata)}\n`,
+    await writeFile(overlay, `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(metadata)}\n- id: connection\n  config:\n    serverTiming: true\n`,
       { flag: 'wx', mode: 0o600 })
     scaffold = await launchWebScaffold({ workbench: true, extraOverlayPath: overlay })
     expect(scaffold.ctx.get('officeToPdf')).toBeDefined()
@@ -96,7 +96,18 @@ describe('web e2e: authorized Office preview', () => {
     if (scaffold === undefined) throw new Error('Web scaffold is unavailable')
     onTestFailed(() => saveFailureShot(page, `workspace-office-${extension}`))
     const tripwire = watchConsole(page)
-    await page.getByRole('button', { name: `Preview ${extension}`, exact: true }).click()
+    const button = page.getByRole('button', { name: `Preview ${extension}`, exact: true })
+    let renderResponse: Response | undefined
+    if (extension === 'docx') {
+      const outcomes = await Promise.allSettled([
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/workspaceFiles.renderOffice'),
+        button.click(),
+      ])
+      for (const outcome of outcomes) if (outcome.status === 'rejected') throw outcome.reason
+      if (outcomes[0].status === 'fulfilled') renderResponse = outcomes[0].value
+    } else {
+      await button.click()
+    }
     const preview = page.getByRole('region', { name: `preview.${extension}`, exact: true })
     if (SPREADSHEETS.has(extension)) {
       const sheet = preview.locator('[data-excel-preview]')
@@ -116,6 +127,9 @@ describe('web e2e: authorized Office preview', () => {
       return bytes.some((value, index) => index % 4 !== 3 && value < 200)
     })).toBe(true)
     if (extension === 'docx') {
+      if (renderResponse === undefined) throw new Error('Office response observation is unavailable')
+      const headers = await renderResponse.allHeaders()
+      expect(headers['server-timing']).toMatch(/^dsh_rpc;dur=\d+\.\d{2}, dsh_conn;dur=\d+\.\d{2}$/)
       if (metadataRoot === undefined) throw new Error('Metadata fixture is unavailable')
       const metadata = JSON.parse(await readFile(join(metadataRoot, 'metadata/font-metadata.json'), 'utf8')) as {
         format: number

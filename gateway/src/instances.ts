@@ -856,6 +856,7 @@ export class InstanceManager {
       }
       patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
       patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
+      patchText += `- id: connection\n  config:\n    serverTiming: ${String(this.cfg.performanceEnabled)}\n`
       if (this.cfg.officeFontMetadataCacheDirectory !== undefined) {
         patchText += `- id: office-to-pdf\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(this.cfg.officeFontMetadataCacheDirectory)}\n`
       }

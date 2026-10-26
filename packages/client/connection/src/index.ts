@@ -110,6 +110,8 @@ export const inject = ['credentials']
 
 /** Plugin config: the deployment's non-loopback serving authorities. */
 export interface ConnectionConfig {
+  /** Include runtime dispatch and unary processing durations in Server-Timing; disabled by default. */
+  serverTiming?: boolean
   /** Browser generation recovery timing delivered through the served index. */
   recovery?: {
     /** First retry delay cap in milliseconds. */
@@ -147,6 +149,7 @@ export interface ConnectionConfig {
 }
 
 export const Config: z<ConnectionConfig> = z.object({
+  serverTiming: z.boolean().default(false),
   recovery: z.object({
     backoffBaseMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(500),
     backoffFactor: z.number().min(1).default(2),
@@ -243,6 +246,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   const trustedHosts = config?.trustedHosts ?? []
   const cookieMaxAgeDays = config?.cookieMaxAgeDays ?? 30
   const maxRequestBodyBytes = config?.maxRequestBodyBytes ?? DEFAULT_MAX_REQUEST_BODY_BYTES
+  const serverTiming = config?.serverTiming ?? false
   const historyPageTargetBytes =
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const websocketHeartbeatIntervalMs = config?.websocketHeartbeatIntervalMs ?? 30_000
@@ -300,6 +304,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
         let carrier = fetchHandlers.get(apiProxy)
         if (carrier === undefined) {
           carrier = toFetchHandler(apiProxy, {
+            serverTiming,
             historyPageTargetBytes,
             requestBodyMaxBytes: maxRequestBodyBytes,
           })
@@ -318,6 +323,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
           return
         }
+        const startedAt = serverTiming && req.method === 'POST' ? performance.now() : undefined
         await webCtx.waterfall('connection/request', {
           kind: 'http',
           headers: req.headers,
@@ -326,7 +332,14 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           ...(req.url === undefined ? {} : { url: req.url }),
         }, async () => {
           if (await connection.dispatchHttp(req, res)) return
-          await bridge(req, res, fetchHandler, maxRequestBodyBytes)
+          const handler = startedAt === undefined ? fetchHandler : {
+            async fetch(request: Request): Promise<Response> {
+              const response = await fetchHandler.fetch(request)
+              response.headers.append('server-timing', `dsh_conn;dur=${(performance.now() - startedAt).toFixed(2)}`)
+              return response
+            },
+          }
+          await bridge(req, res, handler, maxRequestBodyBytes)
         })
       },
     }

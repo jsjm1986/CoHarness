@@ -275,6 +275,8 @@ function sseResponse(
 
 /** Construction options for the Fetch carrier handler. */
 export interface FetchHandlerOptions {
+  /** Include unary processing time in Server-Timing; disabled by default. */
+  serverTiming?: boolean
   /** Complete history response target in uncompressed UTF-8 JSON bytes. */
   historyPageTargetBytes?: number
   /** Maximum UTF-8 bytes accepted for one unary JSON request body. */
@@ -387,6 +389,7 @@ export function toFetchHandler(
   const historyPageTargetBytes = options.historyPageTargetBytes
     ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const requestBodyMaxBytes = options.requestBodyMaxBytes ?? DEFAULT_REQUEST_BODY_MAX_BYTES
+  const serverTiming = options.serverTiming ?? false
   if (!Number.isSafeInteger(historyPageTargetBytes) || historyPageTargetBytes < 1) {
     throw new RangeError('historyPageTargetBytes must be a positive safe integer')
   }
@@ -484,7 +487,11 @@ export function toFetchHandler(
       if (message.method !== method) {
         return errorResponse(message.rpcId, { code: 'bad-request', message: `method "${message.method}" does not match path "${method}"`, details: { issues: [] } })
       }
-      return handleUnary(api, method, message, req.signal, historyPageTargetBytes)
+      if (!serverTiming) return handleUnary(api, method, message, req.signal, historyPageTargetBytes)
+      const startedAt = performance.now()
+      const response = await handleUnary(api, method, message, req.signal, historyPageTargetBytes)
+      response.headers.append('server-timing', `dsh_rpc;dur=${(performance.now() - startedAt).toFixed(2)}`)
+      return response
     },
   }
 }

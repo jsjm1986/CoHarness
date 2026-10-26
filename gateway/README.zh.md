@@ -63,7 +63,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_RUNTIME_MAX_RESIDENT` | 8 | 常驻与启动中 Runtime 的进程预约总数 |
 | `HGW_RUNTIME_MAX_QUEUED` | 32 | 等待冷启动准入的 Runtime 数 |
 | `HGW_RUNTIME_QUEUE_WAIT_MS` | 30 秒 | 冷启动准入最长等待时间 |
-| `HGW_PERFORMANCE_ENABLED` | `true` | 启用有界累计请求与进程诊断；仅接受 `true` 或 `false` |
+| `HGW_PERFORMANCE_ENABLED` | `true` | 启用有界累计请求／进程诊断和受管 Runtime 的一元响应耗时；仅接受 `true` 或 `false` |
 | `HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS` | 20 毫秒 | 原生事件循环延迟采样间隔 |
 | `HGW_UPSTREAM_TIMEOUT_MS` | 30 秒 | 单次 HTTP/WebSocket 代理操作或已转发的指定作用域文档元数据请求等待运行时上游的最长时间，最大 2,147,483,647 毫秒 |
 | `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` | 64 MiB | Gateway 保留或转发的运行时响应最大字节数 |

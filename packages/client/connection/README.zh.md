@@ -63,6 +63,8 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 
 `connection/request` 是 Host 侧包围每个已通过浏览器信任栅栏请求的 waterfall。它接收请求进入时的 Node header，以及取值为 `http` 或 `upgrade` 的 `kind`，并在 RPC 分发或事件流开启前完成。认证与请求上下文监听器必须将 header 视为不可变值，并调用 `next()` 让独立插件组合；不委托会阻止后续监听器与载体处理器运行。 upgrade 分发还提供由 socket 所有的 `signal`，在关闭或错误时中止；保留事件流权限的监听器必须使用该信号作为生命周期，而不能使用 waterfall 完成时间。
 
+Host 配置项 `serverTiming: true` 为 ApiProxy 回退 POST 响应添加固定名称的数值 `Server-Timing` 指标，默认为 `false`。`dsh_conn` 从 Runtime 请求通过信任检查后开始，覆盖请求上下文 waterfall、请求体接收及响应构造；`dsh_rpc` 覆盖一元负载校验、调用及 JSON 构造。waterfall 前的浏览器信任拒绝、Gateway 处理、网络传输、响应体消费、GET 流／下载和已注册 Remote 路由不在这些计时内。响应头不包含请求标识、路径或内容。Gateway 根据 `HGW_PERFORMANCE_ENABLED` 提供该选项；[计时决策](../../../.agents/notes/implemented/architecture/2026-10-26-runtime-unary-timing.zh.md)定义解读方式。
+
 <a id="model-experience"></a>
 ## 模型体验
 
