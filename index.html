@@ -38,7 +38,8 @@ body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(
 img{max-width:100%;display:block}
 a{color:var(--acc)}
 ::selection{background:rgba(37,71,224,.16)}
-:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:4px}
+a{text-underline-offset:3px}
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px;position:relative}
 .wrap::before,.wrap::after{content:"";position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.55;pointer-events:none}
 .wrap::before{left:0}
@@ -51,8 +52,7 @@ a{color:var(--acc)}
 nav{position:sticky;top:0;z-index:50;background:rgba(251,251,252,.85);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .nav-in{display:flex;align-items:center;gap:24px;height:62px}
 .brand{display:flex;align-items:center;gap:11px;font:700 14px var(--mono);letter-spacing:.24em;color:var(--ink);text-decoration:none}
-.nav-dot{width:7px;height:7px;border-radius:50%;background:#12b76a;flex:none;box-shadow:0 0 0 0 rgba(18,183,106,.4);animation:pulse 2.6s ease-out infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(18,183,106,.45)}70%{box-shadow:0 0 0 8px rgba(18,183,106,0)}100%{box-shadow:0 0 0 0 rgba(18,183,106,0)}}
+.nav-dot{width:7px;height:7px;border-radius:50%;background:#12b76a;flex:none}
 .nav-links{display:flex;gap:2px;margin-left:auto}
 .nav-links a{display:inline-flex;align-items:center;min-height:44px;padding:0 11px;font-size:13.5px;color:var(--sub);border-radius:8px;text-decoration:none}
 .nav-links a:hover{color:var(--ink);background:#f0f2f7}
@@ -93,11 +93,11 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .hero .lead{margin-top:24px;font-size:17px;color:var(--sub);max-width:33em;text-wrap:pretty}
 .cta-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:40px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:50px;padding:0 26px;border-radius:10px;font-size:15px;font-weight:600;letter-spacing:.01em;text-decoration:none;transition:transform .18s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease}
-.btn-p{background:var(--acc);color:#fff;box-shadow:0 14px 32px -12px rgba(37,71,224,.45)}
-.btn-p:hover{background:var(--acc-deep);transform:translateY(-1px);box-shadow:0 18px 38px -12px rgba(37,71,224,.5)}
+.btn-p{background:var(--acc);color:#fff;box-shadow:0 14px 30px -14px rgba(16,24,40,.35)}
+.btn-p:hover{background:var(--acc-deep);transform:translateY(-1px);box-shadow:0 18px 36px -14px rgba(16,24,40,.4)}
 .btn-g{border:1px solid var(--line2);background:#fff;color:var(--ink)}
 .btn-g:hover{border-color:var(--ink);transform:translateY(-1px)}
-.live{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:34px;font:12px var(--mono);letter-spacing:.05em;color:var(--sub)}
+.live{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:34px;font:12px var(--mono);letter-spacing:.03em;color:var(--sub)}
 .live span{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
 .live i{width:7px;height:7px;border-radius:50%;flex:none}
 .live .g{background:#12b76a}
@@ -114,7 +114,7 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .winbar i:first-child{background:#e8a020}
 .winbar .url{margin-left:12px;font:11.5px var(--mono);color:var(--faint);background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 12px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .win img{width:100%;display:block}
-.wincap{display:flex;justify-content:space-between;gap:12px;margin-top:13px;font:11px var(--mono);letter-spacing:.14em;color:var(--sub)}
+.wincap{display:flex;justify-content:space-between;gap:12px;margin-top:13px;font:12px var(--mono);letter-spacing:.03em;color:var(--sub)}
 .wincap .cap-r{flex:none}
 
 /* spec rows */
@@ -137,7 +137,7 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 
 /* dark console card — the one dark moment */
 .console{background:linear-gradient(165deg,#0e1730,#0c1424);color:#dbe4f4;border-radius:16px;padding:8px;box-shadow:0 34px 80px -30px rgba(12,20,36,.5)}
-.console .c-head{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--dk-line);font:11px var(--mono);letter-spacing:.16em;color:#7d8da6}
+.console .c-head{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--dk-line);font:11.5px var(--mono);letter-spacing:.14em;color:#7d8da6}
 .console .c-head i{width:9px;height:9px;border-radius:50%;background:#22304f;flex:none}
 .console .c-head i:first-child{background:#3ddc97;box-shadow:0 0 0 0 rgba(61,220,151,.5);animation:pulse-g 2.6s ease-out infinite}
 @keyframes pulse-g{0%{box-shadow:0 0 0 0 rgba(61,220,151,.5)}70%{box-shadow:0 0 0 7px rgba(61,220,151,0)}100%{box-shadow:0 0 0 0 rgba(61,220,151,0)}}
@@ -147,10 +147,10 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .c-node .p{font:12.5px var(--mono);color:#4cc9ff}
 .c-node b{display:block;font-size:14.5px;color:#eef3ff;font-weight:600}
 .c-node i{font-style:normal;font-size:12.5px;color:#8fa0bd}
-.c-st{font:10.5px var(--mono);letter-spacing:.14em;padding:4px 10px;border-radius:6px;border:1px solid}
+.c-st{font:11px var(--mono);letter-spacing:.12em;padding:4px 10px;border-radius:6px;border:1px solid}
 .c-st.ok{color:#3ddc97;border-color:rgba(61,220,151,.4);background:rgba(61,220,151,.08)}
 .c-st.wt{color:#f0b64f;border-color:rgba(240,182,79,.4);background:rgba(240,182,79,.08)}
-.c-foot{display:flex;flex-wrap:wrap;gap:6px 20px;padding:13px 18px;border-top:1px solid var(--dk-line);font:10.5px var(--mono);letter-spacing:.14em;color:#7d8da6}
+.c-foot{display:flex;flex-wrap:wrap;gap:6px 20px;padding:13px 18px;border-top:1px solid var(--dk-line);font:11px var(--mono);letter-spacing:.12em;color:#7d8da6}
 .c-foot b{color:#c9d8f2;font-weight:600}
 .runtime-in{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:start}
 
@@ -230,7 +230,7 @@ html.js .reveal.on{opacity:1;transform:none}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   html.js .reveal{opacity:1;transform:none;transition:none}
-  .nav-dot,.console .c-head i:first-child{animation:none}
+  .console .c-head i:first-child{animation:none}
   .btn,.win,.spec .row,.rows .row,.cap-item,.path{transition:none}
 }
 
@@ -249,9 +249,10 @@ html.js .reveal.on{opacity:1;transform:none}
   .plate-grid{grid-template-columns:1fr}
   .rows .row,.rows.compact .row .c{grid-template-columns:1fr;gap:6px}
   .rows .row{grid-template-columns:34px 1fr;gap:14px}
+  .rows .row>p{grid-column:2}
   .cap-item{grid-template-columns:1fr;gap:4px}
   .gnum{font-size:56px;top:-6px;transform:none}
-  .sec-head h2,.sec-head .sub{max-width:calc(100% - 68px)}
+  .sec-head h2,.sec-head .sub{max-width:calc(100% - 84px)}
 }
 @media (max-width:560px){
   .wrap{padding:0 20px}
@@ -313,7 +314,6 @@ html.js .reveal.on{opacity:1;transform:none}
 <header class="hero" id="top">
   <div class="wrap hero-in">
     <div>
-      <div class="idx" style="margin-bottom:0" data-i18n="hero.kick">PREVIEW · BUILT FOR YOUR TEAM</div>
       <h1 data-i18n="hero.title">把 AI 团队，<span class="hl">管成一个团队</span></h1>
       <p class="lead" data-i18n="hero.sub">AI 已经进了团队，却还没有工号和台账——谁在用、花多少、碰了什么，常常说不清。CoHarness 把 AI 当成正式成员管起来：管理员一个后台管住账号、模型、用量和审计；员工和 AI 在同一个工作台接力干活，任务不丢、有记忆、留痕可查。</p>
       <div class="cta-row">
@@ -321,7 +321,7 @@ html.js .reveal.on{opacity:1;transform:none}
         <a class="btn btn-g" href="#admin" data-i18n="hero.cta2">看看管理后台</a>
       </div>
       <div class="live" data-i18n="hero.live"><span><i class="g"></i>GATEWAY :8899 · READY</span><span><i class="g"></i>MEMBER :42000 · READY</span><span><i class="a"></i>PROJECT :42010 · STARTING</span></div>
-      <p class="terms" data-i18n="hero.terms">APACHE-2.0 · 开源自托管 · 用量账本不记录密钥与聊天内容</p>
+      <p class="terms" data-i18n="hero.terms">预览版 · APACHE-2.0 · 开源自托管 · 用量账本不记录密钥与聊天内容</p>
     </div>
     <div class="shot reveal">
       <div class="win">
@@ -344,7 +344,7 @@ html.js .reveal.on{opacity:1;transform:none}
     <div class="admin-in">
       <div class="reveal">
         <div class="spec">
-          <div class="row"><span class="n">01</span><div><b data-i18n="ad.1t">账号与工作环境</b><p data-i18n="ad.1p">员工账号、角色、登录状态，以及每人独立的 AI 工作环境——启动、停止、重启由管理员一手掌控。</p></div></div>
+          <div class="row"><span class="n">01</span><div><b data-i18n="ad.1t">账号与工作环境</b><p data-i18n="ad.1p">员工账号、角色、登录状态，以及每人独立的 AI 工作环境，启动、停止、重启由管理员一手掌控。</p></div></div>
           <div class="row"><span class="n">02</span><div><b data-i18n="ad.2t">项目与成员权限</b><p data-i18n="ad.2p">管理员或员工创建的项目统一在册；成员分只读/可写，支持邀请加入；项目里的对话可全项目可见，也可仅创建者可见。</p></div></div>
           <div class="row"><span class="n">03</span><div><b data-i18n="ad.3t">模型治理</b><p data-i18n="ad.3p">公司统一登记可用的模型服务商和模型清单，按角色、成员、项目授权；员工也可以登记自己的 Key，两条线互不混淆。</p></div></div>
           <div class="row"><span class="n">04</span><div><b data-i18n="ad.4t">用量与成本</b><p data-i18n="ad.4p">按成员和项目统计 Token 用量与成本估算，配额度、设告警；账本只记用量归属，不写 API 密钥和对话内容。</p></div></div>
@@ -375,7 +375,7 @@ html.js .reveal.on{opacity:1;transform:none}
     </div>
     <div class="runtime-in">
       <div class="rows reveal">
-        <div class="row"><span class="n">01</span><b data-i18n="rt.1t">一人一个工作环境</b><p data-i18n="rt.1p">每位成员分配独立的 AI 工作环境和数据目录——个人任务的会话、记忆、文档都落在自己名下；自己参与的项目目录，按只读/可写权限映射进来。</p></div>
+        <div class="row"><span class="n">01</span><b data-i18n="rt.1t">一人一个工作环境</b><p data-i18n="rt.1p">每位成员分配独立的 AI 工作环境和数据目录：个人任务的会话、记忆、文档都落在自己名下；自己参与的项目目录，按只读/可写权限映射进来。</p></div>
         <div class="row"><span class="n">02</span><b data-i18n="rt.2t">一个项目一个共享环境</b><p data-i18n="rt.2p">项目环境直接在项目目录里工作，自带协作套件和项目记忆——成员在同一个环境里接力：会话、项目记忆和文档属于项目，不是每人一份拷贝。</p></div>
         <div class="row"><span class="n">03</span><b data-i18n="rt.3t">按需唤醒，空闲休眠</b><p data-i18n="rt.3p">两种环境都有明确的启动/就绪/停止状态：空闲自动休眠省资源，有操作自动唤醒；管理员手动停掉的不会被悄悄拉起；运维通道常驻。</p></div>
         <div class="row"><span class="n">04</span><b data-i18n="rt.4t">三档权限 + 目录级授权</b><p data-i18n="rt.4p">工作环境可挂只读、工作区可写、完全放开三档权限；会话按目录精确授权，并过滤掉该参与者无权查看的内容；项目目录不允许与任何人的个人目录重叠。</p></div>
@@ -426,7 +426,7 @@ html.js .reveal.on{opacity:1;transform:none}
       <div class="cap-item"><b data-i18n="cap.1t">AI 工作环境</b><p data-i18n="cap.1p">插件化运行时，每次操作完整留痕：任务可暂停、恢复、分叉；模型请求、审批、计划、目标、待办、后台任务、定时提醒、工作流与用量遥测一应俱全。</p></div>
       <div class="cap-item"><b data-i18n="cap.2t">工具与执行</b><p data-i18n="cap.2p">读写文件、跑命令和持久终端、查代码、搜网页、调技能、收图片与文档附件，外加沙箱与目录策略兜底。</p></div>
       <div class="cap-item"><b data-i18n="cap.3t">跨任务记忆</b><p data-i18n="cap.3p">个人、工作区、项目三层记忆：AI 记住团队画像、工作约定、背景资料；每次开工自动带上该带的，可搜可改。</p></div>
-      <div class="cap-item"><b data-i18n="cap.4t">历史会话检索</b><p data-i18n="cap.4p">AI 能搜索、精读自己有权看的过往会话，并生成「接着干」的交接摘要——昨天的工作就是今天的上下文。</p></div>
+      <div class="cap-item"><b data-i18n="cap.4t">历史会话检索</b><p data-i18n="cap.4p">AI 能搜索、精读自己有权看的过往会话，并生成「接着干」的交接摘要：昨天的工作就是今天的上下文。</p></div>
       <div class="cap-item"><b data-i18n="cap.5t">文档管理</b><p data-i18n="cap.5p">团队文档统一上传、按作用域归档、直接带进对话；有版本谱系和操作历史。</p></div>
       <div class="cap-item"><b data-i18n="cap.6t">专业 AI 组队</b><p data-i18n="cap.6p">可长期共事的专家 AI：关系明确、可中断恢复、可继续追问，汇报什么由主任务挑。</p></div>
       <div class="cap-item"><b data-i18n="cap.7t">自动化任务</b><p data-i18n="cap.7p">定时与触发器驱动的后台任务：计划、目标、自动执行，关了浏览器活照样跑。</p></div>
@@ -448,10 +448,10 @@ html.js .reveal.on{opacity:1;transform:none}
       <p class="sub" data-i18n="sc2.sub">以下是我们自己部署中真实在跑的项目形态。</p>
     </div>
     <div class="rows compact reveal">
-      <div class="row"><span class="n">S1</span><div class="c"><b data-i18n="sc2.1t">内容生产与自媒体运营</b><p data-i18n="sc2.1p">选题、文案、素材到发布复盘的流水线——AI 记得住品牌口径和风格约定。</p></div></div>
+      <div class="row"><span class="n">S1</span><div class="c"><b data-i18n="sc2.1t">内容生产与自媒体运营</b><p data-i18n="sc2.1p">选题、文案、素材到发布复盘的流水线，AI 记得住品牌口径和风格约定。</p></div></div>
       <div class="row"><span class="n">S2</span><div class="c"><b data-i18n="sc2.2t">客服与私信协同</b><p data-i18n="sc2.2p">客服项目共享一个工作环境：知识文档入库、对话留痕，人和 AI 在同一份历史里接力。</p></div></div>
       <div class="row"><span class="n">S3</span><div class="c"><b data-i18n="sc2.3t">监控与巡检</b><p data-i18n="sc2.3p">定时巡检产出异常摘要和留痕报告，Webhook 把结果推进团队既有系统。</p></div></div>
-      <div class="row"><span class="n">S4</span><div class="c"><b data-i18n="sc2.4t">研发与内部工具</b><p data-i18n="sc2.4p">插件开发、提示词工具、图像生成——团队的 AI 项目在同一个边界里被管理、计量与审计。</p></div></div>
+      <div class="row"><span class="n">S4</span><div class="c"><b data-i18n="sc2.4t">研发与内部工具</b><p data-i18n="sc2.4p">插件开发、提示词工具、图像生成，团队的 AI 项目在同一个边界里被管理、计量与审计。</p></div></div>
     </div>
   </div>
 </section>
@@ -535,7 +535,7 @@ html.js .reveal.on{opacity:1;transform:none}
       <span class="gnum" aria-hidden="true">09</span>
       <div class="idx">SEC.09 · OPEN &amp; SELF-HOSTED</div>
       <h2 data-i18n="os.title">开源、自托管：代码和数据都在你手里</h2>
-      <p class="sub" data-i18n="os.sub">Apache-2.0。全部实现可审：管理后台、工作环境编排、文档与部署。所有数据落在自有基础设施——模型走你们自己的 Key，用量账本不记录密钥和聊天内容。</p>
+      <p class="sub" data-i18n="os.sub">Apache-2.0。全部实现可审：管理后台、工作环境编排、文档与部署。所有数据落在自有基础设施，模型走你们自己的 Key，用量账本不记录密钥和聊天内容。</p>
     </div>
     <ul class="oss-list reveal">
       <li data-i18n="os.1">全插件化：平台能力由插件组合，团队可增可换</li>
@@ -580,12 +580,12 @@ const dict = {
   en: {
     'nav.admin': 'Admin center', 'nav.runtime': 'How it runs', 'nav.principles': 'Philosophy', 'nav.capabilities': 'Capabilities',
     'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source', 'nav.menu': 'Menu',
-    'hero.kick': 'PREVIEW · BUILT FOR YOUR TEAM',
+    'hero.kick': '',
     'hero.title': 'Run your AI team <span class="hl">like a team</span>',
     'hero.sub': 'AI is already on your team — but without an account or a ledger, nobody can say who used what, what it cost, or what it touched. CoHarness manages AI like a real team member: admins run accounts, models, spend, and audit from one console; people and AI share one workbench where tasks persist, memory carries over, and every action is on record.',
     'hero.cta1': 'View on GitHub', 'hero.cta2': 'See the admin center',
     'hero.live': '<span><i class="g"></i>GATEWAY :8899 · READY</span><span><i class="g"></i>MEMBER :42000 · READY</span><span><i class="a"></i>PROJECT :42010 · STARTING</span>',
-    'hero.terms': 'APACHE-2.0 · OPEN &amp; SELF-HOSTED · THE USAGE LEDGER STORES NO KEYS OR CHAT CONTENT',
+    'hero.terms': 'PREVIEW · APACHE-2.0 · OPEN &amp; SELF-HOSTED · THE USAGE LEDGER STORES NO KEYS OR CHAT CONTENT',
     'hero.cap': 'LIVE DEPLOYMENT · NOT A MOCKUP',
     'map.gw': 'Gateway · sign-in / routing / ledger / audit', 'map.gws': 'GATEWAY',
     'map.rt1': 'Member workspace', 'map.rt1s': 'one per member · own directory · projects mapped by grant',
