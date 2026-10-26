@@ -18,6 +18,8 @@ Web 会话树会隐藏空白 Session，并把当前选中的空白项复用为 N
 
 `updatedAt` 取 `createdAt` 与 `lastPromptAt` 中较晚者。符合资格的工件读取无需额外 I/O 即可提供精确 `lastPromptAt`；其他 cache miss 或陈旧 checkpoint 只会让 Session 排得偏旧，而不会因无关的文件写入被提升。每次异步冷读取后，网关都会再次检查实时 store；若另一请求期间已恢复该 Session，则用已附加摘要替换冷结果。
 
+成功的有界读取可通过[已验证冷会话列表元数据](../architecture/2026-10-26-verified-cold-list-metadata.zh.md)，按重新确认的存储修订保留标量摘要。这不会使过期空白提示成为权威：后续每次列表仍发现当前头部与修订，来源变化时继续使用上述验证规则。
+
 ## Alternatives considered
 
 **信任缓存的 `blank: true`。** 拒绝，因为 projection cache 有意允许持久日志前进到 checkpoint 之后。首个 `turn/start` 之后若发生崩溃或 fail-soft 写入失败，真实对话就会被隐藏，客户端还可能把它复用为 New Session。

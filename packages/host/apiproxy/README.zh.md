@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
+所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, coldSummaryCacheMaxEntries?, coldSummaryCacheMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
 
 `workspaceFiles.*` 在 Session 授权、canonical containment、符号链接检查和已组合的 `workspace-files/authorize` 目录策略通过后，读取 Session 相对文件。冷读取只加载 header。Host 在返回相对元数据、UTF-8 文本页或 Base64 窗口前复核文件身份与权限；可选版本保护拒绝混合版本分页。`host.describe.workspaceFiles` 声明支持情况与配置上限：默认每页／窗口 2 MiB、5,000 行、2,000 个目录项和 512 条 Client 元数据记录。Agent 工具继续拥有写入、CAS 与审计语义。
 
@@ -134,6 +134,8 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-preset-registry`](
 `inbox` 投影从 Session 自有的持久化 splice 重建待处理输入，不恢复 Agent。历史读取仍由 Gateway 授权控制；冷队列修改继续要求 live Agent。
 
 `toFetchHandler(api, { serverTiming: true })` 为已校验的一元信封添加数值 `dsh_rpc` 耗时，包括业务拒绝和处理器异常。计时在响应构造完成时结束，不消费响应体。一元分发前的载体拒绝、事件流和下载没有一元指标。该选项默认为 `false`；[Connection](../../client/connection/README.zh.md)定义物理请求计时和部署配置。
+
+只有本次列表取得的完整头部及带存储来源的修订标识完全相同时，才复用已验证的冷会话标量摘要。成功完成有界正文读取后，还需第二次快照列表复核来源，失败则不保留并记录警告。在线接管、投影及当前身份授权仍重新计算。`coldSummaryCacheMaxEntries` 默认为 512，`coldSummaryCacheMaxBytes` 默认为来源标识与摘要 UTF-8 JSON 合计 1048576 字节，不含对象开销；任一项设为零会关闭复用和额外验证。ApiProxy 缓存与每个请求内暂存缓存分别遵守两项界限。卸载会清空 ApiProxy 缓存并阻止晚完成的读取再次保留数据。这些摘要缓存不保留事件正文或权限决定。
 
 <a id="model-experience"></a>
 ## 模型体验

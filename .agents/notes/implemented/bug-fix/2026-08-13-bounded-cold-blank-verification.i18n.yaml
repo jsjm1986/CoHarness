@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-13-bounded-cold-blank-verification.md
 document:
-  en: 6904cabc9b1ec7944a455f6a56ad9a531e7ad8f7
-  zh: a5a0ba79b3620b3baa1dfb3f642b9198ef34c0e4
+  en: 878ec7947fd65d6f6c497c0763b2055d3785c175
+  zh: 95b28b7a52c2c6cf0186a8ca340ed572fa2e4be5
 /agent-note-bound-cold-blank-session-verification:
   en: 9beebe09717933c5
   zh: b1ba1b3af8ec4f2b
@@ -12,8 +12,8 @@ document:
   en: 2322409feac31cda
   zh: 5a97062e95fdcadd
 /agent-note-bound-cold-blank-session-verification/decision:
-  en: 240f6072e4d4d0ed
-  zh: cf0ab9d97c9aa3b0
+  en: 27aaa6a1ba6d7fac
+  zh: 415855d5c8ae24c2
 /agent-note-bound-cold-blank-session-verification/alternatives-considered:
   en: 1b807881da4de6bb
   zh: f99635636c233e15

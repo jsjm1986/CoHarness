@@ -1499,7 +1499,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-apiproxy`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `directoryPicker` · `llm` · `sessions` · `subagents` · `sessionQuery` · `tools` · `userQuestions` · `workspaceRegistry`
-- `source`: [`packages/host/apiproxy/src/index.ts:59`](../packages/host/apiproxy/src/index.ts)
+- `source`: [`packages/host/apiproxy/src/index.ts:60`](../packages/host/apiproxy/src/index.ts)
 
 ```ts config-catalog
 /** Gateway plugin configuration. */
@@ -1524,6 +1524,10 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
+  /** Maximum verified cold summaries retained; zero disables reuse. */
+  coldSummaryCacheMaxEntries?: number
+  /** Maximum encoded source-identity and summary bytes retained; zero disables reuse. */
+  coldSummaryCacheMaxBytes?: number
   /** Maximum bytes retained by one remote Workspace file operation. */
   workspaceFileMaxBytes?: number
   /** Maximum lines returned by one remote Workspace text page. */

@@ -59,6 +59,11 @@ import type {
   SessionPersistencePage,
   SessionPersistencePageRequest,
 } from '@deepseek-ai/dsh-session-persistence'
+import { isDeepStrictEqual } from 'node:util'
+import {
+  ColdSummaryCache, DEFAULT_COLD_SUMMARY_CACHE_MAX_BYTES, DEFAULT_COLD_SUMMARY_CACHE_MAX_ENTRIES,
+} from './cold-summary-cache.ts'
+import type { ColdSessionSummary } from './cold-summary-cache.ts'
 import { ensureSshRealm, sshRealmKey } from './ssh-execution.ts'
 // Type-only: resolves the optional permission-default owner notified after
 // the browser confirms and the Host verifies a Workspace blank reuse target.
@@ -1204,7 +1209,7 @@ async function probeColdSessionMetadata(
   meta: SessionHeader,
   maxBytes: number,
   signal?: AbortSignal,
-): Promise<{ metadata: SessionListMetadata; events: readonly SessionEvent[] } | undefined> {
+): Promise<{ header: SessionHeader; metadata: SessionListMetadata; events: readonly SessionEvent[] } | undefined> {
   if (maxBytes === 0) return undefined
   signal?.throwIfAborted()
   const location = persistence.locate(meta)
@@ -1219,9 +1224,9 @@ async function probeColdSessionMetadata(
   }
   if (size > maxBytes) return undefined
   try {
-    const { events } = await persistence.readFrom(meta.id, SessionLogOffset(0), signal)
+    const { meta: header, events } = await persistence.readFrom(meta.id, SessionLogOffset(0), signal)
     signal?.throwIfAborted()
-    return { metadata: sessionListMetadata(events), events }
+    return { header, metadata: sessionListMetadata(events), events }
   } catch (error) {
     signal?.throwIfAborted()
     ctx.logger.warn(`session.list: blank probe for "${meta.id}" failed (serving it as visible): ${String(error)}`)
@@ -1237,12 +1242,12 @@ async function summarizeCold(
   metadata: SessionListMetadata | undefined,
   blankProbeMaxBytes: number,
   signal?: AbortSignal,
-): Promise<SessionSummary> {
+): Promise<{ summary: ColdSessionSummary; verifiedHeader: SessionHeader | undefined }> {
   const probed = metadata?.blank === false
     ? undefined
     : await probeColdSessionMetadata(ctx, persistence, meta, blankProbeMaxBytes, signal)
   const resolvedMetadata = probed?.metadata ?? metadata
-  return {
+  const summary: ColdSessionSummary = {
     sessionId: meta.id,
     updatedAt: sessionListUpdatedAt(meta, resolvedMetadata),
     running: false,
@@ -1261,6 +1266,7 @@ async function summarizeCold(
     // log for that switch would defeat the index read.
     ...sessionListFields(meta, probed?.events ?? []),
   }
+  return { summary, verifiedHeader: probed?.header }
 }
 
 /** Map a browse-primitive failure onto the wire error vocabulary (unknown throws stay internal). */
@@ -1304,6 +1310,10 @@ export interface ApiProxyDefaults {
   sessionExportCompressionLevel?: SessionLogCompressionLevel
   /** Maximum artifact size eligible for one cold blankness read. */
   coldBlankProbeMaxBytes?: number
+  /** Maximum verified cold summaries retained per ApiProxy; zero disables reuse. */
+  coldSummaryCacheMaxEntries?: number
+  /** Maximum encoded source-identity and summary bytes retained; zero disables reuse. */
+  coldSummaryCacheMaxBytes?: number
   /**
    * Whether handing a path to the native opener can work at all — the
    * `hasDocument` capability the preset roster reports, and the switch
@@ -1891,6 +1901,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL
   const coldBlankProbeMaxBytes = defaults.coldBlankProbeMaxBytes
     ?? DEFAULT_COLD_BLANK_PROBE_MAX_BYTES
+  const coldSummaryCacheMaxEntries = defaults.coldSummaryCacheMaxEntries ?? DEFAULT_COLD_SUMMARY_CACHE_MAX_ENTRIES
+  const coldSummaryCacheMaxBytes = defaults.coldSummaryCacheMaxBytes ?? DEFAULT_COLD_SUMMARY_CACHE_MAX_BYTES
+  const coldSummaries = new ColdSummaryCache(coldSummaryCacheMaxEntries, coldSummaryCacheMaxBytes)
+  ctx.effect(() => () => { coldSummaries.close() }, 'api-proxy: verified cold summaries')
   /** The seed model each create/resume declares; re-read so it never goes stale. */
   const agentOptions = (): AgentOptions => {
     const { provider, model } = defaults.defaultModelSelection()
@@ -3607,7 +3621,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const attached = new Set(items.map(item => item.sessionId))
     const persistence = ctx.get('sessionPersistence')
     if (persistence !== undefined) {
-      const snapshots: Array<{ header: SessionHeader; content?: SessionListMetadata }> = typeof persistence.listSnapshots === 'function'
+      const snapshots: Array<{ header: SessionHeader; revision?: SessionPersistenceRevision; content?: SessionListMetadata }> = typeof persistence.listSnapshots === 'function'
         ? await persistence.listSnapshots(signal)
         : (await persistence.listHeaders(signal)).map(header => ({ header }))
       const cold = snapshots
@@ -3615,47 +3629,70 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           && snapshot.header.cwd !== undefined
           && (snapshot.header.draft !== true || snapshot.content?.blank !== true))
       signal?.throwIfAborted()
-      for (let offset = 0; offset < cold.length; offset += COLD_SUMMARY_BATCH_SIZE) {
-        signal?.throwIfAborted()
-        const batch = cold.slice(offset, offset + COLD_SUMMARY_BATCH_SIZE)
-        const settled = await Promise.allSettled(
-          batch.map(async (snapshot) => {
-            const meta = snapshot.header
-            // Projection hints remain optional. Blank verification may read
-            // this Session's artifact only when it passes the configured size check.
-            const projections = listProjectionsFor(ctx, meta, undefined)
-            const summary = await summarizeCold(
-              ctx,
-              persistence,
-              meta,
-              snapshot.content ?? projections?.values.sessionListMetadata,
-              coldBlankProbeMaxBytes,
-              signal,
-            )
-            const attachedSession = ctx.sessions.get(meta.id)
-            if (attachedSession !== undefined) return summarizeAttached(attachedSession)
-            if (meta.draft === true && summary.blank) return undefined
-            return {
-              ...summary,
-              ...projections === undefined ? {} : { projections },
+      const verified = new ColdSummaryCache(coldSummaries.enabled ? coldSummaryCacheMaxEntries : 0, coldSummaryCacheMaxBytes)
+      try {
+        for (let offset = 0; offset < cold.length; offset += COLD_SUMMARY_BATCH_SIZE) {
+          signal?.throwIfAborted()
+          const batch = cold.slice(offset, offset + COLD_SUMMARY_BATCH_SIZE)
+          const settled = await Promise.allSettled(
+            batch.map(async (snapshot) => {
+              const meta = snapshot.header
+              // Projection hints remain optional. Blank verification may read
+              // this Session's artifact only when it passes the configured size check.
+              const projections = listProjectionsFor(ctx, meta, undefined)
+              const metadata = snapshot.content ?? projections?.values.sessionListMetadata
+              let summary = metadata?.blank === false ? undefined : coldSummaries.get(snapshot)
+              if (summary === undefined) {
+                const resolved = await summarizeCold(ctx, persistence, meta, metadata, coldBlankProbeMaxBytes, signal)
+                summary = resolved.summary
+                if (verified.enabled && snapshot.revision !== undefined
+                  && resolved.verifiedHeader !== undefined && isDeepStrictEqual(resolved.verifiedHeader, meta)) {
+                  verified.set(snapshot, summary)
+                }
+              }
+              const attachedSession = ctx.sessions.get(meta.id)
+              if (attachedSession !== undefined) return summarizeAttached(attachedSession)
+              if (meta.draft === true && summary.blank) return undefined
+              return {
+                ...summary,
+                ...projections === undefined ? {} : { projections },
+              }
+            }),
+          )
+          const summaries: SessionSummary[] = []
+          let rejected = false
+          let failure: unknown
+          for (const result of settled) {
+            if (result.status === 'fulfilled') {
+              if (result.value !== undefined) summaries.push(result.value)
+            } else if (!rejected) {
+              rejected = true
+              failure = result.reason
             }
-          }),
-        )
-        const summaries: SessionSummary[] = []
-        let rejected = false
-        let failure: unknown
-        for (const result of settled) {
-          if (result.status === 'fulfilled') {
-            if (result.value !== undefined) summaries.push(result.value)
-          } else if (!rejected) {
-            rejected = true
-            failure = result.reason
+          }
+          if (rejected) throw failure
+          signal?.throwIfAborted()
+          items.push(...summaries)
+        }
+        if (verified.size > 0 && coldSummaries.enabled) {
+          let current: typeof snapshots | undefined
+          try { current = await persistence.listSnapshots(signal) }
+          catch (error: unknown) {
+            // Failed optional source verification skips retention; the already completed listing remains usable.
+            signal?.throwIfAborted()
+            ctx.logger.warn('Cold Session summary reuse skipped: source verification failed; using freshly read summaries.', error)
+          }
+          signal?.throwIfAborted()
+          for (const snapshot of current ?? []) {
+            const summary = verified.get(snapshot)
+            if (summary !== undefined) coldSummaries.set(snapshot, summary)
+          }
+          for (const [index, item] of items.entries()) {
+            const session = ctx.sessions.get(item.sessionId)
+            if (session !== undefined) items[index] = summarizeAttached(session)
           }
         }
-        if (rejected) throw failure
-        signal?.throwIfAborted()
-        items.push(...summaries)
-      }
+      } finally { verified.close() }
     }
     items.sort((a, b) => b.updatedAt - a.updatedAt)
     const collaboration = ctx.get('collaboration')
