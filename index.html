@@ -19,7 +19,7 @@
 <meta name="twitter:title" content="CoHarness — 把 AI 团队，管成一个团队">
 <meta name="twitter:description" content="一个后台管住团队的全部 AI 资产；员工和 AI 共享真实的工作。开源，可自托管。">
 <meta name="twitter:image" content="https://jsjm1986.github.io/CoHarness/assets/conversation.jpg">
-<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-coharness.svg" type="image/svg+xml">
 <script>document.documentElement.classList.add('js')</script>
 <style>
 :root{
@@ -44,14 +44,8 @@ a{color:var(--acc)}
 .wrap::before{left:0}
 .wrap::after{right:0}
 
-/* firefly */
+/* brand mark */
 .mascot{width:30px;height:30px;flex:none}
-.mascot .m-wing{fill:#fff;stroke:var(--ink);stroke-width:2.4}
-.mascot .m-dark{fill:var(--ink)}
-.mascot .m-lamp{fill:#e8a020}
-.mascot .m-spark{fill:#e8a020}
-.m-lamp-halo{fill:#e8a020;opacity:.18;animation:breathe 3.2s ease-in-out infinite}
-@keyframes breathe{0%,100%{opacity:.9}50%{opacity:.4}}
 
 /* nav */
 nav{position:sticky;top:0;z-index:50;background:rgba(251,251,252,.85);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
@@ -216,8 +210,6 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .close-panel h2{color:#f4f8ff;font-size:clamp(26px,3.4vw,38px)}
 .close-panel .sub{color:#93a3bb;margin-left:auto;margin-right:auto;max-width:44em}
 .close-panel .ffy{width:44px;height:44px;margin:0 auto 24px}
-.close-panel .m-wing{fill:#c7d4f2;stroke:none}
-.close-panel .m-dark{fill:#e8eefc}
 .close-panel .btn-g{border-color:rgba(126,164,255,.35);background:transparent;color:#dbe4f4}
 .close-panel .btn-g:hover{border-color:#fff;color:#fff}
 .close-panel .cta-row{justify-content:center;position:relative}
@@ -238,7 +230,7 @@ html.js .reveal.on{opacity:1;transform:none}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   html.js .reveal{opacity:1;transform:none;transition:none}
-  .m-lamp-halo,.nav-dot,.console .c-head i:first-child{animation:none}
+  .nav-dot,.console .c-head i:first-child{animation:none}
   .btn,.win,.spec .row,.rows .row,.cap-item,.path{transition:none}
 }
 
@@ -278,7 +270,7 @@ html.js .reveal.on{opacity:1;transform:none}
 <nav>
   <div class="wrap nav-in">
     <a class="brand" href="#top">
-      <svg class="mascot" viewBox="0 0 64 64" fill="none" aria-hidden="true"><ellipse class="m-wing" cx="20" cy="26" rx="10.5" ry="5.5" transform="rotate(-28 20 26)"/><ellipse class="m-wing" cx="44" cy="20" rx="10.5" ry="5.5" transform="rotate(-36 44 20)"/><path d="M26 14 q-3.5-6-9.5-7.5 M30.5 12.5 q-.5-7-4.5-11" stroke="#101828" stroke-width="1.9" stroke-linecap="round" fill="none"/><circle class="m-lamp-halo" cx="41" cy="44.5" r="13"/><circle class="m-dark" cx="29" cy="19" r="6.8"/><ellipse class="m-dark" cx="33.5" cy="30.5" rx="7" ry="10" transform="rotate(16 33.5 30.5)"/><ellipse class="m-lamp" cx="40" cy="44" rx="6.4" ry="7.2" transform="rotate(16 40 44)"/><circle cx="38.5" cy="42.5" r="1.8" fill="#fff" opacity=".85"/><circle class="m-spark" cx="52" cy="38.5" r="1.7"/><circle class="m-spark" cx="53.5" cy="47" r="1.3"/><circle class="m-spark" cx="47" cy="53.5" r="1.5"/><circle cx="26.6" cy="18.5" r="1.5" fill="#fff"/></svg>
+      <img class="mascot" src="assets/favicon-coharness.svg" alt="" width="30" height="30">
       COHARNESS
       <span class="nav-dot" title="live"></span>
     </a>
@@ -323,7 +315,7 @@ html.js .reveal.on{opacity:1;transform:none}
     <div>
       <div class="idx" style="margin-bottom:0" data-i18n="hero.kick">PREVIEW · BUILT FOR YOUR TEAM</div>
       <h1 data-i18n="hero.title">把 AI 团队，<span class="hl">管成一个团队</span></h1>
-      <p class="lead" data-i18n="hero.sub">给中小企业团队的 AI 协作平台。管理员在一个后台管住账号、项目、模型、用量和审计；员工和 AI 在同一个工作台里干活——会话不丢、跨任务有记忆、每个操作留痕、工作可交接。</p>
+      <p class="lead" data-i18n="hero.sub">AI 已经进了团队，却还没有工号和台账——谁在用、花多少、碰了什么，常常说不清。CoHarness 把 AI 当成正式成员管起来：管理员一个后台管住账号、模型、用量和审计；员工和 AI 在同一个工作台接力干活，任务不丢、有记忆、留痕可查。</p>
       <div class="cta-row">
         <a class="btn btn-p" href="https://github.com/jsjm1986/CoHarness" target="_blank" rel="noopener" data-i18n="hero.cta1">在 GitHub 查看</a>
         <a class="btn btn-g" href="#admin" data-i18n="hero.cta2">看看管理后台</a>
@@ -359,7 +351,7 @@ html.js .reveal.on{opacity:1;transform:none}
           <div class="row"><span class="n">05</span><div><b data-i18n="ad.5t">审计与运维</b><p data-i18n="ad.5p">谁在什么时间做了什么管理操作，全部留痕可查；部署状态、终端、SSH、Webhook、桌面与归档，在同一个后台里。</p></div></div>
         </div>
         <div class="chiprow" aria-hidden="true">
-          <span class="chip" data-i18n="ad.m1">用户</span><span class="chip" data-i18n="ad.m2">项目</span><span class="chip" data-i18n="ad.m3">插件</span><span class="chip" data-i18n="ad.m4">模型</span><span class="chip" data-i18n="ad.m5">用量</span><span class="chip" data-i18n="ad.m6">文档</span><span class="chip" data-i18n="ad.m7">归档</span><span class="chip" data-i18n="ad.m8">终端</span><span class="chip">SSH</span><span class="chip" data-i18n="ad.m10">部署</span><span class="chip" data-i18n="ad.m11">运维通道</span><span class="chip">WEBHOOK</span><span class="chip" data-i18n="ad.m13">桌面</span><span class="chip" data-i18n="ad.m14">审计</span>
+          <span class="chip" data-i18n="ad.m1">用户</span><span class="chip" data-i18n="ad.m2">项目</span><span class="chip" data-i18n="ad.m3">插件</span><span class="chip" data-i18n="ad.m4">模型</span><span class="chip" data-i18n="ad.m5">用量</span><span class="chip" data-i18n="ad.m6">文档</span><span class="chip" data-i18n="ad.m7">归档</span><span class="chip" data-i18n="ad.m8">终端</span><span class="chip">SSH</span><span class="chip" data-i18n="ad.m10">部署</span><span class="chip" data-i18n="ad.m11">维护中枢</span><span class="chip">WEBHOOK</span><span class="chip" data-i18n="ad.m13">桌面</span><span class="chip" data-i18n="ad.m14">审计</span>
         </div>
       </div>
       <div class="plate-grid">
@@ -388,6 +380,7 @@ html.js .reveal.on{opacity:1;transform:none}
         <div class="row"><span class="n">03</span><b data-i18n="rt.3t">按需唤醒，空闲休眠</b><p data-i18n="rt.3p">两种环境都有明确的启动/就绪/停止状态：空闲自动休眠省资源，有操作自动唤醒；管理员手动停掉的不会被悄悄拉起；运维通道常驻。</p></div>
         <div class="row"><span class="n">04</span><b data-i18n="rt.4t">三档权限 + 目录级授权</b><p data-i18n="rt.4p">工作环境可挂只读、工作区可写、完全放开三档权限；会话按目录精确授权，并过滤掉该参与者无权查看的内容；项目目录不允许与任何人的个人目录重叠。</p></div>
         <div class="row"><span class="n">05</span><b data-i18n="rt.5t">服务器上真隔离</b><p data-i18n="rt.5p">开发时在本地直接起进程；Linux 生产环境每个工作环境跑在独立系统账号下，文件系统互相隔离——普通项目环境只看得见自己的项目目录。</p></div>
+        <div class="row"><span class="n">06</span><b data-i18n="rt.6t">常驻的运维中枢</b><p data-i18n="rt.6p">管理员还有一个永不离线的专属 AI 工位，专门照看这套系统本身：默认只能只读查平台数据，每次写入都要当场特批一次，每条查询都进审计——连运维通道自己也被管着，这才是它能被信任的原因。</p></div>
       </div>
       <div class="reveal">
         <div class="console">
@@ -396,7 +389,8 @@ html.js .reveal.on{opacity:1;transform:none}
           <div class="c-node"><span class="p">:42000</span><div><b data-i18n="map.rt1">成员工作环境</b><i data-i18n="map.rt1s">每成员一个 · 独立目录 · 按权限映射项目</i></div><span class="c-st ok">READY</span></div>
           <div class="c-node"><span class="p">:42010</span><div><b data-i18n="map.rt2">项目共享环境</b><i data-i18n="map.rt2s">每项目一个 · 工作在项目目录 · 协作套件</i></div><span class="c-st wt">STARTING</span></div>
           <div class="c-node"><span class="p">PROJ</span><div><b data-i18n="map.pj">项目</b><i data-i18n="map.pjs">一个目录 + 一张成员表 · 可见性规则</i></div><span class="c-st ok">READY</span></div>
-          <div class="c-foot"><span><b>4</b> NODES</span><span><b>2</b> RUNTIMES</span><span>IDLE-REAP <b>ON</b></span><span>ISOLATION <b>systemd</b></span></div>
+          <div class="c-node"><span class="p">STWD</span><div><b data-i18n="map.st">维护中枢</b><i data-i18n="map.sts">常驻运维环境 · 准入叠加 · 逐条留痕</i></div><span class="c-st ok">RESIDENT</span></div>
+          <div class="c-foot"><span><b>5</b> NODES</span><span><b>3</b> RUNTIMES</span><span>IDLE-REAP <b>ON</b></span><span>ISOLATION <b>systemd</b></span></div>
         </div>
       </div>
     </div>
@@ -559,7 +553,7 @@ html.js .reveal.on{opacity:1;transform:none}
 <section class="closing">
   <div class="wrap">
     <div class="close-panel reveal">
-      <svg class="mascot ffy" viewBox="0 0 64 64" fill="none" aria-hidden="true"><ellipse class="m-wing" cx="20" cy="26" rx="10.5" ry="5.5" transform="rotate(-28 20 26)"/><ellipse class="m-wing" cx="44" cy="20" rx="10.5" ry="5.5" transform="rotate(-36 44 20)"/><circle class="m-lamp-halo" cx="41" cy="44.5" r="13"/><circle class="m-dark" cx="29" cy="19" r="6.8"/><ellipse class="m-dark" cx="33.5" cy="30.5" rx="7" ry="10" transform="rotate(16 33.5 30.5)"/><ellipse cx="40" cy="44" rx="6.4" ry="7.2" transform="rotate(16 40 44)" fill="#ffd76a"/><circle cx="38.5" cy="42.5" r="1.8" fill="#fff" opacity=".85"/><circle class="m-spark" cx="52" cy="38.5" r="1.7"/><circle class="m-spark" cx="53.5" cy="47" r="1.3"/><circle class="m-spark" cx="47" cy="53.5" r="1.5"/><circle cx="26.6" cy="18.5" r="1.5" fill="#fff"/></svg>
+      <svg class="mascot ffy" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M16.875 7.125a8.25 8.25 0 1 0 0 9.75" stroke="#dbe4f4" stroke-width="2.6" stroke-linecap="round"/><path d="M7.5 12h7.1" stroke="#7ea2ff" stroke-width="2.6" stroke-linecap="round"/><circle cx="16.6" cy="12" r="2.2" fill="#7ea2ff"/></svg>
       <h2 data-i18n="cl.title">读代码，就是审计它</h2>
       <p class="sub" data-i18n="cl.sub">管理后台、工作环境编排、文档与部署，全部在仓库里。预览阶段，欢迎 issue 与 PR。</p>
       <div class="cta-row">
@@ -588,7 +582,7 @@ const dict = {
     'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source', 'nav.menu': 'Menu',
     'hero.kick': 'PREVIEW · BUILT FOR YOUR TEAM',
     'hero.title': 'Run your AI team <span class="hl">like a team</span>',
-    'hero.sub': 'An AI collaboration platform for small and mid-sized teams. Admins govern accounts, projects, models, usage, and audit from one console; members and agents work side by side on one workbench — durable sessions, cross-task memory, every action on record, and work that can be handed over.',
+    'hero.sub': 'AI is already on your team — but without an account or a ledger, nobody can say who used what, what it cost, or what it touched. CoHarness manages AI like a real team member: admins run accounts, models, spend, and audit from one console; people and AI share one workbench where tasks persist, memory carries over, and every action is on record.',
     'hero.cta1': 'View on GitHub', 'hero.cta2': 'See the admin center',
     'hero.live': '<span><i class="g"></i>GATEWAY :8899 · READY</span><span><i class="g"></i>MEMBER :42000 · READY</span><span><i class="a"></i>PROJECT :42010 · STARTING</span>',
     'hero.terms': 'APACHE-2.0 · OPEN &amp; SELF-HOSTED · THE USAGE LEDGER STORES NO KEYS OR CHAT CONTENT',
@@ -597,6 +591,7 @@ const dict = {
     'map.rt1': 'Member workspace', 'map.rt1s': 'one per member · own directory · projects mapped by grant',
     'map.rt2': 'Project workspace', 'map.rt2s': 'one per project · works in the project dir · team suite',
     'map.pj': 'Project', 'map.pjs': 'one directory + one member list · visibility rules',
+    'map.st': 'Steward', 'map.sts': 'resident ops runtime · layered access · every query logged',
     'ad.title': 'One console for every AI asset the team owns',
     'ad.sub': 'AI tools scattered across individuals cannot be governed. CoHarness ships a complete admin console: who is using it, which models, at what cost, and what was done — visible and controlled in one place.',
     'ad.1t': 'Accounts & workspaces', 'ad.1p': 'Member accounts, roles, sign-in state, and a dedicated AI workspace per person — start, stop, and restart under admin control.',
@@ -616,6 +611,7 @@ const dict = {
     'rt.3t': 'Wakes on demand, sleeps when idle', 'rt.3p': 'Both kinds carry a clear starting / ready / stopping / stopped lifecycle: idle workspaces sleep to save resources and wake on activity; one an admin stops is never quietly revived; the ops channel stays resident.',
     'rt.4t': 'Three permission tiers + directory-level grants', 'rt.4p': 'Workspaces mount read-only, workspace-write, or full-access tiers; sessions authorize by exact directory and filter out what a participant may not see; a project directory may not overlap any member’s personal directory.',
     'rt.5t': 'Real isolation on the server', 'rt.5p': 'In development, processes run locally; on Linux in production every workspace runs under its own system account with filesystem isolation — an ordinary project workspace sees only its own project directory.',
+    'rt.6t': 'A resident operations seat', 'rt.6p': 'Admins also get an always-on AI workspace dedicated to the platform itself: read-only queries by default, every write needs a fresh one-time approval, and every query is audited — even the operations channel is governed, which is why it can be trusted.',
     'pr.title': 'The unit of collaboration is shared work, not a forwarded chat link',
     'pr.sub': 'A project remembers the running AI workspace, each participant’s contribution, delegation relationships, pending approvals, and recoverable progress — close the browser or stop an agent, and the work stays put.',
     'pr.1t': 'Assembled your way, not a fixed pipeline', 'pr.1p': 'Which models, which tools the AI gets, who may approve what, and how work is delegated all compose through plugins and configuration — fitted to how the team actually works.',
