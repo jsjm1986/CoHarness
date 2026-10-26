@@ -9,7 +9,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PaneId, SplitId, TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { dockPaneIds, getPane } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { createSnapshotStore, ProjectUiPolicyRuntime } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, ProjectUiPolicyRuntime, type ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '../src/client/index.ts'
 import { writeSidebarLayout } from '../src/client/persistence.ts'
 import { intentsFor } from '../src/client/shell/SidebarRight.tsx'
@@ -67,6 +67,9 @@ async function mountSeat(viewportWidth = 1440, canShow = true, entryCount = 0) {
   }
   const pin = vi.fn<(address: string, signal: AbortSignal) => void>()
   runtime.ctx.provide('layout', frame as never)
+  runtime.ctx.provide('conversationViewport', {
+    snapshot: createSnapshotStore<ConversationViewportSnapshot>({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }),
+  } as never)
   runtime.ctx.provide('workspaceResources', { pin } as never)
   runtime.ctx.provide('shortcuts', {
     runtime: 'web',

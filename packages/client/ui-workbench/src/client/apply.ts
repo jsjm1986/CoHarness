@@ -9,6 +9,7 @@ import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { WorkbenchCatalog } from './catalog.ts'
+import { WorkbenchCatalogReader } from './catalog-reader.ts'
 import { WorkbenchEmpty } from './components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from './components/WorkbenchPaneHeader.tsx'
 import { WorkbenchSidebar, type WorkbenchSidebarInjected } from './components/WorkbenchSidebar.tsx'
@@ -76,9 +77,17 @@ export function apply(ctx: ClientContext): void {
     subscribe: listener => viewport.snapshot.subscribe(listener),
   }
   const lifetime = new AbortController()
+  const catalogReader = new WorkbenchCatalogReader(() => catalogRestore.getSnapshot())
+  let catalogPickerOpening = 0
   let disposed = false
   const isDisposed = (): boolean => disposed
-  ctx.effect(() => () => { disposed = true; lifetime.abort() }, 'ui-workbench: pending navigation lifetime')
+  ctx.effect(() => () => {
+    disposed = true
+    lifetime.abort()
+    return catalogReader.dispose()
+  }, 'ui-workbench: pending navigation and catalog lifetime')
+  ctx.effect(() => catalogRestore.subscribe(() => { catalogReader.releaseUnobserved() }),
+    'ui-workbench: catalog restoration demand')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workbench: dictionaries')
   ctx.effect(() => ctx.locale.register('sidebarPdf', { zh: pdfZh, en: pdfEn }))
   ctx.effect(() => ctx.locale.register('sidebarOffice', { zh: officeZh, en: officeEn }))
@@ -226,6 +235,13 @@ export function apply(ctx: ClientContext): void {
       const wb = viewport as WorkbenchViewport
       return {
         hooks: { catalogRestore },
+        loadCatalog: (signal: AbortSignal, fresh: boolean) => {
+          if (lifetime.signal.aborted) return Promise.reject(new DOMException('Workbench plugin disposed', 'AbortError'))
+          const picker = ctx.slots.bindStore(chooser).store.getSnapshot()
+          const opened = picker.pickerOpen && picker.pickerOpening !== catalogPickerOpening
+          catalogPickerOpening = picker.pickerOpening
+          return catalogReader.read(signal, fresh || opened)
+        },
         listWorkbenches: () => wb.listWorkbenches?.() ?? [],
         currentWorkbench: () => wb.currentWorkbench?.(),
         createWorkbench: (name: string) => wb.createWorkbench?.(name) ?? '',

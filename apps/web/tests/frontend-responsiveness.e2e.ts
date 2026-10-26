@@ -230,6 +230,101 @@ it('keeps full JSON results reachable and directory selection stable through ref
   if (failures.length > 0) throw new AggregateError(failures, 'frontend responsiveness journey failed')
 })
 
+it('retains the restoration catalog request when initial navigation moves its controls', async () => {
+  const scaffold = await launchWebScaffold({ workbench: true, openInApp: false })
+  let browser: Browser | undefined
+  let page: Page | undefined
+  let sessionArrived = false
+  const catalogRelease = Promise.withResolvers<undefined>()
+  const sessionRelease = Promise.withResolvers<undefined>()
+  const operations = new Set<Promise<void>>()
+  const failures: unknown[] = []
+  let catalogRequests = 0
+  try {
+    const id = 'catalog-restoration'
+    const title = 'SYNTHETIC_CATALOG_RESTORATION'
+    const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
+    await workspace.attachSession(await seedSession(scaffold, history(id, title, 1), id, undefined, scaffold.workspaceCwd))
+    const key = clientSessionKey({ kind: 'personal' }, SessionId(id))
+    browser = await chromium.launch({ headless: true })
+    page = await newEnglishPage(browser)
+    const consoleWatch = watchConsole(page)
+    page.setDefaultTimeout(30_000)
+    await page.addInitScript(({ origin, key }) => {
+      if (location.origin !== origin) return
+      localStorage.setItem('dsh.conversation.workbenches.v3.local', JSON.stringify({
+        version: 3, mode: 'single', activeId: 'default', workbenches: [
+          { id: 'default', name: 'Synthetic saved layout', paneIds: [key], activePaneId: key, paneRatios: [1], updatedAt: 1 },
+        ],
+      }))
+    }, { origin: new URL(scaffold.authenticatedUrl).origin, key })
+    const catalog = {
+      personalComplete: true, personal: { id: 1, name: 'Synthetic account' }, activeRuntime: { kind: 'personal' }, projects: [],
+      items: [{ sessionId: id, title, runtime: { kind: 'personal' }, visibility: 'personal',
+        creatorUserId: 1, creatorDisplayName: 'Synthetic account', updatedAt: 1, blank: false, canWrite: true }],
+    }
+    await page.route(url => ['/account/api/workbench/catalog', '/api/session.list'].includes(url.pathname), async (route) => {
+      const operation = (async () => {
+        if (new URL(route.request().url()).pathname === '/account/api/workbench/catalog') {
+          catalogRequests++
+          await catalogRelease.promise
+          await route.fulfill({ contentType: 'application/json', json: catalog })
+        } else {
+          const response = await route.fetch()
+          expect(response.ok()).toBe(true)
+          sessionArrived = true
+          await sessionRelease.promise
+          await route.fulfill({ response })
+        }
+      })()
+      operations.add(operation)
+      try { await operation } catch (error) {
+        failures.push(error)
+        await route.abort().catch((abortError: unknown) => { failures.push(abortError) })
+      } finally { operations.delete(operation) }
+    })
+    const start = performance.now()
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' })
+    await expect.poll(() => catalogRequests > 0 && sessionArrived).toBe(true)
+    await page.locator('[data-workbench-toolbar]').waitFor()
+    sessionRelease.resolve(undefined)
+    await page.locator('textarea:enabled').last().waitFor()
+    await page.locator('[data-model-trigger][aria-busy="false"]').waitFor()
+    console.info('Restoration catalog diagnostic:', JSON.stringify({
+      requestsAfterInitialNavigation: catalogRequests, initialNavigationMs: performance.now() - start,
+    }))
+    expect(catalogRequests).toBe(1)
+    const directory = page.waitForResponse(response => new URL(response.url()).pathname === '/account/api/workbench/catalog')
+    catalogRelease.resolve(undefined)
+    expect(await (await directory).finished()).toBeNull()
+    const toolbar = page.locator('[data-workbench-toolbar]')
+    await toolbar.getByRole('button', { name: 'Select workbench', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Synthetic saved layout · 1/4', exact: true }).click()
+    const pane = page.locator(`[data-session-pane="${key}"]`)
+    await pane.locator('textarea:enabled').waitFor()
+    await pane.locator('[data-model-trigger][aria-busy="false"]').waitFor()
+    expect(catalogRequests).toBe(1)
+    const golden = fileURLToPath(new URL('./expected/frontend-responsiveness/catalog-restoration.expected.md', import.meta.url))
+    await compareOrRefreshGolden(golden, `Catalog requests through initial navigation: ${String(catalogRequests)}\n\n${
+      await captureStableAria(page, '[data-workbench-toolbar]', scaffold.workspaceCwd)}`, webSnapshotMode())
+    expect(consoleWatch.pageErrors).toEqual([])
+    expect(consoleWatch.warnings).toEqual([])
+  } catch (error) {
+    failures.push(error)
+    if (page !== undefined) await diagnoseFrontend(page, scaffold, 'catalog-restoration')
+      .catch((diagnosticError: unknown) => { failures.push(diagnosticError) })
+  } finally {
+    catalogRelease.resolve(undefined)
+    sessionRelease.resolve(undefined)
+    await page?.unrouteAll({ behavior: 'wait' }).catch((error: unknown) => { failures.push(error) })
+    const settled = await Promise.allSettled([...operations])
+    for (const result of settled) if (result.status === 'rejected') failures.push(result.reason)
+    await browser?.close().catch((error: unknown) => { failures.push(error) })
+    await scaffold.close().catch((error: unknown) => { failures.push(error) })
+  }
+  if (failures.length > 0) throw new AggregateError(failures, 'catalog restoration journey failed')
+})
+
 it('reads the workbench catalog for chooser demand while ordinary Session switching remains independent', async () => {
   const scaffold = await launchWebScaffold({ workbench: true, openInApp: false })
   let browser: Browser | undefined

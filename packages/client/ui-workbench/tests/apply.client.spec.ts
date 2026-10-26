@@ -13,6 +13,7 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import { Config, apply as nodeApply } from '../src/index.ts'
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
 import type { WorkbenchToolbarInjected } from '../src/client/components/WorkbenchToolbar.tsx'
+import type { createWorkbenchStore } from '../src/client/stores.ts'
 
 const A = 'a' as SessionId
 const item: WorkbenchConversation = { sessionId: A, runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }
@@ -114,11 +115,70 @@ async function harness(services: HarnessServices = {}) {
   })()
   return {
     ctx, slots, fiber, sessions, viewport, snapshot, sidebarRight, layout, tabTypes,
+    chooser: slots.bindStore(slots.entries('conversation.workbench.toolbar')[0]!.store as ReturnType<typeof createWorkbenchStore>),
     actions: { ...actions, ...createWorkspacePreviewReaders(services.connection as ConnectionHandle | undefined) },
   }
 }
 
 describe('workbench navigation lifecycle', () => {
+  it('reads fresh on each chooser opening while sharing reads across controls of that opening', async () => {
+    const h = await harness()
+    const pending = Promise.withResolvers<undefined>()
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => {
+      await pending.promise
+      return new Response(JSON.stringify(catalog))
+    })
+    vi.stubGlobal('fetch', fetcher)
+    try {
+      const reads = [h.actions.loadCatalog(new AbortController().signal, false)]
+      h.chooser.actions.openPicker()
+      reads.push(h.actions.loadCatalog(new AbortController().signal, false))
+      reads.push(h.actions.loadCatalog(new AbortController().signal, false))
+      expect(fetcher).toHaveBeenCalledTimes(2)
+      h.chooser.actions.closePicker()
+      h.chooser.actions.openPicker()
+      reads.push(h.actions.loadCatalog(new AbortController().signal, false))
+      reads.push(h.actions.loadCatalog(new AbortController().signal, false))
+      expect(fetcher).toHaveBeenCalledTimes(3)
+      pending.resolve(undefined)
+      const results = await Promise.all(reads)
+      expect(results).toEqual(Array.from({ length: 5 }, () => catalog))
+    } finally {
+      pending.resolve(undefined)
+      await h.ctx.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('shares catalog reads through slot injections and joins them when its plugin is disposed', async () => {
+    const h = await harness()
+    const pending = Promise.withResolvers<Response>()
+    const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
+    vi.stubGlobal('fetch', fetcher)
+    try {
+      const firstFace = (h.slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => WorkbenchToolbarInjected)()
+      const first = h.actions.loadCatalog(new AbortController().signal, false)
+      const firstCanceled = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+      const second = firstFace.loadCatalog(new AbortController().signal, false)
+      const secondCanceled = expect(second).rejects.toMatchObject({ name: 'AbortError' })
+      expect(fetcher).toHaveBeenCalledOnce()
+      let disposed = false
+      const disposal = h.fiber.dispose().then(() => { disposed = true })
+      await Promise.all([firstCanceled, secondCanceled])
+      expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+      expect(disposed).toBe(false)
+      pending.resolve(new Response(JSON.stringify(catalog)))
+      await disposal
+      expect(disposed).toBe(true)
+      await expect(firstFace.loadCatalog(new AbortController().signal, false)).rejects.toMatchObject({ name: 'AbortError' })
+      expect(fetcher).toHaveBeenCalledOnce()
+    } finally {
+      pending.resolve(new Response(JSON.stringify(catalog)))
+      await h.ctx.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it.each([
     { entry: 'toolbar', target: A, selection: 'same-current pane' },
     { entry: 'toolbar', target: 'q' as SessionId, selection: 'another pane' },

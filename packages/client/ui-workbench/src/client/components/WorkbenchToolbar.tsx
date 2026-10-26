@@ -11,7 +11,7 @@ import type { AddPaneResult, ConversationViewportMode, SessionId, SessionRuntime
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkbenchStore } from '../stores.ts'
 import { NS } from '../locales.ts'
-import { loadWorkbenchCatalog, type WorkbenchCatalog, type WorkbenchConversation } from '../catalog.ts'
+import type { WorkbenchCatalog, WorkbenchConversation } from '../catalog.ts'
 import { ScopeTile } from './ScopeTile.tsx'
 import css from './Workbench.module.css'
 import { WorkspaceFileBrowser, type ListWorkspaceDirectory, type OpenWorkspaceResource } from './WorkspaceFileBrowser.tsx'
@@ -19,6 +19,12 @@ import { WorkspaceFileBrowser, type ListWorkspaceDirectory, type OpenWorkspaceRe
 /** Viewport-owned demand for authenticated saved-layout restoration. */
 export interface WorkbenchToolbarInjected {
   hooks: { catalogRestore: HostObservable<boolean> }
+  /** Read the directory through the owning plugin's pending request.
+   * @param signal - cancellation for this toolbar instance.
+   * @param fresh - explicit retry requires a new request.
+   * @returns the validated account catalog.
+   */
+  loadCatalog(signal: AbortSignal, fresh: boolean): Promise<WorkbenchCatalog>
 }
 
 interface Actions {
@@ -60,7 +66,7 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
  */
 export function WorkbenchToolbar({
   viewport, tabbed, inline = false, layout, onSelectLayout, useStore, actions, useSessions, useWorkspaces, useCatalogRestore,
-  chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode,
+  chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode, loadCatalog,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
   listWorkspaceDirectory, openWorkspaceResource, filesAvailable, openFiles, t,
@@ -93,7 +99,7 @@ export function WorkbenchToolbar({
     handledCatalogAttempt.current = catalogAttempt
     if (!catalogRequired && !retry) return
     const abort = new AbortController()
-    void loadWorkbenchCatalog(abort.signal).then((next) => {
+    void loadCatalog(abort.signal, retry).then((next) => {
       if (abort.signal.aborted) return
       setCatalog(next)
     }, () => { if (!abort.signal.aborted) catalogUnavailable?.() })

@@ -11,6 +11,8 @@ import { WorkbenchSidebar } from '../src/client/components/WorkbenchSidebar.tsx'
 import { paneIdentity, ScopeTile } from '../src/client/components/ScopeTile.tsx'
 import { WorkbenchToolbar } from '../src/client/components/WorkbenchToolbar.tsx'
 import { createWorkbenchStore } from '../src/client/stores.ts'
+import { loadWorkbenchCatalog } from '../src/client/catalog.ts'
+import { WorkbenchCatalogReader } from '../src/client/catalog-reader.ts'
 import { zh } from '../src/client/locales.ts'
 
 const SID_A = 'a' as SessionId
@@ -44,6 +46,7 @@ function props() {
     useSessions: bindSnapshotSelector(sessions), useWorkspaces: bindSnapshotSelector(workspaces),
     useProjectPolicy: bindSnapshotSelector(policy),
     useCatalogRestore: bindSnapshotSelector(catalogRestore),
+    loadCatalog: (signal: AbortSignal, _fresh: boolean) => loadWorkbenchCatalog(signal),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
   }
 }
@@ -51,6 +54,33 @@ function props() {
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('workbench components', () => {
+  it('shares pending catalog reads across simultaneous root controls', async () => {
+    const pending = Promise.withResolvers<undefined>()
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => {
+      await pending.promise
+      return new Response(JSON.stringify({
+        personalComplete: true, personal: { id: 1, name: 'Synthetic account' }, activeRuntime: { kind: 'personal' }, projects: [], items: [],
+      }))
+    })
+    vi.stubGlobal('fetch', fetcher)
+    const p = props()
+    const reader = new WorkbenchCatalogReader(() => p.catalogRestoreStore.getSnapshot())
+    const hydrateCatalog = vi.fn(async () => {})
+    const controls = { ...p, loadCatalog: (signal: AbortSignal, fresh: boolean) => reader.read(signal, fresh),
+      viewport: { mode: 'single' as const, paneIds: [], paneRatios: [], collapsedIds: [] },
+      tabbed: false, chooseSession: vi.fn(), focusSession: vi.fn(), createSession: vi.fn(), setMode: vi.fn(), hydrateCatalog, t }
+    try {
+      render(<><WorkbenchToolbar {...controls} /><WorkbenchToolbar {...controls} inline /></>)
+      await act(async () => { pending.resolve(undefined) })
+      await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledTimes(2) })
+      expect(fetcher).toHaveBeenCalledOnce()
+    } finally {
+      pending.resolve(undefined)
+      cleanup()
+      await reader.dispose()
+    }
+  })
+
   it('does not reinsert local sessions excluded by the account catalog', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       personalComplete: true, personal: { id: 1, name: 'admin' }, activeRuntime: { kind: 'personal' }, projects: [],
