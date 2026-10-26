@@ -4225,15 +4225,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the transformed body.',
       },
       {
-        signature: 'collectIndexInjections(): IndexInjection[]',
+        signature: 'collectIndexInjections(request?: IncomingMessage): IndexInjection[]',
         description: 'Collect live structured index rows in listener activation order.',
-        parameters: [],
+        parameters: [{ name: 'request', description: 'index request for request-owned rows; omission collects only request-independent rows.' }],
         returns: 'the fresh mutable row table after all listeners have appended.',
       },
       {
-        signature: 'renderIndex(html: string): string',
+        signature: 'renderIndex(html: string, request?: IncomingMessage): string',
         description: 'Render structured rows first, then legacy raw HTML transforms.',
-        parameters: [{ name: 'html', description: 'the raw index.html body.' }],
+        parameters: [{ name: 'html', description: 'the raw index.html body.' }, { name: 'request', description: 'index request for request-owned rows; omission collects only request-independent rows.' }],
         returns: 'the rendered body with current injections and transforms applied.',
       },
     ],
@@ -5069,10 +5069,10 @@ export const EVENT_API: readonly EventApiEntry[] = [
   {
     name: 'webserver/index-inject',
     mode: 'emit',
-    signature: '\'webserver/index-inject\'(table: IndexInjection[]): void',
+    signature: '\'webserver/index-inject\'(table: IndexInjection[], request?: IncomingMessage): void',
     summary: 'Collect structured index rows for one fresh index render.',
     description: 'Collect structured index rows for one fresh index render. Listeners append JSON-safe rows to the mutable table; the fallback owner renders the completed table before applying legacy raw HTML transforms.',
-    parameters: [{ name: 'table', description: 'the fresh row table for this index response.' }],
+    parameters: [{ name: 'table', description: 'the fresh row table for this index response.' }, { name: 'request', description: 'the current index request; absent for request-independent collection.' }],
   },
   {
     name: 'workflow/agent-end',

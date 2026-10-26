@@ -7,7 +7,7 @@
  */
 
 import { randomBytes } from 'node:crypto'
-import { request as httpRequest } from 'node:http'
+import { request as httpRequest, type IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import type { GatewayPrincipalClaims } from '../src/index.ts'
@@ -21,6 +21,7 @@ import { loadGatewayComposition } from './fixtures/gateway-admission.fixture.ts'
 interface ProbeResponse {
   readonly status: number
   readonly body: string
+  readonly cacheControl: string | undefined
 }
 
 function call(
@@ -35,7 +36,7 @@ function call(
     req.on('response', (res) => {
       const chunks: Buffer[] = []
       res.on('data', (chunk: Buffer) => { chunks.push(chunk) })
-      res.on('end', () => { resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString() }) })
+      res.on('end', () => { resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString(), cacheControl: res.headers['cache-control'] }) })
     })
     req.on('error', reject)
     if (body !== undefined) req.write(body)
@@ -100,6 +101,50 @@ function tamperPayload(assertion: string, patch: Record<string, unknown>): strin
 }
 
 describe('gateway runtime admission', () => {
+  it.each(['user', 'project'] as const)('renders only the authenticated document identity for a %s runtime', async (kind) => {
+    const gateway = await loadGatewayComposition({ runtime: { kind, id: 9, generation: 7 } })
+    try {
+      let lastRequest: IncomingMessage | undefined
+      const stopCapture = gateway.ctx.on('webserver/index-inject', (_rows, request) => { lastRequest = request })
+      const expectedTarget = kind === 'user' ? { kind: 'personal' } : { kind: 'project', projectId: 9 }
+      const read = async (id: number): Promise<void> => {
+        const reply = await call(gateway.origin, '/', principalHeaders(gateway.origin, gateway.issue({
+          user: { id, username: `member-${String(id)}`, displayName: 'Member', role: 'user' },
+        })))
+        expect(reply.status).toBe(200)
+        expect(reply.cacheControl).toBe('no-store')
+        const value = /globalThis\["__DSH_DOCUMENT_IDENTITY__"\] = ([^<]+)<\/script>/.exec(reply.body)?.[1]
+        expect(value).toBeDefined()
+        expect(JSON.parse(value!)).toEqual({ version: 1, principalId: id, runtimeTarget: expectedTarget })
+        expect(reply.body).not.toContain('runtime-secret')
+        expect(reply.body).not.toContain('principalPublicKey')
+      }
+      await Promise.all((kind === 'user' ? [9] : [9, 10]).map(read))
+      stopCapture()
+      if (lastRequest === undefined) throw new Error('Served index did not forward its request')
+      expect(gateway.ctx.webServer.collectIndexInjections().some(row => row.kind === 'global'
+        && row.name === '__DSH_DOCUMENT_IDENTITY__')).toBe(false)
+      // An alternate index owner cannot turn forwarded request headers into
+      // an identity without the producer's own signature and purpose checks.
+      const originalHeaders = lastRequest.headers
+      try {
+        lastRequest.headers = { ...originalHeaders }
+        delete lastRequest.headers['x-dsh-gateway-principal']
+        expect(() => gateway.ctx.webServer.collectIndexInjections(lastRequest)).toThrow(/principal assertion is required/)
+        lastRequest.headers[GATEWAY_PRINCIPAL_HEADER] = 'not.a-principal'
+        expect(() => gateway.ctx.webServer.collectIndexInjections(lastRequest)).toThrow(/principal assertion/)
+        lastRequest.headers[GATEWAY_PRINCIPAL_HEADER] = gateway.issue({ purpose: 'archive-read', user: adminUser })
+        expect(() => gateway.ctx.webServer.collectIndexInjections(lastRequest))
+          .toThrow('Purpose assertions permit only their declared HTTP operations.')
+      } finally { lastRequest.headers = originalHeaders }
+      const entry = [...gateway.ctx.loader.entries()].find(candidate => candidate.options.name === '@deepseek-ai/dsh-gateway-runtime')
+      if (entry === undefined) throw new Error('GatewayRuntime Loader entry is missing')
+      await gateway.ctx.loader.update(entry.id, { disabled: true })
+      expect(gateway.ctx.webServer.collectIndexInjections(lastRequest).some(row => row.kind === 'global'
+        && row.name === '__DSH_DOCUMENT_IDENTITY__')).toBe(false)
+    } finally { await gateway.dispose() }
+  })
+
   it('admits a verified principal to the index and API without a cookie', async () => {
     const gateway = await loadGatewayComposition()
     try {

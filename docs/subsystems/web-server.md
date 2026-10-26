@@ -168,16 +168,18 @@ applyIndexTaps(html: string): string
 
 /**
  * Collect live structured index rows in listener activation order.
+ * @param request - index request for request-owned rows; omission collects only request-independent rows.
  * @returns the fresh mutable row table after all listeners have appended.
  */
-collectIndexInjections(): IndexInjection[]
+collectIndexInjections(request?: IncomingMessage): IndexInjection[]
 
 /**
  * Render structured rows first, then legacy raw HTML transforms.
  * @param html - the raw index.html body.
+ * @param request - index request for request-owned rows; omission collects only request-independent rows.
  * @returns the rendered body with current injections and transforms applied.
  */
-renderIndex(html: string): string
+renderIndex(html: string, request?: IncomingMessage): string
 ```
 
 Source: [`packages/host/webserver/src/index.ts`](../../packages/host/webserver/src/index.ts)
@@ -198,9 +200,10 @@ Collect structured index rows for one fresh index render. Listeners append JSON-
  * JSON-safe rows to the mutable table; the fallback owner renders the
  * completed table before applying legacy raw HTML transforms.
  * @param table - the fresh row table for this index response.
+ * @param request - the current index request; absent for request-independent collection.
  * @mode emit
  */
-'webserver/index-inject'(table: IndexInjection[]): void
+'webserver/index-inject'(table: IndexInjection[], request?: IncomingMessage): void
 ```
 
 Source: [`packages/host/webserver/src/index.ts`](../../packages/host/webserver/src/index.ts)

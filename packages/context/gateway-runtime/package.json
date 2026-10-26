@@ -32,6 +32,7 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-host-webserver": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-execution-authority": "workspace:*"
   },
@@ -42,6 +43,7 @@
     "@deepseek-ai/dsh-credentials-local": "workspace:*",
     "@deepseek-ai/dsh-execution-authority": "workspace:*",
     "@deepseek-ai/dsh-host-frontend-static": "workspace:*",
+    "@deepseek-ai/dsh-host-webserver": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*"
   }
 }

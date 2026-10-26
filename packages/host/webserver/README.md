@@ -19,6 +19,8 @@ A listen failure (EADDRINUSE…) throws out of activation and rejects Loader com
 
 A `script-preload` row adds an advisory classic-script preload to the head. Its URL is HTML-attribute escaped, and the row does not execute the script or settle boot readiness; ordered `script-src` rows and the readiness tail retain those responsibilities.
 
+`renderIndex(html, request?)` and `collectIndexInjections(request?)` forward the exact index request to `webserver/index-inject` listeners. Without a request, listeners collect only request-independent rows, as used by static workers. The caller authenticates an index before rendering; collecting rows neither admits a request nor installs a Connection request context.
+
 ## Summary
 
 Browsers reach the web GUI over HTTP through `dsh-host-webserver`: a `node:http` server — `node:https` once `tls` names a certificate and key — where other plugins register named routes, upgrade routes, index startup inputs, and one fallback handler. It knows no harness concepts and serves no files — the `/api` bridge, plugin bundles, the HMR event stream, and the SPA dist belong to the plugins that register them. Route matching is fixed: exact over the whole table, then longest prefix, then the fallback handler. It serves browsers only; Electron loads dist over `file://` and carries fetch over an IPC bridge.

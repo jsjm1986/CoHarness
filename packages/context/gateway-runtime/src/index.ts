@@ -16,6 +16,7 @@ import type {
 } from '@deepseek-ai/dsh-client-connection'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-execution-authority'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import { StreamPrincipalLeasePool, type StreamPrincipalRenewalConfig } from './stream-principal-leases.ts'
 export type { StreamPrincipalRenewalConfig } from './stream-principal-leases.ts'
 
@@ -496,6 +497,21 @@ export class GatewayRuntime extends Service {
         return 'deny'
       }
       return 'allow'
+    })
+    ctx.inject(['webServer'], (scope) => {
+      scope.on('webserver/index-inject', (rows, request) => {
+        if (request === undefined) return
+        const header = headerString(request.headers, GATEWAY_PRINCIPAL_HEADER)
+        if (header === undefined) throw new Error('Gateway index principal assertion is required')
+        const claims = verifyGatewayPrincipal(header, this.credential, this.publicKey)
+        this.assertPurposePermitted(claims, 'index', request.method, new URL(request.url ?? '/', 'http://dsh.invalid').pathname)
+        rows.push({ kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: {
+          version: 1,
+          principalId: claims.user.id,
+          runtimeTarget: claims.scope.kind === 'personal' ? { kind: 'personal' }
+            : { kind: 'project', projectId: claims.scope.projectId },
+        } })
+      })
     })
     ctx.on('connection/request', (request: ConnectionRequestBoundary, next) => {
       const requestMeta = request as ConnectionRequestBoundary & { method?: string; pathname?: string }

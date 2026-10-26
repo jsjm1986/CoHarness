@@ -902,6 +902,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 
 /** Project types deliberately documented outside the subsystems catalog. */
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
+  IncomingMessage: 'Node HTTP request forwarding is owned by packages/host/webserver/README.md',
   TerminalShell: 'Browser terminal shell profiles are owned by packages/api/terminal-controller/README.md',
   TerminalEnvironment: 'Browser terminal environment fields are owned by packages/api/terminal-controller/README.md',
   WebTerminalInfo: 'Browser terminal metadata is owned by packages/api/terminal-controller/README.md',

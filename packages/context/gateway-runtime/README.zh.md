@@ -27,6 +27,7 @@ kind: "package-reference"
 
 - 启动凭据必须且只能从 `DSH_GATEWAY_CREDENTIAL_FD` 或 `DSH_GATEWAY_CREDENTIAL_FILE` 之一读取。它包含仅限 loopback 的 Gateway origin、运行时 bearer token、运行时 generation、组织和 Ed25519 公钥。
 - 运行时注册 `connection/authenticate` provider，使 Connection 在浏览器令牌交换与 Cookie 之前就向 index、`/api`、通用通道和事件流放行已验证的 principal；经 Gateway 启动的进程绝不单独接受浏览器凭据。受限用途的断言被约束在 HTTP 操作内，绝不能提供 index 或开启事件流——三个钉死用途（`terminal-admin`、`plugin-admin`、`webhook-dispatch`）只能到达其声明的 POST 路由。
+- 已认证的 index 渲染仅向 `__DSH_DOCUMENT_IDENTITY__` 提供带版本的账号 ID 与 Runtime 目标。每次渲染验证当前请求的签名 principal，并拒绝受限用途；输入不包含凭据、断言、权限或 Host 描述。非请求专属收集不提供该输入。[Connection](../../client/connection/README.zh.md) 拥有浏览器身份固定与就绪检查。
 - `connection/request` 监听器要求 `x-dsh-gateway-principal`，验证其签名、有效期、组织、scope、运行时身份和 generation，再通过请求局部的 `current()` / `requireCurrent()` 暴露它。
 - 只有已准入且持有 socket 生命周期信号的 `/api/events.mux` 与 `/api/events.host` upgrade 可以私有续租。服务所有的池只保留一份有界在途批次，按相同身份、权限、scope 和 generation 验证每份替代签名，并且只在上一份签名到期前应用。socket 关闭、服务销毁、拒绝或到期都会中止保留的 principal；晚到响应不能复活它。HTTP 断言仍保持固定到期。
 - `interactive()` 只在认证 HTTP 操作仍活动时暴露该主体。`current()` 标识起始认证分发，并可以沿异步上下文传递；它不会向脱离请求的工作授予交互权限。

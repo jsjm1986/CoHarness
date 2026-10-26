@@ -51,6 +51,7 @@ export interface GatewayComposition {
  * @returns the composed context, its assertion issuer, and its loopback origin.
  */
 export async function loadGatewayComposition(options: {
+  runtime?: GatewayRuntimeCredential['runtime']
   gatewayUrl?: string
   streamPrincipalRenewal?: GatewayRuntimeCredential['streamPrincipalRenewal']
   onEvent?: (principal: GatewayRequestPrincipal, signal: AbortSignal) => void
@@ -61,7 +62,7 @@ export async function loadGatewayComposition(options: {
     gatewayUrl: options.gatewayUrl ?? 'http://127.0.0.1:8899',
     ...(options.streamPrincipalRenewal === undefined ? {} : { streamPrincipalRenewal: options.streamPrincipalRenewal }),
     organization: 'acme',
-    runtime: { kind: 'user', id: 9, generation: 7 },
+    runtime: options.runtime ?? { kind: 'user', id: 9, generation: 7 },
     token: 'runtime-secret',
     principalPublicKey: pair.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
   }
@@ -73,8 +74,9 @@ export async function loadGatewayComposition(options: {
       audience: 'dsh-runtime',
       organization: 'acme',
       user: { id: 9, username: 'lin', displayName: 'Lin', role: 'user' },
-      scope: { kind: 'personal' },
-      runtime: { kind: 'user', id: 9, generation: 7 },
+      scope: credential.runtime.kind === 'user' ? { kind: 'personal' }
+        : { kind: 'project', projectId: credential.runtime.id, projectName: 'Fixture project', mode: 'rw' },
+      runtime: { ...credential.runtime },
       issuedAt: now,
       expiresAt: now + 30_000,
       nonce: 'nonce-1',

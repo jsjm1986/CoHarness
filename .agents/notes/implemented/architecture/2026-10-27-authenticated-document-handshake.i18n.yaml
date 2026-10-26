@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-27-authenticated-document-handshake.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-27-authenticated-document-handshake.md
+document:
+  en: 48f616a759c93014c17ca7bb3ff71c229a6ab92e
+  zh: 954c7a0c15add45a7d00310d1ad20c5aa5cf9114
+/agent-note-authenticated-document-identity-permits-parallel-connection-opening:
+  en: b61d8acbae71ed80
+  zh: cc1ffbf41345d45d
+/agent-note-authenticated-document-identity-permits-parallel-connection-opening/problem:
+  en: 97a29f1924d76c4b
+  zh: a855695f60489376
+/agent-note-authenticated-document-identity-permits-parallel-connection-opening/decision:
+  en: 5f9ab00f759e80ca
+  zh: a63d53aa36fe05ff
+/agent-note-authenticated-document-identity-permits-parallel-connection-opening/alternatives-considered:
+  en: 2bb0ef59e7bc6ea7
+  zh: a24423ed49ab14c5
+/agent-note-authenticated-document-identity-permits-parallel-connection-opening/verification:
+  en: f91417295aa5b838
+  zh: 913936c331671f37
+/agent-note-authenticated-document-identity-permits-parallel-connection-opening/consequences:
+  en: 19841d109a66e013
+  zh: 9ea74eae1d34340a

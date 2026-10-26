@@ -4,7 +4,7 @@
  */
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apply, type ConnectionHandle } from '../src/client/index.ts'
+import { apply, installConnection, type ConnectionHandle } from '../src/client/index.ts'
 import type { RpcMessage, SessionId } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
 import { FixtureApiClient } from '../src/client/fixture.ts'
@@ -226,6 +226,147 @@ async function mount(): Promise<ConnectionHandle> {
 }
 
 describe('connection client apply', () => {
+  it('rejects malformed browser document input before replacing fetch or providing a connection', () => {
+    const ctx = new Context()
+    mountedContexts.push(ctx)
+    const original = globalThis.fetch
+    expect(() => {
+      installConnection(ctx, {
+        location: { hostname: 'harness.example', origin: 'https://harness.example' },
+        documentIdentity: { version: 2 },
+      })
+    }).toThrow(/Connection document identity/)
+    expect(globalThis.fetch).toBe(original)
+    expect(ctx.get('connection')).toBeUndefined()
+  })
+
+  it('leaves document identity to an explicit carrier', () => {
+    const ctx = new Context()
+    mountedContexts.push(ctx)
+    const api = new FixtureApiClient()
+    const original = globalThis.fetch
+    installConnection(ctx, {
+      location: { hostname: 'harness.example', origin: 'https://harness.example' },
+      documentIdentity: { version: 2 },
+      transport: { createApiClient: () => api },
+    })
+    expect((ctx.get('connection') as ConnectionHandle).api).toBe(api)
+    expect(globalThis.fetch).toBe(original)
+  })
+
+  it.each(['account', 'runtime'] as const)('retires early sockets when the first response changes the document %s', async (changed) => {
+    const reloaded = deferred<undefined>()
+    vi.stubGlobal('location', {
+      hostname: 'harness.example', search: '', origin: 'https://harness.example',
+      reload: () => { reloaded.resolve(undefined) },
+    })
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.stubGlobal('__DSH_DOCUMENT_IDENTITY__', { version: 1, principalId: 7, runtimeTarget: { kind: 'project', projectId: 42 } })
+    const held = deferred<Response>()
+    const requested = deferred<RequestInit | undefined>()
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      requested.resolve(init)
+      return held.promise
+    })
+    let loop: ReturnType<ConnectionHandle['start']> | undefined
+    try {
+      const handle = await mount()
+      const connected = vi.fn()
+      loop = handle.start({ onConnected: connected })
+      const init = await requested.promise
+      await vi.waitFor(() => { expect(sockets).toHaveLength(2) })
+      held.resolve(Response.json({
+        type: 'server-response', rpcId: (JSON.parse(init?.body as string) as { rpcId: string }).rpcId,
+        result: { ok: true, value: {
+          version: 'test', cwd: '/fixture', home: '/fixture', attachedSessions: 0, canOpenPath: false,
+          executionAuthorityRequired: true, runtimeTarget: { kind: 'project', projectId: changed === 'runtime' ? 43 : 42 },
+        } },
+      }, { headers: { 'x-dsh-principal-id': changed === 'account' ? '8' : '7' } }))
+      await reloaded.promise
+      expect(connected).not.toHaveBeenCalled()
+      expect(handle.hostDescription.getSnapshot()).toBeUndefined()
+      expect(sockets.every(socket => socket.readyState === FakeWebSocket.CLOSED)).toBe(true)
+    } finally {
+      loop?.stop()
+      held.resolve(new Response('{}'))
+      await mountedContexts.at(-1)?.fiber.dispose()
+      fetch.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('ignores document input for a fixture carrier', async () => {
+    vi.stubGlobal('location', { hostname: 'localhost', search: '?fixture', origin: 'http://localhost:3080' })
+    vi.stubGlobal('__DSH_DOCUMENT_IDENTITY__', { version: 'invalid-for-HTTP' })
+    try {
+      expect((await mount()).api).toBeInstanceOf(FixtureApiClient)
+    } finally {
+      await mountedContexts.at(-1)?.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each([
+    { kind: 'personal' as const },
+    { kind: 'project' as const, projectId: 42 },
+  ])('opens pinned startup sockets before describe without publishing early for $kind', async (runtimeTarget) => {
+    vi.stubGlobal('location', { hostname: 'harness.example', search: '', origin: 'https://harness.example' })
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.stubGlobal('__DSH_DOCUMENT_IDENTITY__', { version: 1, principalId: 7, runtimeTarget })
+    FakeWebSocket.autoOpen = false
+    const held = deferred<Response>()
+    const requested = deferred<RequestInit | undefined>()
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      requested.resolve(init)
+      return held.promise
+    })
+    let loop: ReturnType<ConnectionHandle['start']> | undefined
+    try {
+      const handle = await mount()
+      const order: string[] = []
+      const connected = deferred<undefined>()
+      loop = handle.start({
+        onConnected: () => { order.push('connected'); connected.resolve(undefined) },
+        onHostEnvelope: () => { order.push('host-frame') },
+      })
+      const init = await requested.promise
+      await vi.waitFor(() => { expect(sockets).toHaveLength(2) })
+      const pinned = runtimeTarget.kind === 'personal' ? 'personal' : 'project:42'
+      for (const socket of sockets) {
+        const url = new URL(socket.url)
+        expect(url.searchParams.get('dshTarget')).toBe(pinned)
+        expect(url.searchParams.get('dshPrincipal')).toBe('7')
+        socket.readyState = FakeWebSocket.OPEN
+        socket.dispatchEvent(new Event('open'))
+      }
+      expect(new Headers(init?.headers).get('x-dsh-expected-principal-id')).toBe('7')
+      const input = fetch.mock.calls[0]![0]
+      const descriptionUrl = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+      expect(descriptionUrl.searchParams.get('dshTarget')).toBe(pinned)
+      sockets.find(socket => new URL(socket.url).pathname.endsWith('events.host'))!.receive(JSON.stringify({
+        type: 'server-request', rpcId: 'early-host', method: 'host/remote-event',
+        payload: { type: 'host/remote-event', event: 'commands/change', args: [] },
+      }))
+      expect(handle.hostDescription.getSnapshot()).toBeUndefined()
+      expect(order).toEqual([])
+      held.resolve(Response.json({
+        type: 'server-response', rpcId: (JSON.parse(init?.body as string) as { rpcId: string }).rpcId,
+        result: { ok: true, value: {
+          version: 'test', cwd: '/fixture', home: '/fixture', attachedSessions: 0, canOpenPath: false,
+          executionAuthorityRequired: true, runtimeTarget,
+        } },
+      }, { headers: { 'x-dsh-principal-id': '7' } }))
+      await connected.promise
+      await vi.waitFor(() => { expect(order).toEqual(['connected', 'host-frame']) })
+    } finally {
+      loop?.stop()
+      held.resolve(new Response('{}'))
+      await mountedContexts.at(-1)?.fiber.dispose()
+      fetch.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('mounts ctx.connection with the real client when no ?fixture switch is present', async () => {
     ;(globalThis as Win).location = { hostname: 'localhost', search: '' }
     const handle = await mount()

@@ -4,6 +4,7 @@
  * controller with its sinks.
  */
 import { createBrowserIdentityFence, type BrowserIdentityFence } from './identity-fence.ts'
+import { parseDocumentIdentity } from './document-identity.ts'
 import { sessionAddressApi } from './session-api.ts'
 export { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -124,6 +125,7 @@ export interface ClientTransportHooks {
 interface ClientTransportGlobal {
   __DSH_TRANSPORT__?: ClientTransportHooks
   __DSH_CONNECTION_RECOVERY__?: unknown
+  __DSH_DOCUMENT_IDENTITY__?: unknown
 }
 
 /** Browser location fields used to classify loopback authority and detect fixture mode. */
@@ -150,6 +152,8 @@ export interface ConnectionInstallOptions {
   readonly recovery?: ConnectionConfig
   /** Page location; omit for a non-browser composition. */
   readonly location?: ConnectionLocation
+  /** Authenticated HTML account/Runtime input; absent or non-browser carriers retain describe-first admission. */
+  readonly documentIdentity?: unknown
 }
 
 function targetKey(target: ConnectionRuntimeTarget): string {
@@ -173,7 +177,7 @@ interface ConnectionShared {
   /** Translate declared Remote Session arguments to the wire form of their owning runtime. */
   mapRemote?: ((endpoint: string, args: Readonly<Record<string, unknown>>, scopeWire?: string) =>
   Readonly<Record<string, unknown>>) | undefined
-  /** Runtime target the bootstrap handshake verified; bounds the root handle's key. */
+  /** Runtime target established by authenticated HTML or the bootstrap handshake; bounds the root handle's key. */
   baseTarget?: ConnectionRuntimeTarget
   /** Subscribers notified when the bootstrap runtime target is declared. */
   targetListeners?: Set<(target: ConnectionRuntimeTarget) => void>
@@ -494,6 +498,7 @@ function createConnectionHandle(
  * timing every later `start` merges over.
  * @param ctx - client Cordis context.
  * @param options - physical carrier, reconnect timing, and page location.
+ * @throws when supplied document identity is malformed for a browser HTTP install.
  */
 export function installConnection(ctx: Context, options: ConnectionInstallOptions = {}): void {
   const pageLocation = options.location
@@ -507,7 +512,12 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
   const identity = fixtureClient === undefined && transport === undefined && pageLocation?.origin !== undefined
     && /^https?:\/\//u.test(pageLocation.origin)
     ? createBrowserIdentityFence(nativeFetch, pageLocation.origin, () => { pageLocation.reload?.() }) : undefined
+  const documentIdentity = identity === undefined ? undefined : parseDocumentIdentity(options.documentIdentity)
   if (identity !== undefined) {
+    if (documentIdentity !== undefined) {
+      identity.confirm(documentIdentity.principalId)
+      identity.setRuntimeTarget(documentIdentity.runtimeTarget)
+    }
     globalThis.fetch = identity.fetch
     ctx.effect(() => () => {
       identity.dispose()
@@ -539,7 +549,11 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
     interactions,
     accountPreferences,
     projectModelSettings,
-    { root: undefined, handles: new Map(), ...(identity === undefined ? {} : { identity }) },
+    {
+      root: undefined, handles: new Map(),
+      ...(identity === undefined ? {} : { identity }),
+      ...(documentIdentity === undefined ? {} : { baseTarget: documentIdentity.runtimeTarget }),
+    },
     undefined,
     carrier,
   )
@@ -559,6 +573,7 @@ export function apply(ctx: Context): void {
     ...(transport === undefined ? {} : { transport }),
     ...(recovery === undefined ? {} : { recovery }),
     ...(pageLocation === undefined ? {} : { location: pageLocation }),
+    ...(globals.__DSH_DOCUMENT_IDENTITY__ === undefined ? {} : { documentIdentity: globals.__DSH_DOCUMENT_IDENTITY__ }),
   })
 }
 
