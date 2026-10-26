@@ -26,12 +26,19 @@ describe('database startup retry', () => {
   })
 
   it('fails immediately for non-transient migration or credential errors', async () => {
-    const failure = Object.assign(new Error('invalid password'), { code: '28P01' })
-    await expect(withDatabaseStartupRetry(async () => { throw failure }, {
-      initialDelayMs: 1,
-      maxDelayMs: 2,
-    })).rejects.toBe(failure)
-    expect(isTransientDatabaseError(failure)).toBe(false)
+    const failures = [
+      Object.assign(new Error('invalid password'), { code: '28P01' }),
+      new Error('migration checksum differs'),
+    ]
+    for (const failure of failures) {
+      let attempts = 0
+      await expect(withDatabaseStartupRetry(async () => { attempts++; throw failure }, {
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+      })).rejects.toBe(failure)
+      expect(isTransientDatabaseError(failure)).toBe(false)
+      expect(attempts).toBe(1)
+    }
   })
 
   it('recognizes wrapped network errors without exposing their message in diagnostics', () => {

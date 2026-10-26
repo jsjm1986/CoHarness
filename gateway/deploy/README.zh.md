@@ -164,6 +164,8 @@ OLD_RELEASE_NAME=coharness-OLD-REVISION
 
 Gateway 启动在 PostgreSQL 暂时不可用时采用有界指数退避等待（`HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` 与 `HGW_DATABASE_STARTUP_RETRY_MAX_MS`）。凭据错误、migration 校验和企业/节点未激活不会重试。PostgreSQL 容器保持 `unless-stopped` 策略；Docker Desktop 或主机恢复后执行 `docker compose up -d --wait`，Gateway 在数据库及所选企业/节点可用前必须保持未就绪。
 
+默认数据库客户端会将本地主动关闭前的对端 EOF 报告为 `08006`，包括 TLS 协商后的连接，使连接或启动查询中断能够进入现有重试策略。PostgreSQL 拒绝码和 TLS 验证失败保持原样；主动关闭连接不会报告连接故障。普通数据查询继续向调用方报告失败，不会自动重复执行；会话读取沿用临时依赖故障分类。显式提供的自定义 `Client` 实现负责其传输错误。
+
 ## 升级与备份
 
 [当前节点配置](node-configuration/README.zh.md) 说明管理员设置、独立配置工作进程及本机恢复。保存与应用是分开的操作。

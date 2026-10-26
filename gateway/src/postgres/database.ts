@@ -3,6 +3,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
+import { GatewayPostgresClient } from './client.ts'
 
 const MIGRATION_LOCK_KEY = 0x48475750
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -181,6 +182,7 @@ export function createPostgresPool(connectionString: string, overrides: GatewayP
     statement_timeout: DEFAULT_DATABASE_STATEMENT_TIMEOUT_MS,
     lock_timeout: DEFAULT_DATABASE_LOCK_TIMEOUT_MS,
     idle_in_transaction_session_timeout: DEFAULT_DATABASE_IDLE_TRANSACTION_TIMEOUT_MS,
+    Client: GatewayPostgresClient,
     ...poolOverrides,
   }, checkoutQueueLimit)
   // `pg.Pool` emits an `error` event when an idle client is terminated by the
