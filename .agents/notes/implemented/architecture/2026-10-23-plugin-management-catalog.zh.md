@@ -12,7 +12,7 @@ Status: implemented
 
 现有 `pluginManager` Remote 命名空间拥有一次聚合读取。[包参考](../../../../packages/boot/plugin-manager/README.zh.md#use-this-package)定义响应、授权与取消。Web 组合挂载独立的只读入口，使没有 profile 的状态也可被查询，而不削弱受管服务必需的 `profileContext` 依赖。共享 base、headless 和 SDK 组合保留原有提供者。该读取器不增加第二个 profile 所有者，也不跨请求缓存。
 
-管理读取通过清单包的同步 `readRuntimePluginEntries(ctx)` 投影当前 Runtime 条目。完整的 `readPluginInventory(ctx)` 共享这层投影，并为诊断消费者添加可选的预设组合。管理读取不等待其响应无法展示的预设发现、解析或 disabled 表达式求值。元数据、有效启用状态、存活阶段和 Loader 顺序使用同一层投影；预设健康状态和组合仍由 roster 拥有。
+管理读取通过清单包的同步 `readRuntimePluginEntries(ctx)` 投影当前 Runtime 条目。完整的 `readPluginInventory(ctx)` 共享这层投影，并为诊断消费者添加可选的预设组合。管理读取不等待其响应无法展示的预设发现、解析或 disabled 表达式求值。有效启用状态、存活阶段和 Loader 顺序共享同一层投影。可选的元数据选择默认包含当前显示资源。工作台目录省略 Runtime 条目元数据，因为页面从组合包行与 Client 注册取得显示信息。组合包和声明行的元数据保持完整；Admin 矩阵与诊断清单保留条目标题。此选择直接减少资源读取，不增加缓存或延后更新元数据；预设健康状态和组合仍由 roster 拥有。
 
 授权继续由[部署策略](2026-09-22-gateway-profile-management-authority.zh.md)与现有传输断言拥有。读取器在启动原有读取前，以及发布结果前检查权限；把多个值装进一个响应不会使它们成为原子 profile 修订。工具及其他消费者仍可使用现有方法。
 
@@ -49,6 +49,8 @@ Admin 活动控制器将每个已接纳的目录结果传给同一目标的组�
 装配后的 [Admin 流程](../../../../apps/web/tests/plugin-administration.e2e.ts)先通过内置 CLI 的签名 `plugin-admin` 路由，再经真实页面安装并启用本地组合包。[运行时准入测试](../../../../packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts)拒绝未签名的目录请求；用途方法矩阵拒绝该端点的 GET 与 upgrade 请求。
 
 真实 Admin 页面组件回归在首个目录请求处设置完成屏障，要求启动状态读取一次、目录请求一次、旧插件和组合包列表调用零次。`180b8a7c261` 参考实现会读取两次启动状态，并调用四次旧列表。后续用例保留设置读取、矩阵写入、聚焦重试、StrictMode 清理与重建、权限失效、目标替换，以及晚到目录和写入回复的拒绝。这些是请求次数与生命周期检查；脱敏公网记录中的请求时长不代表候选端到端改善。
+
+清单与管理器回归用例要求控制投影不调用条目元数据读取，完整投影的活动字段保持一致。组装后的按需清单场景检查真实目录响应：工作台条目省略元数据，组合包显示元数据仍然存在，原有卡片正常显示，设置中的完整预设清单保留预期输出。未优化实现会在省略元数据的断言上失败。Admin 控制器和传输用例保留完整元数据选择及取消行为。这些工作量检查证明文件读取被移除；公网耗时与宿主争用仍单独测量。
 
 ## 影响
 

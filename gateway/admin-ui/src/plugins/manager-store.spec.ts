@@ -76,9 +76,9 @@ function catalog(value: Partial<PluginManagementCatalog> = {}) {
 function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}, callbacks: Omit<ConstructorParameters<typeof PluginManagerController>[0], 'remote'> = {}) {
   const inventory = { list: overrides.inventory ?? vi.fn(() => Promise.resolve(ok({ entries: [], managementAvailable: true }))) }
   const plugins = {
-    catalog: vi.fn<(signal?: AbortSignal) => Promise<ReturnType<typeof catalog> | ReturnType<typeof refused>>>(
-      () => Promise.resolve(catalog()),
-    ),
+    catalog: vi.fn<
+      (includeEntryMetadata?: boolean, signal?: AbortSignal) => Promise<ReturnType<typeof catalog> | ReturnType<typeof refused>>
+    >(() => Promise.resolve(catalog())),
     listBundles: vi.fn<() => Promise<ReturnType<typeof ok<BundleInfo[]>> | ReturnType<typeof refused>>>(
       () => Promise.resolve(ok([BUNDLE])),
     ),
@@ -126,8 +126,9 @@ describe('shared Admin catalog acceptance', () => {
   it('publishes an accepted catalog and reports actual writes without an initial idle notification', async () => {
     const onCatalog = vi.fn()
     const onWriteSettled = vi.fn()
-    const { controller, face } = bench({}, { onCatalog, onWriteSettled })
+    const { controller, face, plugins } = bench({}, { onCatalog, onWriteSettled })
     await controller.load()
+    expect(plugins.catalog).toHaveBeenCalledWith(true, expect.any(AbortSignal))
     expect(onCatalog).toHaveBeenCalledExactlyOnceWith(catalog().value)
     expect(onWriteSettled).not.toHaveBeenCalled()
     face.setRowEnabled(ROW_ENTRY, false)
@@ -1298,7 +1299,7 @@ describe('PluginManagerController', () => {
     const { state, controller, plugins } = bench({ catalog: vi.fn().mockReturnValueOnce(gate.promise) })
     const loading = controller.load()
     await Promise.resolve()
-    const signal = plugins.catalog.mock.calls[0]?.[0]
+    const signal = plugins.catalog.mock.calls[0]?.[1]
     expect(signal?.aborted).toBe(false)
     const before = state()
     controller.dispose()

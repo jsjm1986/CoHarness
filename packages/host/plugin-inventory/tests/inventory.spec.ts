@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +8,7 @@ import { PluginPackages, readPluginMeta, type RuntimeResolution } from '@deepsee
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
 import type { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
-import PluginInventoryGateway from '../src/index.ts'
+import PluginInventoryGateway, { readRuntimePluginEntries } from '../src/index.ts'
 
 const contexts: Context[] = []
 const roots: string[] = []
@@ -66,6 +66,16 @@ function metadataFixture(mode: 'native' | 'runtime') {
 }
 
 describe('PluginInventoryGateway', () => {
+  it('omits the composition include title along with package metadata for controls', async () => {
+    const { ctx, inventory } = await harness()
+    await ctx.loader.create({ name: 'cordis:include', disabled: true })
+    const full = (await inventory.list()).entries
+    expect(full).toMatchObject([{ moduleName: 'cordis:include', meta: { title: { en: 'Composition include' } } }])
+    const controls = readRuntimePluginEntries(ctx, false)
+    expect(controls.every(entry => !Object.hasOwn(entry, 'meta'))).toBe(true)
+    expect(full.map(({ meta: _meta, ...entry }) => entry)).toEqual(controls)
+  })
+
   it.each(['native', 'runtime'] as const)('reads local metadata while the package entry remains disabled with %s resolution', async (mode) => {
     const { dir, baseUrl, resolution, expectUnlinked } = metadataFixture(mode)
     mkdirSync(join(dir, 'locale'), { recursive: true })
@@ -81,6 +91,15 @@ describe('PluginInventoryGateway', () => {
     const { ctx, inventory } = await harness(baseUrl)
     await ctx.plugin(PluginPackages, mode === 'runtime' ? { resolution } : {})
     await ctx.loader.create({ name: 'local-plugin/feature', disabled: true })
+    const metadata = vi.spyOn(ctx.pluginPackages, 'metaOf')
+    try {
+      const controls = readRuntimePluginEntries(ctx, false)
+      expect(controls).toMatchObject([{ moduleName: 'local-plugin/feature', enabled: false, fiberPhase: null }])
+      expect(controls.every(entry => !Object.hasOwn(entry, 'meta'))).toBe(true)
+      expect(metadata).not.toHaveBeenCalled()
+    } finally {
+      metadata.mockRestore()
+    }
     expect((await inventory.list()).entries).toMatchObject([{
       enabled: false, fiberPhase: null, meta: { title: { en: 'Local plugin' }, description: { en: 'Local description' } },
     }])

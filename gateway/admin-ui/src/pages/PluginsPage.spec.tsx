@@ -197,7 +197,7 @@ it('ignores an old catalog after a target switch even when the old request succe
   render(<PluginsPage />)
   const user = await chooseUser()
   await waitFor(() => expect(remoteFixture.pluginManager.catalog).toHaveBeenCalledTimes(1))
-  const oldSignal = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls[0]![0]!
+  const oldSignal = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls[0]![1]!
   await user.selectOptions(screen.getByLabelText('插件管理对象'), 'project:7')
   expect(await screen.findByLabelText('当前启用 new-target')).toBeTruthy()
   expect(oldSignal.aborted).toBe(true)
@@ -215,7 +215,7 @@ it('drops a late admitted catalog after unmount or revoked authorization', async
   await waitFor(() => expect(remoteFixture.pluginManager.catalog).toHaveBeenCalledTimes(1))
   act(() => { vi.mocked(pluginManagementRemote).mock.calls.forEach(call => call[3]('403 denied')) })
   expect(screen.getByText('403 denied')).toBeTruthy()
-  const signal = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls[0]![0]!
+  const signal = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls[0]![1]!
   expect(signal.aborted).toBe(true)
   page.unmount()
   await act(async () => { old.resolve(catalogAnswer([livePlugin('revoked')])); await old.promise })
@@ -240,12 +240,12 @@ it('uses a fresh active catalog lifetime after StrictMode cleanup and aborts it 
   const page = render(<StrictMode><PluginsPage /></StrictMode>)
   await chooseUser()
   expect(await screen.findByLabelText('当前启用 strict-owner')).toBeTruthy()
-  const current = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls.at(-1)![0]!
+  const current = vi.mocked(remoteFixture.pluginManager.catalog).mock.calls.at(-1)![1]!
   expect(current.aborted).toBe(false)
   expect(remoteFixture.pluginManager.listPlugins).not.toHaveBeenCalled()
   expect(remoteFixture.pluginManager.listBundles).not.toHaveBeenCalled()
   page.unmount()
-  expect(vi.mocked(remoteFixture.pluginManager.catalog).mock.calls.every(([signal]) => signal?.aborted)).toBe(true)
+  expect(vi.mocked(remoteFixture.pluginManager.catalog).mock.calls.every(([, signal]) => signal?.aborted)).toBe(true)
 })
 
 it('does not refresh either owner from a previous target write that settles late', async () => {

@@ -28,25 +28,27 @@ export class PluginManagerCatalogGateway extends TypertRemoteService {
    * Read current profile availability, mutation authority, bundles, and entries.
    * Transport authorization precedes invocation, including the administrator assertion.
    * A missing profile reads no files; a refused read publishes no catalog.
-   * @param signal - cancellation of this request; disposal also cancels publication and drains reads.
+   * @param includeEntryMetadata - whether to read runtime entry display resources; defaults to true. False keeps bundle and row metadata.
+   * @param signal - optional request cancellation; when absent, service disposal still cancels publication and drains reads.
    * @returns live catalog values, without an atomic profile-revision guarantee.
    */
   @Remote
-  catalog(signal: AbortSignal): Promise<PluginManagementCatalog> {
-    const operation = this.read(AbortSignal.any([signal, this.abort.signal]))
+  catalog(includeEntryMetadata?: boolean, signal?: AbortSignal): Promise<PluginManagementCatalog> {
+    const operation = this.read(includeEntryMetadata !== false,
+      signal === undefined ? this.abort.signal : AbortSignal.any([signal, this.abort.signal]))
     this.reads.add(operation)
     const settled = (): void => { this.reads.delete(operation) }
     void operation.then(settled, settled)
     return operation
   }
 
-  private async read(signal: AbortSignal): Promise<PluginManagementCatalog> {
+  private async read(includeEntryMetadata: boolean, signal: AbortSignal): Promise<PluginManagementCatalog> {
     signal.throwIfAborted()
     const manager = this.ctx.get('pluginManager')
     if (manager === undefined) return { managementAvailable: false, manage: false, bundles: [], plugins: [] }
     await manager.authorize('read')
     signal.throwIfAborted()
-    const pending = [manager.listBundles(), manager.listPlugins(), manager.access()] as const
+    const pending = [manager.listBundles(), manager.listPlugins(includeEntryMetadata), manager.access()] as const
     try {
       const [bundles, plugins, access] = await Promise.all(pending)
       signal.throwIfAborted()

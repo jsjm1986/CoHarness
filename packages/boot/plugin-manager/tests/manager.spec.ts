@@ -380,6 +380,20 @@ it('names where each installed bundle comes from as a spec pnpm installs', async
   })
 })
 
+it('lists current controls without reading entry metadata when it is omitted', async () => {
+  const { ctx, manager } = await fixture('startup')
+  await ctx.plugin(PluginPackages)
+  const metadata = vi.spyOn(ctx.pluginPackages, 'metaOf')
+  onTestFinished(() => { metadata.mockRestore() })
+  const controls = await manager.listPlugins(false)
+  expect(controls.length).toBeGreaterThan(0)
+  expect(controls.every(entry => !Object.hasOwn(entry, 'meta'))).toBe(true)
+  expect(metadata).not.toHaveBeenCalled()
+  const full = await manager.listPlugins()
+  expect(metadata).toHaveBeenCalled()
+  expect(full.map(({ meta: _meta, ...entry }) => entry)).toEqual(controls)
+})
+
 it.each(['native', 'runtime'] as const)('reads a disabled bundle and its independent exported plugins without running them with %s resolution', async (mode) => {
   const { ctx, manager, dir, bundle, profile } = await fixture('startup')
   bundle('localized', [{ id: 'first', name: 'local-child/first' }, { id: 'second', name: 'local-child/second' }])

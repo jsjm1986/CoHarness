@@ -381,7 +381,7 @@ export interface PluginManagementCatalog extends PluginManagementAccess {
   managementAvailable: boolean
   /** The same bundle records exposed by the existing list operation. */
   bundles: BundleInfo[]
-  /** The same plugin entries exposed by the existing list operation. */
+  /** Current plugin entries and control availability; display metadata is absent when `includeEntryMetadata` is false. */
   plugins: PluginInfo[]
 }
 

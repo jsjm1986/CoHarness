@@ -11,6 +11,8 @@ description: "自定义原始 Web 组合必须挂载 Plugin Manager 目录入口
 
 Web 与 Admin 插件页通过 `pluginManager/catalog` 读取可用性、变更权限、组合包与条目。只挂载旧管理器和清单入口的自定义原始 Web 组合，还必须挂载 `@deepseek-ai/dsh-plugin-manager/catalog`；入口缺失时页面报错，不回退到旧读取方式。现有管理读取与变更端点继续可用。
 
+`catalog(includeEntryMetadata?, signal?)` 与 `listPlugins(includeMetadata?)` 默认保留完整条目元数据。工作台传入 `false`，省略未使用的条目显示资源；组合包及声明行的元数据保持完整。Admin 和完整清单消费者保留元数据。显式取消信号使用目录方法的第二个参数：自定义 Client 将 `catalog(signal)` 改为 `catalog(undefined, signal)`。
+
 随附的 `web-app` patch 包含新的只读入口。共享 base、headless 与 SDK 组合保留原有提供者。[包参考](../../../../packages/boot/plugin-manager/README.zh.md#use-this-package)说明未托管 profile 与授权行为。
 
 ## 迁移

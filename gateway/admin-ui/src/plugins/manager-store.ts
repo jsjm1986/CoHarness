@@ -776,7 +776,7 @@ export class PluginManagerController {
         const generation = ++this.generation
         if (this.getSnapshot().status === 'idle') this.patch({ status: 'loading' })
         try {
-          const catalog = await this.ctx.remote.pluginManager.catalog(this.catalogAbort.signal)
+          const catalog = await this.ctx.remote.pluginManager.catalog(true, this.catalogAbort.signal)
           if (generation !== this.generation) return
           if (!catalog.ok) {
             if (catalog.error.code === 'plugin-management/forbidden') {

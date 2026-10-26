@@ -78,18 +78,19 @@ export default PluginInventoryGateway
 
 /** Read current non-group Loader entries without discovering or inspecting agent presets.
  * @param ctx Context with the Loader service.
+ * @param includeMetadata Whether to read display resources; defaults to true. False omits metadata, including the include title.
  * @returns Current runtime entries in Loader order, with optional display metadata and no separate cache.
  */
-export function readRuntimePluginEntries(ctx: Context): PluginInventoryEntry[] {
+export function readRuntimePluginEntries(ctx: Context, includeMetadata: boolean = true): PluginInventoryEntry[] {
   const entries: PluginInventoryEntry[] = []
   const packages = ctx.get('pluginPackages')
   for (const entry of ctx.loader.entries()) {
     if (entry.options.group) continue
     const base = entry.parent.tree.ctx.baseUrl
-    let meta = base === undefined ? undefined : packages?.metaOf(entry.options.name, base)
+    let meta = !includeMetadata || base === undefined ? undefined : packages?.metaOf(entry.options.name, base)
     // The root `cordis:include` entry is the included composition itself, not a
     // package, so package metadata cannot resolve; give the row its own title.
-    if (meta === undefined && entry.options.name === 'cordis:include') {
+    if (includeMetadata && meta === undefined && entry.options.name === 'cordis:include') {
       meta = { title: { en: 'Composition include', zh: '组合包含' } }
     }
     entries.push({

@@ -27,6 +27,8 @@ Clients can call `pluginInventory/list` to display the host’s current plugins 
 
 Call `pluginInventory/list` when a client or settings page needs to show what is currently composed in the host — which plugins are loaded, enabled, and alive, and what each agent preset would give a session. The service is Remote-only and deliberately declares no same-process Cordis `Context` merge. Same-process consumers use `readPluginInventory(ctx)` for that complete snapshot or synchronous `readRuntimePluginEntries(ctx)` for current Loader entries alone; the latter performs no preset discovery, composition reads, or disabled-expression evaluation.
 
+`readRuntimePluginEntries(ctx, false)` omits display metadata and performs no entry metadata resource reads, including the composition-include title. Omit the second argument or pass `true` to read metadata. Both projections read live Loader state in the same order; `readPluginInventory` and the Remote list retain complete metadata.
+
 ### What a snapshot contains
 
 Each row is one non-group Loader entry: its entry id, the exact module specifier, the effective enablement (including disabled ancestor groups), and the current root Fiber phase. `pending` means the entry waits to load, `loading` that it is being read, `active` that it is running, `failed` that its fiber rejected, and `unloading` that it is being torn down; `null` means no live root Fiber exists at all. Structural group rows are skipped.

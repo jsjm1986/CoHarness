@@ -11,6 +11,8 @@ English | [中文](guide.zh.md)
 
 The Web and Admin plugin pages load availability, mutation authority, bundles, and entries through `pluginManager/catalog`. A custom raw Web composition that mounted the earlier manager and inventory entries alone must also mount `@deepseek-ai/dsh-plugin-manager/catalog`; the pages report a missing endpoint as an error and do not fall back to the earlier reads. Existing management read and mutation endpoints remain available.
 
+`catalog(includeEntryMetadata?, signal?)` and `listPlugins(includeMetadata?)` default to complete entry metadata. The workbench passes `false` to omit unused entry display resources; bundle and declared-row metadata remains complete. Admin and complete-inventory consumers retain metadata. Explicit cancellation calls use the second catalog argument: replace `catalog(signal)` with `catalog(undefined, signal)` in custom Clients.
+
 The shipped `web-app` patch includes the new read-only entry. Shared base, headless, and SDK compositions keep their existing providers. The [package reference](../../../../packages/boot/plugin-manager/README.md#use-this-package) describes unmanaged profiles and authorization.
 
 ## Migration

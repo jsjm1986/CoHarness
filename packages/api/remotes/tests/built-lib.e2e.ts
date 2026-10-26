@@ -67,7 +67,7 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       await loaderHost.plugin(Loader)
       await loaderHost.loader.create({ name: '@deepseek-ai/dsh-plugin-manager/catalog' })
       await loaderHost.loader.await()
-      const loaderUnmanaged = await loaderHost.pluginManagerCatalog.catalog(new AbortController().signal)
+      const loaderUnmanaged = await loaderHost.pluginManagerCatalog.catalog(undefined, new AbortController().signal)
       await loaderHost.fiber.dispose()
       const { default: AgentRegistry } = await import(urls.agent)
       const connectionHost = await import(urls.connectionHost)
@@ -243,6 +243,11 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       const accessDenied = await client.remote.pluginManager.access()
       administrator = true
       const catalogAllowed = await client.remote.pluginManager.catalog()
+      const catalogOmitted = await client.remote.pluginManager.catalog(false)
+      const invalidMetadataSelections = [
+        (await client.remote.pluginManager.catalog('invalid')).ok,
+        (await client.remote.pluginManager.listPlugins('invalid')).ok,
+      ]
       const managementAllowed = await client.remote.pluginManager.listBundles()
       const accessAllowed = await client.remote.pluginManager.access()
       stopPolicy()
@@ -263,7 +268,7 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       const result = {
         loaderUnmanaged, catalogUnmanaged, catalogReadOnly,
         catalogDenied: catalogDenied.ok ? catalogDenied : { ok: false, error: { code: catalogDenied.error.code } },
-        catalogAllowed,
+        catalogAllowed, catalogOmitted, invalidMetadataSelections,
         managementReads, managementDenied, accessDenied,
         managementAllowed, accessAllowed, managementMissing, accessMissing, writeMissing,
         invalidResult,
@@ -294,6 +299,8 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       catalogReadOnly: unknown
       catalogDenied: unknown
       catalogAllowed: unknown
+      catalogOmitted: unknown
+      invalidMetadataSelections: boolean[]
       managementReads: Array<{ ok: boolean; value: unknown[] }>
       managementDenied: Array<{ ok: boolean; error?: { code: string } }>
       accessDenied: { ok: boolean; value: { manage: boolean } }
@@ -312,6 +319,8 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       scopedEvents: number
     }
     expect(output.loaderUnmanaged).toEqual({ managementAvailable: false, manage: false, bundles: [], plugins: [] })
+    expect(output.catalogOmitted).toEqual(output.catalogAllowed)
+    expect(output.invalidMetadataSelections).toEqual([false, false])
     expect([
       output.catalogUnmanaged, output.catalogReadOnly, output.catalogDenied, output.catalogAllowed,
     ]).toMatchInlineSnapshot(`

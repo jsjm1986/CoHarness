@@ -1918,9 +1918,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'Saved and runtime outcomes. Startup-only profiles require restart.',
       },
       {
-        signature: '@Remote async listPlugins(): Promise<PluginInfo[]>',
+        signature: '@Remote async listPlugins(includeMetadata?: boolean): Promise<PluginInfo[]>',
         description: 'Read current plugins, including why a row cannot be changed through the profile patch.',
-        parameters: [],
+        parameters: [{ name: 'includeMetadata', description: 'Whether to read each entry\'s display resources; defaults to true. False returns controls without metadata.' }],
         returns: 'Current runtime entries with persistent patch targets.',
       },
       {
@@ -2003,9 +2003,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Aggregate the existing profile reads without allocating a second management owner or cache.',
     methods: [
       {
-        signature: '@Remote catalog(signal: AbortSignal): Promise<PluginManagementCatalog>',
+        signature: '@Remote catalog(includeEntryMetadata?: boolean, signal?: AbortSignal): Promise<PluginManagementCatalog>',
         description: 'Read current profile availability, mutation authority, bundles, and entries. Transport authorization precedes invocation, including the administrator assertion. A missing profile reads no files; a refused read publishes no catalog.',
-        parameters: [{ name: 'signal', description: 'cancellation of this request; disposal also cancels publication and drains reads.' }],
+        parameters: [{ name: 'includeEntryMetadata', description: 'whether to read runtime entry display resources; defaults to true. False keeps bundle and row metadata.' }, { name: 'signal', description: 'optional request cancellation; when absent, service disposal still cancels publication and drains reads.' }],
         returns: 'live catalog values, without an atomic profile-revision guarantee.',
       },
     ],

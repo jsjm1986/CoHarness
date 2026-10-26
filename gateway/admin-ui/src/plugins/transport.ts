@@ -73,8 +73,9 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
     pluginInventory: { list: () => call('pluginInventory/list', {}) },
     pluginRegistryProbe: { fastest: () => call('pluginRegistryProbe/fastest', {}) },
     pluginManager: {
-      catalog: signal => call('pluginManager/catalog', {}, signal),
-      listPlugins: () => call('pluginManager/listPlugins', {}),
+      catalog: (includeEntryMetadata, signal) => call('pluginManager/catalog',
+        includeEntryMetadata === undefined ? {} : { includeEntryMetadata }, signal),
+      listPlugins: includeMetadata => call('pluginManager/listPlugins', includeMetadata === undefined ? {} : { includeMetadata }),
       listBundles: () => call('pluginManager/listBundles', {}),
       inspect: (spec, options, signal) => call('pluginManager/inspect', { spec, options }, signal),
       setPluginEnabled: (id, enabled) => call('pluginManager/setPluginEnabled', { id, enabled }),

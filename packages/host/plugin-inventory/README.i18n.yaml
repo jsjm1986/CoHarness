@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/plugin-inventory/README.md
 document:
-  en: 8c2138437bd3071f884b5d53d2b709fe043fa0ab
-  zh: 78b6d08d5bc03725d572697acbabba26a6298e5c
+  en: 7fb77da1f8962c9cd932475a2accbdd51c859105
+  zh: 185595c10c95370ab066366615964f54fc1700e0
 /:
   en: 94ee43dddb605a56
   zh: 1928b76cbc58ca5a
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-host-plugin-inventory/use-this-package:
-  en: 2c00ea906fa8b57d
-  zh: 1869fa289d0f98c3
+  en: 0f80caf04093fe94
+  zh: 98b843fef1e25c1f
 /deepseek-ai-dsh-host-plugin-inventory/use-this-package/what-a-snapshot-contains:
   en: 6ea16b098e3e3212
   zh: 7989b72034884c69

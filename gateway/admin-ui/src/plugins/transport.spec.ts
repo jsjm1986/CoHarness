@@ -20,12 +20,29 @@ it('validates one catalog response through the generated codec and exact target'
   expect(await remote.pluginManager.catalog()).toMatchObject({ ok: false })
 })
 
+it.each([true, false])('forwards metadata selection %s to both read endpoints', async (selection) => {
+  const remote = pluginManagementRemote(target, new AbortController().signal, () => {}, () => {})
+  vi.mocked(pluginManagementInvoke).mockImplementation(async input => ({
+    rpcId: (input as { rpcId: string }).rpcId,
+    result: { ok: true, value: (input as { endpoint: string }).endpoint === 'pluginManager/listPlugins'
+      ? [] : { managementAvailable: true, manage: false, bundles: [], plugins: [] } },
+  }))
+  expect(await remote.pluginManager.catalog(selection)).toMatchObject({ ok: true })
+  expect(pluginManagementInvoke).toHaveBeenLastCalledWith(expect.objectContaining({
+    endpoint: 'pluginManager/catalog', args: { includeEntryMetadata: selection },
+  }), expect.any(AbortSignal))
+  expect(await remote.pluginManager.listPlugins(selection)).toEqual({ ok: true, value: [] })
+  expect(pluginManagementInvoke).toHaveBeenLastCalledWith(expect.objectContaining({
+    endpoint: 'pluginManager/listPlugins', args: { includeMetadata: selection },
+  }), expect.any(AbortSignal))
+})
+
 it.each(['request', 'target'] as const)('rejects a late catalog after its %s is cancelled', async owner => {
   const targetAbort = new AbortController(), requestAbort = new AbortController(), invalidate = vi.fn()
   const pending = Promise.withResolvers<unknown>()
   vi.mocked(pluginManagementInvoke).mockReturnValue(pending.promise)
   const remote = pluginManagementRemote(target, targetAbort.signal, () => {}, invalidate)
-  const operation = remote.pluginManager.catalog(requestAbort.signal)
+  const operation = remote.pluginManager.catalog(undefined, requestAbort.signal)
   const signal = vi.mocked(pluginManagementInvoke).mock.calls[0]![1]!
   const input = vi.mocked(pluginManagementInvoke).mock.calls[0]![0] as { rpcId: string }
   try {

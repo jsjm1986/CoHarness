@@ -187,9 +187,10 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 @Remote async setVersionExemption(packageVersion: string, runtimeVersion: string, enabled: boolean, acceptRisk?: boolean): Promise<ChangeResult>
 
 /** Read current plugins, including why a row cannot be changed through the profile patch.
+ * @param includeMetadata Whether to read each entry's display resources; defaults to true. False returns controls without metadata.
  * @returns Current runtime entries with persistent patch targets.
  */
-@Remote async listPlugins(): Promise<PluginInfo[]>
+@Remote async listPlugins(includeMetadata?: boolean): Promise<PluginInfo[]>
 
 /** Read the profile's installed bundles, the bundles this dsh installation supplies, and the selected names that are not bundles.
  * A dependency without a bundle patch is listed, as a `not-bundle` problem, only while it is selected.
@@ -300,10 +301,11 @@ Aggregate the existing profile reads without allocating a second management owne
  * Read current profile availability, mutation authority, bundles, and entries.
  * Transport authorization precedes invocation, including the administrator assertion.
  * A missing profile reads no files; a refused read publishes no catalog.
- * @param signal - cancellation of this request; disposal also cancels publication and drains reads.
+ * @param includeEntryMetadata - whether to read runtime entry display resources; defaults to true. False keeps bundle and row metadata.
+ * @param signal - optional request cancellation; when absent, service disposal still cancels publication and drains reads.
  * @returns live catalog values, without an atomic profile-revision guarantee.
  */
-@Remote catalog(signal: AbortSignal): Promise<PluginManagementCatalog>
+@Remote catalog(includeEntryMetadata?: boolean, signal?: AbortSignal): Promise<PluginManagementCatalog>
 ```
 
 Source: [`packages/boot/plugin-manager/src/catalog.ts`](../../packages/boot/plugin-manager/src/catalog.ts)

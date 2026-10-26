@@ -27,6 +27,8 @@ kind: "package-reference"
 
 当客户端或设置页需要展示宿主当前组合了什么——哪些插件已加载、已启用、是否存活，以及每个 agent preset 会给会话什么——时调用 `pluginInventory/list`。该服务仅供 Remote 使用，刻意不声明同进程 Cordis `Context` 合并。同进程消费者通过 `readPluginInventory(ctx)` 获取完整快照，或通过同步的 `readRuntimePluginEntries(ctx)` 仅获取当前 Loader 条目；后者不发现预设、不读取预设组合，也不对其 disabled 表达式求值。
 
+`readRuntimePluginEntries(ctx, false)` 省略显示元数据，不执行条目元数据资源读取，也不提供组合包含条目的标题。省略第二个参数或传入 `true` 则读取元数据。两种投影都按相同顺序读取当前 Loader 状态；`readPluginInventory` 和 Remote 清单仍保留完整元数据。
+
 ### 快照包含什么
 
 每一行是一个非组 Loader 条目：其条目 id、精确模块标识、有效启用状态（含被禁用的祖先组）与当前根 Fiber 阶段。`pending` 表示条目等待加载，`loading` 表示正在读取，`active` 表示正在运行，`failed` 表示其 fiber 被拒绝，`unloading` 表示正在拆除；`null` 表示完全不存在存活的根 Fiber。结构性的 group 行会被跳过。

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-plugin-management-catalog.md
 document:
-  en: 307636afa0baae309a241b7ad348fe2ecc63c2f0
-  zh: 1559d88494995acff8cbca0fc85ee6e197048361
+  en: fbd500af019db07fce2eb38bd1afefd6e036fa90
+  zh: ba6fe2d71dba19589ad07b0603509d24a02ff857
 /agent-note-one-authorized-plugin-management-catalog:
   en: 41f4ce880cc9a4f1
   zh: e6384e36ca345613
@@ -12,14 +12,14 @@ document:
   en: 31ef4568de6896f9
   zh: 3bafc655c1d56d4f
 /agent-note-one-authorized-plugin-management-catalog/decision:
-  en: f7c76aa563b039fc
-  zh: c752721a4bfb4384
+  en: 02ecef13e37a5345
+  zh: 46211d8d8befbab4
 /agent-note-one-authorized-plugin-management-catalog/alternatives-considered:
   en: 5032b1432317651d
   zh: 90ba3ae9109dd328
 /agent-note-one-authorized-plugin-management-catalog/verification:
-  en: 89cc0461ac1201e7
-  zh: 8afbb3fe8a9c2aaa
+  en: c9b659be5c29da1e
+  zh: 296dbeef5d7c568f
 /agent-note-one-authorized-plugin-management-catalog/consequences:
   en: 74ad367956da14b1
   zh: 99587d6c264977b2

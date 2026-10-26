@@ -51,9 +51,23 @@ it('reads preset compositions only when the full inventory is opened', async () 
   await page.goto(scaffold.authenticatedUrl)
   await page.getByRole('navigation', { name: '面板' }).waitFor()
   const before = (await readFile(probe, 'utf8')).length
-  await page.getByRole('navigation', { name: '面板' }).getByRole('button', { name: '插件', exact: true }).click()
+  const [catalogResponse] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname === '/api/pluginManager/catalog'),
+    page.getByRole('navigation', { name: '面板' }).getByRole('button', { name: '插件', exact: true }).click(),
+  ])
   const panel = page.locator('[data-plugin-panel]')
   await panel.getByRole('button', { name: '查看 终端', exact: true }).waitFor()
+  const catalog: unknown = await catalogResponse.json()
+  const result = (catalog as { result: {
+    ok: boolean
+    value: { plugins: Record<string, unknown>[]; bundles: Record<string, unknown>[] }
+  } }).result
+  expect(result.ok).toBe(true)
+  const { plugins, bundles } = result.value
+  expect(plugins.length).toBeGreaterThan(0)
+  expect(plugins.every(entry => typeof entry.moduleName === 'string')).toBe(true)
+  expect(bundles.some(bundle => typeof bundle.meta === 'object' && bundle.meta !== null)).toBe(true)
+  expect(plugins.every(entry => !Object.hasOwn(entry, 'meta'))).toBe(true)
   expect((await readFile(probe, 'utf8')).length).toBe(before)
 
   await page.getByRole('button', { name: '设置', exact: true }).click()
