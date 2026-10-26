@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-27-terminal-pending-input-batches.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-27-terminal-pending-input-batches.md
+document:
+  en: daa49d7f08b12a438c5fd48c01015ce5eca4366f
+  zh: fd42e8b6b233414f2414e6f222a1ca7048edf65c
+/agent-note-ordered-pending-input-batches-for-browser-terminals:
+  en: 8187e41693117f46
+  zh: 0a3e71186245d4d4
+/agent-note-ordered-pending-input-batches-for-browser-terminals/problem:
+  en: 0ea13e1aa661b50d
+  zh: 0d63c2f00309c88d
+/agent-note-ordered-pending-input-batches-for-browser-terminals/decision:
+  en: c43ee283bc890411
+  zh: 29b8488ebc5158f3
+/agent-note-ordered-pending-input-batches-for-browser-terminals/alternatives-considered:
+  en: 754423d3378f7567
+  zh: 32a904d67f0a2ec3
+/agent-note-ordered-pending-input-batches-for-browser-terminals/verification:
+  en: eb8ffaf2f7f69042
+  zh: 252d027e9866b13c
+/agent-note-ordered-pending-input-batches-for-browser-terminals/consequences:
+  en: 09764b12e67abbf9
+  zh: caf6b111240ec74a

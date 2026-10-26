@@ -121,6 +121,54 @@ it('waits for render acknowledgement before publishing subsequent output', async
   await expect.poll(() => model.state.getSnapshot().render?.frame).toMatchObject({ type: 'output', sequence: 2 })
 })
 
+it('coalesces pending terminal input behind an outstanding request without delaying the first key', async () => {
+  const { model, remote } = fixture()
+  await connected(model)
+  const first = Promise.withResolvers<RemoteResult<void>>()
+  cleanups.push(() => { first.resolve(success(undefined)) })
+  vi.mocked(remote.write).mockReturnValueOnce(first.promise)
+  model.write('e')
+  await expect.poll(() => vi.mocked(remote.write).mock.calls.length).toBe(1)
+  for (const data of ['c', 'h', 'o', ' ', 'safe', '\r']) model.write(data)
+  expect(vi.mocked(remote.write).mock.calls.map(call => call[3])).toEqual(['e'])
+  first.resolve(success(undefined))
+  await expect.poll(() => vi.mocked(remote.write).mock.calls.map(call => call[3]))
+    .toEqual(['e', 'cho safe\r'])
+  expect(model.state.getSnapshot()).toMatchObject({ phase: 'connected', writable: true })
+})
+
+it('keeps resize requests between coalesced input batches', async () => {
+  const { model, remote } = fixture()
+  await connected(model)
+  const first = Promise.withResolvers<RemoteResult<void>>()
+  cleanups.push(() => { first.resolve(success(undefined)) })
+  const operations: string[] = []
+  vi.mocked(remote.write).mockImplementation(async (_session, _id, _attachment, data) => {
+    operations.push(`write:${data}`)
+    return operations.length === 1 ? first.promise : success(undefined)
+  })
+  vi.mocked(remote.resize).mockImplementation(async (_session, _id, _attachment, cols, rows) => {
+    operations.push(`resize:${String(cols)}x${String(rows)}`)
+    return success(undefined)
+  })
+  model.write('first')
+  await expect.poll(() => operations).toEqual(['write:first'])
+  model.write('left-')
+  model.write('tail')
+  model.resize(100, 30)
+  model.write('right-')
+  model.write('tail')
+  model.resize(110, 35)
+  model.write('last-')
+  model.write('tail')
+  expect(operations).toEqual(['write:first'])
+  first.resolve(success(undefined))
+  await expect.poll(() => operations).toEqual([
+    'write:first', 'write:left-tail', 'resize:100x30',
+    'write:right-tail', 'resize:110x35', 'write:last-tail',
+  ])
+})
+
 it('serializes input and resizes, clamps geometry, and suppresses unchanged sizes', async () => {
   const { model, remote } = fixture()
   await connected(model)
@@ -136,7 +184,7 @@ it('serializes input and resizes, clamps geometry, and suppresses unchanged size
   await expect.poll(() => vi.mocked(remote.resize).mock.calls.length).toBe(1)
   const attachmentId = vi.mocked(remote.follow).mock.calls[0]![2]
   const id = model.state.getSnapshot().info!.id
-  expect(vi.mocked(remote.write).mock.calls.map(call => call[3])).toEqual(['first', 'second'])
+  expect(vi.mocked(remote.write).mock.calls.map(call => call[3])).toEqual(['firstsecond'])
   expect(remote.resize).toHaveBeenCalledWith(sessionId, id, attachmentId, 200, 100)
   model.resize(90, 24)
   await expect.poll(() => vi.mocked(remote.resize).mock.calls.length).toBe(2)
@@ -158,6 +206,27 @@ it('bounds queued input by UTF-8 bytes and releases the byte budget after settle
   model.write('界界')
   await expect.poll(() => vi.mocked(remote.write).mock.calls.length).toBe(2)
   expect(vi.mocked(remote.write).mock.calls.map(call => call[3])).toEqual(['界界', '界界'])
+})
+
+it('releases the complete UTF-8 byte budget of a coalesced input request', async () => {
+  const { model, remote } = fixture()
+  vi.mocked(remote.environment).mockResolvedValue(success({ ...environment, maxInputBytes: 8 }))
+  await connected(model)
+  const first = Promise.withResolvers<RemoteResult<void>>()
+  cleanups.push(() => { first.resolve(success(undefined)) })
+  vi.mocked(remote.write).mockReturnValueOnce(first.promise)
+  model.write('a')
+  await expect.poll(() => vi.mocked(remote.write).mock.calls.length).toBe(1)
+  model.write('界')
+  model.write('🙂')
+  expect(model.state.getSnapshot()).toMatchObject({ phase: 'connected', writable: true })
+  first.resolve(success(undefined))
+  await expect.poll(() => vi.mocked(remote.write).mock.calls.map(call => call[3])).toEqual(['a', '界🙂'])
+  await setImmediate()
+  model.write('界🙂a')
+  await expect.poll(() => vi.mocked(remote.write).mock.calls.map(call => call[3]))
+    .toEqual(['a', '界🙂', '界🙂a'])
+  expect(model.state.getSnapshot()).toMatchObject({ phase: 'connected', writable: true })
 })
 
 it('drops queued commands from a detached attachment and ignores its late resize failure', async () => {

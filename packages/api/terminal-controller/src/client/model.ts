@@ -50,6 +50,14 @@ export interface TerminalRenderFrame {
   readonly frame: Extract<TerminalFrame, { type: 'snapshot' | 'output' }>
 }
 
+/** Adjacent input waiting for one ordered request under the same terminal attachment. */
+interface PendingTerminalInput {
+  readonly id: WebTerminalId
+  readonly attachmentId: TerminalAttachmentId
+  data: string
+  bytes: number
+}
+
 /** Observable state of one sidebar occurrence. */
 export interface TerminalViewState {
   readonly phase: 'idle' | 'loading' | 'creating' | 'connecting' | 'connected' | 'disconnected' | 'closing' | 'closed' | 'failed'
@@ -76,6 +84,7 @@ export class TerminalView {
   private loading: Promise<void> | undefined
   private closing: Promise<void> | undefined
   private writes: Promise<void> = Promise.resolve()
+  private pendingInput: PendingTerminalInput | undefined
   private queuedInput = 0
   private readonly detaching = new Set<Promise<void>>()
 
@@ -206,7 +215,8 @@ export class TerminalView {
   }
 
   /**
-   * Serialize raw input so concurrent RPC requests cannot reorder keystrokes.
+   * Coalesce adjacent pending input without delaying the first ordered request.
+   * Resize requests and attachment changes separate batches; the pending-byte limit covers all input.
    * @param data - input from the terminal emulator.
    */
   write(data: string): void {
@@ -217,10 +227,20 @@ export class TerminalView {
     if (this.queuedInput + bytes > (state.environment?.maxInputBytes ?? 0)) { this.fail(new TerminalViewError('inputFull')); return }
     this.queuedInput += bytes
     const id = state.info.id
+    const pending = this.pendingInput
+    if (pending?.id === id && pending.attachmentId === attachmentId) {
+      pending.data += data
+      pending.bytes += bytes
+      return
+    }
+    const batch: PendingTerminalInput = { id, attachmentId, data, bytes }
+    this.pendingInput = batch
     this.writes = this.writes.then(async () => {
+      if (this.pendingInput === batch) this.pendingInput = undefined
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable) return
-      valueOf(await this.remote.write(this.sessionId, id, attachmentId, data))
-    }).catch((error: unknown) => { if (this.attachmentId === attachmentId) this.fail(error) }).finally(() => { this.queuedInput -= bytes })
+      valueOf(await this.remote.write(this.sessionId, id, attachmentId, batch.data))
+    }).catch((error: unknown) => { if (this.attachmentId === attachmentId) this.fail(error) })
+      .finally(() => { this.queuedInput -= batch.bytes })
   }
 
   /**
@@ -236,6 +256,7 @@ export class TerminalView {
     const id = state.info.id
     cols = Math.min(cols, state.environment?.maxCols ?? cols)
     rows = Math.min(rows, state.environment?.maxRows ?? rows)
+    this.pendingInput = undefined
     this.writes = this.writes.then(async () => {
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable) return
       valueOf(await this.remote.resize(this.sessionId, id, attachmentId, cols, rows))
@@ -290,6 +311,7 @@ export class TerminalView {
     const previous = this.stream
     this.stream = undefined
     this.attachmentId = undefined
+    this.pendingInput = undefined
     this.pendingRender?.resolve()
     this.pendingRender = undefined
     if (previous !== undefined) {
